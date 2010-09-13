@@ -1,0 +1,15 @@
+lib	getdomainname,gethostid,gethostname,sethostname,syscall,systeminfo,uname
+lib	syssgi
+mem	utsname.base_rel,utsname.idnumber,utsname.m_type,utsname.nodeext sys/utsname.h
+sys	syscall,systeminfo,syssgi
+
+tst	cross{
+	u=`/bin/uname -o 2>/dev/null`
+	case $u in
+	UWIN-*)	u=UWIN ;;
+	esac
+	case $u in
+	'')	;;
+	*)	echo "#define _UNAME_os_DEFAULT     \"$u\"  /* default os name */" ;;
+	esac
+}end

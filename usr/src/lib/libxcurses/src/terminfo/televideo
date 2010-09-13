@@ -1,0 +1,157 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	@(#)televideo	1.4	5/19/82
+#
+# televideo: TELEVIDEO
+#
+# There are some tvi's that require incredible amounts of padding and
+# some that don't.  I'm assuming 912 and 920 are the old slow ones,
+# and 912b, 912c, 920b, 920c are the new ones that don't need padding.
+tvi912|912|920|tvi920|old televideo,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE$<33*>, am,
+	cub1=^H, el=\ET, cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=^Z,
+	cols#80, dch1=\EW, dl1=\ER$<33*>,
+	kbs=^h, kcuu1=^K, kcud1=^J, kcub1=^H, kcuf1=^L,
+	kf0=^A@\r, kf1=^AA\r, kf2=^AB\r, kf3=^AC\r, kf4=^AD\r,
+	kf5=^AE\r, kf6=^AF\r, kf7=^AG\r, kf8=^AH\r, kf9=^AI\r,
+	home=^^, ich1=\EQ, lines#24, cuf1=^L, ht=^I, 
+	rmso=\Ek, smso=\Ej, cuu1=^K, smul=\El, rmul=\Em, xmc#1,
+# the 912 has a <funct> key that's like shift: <funct>8 xmits "^A8\r".
+# The 920 has this plus real function keys that xmit different things.
+# Terminfo makes you use the funct key on the 912 but the real keys on the 920.
+912b|912c|tvi912b|tvi912c|tvi|new televideo 912,
+	il1=\EE$<5*>, dl1=\ER$<5*>, use=tvi912,
+920b|920c|tvi920b|tvi920c|new televideo 920,
+	kf0=^A@\r, kf1=^AA\r, kf2=^AB\r, kf3=^AC\r, kf4=^AD\r, kf5=^AE\r,
+	kf6=^AF\r, kf7=^AG\r, kf8=^AH\r, kf9=^AI\r, use=tvi912b,
+# Two page TVI 912/920.
+# set to page 1 when entering ex (\E-17 )
+# reset to page 0 when exiting ex (\E-07 )
+tvi912-2p|tvi920-2p|912-2p|920-2p|tvi-2p|televideo w/2 pages,
+	smcup=\E-17 , rmcup=\E-07 , use=tvi912,
+tvi950-ap|tvi 950 w/alt pages,
+	is2=\E\\1, smcup=\E-06 , rmcup=\E-16 , use=tvi950,
+tvi950-b|bare tvi950 no is2,
+	is2@, smkx=\El, rmkx=\Ek, use=tvi950,
+tvi950-ns|tvi950 w/no standout,
+	smso@, rmso@, smul@, rmul@, use=tvi950,
+# The following tvi descriptions from B:pjphar
+# Now that we have is1, is2, and is3, these should be factored.
+#
+# is2 for all 950's.  It sets the following attributes:
+# full duplex (\EDF)		write protect off (\E()
+# conversation mode (\EC)	graphics mode off (\E%)
+# white on black (\Ed)		auto page flip off (\Ew)
+# turn off status line (\Eg)	clear status line (\Ef\r)
+# normal video (\E0)		monitor mode off (\EX or \Eu)
+# edit mode (\Er)		load blank char to space (\Ee\040)
+# line edit mode (\EO)		enable buffer control (^O)
+# protect mode off (\E\047)	local edit keys (\Ek)
+# program unshifted send key to send line all (\E016)
+# program shifted send key to send line unprotected (\E004)
+# set the following to nulls:
+#	field delimiter (\Ex0\0\0)
+#	line delimiter (\Ex1\0\0)
+#	start-protected field delimiter (\Ex2\0\0)
+#	end-protected field delimiter (\Ex3\0\0)
+# set end of text delimiter to carriage return/null (\Ex4\r\0)
+#
+# tvi950 sets duplex (send) edit keys (\El) when entering vi
+#        sets local (no send) edit keys (\Ek) when exiting vi
+#
+tvi950|950|televideo950,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\Ef\r\El,
+	il1=\EE, am, cub1=^H, cbt=\EI, ed=\Ey, el=\Et, clear=\E*,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\EW, dl1=\ER,
+	cud1=^V, rmir=\Er, home=^^, smir=\Eq, kf0=^A0\r,
+	kf1=^A@\r, kf2=^AA\r, kf3=^AB\r, kf4=^AC\r, kf5=^AD\r, kf6=^AE\r,
+	kf7=^AF\r, kf8=^AG\r, kf9=^AH\r, kbs=^H, kcud1=^V, khome=^^, kcub1=^H,
+	kcuf1=^L, kcuu1=^K, lines#24, mir, msgr, cuf1=^L,
+	ht=^I, rmso=\EG0, xmc#1, smso=\EG4, ri=\Ej,
+	rmul=\EG0, cuu1=^K, smul=\EG8,
+	flash=\Eb$<20>\Ed, cnorm=\Ek, cvvis=\El, xenl,
+	hs, tsl=\Eg\Ef, fsl=\r,
+#
+# is2 for 950 with two pages adds the following:
+#	set 48 line page (\E\\2)
+#	place cursor at page 0, line 24, column 1 (\E-07 )
+#
+# two page 950 adds the following:
+#	when entering ex, set 24 line page (\E\\1)
+#	when exiting ex, reset 48 line page (\E\\2)
+#			 place cursor at 0,24,1 (\E-07 )
+#
+tvi950-2p|950-2p|televideo950 w/2 pages,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\2\E-07 
+	rmcup=\E\\2\E-07 , smcup=\E\\1\E-07 , use=tvi950,
+#
+# is2 for 950 with four pages adds the following:
+#	set 96 line page (\E\\3)
+#	place cursor at page 0, line 24, column 1 (\E-07 )
+#
+# four page 950 adds the following:
+#	when entering ex, set 24 line page (\E\\1)
+#	when exiting ex, reset 96 line page (\E\\3)
+#			 place cursor at 0,24,1 (\E-07 )
+#
+tvi950-4p|950-4p|televideo950 w/4 pages,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\3\E-07 
+	rmcup=\E\\3\E-07 , smcup=\E\\1\E-07 , use=tvi950,
+#
+# is2 for reverse video 950 changes the following:
+#	set reverse video (\Ed)
+#
+# set flash accordingly (\Eb ...nulls... \Ed)
+#
+tvi950-rv|950-rv|televideo950 rev video,
+	tbc=\E3, hts=\E1,
+	is2=\EDF\EC\Eb\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0, flash=\Ed$<20>\Eb, use=tvi950,
+#
+# uses the appropriate entries from 9502p and 950rv
+#
+tvi950-rv2p|950-rv2p|televideo950 rev video w/2 pages,
+	is2=\EDF\EC\Eb\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\2\E-07 
+	rmcup=\E\\2\E-07 , smcup=\E\\1\E-07 , use=tvi950rv,
+#
+# uses the appropriate entries from 9504p and 950rv
+#
+tvi950-rv4p|950-rv4p|televideo950 rev video w/4 pages,
+	is2=\EDF\EC\Eb\EG0\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\3\E-07 
+	rmcup=\E\\3\E-07 , smcup=\E\\1\E-07 , use=tvi950rv,

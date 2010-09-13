@@ -1,0 +1,2899 @@
+<?xml version="1.0" standalone="yes"?>
+<!DOCTYPE specification SYSTEM "audit.dtd">
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+
+-->
+
+<specification>
+
+<!-- comments are displayed to stderr if debug is on -->
+<debug set="off"/>
+
+    <!-- The order of events is arbitrary EXCEPT generic events must
+	 precede their instances -->
+       <!-- The order of entries within an event determine the order
+            data is defined in the external API -->
+	    <!-- The order of internal / external is arbitrary -->
+
+<!--
+	tags:
+			The following top level tags are defined:
+			<event> <token> <msg_list> <debug>
+
+	event		defines an audit record
+			- id is the record id from audit_uevents.h
+			- reorder="yes" or "no".  (default is "no").
+			  if "yes" then the order of the tokens to be
+			  output does not match the order of the data
+			  input.  (see order attribute of <entry>)
+			- header defines the header file to contain the external
+			  definitions for this event type.  The header file
+			  name is adt_event_N.h, where N is the value supplied
+			  header="0" is for "stable" events, > 0 for new ones.
+			  with this attribute. (header="1").
+			- idNo is the number associated with the external
+			  name of this event. (For AUE_login, ADT_login is
+			  the external name and idNo is the value for
+			  ADT_login.)
+			- omit is by default 'no' (i.e., don't omit) and can be
+			  'always' or 'JNI'.  In the latter case, C interface
+			  code is generated but neither Java nor JNI code is.
+			- included text is just a comment
+			Within an event block, the following tags are defined:
+			<entry>, <debug>, <altname>, <title>, <program>, <see>
+
+	altname		defines the internal name of an audit record; if
+			omitted, the internal name is the same as the
+			external name.
+
+	title,		these tags are used by auditrecord(1M) build to create
+	program,	audit_record_attr database from adt events.
+	see		Following example demonstrates their semantics:
+
+			auditrecord -p passwd
+			passwd		<-   <title>
+			  program     various              See passwd(1)
+			  		^-   <program>		^-   <see>
+			  event ID    6163                 AUE_passwd
+			  class       lo                   (0x00001000)
+			      header
+			      subject
+			      [text]                       username...
+			      					^-   <comment>
+			      return
+
+			If the length of string in any of the given
+			elements is longer than defined, the string is
+			silently truncated to the defined length in the
+			auditrecord(1M) runtime: 
+				
+				element	<= max (non-truncated) string length
+				title	<= 46
+				program	<= 20
+				see	<= 39
+				comment	<= unlimited
+				token	<= 28
+
+	entry		defines the correspondence between the data
+			supplied by the caller and the token to be
+			output.
+			- id is the data name that shows up in the structures
+			  of adt_event.h  If it is a comma separated list,
+			  it is the list of names of data to be associated
+			  with one output token.  (See <external>, below)
+			Within an entry block, the following tags are defined:
+			<internal>, <external>, <debug>, <comment>
+
+	internal	defines the token to be generated.
+			- token is a name that must also be defined with
+			  a <token> tag elsewhere in this file.  (order is
+			  not important).
+			- order="some number" determines the order of the
+			  tokens to be output, starting with 1.  The subject
+			  token is normally order="1".  The use is to insure
+			  that the order of fields listed in adt_event.h does
+			  not change when we arbitrarily change the order of
+			  tokens.  If the <event reorder="yes"> is not set,
+			  order is ignored.
+			- format is a printf-like string that will be used
+			  in to format the data supplied by the user.
+
+	external	defines the data to be supplied for creating the
+			token defined via <internal>
+			- opt is one of four values:  "required", "optional",
+			  "obsolete", or "none".  The first two values
+			  indicate that this token's data must or may
+			  be supplied by the user; the third value is
+			  equivalent to "optional" but shows in the
+			  comment that this field is no longer used;
+			  the forth value indicates that this token
+			  does not require any user-supplied data.  If
+			  data is required, then a token is always
+			  output, while optional data is output only
+			  if data is supplied.
+			- type describes the C data type to be associated
+			  with the <entry id="dataName">.  The following
+			  data types are representative:
+
+				au_asid_t (uint32_t)
+				char
+				char * (blank is optional)
+				char ** (blank is optional)
+				fd_t (int, a file descriptor)
+				uint_t, int, int32_t, uid_t, gid_t
+				uid_t *, gid_t *
+				long, ulong_t
+				m_label_t *
+				pid_t
+				priv_set_t *
+				uint16_t, unit32_t, uint64_t
+				uint32_t *, uint32_t[], uint64_t *
+				msg  (not a C type, see below)
+
+			Below is what Tony said.  Above seems to be
+			what is implemented
+				char
+				char * (blank is optional)
+				char ** (blank is optional)
+				int, uid_t, gid_t
+				int *, uid_t *, gid_t *
+				msg  (not a C type, see below)
+				time_t
+				uint, uint *
+
+			  The msg type refers to an enumerated type
+			  that must be defined via a <msg> description
+			  else where in this file. The syntax is
+			  special.  Example: <external opt="optional"
+			  type="msg login_text"/> "login_text" is the
+			  id of a <msg_list> descriptor given
+			  elsewhere in this file.
+
+			If the <entry> id is a list, the type must also
+			be a comma-separated list, where the types are
+			in the same order as the id's.
+			If the type is an array, its length must be given
+			explicitly.
+
+	comment		Used by auditrecord(1M) build to generate 
+			audit_record_attr. Comment is explanation note
+			printed with token type. Colon (':') may not be
+			used in a comment. See example above for other
+			tags related to auditrecord(1M).
+
+	token		Define allowed token names.
+			- id is the name of token; this name is used
+			as an <internal> id.
+			- a token id name may not end in digits.
+			- usage is an optional value.  At present, only
+			  "TSOL" is defined; it means that this data is
+			  to be used only in Trusted Solaris implementations.
+			See also example above for "token" tag relation to 
+			the auditrecord(1M) output.
+
+	msg_list	Define a set of text strings.
+			- id is the name to be used for this group of text
+			  strings in adt_event.h
+			- header is as defined for <event>
+			- start is a number where produced enum type begins;
+			  ensure msg lists do not overlap
+			Within a msg_list block, <msg> and <debug> are defined.
+			The order of <msg> tags in a msg_list is reflected
+			directly in adt_event.h. Also add ADT_LIST_<<id>> to
+			enum adt_msg_list in adt_xlate.h.
+
+	msg		Define one string.
+			- id is the name to be used in the enum describing
+			  this set of strings.  Convention:  use upper case.
+			The content (text between <msg> and </msg>) is the
+			actual string.  Extra white space, including line
+			feeds, is ignored.  If empty, no output token
+			is generated unless the <external> opt attribute is
+			set to "required", in which case a blank text token
+			is generated.
+			Within a msg block, <debug> is defined, but has not been
+			tested and may have no effect.
+
+	debug		This turns on/off debug messages during the processing
+			of the xml data.  It affects the block within which it
+			is defined.
+			- set may have one of two values:  "on" or "off".  If
+			  set is omitted, the debug state for the current block
+			  is toggled.
+			The use of the <debug> tag does not affect the output
+			of data to the various files created, but does generate
+			potentially large amounts of output to stderr.
+
+-->
+<!--        template for an event record definition
+
+    <event id="" header="0" idNo="">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="">
+	    <internal token=""/>
+	    <external opt="" type="" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    Generic events must precede Instance events; within each
+    group, please group the AUE_* by area and event idNo-s in order,
+    gaps in idNo-s are OK.
+    N.B. Renumbering idNo-s requires recompilation of consumers.  See
+    the contracts for whom to notify if/when this happens.
+-->
+
+<!-- generic events  -->
+
+    <!--
+	'omit="always"' means that this record type is not reflected
+	in the generated header and table files.
+     -->
+
+    <event id="AUE_generic_basic" type="generic" omit="always">
+	<!--
+
+	This is a template for the event types that have no tokens
+	other than the header and return. There is no allowed_type
+	list because the template is not externally visible due to the
+	omit="always".
+
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_login" type="generic" omit="always">
+	<!--
+
+	This is a template for the various login event types
+	AUE_login, AUE_ftp, etc which match this template.  There is
+	no allowed_type list because the template is not externally
+	visible due to the omit="always".
+
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+
+	<!--	This field is still in use for SMC until it is cleaned up,
+		it must remain, see login_text msg list at the end of the
+		file.
+	-->
+	<entry id="message">
+	    <internal token="text"/>
+	    <external opt="optional" type="msg login_text"/>
+	    <comment>error message</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- generic SMC events  -->
+
+    <event id="AUE_generic_SMC_add" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<!--
+	  This should really be its own token type, not "text"
+	-->
+	<entry id="initial_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>initial values</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_SMC_delete" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="delete_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>deleted values</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_SMC_modify" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="changed_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>changed values</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- instances -->
+
+<!--
+	Java needed for SMC events.  Since the SMC events grow less
+	often than the C related events.  They come first.  It
+	would be nice to reorder the idNo-s, but that's an ABI
+	change and should rev libbsm version no.  If reordered
+	start with 1 and eliminate the comment at the end about
+	the highest idNo.
+-->
+    <event id="AUE_admin_authenticate" instance_of="AUE_generic_login"
+	header="0" idNo="3">
+	<title>Admin Server Authentication</title>
+	<program>admin (various)</program>
+	<see>SMC, WBEM, or AdminSuite</see>
+    </event>
+
+    <event id="AUE_filesystem_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="4">
+	<title>SMC: filesystem add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_filesystem_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="5">
+	<title>SMC: filesystem delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_filesystem_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="6">
+	<title>SMC: filesystem modify</title>
+	<program>SMC server</program>
+    </event>
+
+    <event id="AUE_network_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="7">
+	<title>SMC: network add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_network_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="8">
+	<title>SMC: network delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_network_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="9">
+	<title>SMC: network modify</title>
+	<program>SMC server</program>
+    </event>
+
+    <event id="AUE_printer_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="10">
+	<title>SMC: printer add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_printer_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="11">
+	<title>SMC: printer delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_printer_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="12">
+	<title>SMC: printer modify</title>
+	<program>SMC server</program>
+    </event>
+
+<!--
+	This is SMC; it's also used in su and should probably be used in
+	desktop role login.  If we fix the SMC to not record NO_MSG here,
+	we can fix to record failed user.  See su.c and AUE_su.
+-->
+    <event id="AUE_role_login" instance_of="AUE_generic_login"
+	header="0" idNo="13">
+	<title>RBAC: role login</title>
+	<program>SMC server</program>
+	<program>/usr/bin/su</program>
+    </event>
+
+    <event id="AUE_scheduledjob_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="14">
+	<title>SMC: scheduled job add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_scheduledjob_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="15">
+	<title>SMC: scheduled job delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_scheduledjob_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="16">
+	<title>SMC: scheduled job modify</title>
+	<program>SMC server</program>
+    </event>
+
+    <event id="AUE_serialport_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="17">
+	<title>SMC: serial port add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_serialport_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="18">
+	<title>SMC: serial port delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_serialport_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="19">
+	<title>SMC: serial port modify</title>
+	<program>SMC server</program>
+    </event>
+
+<!-- This is SMC; should this also be used elsewhere? -->
+    <event id="AUE_uauth" header="0" idNo="20">
+    	<title>SMC: Use of Authorization</title>
+	<program>SMC server</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="objectname">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_usermgr_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="21">
+	<title>SMC: User Manager add</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_usermgr_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="22">
+	<title>SMC: User Manager delete</title>
+	<program>SMC server</program>
+    </event>
+    <event id="AUE_usermgr_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="23">
+	<title>SMC: User Manager modify</title>
+	<program>SMC server</program>
+    </event>
+<!-- end of Java needed for SMC events -->
+<!--
+    while not used by SMC logout is used by Lockhart
+-->
+    <event id="AUE_logout" header="0" idNo="1"> 
+    	<title>login: logout</title>
+	<program>various</program>
+	<see>login(1)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+<!-- 
+    not used by C code, used by Lockhart,
+    get them to change and remove
+    event.user_name("logout " + session.getUserName());
+    from /ws/lockhart-nv-gate/src/bundled/app/webmgt/lib/services/
+    com/sun/management/services/audit/SolarisAuditEvent_Logout.java
+-->
+	<entry id="user_name">
+	    <internal token="text" format="logout %s"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>"logout" username</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+
+<!-- C Only events -->
+    <event id="AUE_init_solaris" header="0" idNo="32" omit="JNI">
+    	<title>init</title>
+	<program>/sbin/init</program>
+	<program>/usr/sbin/init</program>
+	<program>/usr/sbin/shutdown</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="info">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>init level or zone name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_login" instance_of="AUE_generic_login" header="0"
+	idNo="25" omit="JNI">
+	<title>terminal login</title>
+	<program>/usr/sbin/login</program>
+	<program>/usr/dt/bin/dtlogin</program>
+	<see>login(1)</see>
+	<see>dtlogin</see>
+    </event>
+    <event id="AUE_rlogin" instance_of="AUE_generic_login" header="0"
+	idNo="28" omit="JNI">
+	<title>rlogin</title>
+	<program>/usr/sbin/login</program>
+	<see>login(1) - rlogin</see>
+    </event>
+    <event id="AUE_telnet" instance_of="AUE_generic_login" header="0"
+	idNo="29" omit="JNI">
+	<title>telnet login</title>
+	<program>/usr/sbin/login</program>
+	<see>login(1) - telnet</see>
+    </event>
+    <event id="AUE_ssh" instance_of="AUE_generic_login" header="0"
+	idNo="2" omit="JNI">
+	<program>/usr/lib/ssh/sshd</program>
+    </event>
+
+    <event id="AUE_zlogin" header="0" idNo="38" omit="JNI">
+    	<title>zone login</title>
+	<program>/usr/sbin/login</program>
+	<see>zlogin(1)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>error message</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_su" header="0" idNo="30" omit="JNI">
+    	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+<!--
+	should be changed to "fail_user" and su.c updated
+	However, the jni stuff is broken, so for now it's "message"
+-->
+	<entry id="message">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>"user name" of failed new user/role</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_passwd" header="0" idNo="27" omit="JNI">
+    	<title>passwd</title>
+	<program>various</program>
+	<see>passwd(1)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="uid,username">
+	    <internal token="user"/>
+	    <external opt="optional" type="uid_t,char *"/>
+	    <comment>user if different than caller</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_screenlock" instance_of="AUE_generic_basic" header="0"
+	idNo="26" omit="JNI">
+	<program>desktop screen lock</program>
+    </event>
+    <event id="AUE_screenunlock" instance_of="AUE_generic_basic" header="0"
+	idNo="31" omit="JNI">
+	<program>desktop screen unlock</program>
+    </event>
+
+    <!--
+	AUE_prof_cmd is not supportable for Java due to the structure of
+	the priv token.  When and if a Java program needs to generate
+	a priv token, we'll need to look at the data format in the
+	Java code and provide an appropriate java and jni implementation.
+    -->
+
+    <event id="AUE_prof_cmd" header="0" idNo="24" omit="JNI">
+    	<title>pfexec</title>
+	<program>/usr/bin/pfexec</program>
+	<see>pfexec(1)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="cwdpath">
+	    <internal token="path"/>
+	    <external opt="required" type="char*"/>
+	    <comment>working directory</comment>
+	</entry>
+	<entry id="cmdpath">
+	    <internal token="path"/>
+	    <external opt="required" type="char*"/>
+	    <comment>command pathname</comment>
+	</entry>
+	<entry id="argc,argv,envp">
+	    <internal token="command"/>
+	    <external opt="required" type="int,char**,char**"/>
+	</entry>
+	<entry id="proc_auid,proc_euid,proc_egid,proc_ruid,proc_rgid,proc_pid,proc_sid,proc_termid">
+	    <internal token="process"/>
+	    <external opt="required"
+		type="uid_t,uid_t,gid_t,uid_t,gid_t,pid_t,au_asid_t,termid*"/>
+	</entry>
+	<entry id="limit_set">
+	    <internal token="priv_limit"/>
+	    <external opt="optional" type="priv_set_t*"/>
+ 	</entry>
+	<entry id="inherit_set">
+	    <internal token="priv_inherit"/>
+	    <external opt="optional" type="priv_set_t*"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_connect" header="0" idNo="34" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
+	</entry>
+	<entry id="ip_type,ip_remote_port,ip_local_port,ip_adr">
+	    <internal token="tid"/>
+	    <external opt="required"
+		type="uint32_t,uint16_t,uint16_t,uint32_t[4]"/>
+	    <comment>client address</comment>
+	</entry>
+	<entry id="cmd">
+	    <internal token="command_alt"/>
+	    <external opt="required" type="char *"/>
+	    <comment>inetd command</comment>
+	</entry>
+	<entry id="privileges">
+	    <internal token="priv_effective"/>
+	    <external opt="required" type="priv_set_t *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_ratelimit" header="0" idNo="35" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
+	</entry>
+	<entry id="limit">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>limit value</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_copylimit" header="0" idNo="36" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
+	</entry>
+	<entry id="limit">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>limit value</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_failrate" header="0" idNo="37" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
+	</entry>
+	<entry id="values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>limit value, interval</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_zone_state" header="0" idNo="33" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="new_state">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>New zone state</comment>
+	</entry>
+	<entry id="zonename">
+	    <internal token="zonename"/>
+	    <external opt="required" type="char *"/>
+	    <comment>zone name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_su_logout" instance_of="AUE_generic_basic"
+	header="0" idNo="39" omit="JNI">
+	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
+    </event>
+
+    <event id="AUE_role_logout" instance_of="AUE_generic_basic"
+	header="0" idNo="40" omit="JNI">
+	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
+    </event>
+
+    <event id="AUE_newgrp_login" header="0" idNo="41" omit="JNI">
+    	<program>newgrp</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="groupname">
+	    <internal  token="text"/>
+	    <external opt="required"  type="char *"/>
+	    <comment>group name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_mountable" type="generic" omit="always">
+	<!--
+
+	User device mounting related functions
+
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="mount_point">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>mount point</comment>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
+	</entry>
+	<entry id="options">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>options</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_attach" instance_of="AUE_generic_mountable"
+	header="0" idNo="42" omit="JNI">
+	<program>hald</program>
+    </event>
+    <event id="AUE_detach" instance_of="AUE_generic_mountable"
+	header="0" idNo="43" omit="JNI">
+	<program>hald</program>
+    </event>
+    <event id="AUE_remove" header="0" idNo="44" omit="JNI">
+	<program>hald</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="mount_point">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>mount point</comment>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_pool_import" header="0" idNo="45" omit="JNI">
+    	<program>hald</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="pool">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>pool</comment>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_pool_export" header="0" idNo="46" omit="JNI">
+    	<program>hald</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="pool">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>pool</comment>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- dladm security objected events -->
+    <event id="AUE_dladm_generic" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="obj_class">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object class name</comment>
+	</entry>
+	<entry id="obj_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_dladm_create_secobj" instance_of="AUE_dladm_generic"
+	header="0" idNo="47" omit="JNI">
+	<title>create wifi security object</title>
+	<program>/usr/sbin/dladm</program>
+	<see>dladm(1M)</see>
+    </event>
+    <event id="AUE_dladm_delete_secobj" instance_of="AUE_dladm_generic"
+	header="0" idNo="48" omit="JNI">
+	<title>delete wifi security object</title>
+	<program>/usr/sbin/dladm</program>
+	<see>dladm(1M)</see>
+    </event>
+
+<!-- Trusted eXtensions (TX) events -->
+
+    <!-- labeld events -->
+    <event id="AUE_file_relabel" header="0" idNo="49" omit="JNI">
+    	<title>relabel file from one zone to another</title>
+	<program>setlabel(1)</program>
+	<see>setflabel(3TSOL)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>file relabeled</comment>
+	</entry>
+	<entry id="src_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	    <comment>original label</comment>
+	</entry>
+	<entry id="dst_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	    <comment>new label</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_file_copy" header="0" idNo="50" omit="JNI">
+    	<title>copy file to another zone</title>
+	<program>dtfile(1X)</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="src_file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>source file</comment>
+	</entry>
+	<entry id="src_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	    <comment>source label</comment>
+	</entry>
+	<entry id="dst_file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>destination directory</comment>
+	</entry>
+	<entry id="dst_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	    <comment>destination label</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <!-- uadmin(1m) events -->
+    <event id="AUE_uadmin_generic" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>next action</comment>
+	</entry>
+	<entry id="mdep">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>machine dependent argument</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_uadmin_generic_fcn" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>next action</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_uadmin_shutdown" instance_of="AUE_uadmin_generic"
+        header="0" idNo="51" omit="JNI">
+    	<title>uadmin shutdown</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_reboot" instance_of="AUE_uadmin_generic"
+        header="0" idNo="52" omit="JNI">
+    	<title>uadmin reboot</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_dump" instance_of="AUE_uadmin_generic"
+        header="0" idNo="53" omit="JNI">
+    	<title>uadmin dump</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_freeze" instance_of="AUE_uadmin_generic"
+        header="0" idNo="54" omit="JNI">
+    	<title>uadmin freeze</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_remount" header="0" idNo="55" omit="JNI">
+    	<title>uadmin remount</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <!-- uadmin ftrace and swapctl are not documented in uadmin(2) -->
+    <event id="AUE_uadmin_ftrace" instance_of="AUE_uadmin_generic"
+        header="0" idNo="56" omit="JNI">
+    	<title>uadmin ftrace</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_swapctl" instance_of="AUE_uadmin_generic_fcn"
+        header="0" idNo="57" omit="JNI">
+    	<title>uadmin swapctl</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_thaw" header="0" idNo="96" omit="JNI">
+    	<title>thaw after freeze</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>freeze action type</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <!-- uadmin config is not documented in uadmin(2) -->
+    <event id="AUE_uadmin_config" instance_of="AUE_uadmin_generic"
+        header="0" idNo="119" omit="JNI">
+    	<title>uadmin config</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+
+<!-- smbd service event; smbd session setup -->
+    <event id="AUE_smbd_session" header="0" idNo="58" omit="JNI">
+	<title>smbd</title>
+	<program>/usr/lib/smbsrv/smbd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>domain</comment>
+	</entry>
+	<entry id="username">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>username</comment>
+	</entry>
+	<entry id="sid">
+	    <internal token="text"/>
+	    <external opt="optional" type="char*"/>
+	<comment>sid</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- smbd service event; smbd session logoff -->
+    <event id="AUE_smbd_logoff" header="0" idNo="59" omit="JNI">
+	<title>smbd</title>
+	<program>/usr/lib/smbsrv/smbd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>domain</comment>
+	</entry>
+	<entry id="username">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>username</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- vscan service event; infected file detected -->
+    <event id="AUE_vscan_quarantine" header="0" idNo="60" omit="JNI">
+    	<title>VSCAN: quarantine infected file</title>
+	<program>/usr/lib/vscan/vscand</program>
+	<see>vscand(1M), ICAP RFC 3507 (Extensions)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="file">
+	    <internal token="path"/>
+	    <external opt="required" type="char*"/>
+	    <comment>infected file</comment>
+	</entry>
+	<entry id="violations,nviolations">
+	    <internal token="text"/>
+	    <external opt="optional" type="char**,int"/>
+	    <comment>ID - threat description</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- ndmp service event; ndmp client connect -->
+    <event id="AUE_ndmp_connect" instance_of="AUE_generic_basic" header="0"
+	idNo="61" omit="JNI">
+	<title>NDMP Connect</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+    </event>
+
+<!-- ndmp service event; ndmp client disconnect -->
+    <event id="AUE_ndmp_disconnect" instance_of="AUE_generic_basic" header="0"
+	idNo="62" omit="JNI">
+	<title>NDMP Disconnect</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+    </event>
+
+<!-- ndmp service event; ndmp backup -->
+    <event id="AUE_ndmp_backup" header="0" idNo="63" omit="JNI">
+	<title>NDMP Backup</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="source">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>path to be backed up</comment>
+	</entry>
+	<entry id="local_dest">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>local path of backup destination</comment>
+	</entry>
+	<entry id="remote_dest">
+	    <internal token="in_peer"/>
+	    <external opt="optional" type="fd_t"/>
+	    <comment>remote ip address and port of backup destination</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- ndmp service event; ndmp restore -->
+    <event id="AUE_ndmp_restore" header="0" idNo="64" omit="JNI">
+	<title>NDMP Restore</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="destination">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>path to restore to</comment>
+	</entry>
+	<entry id="local_source">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>local path to restore from</comment>
+	</entry>
+	<entry id="remote_source">
+	    <internal token="in_peer"/>
+	    <external opt="optional" type="fd_t"/>
+	    <comment>remote ip address and port to restore from</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- SMF related events -->
+    <event id="AUE_smf_generic" type="generic" omit="always">
+	<!--
+	This is a template for the event types that have no tokens
+	other than the header and return. There is no allowed_type
+	list because the template is not externally visible due to the
+	omit="always".
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_generic_pg" type="generic" omit="always">
+	<!--
+	This is a template for the event types related to property groups.
+	There is no allowed_type list because the template is not externally
+	visible due to the omit="always".
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>property group type</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_enable" instance_of="AUE_smf_generic" header="0"
+	idNo="65" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_tmp_enable" instance_of="AUE_smf_generic" header="0"
+	idNo="66" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_disable" instance_of="AUE_smf_generic" header="0"
+	idNo="67" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_tmp_disable" instance_of="AUE_smf_generic" header="0"
+	idNo="68" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_restart" instance_of="AUE_smf_generic" header="0"
+	idNo="69" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_refresh" instance_of="AUE_smf_generic" header="0"
+	idNo="70" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_clear" instance_of="AUE_smf_generic" header="0"
+	idNo="71" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_degrade" instance_of="AUE_smf_generic" header="0"
+	idNo="72" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_immediate_degrade" instance_of="AUE_smf_generic"
+	header="0" idNo="73" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_maintenance" instance_of="AUE_smf_generic" header="0"
+	idNo="74" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_immediate_maintenance" instance_of="AUE_smf_generic"
+	header="0" idNo="75" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_immtmp_maintenance" instance_of="AUE_smf_generic"
+	header="0" idNo="76" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_tmp_maintenance" instance_of="AUE_smf_generic" header="0"
+	idNo="77" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+    <event id="AUE_smf_milestone" instance_of="AUE_smf_generic" header="0"
+	idNo="78" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svcadm(1M)</see>
+    </event>
+
+    <event id="AUE_smf_create" instance_of="AUE_smf_generic" header="0"
+	idNo="79" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+    <event id="AUE_smf_delete" instance_of="AUE_smf_generic" header="0"
+	idNo="80" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+
+    <event id="AUE_smf_create_pg" instance_of="AUE_smf_generic_pg" header="0"
+	idNo="81" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+    <event id="AUE_smf_create_npg" instance_of="AUE_smf_generic_pg" header="0"
+	idNo="82" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+    <event id="AUE_smf_delete_pg" instance_of="AUE_smf_generic_pg" header="0"
+	idNo="83" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+    <event id="AUE_smf_delete_npg" instance_of="AUE_smf_generic_pg" header="0"
+	idNo="84" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+
+    <event id="AUE_smf_create_snap" header="0" idNo="85" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>snapshot name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_smf_delete_snap" header="0" idNo="86" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>snapshot name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_smf_attach_snap" header="0" idNo="87" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="old_fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>old name</comment>
+	</entry>
+	<entry id="old_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>old snapshot</comment>
+	</entry>
+	<entry id="new_fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>new name</comment>
+	</entry>
+	<entry id="new_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>new snapshot</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_annotation" header="0" idNo="88" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="operation">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>operation</comment>
+	</entry>
+	<entry id="file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>imported file</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_create_prop" header="0" idNo="89" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>type</comment>
+	</entry>
+	<entry id="value">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>value</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_change_prop" header="0" idNo="90" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>type</comment>
+	</entry>
+	<entry id="value">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>value</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_smf_delete_prop" header="0" idNo="91" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="fmri">
+	    <internal token="fmri"/>
+	    <external opt="required" type="char *"/>
+	    <comment>name</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_smf_read_prop" instance_of="AUE_smf_generic" header="0"
+	idNo="92" omit="JNI">
+	<program>svc.configd(1M)</program>
+	<see>svccfg(1M)</see>
+    </event>
+
+<!-- CPUFreq related events -->
+
+    <event id="AUE_cpu_ondemand" header="0" idNo="93" omit="JNI">
+	<title>set CPU freq to minimal unless load increases</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_cpu_performance" header="0" idNo="94" omit="JNI">
+	<title>set CPU freq to Max</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_cpu_threshold" header="0" idNo="95" omit="JNI">
+	<title>set CPU frequency threshold percentage</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="threshold">
+	    <internal token="text"/>
+	    <external opt="required" type="int"/>
+	    <comment>threshold percent 1-100</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- TPM events recorded by tcsd(8) -->
+
+    <event id="AUE_generic_tpm" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+		<internal token="text"/>
+		<external opt="optional" type="msg tpm_e"/>
+		<comment>TPM error message</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_tpm_takeownership" instance_of="AUE_generic_tpm"
+	header="0" idNo="99" omit="JNI">
+	<title>TPM_TakeOwnership</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_setoperatorauth" instance_of="AUE_generic_tpm"
+	header="0" idNo="100" omit="JNI">
+	<title>TPM_SetOperatorAuth</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_setownerinstall" instance_of="AUE_generic_tpm"
+	header="0" idNo="101" omit="JNI">
+	<title>TPM_SetOwnerInstall</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_selftestfull" instance_of="AUE_generic_tpm"
+	header="0" idNo="102" omit="JNI">
+	<title>TPM_SelfTestFull</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_certifyselftest" instance_of="AUE_generic_tpm"
+	header="0" idNo="103" omit="JNI">
+	<title>TPM_CertifySelfTest</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_continueselftest" instance_of="AUE_generic_tpm"
+	header="0" idNo="104" omit="JNI">
+	<title>TPM_ContinueSelfTest</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_ownersetdisable" instance_of="AUE_generic_tpm"
+	header="0" idNo="105" omit="JNI">
+	<title>TPM_OwnerSetDisable</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_ownerclear" instance_of="AUE_generic_tpm"
+	header="0" idNo="106" omit="JNI">
+	<title>TPM_OwnerClear</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_disableownerclear" instance_of="AUE_generic_tpm"
+	header="0" idNo="107" omit="JNI">
+	<title>TPM_DisableOwnerClear</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_forceclear" instance_of="AUE_generic_tpm"
+	header="0" idNo="108" omit="JNI">
+	<title>TPM_ForceClear</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_disableforceclear" instance_of="AUE_generic_tpm"
+	header="0" idNo="109" omit="JNI">
+	<title>TPM_DisableForceClear</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_physicaldisable" instance_of="AUE_generic_tpm"
+	header="0" idNo="110" omit="JNI">
+	<title>TPM_PhysicalDisable</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_physicalenable" instance_of="AUE_generic_tpm"
+	header="0" idNo="111" omit="JNI">
+	<title>TPM_PhysicalEnsable</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_physicaldeactivate" instance_of="AUE_generic_tpm"
+	header="0" idNo="112" omit="JNI">
+	<title>TPM_PhysicalSetDeactivated</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_settempdeactivated" instance_of="AUE_generic_tpm"
+	header="0" idNo="113" omit="JNI">
+	<title>TPM_SetTempDeactivated</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_physicalpresence" instance_of="AUE_generic_tpm"
+	header="0" idNo="114" omit="JNI">
+	<title>TPM_PhysicalPresence</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_fieldupgrade" instance_of="AUE_generic_tpm"
+	header="0" idNo="115" omit="JNI">
+	<title>TPM_FieldUpgrade</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+    <event id="AUE_tpm_resetlockvalue" instance_of="AUE_generic_tpm"
+	header="0" idNo="116" omit="JNI">
+	<title>TPM_ResetLockValue</title>
+	<program>/usr/lib/tcsd</program>
+	<see>tcsd(8)</see>
+    </event>
+
+<!-- hotplug events recorded by hotplugd(1m) -->
+
+    <event id="AUE_hotplug_state" header="0" idNo="117" omit="JNI">
+        <title>change hotplug connection state</title>
+        <program>/usr/lib/hotplugd</program>
+        <see>hotplugd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="device_path">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>device path</comment>
+        </entry>
+        <entry id="connection">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>connector or port</comment>
+        </entry>
+        <entry id="new_state">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>new connection state</comment>
+        </entry>
+        <entry id="old_state">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>old connection state</comment>
+        </entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_hotplug_set" header="0" idNo="118" omit="JNI">
+        <title>set hotplug bus private options</title>
+        <program>/usr/lib/hotplugd</program>
+        <see>hotplugd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="device_path">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>device path</comment>
+        </entry>
+        <entry id="connection">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>connector or port</comment>
+        </entry>
+        <entry id="options">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>bus private options</comment>
+        </entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_ilb_create_healthcheck" header="0" idNo="120" omit="JNI">
+        <title>Create Integrated Loadbalancer healthcheck object</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="hc_test">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck type-PING,TCP,UDP or 3rd party script</comment>
+        </entry>
+        <entry id="hc_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="hc_timeout">
+            <internal token="text"/>
+            <external opt="required" type="int32_t" />
+            <comment>timeout(secs) to kill a hung healthcheck probe
+		- 0 means default value (see man page)
+	    </comment>
+        </entry>
+        <entry id="hc_count">
+            <internal token="text"/>
+            <external opt="required" type="int"/>
+            <comment>number of times to run a health check probe
+		before declaring a server to be dead - 0 means
+		default value (see man page)
+	    </comment>
+        </entry>
+        <entry id="hc_interval">
+            <internal token="text"/>
+            <external opt="required" type="int32_t"/>
+            <comment>time(secs) between 2 healthcheck events -
+		0 means default value(see man page)
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_delete_healthcheck" header="0" idNo="121" omit="JNI">
+        <title>Delete Integrated Loadbalancer healthcheck object</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="hc_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event>
+
+    <event id="AUE_ilb_create_rule" header="0" idNo="122" omit="JNI">
+        <title>Create Integrated Loadbalancer rule</title>
+	<program>/usr/sbin/ilbadm</program>
+	<see>ilbadm(1m)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="virtual_ipaddress_type,virtual_ipaddress">
+	    <internal token="in_remote"/>
+	    <external opt="required" type="int32_t,uint32_t[4]"/>
+	    <comment>LB virtual IP address</comment>
+	</entry>
+	<entry id="min_port">
+	    <internal token="iport"/>
+	    <external opt="required" type="uint16_t"/>
+	    <comment>minimum value in port range</comment>
+	</entry>
+	<entry id="max_port">
+	    <internal token="iport"/>
+	    <external opt="required" type="uint16_t"/>
+	    <comment>maximum value in port range - max=min means single
+		port is specified
+	    </comment>
+	</entry>
+	<entry id="protocol">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>protocol</comment>
+	</entry>
+        <entry id="algo_optype">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>[rr,hip,hipp,hipv],[dsr,nat,half-nat]</comment>
+        </entry>
+        <entry id="proxy_src_min_type,proxy_src_min">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>min value for proxy source address for NAT</comment>
+        </entry>
+        <entry id="proxy_src_max_type,proxy_src_max">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>max value in proxy source address range for NAT
+	          - max=min means single address is specified
+	    </comment>
+        </entry>
+        <entry id="persist_mask">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>prefix length</comment>
+        </entry>
+        <entry id="hcname">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="hcport">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>healthcheck port - ANY(dynamically determined by ilbd)
+		or a positive integer
+	    </comment>
+        </entry>
+        <entry id="conndrain_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>connection timeout for NAT/half-NAT in sec. - 0 means
+		no forced removal)
+	    </comment>
+	</entry>
+        <entry id="nat_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>nat entry timeout for NAT/half-NAT in sec - 0 means
+		default value(see man page)
+	    </comment>
+	</entry>
+        <entry id="persist_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>session persistence mapping in sec - 0 means no
+		persistence
+	    </comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="rule_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>rule name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event>
+
+<!-- generic ILB rule event -->
+
+    <event id="AUE_generic_ILB_rule" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="rule_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>rule name - "all" means all rules</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!--  instances of the ILB generic rule  event. -->
+    <event id="AUE_ilb_delete_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="123">
+        <title>Delete Integrated Loadbalancer rule</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <event id="AUE_ilb_disable_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="124">
+        <title>Disable Integrated Loadbalancer rule</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <event id="AUE_ilb_enable_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="125">
+        <title>Enable Integrated Loadbalancer rule</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <event id="AUE_ilb_add_server" header="0" idNo="126" omit="JNI">
+        <title>Add server to Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="required" type="int32_t,uint32_t[4]"/>
+            <comment>IP address</comment>
+        </entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>serverid that corresponds IP address - empty
+		if authorization fails, user specified IP address
+		is invalid or server cannot be added because
+		server group is full
+	    </comment>  
+        </entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+	<entry id="server_minport">
+	    <internal token="iport"/>
+	    <external opt="optional" type="uint16_t" />
+	    <comment>server's minimum value in port range - empty
+		means default value (see man page)
+	    </comment>
+	</entry>
+	<entry id="server_maxport">
+	    <internal token="iport"/>
+	    <external opt="optional" type="uint16_t" />
+	    <comment>server's maximum value in port range - empty 
+		means default value(see man page)
+	    </comment>
+	</entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_disable_server" header="0" idNo="127" omit="JNI">
+        <title>Disable server to Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to the serverid - empty 
+		if authorization fails, or user specified serverid
+		is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_enable_server" header="0" idNo="128" omit="JNI">
+        <title>Enable server to Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to the serverid - empty 
+		if authorization fails, or user specified serverid
+		is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_remove_server" header="0" idNo="129" omit="JNI">
+        <title>Remove server from Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to serverid - empty 
+		if authorization fails or user specified serverid
+		serverid is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_create_servergroup" header="0" idNo="130" omit="JNI">
+        <title>Create server group for Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event> 
+
+    <event id="AUE_ilb_delete_servergroup" header="0" idNo="131" omit="JNI">
+        <title>Delete server group from Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+            <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_nwam_enable" header="0" idNo="132" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="profile_type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Type of profile being enabled</comment>
+	</entry>
+	<entry id="profile_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of profile being enabled</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_nwam_disable" header="0" idNo="133" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="profile_type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Type of profile being disabled</comment>
+	</entry>
+	<entry id="profile_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of profile being disabled</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_netcfg_update" header="0" idNo="134" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="parent_file">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Back-end data file being updated</comment>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of object being updated</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_netcfg_remove" header="0" idNo="135" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="parent_file">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Back-end data file being modified</comment>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of object being removed</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- add new events here with the next higher idNo -->
+<!-- Highest idNo is 135, so next is 136, then fix this comment -->
+<!-- end of C Only events -->
+
+<!--
+     token definitions are partially implemented.  All they do for now
+     is create a list of defined token names.  In the future they may
+     become a way of describing token structure.
+-->
+
+    <token id="acl">	
+    </token>
+    <token id="arbitrary">
+    </token>
+    <token id="arg">
+    </token>
+    <token id="attr">
+    </token>
+    <token id="command">
+    </token>
+    <token id="command_alt">
+    </token>
+    <token id="date">
+    </token>
+    <token id="exec_args">
+    </token>
+    <token id="exec_env">
+    </token>
+    <token id="exit">
+    </token>
+    <token id="file">
+    </token>
+    <token id="fmri">
+    </token>
+    <token id="groups">
+    </token>
+    <!--
+    	the iport token take a single argument of type uint16_t
+	if there are any other tokens following it that have arguments
+	the last of the iport tokens in the event description must
+	be followed by a dummy iport token that is optional.
+	This is to ensure proper structure alignment across all
+	compliers and architectures.
+    -->
+    <token id="iport">
+    </token>
+    <!-- pseudo token; in_addr and in_port of peer -->
+    <token id="in_peer">
+    </token>
+    <!-- pseudo token; specified in_addr -->
+    <token id="in_remote">
+    </token>
+    <token id="ipc">
+    </token>
+    <token id="ipc_perm">
+    </token>
+    <token id="label">
+    </token>
+    <token id="newgroups">
+    </token>
+    <token id="opaque">
+    </token>
+    <token id="path">
+    </token>
+    <!-- pseudo token; path list generates 0 or more path tokens -->
+    <token id="path_list">
+    </token>
+    <!--
+	privilege token is implemented as one of the pseudo tokens
+	priv_limit, priv_effective, or priv_inherit
+
+    <token id="privilege">
+    </token>
+    -->
+    <token id="priv_effective">
+    </token>
+    <token id="priv_inherit">
+    </token>
+    <token id="priv_limit">
+    </token>
+    <token id="process">
+    </token>
+    <token id="return">
+    </token>
+    <token id="seq">
+    </token>
+    <token id="socket">
+    </token>
+    <token id="socket-inet">
+    </token>
+    <token id="subject">
+    </token>
+    <token id="text">
+    </token>
+    <token id="tid">
+    </token>
+    <token id="uauth">
+    </token>
+    <token id="user">
+    </token>
+    <token id="zonename">
+    </token>
+
+<!--
+    error value list for return values with success/fail code of fail.
+    These values start at 1000 so praudit can tell the difference
+    between the libbsm/common/audit_*.c broken error values and
+    the new adt_ error value list.  It is public so that praudit
+    can find it.
+
+    praudit outputs "failure" %s" for these strings, so there is
+    no need to use words such as "failed" in the message.
+
+    ** Add to the end only to maintain validity across versions of
+    the audit log. **
+-->
+
+    <msg_list id="fail_value" header="0" start="1000" public="true">
+	<msg id="PW_ATTR">Attribute update</msg>
+	<msg id="PW">Password update</msg>
+	<msg id="USERNAME">bad username</msg>
+	<msg id="AUTH">authorization failed</msg>
+	<msg id="UID">bad uid</msg>
+	<msg id="UNKNOWN">unknown failure</msg>
+	<msg id="EXPIRED">password expired</msg>
+	<msg id="ACCOUNT_LOCKED">Account is locked</msg>
+	<msg id="BAD_DIALUP">Bad dial up</msg>
+	<msg id="BAD_ID">Invalid ID</msg>
+	<msg id="BAD_PW">Invalid password</msg>
+	<msg id="CONSOLE">Not on console</msg>
+	<msg id="MAX_TRIES">Too many failed attempts</msg>
+	<msg id="PROTOCOL_FAILURE">Protocol failure</msg>
+	<msg id="EXCLUDED_USER">Excluded user</msg>
+	<msg id="ANON_USER">No anonymous</msg>
+	<msg id="BAD_CMD">Invalid command</msg>
+	<msg id="BAD_TTY">Standard input not a tty line</msg>
+	<msg id="PROGRAM">Program failure</msg>
+	<msg id="CHDIR_FAILED">chdir to home directory</msg>
+	<msg id="INPUT_OVERFLOW">Input line too long.</msg>
+	<msg id="DEVICE_PERM">login device override</msg>
+	<msg id="AUTH_BYPASS">authorization bypass</msg>
+	<msg id="LOGIN_DISABLED">login disabled</msg>
+    </msg_list>
+
+<!--
+	The following empty list is used for PAM errors; the "start"
+	value is used by praudit to know to use the PAM infrastructure
+	for generating error strings
+-->
+    <msg_list id="fail_pam" header="0" start="2000" public="true">
+    </msg_list>
+
+<!--
+     This is still in use by SMC.  See AUE_generic_login.  When
+     either SMC is fixed to stop using this, or SMC goes away.
+     REMOVE this stuff and the corresponding AUE_generic_login
+     message field.
+
+     Message list for the various authentication events, such
+     as AUE_login and AUE_admin_authenticate.  Add new entries
+     at the end.  The order of msg_list entries and the order
+     of msg entries both affect the names in adt.h and the value
+     of the associated enumerated types.
+
+     Each of these messages except NO_MSG is also in the failure_attribute
+     list; the difference is that the messages below use a text token
+     in the audit record, while the failure_attribute messages are
+     associated with the return value of the return token.
+
+     This list is deprecated; please don't use text tokens for error
+     messages.
+-->
+
+    <msg_list id="login_text" header="0" deprecated="true">
+	<msg id="NO_MSG"></msg>
+	<msg id="ACCOUNT_LOCKED">Account is locked</msg>
+	<msg id="BAD_DIALUP">Bad dial up</msg>
+	<msg id="BAD_ID">Invalid ID</msg>
+	<msg id="BAD_PW">Invalid password</msg>
+	<msg id="CONSOLE">Not on console</msg>
+	<msg id="MAX_TRIES">Too many failed attempts</msg>
+	<msg id="PROTOCOL_FAILURE">Protocol failure</msg>
+	<msg id="EXCLUDED_USER">Excluded user</msg>
+	<msg id="ANON_USER">No anonymous</msg>
+    </msg_list>
+
+<!-- msg list for uadmin(1m) fcn argument (next action, see uadmin(2)) -->
+    <msg_list id="uadmin_fcn" header="0" start="3000" public="true">
+    	<msg id="AD_HALT">Halt the processor(s)</msg>
+	<msg id="AD_POWEROFF">Halt the processor(s) and turn off the power</msg>
+	<msg id="AD_BOOT">Reboot the system using the kernel file</msg>
+	<msg id="AD_IBOOT">Interactive reboot</msg>
+	<msg id="AD_SUSPEND_TO_DISK">Save the system state to the state file</msg>
+	<msg id="AD_CHECK_SUSPEND_TO_DISK">Check if system supports suspend to disk</msg>
+	<msg id="AD_FORCE">Force suspend to disk even when threads of user
+	applications are not suspendable</msg>
+	<msg id="AD_SUSPEND_TO_RAM">Save the system state to memory</msg>
+	<msg id="AD_CHECK_SUSPEND_TO_RAM">Check if system supports suspend to memory</msg>
+	<msg id="AD_SBOOT">Single-user reboot</msg>
+	<msg id="AD_SIBOOT">Single-user interactive reboot</msg>
+	<msg id="AD_NOSYNC">Do not sync filesystems on next A_DUMP</msg>
+	<msg id="AD_FASTREBOOT">Reboot bypassing BIOS and boot loader</msg>
+	<msg id="AD_FASTREBOOT_DRYRUN">Check if system supports reboot bypassing BIOS and boot loader</msg>
+	<msg id="AD_UPDATE_BOOT_CONFIG">Update boot configuration parameters</msg>
+	<msg id="AD_REUSEINIT">Prepare for AD_REUSABLE</msg>
+	<msg id="AD_REUSABLE">Create reusable statefile</msg>
+	<msg id="AD_REUSEFINI">Revert to normal CPR mode (not reusable)</msg>
+	<msg id="AD_FTRACE_START">ftrace start</msg>
+	<msg id="AD_FTRACE_STOP">ftrace stop</msg>
+    </msg_list>
+
+<!--
+      msg list for TPM errors that will be reported by tcsd(8).
+      This list must match the order of the TPM_E_* error codes defined
+      in /usr/include/tss/tpm_error.h (SUNWtss package)
+-->
+    <msg_list id="tpm_e" header="0" start="4000" public="true">
+	<msg id="AUTHFAIL">Authentication failed</msg>
+	<msg id="BADINDEX">The index to a PCR, DIR or other register is incorrect</msg>
+	<msg id="BAD_PARAMETER">One or more parameter is bad</msg>
+	<msg id="AUDITFAILURE">auditing of the operation failed.</msg>
+	<msg id="CLEAR_DISABLED">clear operations now physical access</msg>
+	<msg id="DEACTIVATED">The TPM is deactivated</msg>
+	<msg id="DISABLED">The TPM is disabled</msg>
+	<msg id="DISABLED_CMD">The target command has been disabled</msg>
+	<msg id="FAIL">The operation failed</msg>
+	<msg id="BAD_ORDINAL">The ordinal was unknown or inconsistent</msg>
+	<msg id="INSTALL_DISABLED">The ability to install an owner is disabled</msg>
+	<msg id="INVALID_KEYHANDLE">The key handle can not be interpreted</msg>
+	<msg id="KEYNOTFOUND">The key handle points to an invalid key</msg>
+	<msg id="INAPPROPRIATE_ENC">Unacceptable encryption scheme</msg>
+	<msg id="MIGRATEFAIL">Migration authorization failed</msg>
+	<msg id="INVALID_PCR_INFO">PCR information could not be interpreted</msg>
+	<msg id="NOSPACE">No room to load key.</msg>
+	<msg id="NOSRK">There is no SRK set</msg>
+	<msg id="NOTSEALED_BLOB">An encrypted blob is invalid or was 
+	not created by this TPM</msg>
+	<msg id="OWNER_SET">There is already an Owner </msg>
+	<msg id="RESOURCES">The TPM has insufficient internal resources</msg>
+	<msg id="SHORTRANDOM">A random string was too short</msg>
+	<msg id="SIZE">The TPM does not have the space to perform the operation.</msg>
+	<msg id="WRONGPCRVAL">The named PCR value does not match the current PCR value.</msg>
+	<msg id="BAD_PARAM_SIZE">The paramSize argument has the incorrect value </msg>
+	<msg id="SHA_THREAD">There is no existing SHA-1 thread.</msg>
+	<msg id="SHA_ERROR">SHA-1 thread encountered an error.</msg>
+	<msg id="FAILEDSELFTEST">Self-test has failed and the TPM has shutdown.</msg>
+	<msg id="AUTH2FAIL">The auth for the second key failed authorization</msg>
+	<msg id="BADTAG">The tag value sent to for a command is invalid</msg>
+	<msg id="IOERROR">An IO error occurred transmitting information to the TPM</msg>
+	<msg id="ENCRYPT_ERROR">The encryption process had a problem.</msg>
+	<msg id="DECRYPT_ERROR">The decryption process did not complete.</msg>
+	<msg id="INVALID_AUTHHANDLE">An invalid handle was used.</msg>
+	<msg id="NO_ENDORSEMENT">The TPM does not a EK installed</msg>
+	<msg id="INVALID_KEYUSAGE">The usage of a key is not allowed</msg>
+	<msg id="WRONG_ENTITYTYPE">The submitted entity type is not allowed</msg>
+	<msg id="INVALID_POSTINIT">The command was received in the wrong sequence</msg>
+	<msg id="INAPPROPRIATE_SIG">Signed data cannot include additional DER information</msg>
+	<msg id="BAD_KEY_PROPERTY">The key properties are not supported by this TPM</msg>
+	<msg id="BAD_MIGRATION">The migration properties of this key are incorrect.</msg>
+	<msg id="BAD_SCHEME">Incorrect signature or encryption scheme</msg>
+	<msg id="BAD_DATASIZE">The size of the data parameter is bad</msg>
+	<msg id="BAD_MODE">A mode parameter is bad</msg>
+	<msg id="BAD_PRESENCE">physicalPresence or physicalPresenceLock bits have wrong value</msg>
+	<msg id="BAD_VERSION">The TPM cannot perform this version of the capability</msg>
+	<msg id="NO_WRAP_TRANSPORT">The TPM does not allow for wrapped transport sessions</msg>
+	<msg id="AUDITFAIL_UNSUCCESSFUL">TPM audit construction failed for failed command</msg>
+	<msg id="AUDITFAIL_SUCCESSFUL">TPM audit construction failed for successful command</msg>
+	<msg id="NOTRESETABLE">PCR register does not have the resettable attribute</msg>
+	<msg id="NOTLOCAL">PCR register requires locality</msg>
+	<msg id="BAD_TYPE">Make identity blob not properly typed</msg>
+	<msg id="INVALID_RESOURCE">Resource type does not match actual resource</msg>
+	<msg id="NOTFIPS">Command only available when TPM is in FIPS mode</msg>
+	<msg id="INVALID_FAMILY">The command is attempting to use an invalid family ID</msg>
+	<msg id="NO_NV_PERMISSION">The permission to manipulate the NV storage is not available</msg>
+	<msg id="REQUIRES_SIGN">The operation requires a signed command</msg>
+	<msg id="KEY_NOTSUPPORTED">Wrong operation to load an NV key</msg>
+	<msg id="AUTH_CONFLICT">NV_LoadKey blob requires both owner and blob authorization</msg>
+	<msg id="AREA_LOCKED">The NV area is locked and not writable</msg>
+	<msg id="BAD_LOCALITY">The locality is incorrect for the attempted operation</msg>
+	<msg id="READ_ONLY">The NV area is read only and can't be written to</msg>
+	<msg id="PER_NOWRITE">There is no protection on the write to the NV area</msg>
+	<msg id="FAMILYCOUNT">The family count value does not match</msg>
+	<msg id="WRITE_LOCKED">The NV area has already been written to</msg>
+	<msg id="BAD_ATTRIBUTES">The NV area attributes conflict</msg>
+	<msg id="INVALID_STRUCTURE">The tag and version are invalid or inconsistent</msg>
+	<msg id="KEY_OWNER_CONTROL">The key evicted by the TPM Owner.</msg>
+	<msg id="BAD_COUNTER">The counter handle is incorrect</msg>
+	<msg id="NOT_FULLWRITE">The write is not a complete write of the area</msg>
+	<msg id="CONTEXT_GAP">The gap between saved context counts is too large</msg>
+	<msg id="MAXNVWRITES">Max number of NV writes without owner has been exceeded</msg>
+	<msg id="NOOPERATOR">No operator AuthData value is set</msg>
+	<msg id="RESOURCEMISSING">The resource pointed to by context is not loaded</msg>
+	<msg id="DELEGATE_LOCK">The delegate administration is locked</msg>
+	<msg id="DELEGATE_FAMILY">Attempt to manage a family other then the delegated family</msg>
+	<msg id="DELEGATE_ADMIN">Delegation table management not enabled</msg>
+	<msg id="TRANSPORT_NOTEXCLUSIVE">Command executed outside of exclusive transport session</msg>
+	<msg id="OWNER_CONTROL">Attempt to context save a owner evict controlled key</msg>
+	<msg id="DAA_RESOURCES">DAA command has no resources available to execute the command</msg>
+	<msg id="DAA_INPUT_DATA0">The consistency check on DAA parameter inputData0 has failed.</msg>
+	<msg id="DAA_INPUT_DATA1">The consistency check on DAA parameter inputData1 has failed.</msg>
+	<msg id="DAA_ISSUER_SETTINGS">The consistency check on DAA_issuerSettings has failed.</msg>
+	<msg id="DAA_TPM_SETTINGS">The consistency check on DAA_tpmSpecific has failed.</msg>
+	<msg id="DAA_STAGE">Atomic process indicated by DAA command is not the expected process.</msg>
+	<msg id="DAA_ISSUER_VALIDITY">Inconsistent issuer validity</msg>
+	<msg id="DAA_WRONG_W">The consistency check on w has failed.</msg>
+	<msg id="BAD_HANDLE">The handle is incorrect</msg>
+	<msg id="BAD_DELEGATE">Delegation is not correct</msg>
+	<msg id="BADCONTEXT">The context blob is invalid</msg>
+	<msg id="TOOMANYCONTEXTS">Too many contexts held by the TPM</msg>
+	<msg id="MA_TICKET_SIGNATURE">Migration authority signature validation failure</msg>
+	<msg id="MA_DESTINATION">Migration destination not authenticated</msg>
+	<msg id="MA_SOURCE">Migration source incorrect</msg>
+	<msg id="MA_AUTHORITY">Incorrect migration authority</msg>
+	<msg id="PERMANENTEK">Attempt to revoke the EK and the EK is not revocable</msg>
+	<msg id="BAD_SIGNATURE">Bad signature of CMK ticket</msg>
+	<msg id="NOCONTEXTSPACE">There is no room in the context list for additional contexts</msg>
+	<msg id="RETRY">The TPM is too busy to respond to the command immediately</msg>
+	<msg id="NEEDS_SELFTEST">SelfTestFull has not been run</msg>
+	<msg id="DOING_SELFTEST">The TPM is currently executing a full selftest</msg>
+	<msg id="DEFEND_LOCK_RUNNING">TPM is defending against dictionary attacks</msg>
+	<msg id="NO_MSG"></msg>
+	<!-- End TPM failure codes -->
+    </msg_list>
+</specification>

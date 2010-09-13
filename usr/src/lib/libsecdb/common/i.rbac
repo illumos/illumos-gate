@@ -1,0 +1,570 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# i.rbac
+#
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# class action script for "rbac" class files
+# installed by pkgadd
+#
+# Files in "rbac" class:
+#
+# /etc/security/{prof_attr,exec_attr,auth_attr}
+# /etc/user_attr
+#
+#  Allowable exit codes
+#
+# 0 - success
+# 2 - warning or possible error condition. Installation continues. A warning
+#     message is displayed at the time of completion.
+#
+
+umask 022
+
+tmp_dir=${TMPDIR:-/tmp}
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+basename_cmd=basename
+cp_cmd=cp
+egrep_cmd=egrep
+mv_cmd=mv
+nawk_cmd=nawk
+rm_cmd=rm
+sed_cmd=sed
+sort_cmd=sort
+
+# $1 is the type
+# $2 is the "old/existing file"
+# $3 is the "new (to be merged)" file
+# $4 is the output file
+# returns 0 on success
+# returns 2 on failure if nawk fails with non-zero exit status
+#
+dbmerge() {
+#
+# Remove the ident lines.
+#
+	${egrep_cmd} -v '^#[pragma 	]*ident' $2 > $4.old 2>/dev/null
+#
+# If the new file has a Sun copyright, remove the Sun copyright from the old
+# file.
+#
+	newcr=`${egrep_cmd} '^# Copyright.*Sun Microsystems, Inc.' $3 \
+	    2>/dev/null`
+	if [ -n "${newcr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    $4.old > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4.old
+	fi
+#
+# If the new file has an Oracle copyright, remove both the Sun and Oracle
+# copyrights from the old file.
+#
+	oracle_cr=`${egrep_cmd} '^# Copyright.*Oracle and/or its affiliates.' \
+	    $3 2>/dev/null`
+	if [ -n "${oracle_cr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    -e '/^# Copyright.*Oracle and\/or its affiliates./d' \
+		    $4.old > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4.old
+	fi
+#
+# If the new file has the CDDL, remove it from the old file.
+#
+	newcr=`${egrep_cmd} '^# CDDL HEADER START' $3 2>/dev/null`
+	if [ -n "${newcr}" ]; then
+		$sed_cmd -e '/^# CDDL HEADER START/,/^# CDDL HEADER END/d' \
+		    $4.old > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4.old
+	fi
+#
+# Remove empty lines and multiple instances of these comments:
+#
+	$sed_cmd -e '/^# \/etc\/security\/exec_attr/d' -e '/^#$/d' \
+		-e '/^# execution attributes for profiles./d' \
+		-e '/^# See exec_attr(4)/d' \
+		-e '/^# \/etc\/user_attr/d' \
+		-e '/^# user attributes. see user_attr(4)/d' \
+		-e '/^# \/etc\/security\/prof_attr/d' \
+		-e '/^# profiles attributes. see prof_attr(4)/d' \
+		-e '/^# See prof_attr(4)/d' \
+		-e '/^# \/etc\/security\/auth_attr/d' \
+		-e '/^# authorizations. see auth_attr(4)/d' \
+		-e '/^# authorization attributes. see auth_attr(4)/d' \
+		    $4.old > $4.$$
+	$mv_cmd $4.$$ $4.old
+#
+# Retain old and new header comments.
+#
+	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $4.old > $4
+	$rm_cmd $4.old
+	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $3 >> $4
+#
+# If the output file now has both Sun and Oracle copyrights, remove
+# the Sun copyright.
+#
+	sun_cr=`${egrep_cmd} '^# Copyright.*Sun Microsystems, Inc.' \
+	    $4 2>/dev/null`
+	oracle_cr=`${egrep_cmd} '^# Copyright.*Oracle and/or its affiliates.' \
+	    $4 2>/dev/null`
+	if [ -n "${sun_cr}" ] && [ -n "${oracle_cr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    $4 > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4
+	fi
+#
+# Handle line continuations (trailing \)
+#
+ 	$sed_cmd \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    $2 > $4.old
+ 	$sed_cmd \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    $3 > $4.new
+#
+# The nawk script below processes the old and new files using up to
+# three passes.  If the old file is empty, only the final pass over
+# the new file is required.
+#
+	if [ -s $4.old ]; then
+		nawk_pass1=$4.old
+		nawk_pass2=$4.new
+		nawk_pass3=$4.new
+	else
+		nawk_pass1=
+		nawk_pass2=
+		nawk_pass3=$4.new
+	fi
+#
+#!/usr/bin/nawk -f
+#
+#       dbmerge type=[auth|prof|user|exec] [ old-file new-file ] new-file
+#
+#       Merge two versions of an RBAC database file. The output
+#       consists of the lines from the new-file, while preserving
+#       user customizations in the old-file.
+#
+#	Entries in the new-file replace corresponding entries in the
+#	old-file, except as follows:  For exec_attr, all old entries
+#	for profiles contained in the new-file are discarded.  For
+#	user_attr, the "root" entry from the old-file is retained,
+#	and new keywords from the new-file are merged into it.
+#
+#	Records with the same key field(s) are merged, so that the
+#	keyword/value section of each output record contains the union
+#	of the keywords found in all input records with the same key
+#	field(s).  For selected multi-value keywords [1] the values from
+#	the new-file are merged with retained values from the old-file.
+#	Otherwise, the value for each keyword is the final value found
+#	in the new-file, except for keywords in the user_attr entry for
+#	"root" where values from the old-file are always retained.
+#
+#	[1] The following file type and keyword combinations are merged:
+#	    prof_attr: auths, profiles, privs
+#	    user_attr: auths, profiles, roles
+#
+#	The output is run through sort except for the comments
+#	which will appear first in the output.
+#
+#
+	$nawk_cmd  '
+
+# This script may be invoked with up to three file names.  Each file
+# name corresponds to a separate processing pass.  The passes are
+# defined as follows:
+#
+# Pass 1: Read existing data.
+# Data from the old-file is read into memory.
+#
+# Pass 2: Remove obsolete data.
+# Discard any data from the old-file that is part of profiles that
+# are also in the new-file.  (As a special case, the user_attr entry
+# for 'root' is always retained.)
+#
+# Pass 3: Merge new data.
+# Data from the new-file is merged with the remaining old-file data.
+# (As a special case, exec_attr entries are replaced, not merged.)
+
+BEGIN {
+	# The variable 'pass' specifies which type of processing to perform.
+	# When processing only one file, skip passes 1 and 2.
+	if (ARGC == 3)
+		pass += 2;
+
+	# The array 'keyword_behavior' specifies the special treatment of
+	# [type, keyword] combinations subject to value merging.
+	keyword_behavior["prof", "auths"] =	"merge";
+	keyword_behavior["prof", "profiles"] =	"merge";
+	keyword_behavior["prof", "privs"] =	"merge";
+	keyword_behavior["user", "auths"] =	"merge";
+	keyword_behavior["user", "profiles"] =	"merge";
+	keyword_behavior["user", "roles"] =	"merge";
+
+	FS=":"
+}
+
+# When FNR (current file record number) is 1 it indicates that nawk
+# is starting to read the next file specified on its command line,
+# and is beginning the next processing pass.
+FNR == 1 {
+	pass++;
+}
+
+/^#/ || /^$/ {
+	continue;
+}
+
+{
+	# For each input line, nawk automatically assigns the complete
+	# line to $0 and also splits the line at field separators and
+	# assigns each field to a variable $1..$n.  Assignment to $0
+	# re-splits the line into the field variables.  Conversely,
+	# assgnment to a variable $1..$n will cause $0 to be recomputed
+	# from the field variable values.
+	#
+	# This code adds awareness of escaped field separators by using
+	# a custom function to split the line into a temporary array.
+	# It assigns the empty string to $0 to clear any excess field
+	# variables, and assigns the desired elements of the temporary
+	# array back to the field variables $1..$7.
+	#
+	# Subsequent code must not assign directly to $0 or the fields
+	# will be re-split without regard to escaped field separators.
+	split_escape($0, f, ":");
+	$0 = "";
+	$1 = f[1];
+	$2 = f[2];
+	$3 = f[3];
+	$4 = f[4];
+	$5 = f[5];
+	$6 = f[6];
+	$7 = f[7];
+}
+
+type == "auth" {
+	key = $1 ":" $2 ":" $3 ;
+	if (pass == 1) {
+		short_comment[key] = $4 ;
+		long_comment[key] = $5;
+		record[key] = $6;
+	} else if (pass == 2) {
+		delete short_comment[key];
+		delete long_comment[key];
+		delete record[key];
+	} else if (pass == 3) {
+		if ( $4 != "" ) {
+			short_comment[key] = $4 ;
+		}
+		if ( $5 != "" ) {
+			long_comment[key] =  $5 ;
+		}
+		record[key] = merge_attrs(record[key], $6);
+	}
+}
+
+type == "prof" {
+	key = $1 ":" $2 ":" $3 ;
+	if (pass == 1) {
+		comment[key] = $4;
+		record[key] = $5;
+	} else if (pass == 2) {
+		delete comment[key];
+		delete record[key];
+	} else if (pass == 3) {
+		if ( $4 != "" ) {
+			comment[key] = $4 ;
+		}
+		if (key != "::") {
+			record[key] = merge_attrs(record[key], $5);
+		}
+	}
+}
+
+type == "exec" {
+	key = $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ;
+	if (pass == 1) {
+		record[key] = $7;
+	} else if (pass == 2) {
+		# For exec_attr, deletion is based on the 'name' field only,
+		# so that all old entries for the profile are removed.
+		for (oldkey in record) {
+			split_escape(oldkey, oldkey_fields, ":");
+			if (oldkey_fields[1] == $1)
+				delete record[oldkey];
+		}
+	} else if (pass == 3) {
+		# Substitute new entries, do not merge.
+		record[key] = $7;
+	}
+}
+
+type == "user" {
+	key = $1 ":" $2 ":" $3 ":" $4 ;
+	if (pass == 1) {
+		record[key] = $5;
+	} else if (pass == 2) {
+		if ($1 != "root")
+			delete record[key];
+	} else if (pass == 3) {
+		record[key] = merge_attrs(record[key], $5);
+	}
+}
+
+END {
+	for (key in record) {
+		if (type == "prof") {
+			if (key != "::") {
+				print key ":" comment[key] ":" record[key];
+			}
+		} else
+			if (type == "auth") {
+				print key ":" short_comment[key] ":"  \
+				    long_comment[key] ":" record[key];
+			} else
+				print key ":" record[key];
+		}
+}
+
+function merge_attrs(old, new, cnt, new_cnt, i, j, list, new_list, keyword)
+{
+	cnt = split_escape(old, list, ";");
+	new_cnt = split_escape(new, new_list, ";");
+	for (i = 1; i <= new_cnt; i++) {
+		keyword = substr(new_list[i], 1, index(new_list[i], "=")-1);
+		for (j = 1; j <= cnt; j++) {
+			if (match(list[j], "^" keyword "=")) {
+				list[j] = merge_values(keyword, list[j],
+				    new_list[i]);
+				break;
+			}
+		}
+		if (j > cnt)
+			list[++cnt] = new_list[i];
+	}
+
+	return unsplit(list, cnt, ";"); \
+}
+
+function merge_values(keyword, old, new, cnt, new_cnt, i, j, list, new_list, d)
+{
+	# Keywords with multivalued attributes that are subject to merging
+	# are processed by the algorithm implemented further below.
+	# Otherwise, the keyword is not subject to merging, and:
+	#   For user_attr, the existing value is retained.
+	#   For any other file, the new value is substituted.
+	if (keyword_behavior[type, keyword] != "merge") {
+		if (type == "user") {
+			return old;
+		} else {
+			return new;
+		}
+	}
+
+	cnt = split(substr(old, length(keyword)+2), list, ",");
+	new_cnt = split(substr(new, length(keyword)+2), new_list, ",");
+
+	# If the existing list contains "All", remove it and add it
+	# to the new list; that way "All" will appear at the only valid
+	# location, the end of the list.
+	if (keyword == "profiles") {
+		d = 0;
+		for (i = 1; i <= cnt; i++) {
+			if (list[i] != "All")
+				list[++d] = list[i];
+		}
+		if (cnt != d) {
+			new_list[++new_cnt] = "All";
+			cnt = d;
+		}
+	}
+	for (i = 1; i <= new_cnt; i++) {
+		for (j = 1; j <= cnt; j++) {
+			if (list[j] == new_list[i])
+				break;
+		}
+		if (j > cnt)
+			list[++cnt] = new_list[i];
+	}
+
+	return keyword "=" unsplit(list, cnt, ",");
+}
+
+# This function is similar to the nawk built-in split() function,
+# except that a "\" character may be used to escape any subsequent
+# character, so that the escaped character will not be treated as a
+# field separator or as part of a field separator regular expression.
+# The "\" characters will remain in the elements of the output array
+# variable upon completion.
+function split_escape(str, list, fs, cnt, saved, sep)
+{
+	# default to global FS
+	if (fs == "")
+		fs = FS;
+	# initialize empty list, cnt, saved
+	split("", list, " ");
+	cnt = 0;
+	saved = "";
+	# track whether last token was a field separator
+	sep = 0;
+	# nonzero str length indicates more string left to scan
+	while (length(str)) {
+		if (match(str, fs) == 1) {
+			# field separator, terminates current field
+			list[++cnt] = saved;
+			saved = "";
+			str = substr(str, RLENGTH + 1);
+			sep = 1;
+		} else if (substr(str, 1, 1) == "\\") {
+			# escaped character
+			saved = saved substr(str, 1, 2);
+			str = substr(str, 3);
+			sep = 0;
+		} else {
+			# regular character
+			saved = saved substr(str, 1, 1);
+			str = substr(str, 2);
+			sep = 0;
+		}
+	}
+	# if required, append final field to list
+	if (sep || length(saved))
+		list[++cnt] = saved;
+
+	return cnt;
+}
+
+function unsplit(list, cnt, delim, str)
+{
+	str = list[1];
+	for (i = 2; i <= cnt; i++)
+		str = str delim list[i];
+	return str;
+}' \
+	type=$1 $nawk_pass1 $nawk_pass2 $nawk_pass3 > $4.unsorted
+	rc=$?
+	$sort_cmd < $4.unsorted >> $4
+	return $rc
+}
+
+# $1 is the merged file
+# $2 is the target file
+#
+commit() {
+	# Make sure that the last mv uses rename(2) by first moving to
+	# the same filesystem.
+	$mv_cmd $1 $2.$$
+	$mv_cmd $2.$$ $2
+	return $?
+}
+
+outfile=""
+type=""
+set_type_and_outfile() {
+	#
+	# Assumes basename $1 returns one of
+	# prof_attr, exec_attr, auth_attr, or user_attr
+	#
+	fname=`$basename_cmd $1`
+	type=`echo $fname | $sed_cmd -e s'/^\([a-z][a-z]*\)_attr$/\1/' `
+	case "$type" in
+		"prof"|"exec"|"user"|"auth") ;;
+		*) return 2 ;;
+	esac
+
+	outfile=$tmp_dir/rbac_${PKGINST}_${fname}_merge.$$
+
+	return 0
+}
+
+cleanup() {
+	$rm_cmd -f $outfile $outfile.old $outfile.new $outfile.unsorted
+
+	return 0
+}
+
+exit_status=0
+
+# main
+
+while read newfile oldfile ; do
+	if [ -n "$PKGINST" ]
+	then
+		# Install the file in the "fragment" directory.
+		mkdir -m 755 -p ${oldfile}.d
+		rm -f ${oldfile}.d/"$PKGINST"
+		cp $newfile ${oldfile}.d/"$PKGINST"
+
+		# Make sure that it is marked read-only.
+		chmod a-w,a+r ${oldfile}.d/"$PKGINST"
+
+		# We also execute the rest of the i.rbac script.
+	fi
+
+	if [ ! -f $oldfile ]; then
+		cp $newfile $oldfile
+	else
+		set_type_and_outfile $newfile ||
+			set_type_and_outfile $oldfile
+		if [ $? -ne 0 ]; then
+			echo "$0 : $newfile not one of" \
+			    " prof_attr, exec_attr, auth_attr, user_attr"
+			exit_status=2
+			continue
+		fi
+
+		dbmerge $type $oldfile $newfile $outfile
+		if [ $? -ne 0 ]; then
+			echo "$0 : failed to merge $newfile with $oldfile"
+			cleanup
+			exit_status=2
+			continue
+		fi
+
+		commit $outfile $oldfile
+		if [ $? -ne 0 ]; then
+			echo "$0 : failed to mv $outfile to $2"
+			cleanup
+			exit_status=2
+			continue
+		fi
+
+		cleanup
+	fi
+done
+
+if [ "$1" = "ENDOFCLASS" ]; then
+	exit 0
+fi
+
+exit $exit_status

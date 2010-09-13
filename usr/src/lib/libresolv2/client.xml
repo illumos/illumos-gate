@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:dns-client'>
+
+<service
+	name='network/dns/client'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+	    name='usr'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<!--
+	  Wait for potential DHCP modification of resolv.conf.
+	-->
+	<dependency
+	    name='net'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/service' />
+	</dependency>
+
+	<dependency
+	    name='config_data'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='path'>
+		<service_fmri
+		    value='file://localhost/etc/resolv.conf' />
+	</dependency>
+
+	<dependency
+	    name='loopback'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependency
+	    name='network'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec=':true'
+	    timeout_seconds='10' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':true'
+	    timeout_seconds='10' />
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				DNS resolver
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='resolver' section='3RESOLV'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

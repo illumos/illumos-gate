@@ -1,0 +1,64 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Start the lockd service; we are serving NFS and we need to verify
+# that rpcbind is accepting traffic from the network.
+#
+
+BIND_FMRI=svc:/network/rpc/bind
+do_change=false
+if set -- `svcprop -t -p config/local_only $BIND_FMRI`; then
+	if [ "$2" != boolean ]; then
+		echo "$0: config/local_only property for $BIND_FMRI has wrong "\
+		    "type" 1>&2
+	elif [ "$#" -ne 3 ]; then
+		echo "$0: config/local_only property for $BIND_FMRI has wrong "\
+		    "number of values" 1>&2
+	elif [ "$3" = true ]; then
+		do_change=true
+	fi
+else
+	# If the property is not found, we just set it.
+	do_change=true
+fi
+
+if $do_change
+then
+	# These will generate errors in the log.
+	svccfg -s $BIND_FMRI setprop config/local_only = boolean: false
+	if [ $? != 0 ]; then
+		echo "$0: WARNING setprop failed" 1>&2
+	fi
+
+	svcadm refresh $BIND_FMRI
+	if [ $? != 0 ]; then
+		echo "$0: WARNING svcadm refresh failed" 1>&2
+	fi
+fi
+   
+exec /usr/lib/nfs/lockd

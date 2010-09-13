@@ -1,0 +1,74 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1995-1997, 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# psm/promif/ieee1275/common/Makefile.files
+#
+#	This Makefile defines all the promif file modules for the 
+#	directory psm/promif/ieee1275/common
+#
+
+#
+#			IEEE 1275-1994 'common' PROM Routines
+#
+
+COMMON_PROM =		\
+	prom_2path.o	\
+	prom_boot.o	\
+	prom_devname.o	\
+	prom_devtype.o	\
+	prom_enter.o	\
+	prom_env.o	\
+	prom_exit.o	\
+	prom_fb.o	\
+	prom_getchar.o	\
+	prom_gettime.o	\
+	prom_handler.o	\
+	prom_inpath.o	\
+	prom_interp.o	\
+	prom_io.o	\
+	prom_kbd.o	\
+	prom_key.o	\
+	prom_node.o	\
+	prom_outpath.o	\
+	prom_panic.o	\
+	prom_path.o	\
+	prom_phandle.o	\
+	prom_printf.o	\
+	prom_prop.o	\
+	prom_putchar.o	\
+	prom_reboot.o	\
+	prom_stdin.o	\
+	prom_stdout.o	\
+	prom_string.o	\
+	prom_test.o	\
+	prom_trap.o	\
+	prom_version.o	\
+	prom_wrtestr.o
+
+sparc_PROM =
+
+CORE_OBJS += $(COMMON_PROM) $($(MACH)_PROM)

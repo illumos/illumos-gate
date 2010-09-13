@@ -1,0 +1,66 @@
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+
+\
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+
+#include <mcamd.h>
+
+mc_t
+	mc_props.mcp_num		MCAMD_MC_OFF_NUM
+	mc_props.mcp_rev		MCAMD_MC_OFF_REV
+	mc_props.mcp_base		MCAMD_MC_OFF_BASE_ADDR
+	mc_props.mcp_lim		MCAMD_MC_OFF_LIM_ADDR
+	mc_props.mcp_ilen		MCAMD_MC_OFF_ILEN
+	mc_props.mcp_ilsel		MCAMD_MC_OFF_ILSEL
+	mc_props.mcp_csintlvfctr	MCAMD_MC_OFF_CSINTLVFCTR
+	mc_props.mcp_dramhole_size	MCAMD_MC_OFF_DRAMHOLE_SIZE
+	mc_props.mcp_accwidth		MCAMD_MC_OFF_ACCWIDTH
+	mc_props.mcp_csbankmapreg	MCAMD_MC_OFF_CSBANKMAPREG
+	mc_props.mcp_bnkswzl		MCAMD_MC_OFF_BNKSWZL
+	mc_props.mcp_mod64mux		MCAMD_MC_OFF_MOD64MUX
+	mc_props.mcp_sparecs		MCAMD_MC_OFF_SPARECS
+	mc_props.mcp_badcs		MCAMD_MC_OFF_BADCS
+	mc_cfgregs.mcr_drambase		MCAMD_MC_OFF_DRAMBASE_REG
+	mc_cfgregs.mcr_dramlimit	MCAMD_MC_OFF_DRAMLIMIT_REG
+	mc_cfgregs.mcr_dramhole		MCAMD_MC_OFF_DRAMHOLE_REG
+	mc_cfgregs.mcr_dramcfglo	MCAMD_MC_OFF_DRAMCFGLO_REG
+	mc_cfgregs.mcr_dramcfghi	MCAMD_MC_OFF_DRAMCFGHI_REG
+
+mc_cs_t
+	mccs_props.csp_num		MCAMD_CS_OFF_NUM
+	mccs_props.csp_base		MCAMD_CS_OFF_BASE_ADDR
+	mccs_props.csp_mask		MCAMD_CS_OFF_MASK
+	mccs_props.csp_size		MCAMD_CS_OFF_SIZE
+	mccs_props.csp_csbe		MCAMD_CS_OFF_CSBE
+	mccs_props.csp_spare		MCAMD_CS_OFF_SPARE
+	mccs_props.csp_testfail		MCAMD_CS_OFF_TESTFAIL
+	mccs_props.csp_dimmnums		MCAMD_CS_OFF_DIMMNUMS
+	mccs_props.csp_dimmrank		MCAMD_CS_OFF_DIMMRANK
+	mccs_cfgregs.csr_csbase		MCAMD_CS_OFF_CSBASE_REG
+	mccs_cfgregs.csr_csmask		MCAMD_CS_OFF_CSMASK_REG
+
+mc_dimm_t
+	mcd_num			MCAMD_DIMM_OFF_NUM
+	mcd_size		MCAMD_DIMM_OFF_SIZE
+

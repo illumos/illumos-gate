@@ -1,0 +1,68 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This file provides information about all supported DHCPv6 options, for
+# use by DHCPv6-related programs.
+#
+# Please consult dhcp_inittab(4) for further information.  Note that
+# this interface is "Uncommitted" as defined by attributes(5).
+#
+# Note: options 10 and 35 are not assigned.
+#
+ClientID	STANDARD,	1,	DUID,	   1,	1,	sdi
+ServerID	STANDARD,	2,	DUID,	   1,	1,	sdi
+Preference	STANDARD,	7,	UNUMBER8,  1,	1,	sdmi
+Unicast		STANDARD,	12,	IPV6,	   1,	1,	sdmi
+Status		STANDARD,	13,	UNUMBER16, 1,	1,	si
+RapidCommit	STANDARD,	14,	BOOL,	   0,	0,	sdi
+UserClass	STANDARD,	15,	OCTET,	   1,	0,	sdi
+VendorClass	STANDARD,	16,	OCTET,	   1,	0,	sdi
+Reconfigure	STANDARD,	19,	UNUMBER8,  1,	1,	si
+SIPNames	STANDARD,	21,	DOMAIN,	   1,	0,	sdmi
+SIPAddresses	STANDARD,	22,	IPV6,	   1,	0,	sdmi
+DNSAddresses	STANDARD,	23,	IPV6,	   1,	0,	sdmi
+DNSSearch	STANDARD,	24,	DOMAIN,	   1,	0,	sdmi
+NISServers	STANDARD,	27,	IPV6,	   1,	0,	sdmi
+NIS+Servers	STANDARD,	28,	IPV6,	   1,	0,	sdmi
+NISDomain	STANDARD,	29,	DOMAIN,	   1,	0,	sdmi
+NIS+Domain	STANDARD,	30,	DOMAIN,	   1,	0,	sdmi
+SNTPServers	STANDARD,	31,	IPV6,	   1,	0,	sdmi
+InfoRefresh	STANDARD,	32,	UNUMBER32, 1,	1,	sdmi
+BCMCDomain	STANDARD,	33,	DOMAIN,	   1,	0,	sdmi
+BCMCAddresses	STANDARD,	34,	IPV6,	   1,	0,	sdmi
+Geoconf		STANDARD,	36,	OCTET,	   1,	3,	sdmi
+RemoteID	STANDARD,	37,	OCTET,	   1,	4,	si
+Subscriber	STANDARD,	38,	OCTET,	   1,	0,	sdmi
+ClientFQDN	STANDARD,	39,	OCTET,	   1,	0,	sdmi
+
+#
+# DHCPv6 packet fields.  Code field is byte offset into DHCPv6 packet.
+#
+
+MsgType		FIELD,		0,	UNUMBER8,  1,	1,	id
+TransId		FIELD,		1,	UNUMBER24, 1,	1,	id
+HopCount	FIELD,		1,	UNUMBER8,  1,	1,	id
+LinkAddr	FIELD,		2,	IPV6,	   1,	1,	id
+PeerAddr	FIELD,		18,	IPV6,	   1,	1,	id

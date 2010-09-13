@@ -1,0 +1,112 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+	Service manifests for the stmfproxy daemon
+-->
+
+<service_bundle type='manifest' name='SUNWstmfu:svc-stmfproxy'>
+
+<service
+    name='system/stmfproxy'
+    type='service'
+    version='1'>
+
+    <single_instance/>
+
+    <dependency
+        name='stmf'
+        grouping='require_all'
+        restart_on='none'
+        type='service'>
+        <service_fmri value='svc:/system/stmf' />
+    </dependency>
+
+	<!--
+	   Set a timeout of -1 to signify to inetd that we don't want
+	   to timeout this service, since the forked process is the
+	   one that does the services work. This is the case for most/all
+	   legacy inetd services; for services written to take advantage
+	   of Greenlines capabilities, the start method should fork
+	   off a process to handle the request and return a success code.
+	-->
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/demo/comstar/bin/svc-stmfproxy %{config/proxy_host}'
+		timeout_seconds='600'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
+		</method_context>
+	</exec_method>
+        
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='600'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
+		</method_context>
+	</exec_method>
+
+        <property_group name='config' type='application' >
+                <stability value='Unstable' />
+                <propval name='proxy_host' type='astring'
+                        value='no:host:set' />
+                <propval name='proxy_port' type='integer'
+                        value='6543' />
+        </property_group>
+        
+	<!--
+	    Create an enabled instance.
+	-->
+	<instance
+        name='default'
+        enabled='false' >
+	</instance>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				stmfproxy daemon
+			</loctext>
+		</common_name>
+
+	</template>
+</service>
+
+</service_bundle>

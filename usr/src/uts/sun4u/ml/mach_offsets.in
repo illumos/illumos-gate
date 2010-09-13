@@ -1,0 +1,358 @@
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ offsets.in: input file to produce assym.h using the stabs program
+\
+\
+\ Guidelines:
+\ 
+\ A blank line is required between structure/union/intrinsic names.
+\ 
+\ The general form is:
+\ 
+\	name size_define [shift_define]
+\		[member_name [offset_define]]
+\	{blank line}
+\ 
+\ If no individual member_name's are specified then NO members are processed.
+\ If offset_define is not specified then the member_name is
+\ converted to all caps and used instead.  If the size of an item is
+\ a power of two then an optional shift count may be output using
+\ shift_define as the name but only if shift_define was specified.
+\ 
+\ Arrays cause stabs to automatically output the per-array-item increment
+\ in addition to the base address:
+\ 
+\	 foo FOO_SIZE
+\		array	FOO_ARRAY
+\ 
+\ results in:
+\ 
+\	#define	FOO_ARRAY	0x0
+\	#define	FOO_ARRAY_INCR	0x4
+\ 
+\ which allows \#define's to be used to specify array items:
+\ 
+\	#define	FOO_0	(FOO_ARRAY + (0 * FOO_ARRAY_INCR))
+\	#define	FOO_1	(FOO_ARRAY + (1 * FOO_ARRAY_INCR))
+\	...
+\	#define	FOO_n	(FOO_ARRAY + (n * FOO_ARRAY_INCR))
+\ 
+\ There are several examples below (search for _INCR).
+\ 
+\ There is currently no manner in which to identify "anonymous"
+\ structures or unions so if they are to be used in assembly code
+\ they must be given names.
+\ 
+\ When specifying the offsets of nested structures/unions each nested
+\ structure or union must be listed separately then use the
+\ "\#define" escapes to add the offsets from the base structure/union
+\ and all of the nested structures/unions together.  See the many
+\ examples already in this file.
+
+#ifndef	_GENASSYM
+#define	_GENASSYM
+#endif
+
+#include <vm/hat_sfmmu.h>
+#include <sys/spitregs.h>
+#include <sys/cheetahregs.h>
+#include <sys/fpras_impl.h>
+#include <sys/traptrace.h>
+
+machcpu
+	intrstat		MCPU_INTRSTAT
+	pil_high_start		MCPU_PIL_HIGH_START
+
+trap_trace_record	TRAP_ENT_SIZE
+	tt_tl		TRAP_ENT_TL
+	tt_tt		TRAP_ENT_TT
+	tt_tpc		TRAP_ENT_TPC
+	tt_tstate	TRAP_ENT_TSTATE
+	tt_tick		TRAP_ENT_TICK
+	tt_sp		TRAP_ENT_SP
+	tt_tr		TRAP_ENT_TR
+	tt_f1		TRAP_ENT_F1
+	tt_f2		TRAP_ENT_F2
+	tt_f3		TRAP_ENT_F3
+	tt_f4		TRAP_ENT_F4
+
+hat     HAT_SIZE
+        sfmmu_cpusran
+        sfmmu_tsb
+        sfmmu_ismblkpa
+        sfmmu_tteflags
+        sfmmu_rtteflags
+        sfmmu_srdp
+        sfmmu_region_map.h_rmap_s.hmeregion_map SFMMU_HMERMAP
+        sfmmu_scdp
+        sfmmu_cext
+        sfmmu_ctx_lock
+        sfmmu_ctxs
+
+sf_scd SCD_SIZE
+        scd_sfmmup
+        scd_region_map.h_rmap_s.hmeregion_map   SCD_HMERMAP
+
+sfmmu_global_stat HATSTAT_SIZE
+        sf_pagefaults           HATSTAT_PAGEFAULT
+        sf_uhash_searches       HATSTAT_UHASH_SEARCH
+        sf_uhash_links          HATSTAT_UHASH_LINKS
+        sf_khash_searches       HATSTAT_KHASH_SEARCH
+        sf_khash_links          HATSTAT_KHASH_LINKS
+
+sf_hment        SFHME_SIZE      SFHME_SHIFT
+        hme_tte         SFHME_TTE
+
+tsbmiss         TSBMISS_SIZE
+        ksfmmup         TSBMISS_KHATID
+        usfmmup         TSBMISS_UHATID
+        usrdp           TSBMISS_SHARED_UHATID
+        tsbptr          TSBMISS_TSBPTR
+        tsbptr4m        TSBMISS_TSBPTR4M
+        tsbscdptr       TSBMISS_TSBSCDPTR
+        tsbscdptr4m     TSBMISS_TSBSCDPTR4M
+        ismblkpa        TSBMISS_ISMBLKPA
+        khashstart      TSBMISS_KHASHSTART
+        uhashstart      TSBMISS_UHASHSTART
+        khashsz         TSBMISS_KHASHSZ
+        uhashsz         TSBMISS_UHASHSZ
+	dcache_line_mask TSBMISS_DMASK
+        uhat_tteflags   TSBMISS_UTTEFLAGS
+        uhat_rtteflags  TSBMISS_URTTEFLAGS
+        utsb_misses     TSBMISS_UTSBMISS
+        ktsb_misses     TSBMISS_KTSBMISS
+        uprot_traps     TSBMISS_UPROTS
+        kprot_traps     TSBMISS_KPROTS
+        scratch         TSBMISS_SCRATCH
+        shmermap        TSBMISS_SHMERMAP
+        scd_shmermap    TSBMISS_SCDSHMERMAP
+
+\#define        TSB_TAGACC      (0 * TSBMISS_SCRATCH_INCR)
+\#define        TSBMISS_HMEBP   (1 * TSBMISS_SCRATCH_INCR)
+\#define        TSBMISS_HATID   (2 * TSBMISS_SCRATCH_INCR)
+
+kpmtsbm		KPMTSBM_SIZE KPMTSBM_SHIFT
+	vbase		KPMTSBM_VBASE
+	vend		KPMTSBM_VEND
+	flags		KPMTSBM_FLAGS
+	sz_shift	KPMTSBM_SZSHIFT
+	kpmp_shift	KPMTSBM_KPMPSHIFT
+	kpmp2pshft	KPMTSBM_KPMP2PSHFT
+	kpmp_table_sz	KPMTSBM_KPMPTABLESZ
+	kpmp_tablepa	KPMTSBM_KPMPTABLEPA
+	msegphashpa	KPMTSBM_MSEGPHASHPA
+	tsbptr		KPMTSBM_TSBPTR
+	kpm_dtlb_misses	KPMTSBM_DTLBMISS
+	kpm_tsb_misses	KPMTSBM_TSBMISS
+
+kpm_page	KPMPAGE_SIZE KPMPAGE_SHIFT
+	kp_refcnt	KPMPAGE_REFCNT
+	kp_refcnta	KPMPAGE_REFCNTA
+	kp_refcntc	KPMPAGE_REFCNTC
+	kp_refcnts	KPMPAGE_REFCNTS
+
+kpm_hlk		KPMHLK_SIZE KPMHLK_SHIFT
+	khl_mutex	KPMHLK_MUTEX
+	khl_lock	KPMHLK_LOCK
+
+kpm_spage	KPMSPAGE_SIZE KPMSPAGE_SHIFT
+	kp_mapped_flag	KPMSPAGE_MAPPED
+
+kpm_shlk	KPMSHLK_SIZE KPMSHLK_SHIFT
+	kshl_lock	KPMSHLK_LOCK
+
+memseg		MEMSEG_SIZE
+	pages		MEMSEG_PAGES
+	epages		MEMSEG_EPAGES
+	pages_base	MEMSEG_PAGES_BASE
+	pages_end	MEMSEG_PAGES_END
+	next		MEMSEG_NEXT
+	lnext		MEMSEG_LNEXT
+	nextpa		MEMSEG_NEXTPA	
+	pagespa		MEMSEG_PAGESPA
+	epagespa	MEMSEG_EPAGESPA
+	kpm_pbase	MEMSEG_KPM_PBASE
+	kpm_nkpmpgs	MEMSEG_KPM_NKPMPGS
+	mseg_un
+	kpm_pagespa	MEMSEG_KPM_PAGESPA
+
+\#define	MEMSEG_KPM_PAGES	(MSEG_UN)
+\#define	MEMSEG_KPM_SPAGES	(MSEG_UN)
+
+page		PAGE_SIZE
+	p_pagenum	PAGE_PAGENUM
+
+tsb_info	TSBINFO_SIZE
+	tsb_tte		TSBINFO_TTE
+	tsb_va		TSBINFO_VADDR
+	tsb_pa		TSBINFO_PADDR
+	tsb_szc		TSBINFO_SZCODE
+	tsb_next	TSBINFO_NEXTPTR
+
+cpu_node	CPU_NODE_SIZE
+	implementation
+	version
+	nodeid
+	clock_freq
+	tick_nsec_scale
+	ecache_size	ECACHE_SIZE
+	ecache_linesize	ECACHE_LINESIZE
+	device_id	DEVICE_ID
+	itlb_size	ITLB_SIZE
+	dtlb_size	DTLB_SIZE
+
+spitfire_scrub_misc_t
+	ec_scrub_outstanding
+
+spitfire_private_t
+	sfpr_scrub_misc
+	sfpr_scrub_afsr
+
+cheetah_private_t
+	chpr_icache_size
+	chpr_icache_linesize
+	chpr_tl1_err_data
+	chpr_scrub_misc
+	chpr_fecctl0_logout
+	chpr_cecc_logout
+	chpr_async_logout
+	chpr_tlb_logout
+	chpr_fpras_timestamp
+
+ch_scrub_misc_t
+	chsm_outstanding
+
+ch_cpu_logout_t		CH_CPU_LOGOUT_SIZE
+	clo_flags	CH_CLO_FLAGS
+	clo_nest_cnt	CH_CLO_NEST_CNT
+	clo_data	CH_CLO_DATA
+	clo_sdw_data	CH_CLO_SDW_DATA
+
+ch_err_tl1_data_t	CH_ERR_TL1_DATA_SIZE
+	ch_err_tl1_g1
+	ch_err_tl1_g2
+	ch_err_tl1_g3
+	ch_err_tl1_g4
+	ch_err_tl1_g5
+	ch_err_tl1_g6
+	ch_err_tl1_g7
+	ch_err_tl1_tpc
+	ch_err_tl1_flags
+	ch_err_tl1_tmp
+	ch_err_tl1_logout
+
+ch_cpu_errors_t         CH_CPU_ERROR_SIZE
+	afsr		CH_CPU_ERRORS_AFSR
+	afar		CH_CPU_ERRORS_AFAR
+	shadow_afsr	CH_CPU_ERRORS_SHADOW_AFSR
+	shadow_afar	CH_CPU_ERRORS_SHADOW_AFAR
+	afsr_ext	CH_CPU_ERRORS_AFSR_EXT
+	shadow_afsr_ext	CH_CPU_ERRORS_SHADOW_AFSR_EXT
+	afar2		CH_CPU_ERRORS_AFAR2
+
+ch_diag_data_t		CH_DIAG_DATA_SIZE
+	chd_afar	CH_CHD_AFAR
+	chd_afar2	CH_CHD_AFAR2
+	chd_afsr	CH_CHD_AFSR
+	chd_afsr_ext	CH_CHD_AFSR_EXT
+	chd_ec_data	CH_CHD_EC_DATA
+	chd_l2_data	CH_CHD_L2_DATA
+	chd_dc_data	CH_CHD_DC_DATA
+	chd_ic_data	CH_CHD_IC_DATA
+
+ch_ec_data_t		CH_EC_DATA_SIZE
+	ec_idx		CH_EC_IDX
+	ec_tag		CH_EC_TAG
+	ec_tag_ecc	CH_EC_TAG_ECC
+	ec_data		CH_EC_DATA
+
+ch_dc_data		CH_DC_DATA_SIZE
+	dc_idx		CH_DC_IDX
+	dc_way		CH_DC_WAY
+	dc_tag		CH_DC_TAG
+	dc_utag		CH_DC_UTAG
+	dc_sntag	CH_DC_SNTAG
+	dc_data		CH_DC_DATA
+	dc_pn_data_parity	CH_DC_PN_DATA_PARITY
+
+ch_ic_data		CH_IC_DATA_SIZE
+	ic_idx		CH_IC_IDX
+	ic_way		CH_IC_WAY
+	ic_patag	CH_IC_PATAG
+	ic_utag		CH_IC_UTAG
+	ic_upper	CH_IC_UPPER
+	ic_lower	CH_IC_LOWER
+	ic_sntag	CH_IC_SNTAG
+	ic_data		CH_IC_DATA
+
+fpras_chkfn		FPRAS_CHKFN_SIZE FPRAS_CHKFN_SIZE_SHIFT
+	fpras_blk0
+
+fpras_chkfngrp		FPRAS_CHKFNGRP_SIZE FPRAS_CHKFNGRP_SIZE_SHIFT
+
+ch_pc_data		CH_PC_DATA_SIZE
+	pc_idx		CH_PC_IDX
+	pc_way		CH_PC_WAY
+	pc_status	CH_PC_STATUS
+	pc_tag		CH_PC_TAG
+	pc_sntag	CH_PC_SNTAG
+	pc_data		CH_PC_DATA
+
+pn_tlb_logout		PN_TLO_SIZE
+	tlo_info	PN_TLO_INFO
+	tlo_addr	PN_TLO_ADDR
+	tlo_pc		PN_TLO_PC
+	tlo_itlb_tte	PN_TLO_ITLB_TTE
+	tlo_dtlb_tte	PN_TLO_DTLB_TTE
+
+ch_tte_entry		CH_TLO_TTE_SIZE
+	ch_tte_tag	CH_TLO_TTE_TAG
+	ch_tte_data	CH_TLO_TTE_DATA
+
+ptl1_regs
+	ptl1_trap_regs
+	ptl1_g1
+	ptl1_g2
+	ptl1_g3
+	ptl1_g4
+	ptl1_g5
+	ptl1_g6
+	ptl1_g7
+	ptl1_tick
+	ptl1_dmmu_sfar
+	ptl1_dmmu_sfsr
+	ptl1_dmmu_tag_access
+	ptl1_immu_sfsr
+	ptl1_immu_tag_access
+	ptl1_rwindow
+	ptl1_softint
+	ptl1_pstate
+	ptl1_pil
+	ptl1_cwp
+	ptl1_wstate
+	ptl1_otherwin
+	ptl1_cleanwin
+	ptl1_cansave
+	ptl1_canrestore
+

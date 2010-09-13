@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+
+ CDDL HEADER START
+
+	The contents of this file are subject to the terms of the
+	Common Development and Distribution License (the "License").
+	You may not use this file except in compliance with the License.
+
+	You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+	or http://www.opensolaris.org/os/licensing.
+	See the License for the specific language governing permissions
+	and limitations under the License.
+
+	When distributing Covered Code, include this CDDL HEADER in each
+	file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+	If applicable, add the following below this CDDL HEADER, with the
+	fields enclosed by brackets "[]" replaced with your own identifying
+	information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+-->
+
+<service_bundle type='manifest' name='SUNWshmr:group'>
+
+<service
+	name='network/shares/group'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<!-- Must have all local filesystems mounted before we share them -->
+	<dependency name='filesystem-local'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+	    	<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+	<!-- Also want to have some form of networking up -->
+	<dependency name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+	<!--
+	  SMB is optional_all so that we don't have to have SMB
+	  enabled to work, but if it is, we want to run "after" the
+	  smb/service starts.
+	-->
+	<dependency name='smb'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/smb/server' />
+	</dependency>
+
+	<!--
+	  The start method will cause each share group to be
+	  activated. since these are done in parallel and have been
+	  pre-checked for sanity, the shareall equivalent should not
+	  take overly long, but be prepared.
+	 -->
+
+	 <exec_method
+	    type='method'
+	    name='start'
+	    exec='/usr/sbin/sharemgr start %i'
+	    timeout_seconds='3600' />
+
+	 <exec_method
+	    type='method'
+	    name='stop'
+	    exec='/usr/sbin/sharemgr stop %i'
+	    timeout_seconds='3600' />
+
+	 <exec_method
+	    type='method'
+	    name='restart'
+	    exec='/usr/sbin/sharemgr start %i'
+	    timeout_seconds='3600' />
+
+	 <exec_method
+	    type='method'
+	    name='refresh'
+	    exec='/usr/sbin/sharemgr start %i'
+	    timeout_seconds='3600' />
+
+	 <property_group name='general' type='framework'>
+		<!-- to start/stop service -->
+		<propval name='action_authorization' type='astring'
+                        value='solaris.smf.manage.group' />
+		<propval name='value_authorization' type='astring'
+                        value='solaris.smf.manage.group' />
+	 </property_group>
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring'
+			value='transient' />
+	</property_group>
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Share Group
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='sharemgr' section='1M'
+				 manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

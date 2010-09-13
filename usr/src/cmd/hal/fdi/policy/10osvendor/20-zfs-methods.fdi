@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+  <device>
+    <match key="volume.fstype" string="zfs">
+
+      <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Volume</append>
+
+      <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">ZpoolExport</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-zpool-export</append>
+
+      <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">ZpoolImport</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-zpool-import</append>
+
+    </match>
+  </device>
+</deviceinfo>

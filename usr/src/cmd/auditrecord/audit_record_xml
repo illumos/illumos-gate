@@ -1,0 +1,111 @@
+#!/usr/perl5/bin/perl -w
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# audit_record_xml [-d] <xml input file>
+
+# audit_record_xml takes the audit record description (.xml file) and
+# generates adt_ part of audit_record_attr on stdout.
+
+use auditxml;
+use Getopt::Std;
+use vars qw($opt_d);
+use strict;
+
+
+our $debug = 0; # normal use is to set via the file being parsed.
+               # <debug set="on"/> or <debug set="off"/> or <debug/>
+               # if the set attribute is omitted, debug state is toggled
+               # Override with appDebug, but toggle won't do what you
+               # want.
+my $appDebug = 0; # used after return from "new auditxml";
+
+my $prog = $0; $prog =~ s|.*/||g;
+my $usage = "usage: $prog [-d] file.xml\n";
+
+getopts('d');
+
+$appDebug = $opt_d;
+
+die $usage if ($#ARGV < 0);
+
+my $doc = new auditxml ($ARGV[0]);  # input XML file
+
+$debug = $appDebug;
+
+foreach my $eventId ($doc->getEventIds) {
+	my $event = $doc->getEvent($eventId);
+	next if ($event->getOmit eq 'always');
+	print "label=$eventId\n";
+	my $title = $event->getTitle;
+	print "  title=$title\n" if (defined $title && length($title));
+	my $program = $event->getProgram;
+	if (defined $program && scalar @$program) {
+		print "  program=";
+		print join(";", @$program);
+		print "\n";
+	}
+	my $see = $event->getSee;
+	if (defined $see && scalar @$see) {
+		print "  see=";
+		print join(";", @$see);
+		print "\n";
+	}
+	my $format = [];
+	my $comments = [];
+	my $idx = 0;
+	my $superClass = $event->getSuperClass;
+	$event = $superClass if (defined $superClass && ref($superClass));
+	foreach my $entryId ($event->getExternal->getEntryIds) {
+		next if $entryId eq 'subject';
+		next if $entryId eq 'return';
+		my @entry = $event->getExternal->getEntry($entryId);
+		my $token = $entry[2];
+		my $comment = $entry[4];
+		my $opt = $entry[0]->getAttr('opt');
+		$token = "[$token]" if ($opt eq 'optional');
+		if (defined $comment && ($comment ne '')) {
+			$idx++;
+			$token .= $idx;
+			push @$comments, $comment;
+		}
+		push @$format, $token;
+	}
+	if (scalar @$format) {
+		print "  format=".join(":", @$format)."\n";
+	} else {
+		print "  format=user\n";
+	}
+	my $commentStr = '';
+	foreach (@$comments) {
+		$commentStr .= "  comment=$_:\n";
+	}
+	$commentStr =~ s/:\n$/\n/s;
+	print $commentStr;
+	print "\n";
+}
+
+exit (0);
+

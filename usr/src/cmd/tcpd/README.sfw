@@ -1,0 +1,29 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+
+Built with the Sun Workshop Compilers.
+
+The Makefile has been edited to define the appropriate system parameters for
+Solaris 9 except for REAL_DAEMON_DIR which must be defined on the command
+line as below or by editing the Makefile.  The sunos5 make target will build
+the Solaris compatible libwrap shared object and the executable programs
+including tcpd.
+
+There is no configure script.  Instead unset the environment variable
+HOSTNAME and build using
+
+	env \
+		MAKE="/usr/ccs/bin/make -e" \
+		/usr/ccs/bin/make -e \
+		REAL_DAEMON_DIR=/usr/sbin \
+		sunos5
+
+The header tcpd.h has been modified to define HAVE_IPV6, so that consumers of
+the file do not have to define HAVE_IPV6 and will always get data structures
+that are compatible with the libwrap.so.1 shipped with Solaris.  HAVE_IPV6 is
+defined since this is the IPv6 version of tcp_wrappers and Solaris supports
+IPv6.

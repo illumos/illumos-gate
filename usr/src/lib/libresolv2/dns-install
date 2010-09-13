@@ -1,0 +1,204 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# Install DNS client service
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+SVCCFG=/usr/sbin/svccfg
+SVCPROP=/usr/bin/svcprop
+SVCADM=/usr/sbin/svcadm
+
+DNS_NWAM_FMRI="svc:/network/physical:nwam"
+DNS_INSTALL_FMRI=$SMF_FMRI
+
+DNS_INSTALL_PG="install_props"
+
+DNS_UNDEFINED_STRING_PROP="\"\""
+
+dns_install_debug=0
+
+unset dns_install_domain dns_install_servers dns_install_search
+
+dns_process_install_pg()
+{
+	dns_install_domain=""
+	dns_install_servers=""
+	dns_install_search=""
+	config=0
+
+	#
+	# Retrieve the name server property values.
+	#
+	prop=`$SVCPROP -p $DNS_INSTALL_PG/nameserver $DNS_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_INADDR_ANY" ]; then
+		dns_install_servers=$prop
+		config=1
+	fi
+
+	#
+	# Retrieve the name service domain.
+	#
+	prop=`$SVCPROP -p $DNS_INSTALL_PG/domain $DNS_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$DNS_UNDEFINED_STRING_PROP" ]; then
+		dns_install_domain=$prop
+		config=1
+	fi
+
+	#
+	# Retrieve the search list.
+	#
+	prop=`$SVCPROP -p $DNS_INSTALL_PG/search $DNS_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$DNS_UNDEFINED_STRING_PROP" ]; then
+		dns_install_search=$prop
+		config=1
+	fi
+
+	[ $config -ne 0 ] || return $SMF_EXIT_OK
+	
+	#
+	# Create the resolv.conf file.
+	#
+	/usr/bin/touch /etc/resolv.conf.$$
+	if [ $? -ne 0 ]; then
+		net_record_err "Error creating \"/etc/resolv.conf.$$\"" $?
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	for j in $dns_install_servers
+	do
+		server=`echo $j | /usr/bin/sed s/\"//g`
+		echo "nameserver $server" >>/etc/resolv.conf.$$
+	done
+
+	if [ "$dns_install_domain" != "" ]; then
+		echo "domain $dns_install_domain" >>/etc/resolv.conf.$$
+	fi
+
+	if [ "$dns_install_search" != "" ]; then
+		list="search"
+		for j in $dns_install_search
+		do
+			domain=`echo $j | /usr/bin/sed s/\"//g`
+			list="$list $domain"
+		done
+		echo $list >>/etc/resolv.conf.$$
+	fi
+
+	/usr/bin/mv /etc/resolv.conf.$$ /etc/resolv.conf
+	if [ $? -ne 0 ]; then
+		err=$?
+		msg="Error moving /etc/resolv.conf.$$ to \"/etc/resolv.conf\""
+		net_record_err "$msg" $err
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	/usr/bin/chmod 644 /etc/resolv.conf
+	if [ $? -ne 0 ]; then
+		err=$?
+		msg="Error setting permissions on \"/etc/resolv.conf\""
+		net_record_err "$msg" $err
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	#
+	# Create the nsswitch.conf file
+	#
+	/usr/bin/cp -f /etc/nsswitch.dns /etc/nsswitch.conf
+	if [ $? -ne 0 ]; then
+		err=$?
+		msg="Error copying /etc/nsswitch.dns to \"/etc/nsswitch.conf\""
+		net_record_err "$msg" $err
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	/usr/bin/chmod 644 /etc/nsswitch.conf
+	if [ $? -ne 0 ]; then
+		err=$?
+		msg="Error setting permissions on \"/etc/nsswitch.conf\""
+		net_record_err "$msg" $err
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	return $SMF_EXIT_OK
+}
+
+dns_process_install()
+{
+	vout=`$SVCCFG -s $DNS_INSTALL_FMRI validate 2>&1`
+	if [ "$vout" != "" ]; then
+		msg="Validation errors in $DNS_INSTALL_FMRI:\n$vout"
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+	fi
+
+	ecode=$SMF_EXIT_OK
+	errs=0
+	cnt=0
+	pg=`$SVCPROP -p $DNS_INSTALL_PG $DNS_INSTALL_FMRI`
+	if [ $? -eq 0 ]; then
+		if service_is_enabled $DNS_NWAM_FMRI; then
+			echo "NWAM enabled. Install static" \
+			    "DNS configuration ignored." | smf_console
+			errs=`expr $errs +  1`
+			ecode=$SMF_EXIT_ERR_CONFIG
+		else
+			dns_process_install_pg
+			if [ $? -ne $SMF_EXIT_OK ]; then
+				ecode=$?
+				errs=`expr $errs +  1`
+			else
+				cnt=`expr $cnt +  1`
+			fi
+
+		fi
+		$SVCCFG -s $DNS_INSTALL_FMRI delpg $DNS_INSTALL_PG
+		$SVCCFG -s $DNS_INSTALL_FMRI refresh
+	fi
+
+	if [ $dns_install_debug -eq 1 ]; then
+		if [ $errs -ne 0 ]; then
+			echo "$errs errors encountered" \
+			    "configuring DNS on behalf of install"
+		fi
+
+		if [ $cntf -ne 0 ]; then
+			echo "DNS configured on behalf of install"
+		fi
+	fi
+
+	return $ecode
+}
+
+#
+# Script execution starts here.
+#
+dns_process_install || exit $?
+
+$SVCADM disable $DNS_INSTALL_FMRI
+exit $SMF_EXIT_OK

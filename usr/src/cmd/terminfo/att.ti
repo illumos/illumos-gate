@@ -1,0 +1,3305 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+# # --------------------------------
+#
+# att: AT&T
+#
+# Manufacturer:	AT&T
+# Class:	I
+
+2300|att2300|ATT2300|sv80|AT&T 2300 Video Information Terminal 80 column mode @(#)2300.ti 1.1,
+	am, xon, eo, mir, msgr,
+	cols#80, lines#24, it#8,
+	bel=^G,
+	cub=\E[%p1%dD, cub1=\b,
+	cuf=\E[%p1%dC, cuf1=\E[C,
+	cud=\E[%p1%dB, cud1=\n,
+	cuu=\E[%p1%dA, cuu1=\E[A,
+	cup=\E[%i%p1%d;%p2%dH,
+	ich=\E[%p1%d@, 
+	il=\E[%p1%dL, il1=\E[L,
+	dch=\E[%p1%dP, dch1=\E[P,
+	dl=\E[%p1%dM, dl1=\E[M,
+	smso=\E[7m, rmso=\E[0m, rev=\E[7m,
+	cr=\r, ind=\n, 
+	ht=\t, smir=\E[4h, rmir=\E[4l,
+	home=\E[H, clear=\E[H\E[J, ed=\E[J, el=\E[K, el1=\E[1K,
+	kf1=\E[1r, kf2=\E[2r, kf3=\E[3r, kf4=\E[4r,
+	kf5=\E[5r, kf6=\E[6r, kf7=\E[7r, kf8=\E[8r,
+	kf9=\E[9r, kf10=\E[10r, kf11=\E[11r, kf12=\E[12r,
+	kf13=\E[13r, kf14=\E[14r, kf15=\E[15r, kf16=\E[16r,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	khome=\E[H, kclr=\E[J, kcbt=\E[Z, kbs=\b,
+	kil1=\E[L, kich1=\E[@, kdl1=\E[M, kdch1=\E[P,
+	mc0=\E[0i, mc4=\E[4i, mc5=\E[5i,
+	sgr0=\E[m, 
+2350|att2350|ATT2350|AT&T 2350 Video Information Terminal 80 column mode @(#)2300.ti 1.1,
+	mc0@, mc4@, mc5@, use=att2300,
+2300-x40|att2300-x40|ATT2300-x40|sv40|AT&T 2300 Video Information Terminal 40 column mode @(#)2300.ti 1.1,
+	cols#40, lines#23, it#5, il@, il1@, use=att2300,
+2350-x40|att2350-x40|ATT2350-x40|AT&T 2350 Video Information Terminal 40 column mode @(#)2300.ti 1.1,
+	cols#40, lines#23, it#5, il@, il1@, use=att2350,
+#
+# AT&T 386 monocrome console
+#
+AT386-M|at386-m|386AT-M|386at-m|at/386 console @(#)386.ti 1.4,
+	am, bw, eo, xon,
+	cols#80, lines#25,
+	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[2J\E[H,
+	cr=\r, cub=\E[%p1%dD, cub1=\E[D, cud=\E[%p1%dB,
+	cud1=\E[B, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%02d;%p2%02dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	dch=\E[%p1%dP, dch1=\E[P, dl=\E[%p1%dM, dl1=\E[1M,
+	ed=\E[J, el=\E[K, flash=^G, home=\E[H, ht=\t,
+	ich=\E[%p1%d@, ich1=\E[1@, il=\E[%p1%dL, il1=\E[1L,
+	ind=\E[S, indn=\E[%p1%dS, invis=\E[9m, is2=\E[0;10m,
+	kbs=\b, kcbt=^], kclr=\E[2J, kcub1=\E[D, kcud1=\E[B,
+	kcuf1=\E[C, kcuu1=\E[A, kdch1=\E[P, kend=\E[Y,
+	kf1=\EOP, kf10=\EOY, kf11=\EOZ, kf12=\EOA, kf2=\EOQ,
+	kf3=\EOR, kf4=\EOS, kf5=\EOT, kf6=\EOU, kf7=\EOV,
+	kf8=\EOW, kf9=\EOX, khome=\E[H, kich1=\E[@, knp=\E[U,
+	kpp=\E[V, krmir=\E0, pfx=\EQ%p1%{1}%-%d'%p2%s',
+	rev=\E[7m, rin=\E[S, rmacs=\E[10m, rmso=\E[m, rmul=\E[m,
+	sgr=\E[10m\E[0%?%p1%p3%|%t;7%;%?%p2%t;4%;%?%p4%t;5%;%?%p6%t;1%;%?%p9%t;12%;%?%p7%t;9%;m,
+	sgr0=\E[0;10m, smacs=\E[12m, smso=\E[7m, smul=\E[4m,
+#
+# AT&T 386 color console
+#
+AT386|at386|386AT|386at|at/386 console @(#)386.ti 1.4,
+	colors#8, ncv#3, pairs#64,
+	op=\E[0m,
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	setb=\E[4%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	setf=\E[3%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	use=at386-m,
+
+AT386-DOS-M|at/386 console for 437 codeset @(#)386.ti 1.4,
+	acsc=``a~ffggjYk?lZm@nEooppqDrrsstCu4vAwBx3yyzz{{||}}~~,
+	use=at386-m,
+
+AT386-DOS|at/386 console for 437 codeset @(#)386.ti 1.4,
+	acsc=``a~ffggjYk?lZm@nEooppqDrrsstCu4vAwBx3yyzz{{||}}~~,
+	use=at386,
+
+33|tty33|tty|AT&T model 33 teletype @(#)33.ti 1.1,
+	xon,cr=^M, cud1=^J, ind=^J, bel=^G, cols#72, hc, os,
+
+35|tty35|AT&T model 35 teletype @(#)35.ti 1.1,
+	use=tty33,
+
+37|tty37|AT&T model 37 teletype @(#)37.ti 1.1,
+	xon,cr=^M, cud1=^J, ind=^J, bel=^G,
+	cub1=^H, hc, hu=\E8, hd=\E9, cuu1=\E7, os,
+
+# Info:
+#	The Dataspeed 40's print a visible newline indicator after 
+#	each newline. The 40-1 is a half duplex terminal.
+#	and is described here. The 40-4 is a 3270 lookalike 
+#	
+#	The terminal has blinking standout. It also has visible bell 
+#	but I don't know it - it's null here to prevent it from showing
+#	the BL character.
+#	
+#	I am not sure if the 40 has xmc, it looked like it didn't.
+#	
+#	Note also that the control characters have been randomly 
+#	rearranged, for example, to get escape you type control-P and 
+#	cntrol-H generates GS, group separator!
+#	
+#	
+#	\EX will get terminal out of protect mode but there doesn't 
+#	appear to be a mnemonic for it (\EW will put it into protect).
+#	
+#	When printer is enabled all received characters are printed - no
+#	print screen is provided. Most delays are pure guesswork.
+#	
+#	Watch out for the visible newline symbol. Note that 
+#	the editing and cursor controls do not work in S/R mode except 
+#	for cursor left arrow which generates the backspace character. 
+#	
+#	Note also that many control codes echo visibly while the 
+#	corresponding escape sequences do not; for example, both ^K 
+#	and \EC move the cursor right one place, but the former
+#	prints a VT symbol, too.
+#
+
+40|tty40|ds40|ds40-2|dataspeed40|teletype dataspeed 40/2 @(#)40.ti 1.1,
+	clear=\EH$<20>\EJ$<80>, ed=\EJ$<75>, il1=\EL$<50>, dl1=\EM$<50>,
+	dch1=\EP$<50>, ich1=\E\^$<50>, cuf1=\EC, cuu1=\E7, cub1=^H, cr=\EG,
+	ind=\ES$<20>, cud1=\EB, cols#80, lines#24, smso=\E3, rmso=\E4,
+	xon,kbs=\035, kcub1=^H, rs2=^S\ER$<60>, hts=\E1, home=\EH$<10>,
+	ri=\ET$<10>, tbc=\EH\E2$<80>, mc5=^R$<2000>, mc4=^T, ht=\E@$<10>,
+
+43|tty43|AT&T model 43 teletype @(#)43.ti 1.1,
+	xon,cr=^M, cud1=^J, ind=^J, bel=^G,
+	kbs=^h, am, cub1=^H, hc, os, cols#132,
+
+# Info:
+#	Must setup RETURN KEY - CR, REC'VD LF - INDEX.
+#	Seems upward compatible with vt100, plus ins/del line/char.
+#	On sgr, the protection parameter is ignored.
+#	No check is made to make sure that only 3 parameters are output.
+#		standout= reverse + half-intensity = 3 | 5.
+#		bold= reverse + underline = 2 | 3.
+#	note that half-bright blinking doesn't look different from 
+#	normal blinking.
+#	
+#	NOTE:you must program the function keys first, label second!
+#
+
+
+ATT4410v1|ATT5410v1|att5410v1|att4410v1|4410v1|tty5410v1|5410v1|AT&T 4410/5410 terminal in 80 column mode - version 1 @(#)4410.ti 1.4,
+	am, hs, mir, msgr, xon,
+	cols#80, it#8, lh#2, lines#24, lw#8, nlab#8, wsl#80,
+	acsc=``aaffhhggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~00++--\,\,..,
+	is1=\E[?3l\E)0,
+	is2=\E[0m^O,
+	bel=^G, blink=\E[5m, bold=\E[4;7m, clear=\E[H\E[J,
+	cr=\r, csr=\E[%i%p1%d;%p2%dr, cub1=\b, cud1=\E[B,
+	cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH, cuu1=\E[A,
+	dch1=\E[P, dim=\E[2m, dl1=\E[M, ed=\E[J, el=\E[K,
+	fsl=\E8, home=\E[H, ht=\t, ich1=\E[@, il1=\E[L,
+	ind=\n, invis=\E[8m,
+	is3=\E[1;03q\s\s\sf1\s\s\s\s\s\s\s\s\s\s\s\EOP\E[2;03q\s\s\sf2\s\s\s\s\s\s\s\s\s\s\s\EOQ\E[3;03q\s\s\sf3\s\s\s\s\s\s\s\s\s\s\s\EOR\E[4;03q\s\s\sf4\s\s\s\s\s\s\s\s\s\s\s\EOS\E[5;03q\s\s\sf5\s\s\s\s\s\s\s\s\s\s\s\EOT\E[6;03q\s\s\sf6\s\s\s\s\s\s\s\s\s\s\s\EOU\E[7;03q\s\s\sf7\s\s\s\s\s\s\s\s\s\s\s\EOV\E[8;03q\s\s\sf8\s\s\s\s\s\s\s\s\s\s\s\EOW,
+	kbs=\b, kclr=\E[2J, kcub1=\E[D, kcud1=\E[B,
+	kcuf1=\E[C, kcuu1=\E[A, kf1=\EOP, kf2=\EOQ, kf3=\EOR,
+	kf4=\EOS, kf5=\EOT, kf6=\EOU, kf7=\EOV, kf8=\EOW,
+	khome=\E[H, kll=\E[24;1H, ll=\E[24H, nel=\r\n,
+	pfx=\E[%p1%1d;%p2%l%2.2dq\s\s\sf%p1%1d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pln=\E[%p1%d;00q%p2%:-16s, rc=\E8, rev=\E[7m, ri=\EM,
+	rmacs=^O, rmso=\E[m, rmul=\E[m, rs2=\Ec\E[?3l\E[2;0y,
+	sc=\E7,
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smso=\E[2;7m, smul=\E[4m,
+	tsl=\E7\E[25;%p1%{1}%+%dH,
+
+att4410v1-w|ATT4410v1-w|att5410v1-w|ATT5410v1-w|4410v1-w|tty5410v1-w|5410v1-w|AT&T 4410/5410 terminal in 132 column mode - version 1 @(#)4410.ti 1.4,
+	cols#132,is1=\E[?3h\E)0,rs2=\Ec\E[?3h\E[2;0y,wsl#132,use=4410v1,
+
+att4410|ATT4410|att5410|ATT5410|4410|tty5410|5410|AT&T 4410/5410 terminal in 80 column mode - version 2 @(#)4410.ti 1.4,
+	pfx=\E[%p1%d;%p2%l%02dq   f%p1%d           %p2%s,
+	use=4410v1,
+
+ATT4410-nfk|att4410-nfk|att5410-nfk|ATT5410-nfk|4410-nfk|tty5410-nfk|5410-nfk|version 1 AT&T 4410/5410 entry without function keys @(#)4410.ti 1.4,
+	pln@, is3@, kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@, use=att4410,
+
+att5410-w|ATT5410-w|att4410-w|4410-w|tty5410-w|5410-w|AT&T 4410/5410 in 132 column mode @(#)4410.ti 1.4,
+	cols#132, is1=\E[?3h\E)0,rs2=\Ec\E[?3h\E[2;0y, wsl#132,
+	use=att4410,
+
+
+5410-nsl|att5410-nsl|ATT5410-nsl|4410-nsl|att4410-nsl|ATT4410-nsl|tty5410-nsl|tty5410 entry without pln defined @(#)4410.ti 1.4,
+	pln@,
+	use=tty5410,
+
+otty5410|teletype 5410 for S5R2 curses @(#)4410.ti 1.4,
+	tsl=\E7\E[25;%p1%{1}%+%dH,
+	use=tty5410,
+
+# Info:
+#	5410 in terms of a vt100
+#
+v5410| 5410 in terms of a vt100 @(#)4410.ti 1.4,
+	am, mir, msgr, xon,
+	cols#80, it#8, lines#24, vt#3,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m$<2>, bold=\E[1m$<2>,
+	clear=\E[H\E[J$<50>, cr=\r, csr=\E[%i%p1%d;%p2%dr,
+	cub1=\b, cud1=\n, cuf1=\E[C$<2>,
+	cup=\E[%i%p1%d;%p2%dH$<5>, cuu1=\E[A$<2>, dch1=\E[P,
+	dl1=\E[M, ed=\E[J$<50>, el=\E[K$<3>, el1=\E[1K$<3>,
+	enacs=\E(B\E)0, home=\E[H, ht=\t, hts=\EH, ich1=\E[@,
+	il1=\E[L, ind=\n, ka1=\EOq, ka3=\EOs, kb2=\EOr,
+	kbs=\b, kc1=\EOp, kc3=\EOn, kcub1=\EOD, kcud1=\EOB,
+	kcuf1=\EOC, kcuu1=\EOA, kent=\EOM, kf0=\EOy, kf1=\EOP,
+	kf10=\EOx, kf2=\EOQ, kf3=\EOR, kf4=\EOS, kf5=\EOt,
+	kf6=\EOu, kf7=\EOv, kf8=\EOl, kf9=\EOw, rc=\E8,
+	rev=\E[7m$<2>, ri=\EM$<5>, rmacs=^O, rmkx=\E[?1l\E>,
+	rmso=\E[m$<2>, rmul=\E[m$<2>,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, sc=\E7,
+	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t^N%e^O%;$<2>,
+	sgr0=\E[m^O$<2>, smacs=^N$<2>, smkx=\E[?1h\E=,
+	smso=\E[1;7m$<2>, smul=\E[4m$<2>, tbc=\E[3g,
+
+# Info:
+#	
+#	Teletype Model 5420 -- A souped up 5410, with multiple windows,
+#	even! the 5420 has three modes: scroll, window or page mode
+#	this terminfo should work in scroll or window mode, but doesn't
+#	take advantage of any of the differences between them.
+#
+ATT4415|att4415|4415|tty5420|att5420|ATT5420|5420|AT&T 4415/5420 in 80 column mode @(#)4415.ti 1.4,
+# Info:
+#	Memory below (2 lines!)
+#
+	xon,db, mir,
+# Info:
+#	3 pages of memory (plus some spare)
+#
+	nlab#8, lh#2, lw#8, wsl#55, lm#78,
+	cbt=\E[Z, clear=\E[x\E[J, cnorm=\E[11;0j,
+	cub=\E[%p1%dD, cud=\E[%p1%dB, cuf=\E[%p1%dC, cuu=\E[%p1%dA,
+# Info:
+#	The 5410 sequences would work for these, but these
+#	work in both scroll and window mode...
+#
+	cup=\E[%i%p1%d;%p2%dx,
+	cvvis=\E[11;1j, dch=\E[%p1%dP, dl=\E[%p1%dM,
+	ech=\E[%p1%ds\E[%p1%dD,
+	flash=\E[?5h$<200>\E[?5l,
+	home=\E[x, hpa=\E[%p1%{1}%+%dG, hts=\EH,
+# Info:
+#	Unset insert character so insert mode works
+#
+	ich1@, ich=\E[%p1%d@, il=\E[%p1%dL, indn=\E[%p1%dE,
+# Info:
+#	set 80 column mode,
+#
+	is1=\E[?3l$<100>,
+#	is2 escape sequence:
+#	1) turn off all fonts
+#	2) function keys off, keyboard lock off, control display off,
+#	   insert mode off, erasure mode off,
+#	3) full duplex, monitor mode off, send graphics off, nl on lf off
+#	4) reset origin mode
+#	5) set line wraparound
+#	6) exit erasure mode, positional attribute mode, and erasure extent mode
+#	7) clear margins
+#	8) program ENTER to transmit ^J,
+#	We use \212 to program the ^J because a bare ^J will get translated by
+#	UNIX into a CR/LF. The enter key is needed for AT&T uOMS.
+#	    1      2            3              4     5     6    7  8
+#
+	is2=\E[0m^O\E[1;2;3;4;6l\E[12;13;14;20l\E[?6;97;99l\E[?7h\E[4i\Ex\E[21;1j\212,
+# Info:
+#	set screen color to black,
+#
+	is3=\E[?5l,
+	kbeg=\Et, kcbt=\E[Z, kdch1=\E[P, kdl1=\E[M,
+# info:
+#	No representation in terminfo for the delete word key
+#	kdw1=\Ed
+#
+	kel=\E[2K, kend=\Ez, kent=\Eent,
+# Info:
+#	This assumes the power-up send sequence...
+#
+	kf1=\EOc, kf2=\EOd, kf3=\EOe, kf4=\EOf,
+	kf5=\EOg, kf6=\EOh, kf7=\EOi, kf8=\EOj,
+	kich1=\E[4h, kil1=\E[L, kind=\E[T, kll=\Eu,
+	knp=\E[U, kpp=\E[V, kri=\E[S,
+	lf1=F1, lf2=F2, lf3=F3, lf4=F4, lf5=F5, lf6=F6, lf7=F7, lf8=F8,
+	ll=\Ew, mc0=\E[?2i, mc4=\E[4i, mc5=\E[5i,
+	mrcup=\E[%i%p1%d;%p2%dt,
+	pfx=\E[%p1%d;%p2%l%02dq   F%p1%d           %p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	rmln=\E|, smln=\E~, prot=\EV, rin=\E[%p1%dF,
+# Info:
+#	This rmcup is not strictly necessary, but it helps maximize 
+#	memory usefulness
+#	rmcup=\Ez,
+#
+	rmir=\E[4l, rmkx=\E[19;0j\E[21;1j\212, sgr0=\E[0m^O,
+# Info:
+#	sgr0=\E[0m\EW^O,
+#
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+# Info:
+#	sgr=\E[%?%p1%t2;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?%p7%t;8%;m%?%p8%t\EV%;%?%p9%t^N%e^O%;,
+#
+	smir=\E[4h,
+# Info:
+#	This programs the SYS PF keys to send a set sequence.
+#	It also sets up labels f1, f2, ..., f8, and sends edit keys.
+#	This string causes them to send the strings kf1-kf8
+#	when pressed in SYS PF mode.
+#
+	smkx=\E[19;1j\E[21;4j\Eent, tbc=\E[3g,
+	tsl=\E7\E[25;%p1%{8}%+%dH, vpa=\E[%p1%{1}%+%dd,
+	use=att4410,
+
+ATT4415-w|att4415-w|4415-w|tty5420-w|att5420-w|ATT5420-w|5420-w|AT&T model 4415/5420 in 132 column mode @(#)4415.ti 1.4,
+	lm#54, cols#132, wsl#97,
+# Info:
+#	set 132 column mode,
+#
+	is1=\E[?3h$<100>,
+	use=att4415,
+
+ATT4415-rv|att4415-rv|4415-rv|tty5420-rv|att5420-rv|ATT5420-rv|5420-rv|AT&T model 4415/5420 80 columns in reverse video @(#)4415.ti 1.4,
+	flash=\E[?5l$<200>\E[?5h,
+# Info:
+#	set screen color to white,
+#
+	is3=\E[?5h,
+	use=att4415,
+
+ATT4415-w-rv|att4415-w-rv|4415-w-rv|tty5420-w-rv|att5420-w-rv|ATT5420-w-rv|5420-w-rv|AT&T model 4415/5420 132 columns in reverse video @(#)4415.ti 1.4,
+	lm#54, cols#132, wsl#97,
+	flash=\E[?5l$<200>\E[?5h,
+# Info:
+#	set 132 column mode,
+#
+	is1=\E[?3h$<100>, 
+# Info:
+#	set screen color to white,
+#
+	is3=\E[?5h,
+	use=att4415,
+
+# Info:
+#	Note that this mode permits programming USER PF KEYS and labels
+#	However, when you program user pf labels you have to reselect
+#	user pf keys to make them appear! 
+#
+ATT4415+nl|att4415+nl|4415+nl|tty5420+nl|att5420+nl|ATT5420+nl|5420+nl|generic AT&T 4415/5420 changes for not changing labels @(#)4415.ti 1.4,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+	pfx=\E[%p1%d;%p2%l%02d;0;1q   F%p1%d           %p2%s,
+	pln=\E[%p1%d;0;0;1q%p2%:-16.16s,
+
+ATT4415-nl|att4415-nl|4415-nl|tty5420-nl|att5420-nl|ATT5420-nl|5420-nl|AT&T 4415/5420 without changing labels @(#)4415.ti 1.4,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+	use=att4415+nl, use=att4415,
+
+ATT4415-rv-nl|att4415-rv-nl|4415-rv-nl|tty5420-rv-nl|5420-rv-nl|ATT5420-rv-nl|att5420-rv-nl|AT&T 4415/5420 reverse video without changing labels @(#)4415.ti 1.4,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+	use=att4415+nl, use=att4415-rv,
+
+ATT4415-w-nl|att4415-w-nl|4415-w-nl|tty5420-w-nl|5420-w-nl|att5420-w-nl|ATT5420-w-nl|AT&T 4415/5420 132 cols without changing labels @(#)4415.ti 1.4,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+	use=att4415+nl, use=att4415-w,
+
+ATT4415-w-rv-n|att4415-w-rv-n|4415-w-rv-nl|tty5420-w-rv-n|5420-w-rv-nl|att5420-w-rv-n|ATT5420-w-rv-n|AT&T 4415/5420 132 cols reverse without changing labels @(#)4415.ti 1.4,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+	use=att4415+nl, use=att4415-w-rv,
+
+otty5420|teletype 5420 for SVR2 curses on the 3B-20's @(#)4415.ti 1.4,
+	hpa=\E[%p1%{1}%+%dG,
+	vpa=\E[%p1%{1}%+%dd,
+	use=tty5420,
+
+att5420_2|ATT5420_2|5420_2|AT&T 5420 model 2 in 80 column mode @(#)4415.ti 1.4,
+	am, db, hs, mir, msgr, xon,
+	cols#80, it#8, lh#2, lines#24, lm#78, lw#8, nlab#8,
+	wsl#55,
+	blink=\E[5m, bold=\E[4;7m, cbt=\E[1Z, clear=\EH\EJ, 
+	cnorm=\E[11;0j, cr=\EG, csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, 
+	cub1=\b, cud1=\E[1B, cuf=\E[%p1%dC, cuf1=\E[1C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cvvis=\E[11;1j,
+	dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m, dl=\E[%p1%dM,
+	dl1=\E[M, ech=\E[%p1%ds\E[%p1%dD, ed=\E[0J, el=\E[0K,
+	el1=\E[1K, flash=\E[?5h$<200>\E[?5l, fsl=\E8,
+	home=\E[0;0H, hpa=\E[%p1%{1}%+%dG, ht=\t, hts=\EH,
+	ich=\E[%p1%d@, ich1=\E[@, il=\E[%p1%dL, il1=\E[L,
+	ind=\n, indn=\E[%p1%dE, invis=\E[8m,
+	is1=\E[0;23r\Ex\Ey\E[2;0j\E[3;3j\E[4;0j\E[5;0j\E[6;0j\E[7;0j\E[8;0j\E[9;1j\E[10;0j\E[15;0j\E[16;1j\E[19;0j\E[20;1j\E[29;0j\E[1;24r,
+	kbeg=\Et, kbs=\b, kcbt=\E[Z, kclr=\E[2J, kcub1=\E[D,
+	kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A, kdch1=\E[P,
+	kdl1=\E[M, kel=\E[2K, kend=\Ez, kent=\n, kf1=\EOc,
+	kf2=\EOd, kf3=\EOe, kf4=\EOf, kf5=\EOg, kf6=\EOh,
+	kf7=\EOi, kf8=\EOj, khome=\E[H, kich1=\E[4h,
+	kil1=\E[L, kind=\E[T, kll=\Eu, knp=\E[U, kpp=\E[V,
+	kri=\E[S, lf1=F1, lf2=F2, lf3=F3, lf4=F4, lf5=F5,
+	lf6=F6, lf7=F7, lf8=F8, ll=\Ew, mc0=\E[?;2i,
+	mc4=\E[4i, mc5=\E[5i, mrcup=\E[%i%p1%d;%p2%dt,
+	nel=\r\n,
+	pfx=\E[%p1%d;%p2%l%02dq\s\s\sF%p1%d\s\s\s\s\s\s\s\s\s\s\s%p2%s\E~,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s\E~, prot=\EV, rc=\E8,
+	rev=\E[7m, ri=\EM, rin=\E[%p1%dF, rmacs=^O,
+	rmkx=\E[19;0j, rmln=\E|, rmso=\E[m, rmul=\E[m,
+	rs2=\Ec\E[?3l\E[2;0y, sc=\E7,
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[0m^O, smacs=^N, smkx=\E[19;1j,
+	smln=\E~, smso=\E[2;7m, smul=\E[4m, tbc=\E[3g,
+	tsl=\E7\E[25;%p1%{8}%+%dH, vpa=\E[%p1%{1}%+%dd,
+att5420_2-w|ATT5420_2-w|5420_2-w|AT&T 5420 model 2 in 132 column mode @(#)4415.ti 1.4,
+	cols#132,
+	is1=\E[0;23r\Ex\Ey\E[2;0j\E[3;3j\E[4;0j\E[5;1j\E[6;0j\E[7;0j\E[8;0j\E[9;1j\E[10;0j\E[15;0j\E[16;1j\E[19;0j\E[20;1j\E[29;0j\E[1;24r,
+	use=5420_2,
+
+4418|att4418|ATT4418|5418|att5418|ATT5418|AT&T 5418 in 80 column mode @(#)4418.ti 1.2,
+	am, xon,
+	cols#80, lines#24,
+	bel=^G, blink=\E[5m, clear=\E[H\E[2J, cr=\r,
+	cub=\E[%p1%dD, cub1=\E[D, cud=\E[%p1%dB, cud1=\E[B,
+	cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH,
+	cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP, dch1=\E[1P,
+	dim=\E[2m, dl=\E[%p1%dM, dl1=\E[M, ed=\E[0J, el=\E[0K,
+	home=\E[H, ich=\E[%p1%d@, ich1=\E[1@, il=\E[%p1%dL,
+	il1=\E[1L, ind=\n, is1=\E[?3l, is2=\E)0\E?6l\E?5l,
+	kclr=\E[%, kcub1=\E@, kcud1=\EU, kcuf1=\EA, kcuu1=\ES,
+	khome=\Ec, kent=\E[, kf1=\E[h, kf10=\E[m, kf11=\E[n, kf12=\E[o,
+	kf13=\E[H, kf14=\E[I, kf15=\E[J, kf18=\E[K, kf19=\E[L,
+	kf2=\E[i, kf20=\E[E, kf21=\E[_, kf22=\E[M, kf23=\E[N,
+	kf24=\E[O, kf3=\E[j, kf6=\E[k, kf7=\E[l, kf8=\E[f,
+	kf9=\E[w, rc=\E8, rev=\E[7m, rmacs=^O, rmso=\E[0m,
+	rmul=\E[0m, sc=\E7, sgr0=\E[0m^O, smacs=^N, smso=\E[7m,
+	smul=\E[4m,
+4418-w|att4418-w|ATT4418-w|5418-w|att5418-w|ATT5418-w|AT&T 5418 in 132 column mode @(#)4418.ti 1.2,
+	cols#132,is1=\E[?3h,use=5418,
+
+4420|tty4420|teletype 4420 @(#)4420.ti 1.1,
+	xon,da, db, eo, msgr, ul,lm#72,
+	cols#80, lines#24,
+	bel=^G, clear=\EH\EJ, cr=\EG,
+	cuu1=\EA, cud1=\EB,cuf1=\EC,cub1=\ED,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c, cuu1=\EA,
+	dch1=\EP, dl1=\EM, ed=\EJ, el=\Ez, il1=\EL,
+	home=\EH,
+	ind=\EH\EM\EY7 , kcub1=\b, kcud1=\EB, kcuf1=\EC, kcuu1=\EA,
+	kf0=\EU, kf3=\E@,
+	lf0=segment advance, lf3=cursor tab,
+	kind=\ES, kri=\ET, kcbt=\EO, kclr=\EJ,
+	kil1=\EL, kdl1=\EM, kich1=\E\^, kdch1=\EP, khome=\EH,
+	rmdc@, rmso=\E~, rmul=\EZ, smdc@, smso=\E}, smul=\E\\,
+
+# Info:
+#	 The following is a termcap entry for the Teletype 4424
+#	 asyncronous keyboard-display terminal.  It supports
+#	 the vi editor.  The terminal must be "set up" as follows,
+#		
+#		HIGHLIGHT DEFINITION	3-TONE
+#		DISPLAY FUNCTION	GROUP III
+#		
+#	 The second entry below provides limited (a la adm3a)
+#	 operation under GROUP II.
+#		
+#	 This must be used with DISPLAY FUNCTION GROUP I or III
+#		and HIGHLIGHT DEFINITION 3-TONE
+#
+4424|att4424|ATT4424|tty4424|4424-3|teletype 4424 @(#)4424.ti 1.7,
+	xon,cr=^M, ind=^J, bel=^G, cols#80, lines#24, am,
+	smso=\E[7m, rmso=\E~, rev=\E[7m, smul=\E[4m, rmul=\EZ, ri=\ET,
+# Info:
+#	The terminal has either bold or blink, depending on options
+#
+	xon,bold=\E[1m, blink=\E[5m,
+	ht=^I, cbt=\EO, home=\E[H, cuu1=\EA, cuu=\E[%p1%dA,
+	cud1=\EB, cud=\E[%p1%dB, cuf1=\EC, cuf=\E[%p1%dC,
+	smcup=\E[1m,
+	cub1=^H, cub=\E[%p1%dD, cup=\E[%i%p1%d;%p2%dH,
+	clear=\E[H\E[2J, ed=\EJ, el=\Ez, nel=\EE, hts=\EH, tbc=\EF,
+	smacs=\E(0, rmacs=\E(B, is2=\E[20l\E[?7h, csr=\E[%i%p1%d;%p2%dr,
+	il1=\EL, il=\E[%p1%dL, dl1=\EM, dl=\E[%p1%dM,
+	ich1=\E\^, ich=\E[%p1%d@, dch1=\EP, dch=\E[%p1%dP,
+	sgr=\E[0%?%p1%p3%|%t;7%;%?%p2%t;4%;%?%p6%t;1%;%?%p4%t;5%;m,
+	sgr0=\EX\E~\EZ\E4\E(B,
+	kcuu1=\E[A, kcud1=\E[B, kcub1=\E[D, kcuf1=\E[C, khome=\E[H, kbs=^H, kclr=\EJ,
+	kf1=\EOP, kf2=\EOQ, kf3=\EOR, kf4=\EOS,
+
+4424-1|att4424-1|ATT4424-1|tty4424-1|teletype 4424 in display function group I @(#)4424.ti 1.7,
+	kclr@,kcub1=\ED,kcud1=\EB,kcuf1=\EC,kcuu1=\EA,khome@,use=4424,
+
+# Info:
+#	The Teletype 5425 is really version 2 of the Teletype 5420. It 
+#	is quite similar, except for some minor differences. No page 
+#	mode, for example, so all of the cup sequences used above have 
+#	to change back to what's being used for the 5410. Many of the 
+#	option settings have changed their numbering as well.
+#	
+#	This has been tested on a preliminary model.
+#
+
+ATT4425|ATT5425|att5425|4425|5425|tty5425|att4425|AT&T 4425/5425 @(#)4425.ti 1.4,
+	am, da, db, hs, mir, msgr, xenl, xon,
+	cols#80, it#8, lh#2, lines#24, lm#78, lw#8, nlab#8,
+	wsl#55,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m, bold=\E[4;7m, cbt=\E[Z,
+	clear=\E[H\E[J, cnorm=\E[12;0j, cr=\r,
+	csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	cvvis=\E[12;1j, dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m,
+	dl=\E[%p1%dM, dl1=\E[M, ech=\E[%p1%ds\E[%p1%dD,
+	ed=\E[J, el=\E[K, el1=\E[1K, enacs=\E(B\E)0,
+	flash=\E[?5h$<200>\E[?5l, fsl=\E8, home=\E[H,
+	hpa=\E[%p1%{1}%+%dG, ht=\t, hts=\EH, ich=\E[%p1%d@,
+	il=\E[%p1%dL, il1=\E[L, ind=\n, indn=\E[%p1%dE,
+	invis=\E[8m, is1=\E<\E[?3l$<100>,
+	is2=\E[0m^O\E[1;2;3;4;6l\E[12;13;14;20l\E[?6;97;99l\E[?7h\E[4i\Ex\E[25;1j\212,
+	is3=\E[?5l, kbeg=\Et, kbs=\b, kcbt=\E[Z, kclr=\E[J,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	kdch1=\E[P, kdl1=\E[M, kel=\E[2K, kend=\Ez, kent=\Eent,
+	kf1=\EOc, kf2=\EOd, kf3=\EOe, kf4=\EOf, kf5=\EOg,
+	kf6=\EOh, kf7=\EOi, kf8=\EOj, khome=\E[H, kich1=\E[4h,
+	kil1=\E[L, kind=\E[T, kri=\E[S, ll=\E[24H, mc0=\E[?2i,
+	mc4=\E[4i, mc5=\E[5i, nel=\r\n,
+	pfx=\E[%p1%d;%p2%l%02dq\s\s\sF%p1%1d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s, prot=\EV, rc=\E8,
+	rev=\E[7m, ri=\EM, rin=\E[%p1%dF, rmacs=^O,
+	rmir=\E[4l, rmkx=\E[21;0j\E[25;1j\212, rmln=\E|, rmso=\E[m,
+	rmul=\E[m, rs2=\Ec\E[?3l\E[2;0y, sc=\E7,
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smir=\E[4h, smkx=\E[21;1j\E[25;4j\Eent\E~,
+	smln=\E~, smso=\E[2;7m, smul=\E[4m, tbc=\E[3g,
+	tsl=\E7\E[25;%p1%{8}%+%dH, vpa=\E[%p1%{1}%+%dd,
+
+ATT4425-nl|ATT5425-nl|att5425-nl|4425-nl|5425-nl|tty5425-nl|att4425-nl|AT&T 4425/5425 without label change 80 column mode @(#)4425.ti 1.4,
+	smkx=\E[21;1j\E[25;4j\Eent,use=4425,
+
+ATT4425-nl-w|ATT5425-nl-w|att5425-nl-w|4425-nl-w|5425-nl-w|tty5425-nl-w|att4425-nl-w|AT&T 4425/5425 without label change 132 column mode @(#)4425.ti 1.4,
+	smkx=\E[21;1j\E[25;4j\Eent,use=4425-w,
+
+4425-fk|5425-fk|tty5425-fk|att4425-fk|AT&T 4425/5425 without function keys @(#)4425.ti 1.4,
+	smkx@,rmkx@,use=5425,
+
+ATT4425-w|att5425-w|ATT5425-w|att4425-w|4425-w|5425-w|tty5425-w|teletype 4425/5425 in 132 column mode @(#)4425.ti 1.4,
+	lm#54, cols#132, wsl#97,
+# Info:
+#	set 132 column mode,
+#
+	is1=\E[?3h$<100>,
+	use=tty5425,
+
+4425-w-fk|5425-w-fk|tty5425-w-fk|att4425-w-fk|ATT4425-w-fk|att5425-w-fk|ATT5425-w-fk|AT&T 4425/5425 without function keys in wide mode @(#)4425.ti 1.4,
+	smkx@,rmkx@,use=5425-w,
+
+4426|att4426|ATT4426|tty4426|teletype 4426S @(#)4426.ti 1.2,
+	am,xon,
+	is1=\Ec\E[?7h,
+	bel=^G,
+	bold=\E[5m,
+	clear=\E[H\E[2J\E[1U\E[H\E[2J\E[1V,
+	cols#80,
+	cr=^M,
+	cub1=\E[D,
+	cub=\E[%p1%dD,
+	cud1=\E[B,
+	cud=\E[%p1%dB,
+	cuf1=\E[C,
+	cuf=\E[%p1%dC,
+	cup=\E[%i%p1%d;%p2%dH, 
+	cuu1=\EA,
+	cuu=\E[%p1%dA,
+	dch1=\EP,
+	dch=\E[%p1%dP,
+	dl1=\E[M,
+	dl=\E[%p1%dM,
+	ed=\E[J, 
+	el=\E[0K,
+	home=\E[H,
+	hpa=\E[%p1%dG,
+	hts=\E1,
+	ht=\t,
+	ich1=\E\^, 
+	ich=\E[%p1%d@,
+	il1=\EL,
+	il=\E[%p1%dL,
+	ind=\ES,
+	ind=^J,
+	indn=\E[%p1%dS,
+	is2=\E[m\E[1;24r,
+	kbs=^H,
+	kcbt=\EO,
+	kclr=\E[2J,
+	kcub1=\ED,
+	kcud1=\EB,
+	kcuf1=\EC, 
+	kcuu1=\EA,
+	kf1=\EOP,
+	kf2=\EOQ,
+	kf3=\EOR,
+	kf4=\EOS,
+	kf5=\EOT,
+	kf6=\EOU,
+	kf7=\EOV,
+	kf8=\EOW,
+	khome=\E[H,
+	kll=\E[24;1H,
+	lines#24,
+	ll=\E[24H,
+	nel=^M^J,
+	rc=\E8,
+	rev=\E[7m,
+	ri=\EM,
+	ri=\ET,
+	ri=\E[1U, 
+	rin=\E[%p1%dT,
+	rmacs=\E(B,
+	rmso=\E[0m,
+	rmul=\E[0m,
+	rmul=\E[m,
+	rs2=\Ec\E[?3l\E[2;0y,
+	sc=\E7, 
+	sgr0=\E[0m\E(B,
+	smacs=\E(0,
+	smso=\E[5m,
+	smul=\E[4m,
+	smul=\E[4m,
+	tbc=\E[3g,
+	lm#48,da,db,
+	vpa=\E[%p1%dd,
+
+
+# Terminfo entry for the AT&T 510 A Personal Terminal
+# Function keys 9 - 16 are available only after the 
+# screen labeled (soft keys/action blocks) are labeled.  Function key
+# 9 corresponds to the leftmost touch target on the screen,
+# function key 16 corresponds to the rightmost.
+#
+#
+# This entry is based on one done by Ernie Rice at Summit, NJ and
+# changed by Anne Gallup, Skokie, IL, ttrdc!anne
+#
+att510a|510a|bct510a|510A|AT&T 510A Personal Terminal @(#)510a.ti 1.3,
+	am,
+	xenl,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	lines#24,
+	nlab#8,
+	lh#2,
+	lw#7,
+	cbt=\E[Z,
+	bel=^G,
+	cr=^M,
+	tbc=\E[3g,
+	clear=\E[H\E[J,
+	el=\E[0K,
+	ed=\E[0J,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[1B,
+	home=\E[H,
+	cub1=^H,
+	cnorm=\E[11;3|,
+	cuf1=\E[C,
+	cuu1=\E[A,
+	civis=\E[11;0|,
+	cvvis=\E[11;2|,
+	dch1=\E[P,
+	dl1=\E[M,
+	smacs=^N,
+	blink=\E[5m,
+	bold=\E[2;7m,
+	dim=\E[2m,
+	rev=\E[7m,
+	smso=\E[7m,
+	smul=\E[4m,
+	rmacs=^O,
+	sgr0=\E[m^O,
+	rmso=\E[m,
+	rmul=\E[m,
+	ff=^L,
+	is3=\E[21;1|\212,
+	il1=\E[L,
+	kbs=^H,
+	kcud1=\E[B,
+	kf1=\EOm,
+	kf2=\EOV,
+	kf3=\EOu,
+	kf4=\ENj,
+	kf5=\ENe,
+	kf6=\ENf,
+	kf7=\ENh,
+	kf8=\E[H,
+	kf9=\EOc,
+	kf10=\EOd,
+	kf11=\EOe,
+	kf12=\EOf,
+	kf13=\EOg,
+	kf14=\EOh,
+	kf15=\EOi,
+	kf16=\EOj,
+	kcub1=\E[D,
+	kcuf1=\E[C,
+	kind=\E[S,
+	kri=\E[T,
+	kcuu1=\E[A,
+	nel=\EE,
+	dch=\E[%p1%dP,
+	dl=\E[%p1%dM,
+	cud=\E[%p1%dB,
+	il=\E[%p1%dL,
+	cub=\E[%p1%dD,
+	cuf=\E[%p1%dC,
+	cuu=\E[%p1%dA,
+	mc0=\E[0i,
+	mc4=\E[?8i,
+	mc5=\E[?4i,
+	rc=\E8,
+	sc=\E7,
+	ind=^J,
+	ri=\EM,
+	sgr=\E[0%?%p5%p6%|%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;m%?%p9%t^N%e^O%;,
+	hts=\EH,
+	ht=\t,
+	acsc=hrisjjkkllmmnnqqttuuvvwwxx{{||}}~~-f\,h.e+g`b,
+	pln=\E[%p1%dp%p2%:-16s,
+	kcbt=\E[Z,
+	enacs=\E(B\E)1,
+	kLFT=\E[u,
+	kRIT=\E[v,
+	el1=\E[1K,
+	is1=\E(B\E)1\E[2l,
+
+# Terminfo entry for the AT&T 510 D Personal Terminal
+# Function keys 9 through 16 are accessed by bringing up the
+# system blocks.
+# Function key 9 corresponds to the leftmost touch target on the screen,
+# function key 16 corresponds to the rightmost.
+#
+# There are problems with soft key labeling.  These are due to 
+# strangenesses in the native terminal that are impossible to
+# describe in a terminfo.  
+#
+#
+att510d|510d|bct510d|510D|AT&T 510D Personal Terminal @(#)510d.ti 1.2,
+	am,
+	da,
+	db,
+	mir,
+	msgr,
+	xenl,
+	xon,
+	cols#80,
+	lh#2,
+	lines#24,
+	lm#48,
+	lw#7,
+	nlab#8,
+	acsc=hrisjjkkllmmnnqqttuuvvwwxx{{||}}~~-f\,h.e+g`b,
+	bel=^G,
+	blink=\E[5m,
+	bold=\E[2;7m,
+	cbt=\E[Z,
+	clear=\E[H\E[J,
+	cnorm=\E[11;3|,
+	cr=^M,
+	cub1=^H,
+	cub=\E[%p1%dD,
+	cud1=\E[1B,
+	cud=\E[%p1%dB,
+	cuf1=\E[C,
+	cuf=\E[%p1%dC,
+	cup=\E[%i%p1%d;%p2%dH,
+	cuu1=\E[A,
+	cuu=\E[%p1%dA,
+	cvvis=\E[11;2|,
+	dch1=\E[P,
+	dch=\E[%p1%dP,
+	dim=\E[2m,
+	dl1=\E[M,
+	dl=\E[%p1%dM,
+	ed=\E[0J,
+	el1=\E[1K,
+	el=\E[0K,
+	enacs=\E(B\E)1,
+	ff=^L,
+	home=\E[H,
+	hpa=\E[%p1%{1}%+%dG,
+	hts=\EH,
+	ht=\t,
+	ich=\E[%p1%d@,
+	il1=\E[L,
+	il=\E[%p1%dL,
+	ind=^J,
+	indn=\E[%p1%dS,
+	invis=\E[8m,
+	is1=\E(B\E)1\E[5;0|,
+	is3=\E[21;1|\212,
+	kbs=^H,
+	kcbt=\E[Z,
+	kcub1=\E[D,
+	kcud1=\E[B,
+	kcuf1=\E[C,
+	kcuu1=\E[A,
+	kf10=\EOd,
+	kf11=\EOe,
+	kf12=\EOf,
+	kf13=\EOg,
+	kf14=\EOh,
+	kf15=\EOi,
+	kf16=\EOj,
+	kf1=\EOm,
+	kf2=\EOV,
+	kf3=\EOu,
+	kf4=\ENj,
+	kf5=\ENe,
+	kf6=\ENf,
+	kf7=\ENh,
+	kf8=\E[H,
+	kf9=\EOc,
+	kind=\E[S,
+	kLFT=\E[u,
+	kri=\E[T,
+	kRIT=\E[v,
+	ll=\E#2,
+	mc0=\E[0i,
+	mc4=\E[?8i,
+	mc5=\E[?4i,
+	mgc=\E:,
+	nel=\EE,
+	pln=\E[%p1%dp%p2%:-16s,
+	rc=\E8,
+	rep=%p1%c\E[%p2%{1}%-%db,
+	rev=\E[7m,
+	ri=\EM,
+	rin=\E[%p1%dT,
+	rmacs=^O,
+	rmir=\E[4l,
+	rmkx=\E[19;0|,
+	rmln=\E<,
+	rmso=\E[m,
+	rmul=\E[m,
+	rmxon=\E[29;1|,
+	rs2=\E[5;0|,
+	sc=\E7,
+	sgr0=\E[m^O,
+	sgr=\E[0%?%p5%p6%|%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	smacs=^N,
+	smgl=\E4,
+	smgr=\E5,
+	smir=\E[4h,
+	smkx=\E[19;1|,
+	smln=\E?,
+	smso=\E[7m,
+	smul=\E[4m,
+	smxon=\E[29;0|,
+	tbc=\E[3g,
+	vpa=\E[%p1%{1}%+%dd,
+
+
+ATT513|att513|513|att513-page|513-page|attis513-pfk|513bct|AT&T 513 Terminal using page mode @(#)513.ti 1.3,
+	am, chts, mir, msgr, xenl, xon,
+	cols#80, lh#2, lines#24, lw#8, nlab#8,
+	acsc=hrisjjkkllmmnnqqttuuvvwwxx{{||}}~~-f\,h.e+g`b,
+	bel=^G, blink=\E[5m, bold=\E[4;7m, cbt=\E[Z,
+	clear=\E[H\E[J, cnorm=\E[11;0|, cr=\r,
+	csr=%i\E[%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	cvvis=\E[11;1|, dch=\E[%p1%dP, dch1=\E[P$<1>,
+	dim=\E[2m, dl=\E[%p1%dM, dl1=\E[M, ed=\E[J, el=\E[K,
+	el1=\E[1K, enacs=\E(B\E)1, home=\E[H,
+	hpa=\E[%p1%{1}%+%dG, ht=\t, hts=\EH, ich=\E[%p1%d@,
+	il=\E[%p1%dL, il1=\E[L, ind=\n, indn=\E[%p1%dE,
+	invis=\E[8m,
+	is1=\E?\E[3;3|\E[10;0|\E[21;1|\212\E[6;1|\E[1{\E[?99l,
+	kBEG=\ENB, kCAN=\EOW, kCMD=\EOU, kCPY=\END, kCRT=\EON,
+	kDC=\ENF, kDL=\ENE, kEND=\ENN, kEOL=\EOA, kEXT=\EOK,
+	kFND=\EOX, kHLP=\EOM, kHOM=\ENM, kIC=\ENJ, kLFT=\ENK,
+	kMOV=\ENC, kMSG=\EOL, kNXT=\ENH, kOPT=\EOR, kPRT=\EOZ,
+	kPRV=\ENG, kRDO=\EOT, kRES=\EOQ, kRIT=\ENL, kRPL=\EOY,
+	kSAV=\EOO, kSPD=\EOP, kUND=\EOS, kbeg=\E9, kbs=\b,
+	kcan=\EOw, kcbt=\E[Z, kclo=\EOV, kclr=\E[J, kcmd=\EOu,
+	kcpy=\ENd, kcrt=\EOn, kcub1=\E[D, kcud1=\E[B,
+	kcuf1=\E[C, kcuu1=\E[A, kdch1=\ENf, kdl1=\ENe,
+	kel=\EOa, kend=\E0, kent=\Eent, kext=\EOk, kf1=\EOc,
+	kf2=\EOd, kf3=\EOe, kf4=\EOf, kf5=\EOg, kf6=\EOh,
+	kf7=\EOi, kf8=\EOj, kfnd=\EOx, khlp=\EOm, khome=\E[H,
+	kich1=\ENj, kind=\E[S, kmov=\ENc, kmrk=\ENi,
+	kmsg=\EOl, knp=\E[U, knxt=\ENh, kopn=\EOv, kopt=\EOr,
+	kpp=\E[V, kprt=\EOz, kprv=\ENg, krdo=\EOt, kref=\EOb,
+	kres=\EOq, krfr=\ENa, kri=\E[T, krpl=\EOy, krst=\EOB,
+	ksav=\EOo, kslt=\ENI, kspd=\EOp, kund=\EOs, ll=\E#2,
+	mc0=\E[?98l\E[0i, mc4=\E[?98l\E[?8i,
+	mc5=\E[?98l\E[?4i, nel=\EE,
+	pfkey=\E[%p1%d;%p2%l%d;3;0p\s\s\sF%p1%d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pfloc=\E[%p1%d;%p2%l%d;2;0p\s\s\sF%p1%d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pfx=\E[%p1%d;%p2%l%d;1;0p\s\s\sF%p1%d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pln=\E[%p1%dp%p2%:-16s, rc=\E8,
+	rep=%p1%c\E[%p2%{1}%-%db, rev=\E[7m, ri=\EM,
+	rin=\E[%p1%dF, rmacs=^O, rmir=\E[4l, rmkx=\E[19;0|\E[21;1|\212,
+	rmln=\E<, rmso=\E[m, rmul=\E[m,
+	rs1=\E?\E[3;3|\E[10;0|\E[21;1|\212\E[6;1|\E[1{\E[?99l\E[2;0|\E[6;1|\E[8;0|\E[19;0|\E[1{\E[?99l,
+	rs2=\E[5;0|, sc=\E7,
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smir=\E[4h, smkx=\E[19;1|\E[21;4|\Eent,
+	smln=\E?, smso=\E[2;7m, smul=\E[4m, tbc=\E[3g,
+	vpa=\E[%p1%{1}%+%dd,
+
+ATT500|att500|bct500|500|BCT500|AT&T-IS 500 terminal @(#)513.ti 1.3,
+	use=att513,
+
+# Info:
+#	5620 terminfo  (2.0 or later ROMS with char attributes)
+#	
+#    assumptions:
+#	ind (scroll forward one line) is only done at screen bottom
+#
+att5620|ATT5620|dmd|tty5620|ttydmd|5620|5620 terminal 88 columns @(#)5620.ti 1.3,
+	npc,xon,am, cols#88, lines#70, it#8,
+	bel=^G, cr=^M, clear=\E[H\E[J,
+	ht=^I, nel=^J,
+# Info:
+#	clear to end of line, screen
+#
+	el=\E[K, ed=\E[J,
+# Info:
+#	scroll screen up/down one/many lines
+#
+	ind=\E[S, indn=\E[%p1%dS, ri=\E[T, rin=\E[%p1%dT,
+# Info:
+#	cursor arbitrarily, down, home, left, right, up
+#	cup=\E[%i%p1%d;%p2%dH, home=\E[H,
+#
+	cup=\E[%i%p1%d;%p2%dH, cud1=\E[B, home=\E[H,
+	cub1=^H, cuf1=\E[C, cuu1=\E[A,
+# Info:
+#	delete/insert one/many characters/lines
+#
+	dch1=\E[P, dch=\E[%p1%dP, dl1=\E[M, dl=\E[%p1%dM,
+	ich1=\E[@, ich=\E[%p1%d@, il1=\E[L, il=\E[%p1%dL,
+# Info:
+#	sequences sent by keys: backspace, clear, down-arrow, 
+#	home-arrow, left-arrow, home-down, right-arrow, up-arrow
+#
+	kbs=^H, kclr=\E[2J, kcud1=\E[B, khome=\E[H,
+	kcub1=\E[D, kll=\E[70;1H, kcuf1=\E[C, kcuu1=\E[A,
+# Info:
+#	program function keys, reset terminal, restore/store cursor 
+#	position (padding in pfx cannot be used, since terminal doesn't
+#	have a padding character, but it is needed and FMLI extracts
+#	and uses this information
+#
+	pfx=\E[%p1%d;%p2%l%dq%p2%s$<230/>,
+	rs1=\Ec, rc=\E8, sc=\E7,
+# Info:
+#	set/clear underline/standout character attributes
+#
+	smul=\E[4m, rmul=\E[0m,
+	smso=\E[7m, rmso=\E[0m,
+# Info:
+#	reverse video, reset character attributes, pseudo-dim, 
+#	pseudo-bold
+#
+	rev=\E[7m, sgr0=\E[0m,
+	dim=\E[2m, bold=\E[2m,
+
+att5620-24|ATT5620-24|5620-24|dmd-24|teletype dmd 5620 in a 24x80 layer @(#)5620.ti 1.3,
+	lines#24, use=5620,
+
+att5620-34|ATT5620-34|5620-34|dmd-34|teletype dmd 5620 in a 34x80 layer @(#)5620.ti 1.3,
+	lines#34, use=5620,
+
+
+#Info:
+#       Entries for kf15 thru kf28 refer to the shifted system pf keys.
+#
+#       Entries for kf29 thru kf46 refer to the alternate keypad mode
+#       keys:  = * / + 7 8 9 - 4 5 6 , 1 2 3 0 . ENTER
+
+
+605|705|605bct|ATT605|att605|AT&T 605  80 column  102key keyboard @(#)605.ti 1.5,
+	am,
+	xenl,
+	hs,
+	eslok,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	it#8,
+	lh#2,
+	lines#24,
+	lw#8,
+	nlab#8,
+	wsl#80,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G,
+	blink=\E[5m,
+	bold=\E[1m,
+	cbt=\E[Z,
+	civis=\E[?25l,
+	clear=\E[H\E[J,
+	cnorm=\E[?25h\E[?12l,
+	cr=^M,
+	csr=\E[%i%p1%d;%p2%dr,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[B,
+	cub=\E[%p1%dD,
+	cub1=^H,
+	cud=\E[%p1%dB,
+	cuf=\E[%p1%dC,
+	cuf1=\E[C,
+	cuu=\E[%p1%dA,
+	cuu1=\E[A,
+	cvvis=\E[?12;25h,
+	dch1=\E[P,
+	dch=\E[%p1%dP,
+	dim=\E[2m,
+	dl=\E[%p1%dM,
+	dl1=\E[M,
+	ed=\E[J,
+	el=\E[K,
+	el1=\E[1K,
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	home=\E[H,
+	ht=\t,
+	ich=\E[%p1%d@,      
+	il=\E[%p1%dL,
+	il1=\E[L,
+	ind=\ED,
+	invis=\E[8m,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)0,
+	is2=\E[0m^O,
+	is3=\E(B\E)0,
+	kbs=^H,
+	kcbt=\E[Z,
+	kclr=\E[2J,
+	kcub1=\E[D,
+	kcud1=\E[B,
+	kcuf1=\E[C,
+	kcuu1=\E[A,
+	kdch1=\E[P,
+	kdl1=\E[M,
+	kend=\E[24;1H,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	kf15=\EOC,
+	kf16=\EOD,
+	kf17=\EOE,
+	kf18=\EOF,
+	kf19=\EOG,
+	kf20=\EOH,
+	kf21=\EOI,
+	kf22=\EOJ,
+	kf23=\ENO,
+	kf24=\ENP,
+	kf25=\ENQ,
+	kf26=\ENR,
+	kf27=\ENS,
+	kf28=\ENT,
+	kf29=\EOP,
+	kf30=\EOQ,
+	kf31=\EOR,
+	kf32=\EOS,
+	kf33=\EOw,
+	kf34=\EOx,
+	kf35=\EOy,
+   	kf36=\EOm,
+	kf37=\EOt,
+	kf38=\EOu,
+	kf39=\EOv,
+	kf40=\EOl,
+	kf41=\EOq,
+	kf42=\EOr,
+	kf43=\EOs,
+	kf44=\EOp,
+	kf45=\EOn,
+	kf46=\EOM,
+	khome=\E[H,
+	kil1=\E[L,
+	kind=\E[S,
+	kich1=\E[@,
+	kpp=\E[V,
+	knp=\E[U,
+	kri=\E[T,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	ll=\E[24H,
+	mc4=\E[?4i,
+	mc5=\E[?5i,
+	nel=\EE,
+	pfxl=\E[%p1%d;%p2%l%02dq%?%p1%{9}%<%t   F%p1%1d           %;%p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	rev=\E[7m,
+	ri=\EM,
+	rmacs=^O,
+	rmir=\E[4l,
+	rs2=\Ec\E[?3l,
+	rc=\E8,
+	rmso=\E[m,
+	rmln=\E[2p,
+	rmul=\E[m,
+	sgr0=\E[m^O,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	smacs=^N,
+	smir=\E[4h,
+	smso=\E[7m,
+	smul=\E[4m,
+	smln=\E[p,
+	sc=\E7,
+	tsl=\E7\E[25;%i%p1%dx,
+
+605-w|605bct-w|ATT605-w|att605-w|AT&T 605-w 132 column 102 key keyboard @(#)605.ti 1.5,
+        cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)0,
+	wsl#132,
+	use=605,
+#Info:
+#       Entries for kf15 thru kf28 refer to the shifted system pf keys.
+#
+#       Entries for kf29 thru kf46 refer to the alternate keypad mode
+#       keys:  = * / + 7 8 9 - 4 5 6 , 1 2 3 0 . ENTER
+605V2|605V2bct|ATT605V2|att605V2|AT&T 605V2  80 column  102key keyboard @(#)605V2.ti 1.5,
+	am,
+	xenl,
+	hs,
+	eslok,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	it#8,
+	lh#2,
+	lines#24,
+	lw#8,
+	nlab#8,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G,
+	blink=\E[5m,
+	bold=\E[1m,
+	cbt=\E[Z,
+	civis=\E[?25l,
+	clear=\E[H\E[J,
+	cnorm=\E[?25h\E[?12l,
+	cr=^M,
+	csr=\E[%i%p1%d;%p2%dr,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[B,
+	cub=\E[%p1%dD,
+	cub1=^H,
+	cud=\E[%p1%dB,
+	cuf=\E[%p1%dC,
+	cuf1=\E[C,
+	cuu=\E[%p1%dA,
+	cuu1=\E[A,
+	cvvis=\E[?12;25h,
+	dch1=\E[P,
+	dch=\E[%p1%dP,
+	dim=\E[2m,
+	dl=\E[%p1%dM,
+	dl1=\E[M,
+	ed=\E[J,
+	el=\E[K,
+	el1=\E[1K,
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	home=\E[H,
+	ht=\t,
+	ich=\E[%p1%d@,      
+	il=\E[%p1%dL,
+	il1=\E[L,
+	ind=\ED,
+	invis=\E[8m,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)0,
+	is2=\E[0m^O,
+	is3=\E(B\E)0,
+	kbs=^H,
+	kcbt=\E[Z,
+	kclr=\E[2J,
+	kcub1=\E[D,
+	kcud1=\E[B,
+	kcuf1=\E[C,
+	kcuu1=\E[A,
+	kdch1=\E[P,
+	kdl1=\E[M,
+	kend=\E[24;1H,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	kf15=\EOC,
+	kf16=\EOD,
+	kf17=\EOE,
+	kf18=\EOF,
+	kf19=\EOG,
+	kf20=\EOH,
+	kf21=\EOI,
+	kf22=\EOJ,
+	kf23=\ENO,
+	kf24=\ENP,
+	kf25=\ENQ,
+	kf26=\ENR,
+	kf27=\ENS,
+	kf28=\ENT,
+	kf29=\EOP,
+	kf30=\EOQ,
+	kf31=\EOR,
+	kf32=\EOS,
+	kf33=\EOw,
+	kf34=\EOx,
+	kf35=\EOy,
+   	kf36=\EOm,
+	kf37=\EOt,
+	kf38=\EOu,
+	kf39=\EOv,
+	kf40=\EOl,
+	kf41=\EOq,
+	kf42=\EOr,
+	kf43=\EOs,
+	kf44=\EOp,
+	kf45=\EOn,
+	kf46=\EOM,
+	khome=\E[H,
+	kil1=\E[L,
+	kich1=\E[@,
+	kpp=\E[V,
+	knp=\E[U,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	ll=\E[24H,
+	nel=\EE,
+	pfxl=\E[%p1%d;%p2%l%02dq%?%p1%{9}%<%t   F%p1%1d           %;%p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	rev=\E[7m,
+	ri=\EM,
+	rmacs=\E)B^O,
+	rmir=\E[4l,
+	rs2=\Ec\E[?3l,
+	rc=\E8,
+	rmso=\E[m,
+	rmln=\E[2p,
+	rmul=\E[m,
+	sgr0=\E[m^O,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	smacs=\E)0^N,
+	smir=\E[4h,
+	smso=\E[7m,
+	smul=\E[4m,
+	smln=\E[p,
+	sc=\E7,
+	tsl=\E7\E[25;%i%p1%dx,
+	tbc=\E[3g,
+	fln=4\,4,
+	hts=\EH,
+	swidm=\E#6,
+	mc0=\E[i,
+	mc4=\E[?4i,
+	mc5=\E[?5i,
+605V2-w|605V2bct-w|ATT605V2-w|att605V2-w|AT&T 605V2-w 132 column 102 key keyboard @(#)605V2.ti 1.5,
+        cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)0,
+	use=605V2,
+610|610bct|ATT610|att610|AT&T 610; 80 column; 98key keyboard @(#)610.ti 1.8,
+	am,
+	xenl,
+	hs,
+	eslok,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	it#8,
+	lh#2,
+	lines#24,
+	lw#8,
+	nlab#8,
+	wsl#80,
+	cbt=\E[Z,
+	bel=^G,
+	cr=^M,
+	csr=\E[%i%p1%d;%p2%dr,
+	clear=\E[H\E[J,
+	el=\E[K,
+	ed=\E[J,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[B,
+	home=\E[H,
+	civis=\E[?25l,
+	cub1=^H,
+	cnorm=\E[?25h\E[?12l,
+	cuf1=\E[C,
+	ll=\E[24H,
+	cuu1=\E[A,
+	cvvis=\E[?12;25h,
+	dch1=\E[P,
+	dl1=\E[M,
+	smacs=^N,
+	blink=\E[5m,
+	bold=\E[1m,
+	dim=\E[2m,
+	smir=\E[4h,
+	ich=\E[%p1%d@,
+	invis=\E[8m,
+	rev=\E[7m,
+	smso=\E[7m,
+	smul=\E[4m,
+	rmacs=^O,
+	sgr0=\E[m^O,
+	rmir=\E[4l,
+	rmso=\E[m,
+	rmul=\E[m,
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)0,
+	is2=\E[0m^O,
+	is3=\E(B\E)0,
+	il1=\E[L,
+	kbs=^H,
+	kclr=\E[2J,
+	kcud1=\E[B,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	khome=\E[H,
+	kcub1=\E[D,
+	kcuf1=\E[C,
+	kind=\E[S,
+	kri=\E[T,
+	kcuu1=\E[A,
+	nel=\EE,
+	dch=\E[%p1%dP,
+	dl=\E[%p1%dM,
+	cud=\E[%p1%dB,
+	il=\E[%p1%dL,
+	cub=\E[%p1%dD,
+	cuf=\E[%p1%dC,
+	cuu=\E[%p1%dA,
+	pfxl=\E[%p1%d;%p2%l%02dq%?%p1%{9}%<%t   F%p1%1d           %;%p2%s,
+	mc4=\E[?4i,
+	mc5=\E[?5i,
+	rs2=\Ec\E[?3l,
+	rc=\E8,
+	sc=\E7,
+	ind=\ED,
+	ri=\EM,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	ht=\t,
+	tsl=\E7\E[25;%i%p1%dx,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	kcbt=\E[Z,
+	smln=\E[p,
+	rmln=\E[2p,
+	kLFT=\E[ @,
+	kRIT=\E[ A,
+	el1=\E[1K,
+610-w|610bct-w|ATT610-w|att610-w|AT&T 610; 132 column; 98key keyboard @(#)610.ti 1.8,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=610,
+610-103k|610bct-103k|ATT610-103k|att610-103k|AT&T 610; 80 column; 103key keyboard @(#)610.ti 1.8,
+	kf9@,
+	kf10@,
+	kf11@,
+	kf12@,
+	kf13@,
+	kf14@,
+	kdch1=\ENf,
+	kdl1=\ENe,
+	kel=\EOa,
+	kich1=\ENj,
+	krmir=\ENj,
+	knp=\E[U,
+	kpp=\E[V,
+	kbeg=\E9,
+	kcan=\EOw,
+	kclo=\EOV,
+	kcmd=\EOu,
+	kcpy=\ENd,
+	kcrt=\EOn,
+	kend=\E0,
+	kext=\EOk,
+	kfnd=\EOx,
+	khlp=\EOm,
+	kmrk=\ENi,
+	kmsg=\EOl,
+	kmov=\ENc,
+	knxt=\ENh,
+	kopn=\EOv,
+	kopt=\EOr,
+	kprt=\EOz,
+	kprv=\ENg,
+	krdo=\EOt,
+	kref=\EOb,
+	krfr=\ENa,
+	krpl=\EOy,
+	krst=\EOB,
+	kres=\EOq,
+	ksav=\EOo,
+	kspd=\EOp,
+	kund=\EOs,
+	kBEG=\ENB,
+	kCAN=\EOW,
+	kCMD=\EOU,
+	kCPY=\END,
+	kCRT=\EON,
+	kDC=\ENF,
+	kDL=\ENE,
+	kslt=\ENI,
+	kEND=\ENN,
+	kEOL=\EOA,
+	kEXT=\EOK,
+	kFND=\EOX,
+	kHLP=\EOM,
+	kMSG=\EOL,
+	kMOV=\ENC,
+	kNXT=\ENH,
+	kOPT=\EOR,
+	kPRT=\EOZ,
+	kPRV=\ENG,
+	kRDO=\EOT,
+	kRPL=\EOY,
+	kRES=\EOQ,
+	kSAV=\EOO,
+	kSPD=\EOP,
+	kUND=\EOS,
+	use=610,
+610-103k-w|610bct-103k-w|ATT610-103k-w|att610-103k-w|AT&T 610; 132 column; 103key keyboard @(#)610.ti 1.8,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=610-103k,
+615|615mt|ATT615|att615|AT&T 615; 80 column; 98key keyboard @(#)615.ti 1.4,
+# add sequences for changing flow control setting
+	smxon=\E[?21;29h,
+	rmxon=\E[?21l,
+# modify initialization string font setting to match terminal on power-up
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)B,
+# add print screen not in previous versions of 615 MT
+	mc0=\E[i,
+# add shifted HOME key
+	kHOM=\ENM,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	kf15=\EOC,
+	kf16=\EOD,
+	kf17=\EOE,
+	kf18=\EOF,
+	kf19=\EOG,
+	kf20=\EOH,
+	kf21=\EOI,
+	kf22=\EOJ,
+	kf23=\ENO,
+	kf24=\ENP,
+	kf25=\ENQ,
+	kf26=\ENR,
+	kf27=\ENS,
+	kf28=\ENT,
+	kf29=\EOP,
+	kf30=\EOQ,
+	kf31=\EOR,
+	kf32=\EOS,
+	kf33=\EOw,
+	kf34=\EOx,
+	kf35=\EOy,
+	kf36=\EOm,
+	kf37=\EOt,
+	kf38=\EOu,
+	kf39=\EOv,
+	kf40=\EOl,
+	kf41=\EOq,
+	kf42=\EOr,
+	kf43=\EOs,
+	kf44=\EOp,
+	kf45=\EOn,
+	kf46=\EOM,
+	use=610,
+615-w|615mt-w|ATT615-w|att615-w|AT&T 615; 132 column; 98key keyboard @(#)615.ti 1.4,
+# add sequences for changing flow control setting
+	smxon=\E[?21;29h,
+	rmxon=\E[?21l,
+# modify initialization string font setting to match terminal on power-up
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)B,
+# add print screen not in previous versions of 615 MT
+	mc0=\E[i,
+# add shifted HOME key
+	kHOM=\ENM,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	kf15=\EOC,
+	kf16=\EOD,
+	kf17=\EOE,
+	kf18=\EOF,
+	kf19=\EOG,
+	kf20=\EOH,
+	kf21=\EOI,
+	kf22=\EOJ,
+	kf23=\ENO,
+	kf24=\ENP,
+	kf25=\ENQ,
+	kf26=\ENR,
+	kf27=\ENS,
+	kf28=\ENT,
+	kf29=\EOP,
+	kf30=\EOQ,
+	kf31=\EOR,
+	kf32=\EOS,
+	kf33=\EOw,
+	kf34=\EOx,
+	kf35=\EOy,
+	kf36=\EOm,
+	kf37=\EOt,
+	kf38=\EOu,
+	kf39=\EOv,
+	kf40=\EOl,
+	kf41=\EOq,
+	kf42=\EOr,
+	kf43=\EOs,
+	kf44=\EOp,
+	kf45=\EOn,
+	kf46=\EOM,
+	use=610-w,
+615-103k|615mt-103k|ATT615-103k|att615-103k|AT&T 615; 80 column; 103key keyboard @(#)615.ti 1.4,
+# add sequences for changing flow control setting
+	smxon=\E[?21;29h,
+	rmxon=\E[?21l,
+# modify initialization string font setting to match terminal on power-up
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)B,
+# add print screen not in previous versions of 615 MT
+	mc0=\E[i,
+# remove shifted HOME key added for 615 with 98-key keyboard
+	kHOM@,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	use=610-103k,
+615-103k-w|615mt-103k-w|ATT615-103k-w|att615-103k-w|AT&T 615; 132 column; 103key keyboard @(#)615.ti 1.4,
+# add sequences for changing flow control setting
+	smxon=\E[?21;29h,
+	rmxon=\E[?21l,
+# modify initialization string font setting to match terminal on power-up
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)B,
+# add print screen not in previous versions of 615 MT
+	mc0=\E[i,
+# remove shifted HOME key added for 615 with 98-key keyboard
+	kHOM@,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	use=610-103k-w,
+#
+# AT&T 615CMT - Color Multitasking Terminal - default is 102 keyboard
+#
+615CMT-102k|615cmt-102k|A615CMT-102k|a615CMT-102k|AT&T 615 CMT color multitasking terminal; 80 column; 102 key keyboard @(#)615CMT.ti 1.5,
+	colors#8,pairs#64,
+# all attributes supported except protect
+# with bold mapped to cyan, dim to blue, and standout as for the 615 MT
+#
+# color       terminfo        escape sequence parameters
+#             parameters       foreground    background
+#
+# black           0               30              40
+# blue            1               34              44
+# green           2               32              42
+# cyan            3               36              46
+# red             4               31              41
+# magenta         5               35              45
+# yellow          6               33              43
+# white           7               37              47
+# default         -               39              49
+#
+# initial color always white foreground on black background
+	op=\E[37;40m,
+	sgr0=\E[m^O,
+# set for foreground and background color variable 
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	setf=\E[3%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%{7}%>%t9%e%p1%d%;m,
+	setb=\E[4%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%{7}%>%t9%e%p1%d%;m,
+#
+# attribute     terminfo parameter      escape sequence parameter
+
+# none          0                       0
+# standout      1                       7 (reverse)
+# underline     2                       4
+# reverse       3                       7
+# blink         4                       5
+# dim           5                       34 (blue)
+# bold          6                       36 (cyan)
+# invisible     7                       8
+# protect       8                       not supported
+# altcharset    9                       no sequence - SO for on, SI for off
+#
+# modify sgr from 615 MT for dim and bold
+	sgr=\E[0%?%p6%t;36%;%?%p5%t;34%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	bold=\E[36m,
+	dim=\E[34m,
+# add keys for 102 key keyboard not on 98 key keyboard
+	kdch1=\E[P,
+	kdl1=\E[M,
+	kend=\E[24;1H,
+	kich1=\E[@,
+	kil1=\E[L,
+	knp=\E[U,
+	kpp=\E[V,
+# remove key for 98 key keyboard not on 102 key keyboard
+	kHOM@,
+# add sequences for changing flow control setting
+	smxon=\E[?21;29h,
+	rmxon=\E[?21l,
+# modify initialization string font setting
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)B,
+# add some enhancements not in previous versions for 615 MT
+	mc0=\E[i,
+# all other controls are the same as the 615 MT
+	use=att615,
+#
+# AT&T 615CMT - Color Multitasking Terminal - default is 98 keyboard
+#
+615CMT-98k|615cmt-98k|A615CMT-98k|a615CMT-98k|AT&T 615 CMT color multitasking terminal; 80 column; 98 key keyboard @(#)615CMT.ti 1.5,
+	kHOM=\ENM,
+	kdch1@,
+	kdl1@,
+	kend@,
+	kich1@,
+	kil1@,
+	knp@,
+	kpp@,
+	use=615CMT-102k,
+#
+# AT&T 615CMT - Color Multitasking Terminal - default is 102 keyboard
+#					      and wide columns
+#
+615CMT-102k-w|615cmt-102k-w|A615CMT-102k-w|a615CMT-102k-w|AT&T 615 CMT color multitasking terminal; 132 column; 102 key keyboard @(#)615CMT.ti 1.5,
+	cols#132,
+	wsl#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)B,
+	use=615CMT-102k,
+#
+# AT&T 615CMT - Color Multitasking Terminal - default is 98 keyboard
+#					      and wide columns
+#
+615CMT-98k-w|615cmt-98k-w|A615CMT-98k-w|a615CMT-98k-w|AT&T 615 CMT color multitasking terminal; 132 column; 98 key keyboard @(#)615CMT.ti 1.5,
+	cols#132,
+	wsl#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h\E(B\E)B,
+	kHOM=\ENM,
+	kdch1@,
+	kdl1@,
+	kend@,
+	kich1@,
+	kil1@,
+	knp@,
+	kpp@,
+	use=615CMT-102k,
+620|620mtg|ATT620|att620|AT&T 620; 80 column; 98key keyboard @(#)620.ti 1.8,
+	am,
+	xenl,
+	hs,
+	eslok,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	it#8,
+	lh#2,
+	lines#24,
+	lw#8,
+	nlab#8,
+	wsl#80,
+	cbt=\E[Z,
+	bel=^G,
+	cr=^M,
+	csr=\E[%i%p1%d;%p2%dr,
+	clear=\E[H\E[J,
+	el=\E[K,
+	ed=\E[J,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[B,
+	home=\E[H,
+	civis=\E[?25l,
+	cub1=^H,
+	cnorm=\E[?25h\E[?12l,
+	cuf1=\E[C,
+	ll=\E[24H,
+	cuu1=\E[A,
+	cvvis=\E[?12;25h,
+	dch1=\E[P,
+	dl1=\E[M,
+	smacs=^N,
+	blink=\E[5m,
+	bold=\E[1m,
+	smir=\E[4h,
+	ich=\E[%p1%d@,
+	invis=\E[8m,
+	rev=\E[7m,
+	smso=\E[7m,
+	smul=\E[4m,
+	rmacs=^O,
+	sgr0=\E[m^O,
+	rmir=\E[4l,
+	rmso=\E[m,
+	rmul=\E[m,
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h,
+	is2=\E[0m^O,
+	is3=\E(B\E)0,
+	il1=\E[L,
+	kbs=^H,
+	kclr=\E[2J,
+	kcud1=\E[B,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	kf15=\EOC,
+	kf16=\EOD,
+	kf17=\EOE,
+	kf18=\EOF,
+	kf19=\EOG,
+	kf20=\EOH,
+	kf21=\EOI,
+	kf22=\EOJ,
+	kf23=\ENO,
+	kf24=\ENP,
+	kf25=\ENQ,
+	kf26=\ENR,
+	kf27=\ENS,
+	kf28=\ENT,
+	kf29=\EOP,
+	kf30=\EOQ,
+	kf31=\EOR,
+	kf32=\EOS,
+	kf33=\EOw,
+	kf34=\EOx,
+	kf35=\EOy,
+	kf36=\EOm,
+	kf37=\EOt,
+	kf38=\EOu,
+	kf39=\EOv,
+	kf40=\EOl,
+	kf41=\EOq,
+	kf42=\EOr,
+	kf43=\EOs,
+	kf44=\EOp,
+	kf45=\EOn,
+	kf46=\EOM,
+	khome=\E[H,
+	kcub1=\E[D,
+	kcuf1=\E[C,
+	kind=\E[S,
+	kri=\E[T,
+	kcuu1=\E[A,
+	nel=\EE,
+	dch=\E[%p1%dP,
+	dl=\E[%p1%dM,
+	cud=\E[%p1%dB,
+	il=\E[%p1%dL,
+	cub=\E[%p1%dD,
+	cuf=\E[%p1%dC,
+	cuu=\E[%p1%dA,
+	pfxl=\E[%p1%d;%p2%l%02dq%?%p1%{9}%<%t   F%p1%1d           %;%p2%s,
+	mc4=\E[?4i,
+	mc5=\E[?5i,
+	rs2=\Ec\E[?3l,
+	rc=\E8,
+	sc=\E7,
+	ind=\ED,
+	ri=\EM,
+	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p4%t;5%;%?%p5%t;2%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	ht=\t,
+	tsl=\E7\E[25;%i%p1%dx,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	kcbt=\E[Z,
+	smln=\E[p,
+	rmln=\E[2p,
+	kLFT=\E[ A,
+	kRIT=\E[ @,
+	el1=\E[1K,
+620-w|620mtg-w|ATT620-w|att620-w|AT&T 620; 132 column; 98key keyboard @(#)620.ti 1.8,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=620,
+620-103k|620mtg-103k|ATT620-103k|att620-103k|AT&T 620; 80 column; 103key keyboard @(#)620.ti 1.8,
+	kf9@,
+	kf10@,
+	kf11@,
+	kf12@,
+	kf13@,
+	kf14@,
+	kf15@,
+	kf16@,
+	kf17@,
+	kf18@,
+	kf19@,
+	kf20@,
+	kf21@,
+	kf22@,
+	kf23@,
+	kf24@,
+	kf25@,
+	kf26@,
+	kf27@,
+	kf28@,
+	kf29@,
+	kf30@,
+	kf31@,
+	kf32@,
+	kf33@,
+	kf34@,
+	kf35@,
+	kf36@,
+	kf37@,
+	kf38@,
+	kf39@,
+	kf40@,
+	kf41@,
+	kf42@,
+	kf43@,
+	kf44@,
+	kf45@,
+	kf46@,
+	kdch1=\ENf,
+	kdl1=\ENe,
+	kel=\EOa,
+	kich1=\ENj,
+	krmir=\ENj,
+	knp=\E[U,
+	kpp=\E[V,
+	kbeg=\E9,
+	kcan=\EOw,
+	kclo=\EOV,
+	kcmd=\EOu,
+	kcpy=\ENd,
+	kcrt=\EOn,
+	kend=\E0,
+	kext=\EOk,
+	kfnd=\EOx,
+	khlp=\EOm,
+	kmrk=\ENi,
+	kmsg=\EOl,
+	kmov=\ENc,
+	knxt=\ENh,
+	kopn=\EOv,
+	kopt=\EOr,
+	kprt=\EOz,
+	kprv=\ENg,
+	krdo=\EOt,
+	kref=\EOb,
+	krfr=\ENa,
+	krpl=\EOy,
+	krst=\EOB,
+	kres=\EOq,
+	ksav=\EOo,
+	kspd=\EOp,
+	kund=\EOs,
+	kBEG=\ENB,
+	kCAN=\EOW,
+	kCMD=\EOU,
+	kCPY=\END,
+	kCRT=\EON,
+	kDC=\ENF,
+	kDL=\ENE,
+	kslt=\ENI,
+	kEND=\ENN,
+	kEOL=\EOA,
+	kEXT=\EOK,
+	kFND=\EOX,
+	kHLP=\EOM,
+	kMSG=\EOL,
+	kMOV=\ENC,
+	kNXT=\ENH,
+	kOPT=\EOR,
+	kPRT=\EOZ,
+	kPRV=\ENG,
+	kRDO=\EOT,
+	kRPL=\EOY,
+	kRES=\EOQ,
+	kSAV=\EOO,
+	kSPD=\EOP,
+	kUND=\EOS,
+	use=620,
+620-103k-w|620mtg-103k-w|ATT620-103k-w|att620-103k-w|AT&T 620; 132 column; 103key keyboard @(#)620.ti 1.8,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=620-103k,
+
+##############################################################
+#
+#	630 terminfo
+#
+#
+630|att630|5630|5630DMD|630MTG|AT&T 630 windowing terminal @(#)630.ti 1.5,
+	am, da, db, mir, msgr, npc, xon,
+	cols#80, it#8, lines#60, lm#0,
+#
+# short descriptions without \E
+#
+	bel=^G, cr=\r, ht=\t, nel=\r\n,
+#
+# cursor movement
+#
+	cuu1=\E[A,     cud1=\E[B,     cuf1=\E[C,     cub1=\b,
+	cuu=\E[%p1%dA, cud=\E[%p1%dB, cuf=\E[%p1%dC, cub=\E[%p1%dD,
+	cup=\E[%i%p1%d;%p2%dH,
+	home=\E[H,
+	cbt=\E[Z,
+#
+# scrolling
+#
+	ind=\ED,         ri=\EM,
+	indn=\E[%p1%dS, rin=\E[%p1%dT,
+#
+# character attributes
+#
+	smul=\E[4m, rmul=\E[m,
+	smso=\E[7m, rmso=\E[m,
+	rev=\E[7m,
+	sgr=\E[0%?%p2%t;4%;%?%p1%p3%|%p4%|%p5%|%t;7%;m,
+	sgr0=\E[m,
+#
+# clear
+#
+	el=\E[K, el1=\E[1K, ed=\E[J, clear=\E[H\E[J,
+#
+# insert/delete
+#
+	dch1=\E[P,     dl1=\E[M,     il1=\E[L,
+	dch=\E[%p1%dP, dl=\E[%p1%dM, il=\E[%p1%dL, ich=\E[%p1%d@,
+	smir=\E[4h,    rmir=\E[4l,
+#
+# pf string
+#
+	pfx=\E[%p1%d;%p2%l%dq%p2%s,
+#
+# set/reset
+#
+	sc=\E7, rc=\E8,
+	is2=\E[m, rs2=\Ec,
+#
+# printer
+#
+	mc4=\E[?4i, mc5=\E[?5i,
+#
+# keyboard definitions
+#
+	kbs=\b, kclr=\E[2J, khome=\E[H, kcbt=\E[Z,
+	kcuu1=\E[A, kcud1=\E[B, kcuf1=\E[C, kcub1=\E[D,
+	kf9=\ENo,  kf10=\ENp, kf11=\ENq,
+	kf12=\ENr, kf13=\ENs, kf14=\ENt,
+#
+# the following keys are used only by the 122 key keyboard
+#
+	kdch1=\E[P, kdl1=\E[M,
+	kich1=\E[@, kil1=\E[L,
+	kf15=\ENu, kf16=\ENv, kf17=\ENw,
+	kf18=\ENx, kf19=\ENy, kf20=\ENz,
+	kf21=\EN{, kf22=\EN|, kf23=\EN},
+	kf24=\EN~,
+
+
+630-24|att630-24|5630-24|5630DMD-24|630MTG-24|AT&T 630 windowing terminal 24 lines @(#)630.ti 1.5,
+	lines#24, use=630,
+
+
+6300+|PC6300PLUS|pc6300plus|6300plus|6300PLUS|AT&T-IS PC 6300 PLUS Personal Computer @(#)6300+.ti 1.1,
+	am,
+	cols#80, lines#24,
+	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[2J\E[H,
+	cr=\r, cub1=\b, cud1=\E[B, cuf1=\E[C,
+	cup=\E[%i%p1%02d;%p2%02dH, cuu1=\E[A, dch1=\E[1P,
+	dim=\E[2m, dl1=\E[1M, ed=\E[0J, el=\E[0K, home=\E[H,
+	hts=\EH, ich1=\E[1@, il1=\E[1L, ind=\n, invis=\E[9m,
+	kbs=\b, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C,
+	kcuu1=\E[A, kf1=\EOc, kf10=\EOu, kf2=\EOd, kf3=\EOe,
+	kf4=\EOf, kf5=\EOg, kf6=\EOh, kf7=\EOi, kf8=\EOj,
+	kf9=\EOk, nel=\r\n, rev=\E[7m, rmso=\E[m, rmul=\E[m,
+	smso=\E[7m, smul=\E[4m, tbc=\E[3g,
+730|att730|730MTG|AT&T 730 windowing terminal Version @(#)730.ti 1.3,
+
+# has status line of 80 chars
+
+	hs,
+	wsl#80,
+	tsl=\E7\E[;%i%p1%dx,
+
+# support \E on the status line (status_line_esc_ok)
+
+	eslok,
+
+#	screen dimension
+
+	cols#80,
+	lines#60,
+
+# label information
+
+	lw#8,
+	lh#2,
+	nlab#24,
+	rmln=\E[?13h,
+	smln=\E[?13l,
+
+# mapping of alternate character set to ASCII
+
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+
+# change the scrolling region
+
+	csr=\E[%i%p1%d;%p2%dr,
+
+# cursor visibility control
+
+	civis=\E[?25l,
+	cnorm=\E[?25h\E[?12l,
+	cvvis=\E[?12;25h,
+
+# character set mode
+
+	smacs=^N,
+	rmacs=^O,
+
+	am,
+	da,
+	db,
+	xenl,
+	mir,
+	msgr,
+	npc,
+	xon,
+	it#8,
+	lm#0,
+
+# short descriptions without \E
+
+	bel=^G,
+	cr=^M,
+	ht=\t,
+
+# cursor movement
+
+	cud1=\E[B,
+	cuf1=\E[C,
+	cuu1=\E[A,
+	cub1=^H,
+	cud=\E[%p1%dB,
+	cuu=\E[%p1%dA,
+	cuf=\E[%p1%dC,
+	cub=\E[%p1%dD,
+	cup=\E[%i%p1%d;%p2%dH,
+	home=\E[H,
+	cbt=\E[Z,
+
+# scrolling
+
+	ind=\ED,
+	ri=\EM,
+#	indn=\E[%p1%dS,
+#	rin=\E[%p1%dT,
+
+# character attributes
+
+	smul=\E[4m,
+	rmul=\E[24m,
+	smso=\E[7m,
+	rmso=\E[27m,
+	rev=\E[7m,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O,
+
+# character attribute mode
+
+	blink=\E[5m,
+	bold=\E[1m,
+	dim=\E[2m,
+	invis=\E[8m,
+
+# line attribute
+
+	swidm=\E#6,
+
+# clear
+
+	el=\E[K,
+	el1=\E[1K,
+	ed=\E[J,
+	clear=\E[H\E[J,
+
+# insert/delete
+
+	dch1=\E[P,
+	dl1=\E[M,
+	il1=\E[L,
+	dch=\E[%p1%dP,
+	dl=\E[%p1%dM,
+	il=\E[%p1%dL,
+	ich=\E[%p1%d@,
+	smir=\E[4h,
+	rmir=\E[4l,
+
+# pf string
+# the escape sequences are different to program
+#	system function keys 1-24
+#	shifted system function keys (numbers 25-48, but no label)
+# <25:  ESC [ pf# ; string-length q 16-char-label up-to-8-char-str
+# >24:  ESC [ pf#-24 ; string-length ; 0 ; 3 q       up-to-8-char-str
+	pfxl=\E[%?%p1%{25}%<%t%p1%e%p1%{24}%-%;%d;%p2%l%02d%?%p1%{25}%<%tq\s\s\sSYS\s\s\s\s\sF%p1%:-2d\s\s%e;0;3q%;%p2%s,
+
+# set/reset
+
+	sc=\E7,
+	rc=\E8,
+	is2=\E[0m^O,
+	rs2=\Ec\E[?3l,
+
+# printer
+
+	mc0=\E[?19h\E[0i,
+	mc4=\E[?4i,
+	mc5=\E[?5i,
+
+# keyboard definition
+
+	kich1=\E[@,
+	kil1=\E[L,
+
+	kbs=^H,
+	kclr=\E[2J,
+	khome=\E[H,
+	kcbt=\E[Z,
+	kcuu1=\E[A,
+	kcud1=\E[B,
+	kcuf1=\E[C,
+	kcub1=\E[D,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	kf15=\ENu,
+	kf16=\ENv,
+	kf17=\ENw,
+	kf18=\ENx,
+	kf19=\ENy,
+	kf20=\ENz,
+	kf21=\EN{,
+	kf22=\EN|,
+	kf23=\EN},
+	kf24=\EN~,
+
+# the following keys are used for shifted system Fkeys
+
+	kf25=\EOC,
+	kf26=\EOD,
+	kf27=\EOE,
+	kf28=\EOF,
+	kf29=\EOG,
+	kf30=\EOH,
+	kf31=\EOI,
+	kf32=\EOJ,
+	kf33=\ENO,
+	kf34=\ENP,
+	kf35=\ENQ,
+	kf36=\ENR,
+	kf37=\ENS,
+	kf38=\ENT,
+	kf39=\EOU,
+	kf40=\EOV,
+	kf41=\EOW,
+	kf42=\EOX,
+	kf43=\EOY,
+	kf44=\EOZ,
+	kf45=\EO[,
+	kf46=\EO\s,
+	kf47=\EO],
+	kf48=\EO\^,
+
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)B,
+	is3=\E(B\E)0,
+	kind=\E[S,
+	kri=\E[T,
+	nel=\EE,
+
+
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s,
+	kLFT=\E[\s@,
+	kRIT=\E[\sA,
+
+# add sequences for changing flow control setting
+
+	smxon=\E[?21h,
+	rmxon=\E[?21l,
+
+# add shifted HOME key
+
+	kHOM=\E[2J,
+
+# repeat char
+
+	rep=%p1%c\E[%p2%1%-$db,
+
+
+730-41|att730-41|730MTG-41|AT&T 730-41 windowing terminal Version @(#)730.ti 1.3,
+
+	lines#41,
+	use=730,
+
+730-24|att730-24|730MTG-24|AT&T 730-24 windowing terminal Version @(#)730.ti 1.3,
+
+	lines#24,
+	use=730,
+
+730r|att730r|730MTGr|AT&T 730 rev video windowing terminal Version @(#)730.ti 1.3,
+
+	flash=\E[?5l$<200>\E[?5h,
+	is1=\E[8;0|\E[?3;4;13;15l\E[?5h\E[13;20l\E[?7h\E[12h\E(B\E)B,
+	use=730,
+
+730r-41|att730r-41|730MTG-41r|AT&T 730r-41 rev video windowing terminal Version @(#)730.ti 1.3,
+
+	lines#41,
+	use=730r,
+
+730r-24|att730r-24|730MTGr-24|AT&T 730r-24 rev video windowing terminal Version @(#)730.ti 1.3,
+
+	lines#24,
+	use=730r,
+
+#
+# Info:
+#	TERMINFO entry for the AT&T Unix PC 7300
+#	from escape(7) in Unix PC 7300 Manual.
+#	Somewhat similar to a vt100-am (but different enough
+#	to redo this from scratch.)
+# Info:
+#	/***************************************************************
+#	*
+#	*           FONT LOADING PROGRAM FOR THE UNIX PC
+#	*
+#	*     This routine loads a font defined in the file ALTFONT
+#	*     into font memory slot #1.  Once the font has been loaded,
+#	*     it can be used as an alternative character set.
+#	*
+#	*     The call to ioctl with the argument WIOCLFONT is the key 
+#	*     to this routine.  For more information, see window(7) in 
+#	*     the PC 7300 documentation.
+#	***************************************************************/
+#	#include <string.h>		/* needed for strcpy call */
+#	#include <sys/window.h>         /* needed for ioctl call */
+#	#define FNSIZE	60		/* font name size */
+#	#define ALTFONT  "/usr/lib/wfont/special.8.ft"  /* font file */
+#	/*
+#	*     The file /usr/lib/wfont/special.8.ft comes with the
+#	*     standard PC software.  It defines a graphics character set
+#	*     similar to that of the Teletype 5425 terminal.  To view
+#	*     this or other fonts in /usr/lib/wfont, use the command
+#	*     cfont <filename>.  For further information on fonts see
+#	*     cfont(1) in the PC 7300 documentation.
+#	*/
+#	
+#	struct altfdata 	/* structure for alt font data */
+#	{
+#	short	altf_slot;		/* memory slot number */
+#	char	altf_name[FNSIZE];	/* font name (file name) */
+#	};
+#	ldfont()
+#	{
+#		int wd;		/* window in which altfont will be */
+#		struct altfdata altf;
+#		altf.altf_slot=1;
+#		strcpy(altf.altf_name,ALTFONT);
+#		for (wd =1; wd < 12; wd++) {
+#		     ioctl(wd, WIOCLFONT,&altf);
+#	        }
+#	}
+#
+7300|unixpc|pc7300|PC7300|unix_pc|AT&T UNIX PC Model 7300 @(#)7300.ti 1.5,
+        am, xon,
+        cols#80, lines#24,
+        bel=^G, bold=\E[7m, clear=\E[2J\E[H, cr=\r,
+        cub=\E[%p1%dD, cub1=\b, cud=\E[%p1%dB, cud1=\E[B,
+        cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH,
+        cuu=\E[%p1%dA, cuu1=\E[A, dim=\E[2m, dl=\E[%p1%dM,
+        dl1=\E[M, ed=\E[0J, el=\E[0K, home=\E[H, il=\E[%p1%dL,
+        il1=\E[L, ind=\n, kBEG=\ENB, kCAN=\EOW, kCMD=\EOU,
+        kCPY=\END, kCRT=\EON, kDC=\ENF, kDL=\ENE, kEND=\ENN,
+        kEOL=\EOA, kEXT=\EOK, kFND=\EOX, kHLP=\EOM, kHOM=\ENM,
+        kIC=\ENJ, kLFT=\ENK, kMOV=\ENC, kMSG=\EOL, kNXT=\ENH,
+        kOPT=\EOR, kPRT=\EOZ, kPRV=\ENG, kRDO=\EOT, kRES=\EOQ,
+        kRIT=\ENL, kRPL=\EOY, kSAV=\EOO, kSPD=\EOP, kUND=\EOS,
+        kbeg=\E9, kbs=\b, kcan=\EOw, kclo=\EOV, kclr=\E[J,
+        kcmd=\EOu, kcpy=\ENd, kcrt=\EOn, kcub1=\E[D,
+        kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A, kdch1=\ENf,
+        kdl1=\ENe, kel=\EOa, kend=\E0, kext=\EOk, kf1=\EOc,
+        kf2=\EOd, kf3=\EOe, kf4=\EOf, kf5=\EOg, kf6=\EOh,
+        kf7=\EOi, kf8=\EOj, kfnd=\EOx, khlp=\EOm, khome=\E[H,
+        kich1=\ENj, kind=\E[S, kmov=\ENc, kmrk=\ENi,
+        kmsg=\EOl, knp=\E[U, knxt=\ENh, kopn=\EOv, kopt=\EOr,
+        kpp=\E[V, kprt=\EOz, kprv=\ENg, krdo=\EOt, kref=\EOb,
+        kres=\EOq, krfr=\ENa, kri=\E[T, krpl=\EOy, krst=\EOB,
+        ksav=\EOo, kslt=\ENI, kspd=\EOp, kund=\EOs, nel=\EE,
+        rev=\E[7m, ri=\EM, rmacs=\E[10m, rmso=\E[0m,
+        rmul=\E[0m, sgr0=\E[0;10m, smacs=\E[11m, smso=\E[7m,
+        smul=\E[4m,
+SYS75|sys75|AT&T System 75 Cartridge; 80 column; 98key keyboard @(#)SYS75.ti 1.2,
+	am,
+	xenl,
+	hs,
+	eslok,
+	mir,
+	msgr,
+	xon,
+	cols#80,
+	it#8,
+	lh#2,
+	lines#24,
+	lw#8,
+	nlab#8,
+	wsl#80,
+	cbt=\E[Z,
+	bel=^G,
+	cr=^M,
+	csr=\E[%i%p1%d;%p2%dr,
+	clear=\E[H\E[J,
+	el=\E[K,
+	ed=\E[J,
+	cup=\E[%i%p1%d;%p2%dH,
+	cud1=\E[B,
+	home=\E[H,
+	civis=\E[?25l,
+	cub1=^H,
+	cnorm=\E[?25h\E[?12l,
+	cuf1=\E[C,
+	ll=\E[24H,
+	cuu1=\E[A,
+	cvvis=\E[?12;25h,
+	dch1=\E[P,
+	dl1=\E[M,
+	smacs=^N,
+	blink=\E[5m,
+	bold=\E[1m,
+	dim=\E[2m,
+	smir=\E[4h,
+	ich=\E[%p1%d@,
+	invis=\E[8m,
+	rev=\E[7m,
+	smso=\E[7m,
+	smul=\E[4m,
+	rmacs=^O,
+	sgr0=\E[m^O,
+	rmir=\E[4l,
+	rmso=\E[m,
+	rmul=\E[m,
+	flash=\E[?5h$<200>\E[?5l,
+	fsl=\E8,
+	is1=\E[8;0|\E[?3;4;5;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)0,
+	is2=\E[0m^O,
+	is3=\E(B\E)0,
+	il1=\E[L,
+	kbs=^H,
+	kcud1=\E[B,
+	kf1=\EOc,
+	kf2=\EOd,
+	kf3=\EOe,
+	kf4=\EOf,
+	kf5=\EOg,
+	kf6=\EOh,
+	kf7=\EOi,
+	kf8=\EOj,
+	kf9=\ENo,
+	kf10=\ENp,
+	kf11=\ENq,
+	kf12=\ENr,
+	kf13=\ENs,
+	kf14=\ENt,
+	khome=\E[H,
+	kcub1=\E[D,
+	kcuf1=\E[C,
+	kind=\E[S,
+	kri=\E[T,
+	kcuu1=\E[A,
+	nel=\EE,
+	dch=\E[%p1%dP,
+	dl=\E[%p1%dM,
+	cud=\E[%p1%dB,
+	il=\E[%p1%dL,
+	cub=\E[%p1%dD,
+	cuf=\E[%p1%dC,
+	cuu=\E[%p1%dA,
+	rs2=\Ec\E[?3l,
+	rc=\E8,
+	sc=\E7,
+	ind=\ED,
+	ri=\EM,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	ht=\t,
+	tsl=\E7\E[25;%i%p1%dx,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	pln=\E[%p1%d;0;0;0p%p2%:-16.16s,
+	kcbt=\E[Z,
+	smln=\E?,
+	rmln=\E<,
+	el1=\E[1K,
+	kclr=\E[J,
+	pfxl=\E[%p1%d;%p2%l%02dp%?%p1%{9}%<%t   F%p1%1d           %;%p2%s,
+	mc0=\E[?0i,
+	mc4=\E[?8i,
+	mc5=\E[?4i,
+	kLFT=\ENK,
+	kRIT=\ENL,
+	kHOM=\ENM,
+	hpa=\E[%p1%dG,
+SYS75-w|sys75-w|AT&T System 75 Cartridge; 132 column; 98key keyboard @(#)SYS75.ti 1.2,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=SYS75,
+SYS75-103k|sys75-103k|AT&T System 75 Cartridge; 80 column; 103key keyboard @(#)SYS75.ti 1.2,
+	kf9@,
+	kf10@,
+	kf11@,
+	kf12@,
+	kf13@,
+	kf14@,
+	kdch1=\ENf,
+	kdl1=\ENe,
+	kel=\EOa,
+	kich1=\ENj,
+	krmir=\ENj,
+	knp=\E[U,
+	kpp=\E[V,
+	kbeg=\E9,
+	kcan=\EOw,
+	kclo=\EOV,
+	kcmd=\EOu,
+	kcpy=\ENd,
+	kcrt=\EOn,
+	kend=\E0,
+	kext=\EOk,
+	kfnd=\EOx,
+	khlp=\EOm,
+	kmrk=\ENi,
+	kmsg=\EOl,
+	kmov=\ENc,
+	knxt=\ENh,
+	kopn=\EOv,
+	kopt=\EOr,
+	kprt=\EOz,
+	kprv=\ENg,
+	krdo=\EOt,
+	kref=\EOb,
+	krfr=\ENa,
+	krpl=\EOy,
+	krst=\EOB,
+	kres=\EOq,
+	ksav=\EOo,
+	kspd=\EOp,
+	kund=\EOs,
+	kBEG=\ENB,
+	kCAN=\EOW,
+	kCMD=\EOU,
+	kCPY=\END,
+	kCRT=\EON,
+	kDC=\ENF,
+	kDL=\ENE,
+	kslt=\ENI,
+	kEND=\ENN,
+	kEOL=\EOA,
+	kEXT=\EOK,
+	kFND=\EOX,
+	kHLP=\EOM,
+	kMSG=\EOL,
+	kMOV=\ENC,
+	kNXT=\ENH,
+	kOPT=\EOR,
+	kPRT=\EOZ,
+	kPRV=\ENG,
+	kRDO=\EOT,
+	kRPL=\EOY,
+	kRES=\EOQ,
+	kSAV=\EOO,
+	kSPD=\EOP,
+	kUND=\EOS,
+	use=SYS75,
+SYS75-103k-w|sys75-103k-w|AT&T System 75 Cartridge; 132 column; 103key keyboard @(#)SYS75.ti 1.2,
+	cols#132,
+	is1=\E[8;0|\E[?4;5;13;15l\E[13;20l\E[?3;7h\E[12h,
+	wsl#132,
+	use=SYS75-103k,
+
+blit|jerq|blit running teletype rom @(#)blit.ti 1.1,
+	xon,cr=^M, ind=^J, bel=^G, am, ht=^I, it#8, ul, eo,
+	cud1=^J, cuf1=\EC, cuu1=\EA, cub1=\ED,
+	cols#87, lines#72, clear=^L, el=\EK,
+	cup=\EY%p2%' '%+%c%p1%' '%+%c,
+	il1=\EF!, dl1=\EE!, ich1=\Ef!, dch1=\Ee!,
+	il=\EF%p1%' '%+%c, dl=\EE%p1%' '%+%c,
+	ich=\Ef%p1%' '%+%c, dch=\Ee%p1%' '%+%c,
+	kcuu1=\EA, kcud1=\EB, kcuf1=\EC, kcub1=\ED, kbs=^H,
+	kf1=\Ex, kf2=\Ey, kf3=\Ez,
+
+cbblit|fixterm|blit running columbus code @(#)blit.ti 1.1,
+	smso=\EU!, rmso=\EV!, smul=\EU", rmul=\EV",
+	flash=\E^G, ed=\EJ, smir=\EQ, rmir=\ER, ich1@, cols#88,
+	mc5=^R, mc4=^T, mc5p=\EP%p1%03d, use=blit,
+
+oblit|ojerq|first version of blit rom @(#)blit.ti 1.1,
+	xon,cr=^M, cud1=^J, ind=^J, bel=^G, cols#88, lines#72, it#8, ht=^I,
+	am, ul, eo, mir, il=\Ef%p1%' '%+%c, dl=\Ee%p1%' '%+%c,
+	dl1=\EE, rmir=\ER, smir=\EQ, dch1=\EO, cub1=\ED, da, db,
+	il1=\EF, ed=\EJ, el=\EK, clear=^L, cup=\EY%p2%' '%+%c%p1%' '%+%c,
+	cuf1=\EC, cuu1=\EA, flash=\E^G, kbs=^H,
+
+# Info:	
+#	This is an old version of vitty reentered. It is used when 
+#	running the vitty program outside a blit layer.
+#
+
+blitlayer|vitty| @(#)blit.ti 1.1,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cols#87, lines#72, it#8, ht=^I,
+	am, clear=^L, cup=\EY%p2%' '%+%c%p1%' '%+%c, el=\EK, il1=\EI, dl1=\ED,
+	flash=\E^G, cuu1=^K,
+
+# Info:	
+#	
+#	This is a generic terminal for the new AT&T terminals that is not
+#		really for use by itself, but was created to help make the
+#		support for the other new terminals easier by defining the
+#		common entry fields only once.  There are several things
+#		that weren't defined here but were common to 2 or more terminal
+#		entries because they were different in at least 2 of the other
+#		entries (e.g. clear, cols, cud1, ht, ind, and lines).
+#		Unfortunately the 4424 has almost completely different data
+#		for the fields than what the newer ones have and so hasn't been
+#		included as one of the terminals using this common entry.
+#
+attgeneric| AT&T generic terminal description @(#)generic.ti 1.2,
+	am, hs, mir, msgr, xenl, xon,
+	cols#80, it#8, lh#2, lines#24, lw#8, nlab#8,
+	wsl#55,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m, bold=\E[4;7m, cbt=\E[Z,
+	clear=\E[H\E[J, cnorm=\E[12;0j, cr=\r,
+	csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	cvvis=\E[12;1j, dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m,
+	dl=\E[%p1%dM, dl1=\E[M, ech=\E[%p1%ds\E[%p1%dD,
+	ed=\E[J, el=\E[K, el1=\E[1K, enacs=\E(B\E)0,
+	flash=\E[?5h$<200>\E[?5l, fsl=\E8, home=\E[H,
+	ht=\t, hts=\EH, ich=\E[%p1%d@,
+	il=\E[%p1%dL, il1=\E[L, ind=\n, indn=\E[%p1%dE,
+	invis=\E[8m, is1=\E<\E[?3l$<100>,
+	is2=\E[0m^O\E[1;2;3;4;6l\E[12;13;14;20l\E[?6;97;99l\E[?7h\E[4i\Ex\E[25;1j\212,
+	is3=\E[?5l, kbeg=\Et, kbs=\b, kcbt=\E[Z, kclr=\E[2J,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	kdch1=\E[P, kdl1=\E[M, kel=\E[2K, kend=\Ez, kent=\n,
+	kf1=\EOc, kf2=\EOd, kf3=\EOe, kf4=\EOf, kf5=\EOg,
+	kf6=\EOh, kf7=\EOi, kf8=\EOj, khome=\E[H, kich1=\E[4h,
+	kil1=\E[L, kind=\E[T, kprt=\EOe, kri=\E[S, ll=\E[24H,
+	mc0=\E[?2i, mc4=\E[?9i, mc5=\E[?4i, nel=\r\n,
+	pfx=\E[%p1%d;%p2%l%02dq\s\s\sF%p1%1d\s\s\s\s\s\s\s\s\s\s\s%p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s, prot=\EV, rc=\E8,
+	rev=\E[7m, ri=\EM, rin=\E[%p1%dF, rmacs=^O,
+	rmir=\E[4l, rmkx=\E[21;0j, rmln=\E|, rmso=\E[m,
+	rmul=\E[m, rs2=\Ec\E[?3l\E[2;0y, sc=\E7,
+	sgr=\E[0%?%p1%p5%|%t;2%;%?%p2%p6%|%t;4%;%?%p4%t;5%;%?%p3%p1%|%p6%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smir=\E[4h, smkx=\E[21;1j\E~,
+	smln=\E~, smso=\E[2;7m, smul=\E[4m, tbc=\E[3g,
+	tsl=\E7\E[25;%p1%{8}%+%dH,
+
+netty| @(#)netty.ti 1.2,
+	smcup=\EC@\EI@\EU@\ER@\EW@\EP@\E{A\E[@\E#A\EXA, rmcup=\E{@\E#@\EX@,
+	use=netty-Tabs,
+
+netty-vi| @(#)netty.ti 1.2,
+	smcup=\EC@\EI@\EU@\ER@\EW@\EP@\E{A\E[A\E#B\EX@, rmcup=\E{@\E[@\E#@,
+	use=netty-Tabs,
+
+netty-Tabs| @(#)netty.ti 1.2,
+	am,
+	hs,
+	mir,
+	msgr,
+	it#8,
+	acsc=jjkkllmmqqxx,
+	bel=^G,
+	cr=^M,
+	clear=^L,
+	el=\EZ,
+	cup=\EY%p2%?%p2%{95}%>%t^A%{96}%-%;%' '%+%c%p1%?%p1%{95}%>%t^A%{96}%-%;%' '%+%c,
+	home=\EY\s\s,
+	cub1=^H,
+	cud1=^J,
+	cuu1=\EA,
+	dch1=\Ed,
+	dl1=\ED!,
+	fsl=^A,
+	smacs=\ECA, rmacs=\EC@,
+	smcup=\EC@\EI@\EU@\ER@\EW@\EP@\E{A\E[@\EX@\E#C\EM@!!, rmcup=\E{@\E#@,
+	smcup=\E{A, rmcup=\E{@,
+	smir=\EIA, rmir=\EI@,
+	smul=\EUA, rmul=\EU@,
+	smso=\ERA, rmso=\ER@,
+	sgr0=\EC@\EI@\EU@\ER@,
+	il1=\EO!,
+	is3=\EF@^A^XOE^A\EFA^A^XOF^A\EFB^A^XOG^A\EFC^A^XOH^A\EFD^A^XOI^A\EFE^A^XOJ^A\EFF^A^XOK^A\EFG^A^XOL^A\EFH^A^XOM^A\EFI^A^XON^A\EFK^A^XOO^A,
+	kcud1=^XOB,
+	kf1=^XOE,
+	kf2=^XOF,
+	kf3=^XOG,
+	kf4=^XOH,
+	kf5=^XOI,
+	kf6=^XOJ,
+	kf7=^XOK,
+	kf8=^XOL,
+	kclr=^XOM,
+	khome=^XON,
+	kll=^XOO,
+	kcub1=^XOC,
+	kcuf1=^XOD,
+	kcuu1=^XOA,
+	dl=\ED%p1%' '%+%c,
+	indn=\ES%p1%' '%+%c,
+	ind=\n,
+	il=\EO%p1%' '%+%c,
+	ht=\t,
+	cols#80,
+	lines#24,
+# Info:
+#	wind=\Ev%p1%' '%+%c%p3%' '%+%c%p2%' '%+%c%p4%' '%+%c,	loses bad
+#	rev=^N,		standout seems to work better
+#
+	tsl=\Eb^A,
+
+#
+# The following Terminfo entry describes functions which are supported by
+# the AT&T 5430/pt505 terminal software version 2 and later.
+#
+# The following represents the screen layout along with the associated
+# bezel buttons for the 5430/pt505 terminal. The "kf" designations do
+# not appear on the screen but are shown to reference the bezel buttons.
+# The "CMD", "MAIL", and "REDRAW" buttons are shown in their approximate
+# position relative to the screen.
+#
+#
+#
+#      +----------------------------------------------------------------+
+#      |                                                                |
+# XXXX | kf0                                                       kf24 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf1                                                       kf23 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf2                                                       kf22 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf3                                                       kf21 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf4                                                       kf20 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf5                                                       kf19 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf6                                                       kf18 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX |                                                                | XXXX
+#      |                                                                |
+#      |                                                                |
+#      +----------------------------------------------------------------+
+#
+#          XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX
+#
+# Note: XXXX represents the screen buttons
+#                                                          CMD   REDRAW
+#
+#                                                          MAIL
+#
+#       Depression of the "CMD" key sends    \E!    (kcmd)
+#	Depression of the "MAIL" key sends   \E[26s (kf26)
+#	"REDRAW" same as "REFRESH" (krfr)
+#
+#
+# "kf" functions adds carriage return to output string if terminal is in
+# 'new line' mode.
+#
+# The following are functions not covered in the table above:
+#
+#       Set keyboard character (SKC):
+#
+#               \EPn1;Pn2w
+#
+#                       Pn1= 0 Back Space key
+#                       Pn1= 1 Break key
+#                       Pn2=   Program char (hex)
+#
+#       Screen Definition (SDF):
+#
+#               \E[Pn1;Pn2;Pn3;Pn4;Pn5t
+#
+#                       Pn1=     Window number (1-39)
+#                       Pn2-Pn5= Y;X;Y;X coordinates
+#
+#       Screen Selection (SSL):
+#
+#               \E[Pnu
+#
+#                       Pn= Window number
+#
+#       Set Terminal Modes (SM):
+#
+#               \E[Pnh
+#
+#                       Pn= 3 Graphics mode
+#                       Pn= > Cursor blink
+#                       Pn= < Enter new line mode
+#                       Pn= = Enter reverse insert/replace mode
+#                       Pn= ? Enter no scroll mode
+#
+#       Reset Terminal Mode (RM):
+#
+#               \E[Pnl
+#
+#                       Pn= 3 Exit graphics mode
+#                       Pn= > Exit cursor blink
+#                       Pn= < Exit new line mode
+#                       Pn= = Exit reverse insert/replace mode
+#                       Pn= ? Exit no scroll mode
+#
+#       Screen Status Report (SSR):
+#
+#               \E[Pnp
+#
+#                       Pn= 0 Request current window number
+#                       Pn= 1 Request current window dimensions
+#
+#       Device Status Report (DSR):
+#
+#               \E[6n    Request cursor position
+#
+#       Call Status Report (CSR):
+#
+#               \E[Pnv
+#
+#                       Pn= 0 Call failed
+#                       Pn= 1 Call successful
+#
+#       Transparent Button String (TBS):
+#
+#               \E[Pn1;Pn2;Pn3;{string
+#
+#                       Pn1= Button number to be loaded
+#                       Pn2= Character count of "string"
+#                       Pn3= Key mode being loaded:
+#                               0= Unshifted
+#                               1= Shifted
+#                               2= Control
+#                       String= Text string (15 chars max)
+#
+#       Screen Number Report (SNR):
+#
+#               \E[Pnp
+#
+#                       Pn= Screen number
+#
+#       Screen Dimension Report (SDR):
+#
+#               \E[Pn1;Pn2r
+#
+#                       Pn1= Number of rows available in window
+#                       Pn2= Number of columns available in window
+#
+#       Cursor Position Report (CPR):
+#
+#               \E[Pn1;Pn2R
+#
+#                       Pn1= "Y" Position of cousor
+#                       Pn2= "X" Position of cursor
+#
+#       Request Answer Back (RAB):
+#
+#               \E[c
+#
+#       Answer Back Response (ABR):
+#
+#               \E[?;*;30;VSV
+#
+#                       *=  0 No printer available
+#                       *=  2 Printer available
+#                       V=  Software version number
+#                       SV= Software sub version number
+#
+#       Screen Alingment Aid:
+#
+#               \En
+#
+#       Bell (lower pitch):
+#
+#               \E[x
+#
+#       Dial Phone Number:
+#
+#               \EPdstring\
+#
+#                       string= Phone number to be dialed
+#
+#       Set Phone Labels:
+#
+#               \EPpstring\
+#
+#                       string= Label for phone buttons
+#
+#       Set Clock:
+#
+#               \EPchour;minute;second\
+#
+#       Position Clock:
+#
+#               \EPsY;X\
+#
+#                       Y= "Y" coordinate
+#                       X= "X" coordinate
+#
+#       Delete Clock:
+#
+#               \Epr\
+#
+#       Programming The Function Buttons:
+#
+#               \EPfPn;string\
+#
+#                       Pn= Button number (00-06, 18-24)
+#                                         (kf00-kf06, kf18-kf24)
+#
+#                       string= Text to sent on button depression
+#
+#       Request For Local Directory Data:
+#
+#               \EPp12;\
+#
+#       Local Directory Data to host:
+#
+#               \EPp11;LOCAL...DIRECTORY...DATA\
+#
+#	Request for Local Directory Data in print format:
+#	
+#		\EPp13;\
+#
+#	Enable 'Prt on Line' mode:
+#
+#		\022 (DC2)
+#
+#	Disable 'Prt on Line' mode:
+#
+#		\024 (DC4)
+#
+#
+#
+#								05-Aug-86
+#
+# 
+505|pt505|5430|gs5430| AT&T Personal Terminal 505 or 5430 GETSET terminal @(#)pt505.ti 1.4,
+        am, bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[2J\E[H, cnorm=\E[>l,
+        cols#80, cr=\r, cub1=\E[D, cub=\E[%p1%dD, cud=\E[%p1%dB, cud1=\E[B,
+        cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+        cvvis=\E[>h, dch=\E[%p1%dP, dch1=\E[P, dl=\E[%p1%dM, dl1=\E[M, ed=\E[0J,
+        el=\E[0K, el1=\E2K, home=\E[H, ht=\t, il=\E[%p1%dL, il1=\E[L, ind=\n,
+        is1=\EPr\\E[0u\E[2J\E[0;0H\E[0m\E[3l\E[<l\E[4l\E[>l\E[=l\E[?l,
+        it#8, kbs=\b, kcmd=\E!, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+        kf0=\E[00s, kf1=\E[01s, kf2=\E[02s, kf3=\E[03s, kf4=\E[04s, kf5=\E[05s,
+        kf6=\E[06s, kf18=\E[18s, kf19=\E[19s, kf20=\E[20s, kf21=\E[21s,
+        kf22=\E[22s, kf23=\E[23s, kf24=\E24s, kf26=\E26s, krfr=\E[27s,
+        lines#24, mc4=\E[4i, mc5=\E[5i, rc=\E8,
+        rev=\E[7m, rmacs=\E[10m, rmir=\E[4l, rmso=\E[0m, rmul=\E[0m, rs1=\Ec,
+        sc=\E7, sgr0=\E[0m, smacs=\E[11m, smir=\E[4h, smso=\E[1m, smul=\E[4m,
+        xon, rmam=\E[11;1j, smam=\E[11;0j,
+
+#
+# The following Terminfo entry describes functions which are supported by
+# the AT&T 5430/pt505 terminal software version 1.
+#
+# The following represents the screen layout along with the associated
+# bezel buttons for the 5430/pt505 terminal. The "kf" designations do
+# not appear on the screen but are shown to reference the bezel buttons.
+# The "CMD", "MAIL", and "REDRAW" buttons are shown in their approximate
+# position relative to the screen.
+#
+#
+#
+#      +----------------------------------------------------------------+
+#      |                                                                |
+# XXXX | kf0                                                       kf24 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf1                                                       kf23 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf2                                                       kf22 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf3                                                       kf21 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf4                                                       kf20 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf5                                                       kf19 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX | kf6                                                       kf18 | XXXX
+#      |                                                                |
+#      |                                                                |
+# XXXX |                                                                | XXXX
+#      |                                                                |
+#      |                                                                |
+#      +----------------------------------------------------------------+
+#
+#          XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX  XXXX
+#
+# Note: XXXX represents the screen buttons
+#                                                          CMD   REDRAW
+#
+#                                                          MAIL
+#
+#       Depression of the "CMD" key sends    \E!    (kcmd)
+#	Depression of the "MAIL" key sends   (note) (kf26)
+#	"REDRAW" same as "REFRESH" (krfr)    (note)
+#
+# note: The character string sent by key 'kf26' may be user programmable
+#       to send either \E[16s, or \E[26s.
+#       The character string sent by key 'krfr' may be user programmable
+#       to send either \E[17s, or \E[27s.
+#
+# "kf" functions adds carriage return to output string if terminal is in
+# 'new line' mode.
+#
+# The following are functions not covered in the table above:
+#
+#       Set keyboard character (SKC):
+#
+#               \EPn1;Pn2w
+#
+#                       Pn1= 0 Back Space key
+#                       Pn1= 1 Break key
+#                       Pn2=   Program char (hex)
+#
+#       Screen Definition (SDF):
+#
+#               \E[Pn1;Pn2;Pn3;Pn4;Pn5t
+#
+#                       Pn1=     Window number (1-39)
+#                       Pn2-Pn5= Y;X;Y;X coordinates
+#
+#       Screen Selection (SSL):
+#
+#               \E[Pnu
+#
+#                       Pn= Window number
+#
+#       Set Terminal Modes (SM):
+#
+#               \E[Pnh
+#
+#                       Pn= 3 Graphics mode
+#                       Pn= > Cursor blink
+#                       Pn= < Enter new line mode
+#                       Pn= = Enter reverse insert/replace mode
+#                       Pn= ? Enter no scroll mode
+#
+#       Reset Terminal Mode (RM):
+#
+#               \E[Pnl
+#
+#                       Pn= 3 Exit graphics mode
+#                       Pn= > Exit cursor blink
+#                       Pn= < Exit new line mode
+#                       Pn= = Exit reverse insert/replace mode
+#                       Pn= ? Exit no scroll mode
+#
+#       Screen Status Report (SSR):
+#
+#               \E[Pnp
+#
+#                       Pn= 0 Request current window number
+#                       Pn= 1 Request current window dimensions
+#
+#       Device Status Report (DSR):
+#
+#               \E[6n    Request cursor position
+#
+#       Call Status Report (CSR):
+#
+#               \E[Pnv
+#
+#                       Pn= 0 Call failed
+#                       Pn= 1 Call successful
+#
+#       Transparent Button String (TBS):
+#
+#               \E[Pn1;Pn2;Pn3;{string
+#
+#                       Pn1= Button number to be loaded
+#                       Pn2= Character count of "string"
+#                       Pn3= Key mode being loaded:
+#                               0= Unshifted
+#                               1= Shifted
+#                               2= Control
+#                       String= Text string (15 chars max)
+#
+#       Screen Number Report (SNR):
+#
+#               \E[Pnp
+#
+#                       Pn= Screen number
+#
+#       Screen Dimension Report (SDR):
+#
+#               \E[Pn1;Pn2r
+#
+#                       Pn1= Number of rows available in window
+#                       Pn2= Number of columns available in window
+#
+#       Cursor Position Report (CPR):
+#
+#               \E[Pn1;Pn2R
+#
+#                       Pn1= "Y" Position of cousor
+#                       Pn2= "X" Position of cursor
+#
+#       Request Answer Back (RAB):
+#
+#               \E[c
+#
+#       Answer Back Response (ABR):
+#
+#               \E[?;0;30;VSV
+#
+#                       V=  Software version number
+#                       SV= Software sub version number
+#
+#       Screen Alingment Aid:
+#
+#               \En
+#
+#       Bell (lower pitch):
+#
+#               \E[x
+#
+#       Dial Phone Number:
+#
+#               \EPdstring\
+#
+#                       string= Phone number to be dialed
+#
+#       Set Phone Labels:
+#
+#               \EPpstring\
+#
+#                       string= Label for phone buttons
+#
+#       Set Clock:
+#
+#               \EPchour;minute;second\
+#
+#       Position Clock:
+#
+#               \EPsY;X\
+#
+#                       Y= "Y" coordinate
+#                       X= "X" coordinate
+#
+#       Delete Clock:
+#
+#               \Epr\
+#
+#       Programming The Function Buttons:
+#
+#               \EPfPn;string\
+#
+#                       Pn= Button number (00-06, 18-24)
+#                                         (kf00-kf06, kf18-kf24)
+#
+#                       string= Text to sent on button depression
+#
+#
+#
+#								05-Aug-86
+#
+# 
+505-24|pt505-24|5430-24|gs5430-24| AT&T PT505 or 5430 GETSET version 1 24 lines @(#)pt505v1.ti 1.2,
+        am, bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[2J\E[H, cnorm=\E[>l,
+        cols#80, cr=\r, cub1=\E[D, cub=\E[%p1%dD, cud=\E[%p1%dB, cud1=\E[B,
+        cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+        cvvis=\E[>h, dch=\E[%p1%dP, dch1=\E[P, dl=\E[%p1%dM, dl1=\E[M, ed=\E[0J,
+        el=\E[0K, el1=\E2K, home=\E[H, ht=\t, il=\E[%p1%dL, il1=\E[L, ind=\n,
+        is1=\EPr\\E[0u\E[2J\E[0;0H\E[0m\E[3l\E[<l\E[4l\E[>l\E[=l\E[?l,
+        it#8, kbs=\b, kcmd=\E!, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+        kf0=\E[00s, kf1=\E[01s, kf2=\E[02s, kf3=\E[03s, kf4=\E[04s, kf5=\E[05s,
+        kf6=\E[06s, kf18=\E[18s, kf19=\E[19s, kf20=\E[20s, kf21=\E[21s,
+        kf22=\E[22s, kf23=\E[23s, kf24=\E24s, kf26=\E26s, krfr=\E[27s,
+        lines#24,
+        rev=\E[7m, rmacs=\E[10m, rmir=\E[4l, rmso=\E[0m, rmul=\E[0m, rs1=\Ec,
+        sgr0=\E[0m, smacs=\E[11m, smir=\E[4h, smso=\E[1m, smul=\E[4m,
+        xon,
+505-22|pt505-22|5430-22|gs5430-22| AT&T PT505 or 5430 GETSET version 1 22 lines @(#)pt505v1.ti 1.2,
+        lines#22, use=5430-24,
+
+#	Reconstructed via infocmp from file: /usr/lib/terminfo/7/705
+705c|ATT705C|att705c|4000awtc|AT&T 705 Color 24x80 column display w/102key keyboard @(#)705.ti 1.3,
+	am, da, db, eslok, hs, mir, msgr, xenl, xon,
+	colors#8, cols#80, lh#2, lines#24, lm#0, lw#8, 
+	pairs#64, nlab#8, wsl#80,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m, bold=\E[36m, cbt=\E[Z,
+	civis=\E[?25l, clear=\E[H\E[J, cnorm=\E[?25h\E[?12l,
+	cr=\r, csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\E[B, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	cvvis=\E[?12;25h, dch=\E[%p1%dP, dch1=\E[P, dim=\E[34m,
+	dl=\E[%p1%dM, dl1=\E[M, ed=\E[J, el=\E[K, el1=\E[1K,
+	enacs=\E(B\E)0, flash=\E[?5h$<200>\E[?5l, fln=4\,4,
+	fsl=\E8, home=\E[H, ht=\t, hts=\EH, ich=\E[%p1%d@,
+	il=\E[%p1%dL, il1=\E[L, ind=\ED, invis=\E[8m,
+	is2=\E[50;4|\E[53;0|\E[8;0|\E[?4;13;15l\E[13;20l\E[?7h\E[12h\E(B\E)0\E[?31l\E[0m^O,
+	is3=\E(B\E)0, kLFT=\E[\sA, kRIT=\E[\s@, kbs=\b,
+	kcbt=\E[Z, kclr=\E[2J, kcub1=\E[D, kcud1=\E[B,
+	kcuf1=\E[C, kcuu1=\E[A, kdch1=\E[P, kdl1=\E[M,
+	kend=\E[24;1H, kf1=\EOc, kf10=\ENp, kf11=\ENq,
+	kf12=\ENr, kf13=\ENs, kf14=\ENt, kf15=\EOC, kf16=\EOD,
+	kf17=\EOE, kf18=\EOF, kf19=\EOG, kf2=\EOd, kf20=\EOH,
+	kf21=\EOI, kf22=\EOJ, kf23=\ENO, kf24=\ENP, kf25=\ENQ,
+	kf26=\ENR, kf27=\ENS, kf28=\ENT, kf29=\EOP, kf3=\EOe,
+	kf30=\EOQ, kf31=\EOR, kf32=\EOS, kf33=\EOw, kf34=\EOx,
+	kf35=\EOy, kf36=\EOm, kf37=\EOt, kf38=\EOu, kf39=\EOv,
+	kf4=\EOf, kf40=\EOl, kf41=\EOq, kf42=\EOr, kf43=\EOs,
+	kf44=\EOp, kf45=\EOn, kf46=\EOM, kf5=\EOg, kf6=\EOh,
+	kf7=\EOi, kf8=\EOj, kf9=\ENo, khome=\E[H, kich1=\E[@,
+	kil1=\E[L, knp=\E[U, kpp=\E[V, ll=\E[24H, mc0=\E[i,
+	mc4=\E[?4i, mc5=\E[?5i, nel=\EE,
+	op=\E[37;40m,
+	pfx=\E[%p1%d;%p2%l%02d;0;4q%p2%s,
+	pln=\E[%p1%d;0;0;0q%p2%:-16.16s, rc=\E8,
+	rep=%p1%c\E[%p2%{1}%-%db, rev=\E[7m, ri=\EM, rmacs=^O,
+	rmir=\E[4l, rmln=\E[2p, rmso=\E[27m, rmul=\E[24m,
+	rmxon=\E[53;3|, rs1=\Ec\E[?3;5l\E[56;0|,
+	s0ds=\E[%p1%d;%p2%l%02d;0;0q%p3%:-16.16s%p2%s, sc=\E7,
+        setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+        setb=\E[4%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%{7}%>%t9%e%p1%d%;m,
+        setf=\E[3%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%{7}%>%t9%e%p1%d%;m,
+        sgr=\E[0%?%p6%t;36%;%?%p5%t;34%;%?%p2%t;4%;%?%p4%t;5%;%?%p3%p1%|%t;7%;%?%p7%t;8%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smir=\E[4h, smln=\E[p,
+	smso=\E[7m, smul=\E[4m, smxon=\E[53;0|, tbc=\E[3g,
+	tsl=\E7\E[99;%i%p1%dx,
+
+#
+# xterm: terminal emulator for XWIN system.
+#
+xtermm|xterm terminal emulator (monocrome) @(#)xterm.ti 1.3,
+	am, km, mir, msgr, xenl,
+	cols#80, it#8, lines#24, btns#3,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=@, bold=\E[1m, clear=\E[H\E[2J, cr=\r,
+	csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\E[1D,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	dch=\E[%p1%dP, dch1=\E[P, dl=\E[%p1%dM, dl1=\E[M,
+	ed=\E[J, el=\E[K, el1=\E[1K$<3>, enacs=\E(B\E)0,
+	home=\E[H, ht=\t, hts=\EH, ich=\E[%p1%d@, ich1=\E[@,
+	il=\E[%p1%dL, il1=\E[L, ind=\n, ka1=\EOq, ka3=\EOs,
+	kb2=\EOr, kbs=\b, kc1=\EOp, kc3=\EOn, kcub1=\EOD,
+	kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, kent=\EOM,
+	kend=\E[Y, khome=\E[H, knp=\E[U, kpp=\E[V,
+	kf0=\EOy, kf1=\EOP, kf10=\EOY, kf11=\EOZ, kf12=\EOA,
+	kf2=\EOQ, kf3=\EOR, kf4=\EOS, kf5=\EOT, kf6=\EOU,
+	kf7=\EOV, kf8=\EOW, kf9=\EOX, rc=\E8,
+	rev=\E[7m, ri=\EM, rmacs=^O, rmcup=\E[2J\E[?47l\E8,
+	rmso=\E[m, rs1=\E>\E[1;3;4;5;6l\E[?7h\E[m\E[r\E[2J\E[H,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, sc=\E7,
+	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O, smacs=^N, smcup=\E7\E[?47h,
+	smso=\E[7m, tbc=\E[3g,
+	getm=\E[%p1%dY, kmous=\E[^_, reqmp=\E[492Z,
+	smkx=\E[?1h\E=, rmkx=\E[?1l\E>,
+
+#
+# color xterm
+#
+xtermc|xterm-color|xterm terminal emulator (color) @(#)xterm.ti 1.3,
+	colors#8, ncv#7, pairs#64,
+	op=\E[100m,
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	setb=\E[4%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	setf=\E[3%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	use=xtermm,
+
+

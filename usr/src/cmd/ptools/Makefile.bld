@@ -1,0 +1,116 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PROG:sh = basename `cd ..; pwd`
+
+OBJS = $(PROG).o
+
+SRCS = ../$(PROG).c
+
+FILEMODE = 0555
+
+# libproc is added individually as pwait doesn't need it.
+# These are defined this way so lint can use them
+LDLIBS_pargs	= -lproc
+LDLIBS_pcred	= -lproc
+LDLIBS_pfiles	= -lproc -lnsl
+LDLIBS_pflags	= -lproc
+LDLIBS_pldd	= -lproc
+LDLIBS_plgrp	= -lproc -llgrp
+LDLIBS_pmap	= -lproc
+LDLIBS_pmadvise	= -lproc
+LDLIBS_ppriv	= -lproc
+LDLIBS_preap	= -lproc
+LDLIBS_prun	= -lproc
+LDLIBS_psig	= -lproc
+LDLIBS_pstack	= -lproc -lc_db
+LDLIBS_pstop	= -lproc
+LDLIBS_ptime	= -lproc
+LDLIBS_ptree	= -lproc -lcontract
+LDLIBS_pwdx	= -lproc
+
+LDLIBS += $(LDLIBS_$(PROG))
+
+# pargs depends on ../../common/elfcap components
+# pmadvise depends on pmap components
+
+ELFCAP =	$(SRC)/common/elfcap
+PMAP =		$(SRC)/cmd/ptools/pmap
+
+CPPFLAGS_pargs =	-I$(ELFCAP)
+OBJS_pargs =		elfcap.o
+SRCS_pargs =		$(ELFCAP)/elfcap.c
+
+CPPFLAGS_pmap =		-I$(PMAP)
+OBJS_pmap =		pmap_common.o
+SRCS_pmap =		$(PMAP)/pmap_common.c
+
+CPPFLAGS_pmadvise =	-I$(PMAP)
+OBJS_pmadvise =		pmap_common.o
+SRCS_pmadvise =		$(PMAP)/pmap_common.c
+
+CPPFLAGS +=	$(CPPFLAGS_$(PROG))
+OBJS +=		$(OBJS_$(PROG))
+SRCS +=		$(SRCS_$(PROG))
+
+INSTALL_NEW=
+INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
+	$(LN) -s ../../bin/$(PROG) $(ROOTPROCBINSYMLINK)
+
+.KEEP_STATE:
+
+elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+
+pmap_common.o:	$(PMAP)/pmap_common.c
+		$(COMPILE.c) -o $@ $(PMAP)/pmap_common.c
+
+%.o:	../%.c
+	$(COMPILE.c) $<
+
+all:	$(PROG)
+
+ROOTBINPROG=$(ROOTBIN)/$(PROG)
+ROOTPROCBINSYMLINK=$(ROOT)/usr/proc/bin/$(PROG)
+
+$(PROG): $$(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+#
+# Install the ptool, symlinking it into /usr/proc/bin if PTOOL_TYPE is set
+# to LEGACY.
+#
+install: all $(ROOTISAPROG)
+	-$(RM) $(ROOTBINPROG)
+	-$(LN) $(ISAEXEC) $(ROOTBINPROG)
+	-$(INSTALL_$(PTOOL_TYPE))
+
+clean:
+	$(RM) $(OBJS)
+
+lint:
+	$(LINT.c) $(SRCS) $(LDLIBS)

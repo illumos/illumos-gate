@@ -1,0 +1,528 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * # ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This file creates the system board structure
+ */
+
+name:/frutree/chassis/MB
+NODE system-board fru
+    NODE pci-slot location
+    	PROP Label string r 0 "PCIE2"
+	PROP SlotType string r 0 "pci-e"
+    ENDNODE
+    NODE pci-slot location
+    	PROP Label string r 0 "PCIE1"
+	PROP SlotType string r 0 "pci-e"
+    ENDNODE
+    NODE pci-slot location
+    	PROP Label string r 0 "PCIE0"
+	PROP SlotType string r 0 "pci-e"
+    ENDNODE
+    NODE pci-slot location
+    	PROP Label string r 0 "PCIX1"
+	PROP SlotType string r 0 "pci-x"
+    ENDNODE
+    NODE pci-slot location
+    	PROP Label string r 0 "PCIX0"
+	PROP SlotType string r 0 "pci-x"
+    ENDNODE
+    NODE cpu-slot location
+    	PROP Label string r 0 "0"
+    	PROP Slot uint r 4 0
+	PROP SlotType string r 0 "cpu"
+    ENDNODE
+    NODE cpu-slot location
+    	PROP Label string r 0 "1"
+    	PROP Slot uint r 4 1
+	PROP SlotType string r 0 "cpu"
+    ENDNODE
+    NODE mem-slot location
+    	PROP Slot uint r 4 1
+    	PROP Label string r 0 "DIMM0"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 2
+    	PROP Label string r 0 "DIMM1"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 3
+    	PROP Label string r 0 "DIMM2"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 4
+    	PROP Label string r 0 "DIMM3"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 5
+    	PROP Label string r 0 "DIMM4"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 6
+    	PROP Label string r 0 "DIMM5"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 7
+    	PROP Label string r 0 "DIMM6"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+    NODE mem-slot location
+      	PROP Slot uint r 4 8
+    	PROP Label string r 0 "DIMM7"
+	PROP SlotType string r 0 "memory-module"
+    ENDNODE
+ENDNODE
+
+/*
+ * Create CPU fru modules
+ */
+name:/frutree/chassis/MB/system-board/cpu-slot?Slot=0
+REFNODE cpu-module fru WITH _class:/PLATFORM_CLASS/cpu?ID=0
+
+name:/frutree/chassis/MB/system-board/cpu-slot?Slot=1
+REFNODE cpu-module fru WITH _class:/PLATFORM_CLASS/cpu?ID=1
+
+/*
+ * Create DIMM fru modules
+ */
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM0
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a6
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM1
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a2
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM2
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a4
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM3
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a0
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM4
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a8
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM5
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ac
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM6
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,aa
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM7
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ae
+
+/*
+ * Populate PCI slots
+ */
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE2
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1f,700000/picl?DeviceID=0
+
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE1
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
+
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
+
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX1
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=1
+
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=2
+
+/*
+ * SEEPROM source for the motherboard
+ */
+name:/frutree/chassis/MB/system-board
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,530000/motherboard-fru-prom@0,a2
+
+/*
+ * SEEPROM source for the DIMMs
+ */
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM0/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a6
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM1/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a2
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM2/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a4
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM3/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a0
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM4/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a8
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM5/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,ac
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM6/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,aa
+
+name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM7/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,ae
+
+/*
+ * _fru_parent memory modules
+ */
+name:/platform/memory-controller?portid=0/memory-module-group?ID=1/memory-module?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM0/mem-module
+
+name:/platform/memory-controller?portid=0/memory-module-group?ID=0/memory-module?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM1/mem-module
+
+name:/platform/memory-controller?portid=0/memory-module-group?ID=1/memory-module?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM2/mem-module
+
+name:/platform/memory-controller?portid=0/memory-module-group?ID=0/memory-module?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM3/mem-module
+
+name:/platform/memory-controller?portid=1/memory-module-group?ID=0/memory-module?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM4/mem-module
+
+name:/platform/memory-controller?portid=1/memory-module-group?ID=1/memory-module?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM5/mem-module
+
+name:/platform/memory-controller?portid=1/memory-module-group?ID=0/memory-module?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM6/mem-module
+
+name:/platform/memory-controller?portid=1/memory-module-group?ID=1/memory-module?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM7/mem-module
+
+
+/*
+ * _fru_parent CPU, memory-controller devices
+ */
+_class:/PLATFORM_CLASS/cpu?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=0/cpu-module
+
+name:/platform/memory-controller?portid=0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=0/cpu-module
+
+_class:/PLATFORM_CLASS/cpu?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=1/cpu-module
+
+name:/platform/memory-controller?portid=1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=1/cpu-module
+
+/*
+ * _fru_parent motherboard
+ */
+_class:/PLATFORM_CLASS
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+/*
+ * _fru_parent PCI devices
+ */
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,7
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,7
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,7
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,7
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,7
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+
+/*
+ * _fru_parent for fans
+ */
+name:/platform/ebus@1f,464000/env-monitor@3,0/system-fan0
+REFPROP _fru_parent /frutree/chassis/F0/system-fan0
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/system-fan1
+REFPROP _fru_parent /frutree/chassis/F1/system-fan1
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/system-fan2
+REFPROP _fru_parent /frutree/chassis/F2/system-fan2
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/system-fan3
+REFPROP _fru_parent /frutree/chassis/F3/system-fan3
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/system-fan4
+REFPROP _fru_parent /frutree/chassis/F4/system-fan4
+
+/*
+ * _fru_parent for sensors
+ */
+name:/platform/ebus@1f,464000/env-monitor@3,0/cpu0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=0/cpu-module
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/cpu1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/cpu-slot?Slot=1/cpu-module
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/MotherBoard
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ADT7462
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/LM95221
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/FireASIC
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/LSI1064
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/Front_panel
+REFPROP _fru_parent /frutree/chassis/FIOB/system-board
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/PSU
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+/*
+ * Environmental device associated with motherboard
+ */
+name:/frutree/chassis/MB/system-board
+TABLE Devices
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/MotherBoard
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/ADT7462
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/LM95221
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/FireASIC
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/LSI1064
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/PSU
+ENDROW
+ENDTABLE
+
+/*
+ * Environmental device associated with front panel io board
+ */
+name:/frutree/chassis/FIOB/system-board
+TABLE Devices
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/Front_panel
+ENDROW
+ENDTABLE
+
+/*
+ * Environmental devices associated with cpus
+ */
+
+name:/frutree/chassis/MB/system-board/cpu-slot?Slot=0/cpu-module
+TABLE Devices
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/cpu0
+ENDROW
+ROW
+PROP Class string r 0 "cpu"
+REFPROP _cpu_ _class:/PLATFORM_CLASS/cpu?ID=0
+ENDROW
+ENDTABLE
+
+name:/frutree/chassis/MB/system-board/cpu-slot?Slot=1/cpu-module
+TABLE Devices
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/cpu1
+ENDROW
+ROW
+PROP Class string r 0 "cpu"
+REFPROP _cpu_ _class:/PLATFORM_CLASS/cpu?ID=1
+ENDROW
+ENDTABLE
+
+/*
+ * Hard disk link between fru and device tree
+ */
+name:/frutree/chassis/SAS-BP/HDD0/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0/hard-disk0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
+
+name:/frutree/chassis/SAS-BP/HDD1/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0/hard-disk1
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
+
+name:/frutree/chassis/SAS-BP/HDD2/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0/hard-disk2
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
+
+name:/frutree/chassis/SAS-BP/HDD3/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0/hard-disk3
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
+
+name:/frutree/chassis/FIOB/system-board/RM0/cdrom
+	TABLE Device
+	ROW
+	PROP Class string r 0 "cdrom"
+	REFPROP _cdrom_ name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+	REFPROP _fru_parent name:/frutree/chassis/FIOB/system-board/RM0/cdrom

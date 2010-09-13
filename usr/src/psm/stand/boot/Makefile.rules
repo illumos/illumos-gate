@@ -1,0 +1,120 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# psm/stand/boot/Makefile.rules
+
+#CPPFLAGS += -DDEBUG=1
+
+#
+# Pattern matching rules to compile the source in the current directory
+#
+%.o: $(TOP_CMN_DIR)/util/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(TOP_CMN_DIR)/fs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(PROM_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(CMN_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(PIM_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(PAMD64_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(PAMD64_DIR)/%.s
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(MACH_DIR)/%.s
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(MACH_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: %.s
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(PLAT_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+#
+# Pattern matching rules to lint the source in the current directory
+#
+%.ln: $(TOP_CMN_DIR)/util/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(TOP_CMN_DIR)/fs/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(PROM_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(CMN_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(PIM_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(PAMD64_DIR)/%.s
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(PAMD64_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(MACH_DIR)/%.s
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(MACH_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: %.s
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+%.ln: $(PLAT_DIR)/%.c
+	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
+
+#
+# Rules to compile libraries needed to build and lint the boot loaders.
+#
+$(LIBPROM_DIR)/libprom.a $(LIBPLAT_DEP) $(LIBNAME_DIR)/libnames.a: FRC
+	@cd $(@D); pwd; $(MAKE) $(@F)
+
+$(LIBPROM_DIR)/llib-lprom.ln $(LIBPLAT_DEP_L) $(LIBNAME_DIR)/llib-lnames.ln: FRC
+	@cd $(@D); pwd; $(MAKE) $(@F)
+
+FRC:

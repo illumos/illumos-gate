@@ -1,0 +1,83 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	SUNW_1.1;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	kdb2_bt_rseq;
+	kdb2_dbm_clearerr;
+	kdb2_dbm_close;
+	kdb2_dbm_delete;
+	kdb2_dbm_dirfno;
+	kdb2_dbm_error;
+	kdb2_dbm_fetch;
+	kdb2_dbm_firstkey;
+	kdb2_dbm_nextkey;
+	kdb2_dbm_open;
+	kdb2_dbm_store;
+	kdb2_dbminit;
+	kdb2_dbopen;
+	kdb2_delete;
+	kdb2_fetch;
+	kdb2_firstkey;
+	kdb2_hcreate;
+	kdb2_hdestroy;
+	kdb2_hsearch;
+	kdb2_mpool_close;
+	kdb2_mpool_delete;
+	kdb2_mpool_filter;
+	kdb2_mpool_get;
+	kdb2_mpool_new;
+	kdb2_mpool_open;
+	kdb2_mpool_put;
+	kdb2_mpool_sync;
+	kdb2_nextkey;
+	kdb2_store;
+    local:
+	*;
+};

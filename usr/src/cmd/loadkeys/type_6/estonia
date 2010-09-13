@@ -1,0 +1,75 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# Estonia Type 6 (USB) key layout
+#
+# Note, on the console, Estonian characters and euro sign are not
+# included into this keymap. This is because the console may not have 
+# full font support for the characters available in this language.
+# However, all necessary ASCII characters are placed onto the right keys. 
+#
+#
+key  53  base ` shift fa_tilde caps ` ctrl ^^ altg '¬'
+key  30  base 1 shift ! caps 1 ctrl 1 altg ¹
+key  31  base 2 shift '"' caps 2 ctrl ^@ altg @
+key  32  base 3 shift # caps 3 ctrl 3 altg £
+key  33  base 4 shift ¤ caps 4 ctrl 4 altg $
+key  34  base 5 shift % caps 5 ctrl 5 altg ½
+key  35  base 6 shift & caps 6 ctrl 6 altg '¬'
+key  36  base 7 shift / caps 7 ctrl 7 altg {
+key  37  base 8 shift ( caps 8 ctrl ^[ altg [
+key  38  base 9 shift ) caps 9 ctrl ^] altg ]
+key  39  base 0 shift = caps 0 ctrl 0 altg }
+key  45  base + shift ? caps + ctrl ^_ altg '\\'
+key  46  base fa_acute shift fa_grave caps fa_acute ctrl fa_acute altg `
+key  20  base q shift Q caps Q ctrl ^Q altg @
+key  47  base ü shift Ü caps Ü ctrl ü altg fa_umlaut
+key  48  base fa_umlaut shift ^ caps fa_umlaut ctrl fa_tilde altg ~
+key  51  base ö shift Ö caps Ö ctrl ö altg nop
+key  52  base ä shift Ä caps Ä ctrl ä altg ^
+key  50  base '\'' shift * caps '\'' ctrl '\'' altg '`' numl nonl up nop
+key  49  all hole
+key 100  base < shift > caps < ctrl ^| altg | numl nonl up nop
+key  29  base z shift Z caps Z ctrl ^Z altg «
+key  27  base x shift X caps X ctrl ^X altg »
+key   6  base c shift C caps C ctrl ^C altg ¢
+key  16  base m shift M caps M ctrl '\r' altg µ
+key  54  base , shift ; caps , ctrl , altg <
+key  55  base . shift : caps . ctrl . altg >
+key  56  base - shift _ caps - ctrl ^_ altg nop
+#
+#
+key  99  all bf(10) numl padsep      
+#
+# New function keys assigned old codes
+#
+key  73  all bf(8)        
+key  74  all rf(7)        
+key  75  all rf(9)        
+key  77  all rf(13)        
+key  78  all rf(15)        
+key  82  all string+uparrow        
+key  80  all string+leftarrow        
+key  81  all string+downarrow        
+key  79  all string+rightarrow        

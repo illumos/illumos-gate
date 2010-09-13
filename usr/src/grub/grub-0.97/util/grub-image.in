@@ -1,0 +1,138 @@
+#! /bin/sh
+# grub-image - Create a GRUB boot filesystem image and tarball
+# Gordon Matzigkeit <gord@fig.org>, 2000-07-25
+#
+#   Copyright (C) 2000, 2002 Free Software Foundation, Inc.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sbindir=@sbindir@
+libdir=@libdir@
+PACKAGE=@PACKAGE@
+host_cpu=@host_cpu@
+host_os=@host_os@
+host_vendor=@host_vendor@
+context=${host_cpu}-${host_vendor}
+pkglibdir=${libdir}/${PACKAGE}/${context}
+
+mke2fs=`which mke2fs`
+
+progname=`echo "$0" | sed 's%^.*/%%'`
+thisdir=`echo "$0" | sed 's%/[^/]*$%%'`
+test "X$thisdir" = "X$0" && thisdir=.
+
+# See if we were invoked from within the build directory, and if so,
+# use the built files rather than the installed ones.
+if test -f $thisdir/../stage2/stage2; then
+  grub_shell="$thisdir/../grub/grub"
+  stage1dir="$thisdir/../stage1"
+  stage2dir="$thisdir/../stage2"
+else
+  grub_shell=${sbindir}/grub
+  stage1dir="$pkglibdir"
+  stage2dir="$pkglibdir"
+fi
+
+# Exit on any error.
+set -e
+
+# Get GRUB's version from the Grub shell, since we use the
+# installed files.
+VERSION=`$grub_shell --version | sed -e 's/^.* \([0-9.]*\).*$/\1/'`
+test "X$VERSION" != X
+
+bootdir=${PACKAGE}-${VERSION}-${context}
+image=$bootdir.ext2fs
+
+# Create the tarball.
+if test ! -f $bootdir.tar.gz; then
+  echo "# Creating \`$bootdir.tar.gz'"
+  mkdir -p $bootdir/boot/grub
+  cp -p $stage1dir/stage1 $stage2dir/*_stage1_5 $stage2dir/stage2 \
+    $bootdir/boot/grub
+  test ! -f menu.lst || cp -p menu.lst $bootdir/boot/grub
+  trap "rm -f $bootdir.tar.gz" 0
+  GZIP=-9 tar -zcf $bootdir.tar.gz $bootdir
+  trap '' 0
+  rm -rf $bootdir
+fi
+
+# Create a new filesystem image of the specified size.
+if test ! -f $image; then
+  tarsize=`zcat $bootdir.tar.gz | wc -c`
+
+  # Add about 30% (20% overhead plus 10% breathing room), and convert
+  # to kilobytes.  This factor was determined empirically.
+  SIZE=`expr $tarsize \* 130 / 100 / 1024`k
+  echo "# Creating $SIZE disk image \`$image'"
+  trap "rm -f $image" 0
+  dd if=/dev/zero of=$image bs=$SIZE count=1 >/dev/null
+  $mke2fs -F $image
+  trap '' 0
+fi
+
+
+# Attempt to mount the image.
+echo "# Mounting \`$image'"
+test -d $bootdir || mkdir $bootdir
+case "$host_os" in
+gnu*)
+  settrans -a $bootdir /hurd/ext2fs $image
+  umount="settrans -a $bootdir"
+  ;;
+
+linux*)
+  # This requires running as root, and using the loop device.
+  i=0
+  while test -e /dev/loop$i; do
+    if /sbin/losetup /dev/loop$i $image; then
+      break
+    fi
+    i=`expr $i + 1`
+  done
+
+  # Silly losetup doesn't report an error!
+  mount /dev/loop$i $bootdir
+  umount="umount $bootdir && /sbin/losetup -d /dev/loop$i && trap '' 0"
+  ;;
+
+*)
+  echo "$progname: Mounting \`$image' under \`$host_os' is not supported" 1>&2
+  exit 1
+  ;;
+esac
+trap "$umount" 0
+
+# Extract our tarball into the image, then unmount it.
+echo "# Copying files into \`$image':"
+tar -zxvf $bootdir.tar.gz
+
+echo "# \`$image' usage:"
+df $bootdir
+eval $umount
+rmdir $bootdir || :
+
+# Use the GRUB shell to properly set up GRUB on the image.
+echo "# Installing GRUB in \`$image'"
+cat <<EOF | $grub_shell --batch --device-map=/dev/null
+device (fd0) $image
+root (fd0)
+install /boot/grub/stage1 (fd0) /boot/grub/stage2
+quit
+EOF
+
+exit 0

@@ -1,0 +1,64 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+# 
+
+Configuration files for syseventd(1M).
+
+These files are not intended to be edited and any changes made
+will not be preserved across upgrades.
+
+The format for file names in this directory is:
+
+	<vendor>,[<publisher>,][<class>,[<subclass>,]]sysevent.conf
+
+Files with a suffix other than ',sysevent.conf' are ignored.
+
+After making a change to a file in this directory, restart the
+syseventd daemon by issuing:
+
+	pkill -HUP syseventd
+
+
+The format for each line in a sysevent.conf file is:
+
+	<class> <subclass> <vendor> <publisher> <user> <reserved1>
+		<reserved2> <path> <arguments>
+
+<class>, <subclass>, <vendor> or <publisher> may be "-" to
+match any class, subclass, vendor or publisher, respectively.
+
+<user> may be "-" for commands to be invoked as root, or a
+valid user name.
+
+<reserved1> and <reserved2> must be "-".
+
+<path> must be the path of the command to be invoked in response
+to the event, and must be executable by <user>.
+
+<arguments> are optional, and may be any arbitrary arguments
+for the command to be invoked.  Macros may be used to substitute
+actual parameters from the matching event on the command line.

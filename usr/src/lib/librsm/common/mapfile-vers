@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	rsm_create_localmemory_handle;
+	rsm_free_interconnect_topology;
+	rsm_free_localmemory_handle;
+	rsm_get_controller;
+	rsm_get_controller_attr;
+	rsm_get_interconnect_topology;
+	rsm_get_segmentid_range;
+	rsm_intr_signal_post;
+	rsm_intr_signal_wait;
+	rsm_intr_signal_wait_pollfd;
+	rsm_memseg_export_create;
+	rsm_memseg_export_destroy;
+	rsm_memseg_export_publish;
+	rsm_memseg_export_rebind;
+	rsm_memseg_export_republish;
+	rsm_memseg_export_unpublish;
+	rsm_memseg_get_pollfd;
+	rsm_memseg_import_close_barrier;
+	rsm_memseg_import_connect;
+	rsm_memseg_import_destroy_barrier;
+	rsm_memseg_import_disconnect;
+	rsm_memseg_import_get;
+	rsm_memseg_import_get16;
+	rsm_memseg_import_get32;
+	rsm_memseg_import_get64;
+	rsm_memseg_import_get8;
+	rsm_memseg_import_get_mode;
+	rsm_memseg_import_getv;
+	rsm_memseg_import_init_barrier;
+	rsm_memseg_import_map;
+	rsm_memseg_import_open_barrier;
+	rsm_memseg_import_order_barrier;
+	rsm_memseg_import_put;
+	rsm_memseg_import_put16;
+	rsm_memseg_import_put32;
+	rsm_memseg_import_put64;
+	rsm_memseg_import_put8;
+	rsm_memseg_import_putv;
+	rsm_memseg_import_set_mode;
+	rsm_memseg_import_unmap;
+	rsm_memseg_release_pollfd;
+	rsm_release_controller;
+    local:
+	*;
+};

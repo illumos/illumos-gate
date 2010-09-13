@@ -1,0 +1,152 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	convert_leunicode_to_utf8;
+	convert_unicode_to_utf8;
+	convert_utf8_to_leunicode;
+	convert_utf8_to_unicode;
+	convert_utf8_to_wincs;
+	convert_wincs_to_utf8;
+
+	nb_ctx_create;
+	nb_ctx_done;
+	nb_ctx_readrcsection;
+	nb_ctx_resolve;
+	nb_ctx_setns;
+	nb_resolvehost_in;
+	nb_strerror;
+	nbns_getnodestatus;
+	nbns_resolvename;
+
+	nls_str_toloc;
+	nls_str_upper;
+
+	smb_close_rcfile;
+
+	smb_ctx_alloc;
+	smb_ctx_done;
+	smb_ctx_flags2;
+	smb_ctx_free;
+	smb_ctx_get_ssn;
+	smb_ctx_get_ssnkey;
+	smb_ctx_get_tree;
+	smb_ctx_gethandle;
+	smb_ctx_init;
+	smb_ctx_kill;
+	smb_ctx_opt;
+	smb_ctx_parseunc;
+	smb_ctx_readrc;
+	smb_ctx_resolve;
+	smb_ctx_scan_argv;
+	smb_ctx_set_close_hook;
+
+	smb_ctx_setauthflags;
+	smb_ctx_setdomain;
+	smb_ctx_setfullserver;
+	smb_ctx_setnbflags;
+	smb_ctx_setpassword;
+	smb_ctx_setpwhash;
+	smb_ctx_setscope;
+	smb_ctx_setserver;
+	smb_ctx_setshare;
+	smb_ctx_setsigning;
+	smb_ctx_setsrvaddr;
+	smb_ctx_setuser;
+	smb_ctx_setwins;
+
+	smb_debug		{ FLAGS = NODIRECT };	# data
+	smb_error;
+#
+# Functions to support named pipes
+	smb_fh_close;
+	smb_fh_open;
+	smb_fh_read;
+	smb_fh_write;
+	smb_fh_xactnp;
+#
+	smb_get_authentication;
+	smb_getprogname;
+	smb_iod_connect;
+	smb_iod_door_path;
+	smb_iod_open_door;
+	smb_iod_start;
+	smb_iod_work;
+	smb_lib_init;
+	smb_netshareenum;	# will move to libnetapi
+	smb_open_rcfile;
+	smb_printer_open;
+	smb_printer_close;
+	smb_simplecrypt;
+	smb_simpledecrypt;
+	smb_strerror;
+#
+# Functions to support the Remote Access Protocol (RAP)
+	smb_rap_create;
+	smb_rap_done;
+	smb_rap_error;
+	smb_rap_getNparam;
+	smb_rap_request;
+	smb_rap_setNparam;
+	smb_rap_setPparam;
+#
+	smb_verbose		{ FLAGS = NODIRECT };	# data
+#
+# Functions to support Access Control Lists (ACLs)
+	smbfs_acl_free_sd;
+	smbfs_acl_get;
+	smbfs_acl_getsd;
+	smbfs_acl_print_sd;
+	smbfs_acl_sd2zfs;
+	smbfs_acl_set;
+	smbfs_acl_setsd;
+	smbfs_acl_zfs2sd;
+#
+	smbfs_default_dom_usr;
+	smbfs_keychain_add;
+	smbfs_keychain_chk;
+	smbfs_keychain_del;
+	smbfs_keychain_del_everyone;
+	smbfs_keychain_del_owner;
+
+	smbutil_std_opts;
+    local:
+	*;
+};

@@ -1,0 +1,298 @@
+10-03-07 tail.c: sfsync(sfstdout) after all -f done, fix -f partial line
+10-03-05 mktemp.c: add --regress=seed for testing
+10-03-05 vmstate.c: add
+10-01-26 tail.c: -f sleep(1) only if no progress from last round of checks
+10-01-20 fts_fix.[ch]: use <fts_fix.h> instead of <fts.h> (see fts_fix.c)
+10-01-20 cp.c: free(state) if called from old shell
+09-12-10 join.c: <wctype.h> for iswspace()!
+09-12-04 cmd.h: fix CMD_DYNAMIC logic
+09-12-04 cut.c: handle -d mb
+09-12-03 mkdir.c: add --verbose
+09-11-30 cat.c,date.c,cksum.c: drop setlocale() call already done by optget()
+09-11-30 join.c: handle -t mb
+09-11-28 wclib.c: { -w -L } mb independent of -m
+09-11-28 paste.c: handle -d mb
+09-11-28 uniq.c: handle -s mb
+09-11-28 cksum.c: FTS_SEEDOTDIR by default
+09-09-09 fds.c: add --unit=fd
+09-08-25 tail.c: initialize Tail_t.fifo=0 !!
+09-08-15 tail.c: fix fifo logic
+09-08-11 wc.c: add setlocale(LC_CTYPE,"C") cleanup, add utf8 optimzations
+09-08-10 uniq.c: replace -c 1..9999 sfsprintf() with inline conversion
+09-08-01 join.c: fix empty field null pointer deref
+09-07-23 pathchk.c: add -P,--path and -a,--all
+09-07-02 chgrp.c,chmod.c,cksum.c: fts_flags() default only if not --recursive
+09-06-19 cmd.h,cmdinit.c: add ERROR_CALLBACK for ERROR_NOTIFY main() callback
+09-06-19 mktemp.c: --unsafe now checks and prints path but does create
+09-06-19 tee.c: add ERROR_CALLBACK for tee_cleanup() sfio discipline pop
+09-06-18 rm.c: handle interrupts during interactive query
+09-06-18 cp.c: handle interrupts during interactive query
+09-05-25 tail.c: fix old style option logic to handle --invalid-long-option
+09-05-24 tail.c: -r == +1r
+09-05-01 mktemp.c: handle foo/prefix, add -p dir and -u
+09-03-31 cat.c: handle --no* options
+09-03-15 tail.c: fix --timeout termination logic
+09-03-03 tee.c: clean up sfio disciplines on error
+09-03-03 cat.c: fix -v|-e|-n|-B interaction bugs
+09-02-14 tail.c: fix VSC failures
+09-02-14 join.c: fix VSC failure
+09-02-02 uniq.c: document -number == -fnumber, +number == -snumber
+09-02-02 tail.c: fix usage[] for negative offsets, add sun -b
+09-02-02 mktemp.c: add
+09-02-02 features/utsname: UWIN _UNAME_os_DEFAULT => UWIN
+09-01-31 dirname.c: add experimental { -f -r -x } for pathpath(3)
+09-01-05 cmp.c: fix EOF diagnostic to conform to posix
+09-01-03 mkfifo.c: fix --mode=mode logic
+08-12-07 date.c: add %[_][EO]K for [space pad] [full|long] iso docs
+08-11-10 stty.c: check for -t grouping so -tostop != -t -ostop
+08-10-15 rm.c: handle 'rm -f x x' => exit 0
+08-09-08 stty.c: #ifdef guard TAB[012] -- freebsd: damn the posix, full speed ahead
+08-06-17 shcmd.h: move to libast
+08-04-24 uniq.c: add optget() 'n' option for -1 => -f1
+08-04-24 getconf.c: clarify diffs between "name - value" and "name = value"
+08-04-01 cut.c: add write error check
+08-04-01 paste.c: fix --noserial stream vector access bug
+08-04-01 pids.c: add ls/ps style --format=format
+08-04-01 stty.c: fix off2 unitialized reference
+08-03-28 chgrp.c: add --before=file
+08-03-14 pids.c: add
+08-03-11 chgrp.c: fix -m to use uid:gid as lookup key
+08-02-11 Makefile: add -lmd possibly required by sumlib.o -- hack alert
+08-01-30 expr.c: fix <=0 type that broke substr * 1 * -- wow
+07-12-13 cp.c: fix builtin state reinitialization
+07-11-29 rev.c: honor multibyte locales
+07-11-27 cp.c: open non-existent destination with O_EXCL
+07-11-27 stty.c: add -t,--terminal-group to list tty pgrp
+07-11-27 cksum.c: --silent -s => -S, -s == -x sys5 for gnu compatibility
+07-11-11 tee.c: drop ancient bsd compatibility "-" operand => SIGINT
+07-10-29 cksum.c: add SUM_LEGACY for -r
+07-10-12 cp.c: plug usage string memory leak by using per-builtin state
+07-09-21 cksum.c: add sumprint() default scale arg, --scale, --bsd for solaris
+07-09-10 chmod.c: add --show,-n
+07-07-27 wclib.c: bias <wchar.h> checks for modern unix
+07-07-17 cat.c: fix --squeeze-blank to reduce multiple blank lines to *one*
+07-05-20 cmd.h: handle msvc's balk at if(0)0=0;
+07-05-20 cksum.c: #include <modex.h>
+07-05-11 cmd.h: add _CMD_CONTEXT_OK() to verify >= 20070511 context
+07-05-09 fds.c: handle ipv6 sockets
+07-05-09 cmd.h: <shbltin.h> : cmdquit() => sh_checksig(context)
+07-04-25 mkdir.c: force (S_ISVTX|S_ISUID|S_ISGID) after mkdir(2)
+07-04-24 procrun.c: add -last intercept => sh_run() and whence -q
+07-04-19 uname.c: name operands first checked for CS_NAME, then NAME
+07-03-28 date.c: add --unelapsed=scale, -U: fmtelapsed() => strelapsed()
+07-03-25 wclib.h: iswspace() requires <wctype.h>!
+07-03-11 tty.c: add sysV --line-number, -l
+07-02-26 Makefile: sumlib.o: direct extract from +lsum (vcodex someday)
+07-02-24 Makefile: tweak cmdext.h action for --mam bootstrap
+07-02-09 Makefile: { cmdext.h cmdlist.h } depend on *.c list!
+07-02-09 Makefile: +lsum to bring in static -lsum (no dynamic right now)
+07-02-07 cksum.c: move from src/cmd/std with ftwalk => fts
+07-02-07 getconf.c: handle /bin == /usr/bin in defer logic
+07-01-26 chmod.c: don't FTS_FOLLOW if !FTS_PHYSICAL
+07-01-23 cut.c: Cut_t variable dimension list[] must be last member
+07-01-22 uname.c: fix -h typo that clobbered astconf() state -- ouch
+07-01-02 fmt.c: fix buffer splice off by one bug -- what else
+06-11-23 cmd.h: because of proto cmdinit cannot be a function like macro
+06-11-21 cp.c: fix 06-10-31 const dot[] readonly assignment
+06-11-15 cp.c: fix 06-10-31 ln -s enoent bug
+06-11-11 getconf.c: let astconf() handle "undefined" vs. ""
+06-11-11 getconf.c: fix deferred getconf path search
+06-11-11 fmt.c: handle two char { \t \n } in --usage ouput
+06-10-31 global edit to eliminate most non-const static data0
+06-10-31 use <cmd.h> for all b_*() implementations; drop <cmdlib.h> 
+06-10-31 cmd.h: add CMD_ prefix to { BUILTIN DYNAMIC STANDALONE } 
+06-10-31 join.c: tone down /tmp usage vi SFSK_DISCARD
+06-10-31 cp.c,rm.c: update to <fts.h> to accomodate non-static data
+06-10-29 date.c: "...%H%..." => "...%H" "%..." to avoid SCCS conflict
+06-10-26 fds.c: handle sctp
+06-10-18 tail.c: fix invalid suffix infinite loop
+06-10-11 chgrp.c,cp.c: add sfstruse() error checks
+06-10-10 tee.c: add --linebuffer, -l
+06-10-06 getconf.c: preserve native getconf(1) known variable behavior
+06-10-04 sync.c: add (thanks to Roland Mainz)
+06-10-04 getconf.c: add -v specification => run native getconf(1)
+06-09-28 stty.c: static setmode() => set() for darwin.i386
+06-09-27 head.c: handle -1c => -c1
+06-09-19 pathchk.c: pathconf() => astconf()
+06-09-11 tail.c: handle compatibility corner cases
+06-09-08 date.c: add output write error diagnostic
+06-09-04 tail.c: fix initial position for -n0, no args => no -f
+06-08-28 uniq.c: add -D,--all-repeated
+06-08-25 wc.c,wclib.c: add -L,--longest-line,WC_LONGEST
+06-08-24 wc.c,wclib.c: implement -m and WC_MBYTE
+06-08-24 rmdir.c: -sp applies to every message, add gnu -e
+06-08-23 rmdir.c: add solaris --suppress, -s
+06-08-23 mkdir.c: don't add 0300 to -p final dir mode
+06-07-17 cut.c: handle last line with no newline
+06-07-17 cut.c: --output-delimiter == --line-delimiter
+06-06-25 chmod.c: mask -c output with S_IPERM
+06-05-09 uname.c: add -o; change -a to match linux
+06-05-03 date.c: add --last -L to list last of multiple time args
+06-02-14 tail.c: fix -f bug that lost fast stream data
+06-02-11 getconf.c: exit 1 if name invalid -- duh
+06-01-28 cp.c,rm.c: fix astquery() 'q' to return and not exit()
+05-08-11 fmt.c: fix -o to handle raw --usage strings
+05-05-17 cat.c,head.c: disable EPIPE error messages
+05-04-14 chgrp.c: -f means all non-syntax error messages
+05-04-11 fds.c: add from old internal open(1)
+05-04-09 cmdext.h,cmdlist.h: generate from source -- about time
+05-03-24 features/symlink: verify { lchmod lchown } implementations
+05-03-07 date.c: add --listzones to list the time zone table
+05-02-14 chmod.c: add --reference=file
+05-01-11 cat.c: restore output stream to binary mode on exit
+04-12-15 cp.c: add --preserve high resolution time support
+04-12-08 date.c: add high resolution time support
+04-12-01 cmp.c: fix %6I*ld => %6I*d -- doh
+	 fmt.c: handle "\n\n operands \n\n"
+	 head.c: handle -cN -nN, N > 4Gb
+04-11-22 cmp.c: handle >2G chars/lines
+04-11-18 fold.c: add --prepend=text, --append=text
+04-10-31 tail.c: use SF_LOCKR macro
+04-10-28 tail.c: use strtol() for old stype [+-]number[suffix] -- doh
+04-10-22 cp.c: check rename() errno==ENOENT to retain destination
+04-10-11 fmt.c: fix -o,--optget sublist bugs
+	 tail.c: use strton() for number conversion
+04-10-08 pathchk.c: add empty path and -p - first component char
+04-10-01 fmt.c: add -o,--optget concatenated usage string format
+	 stty.c: context is ERROR_INTERCATIVE
+	 rm.c: restore 3d before exit
+04-09-24 pathchk.c: fix docs
+04-09-14 date.c: add %| and %& --parse docs
+04-08-27 cp.c: add FTW_DC check -- duh
+04-08-01 fmt.c: handle last char != '\n'
+04-07-22 date.c,uname.c: access() => eaccess()
+04-07-01 fmt.c: handle large input lines -- ouch
+04-06-11 id.c: fix -r to output something!
+04-05-27 expr.c: fix `:' op subexpression output
+04-04-15 chmod.c: follow symlink for relative mode
+04-04-12 Makefile: add STDCHMOD (for osf.alpha)
+04-03-19 tail.c: handle -f sfreserve() large chunk failure
+04-02-29 cp.c: decouple -f and -i for standard CONFORMANCE
+	 cp.c: mv now attempts rename() before remove()+rename()
+	 date.c: -f format or +format disables system clock set
+04-02-14 cp.c: add -F --fsync to call fsync(2) for each copied file
+04-01-05 head.c: -s now uses opt_info.number for >2Gb skip
+03-09-18 tail.c: add --log
+03-09-11 rm.c: add --unconditional
+03-08-11 fold.c: add --delimiter=c to break at c
+03-07-28 features/time: change settimeofday() test to 2nd arg of (void*)0
+	 expr.c: add {match,substr,index,length,quote}
+03-07-15 fmt.c: fix trailing space bug
+03-06-20 uname.c: fix -p constant string overwrite
+03-06-04 stty.c: add undef to control assignment docs
+03-05-31 uname.c: add -f and sysinfo()/confstr() compatibility via astconf()
+03-05-27 rm.c: fix inappropriate "/.." append path overflow
+	 cut.c: snarf from dgk
+03-05-18 rm.c: check st_nlink to verify progress w.r.t. ftwalk/fts
+03-05-15 join.c: fix stealth -v2 bug (thanks ahs)
+03-05-04 wc.c: drop trailing space for `wc -l < file'
+03-03-21 date.c: add %Q/recent/distant/ docs
+03-02-19 date.c: fix %+|!flag docs
+02-11-14 update for cmdinit() 4th arg and ERROR_NOTIFY for interrupt cleanup
+02-10-02 date.c: tmform() => tmfmt()
+02-09-30 date.c,uname.c: change execv() calls to procrun(): exec|exit => bad
+02-09-06 wclib.c: fix 1 char-at-a-time miscount bug
+02-08-19 chgrp.c: convert to use <cdt.h>
+02-07-23 join.c: fix comm snarf typo
+02-04-05 date.c: add %u
+02-01-24 stty.c: ifdef a few more macros for uts (yes, its still running)
+01-12-14 date.c: clarify %z doc
+01-10-31 mkdir.c: mkdir() on existing dir could fail with errno!=EEXIST
+	 uname.c: add execve() loop check for unknown options
+01-10-29 tail.c: SF_SHARE on only if not reading through EOF
+01-10-11 getconf.c: fix usage typos
+01-09-11 cp.c,cmd.h: handle . in argv[0]
+	 cp.c: add O_BINARY to all open() calls
+01-09-06 tail: input streams must be SF_SHARE -- duh
+01-07-16 stty: fix cntl() macro for CC_NATIVE!=CC_ASCII
+01-05-31 date: fix /bin/date fallback logic
+	 stty: fix a few mismatched flags, -a and -g option logic
+	 stty: tone down sane to modify current settings rather than from zero
+01-05-01 uname: -i => -h, add sol.sun4 -i, add sgi -R, punt to /usr/bin/uname
+01-04-17 date,rm: add
+01-03-07 cp: fix readonly string mod on "."
+01-01-23 cp: `cp foo' => `cp foo .' only for CONFORMANCE!=standard
+00-12-01 cut: multibyte support
+00-10-31 mkdir: handle races by checking EEXIST
+00-09-20 cp: copy argv to stack before modifying in place
+00-05-18 add setlocale(LC_ALL,"")
+00-04-30 join: drop weird opt_info.argv reference
+00-03-17 expr: add == operator -- duh
+	 cp,ln,mv: delay pathcanon() on destination to verify `cp a b/.'
+	 getconf: use astgetconf for proper message control
+	 ERROR_translate: dictionary update
+00-03-08 tail: handle multiple -f files
+00-03-07 fmt: add
+00-03-07 dirname: handle PATH_LEADING_SLASHES as documented
+	 tail: accept + options
+00-02-14 chmod: --ignore-umask to ignore umask(2) in symbolic expressions
+	 chmod,chgrp,cp: use FTS_NOSEEDOTDIR for correct path construction
+	 cat: fix -n (was ignored, wow)
+00-01-27 getconf: add "-a" and "-v spec" for sol7.* compatibility
+99-09-09 join: fix -j1 vs. -j 1, add --ignorecase
+99-06-22 paste: defualt delim in writable string
+99-06-16 cat: fix --dos-ouput typo
+99-06-11 cp: tighten chown() diagnostics
+99-06-08 expr: nothing for NULL string bug fix
+99-05-21 paste: fix missing newline columnize bug
+99-05-20 mv: do not check for `mv foo foo' since rename() handles it
+99-05-01 cmp,comm,cp/mv/ln,expr,fold,getconf,head: long options
+	 join,logname,paste,pathchk,tail,tee: long options
+99-04-10 uname: long options, stdize -a
+	 chmod,head,tail,rev: long options
+	 cut: long options, pass regression test 02
+99-04-07 cat: long options, fix O_TEXT modes
+99-01-11 tail: fix +n
+	 join: another ggs/psm bug
+	 join: all 1 and/or 2 to be unseekable
+99-01-01 cp: fix -p
+	 chmod: drop -l option because of clash with l (lock) mode
+98-12-25 cat: add -T to sfopen(,,"rt")
+98-11-11 chgrp,chmod: cannot open file stream => not found
+	 join: fix another ggs/psm bug; thanks guys
+98-10-20 cp: fix cp -rp to update dir times too
+98-09-22 join: fix ggs null field bug
+98-08-11 join: fix last regression test bug
+98-05-29 join: add jp->common to handle boundary conditions
+98-03-11 cat,cp,rev,tee: fix sfmove() error checks
+98-03-01 join: fix bug that emitted records more than once after eof
+	 cp: fix sfmove() error check
+98-02-14 cp: -R physical, -[HLP], -r getconf(PATH_RESOLVE)
+98-01-11 cp: check sfclose() return value
+98-01-07 chown,chgrp,chmod: use fts for -R
+	 mkdir: fix -p default mode
+97-12-07 mkdir: fix umask() reset
+97-11-11 chown,chgrp: proper interpretation of -h,-l for lchown()
+	 chown,chgrp: only chown() if uid or gid change
+97-10-31 mkdir: do umask right
+97-08-11 cmdinit: clear opt_info.index to allow multiple calls
+	 cp,ln,mv: add
+97-07-17 join: fix a few more -a bugs
+97-05-31 expr: optget() only if CONFORMANCE==standard
+97-04-01 join: fix a few bugs that make it work!
+96-12-25 head: sfset(sfstdin,SF_SHARE,1)
+	 Makefile: add -last to cmd lib list
+	 drop function __IMPORT__
+96-08-11 tail: check for truncated file and rewind for -f
+96-04-08 update <cmd.h>
+96-02-29 uname: -a like std, -l for everything
+	 id: add -a (default)
+96-02-14 wc: speed up inner loop newline breakout
+96-01-30 unused var cleanup
+96-01-01 AT&T Research now
+	 pathchk: handle getcwd(0,0) error
+	 expr: switch to <regex.h>
+95-11-11 add expr.c
+	 fix cut exit code and -s optimization
+95-10-11 add extern b_* to cmd.h
+	 add void* context 3rd arg to b_main()
+95-05-09 add getconf
+	 cat -u avoids mmap
+	 add chown|chgrp -m uid|gid map file
+	 add chown|chgrp -P for systems with lchown(2)
+	 chown|chgrp -P => lstat() too!
+	 chmod|chown|chgrp -HLP
+95-04-01 version 1.2
+	 add rmdir
+95-02-14 fix mkdir -p symlink bug
+	 fix mkdir '/' skip bug that went one too far

@@ -1,0 +1,122 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+# NOTE:	This script has probably outlived its usefulness, but in
+#	case it hasn't, it still references "old" pathnames,
+#	allowing it to work on any system.
+
+#	execute this as root and in the /usr/spool/uucp directory.
+#	execute
+#	    Cvt
+#	This will create required directories and move the
+#	C. and D. files to the proper place.
+#
+#	use this after running the SetUp script.
+#
+#	use -n option to tell what will be done, but without doing it
+#
+# NOTE!!
+#	It does not take care of X. files yet.
+
+set +e
+SPOOL=/usr/spool/uucp
+TMP=/tmp/CVT
+
+NC=`ls $SPOOL/C. | grep -c "^C."`
+if [ $NC -eq 0 ]
+then
+  echo "There are no old C. files in /usr/spool/uucp/C."
+  echo "exiting"
+  exit
+fi
+
+echo "
+This shell (Cvt) will attempt to take the old C. and D. files
+that are in $SPOOL and put them in the proper directories for
+the new version of uucp.
+
+If the files are not moved, they will never get executed after the
+new uucp is installed.
+
+There are $NC C. files in $SPOOL.
+
+Do you wish to continue (Type y to continue)? \
+\c"
+
+read A
+if [ x$A != "xy" ]; then exit; fi
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	-n)	ECHO=echo
+		shift
+		;;
+
+	*)	break
+		;;
+
+	esac
+done
+
+cd $SPOOL/C.
+for i in C*
+do 
+# S is the 6 character system name
+# E is the last 5 characters of C. name
+
+  echo Processing: $i
+  S=`echo $i | sed "s/..\(.*\)....../\1/"`
+  E=`echo $i | sed "s/.*\(.....\)/\1/"`
+  DIR=
+  DIR=`uuname | grep "^$S"` 
+  if [ -z "$DIR" ]
+  then
+	echo "*****Warning: There is no system=$S in the /etc/uucp/Systems file. ******"
+	DIR=$S
+  fi
+  DIR=`echo $DIR | sed "s/ .*//"`
+  if [ ! -d $SPOOL/$DIR ]
+	then
+	    $ECHO  mkdir $SPOOL/$DIR
+	    $ECHO  chmod 755 $SPOOL/$DIR
+	    $ECHO  chown uucp $SPOOL/$DIR
+  fi
+
+    cat $i | while read AA ; do
+	D=`echo $AA | cut -d" " -f6`
+	if [ -n "$D" -a -f "$SPOOL/D./$D" ]
+	    then $ECHO mv $SPOOL/D./$D $SPOOL/$DIR/$D
+	elif [ -n "$D" -a -f "$SPOOL/D.`uuname -l`/$D" ]
+	    then $ECHO mv $SPOOL/D.`uuname -l`/$D $SPOOL/$DIR/$D
+	fi
+    done
+    S=`echo $DIR | sed "s/\(.......\).*/\1/"`
+    $ECHO mv $i $SPOOL/$DIR/C.$S$E
+
+done

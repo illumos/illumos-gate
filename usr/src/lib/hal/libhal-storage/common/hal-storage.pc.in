@@ -1,0 +1,18 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Licensed under the Academic Free License version 2.1
+#
+
+prefix=/usr
+exec_prefix=${prefix}
+libdir=__LIBDIR__
+includedir=${prefix}/include
+
+Name: hal-storage
+Description: hal library for storage devices and volumes
+Version: __VERSION__
+Requires: dbus-1 hal
+Libs: -L${libdir} -lhal-storage
+Cflags: -DDBUS_API_SUBJECT_TO_CHANGE -I${includedir}/hal

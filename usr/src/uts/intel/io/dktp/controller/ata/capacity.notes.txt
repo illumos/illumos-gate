@@ -1,0 +1,178 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+#
+# Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# 
+
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+Dan Mick, 2/16/1999
+
+I had to come up with some sort of synthetic device geometry in the 
+case that a drive supports LBA access and therefore the BIOS's geometry
+may be wrong or too small.
+
+In despair at reading the specs, I asked the x3t13 reflector
+how one is supposed to calculate capacity:
+
+==
+X-Authentication-Warning: mage.dt.wdc.com: majordom set sender to owner-t13@dt.wdc.com using -f
+Date: Thu, 11 Feb 1999 19:16:39 -0800 (PST)
+From: Dan Mick <dan.mick@West>
+Subject: Capacity?
+To: t13@dt.wdc.com
+
+So, I'm sure I'm being naive in expecting there to be a way to
+reliably calculate the capacity of an ATA drive, but I can't make
+sense of the IDENTIFY DEVICE results, words
+
+1,3,6,53,54-58,60-61
+
+Is the right algorithm for making sense of all this written down
+somewhere?  I *have* searched the specs and Hale's HIW docs and
+the "ATA FAQ" from Wehman and den Hahn, and I still don't understand
+how this can be so nondeterministic.
+
+Even assertions in the specs seem to be ignored; I have a drive for
+which words 57-58 do *not* represent the product of words 54, 55, and
+56, for instance...
+==
+
+Several responses came; one from curtis_stevens@phoenix.com said "just
+use LBA", which of course doesn't answer the question about non-LBA
+drives.  David_S_Thompson@notes.seagate.com said "read section
+6.2.1 of ATA-4, rev 17 or above", which does help a bit.  But
+the best pragmatic answer came from Hale Landis.  I've tried to 
+implement this algorithm in deriving the capacity and geometry 
+for ata, without using "Init Drive Parameters", since the driver
+hasn't done that in recent incarnations, and I'm loath to mess
+with what the BIOS and the drive have figured out unless it
+becomes absolutely necessary.
+
+
+From: "Hale Landis" <hlandis@ibm.net>
+To: "T13 Reflector" <t13@dt.wdc.com>, "Dan Mick" <dan.mick@West>
+Date: Thu, 11 Feb 1999 23:46:59 -0700
+Subject: Re: Capacity?
+
+Dan Mick said...
+>So, I'm sure I'm being naive in expecting there to be a way to
+>reliably calculate the capacity of an ATA drive, but I can't make
+>sense of the IDENTIFY DEVICE results, words
+>
+>1,3,6,53,54-58,60-61
+>
+>Is the right algorithm for making sense of all this written down
+>somewhere?  I *have* searched the specs and Hale's HIW docs and
+>the "ATA FAQ" from Wehman and den Hahn, and I still don't understand
+>how this can be so nondeterministic.
+>
+>Even assertions in the specs seem to be ignored; I have a drive for
+>which words 57-58 do *not* represent the product of words 54, 55, and
+>56, for instance...
+
+If the words [54]*[55]*[56] don't match [57:58] then the drive is
+"broken".  Warning: some older drives have words 57:58 in big endian
+format (that is easy to verify!).
+
+Of course Read/Set Max do alter the drive's apparent capacity but assuming
+this feature is not being used or it is being used and implemented
+correctly...
+
+If you have no need to use CHS mode, then just ignore words 1, 3, 6 and
+53:58.  Words 60:61 are the drive capacity.  But even if you must use CHS
+mode, words 60:61 are still the true drive capacity but words 57:58 are
+the capacity that the current CHS geometry can address and [57:58] must be
+<= [60:61].  Oh yea, if you find that 57:58 are big endian then 60:61 are
+probably big endian too.
+
+An algorithm??? (I hope there aren't any typo's here)...
+
+1) If you are LBA only (don't use CHS) then words 60:61 are all you need,
+you are done.
+
+2) If you must use CHS then I suggest the following:
+
+2a) Check words 53:58...
+    does 53 indicate "valid",
+    is 1 <= [55] <= 16, 
+    is 1 <= [56] <= 63, 
+    and does [54]*[55]*[56] == [57:58]?
+
+   - Yes, you know that current CHS geometry of the drive, you are done.
+     If you don't like this geometry then issue an Init Drv Params with
+     a different heads and sectors and repeat this step.
+
+   - No, then go to 2b).
+
+2b) Does the drive support LBA and is [1]*[3]*[6] <= [60:61]?
+
+   - Yes, assume 60:61 are correct, and go to 2c)
+
+   - No, go to 2d)
+
+2c) Issue a Init Drv Params and set your favorite heads and sectors.
+    Compute the number of cylinders:
+
+    num-cyl = [60:61] / (favorite heads) * (favorite sectors)
+
+    The drive capacity is (num-cyl)*(favorite heads)*(favorite sectors).
+    And this value should be in 57:58 now.  You are done.
+
+2d) Now you got a problem... 60:61 are no good, 53:58 are no good.
+    You don't have much choice but to assume that [1]*[3]*[6] is the
+    drive capacity.  Issue an Init Drv Params to set the default geometry
+    from [3] and [6] -or- issue an Init Drv Params with your favorite 
+    heads and sectors.  Compute the number of cylinders:
+
+    num-cyl = ([1]*[3]*[6]) / (num heads) * (num sectors)
+
+    The drive capacity is (num-cyl)*(num-head)*(num-sectors).
+
+    You are done.
+
+And one final thing... If you used Init Drv Params you must now verify
+that it worked.  Issue a read command and make sure you can read what you
+think is the last sector on the drive.  If this read fails with ABRT or
+IDNF, you are in *BIG* trouble.
+
+All we did here was find a CHS geometry and a drive capacity that should
+work.  If the drive has a Master Boot Record then this geometry may not
+have a CHS translation that matches the CHS translation that was used in
+that Master Boot Record.  But I'll not go into that here (I would probably
+have to say bad things about the documents published by some of my friends
+a few years ago!).
+
+I'll say "sorry" now to all you hardware folks that read these reflector
+messages but I'm sure this will begin a long series of messages on the
+reflector that will just bore you to near death!
+
+
++---------------+---------------------------+
+| Hale Landis   | hlandis@ibm.net           |
+| Niwot, CO USA | hlandis@sugs.talisman.com |
++---------------+---------------------------+
+| !! Coming soon: www.talisman.com/sugs  !! |
++-------------------------------------------+

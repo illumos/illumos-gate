@@ -1,0 +1,208 @@
+<!--
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: Address Wizard</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=615>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+
+<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><P>
+
+<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relays</STRONG></A><P>
+<A HREF="dhcp_addr_ref.html"><STRONG>Addresses</STRONG></A><BR>
+
+&nbsp;&nbsp;<A HREF="dhcp_addr_create.html">Create</A><BR>
+	
+<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">Address Wizard<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#addrno"><EM>Number</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#ownserv"><EM>Server</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#startaddr"><EM>Start Addr</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#name"><EM>Names</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#confirm"><EM>Confirm</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#config"><EM>Config</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#unusable"><EM>Unusable</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#lease"><EM>Lease</EM></a><BR>
+&nbsp;&nbsp;<A HREF="dhcp_addr_dup.html">Duplicate</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_mod.html">Modify</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_multi.html">Modify Multiple</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_rel.html">Release</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_del.html">Delete</A><P>
+
+	
+
+	
+<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>
+<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><P>
+<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+	
+		</td>
+
+
+
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+
+	<td colspan=1 valign="top" bgcolor="#ffffff">
+	<P>&nbsp;</P>
+<h1>Address Wizard</h1>
+
+Use the Address Wizard to add a block of addresses to the server's DHCP network. To start the Address Wizard, select Addresses from the View menu, and then select Address Wizard from the Edit menu.
+<p>
+
+Proceed through the steps by clicking the arrow key at the bottom of
+the screen.
+
+<p>
+To enter information, double-click in the field, enter the desired value, and then press Enter.
+<P>
+If you choose the Address Wizard, you will be asked
+to supply the following information. <P><HR NOSHADE><P>
+
+	<table border=0 cellspacing=4 cellpadding=3>
+
+	
+
+	<tr>
+	<td valign="top" width=125><A NAME="addrno"><STRONG>Number of Addresses</STRONG></A></td>
+	<td valign="top">Enter the total number of addresses to add
+	to the DHCP server's network. </td>
+	</tr>
+
+	<tr>
+	<td valign="top" width=125><A NAME="ownserv"><STRONG>Managed by Server</STRONG></A></td>
+	<td valign="top">Enter the IP address of the DHCP server
+	that manages these IP addresses. This server is responsible for initially responding
+	to the DHCP client's request for an IP address.
+	</td>
+	</tr>
+	
+	<tr>
+	<td valign="top" width=125><A NAME="startaddr"><STRONG>Starting IP Address</STRONG></A></td>
+	<td valign="top">Enter the first IP address in the series.<P></td>
+	</tr>
+
+	<tr>
+	<td valign="top" width=125><A NAME="confirm"><STRONG>Confirm Address List</STRONG></A></td>
+	<td valign="top">You can view the information that you have entered.<P>
+	If you want to add or modify addresses, use the <A HREF="dhcp_addr_create.html">Create Address</A> or <A HREF="dhcp_addr_mod.html">Modify Address</A> options in the Edit menu.<P>
+	<P>
+	</td>
+	</tr>
+	
+	<tr>
+	<td valign="top" width=125><A NAME="config"><STRONG>Client Configuration Macro</STRONG></A></td>
+	<td valign="top">Enter the name of a client configuration macro. You can 
+	scroll for existing macros. Select a macro from the list and click View to display the contents of the macro.<P>
+If you want to name a macro that does not exist,
+	you can create it with the <A HREF="dhcp_macro_create.html">Create Macro</A>
+	dialog box.<P>
+	</td>
+	</tr>
+	
+	<tr>
+	<td valign="top" width=125><A NAME="unusable"><STRONG>Unusable</STRONG></A></td>
+	<td valign="top">You can choose to mark these addresses as <A HREF="dhcp_addr_ref.html#unuse">Unusable</A>. <P>
+	</td>
+	</tr>
+
+	<tr>
+	<td valign="top" width=125><A NAME="lease"><STRONG>Lease Type</STRONG></A></td>
+	<td valign="top">Select Dynamic or Permanent.<p>
+	<U>Dynamic:</U> The DHCP server is responsible for the allocation
+	and re-allocation of this range of IP addresses. Choose Dynamic if you want to 
+	make IP addresses available when they are not being used.<P>
+	Enter the expiration time of the lease. You can specify an
+	expiration date in mm/dd/yyyy format. <P>
+	<U>Permanent:</U> The address is permanently assigned to the client.<P>
+	</td>
+	</tr>
+	
+	</table>
+&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+
+<p>&nbsp;</p>
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

@@ -1,0 +1,72 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# This script is the shared method script for the ipv4-routing, ipv6-routing,
+# ipv4-forwarding and ipv6-forwarding services.
+
+. /lib/svc/share/smf_include.sh
+
+usage() {
+	echo "Usage: $0 { start | stop | refresh } { ipv4 | ipv6 }"
+}
+
+numv6ifs=`/usr/sbin/ifconfig -au6 | /usr/bin/grep -c inet6`
+
+method="$1"
+proto="$2"
+
+if [ -z "$proto" ]; then
+	usage
+	exit $SMF_ERROR_FATAL
+fi
+
+case "$1" in
+'start' | 'refresh' )
+	smf_configure_ip || exit $SMF_EXIT_OK
+	#
+	# Start ip forwarding.
+	#
+	if [ "$proto" = "ipv6" -a "$numv6ifs" = 0 ]; then
+		echo "Error: no IPv6 interface configured"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	/usr/sbin/ipadm set-prop -p forwarding=on $proto
+	[ "$proto" = "ipv6" ] && /usr/sbin/ipadm set-prop \
+				    -p ip6_send_redirects=1 ip
+        ;;
+'stop')
+	/usr/sbin/ipadm set-prop -p forwarding=off $proto
+	[ "$proto" = "ipv6" ] && /usr/sbin/ipadm set-prop \
+				    -p ip6_send_redirects=0 ip
+	;;
+*)
+	usage
+        exit $SMF_ERROR_FATAL
+        ;;
+esac
+
+exit "$SMF_EXIT_OK"

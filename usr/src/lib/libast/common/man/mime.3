@@ -1,0 +1,117 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH MIME 3
+.SH NAME
+mime \- mime/mailcap interface
+.SH SYNOPSIS
+.EX
+#include <mime.h>
+
+Mime_t
+{
+	unsigned long	flags;
+};
+
+Mime_t*   mimeopen(unsigned long \fIflags\fP);
+void      mimeclose(Mime_t* \fImime\fP);
+
+int       mimeload(Mime_t* \fImime\fP, const char* \fIpath\fP, unsigned long \fIflags\fP);
+int       mimelist(Mime_t* \fImime\fP, Sfio_t* \fIsp\fP, const char* \fIpattern\fP);
+
+char*     mimeview(Mime_t* \fImime\fP, const char* \fIview\fP, const char* \fIname\fP, const char* \fItype\fP, const char* \fIopts\fP);
+int       mimeset(Mime_t* \fImime\fP, char* \fIline\fP, unsigned long \fIflags\fP);
+.EE
+.SH DESCRIPTION
+These routines provide an interface to the MIME type database.
+.L mimeopen
+returns a mime session handle that is passed to all of the other routines.
+The
+.I flags 
+argument is currently unused.
+.PP
+.L mimeclose
+closes the mime session.
+.PP
+.L mimeload
+loads the mime file named by
+.I path
+into the mime session.
+.I flags
+may be one of:
+.TP
+.L MIME_LIST
+The
+.I path
+argument is a
+.B :
+separated list of pathnames, each of which is loaded.
+Non-existent files are ignored
+.L MIME_LIST
+set.
+.TP
+.L MIME_REPLACE
+Replace existing entries by new entries with the same type.
+Otherwise original entries take precedence.
+.PP
+More than one mime file can be loaded into a session;
+the files are searched in load order.
+If
+.I path
+is 
+.L 0
+then the default mime file is loaded.
+.PP
+.L mimelist
+lists the mime file contents on the
+.IR sfio (3)
+stream
+.IR sp .
+This is used for debugging mime entries.
+.PP
+.L mimetype
+returns the type string for
+.IR path .
+.L mimetype
+always returns a non-null string.
+If errors are encounterd on
+.I path
+then the return value will be
+.LR "error" .
+.SH "SEE ALSO"
+file(1), mime(4)

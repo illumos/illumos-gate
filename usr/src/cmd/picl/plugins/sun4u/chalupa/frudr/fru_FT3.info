@@ -1,0 +1,78 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * This configuration file is parsed by PICL plugin envmon in response
+ * to a PICL_FRU_ADDED event for FT2
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+VERSION 1.1
+VERBOSE 1
+
+name:/frutree/chassis/FT3
+	PROP SlotType string r 0 "fan-tray"
+	PROP Label string r 0 "FT3"
+	Node F0 location
+	    PROP SlotType string r 0 "fan-unit"
+	    Prop Label string r 0 "F0"
+		NODE fan fru
+		ENDNODE
+	ENDNODE
+name:/platform/pci@1e,600000/isa@7/rmc-comm@0,3e8/SUNW,rmclomv/ft3_f0
+	REFPROP	_location_parent name:/frutree/chassis/FT3/F0
+name:/frutree/chassis/FT3/F0/fan
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:/platform/pci@1e,600000/isa@7/rmc-comm@0,3e8/SUNW,rmclomv/ft3_f0
+	ENDROW
+	ENDTABLE

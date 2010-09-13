@@ -1,0 +1,67 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# hazeltine: HAZELTINE
+#
+# Since cuf1 is blank, when you want to erase something you
+# are out of luck.  You will have to do ^L's a lot to
+# redraw the screen.  h1000 is untested.  It doesn't work in
+# vi - this terminal is too dumb for even vi.  (The code is
+# there but it isn't debugged for this case.)
+h1000|hazeltine 1000,
+	cub1=^H, home=^K, clear=^L, cuf1= , cols#80, lines#12, cr=^M, cud1=^J, ind=^J, bel=^G,
+# Note: the h1552 appears to be the first Hazeltine terminal which
+# is not braindamaged.  It has tildes and backprimes and everything!
+# Be sure the auto lf/cr switch is set to cr.
+h1552|hazeltine 1552,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE, dl1=\EO,
+	kf1=\EP, lf1=blue, kf2=\EQ, lf2=red, kf3=\ER, lf3=green, use=vt52,
+h1552rv|hazeltine 1552 reverse video,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	smso=\ES, rmso=\ET, use=h1552,
+# From cbosg!ucbvax!pur-ee!cincy!chris Thu Aug 20 09:09:18 1981
+h1420|hazeltine 1420,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, am, lines#24, cols#80,
+	il1=\E^Z, dl1=\E^S, ed=\E^X, clear=\E\034, cuu1=\E^L,
+	cuf1=^P, el=\E^O, ht=^N, cup=\E^Q%p2%c%p1%' '%+%c, smso=\E\037, rmso=\E^Y,
+h1500|hazeltine 1500,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=~^Z$<40>, am,
+	cub1=^H, ed=~^X$<10>, el=~^O, clear=~^\, cup=~^Q%p2%c%p1%c, cols#80,
+	dl1=~^S$<40>, cud1=~^K, lines#24, cuf1=^P, .rmso=~^_, .smso=~^Y, cuu1=~^L,
+# h1510 assumed to be in sane escape mode.  Else use h1500.
+h1510|hazeltine 1510,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	il1=\E^Z, am, cub1=^H, ed=\E^X, el=\E^O, clear=\E^\, cup=\E^Q%p2%c%p1%c, cols#80,
+	dl1=\E^S, cud1=\E^K, lines#24, cuf1=^P, .rmso=\E^_, .smso=\E^Y, cuu1=\E^L,
+h1520|hazeltine 1520,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=~^Z, am, cub1=^H,
+	ed=~^X, el=~^O, clear=~\034, cup=~^Q%p2%c%p1%c$<1>, cols#80,
+	dl1=~^S, cud1=~^K, hz, lines#24, cuf1=^P, rmso=~^Y, smso=~\037, cuu1=~^L, home=~^R,
+# Note: h2000 won't work well because of a clash between upper case and ~'s.
+h2000|hazeltine 2000,
+	cud1=^J, ind=^J, bel=^G,
+	il1=~^z$<6>, am, cub1=^H, clear=~^\$<6>, cup=~^q%p2%c%p1%c, cols#74,
+	dl1=~^s$<6>, home=~^r, lines#27, pad=\177,

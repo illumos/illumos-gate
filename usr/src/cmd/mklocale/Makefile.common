@@ -1,0 +1,43 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy is of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
+
+include $(SRC)/cmd/Makefile.cmd
+
+LOCALES=	\
+	en_AU.ISO8859-1 en_AU.ISO8859-15 en_AU.US-ASCII en_AU.UTF-8 \
+	en_CA.ISO8859-1 en_CA.ISO8859-15 en_CA.US-ASCII en_CA.UTF-8 \
+	en_GB.ISO8859-1 en_GB.ISO8859-15 en_GB.US-ASCII en_GB.UTF-8 \
+	en_IE.UTF-8 \
+	en_NZ.ISO8859-1 en_NZ.ISO8859-15 en_NZ.US-ASCII en_NZ.UTF-8 \
+	en_US.ISO8859-1 en_US.ISO8859-15 en_US.US-ASCII en_US.UTF-8
+
+MACHLOCALES=$(LOCALES:%=$(MACH)/%)
+
+ROOTLOCALE=$(ROOT)/usr/lib/locale
+
+ROOTLOCDIRS=\
+	$(ROOT)/usr .WAIT \
+	$(ROOT)/usr/lib .WAIT \
+	$(ROOT)/usr/lib/locale .WAIT \
+	$(LOCALES:%=$(ROOTLOCALE)/%) .WAIT \
+	$(LOCALES:%=$(ROOTLOCALE)/%/$(CATEGORY))
+
+ROOTLOCDATA=\
+	$(LOCALES:%=$(ROOTLOCALE)/%/$(CATEGORY)/LCL_DATA)
+
+$(ROOTLOCDATA)	:=	FILEMODE=0444
+
+HASHSTRIP	=	$(GREP) -v '^$(POUND_SIGN)'
+INS.nohash	=	$(RM) $@; $(GREP) -v '^$(POUND_SIGN)' $< > $@

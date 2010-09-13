@@ -1,0 +1,485 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+IPADM=/sbin/ipadm
+SVCCFG=/usr/sbin/svccfg
+SVCPROP=/usr/bin/svcprop
+SVCADM=/usr/sbin/svcadm
+ROUTE=/sbin/route
+
+NET_NWAM_FMRI="svc:/network/physical:nwam"
+NET_INSTALL_FMRI=$SMF_FMRI
+
+NET_V4IF=install_ipv4_interface
+NET_V6IF=install_ipv6_interface
+
+NET_UNDEFINED_STRING_PROP="\"\""
+
+net_install_debug=0
+
+unset net_install_name net_install_addrtype net_install_addr \
+    net_install_dhcpwait net_install_interface_id \
+    net_install_stateless net_install_stateful net_install_route
+
+net_configure_install_if()
+{
+	ipv6_interface=$1
+
+	case $net_install_addrtype in
+	static)
+		cmd="$IPADM create-addr -T static "
+		cmd=$cmd"-a local=$net_install_addr $net_install_name"
+		;;
+
+	dhcp)
+		dhcpwait=""
+		if [ "$net_install_dhcpwait" != "" ]; then
+			dhcpwait="-w $net_install_dhcpwait"
+		fi
+
+		cmd="$IPADM create-addr -T dhcp $dhcpwait $net_install_name"
+		;;
+	addrconf)
+		interface_id=""
+		if [ "$net_install_interface_id" != "" ]; then
+			interface_id="-i $net_install_interface_id"
+		fi
+
+		state=""
+		if [ "$net_install_stateless" != "" ]; then
+			state="-p stateless=$net_install_stateless"
+		fi
+
+		if [ "$net_install_stateful" != "" ]; then
+			if [ "$state" = "" ]; then
+				state="-p stateful=$net_install_stateful"
+			else
+				state=$state",stateful=$net_install_stateful"
+			fi
+		fi
+
+		cmd="$IPADM create-addr -T addrconf "
+		cmd=$cmd"$interface_id $state $net_install_name"
+		;;
+	esac
+
+	$cmd
+	if [ $? -ne 0 ]; then
+		net_record_err "Error configuring interface:\n\"$cmd\"" $?
+		return $SMF_EXIT_ERR_FATAL
+	fi
+
+	if [ "$net_install_route" != "" ]; then
+		if [ $ipv6_interface == 1 ]; then
+			details="-inet6 default"
+		else
+			details="default"
+		fi
+		ifp=`echo $net_install_name | /usr/bin/cut -f1 -d'/'`
+		details="$details $net_install_route -ifp $ifp"
+		cmd="$ROUTE add $details"
+		$cmd
+		cmd="$ROUTE get $details"
+		$cmd
+		if [ $? -ne 0 ]; then
+			err=$?
+			msg="Error creating default route:\n\"$cmd\""
+			net_record_err "$msg" $err
+			return $SMF_EXIT_ERR_FATAL
+		fi
+		rootdir=/etc/svc/volatile
+		/usr/bin/mkdir -p $rootdir/etc/inet
+		if [ $? -ne 0 ]; then
+			err=$?
+			msg="Error creating \"$rootdir/etc/inet\" directory"
+			net_record_err "$msg" $err
+			return $SMF_EXIT_ERR_FATAL
+		fi
+		cmd="$ROUTE -R $rootdir -p add $details"
+		$cmd
+		if [ $? -ne 0 ]; then
+			err=$?
+			msg="Error adding persistent default route:\n\"$cmd\""
+			net_record_err "$msg" $err
+			return $SMF_EXIT_ERR_FATAL
+		fi
+	fi
+
+	return $SMF_EXIT_OK
+}
+
+net_process_v4_pg()
+{
+	net_install_name=""
+	net_install_addrtype=""
+	net_install_addr=""
+	net_install_dhcpwait=""
+	net_install_route=""
+
+	#
+	# Retrieve the mandatory interface name property value. If
+	# the value is empty, then no interface is configured.
+	#
+	prop=`$SVCPROP -p $NET_V4IF/name $NET_INSTALL_FMRI`
+	if [ $? -ne 0 -o "$prop" = "$NET_UNDEFINED_STRING_PROP" ]; then
+		return $SMF_EXIT_OK
+	fi
+	net_install_name=$prop
+
+	#
+	# Retrieve the mandatory address type property value. The two
+	# valid values are "static" and "dhcp".
+	#
+	prop=`$SVCPROP -p $NET_V4IF/address_type $NET_INSTALL_FMRI`
+	if [ $? -ne 0 -o "$prop" = "$NET_UNDEFINED_STRING_PROP" ]; then
+		msg="No \"address_type\" property defined in the "
+		msg=$msg"\"$NET_V4IF\" property group"
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+	fi
+	case $prop in
+	static | dhcp)
+		net_install_addrtype=$prop
+		;;
+	*)
+		msg="Bad value, \"$prop\", defined for the \"address_type\" "
+		msg=$msg"property in the \"$NET_V4IF\" property group"
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+		;;
+	esac
+
+	#
+	# Retrieve the static address property value. The address property
+	# only applies to static address type configurations. If not
+	# configuring a static address, then the property should still have
+	# its default value of 0.0.0.0/0.
+	#
+	prop=`$SVCPROP -p $NET_V4IF/static_address $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$net_install_addrtype" = "dhcp" ]; then
+			if [ "$prop" != "${NET_INADDR_ANY}/0" ]; then
+				msg="Warning: static address ignored "
+				msg=$msg"in the \"$NET_V4IF\ property group"
+				net_record_err "$msg" 0
+			fi
+		else
+			if [ "$prop" = "${NET_INADDR_ANY}/0" ]; then
+				msg="Error: static address required in the "
+				msg=$msg"\"$NET_V4IF\" property group"
+				net_record_err "$msg" 0
+				return $SMF_EXIT_ERR_CONFIG
+			fi
+			net_install_addr=$prop
+		fi
+	else
+		if [ "$net_install_addrtype" = "static" ]; then
+			msg="Error: static address required in the "
+			msg=$msg"\"$NET_V4IF\" property group"
+			net_record_err "$msg" 0
+			return $SMF_EXIT_ERR_CONFIG
+		fi
+	fi
+
+	#
+	# Retrieve the optional DHCP wait property value.
+	#
+	prop=`$SVCPROP -p $NET_V4IF/dhcp_wait $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$net_install_addrtype" != "dhcp" ]; then
+			if [ "$prop" != "120" ]; then
+				msg="Warning: DHCP wait value ignored in the "
+				msg=$msg"\"$NET_V4IF\" property group"
+				net_record_err "$msg" 0
+			fi
+		else
+			net_install_dhcpwait=$prop
+		fi
+	fi
+
+	#
+	# Retrieve the optional default route property value.
+	#
+	prop=`$SVCPROP -p $NET_V4IF/default_route $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$prop" != "$NET_INADDR_ANY" ]; then
+			net_install_route=$prop
+		fi
+	fi
+
+	net_configure_install_if 0
+
+	return $?
+}
+
+net_process_v6_pg()
+{
+	net_install_name=""
+	net_install_addrtype=""
+	net_install_addr=""
+	net_install_stateless=""
+	net_install_stateful=""
+	net_install_interface_id=""
+	net_install_route=""
+
+	#
+	# Retrieve the mandatory interface name property value. If
+	# the value is empty, then no interface is configured.
+	#
+	prop=`$SVCPROP -p $NET_V6IF/name $NET_INSTALL_FMRI`
+	if [ $? -ne 0 -o "$prop" = "$NET_UNDEFINED_STRING_PROP" ]; then
+		return $SMF_EXIT_OK
+	fi
+	net_install_name=$prop
+
+	#
+	# Retrieve the mandatory address type property value. The two
+	# valid values are "static" and "addrconf".
+	#
+	prop=`$SVCPROP -p $NET_V6IF/address_type $NET_INSTALL_FMRI`
+	if [ $? -ne 0 -o "$prop" = "$NET_UNDEFINED_STRING_PROP" ]; then
+		msg="No \"address_type\" property defined in the "
+		msg=$msg"\"$NET_V6IF\" property group"
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+	fi
+	case $prop in
+	static | addrconf)
+		net_install_addrtype=$prop
+		;;
+	*)
+		msg="Bad value \"$prop\" defined for \"address_type\""
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+		;;
+	esac
+
+	#
+	# Retrieve the static address property value. The address property
+	# only applies to static address type configurations. If not
+	# configuring a static address, then the property should still have
+	# its default value of ::0/0.
+	#
+	prop=`$SVCPROP -p $NET_V6IF/static_address $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$net_install_addrtype" = "addrconf" ]; then
+			if [ "$prop" != "${NET_IN6ADDR_ANY_INIT}/0" ]; then
+				msg="Warning: static address ignored in the "
+				msg=$msg"\"$NET_V6IF\" property group"
+				net_record_err "$msg" 0
+			fi
+		else
+			if [ "$prop" = "${NET_IN6ADDR_ANY_INIT}/0" ]; then
+				msg="Error: static address required in the "
+				msg=$msg"\"$NET_V6IF\" property group"
+				net_record_err "$msg" 0
+				return $SMF_EXIT_ERR_CONFIG
+			fi
+			net_install_addr=$prop
+		fi
+	else
+		if [ "$net_install_addrtype" = "static" ]; then
+			msg="Error: static address required in the "
+			msg=$msg"\"$NET_V6IF\" property group"
+			net_record_err "$msg" 0
+			return $SMF_EXIT_ERR_CONFIG
+		fi
+
+	fi
+
+	#
+	# Retrieve the optional interface id property value. The
+	# property only applies to addrconf address type configurations.
+	# If configuring a static address, then the property should still
+	# have its default value of ::0/0.
+	#
+	prop=`$SVCPROP -p $NET_V6IF/interface_id $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$prop" != "${NET_IN6ADDR_ANY_INIT}/0" ]; then
+			if [ "$net_install_addrtype" != "addrconf" ]; then
+				msg="Warning: interface id value ignored in "
+				msg=$msg"the \"$NET_V6IF\" property group"
+				net_record_err "$msg" 0
+			else
+				net_install_interface_id=$prop
+			fi
+		fi
+	fi
+
+	#
+	# Retrieve the optional stateless property value. The property
+	# only applies to addrconf address type configurations. If
+	# configuring a static address, then the property should still
+	# have its default value of "yes".
+	#
+	prop=`$SVCPROP -p $NET_V6IF/stateless $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		case $prop in
+		yes)
+			net_install_stateless=$prop
+			;;
+		no)
+			if [ "$net_install_addrtype" != "addrconf" ]; then
+				msg="Warning: stateless value ignored in the "
+				msg=$msg"\"$NET_V6IF\" property group"
+				net_record_err "$msg" 0
+			else
+				net_install_stateless=$prop
+			fi
+			;;
+		*)
+			msg="Bad value \"$prop\" defined for the \"stateless\""
+			msg=$msg" property in the \"$NET_V6IF\" property group"
+			net_record_err "$msg" 0
+			return $SMF_EXIT_ERR_CONFIG
+		;;
+		esac
+	fi
+
+	#
+	# Retrieve the optional stateful property value. The property
+	# only applies to addrconf address type configurations. If
+	# configuring a static address, then the property should still
+	# have its default value of "yes".
+	#
+	prop=`$SVCPROP -p $NET_V6IF/stateful $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		case $prop in
+		yes)
+			net_install_stateful=$prop
+			;;
+		no)
+			if [ "$net_install_addrtype" != "addrconf" ]; then
+				msg="Warning: stateless value ignored in the "
+				msg=$msg"\"$NET_V6IF\" property group"
+				net_record_err "$msg" 0
+			else
+				net_install_stateful=$prop
+			fi
+			;;
+		*)
+			msg="Bad value \"$prop\" defined for the \"stateless\""
+			msg=$msg" property in the \"$NET_V6IF\" property group"
+			net_record_err "$msg" 0
+			return $SMF_EXIT_ERR_CONFIG
+		;;
+		esac
+	fi
+
+	#
+	# Retrieve the optional default route property value.
+	#
+	prop=`$SVCPROP -p $NET_V6IF/default_route $NET_INSTALL_FMRI`
+	if [ $? -eq 0 -a "$prop" != "$NET_UNDEFINED_STRING_PROP" ]; then
+		if [ "$prop" != "$NET_IN6ADDR_ANY_INIT" ]; then
+			net_install_route=$prop
+		fi
+	fi
+
+	net_configure_install_if 1
+
+	return $?
+}
+
+net_process_install()
+{
+	vout=`$SVCCFG -s $NET_INSTALL_FMRI validate 2>&1`
+	if [ "$vout" != "" ]; then
+		msg="Validation errors in $NET_INSTALL_FMRI:\n$vout"
+		net_record_err "$msg" 0
+		return $SMF_EXIT_ERR_CONFIG
+	fi
+
+	ecode=$SMF_EXIT_OK
+	errs=0
+	ifcnt=0
+	for intf in $NET_V4IF $NET_V6IF
+	do
+		pg=`$SVCPROP -p $intf $NET_INSTALL_FMRI`
+		if [ $? -eq 0 ]; then
+			if service_is_enabled $NET_NWAM_FMRI; then
+				msg="NWAM enabled. Install static "
+				msg=$msg"configuration ignored."
+				net_record_err "$msg" 0
+				errs=`expr $errs + 1`
+				ecode=$SMF_EXIT_ERR_CONFIG
+			else
+				if [ "$intf" == "$NET_V4IF" ]; then
+					net_process_v4_pg
+				else
+					net_process_v6_pg
+				fi
+				if [ $? -ne $SMF_EXIT_OK ]; then
+					#
+				    	# Last error wins.
+					#
+					ecode=$?
+					errs=`expr $errs + 1`
+				else
+					ifcnt=`expr $ifcnt + 1`
+				fi
+			fi
+			$SVCCFG -s $NET_INSTALL_FMRI delpg $intf
+			$SVCCFG -s $NET_INSTALL_FMRI refresh
+		fi
+	done
+
+ 	if [ $net_install_debug -eq 1 ]; then
+		if [ $errs -ne 0 ]; then
+			echo "$errs errors encountered" \
+			    "configuring interfaces on behalf of install"
+		fi
+
+		if [ $ifcnt -ne 0 ]; then
+			echo "$ifcnt interfaces configured on" \
+			    "behalf of install"
+		fi
+	fi
+
+	return $ecode
+}
+
+#
+# The network/install service will be enabled by the install derived profile
+# after the intial install. The service will disable itself after processing
+# the install defined property values.
+#
+# When the non-global shared-IP stack zone boots, it tries to bring up this
+# service as well. We just want to exit successfully.
+#
+if smf_is_nonglobalzone; then
+	if [ `/sbin/zonename -t` = shared ]; then
+		$SVCADM disable $NET_INSTALL_FMRI
+		exit $SMF_EXIT_OK
+	fi
+fi
+
+net_process_install || exit $?
+
+$SVCADM disable $NET_INSTALL_FMRI
+exit $SMF_EXIT_OK

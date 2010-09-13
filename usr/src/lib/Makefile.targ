@@ -1,0 +1,112 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# included to define local library targets
+#
+
+# conditional assignment of default permissions for the installed
+# DYNLIB/DYNLIBCCC.  Set here and in Makefile.mach, instead of Makefile.lib,
+# because ROOTLIBDIR may be changed in the including makefile after it has
+# included Makefile.lib.
+#
+$(ROOTLIBDIR)/$(DYNLIB) :=	FILEMODE= 755
+$(ROOTLIBDIR)/$(DYNLIBCCC) :=	FILEMODE= 755
+
+$(ROOTFS_LIBDIR)/$(DYNLIB) :=	FILEMODE= 755
+$(ROOTFS_LIBDIR)/$(DYNLIBCCC) :=	FILEMODE= 755
+
+$(ROOTLIBDIR64)/$(DYNLIB) :=	FILEMODE= 755
+$(ROOTLIBDIR64)/$(DYNLIBCCC) :=	FILEMODE= 755
+
+# install rules
+$(ROOTHDRDIR)/%: $(HDRDIR)/%
+	$(INS.file)
+
+$(ROOTLIBDIR)/%: %
+	$(INS.file)
+$(ROOTLIBDIR64)/%: %
+	$(INS.file)	
+$(ROOTFS_LIBDIR)/%: %
+	$(INS.file)
+$(ROOTFS_LIBDIR64)/%: %
+	$(INS.file)	
+
+$(ROOTLIBDIR)/$(LIBLINKS): $(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
+	$(INS.liblink)
+$(ROOTLIBDIR64)/$(LIBLINKS): $(ROOTLIBDIR64)/$(LIBLINKS)$(VERS)
+	$(INS.liblink64)
+
+$(ROOTLIBDIR)/$(LIBLINKSCCC): $(ROOTLIBDIR)/$(LIBLINKSCCC)$(VERS)
+	$(INS.liblinkccc)
+$(ROOTLIBDIR64)/$(LIBLINKSCCC): $(ROOTLIBDIR64)/$(LIBLINKSCCC)$(VERS)
+	$(INS.liblinkccc64)
+
+$(ROOTLINTDIR)/%: $(SRCDIR)/%
+	$(INS.file)
+$(ROOTFS_LINTDIR)/%: $(SRCDIR)/%
+	$(INS.file)
+
+$(ROOTDEMODIRS):
+	$(INS.dir)
+$(ROOTDEMODIRBASE)/%: $(DEMOFILESRCDIR)/%
+	$(INS.file)
+
+objs/%.o pics/%.o: $(SRCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: $(SRCDIR)/%.cc
+	$(COMPILE.cc) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs pics:
+	-@mkdir -p $@
+
+$(LIBRARY): objs .WAIT $$(OBJS)
+	$(BUILD.AR)
+	$(POST_PROCESS_A)
+
+$(DYNLIB): $$(MAPFILES)
+
+$(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
+	$(BUILD.SO)
+	$(POST_PROCESS_SO)
+
+$(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
+	$(BUILDCCC.SO)
+	$(POST_PROCESS_SO)
+
+$(LINTLIB): $$(SRCS) 
+	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1 
+
+lintcheck: $$(SRCS)
+	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
+
+clobber: clean
+	-$(RM) $(CLOBBERTARGFILES)
+
+clean:
+	-$(RM) $(OBJS)
+	-$(RM) $(PICS) $(DUPLICATE_SRC) $(LINTOUT) $(LINTLIB) $(CLEANFILES)

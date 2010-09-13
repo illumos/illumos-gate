@@ -1,0 +1,323 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
+				USBA PIPE STATE TRANSITIONS INFORMATION
+				---------------------------------------
+
+1. Control pipe state transitions:-
+
+   o Default control pipe (endpoint number 0):
+
+     NOTE:- Queuing of control requests are allowed at USBA level.
+
+     Calls			Current state		additional condition		Action			Next state
+     -----			-------------		--------------------		------			-----------
+     usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+     usb_pipe_ctrl_xfer		USB_PIPE_STATE_IDLE	No outstanding request		send req to hcd		USB_PIPE_STATE_ACTIVE
+   							Outstanding reqs pending	queue the requests	USB_PIPE_STATE_IDLE
+ 											(cb() will send
+ 											next reqs to hcd)
+   
+ 				USB_PIPE_STATE_ACTIVE	-				queue the requests	USB_PIPE_STATE_ACTIVE
+ 											(cb() will send
+ 											next reqs to hcd)
+
+ 				USB_PIPE_STATE_ERROR	-				queue the requests	USB_PIPE_STATE_ERROR
+ 											(cb() will send
+ 											next reqs to hcd)
+ 											 										
+ 				USB_PIPE_STATE_CLOSING	-				return failure		USB_PIPE_STATE_CLOSING
+ 			
+ 			
+     usba_hcdi_cb		USB_PIPE_STATE_ACTIVE	-				Before doing callback	USB_PIPE_STATE_IDLE
+     (Normal callback)					No outstanding request		-			USB_PIPE_STATE_IDLE
+  							Outstanding reqs pending	Send next req to hcd	USB_PIPE_STATE_ACTIVE
+
+			
+ 				USB_PIPE_STATE_ERROR	-				Don't send any more req	USB_PIPE_STATE_ERROR
+ 				
+ 				USB_PIPE_STATE_CLOSING	-				Don't send any more req	USB_PIPE_STATE_CLOSING
+ 
+ 			
+     usba_hcdi_cb
+     (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Don't remove
+											outstanding requests)
+							No outstanding request		-			USB_PIPE_STATE_IDLE
+							Outstanding reqs pending	Send next req to hcd	USB_PIPE_STATE_ACTIVE
+							
+     usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Return failure		USB_PIPE_STATE_XXXX
+  											(Not allowed)
+  
+			
+     usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+
+   o Normal control pipe (endpoint number > 0):
+
+     NOTE:- Queuing of control requests are allowed at USBA level.
+
+     Calls			Current state		additional condition		Action			Next state
+     -----			-------------		--------------------		------			-----------
+     usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+     usb_pipe_ctrl_xfer		USB_PIPE_STATE_IDLE	No outstanding request		send req to hcd		USB_PIPE_STATE_ACTIVE
+   							Outstanding reqs pending	queue the requests	USB_PIPE_STATE_IDLE
+ 											(cb() will send
+ 											next reqs to hcd)
+   
+ 				USB_PIPE_STATE_ACTIVE	-				queue the requests	USB_PIPE_STATE_ACTIVE
+ 											(cb() will send
+ 											next reqs to hcd)
+
+ 				USB_PIPE_STATE_ERROR	-				return failure		USB_PIPE_STATE_ERROR
+ 											 										
+ 				USB_PIPE_STATE_CLOSING	-				return failure		USB_PIPE_STATE_CLOSING
+ 			
+ 			
+     usba_hcdi_cb		USB_PIPE_STATE_ACTIVE	-				Before doing callback	USB_PIPE_STATE_IDLE
+     (Normal callback)					No outstanding request		-			USB_PIPE_STATE_IDLE
+  							Outstanding reqs pending	Send next req to hcd	USB_PIPE_STATE_ACTIVE
+
+			
+ 				USB_PIPE_STATE_ERROR	-				Don't send any more req	USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING
+ 
+ 			
+     usba_hcdi_cb
+     (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+     usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+     usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+2. Bulk pipe state transitions (endpoint number > 1, both IN and OUT):-
+
+   NOTE:- Queuing of bulk requests are allowed at USBA level.
+
+   Calls			Current state		additional condition		Action			Next state
+   -----			-------------		--------------------		------			-----------
+   usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+   usb_pipe_bulk_xfer		USB_PIPE_STATE_IDLE	No outstanding request		send req to hcd		USB_PIPE_STATE_ACTIVE
+
+   
+ 				USB_PIPE_STATE_ACTIVE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+ 				USB_PIPE_STATE_ERROR	-				return failure		USB_PIPE_STATE_ERROR
+ 											 										
+ 				USB_PIPE_STATE_CLOSING	-				return failure		USB_PIPE_STATE_CLOSING
+ 			
+   usba_hcdi_cb			USB_PIPE_STATE_ACTIVE	if no requests are pending	Before doing callback	USB_PIPE_STATE_IDLE
+  							else outstanding reqs pending	Before doing callback	USB_PIPE_STATE_ACTIVE
+
+			
+ 				USB_PIPE_STATE_ERROR	-				-			USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING	-				-			USB_PIPE_STATE_CLOSING
+ 
+ 			
+   usba_hcdi_cb
+   (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+   usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+   usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+3. Interrupt pipe state transitions (endpoint number > 1, both IN and OUT) :-
+
+   Interrupt IN:
+
+   Calls			Current state		additional condition		Action			Next state
+   -----			-------------		--------------------		------			-----------
+   usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+   usb_pipe_intr_xfer		USB_PIPE_STATE_IDLE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+ 				USB_PIPE_STATE_ACTIVE	-				return failure		USB_PIPE_STATE_ACTIVE
+ 				USB_PIPE_STATE_ERROR				
+ 				USB_PIPE_STATE_CLOSING				
+ 			
+   usba_hcdi_cb			USB_PIPE_STATE_ACTIVE	One time xfer			Before doing callback	USB_PIPE_STATE_IDLE
+							USB_CR_STOPPED_POLLING
+							USB_CR_PIPE_RESET
+										
+ 				USB_PIPE_STATE_ERROR	-				-			USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING	-				-			USB_PIPE_STATE_CLOSING
+ 
+ 			
+   usba_hcdi_cb
+   (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+   usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+   usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+   Interrupt OUT:
+
+   NOTE: Send all interrupt OUT requests to HCD and no queuing at USBA level.
+
+   Calls			Current state		additional condition		Action			Next state
+   -----			-------------		--------------------		------			-----------
+   usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+   usb_pipe_intr_xfer		USB_PIPE_STATE_IDLE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+   
+ 				USB_PIPE_STATE_ACTIVE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+ 				USB_PIPE_STATE_ERROR	-				return failure		USB_PIPE_STATE_ERROR
+ 											 										
+ 				USB_PIPE_STATE_CLOSING	-				return failure		USB_PIPE_STATE_CLOSING
+ 			
+   usba_hcdi_cb			USB_PIPE_STATE_ACTIVE	if no requests are pending	Before doing callback	USB_PIPE_STATE_IDLE
+  							else outstanding reqs pending	Before doing callback	USB_PIPE_STATE_ACTIVE
+
+			
+ 				USB_PIPE_STATE_ERROR	-				-			USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING	-				-			USB_PIPE_STATE_CLOSING
+ 
+ 			
+   usba_hcdi_cb
+   (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+   usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+   usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+4. Isochronous pipe state transitions (endpoint number > 1, both IN and OUT):-
+
+   Isochronous IN:
+
+   Calls			Current state		additional condition		Action			Next state
+   -----			-------------		--------------------		------			-----------
+   usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+   usb_pipe_isoch_xfer		USB_PIPE_STATE_IDLE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+ 				USB_PIPE_STATE_ACTIVE	-				return failure		USB_PIPE_STATE_ACTIVE
+ 				USB_PIPE_STATE_ERROR				
+ 				USB_PIPE_STATE_CLOSING				
+ 			
+   usba_hcdi_cb			USB_PIPE_STATE_ACTIVE	One time xfer			Before doing callback	USB_PIPE_STATE_IDLE
+							USB_CR_STOPPED_POLLING
+							USB_CR_PIPE_RESET
+										
+ 				USB_PIPE_STATE_ERROR	-				-			USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING	-				-			USB_PIPE_STATE_CLOSING
+ 
+ 			
+   usba_hcdi_cb
+   (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+   usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+   usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+
+   Isochronous OUT:-
+
+   NOTE: Send all isochronous OUT requests to HCD and no queuing at USBA level.
+
+   Calls			Current state		additional condition		Action			Next state
+   -----			-------------		--------------------		------			-----------
+   usb_pipe_open		USB_PIPE_STATE_CLOSED	-				Initialize pipe		USB_PIPE_STATE_IDLE
+
+   usb_pipe_intr_xfer		USB_PIPE_STATE_IDLE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+   
+ 				USB_PIPE_STATE_ACTIVE	-				send req to hcd		USB_PIPE_STATE_ACTIVE
+
+ 				USB_PIPE_STATE_ERROR	-				return failure		USB_PIPE_STATE_ERROR
+ 											 										
+ 				USB_PIPE_STATE_CLOSING	-				return failure		USB_PIPE_STATE_CLOSING
+ 			
+   usba_hcdi_cb			USB_PIPE_STATE_ACTIVE	if no requests are pending	Before doing callback	USB_PIPE_STATE_IDLE
+  							else outstanding reqs pending	Before doing callback	USB_PIPE_STATE_ACTIVE
+
+			
+ 				USB_PIPE_STATE_ERROR	-				-			USB_PIPE_STATE_ERROR
+ 				USB_PIPE_STATE_CLOSING	-				-			USB_PIPE_STATE_CLOSING
+ 
+ 			
+   usba_hcdi_cb
+   (exceptional callback)	USB_PIPE_STATE_ACTIVE	-				Before auto clear	USB_PIPE_STATE_ERROR
+							-				On auto clear		USB_PIPE_STATE_IDLE
+											(Remove all outstanding
+											requests)
+							
+   usb_pipe_reset		USB_PIPE_STATE_XXXX	-				Remove all outstanding	USB_PIPE_STATE_IDLE
+  											requests
+  
+			
+   usb_pipe_close		USB_PIPE_STATE_IDLE	-				-			USB_PIPE_STATE_CLOSING
+				USB_PIPE_STATE_ACTIVE
+				USB_PIPE_STATE_ERROR
+							Once pipe is closed		-			USB_PIPE_STATE_CLOSED
+

@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:nscd'>
+
+<service
+	name='system/name-service-cache'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+		name='config_data'
+		grouping='require_all'
+		restart_on='restart'
+		type='path'>
+		<service_fmri value='file://localhost/etc/nscd.conf' />
+		<service_fmri value='file://localhost/etc/nsswitch.conf' />
+	</dependency>
+
+	<!-- nscd needs to create /var/run/name_service_door -->
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<dependent
+		name='name-service-cache_multi-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-nscd'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' />
+
+	<property_group name='general' type='framework'>
+		<!-- to start stop nscd -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.name-service-cache' />
+	</property_group>
+
+	<property_group name='config' type='application' >
+		<propval
+			name='enable_per_user_lookup'
+			type='boolean'
+			value='true' />
+		<propval
+			name='per_user_nscd_time_to_live'
+			type='integer'
+			value='120' />
+	</property_group>
+
+
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			name service cache
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='nscd' section='1M' manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

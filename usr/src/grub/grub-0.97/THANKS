@@ -1,0 +1,123 @@
+GRUB would not be what it is today without the invaluable help of
+everybody who was kind enough to spend time testing it and reporting
+bugs.
+
+The following people made especially gracious contributions of their
+time and energy in helping to track down bugs, add new features, and
+generally assist in the GRUB maintainership process:
+
+Adam Lackorzynski <adam@os.inf.tu-dresden.de>
+Adrian Phillips <a.phillips@dnmi.no>
+Alban Crequy <alban.crequy@apinc.org>
+Alessandro Rubini <rubini@gnu.org>
+Alexander K. Hudek <alexhudek@home.com>
+Alexander Langer <alex@big.endian.de>
+Alfred M. Szmidt <ams@kemisten.nu>
+Andrew Clausen <clausen@gnu.org>
+Andrew Walrond <andrew@walrond.org>
+Ben Liblit <liblit@eecs.berkeley.edu>
+Bernhard Treutwein <Bernhard.Treutwein@Verwaltung.Uni-Muenchen.DE>
+Bodo Rueskamp <br@itchigo.com>.
+Boji Tony Kannanthanam <boji.t.kannanthanam@intel.com>
+Bradford Hovinen <hovinen@redrose.net>
+Brian Brunswick <brian@skarpsey.demon.co.uk>
+Bryan Ford <baford@cs.utah.edu>
+Cedric Ware <ware@com.enst.fr>
+Chip Salzenberg <chip@valinux.com>
+Christian Jones <chjones@aleph0.com>
+Christoph Plattner <Christoph.Plattner@dot.at>
+Damian Ivereigh <damian@cisco.com>
+David Weinehall <tao@debian.org>
+Dan J. Walters <djw@cs.utexas.edu>
+Daniel Farrell <s2108287@student.rmit.edu.au>
+Daniel Pittman <daniel@rimspace.net>
+Daniel Wagner <wagi@gmx.ch>
+Danilo Godec <danci@agenda.si>
+Dennis Kitzman <dennis-kitzman@uiowa.edu>
+Derrik Pates <dpates@dsdk12.net>
+Edmund GRIMLEY EVANS <edmundo@rano.demon.co.uk>
+Eduard Guzovsky <eguzovsk@enterasys.com>
+Edward Killips <ekillips@triton.net>
+Egmont Koblinger <egmont@uhulinux.hu>
+Eric Hanchrow <erich@microsoft.com>
+Erik Schoenfelder <schoenfr@gaertner.de>
+Eugene Doudine <dudin@np.nk.nornik.ru>
+Florian Hatat <mininet@wanadoo.fr>
+Frank Mehnert <fm3@os.inf.tu-dresden.de>
+Gary Poppitz <gpoppitz@tachyon.net>
+Goran Koruga <goran.koruga@hermes.si>
+Hal Snyder <hal@vailsys.com>
+HASEGAWA Tomoki <thasegawa@mta.biglobe.ne.jp>
+Heikki Vatiainen <hessu@cs.tut.fi>
+Heiko Schroeder <heiko@pool.informatik.rwth-aachen.de>
+Henrik Nordstrom <hno@marasystems.com>
+Herbert Nachtnebel <nachtneb@iaee.tuwien.ac.at>
+Hidetoshi Nishimaki <nishimaki@mxs.nes.nec.co.jp>
+Hisazumi Kenji <nel@soraneko.com>
+HORIKAWA Kazunori <kaz-hori@tkd.att.ne.jp>
+Ilguiz Latypov <ilatypov@superbt.com>
+Jan Fricke <fricke@uni-greifswald.de>
+Jan Zerebecki <jan.list@elite-pferde.de>
+Jason Thomas <jason@topic.com.au>
+Jean-Jacques Michel <jjmichel@linbox.com>
+Jeremy Katz <katzj@redhat.com>
+Jochen Hoenicke <jochen@gnu.org>
+Johannes Kroeger <hanne@squirrel.owl.de>
+John Goerzen <jgoerzen@complete.org>
+John Tobey <spam@john-edwin-tobey.org>
+Josip Rodin <joy@cibalia.gkvk.hr>
+Julien Bordet <julien.bordet@int-evry.fr>
+Julien Perrot <julien.perrot@iie.cnam.fr>
+Kalle Olavi Niemitalo <tosi@ees2.oulu.fi>
+Karsten Scheibler <karsten.scheibler@student.uni-halle.de>
+KB Sriram <mail_kb@yahoo.com>
+Khimenko Victor <grub@khim.sch57.msk.ru>
+Klaus Reichl <klaus.reichl@alcatel.at>
+Kristoffer Branemyr <ztion@swipnet.se>
+Kunihiro Ishiguro <kunihiro@zebra.org>
+Leendert Meyer <leen.meyer@home.nl>
+Leonid Lisovskiy <lly@pisem.net>
+M. Meiarashi <mes@st.rim.or.jp>
+Mark Kettenis <kettenis@chello.nl>
+Mark Lundeberg <aa026@pgfn.bc.ca>
+Matt Perry <matt@primefactor.com>
+Matt Yourst <yourst@mit.edu>
+Matthias Granberry <matthias@slurpee.org>
+Matthias Kretschmer <m.kretschmer@bsdger.org>
+Michael Hohmuth <hohmuth@innocent.com>
+Michael Sullivan <mike@trdlnk.com>
+Mike Meyer <mwm@mired.org>
+Miles Bader <miles@gnu.org>
+NATORI Shin <natori@adm.s.u-tokyo.ac.jp>
+Neal H Walfield <neal@walfield.org>
+Neelkanth Natu <neelnatu@yahoo.com>
+OKUJI Yoshinori <okuji@kuicr.kyoto-u.ac.jp>
+Pavel Roskin <pavel_roskin@geocities.com>
+Per Lundberg <plundis@byggdok.se>
+Peter Astrand <altic@lysator.liu.se>
+Ralf Medow <ralf.medow@t-online.de>
+Ramon van Handel <vhandel@chem.vu.nl>
+Robert Millan  <robertmh@gnu.org>
+Roderich Schupp <rsch@ExperTeam.de>
+Rogelio M. Serrano Jr. <rogelio@victorio.com>
+Sergey Matveychuk <sem@ciam.ru>
+Serguei Tzukanov <tzukanov@narod.ru>
+Stefan Ondrejicka <ondrej@idata.sk>
+Stephen Early <steve@greenend.org.uk>
+Steven Dick <ssd.gnu@mmae.ucf.edu>
+Sven Wegener <swegener@gentoo.org>
+Takehiro Suzuki <takehiro@coral.ocn.ne.jp>
+Taketo Kabe <kabe@sra-tohoku.co.jp>
+Thierry DELHAISE <thierry.delhaise@delhaise.com>
+Thierry Laronde <thierry.laronde@polynum.com>
+Thomas Schweikle <tschweikle@fiducia.de>
+Thomas Schwinge <kischde@gmx.net>
+Tilmann Bubeck <t.bubeck@reinform.de>
+Timothy Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+Torsten Duwe <duwe@caldera.de>
+Uwe Dannowski <ud3@ira.uka.de>
+VaX#n8 <vax@linkdead.paranoia.com>
+Vesa Jaaskelainen <jaaskela@tietomyrsky.fi>
+Yedidyah Bar-David <didi@post.tau.ac.il>
+Yury V. Umanets <umka@namesys.com>
+Yuri Zaporogets <yuriz@ukr.net>

@@ -1,0 +1,193 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+.KEEP_STATE:
+.SUFFIXES:
+
+SRCS += \
+	ffs.c \
+	mdb.c \
+	mdb_addrvec.c \
+	mdb_argvec.c \
+	mdb_callb.c \
+	mdb_cmdbuf.c \
+	mdb_cmds.c \
+	mdb_conf.c \
+	mdb_context.c \
+	mdb_create.c \
+	mdb_ctf.c \
+	mdb_ctf_open.c \
+	mdb_debug.c \
+	mdb_demangle.c \
+	mdb_disasm.c \
+	mdb_dump.c \
+	mdb_err.c \
+	mdb_evset.c \
+	mdb_fdio.c \
+	mdb_fmt.c \
+	mdb_frame.c \
+	mdb_gelf.c \
+	mdb_help.c \
+	mdb_io.c \
+	mdb_kb_kvm.c \
+	mdb_kproc.c \
+	mdb_kvm.c \
+	mdb_logio.c \
+	mdb_list.c \
+	mdb_macalias.c \
+	mdb_main.c \
+	mdb_memio.c \
+	mdb_modapi.c \
+	mdb_module.c \
+	mdb_module_load.c \
+	mdb_nm.c \
+	mdb_nv.c \
+	mdb_pipeio.c \
+	mdb_print.c \
+	mdb_proc.c \
+	mdb_pservice.c \
+	mdb_rawfile.c \
+	mdb_set.c \
+	mdb_shell.c \
+	mdb_signal.c \
+	mdb_stdlib.c \
+	mdb_string.c \
+	mdb_strio.c \
+	mdb_target.c \
+	mdb_tdb.c \
+	mdb_termio.c \
+	mdb_umem.c \
+	mdb_value.c \
+	mdb_vcb.c \
+	mdb_wcb.c \
+	mdb_whatis.c
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
+
+LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
+
+#
+# -erroff=E_INCONS_ARG_DECL2 works around a problem where lint gets confused
+# about how struct mdb_tgt_gregset is used in mdb_tgt_stack_f() and
+# mdb_tgt_stack_iter_f(). Will be resolved as part of fix for CR 6749868.
+#
+LINTFLAGS += -n -errtags=yes -erroff=E_INCONS_ARG_DECL2
+LINTFILES = $(SRCS:%.c=%.ln)
+
+PROG = mdb
+OBJS = $(SRCS:%.c=%.o) mdb_lex.o mdb_grammar.o
+
+LINK = adb
+ROOTLINK = $(ROOTBIN)/$(LINK)
+ROOTLINK32 = $(LINK:%=$(ROOTBIN32)/%)
+ROOTLINK64 = $(LINK:%=$(ROOTBIN64)/%)
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJS) $(LINTFILES)
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+	$(POST_PROCESS)
+
+$(ROOTLINK32): $(ROOTPROG32)
+	$(RM) $@
+	$(LN) $(ROOTPROG32) $@
+
+$(ROOTLINK64): $(ROOTPROG64)
+	$(RM) $@
+	$(LN) $(ROOTPROG64) $@
+
+mdb_lex.c: ../../../common/mdb/mdb_lex.l mdb_grammar.h
+	$(LEX) $(LFLAGS) ../../../common/mdb/mdb_lex.l > $@
+
+mdb_grammar.h mdb_grammar.c: ../../../common/mdb/mdb_grammar.y
+	$(YACC) $(YFLAGS) ../../../common/mdb/mdb_grammar.y
+	@$(MV) y.tab.h mdb_grammar.h
+	@$(MV) y.tab.c mdb_grammar.c
+
+mdb_lex.o mdb_grammar.o := CCVERBOSE =
+
+mdb_conf.o := CPPFLAGS += -DMDB_VERSION='$(MDB_VERSION)'
+
+inet_ntop.o := CPPFLAGS += -Dsnprintf=mdb_snprintf
+
+ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
+
+%.o: ../../../common/mdb/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../../mdb/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/net/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+clean.lint:
+	$(RM) $(LINTFILES)
+
+clean:
+	$(RM) $(OBJS)
+	$(RM) mdb_lex.c mdb_grammar.c mdb_grammar.h y.tab.h y.tab.c y.output
+
+clobber: clean clean.lint
+	$(RM) $(PROG)
+
+%.ln: ../../../common/mdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../mdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/net/util/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/%.c
+	$(LINT.c) -c $<
+
+lint: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES)
+
+dmods:

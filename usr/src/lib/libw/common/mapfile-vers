@@ -1,0 +1,137 @@
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	SUNW_1.1;
+    local:
+	*;
+} SUNW_0.8;
+
+SYMBOL_VERSION SUNW_0.8 {
+    global:
+	getwc			{ TYPE = FUNCTION };
+	putwc			{ TYPE = FUNCTION };
+	iswctype		{ TYPE = FUNCTION };
+	wcscoll			{ TYPE = FUNCTION };
+	wcsftime		{ TYPE = FUNCTION };
+	wcstod			{ TYPE = FUNCTION };
+	wcstol			{ TYPE = FUNCTION };
+	wcstoul			{ TYPE = FUNCTION };
+	wcscat			{ TYPE = FUNCTION };
+	wcsncat			{ TYPE = FUNCTION };
+	wcscmp			{ TYPE = FUNCTION };
+	wcsncmp			{ TYPE = FUNCTION };
+	wcscpy			{ TYPE = FUNCTION };
+	wcsncpy			{ TYPE = FUNCTION };
+	wcslen			{ TYPE = FUNCTION };
+	wcwidth			{ TYPE = FUNCTION };
+	wcswidth		{ TYPE = FUNCTION };
+	wcschr			{ TYPE = FUNCTION };
+	wcsrchr			{ TYPE = FUNCTION };
+	wcspbrk			{ TYPE = FUNCTION };
+	wcsxfrm			{ TYPE = FUNCTION };
+	wctype			{ TYPE = FUNCTION };
+	strtows			{ TYPE = FUNCTION };
+	wcscspn			{ TYPE = FUNCTION };
+	wcsspn			{ TYPE = FUNCTION };
+	wcstok			{ TYPE = FUNCTION };
+	wcswcs			{ TYPE = FUNCTION };
+	wstostr			{ TYPE = FUNCTION };
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	getws			{ TYPE = FUNCTION };
+	fgetws			{ TYPE = FUNCTION };
+	fgetwc			{ TYPE = FUNCTION };
+	getwchar		{ TYPE = FUNCTION };
+	ungetwc			{ TYPE = FUNCTION };
+	iswalpha		{ TYPE = FUNCTION };
+	iswupper		{ TYPE = FUNCTION };
+	iswlower		{ TYPE = FUNCTION };
+	iswdigit		{ TYPE = FUNCTION };
+	iswxdigit		{ TYPE = FUNCTION };
+	iswalnum		{ TYPE = FUNCTION };
+	iswspace		{ TYPE = FUNCTION };
+	iswpunct		{ TYPE = FUNCTION };
+	iswprint		{ TYPE = FUNCTION };
+	iswgraph		{ TYPE = FUNCTION };
+	iswcntrl		{ TYPE = FUNCTION };
+	isphonogram		{ TYPE = FUNCTION };
+	isideogram		{ TYPE = FUNCTION };
+	isenglish		{ TYPE = FUNCTION };
+	isnumber		{ TYPE = FUNCTION };
+	isspecial		{ TYPE = FUNCTION };
+	putws			{ TYPE = FUNCTION };
+	fputwc			{ TYPE = FUNCTION };
+	fputws			{ TYPE = FUNCTION };
+	putwchar		{ TYPE = FUNCTION };
+	towlower		{ TYPE = FUNCTION };
+	towupper		{ TYPE = FUNCTION };
+	wscoll			{ TYPE = FUNCTION };
+	wstod			{ TYPE = FUNCTION };
+	wstol			{ TYPE = FUNCTION };
+	wscat			{ TYPE = FUNCTION };
+	wsncat			{ TYPE = FUNCTION };
+	wscmp			{ TYPE = FUNCTION };
+	wsncmp			{ TYPE = FUNCTION };
+	wscpy			{ TYPE = FUNCTION };
+	wsncpy			{ TYPE = FUNCTION };
+	wslen			{ TYPE = FUNCTION };
+	wschr			{ TYPE = FUNCTION };
+	wsrchr			{ TYPE = FUNCTION };
+	wspbrk			{ TYPE = FUNCTION };
+	wsxfrm			{ TYPE = FUNCTION };
+	wsprintf		{ TYPE = FUNCTION };
+	wsscanf			{ TYPE = FUNCTION };
+	wscasecmp		{ TYPE = FUNCTION };
+	wsncasecmp		{ TYPE = FUNCTION };
+	wsdup			{ TYPE = FUNCTION };
+	wscol			{ TYPE = FUNCTION };
+	watoll			{ TYPE = FUNCTION };
+	wscspn			{ TYPE = FUNCTION };
+	wsspn			{ TYPE = FUNCTION };
+	wstok			{ TYPE = FUNCTION };
+	wstoll			{ TYPE = FUNCTION };
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	SUNWprivate_1.1;
+};

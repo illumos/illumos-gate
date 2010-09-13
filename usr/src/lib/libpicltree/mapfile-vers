@@ -1,0 +1,110 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	ptree_get_frutree_parent;
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	ptree_create_and_add_node;
+	ptree_create_and_add_prop;
+	ptree_find_node;
+	ptree_get_node_by_path;
+	ptree_init_propinfo;
+	ptree_post_event;
+	ptree_register_handler;
+	ptree_unregister_handler;
+	ptree_walk_tree_by_class;
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	picld_plugin_register;
+	ptree_add_node;
+	ptree_add_prop;
+	ptree_add_row_to_table;
+	ptree_create_node;
+	ptree_create_prop;
+	ptree_create_table;
+	ptree_delete_node;
+	ptree_delete_prop;
+	ptree_destroy_node;
+	ptree_destroy_prop;
+	ptree_get_first_prop;
+	ptree_get_next_by_col;
+	ptree_get_next_by_row;
+	ptree_get_next_prop;
+	ptree_get_prop_by_name;
+	ptree_get_propinfo;
+	ptree_get_propval;
+	ptree_get_propval_by_name;
+	ptree_get_root;
+	ptree_update_propval;
+	ptree_update_propval_by_name;
+};
+
+# There really should be only one SUNWprivate version.
+# Don't add any more.  Add new private symbols to SUNWprivate_1.2
+
+SYMBOL_VERSION SUNWprivate_1.2 {
+    global:
+	dbg_exec;
+	dbg_print;
+	verbose_level;
+} SUNWprivate_1.1;
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	cvt_picl2ptree;
+	cvt_ptree2picl;
+	xptree_destroy;
+	xptree_get_propinfo_by_name;
+	xptree_get_propval_by_name_with_cred;
+	xptree_get_propval_with_cred;
+	xptree_initialize;
+	xptree_refresh_notify;
+	xptree_reinitialize;
+	xptree_update_propval_by_name_with_cred;
+	xptree_update_propval_with_cred;
+    local:
+	*;
+};

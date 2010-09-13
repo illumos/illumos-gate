@@ -1,0 +1,270 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This is third phase of TCP/IP startup/configuration.  This script
+# runs after the NIS startup script.  We run things here that may
+# depend on NIS maps.
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+NWAM_FMRI="svc:/network/physical:nwam"
+
+case "$1" in
+'start')
+	#
+	# In a shared-IP zone we need this service to be up, but all of the
+	# work it tries to do is irrelevant (and will actually lead to the
+	# service failing if we try to do it), so just bail out. 
+	# In the global zone and exclusive-IP zones we proceed.
+	#
+	smf_configure_ip || exit $SMF_EXIT_OK
+
+	#
+	# If nwam is enabled, the nwam service will handle the tasks performed
+	# by this service, so just bail out.
+	#
+	service_is_enabled $NWAM_FMRI && exit $SMF_EXIT_OK
+	;; # fall through -- rest of script is the initialization code
+
+'stop')
+	exit $SMF_EXIT_OK
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+interface=$2
+
+# If boot variables are not set, set variables we use
+[ -z "$_INIT_UTS_NODENAME" ] && _INIT_UTS_NODENAME=`/usr/bin/uname -n`
+
+#
+# This function takes two file names and the file mode as input. The two
+# files are compared for differences (using cmp(1)) and if different, the
+# second file is over written with the first. A chmod is done with the file
+# mode passed in. If the files are equal, the first file passed
+# in (the /tmp file) is deleted.
+#
+mv_file ()
+{
+	/usr/bin/cmp -s $1 $2
+	if [ $? -eq 1 ]; then
+		/usr/bin/mv $1 $2
+		#
+		# The umask during boot is configurable, which requires
+		# explicit setting of file permission modes when we
+		# create files.
+		#
+		/usr/bin/chmod $3 $2
+	else
+		/usr/bin/rm $1
+	fi
+}
+
+#
+# This function takes a DHCP parameter (as defined in /etc/dhcp/inittab)
+# and returns the value for that parameter returned by the DHCP server.
+# If the global 'interface' is defined, it will request the value learned
+# on that interface, else it will request the value learned on the primary
+# interface.
+#
+get_dhcp_var ()
+{
+	if [ -n "$interface" ]; then
+		/sbin/dhcpinfo -i $interface $1
+	else
+		/sbin/dhcpinfo $1
+	fi
+}
+
+#
+# This function returns true if the string "# Added by DHCP$" occurs in
+# the passed-in file, false otherwise.
+#
+dhcp_edits ()
+{
+	/usr/bin/grep '# Added by DHCP$' $1 >/dev/null 2>&1
+	return $?
+}
+
+#
+# update_resolv()
+# Go through /etc/resolv.conf and replace any existing domain or
+# nameserver entries with new ones derived from DHCP.  Note that
+# it is important to preserve order of domain entries vs. search
+# entries; the search entries are reserved for administrator
+# customization and if placed after the domain entry will override
+# it.  See resolv.conf(4).
+#
+# The first arg should be the dns servers string, the second
+# should be the dns domain.
+#
+update_resolv ()
+{
+	dnsservers=$1
+	dnsdomain=$2
+
+	if [ ! -f /etc/resolv.conf ]; then
+		/usr/bin/touch /etc/resolv.conf
+	fi
+	export dnsservers dnsdomain
+	/usr/bin/nawk </etc/resolv.conf >/tmp/resolv.conf.$$ '
+		function writedomain() {
+			if (updated == 0) {
+			    	# Use only first domain, not a search list
+			    	split(ENVIRON["dnsdomain"], d)
+				if(length(d[1]) != 0)
+					printf("domain %s\n", d[1])
+			}
+			++updated
+		}
+		$1 == "domain" { writedomain(); next }
+		$1 != "nameserver" { print $0 }
+		END {
+			writedomain()
+			n = split(ENVIRON["dnsservers"], s)
+			for (i = 1; i <= n; ++i)
+				printf("nameserver %s\n", s[i])
+		}'
+	unset dnsservers dnsdomain
+	mv_file /tmp/resolv.conf.$$ /etc/resolv.conf 644
+}
+
+#
+# update_nss()
+# This routine takes as a parameter, the name of the respective policy 
+# to change in the nsswitch.conf (hosts or ipnodes) to update with dns.
+#
+update_nss ()
+{
+	policy=$1;
+	# Add dns to the nsswitch file, if it isn't already there.
+	/usr/bin/awk ' $1 ~ /^'${policy}':/ {
+		n = split($0, a);
+		newl = a[1];
+		if ($0 !~ /dns/) {
+			printf("#%s # Commented out by DHCP\n", $0);
+			updated = 0;
+			for (i = 2; i <= n; i++) {
+				if (updated == 0 && index(a[i], "[") == 1) {
+					newl = newl" dns";
+					updated++;
+				}
+				newl = newl" "a[i];
+			}
+			if (updated == 0) {
+				newl = newl" dns";
+				updated++;
+			}
+			if (updated != 0)
+				newl = newl" # Added by DHCP";
+			else
+				newl = $0;
+			printf("%s\n", newl);
+		} else
+			printf("%s\n", $0);
+	} $1 !~ /^'${policy}':/ { printf("%s\n", $0); }' /etc/nsswitch.conf \
+	    >/tmp/nsswitch.conf.$$
+
+	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
+}
+
+#
+# Remove any lines with the "# Added by DHCP" tag from /etc/nsswitch.conf;
+# also uncomment hosts and ipnodes entries which were previously commented
+# out by this script.
+#
+cleanup_nss ()
+{
+	/usr/bin/sed \
+	    -e '/# Added by DHCP$/d' \
+	    -e 's/^\(#hosts:\)\(.*[^#]\)\(#.*\)$/hosts: \2/' \
+	    -e 's/^\(#ipnodes:\)\(.*[^#]\)\(#.*\)$/ipnodes: \2/' \
+	    /etc/nsswitch.conf >/tmp/nsswitch.conf.$$
+
+	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
+}
+
+#
+# Remove any lines with the "# Added by DHCP" tag from /etc/inet/hosts.
+#
+cleanup_hosts ()
+{
+	/usr/bin/nawk '{
+		if (index($0, "# Added by DHCP") == 0 ||
+		    $1 == "127.0.0.1" || $1 == "::1") {
+			print $0
+		}
+	}' /etc/inet/hosts > /tmp/hosts.$$
+	mv_file /tmp/hosts.$$ /etc/inet/hosts 444
+}
+
+#
+# If our network configuration strategy is DHCP, check for DNS
+# configuration parameters obtained from the DHCP server.
+#
+# Script execution starts here.
+#
+smf_netstrategy
+
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+	dnsservers=`get_dhcp_var DNSserv`
+	dnsdomain=`get_dhcp_var DNSdmain`
+else
+	dnsservers=""
+	dnsdomain=""
+fi
+
+if [ -n "$dnsservers" ]; then
+	#
+	# add settings retrieved from dhcp server to /etc/resolv.conf
+	#
+	update_resolv "$dnsservers" "$dnsdomain"
+
+	#
+	# Add dns to the nsswitch file, if it isn't already there.
+	#
+	update_nss hosts
+	update_nss ipnodes
+
+elif dhcp_edits /etc/nsswitch.conf; then
+	# If we added DNS to the hosts and ipnodes
+	# policy in the nsswitch, remove it.
+	cleanup_nss
+fi
+
+if dhcp_edits /etc/inet/hosts; then
+	# Clean up any old DHCP-added entries
+	# (except loopback) in the hosts file.
+	cleanup_hosts
+fi
+

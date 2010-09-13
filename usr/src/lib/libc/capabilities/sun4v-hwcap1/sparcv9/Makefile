@@ -1,0 +1,39 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+include		../Makefile.com
+include		$(SRC)/lib/Makefile.lib.64
+
+AS_CPPFLAGS +=	-D__sparcv9
+ASFLAGS +=	-xarch=v9 -I$(LIBCBASE)/$(MACH64)
+
+all install:	$(LIBCBASE)/$(MACH64)/assym.h $(SYMCAP)
+
+# We need assym.h, but it won't build directly. smt_pause.o depends on
+# assym.h, so building it forces assym.h to be built.
+$(LIBCBASE)/$(MACH64)/assym.h:
+	@cd $(LIBCBASE)/$(MACH64); $(MAKE) pics/smt_pause.o
+
+include		../../Makefile.targ

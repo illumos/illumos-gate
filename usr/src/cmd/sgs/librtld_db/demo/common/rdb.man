@@ -1,0 +1,185 @@
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\"
+.\" Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+.\"
+.if n .tr \--
+.TH rdb 1 "24 April 2008"
+.SH NAME
+rdb \- run-time demo debugger
+.SH SYNOPSIS
+.B rdb
+[
+.B -f
+.I file
+]
+executable [executable arguments ...]
+.SH AVAILABILITY
+.LP
+SUNWosdem
+.SH DESCRIPTION
+.B rdb
+is a simple general purpose debugger built on top of 
+.I procfs
+and
+.I librtld_db.
+.B rdb
+is distributed is source code format and is a sample
+of how to use the
+.I rtld_db
+interface and is not meant to be used in a production environment. 
+.LP
+Each invocation of
+.B rdb
+will debug a single process.  In order to start debugging the process
+again from the beginning
+.B rdb
+must be reinvoked.
+.SH OPTIONS
+.TP 15
+.BI \-f " file"
+file containing a list of commands to be executed by rdb.  This option
+can be used to run 
+.B rdb
+in batch mode.
+.SH USAGE
+.B rdb
+by default reads commands from standard input and displays responses on the
+standard output.  
+.B rdb 
+is terminated when it reads an EOF on input.
+The commands that
+.B rdb 
+accepts follow:
+.TP 15
+.BI break " [address]"
+Set a break point at address.  If no address is specified then list
+all currently set breakpoints.
+.TP
+.B cont
+Continue execution of the debugged process.  Note that when rdb
+is first invoked it halts the program before it starts to run.  To
+start executing it you must use cont.
+.TP
+.BI delete " address"
+delete the breakpoint at address.
+.TP
+.BI echo " string"
+Prints a string to standard output.  The string must be surrounded
+by double-quotes("").
+.TP
+.BI event " {on|off}"
+To enable or disable the printing of event information to standard output.
+If enabled then 
+.B rdb
+will monitor
+.I rtld_db
+events and print a message to standard output as they occur.
+.TP
+.B getmaps
+Instructs 
+.B rdb
+to load the current link-maps via the
+.I rtld_db
+interface.  No information is printed.
+.TP
+.B linkmaps
+display current link-map information.
+.TP
+.B maps
+display memory mapping information.
+.TP
+.BI objpad " size"
+Set object padding to
+.I size
+bytes for objects mmap()'ed in by 
+.B ld.so.1.  
+object padding will only effect the loading of new objects,
+those already loaded in memory are not effected.
+.TP
+.B pltskip
+enables and disables the skipping over of procedure linkage table entries
+when stepping through a function call.
+.TP
+.BI print " {address [count [format]]|varname}"
+displays data stored at
+.I address
+or register information.  Type 'help print' from within rdb for more
+details on usage.
+.TP
+.BI step " [count [silent]]"
+single step
+.I count
+instructions.  If count is not given then signle step 1 instruction.  If
+the keyword silent is specified then do not dis-assemble the instructions
+as they are stepped.
+.TP
+.BI value " symbol_name"
+display the value (address) associated with a symbol
+.TP
+.B where
+display a stack trace
+.SH EXAMPLES
+A simple example showing how to load a program, set a break point
+at main, and to then display the link-maps of all objects loaded:
+.LP
+.nf
+.ft 3
+polyslo 310% rdb /usr/bin/ls
+parent: 28300 child: 28301 child procname: /proc/28301
+<rdb> break main
+break point set at: 0x11110
+<rdb> cont
+break point reached at addr: 0x11110
+<rdb> linkmaps
+Link Maps
+---------
+link-map: id: 0x0 name: /usr/bin/ls
+       base: 0x00010000   padd_base: 0xeffffa7c
+  data_base: 0x00000000
+        end: 0x00010000    padd_end: 0x00023ad0
+link-map: id: 0x0 name: /usr/lib/libc.so.1(/usr/platform/$PLATFORM/lib/libc_psr.so.1)
+       base: 0xef700000   padd_base: 0xef7f131c
+  data_base: 0x00000000
+        end: 0xef700000    padd_end: 0xef7991cc
+link-map: id: 0x0 name: /usr/lib/libdl.so.1(/usr/lib/ld.so.1)
+       base: 0xef7c0000   padd_base: 0xef7f1478
+  data_base: 0x00000000
+        end: 0xef7c0000    padd_end: 0xef7c0074
+link-map: id: 0x0 name: /usr/platform/SUNW,Ultra-60/lib/libc_psr.so.1
+       base: 0xef6f0000   padd_base: 0xef7f15bc
+  data_base: 0x00000000
+        end: 0xef6f0000    padd_end: 0xef6f0074
+link-map: id: 0x1 name: /usr/lib/ld.so.1
+       base: 0xef7d0000   padd_base: 0xef7d1375
+  data_base: 0x00000000
+        end: 0xef7d0000    padd_end: 0xef7f01f8
+<rdb> cont 
+Makefile    gram.h      m_utils.c   rdb         regs.c
+gram.c      lex.c       objs        rdb_mach.h
+process terminated.
+<rdb>
+.ft
+.fi
+.SH SEE ALSO
+.BR ld.so.1 (1)
+.br
+.TZ LLM

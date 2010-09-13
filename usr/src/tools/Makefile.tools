@@ -1,0 +1,109 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Definitions common to tool source.
+#
+include $(SRC)/Makefile.master
+
+FILEMODE=	0555
+
+TOOLS=			$(SRC)/tools
+TOOLS_PROTO=		$(TOOLS)/proto/root_$(MACH)-nd
+ROOTOPT=		$(TOOLS_PROTO)/opt
+ROOTONBLD=		$(ROOTOPT)/onbld
+ROOTONBLDBIN=		$(ROOTONBLD)/bin
+ROOTONBLDBINMACH=	$(ROOTONBLD)/bin/$(MACH)
+ROOTONBLDETC=		$(ROOTONBLD)/etc
+ROOTONBLDLIB=		$(ROOTONBLD)/lib
+ROOTONBLDLIBMACH=	$(ROOTONBLD)/lib/$(MACH)
+ROOTONBLDLIBPERL=	$(ROOTONBLD)/lib/perl
+ROOTONBLDLIBPY=		$(ROOTONBLD)/lib/python
+ROOTONBLDLIBPY_24=	$(ROOTONBLD)/lib/python2.4
+ROOTONBLDLIBPY_26=	$(ROOTONBLD)/lib/python2.6
+ROOTONBLDENV=		$(ROOTONBLD)/env
+ROOTONBLDGK=		$(ROOTONBLD)/gk
+ROOTONBLDMAN=		$(ROOTONBLD)/man
+ROOTONBLDMAN1=		$(ROOTONBLD)/man/man1
+ROOTONBLDSMAN1=		$(ROOTONBLD)/man/sman1
+ROOTONBLDETCABI=	$(ROOTONBLD)/etc/abi
+ROOTONBLDETCEXCEPT=	$(ROOTONBLD)/etc/exception_lists
+
+CPPFLAGS=		-D_TS_ERRNO
+ELFSIGN_O=		$(TRUE)
+LDLIBS=
+LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
+			    $(MAPFILE.PGA:%=-M%)
+
+ROOTONBLDPROG=		$(PROG:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDMACHPROG=	$(PROG:%=$(ROOTONBLDBINMACH)/%)
+ROOTONBLDSHFILES=	$(SHFILES:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDMAKEFILES=	$(MAKEFILES:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDMACHSHFILES=	$(SHFILES:%=$(ROOTONBLDBINMACH)/%)
+ROOTONBLDMACHBINARIES=	$(BINARIES:%=$(ROOTONBLDBINMACH)/%)
+ROOTONBLDETCFILES=	$(ETCFILES:%=$(ROOTONBLDETC)/%)
+ROOTONBLDENVFILES=	$(ENVFILES:%=$(ROOTONBLDENV)/%)
+ROOTONBLDGKFILES=	$(GKFILES:%=$(ROOTONBLDGK)/.%)
+ROOTONBLDGKSHFILES=	$(SHFILES:%=$(ROOTONBLDGK)/%)
+ROOTONBLDPERLFILES=	$(PERLFILES:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDPERLMODULES=	$(PERLMODULES:%=$(ROOTONBLDLIBPERL)/%)
+ROOTONBLDPYFILES=	$(PYFILES:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDMAN1FILES=	$(MAN1FILES:%=$(ROOTONBLDMAN1)/%)
+ROOTONBLDSMAN1FILES=	$(SMAN1FILES:%=$(ROOTONBLDSMAN1)/%)
+ROOTONBLDABIAUDITFILES=	$(ABI_AUDITFILES:%=$(ROOTONBLDETCABI)/%)
+ROOTONBLDEXCEPTFILES=	$(EXCEPTFILES:%=$(ROOTONBLDETCEXCEPT)/%)
+
+# Break a chicken-and-egg dependency cycle for the tools build
+SCCSCHECK=@echo would sccscheck
+
+$(ROOTONBLDETCABI)/%: %
+	$(INS.file)
+
+$(ROOTONBLDETCEXCEPT)/%: $(CODEMGR_WS)/exception_lists/%
+	$(INS.file)
+
+$(ROOTONBLDBIN)/%: %
+	$(INS.file)
+
+$(ROOTONBLDBINMACH)/%: %
+	$(INS.file)
+
+$(ROOTONBLDETC)/%: %
+	$(INS.file)
+
+$(ROOTONBLDLIBPERL)/%: %
+	$(INS.file)
+
+$(ROOTONBLDMAN1)/%: %
+	$(INS.file)
+
+$(ROOTONBLDSMAN1)/%: %
+	$(INS.file)
+
+$(ROOTONBLDENV)/%: %
+	$(INS.file)
+
+$(ROOTONBLDGK)/.%: %
+	$(INS.rename)
+
+$(ROOTONBLDGK)/%: %
+	$(INS.file)

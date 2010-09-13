@@ -1,0 +1,374 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+#pragma D depends_on module ip
+#pragma D depends_on provider ip
+
+inline int IPH_DF = @IPH_DF@;
+#pragma D binding "1.5" IPH_DF
+inline int IPH_MF = @IPH_MF@;
+#pragma D binding "1.5" IPH_MF
+
+#pragma D binding "1.5" IPPROTO_IP
+inline int IPPROTO_IP = @IPPROTO_IP@;
+#pragma D binding "1.5" IPPROTO_HOPOPTS
+inline int IPPROTO_HOPOPTS = @IPPROTO_HOPOPTS@;
+#pragma D binding "1.5" IPPROTO_ICMP
+inline int IPPROTO_ICMP = @IPPROTO_ICMP@;
+#pragma D binding "1.5" IPPROTO_IGMP
+inline int IPPROTO_IGMP = @IPPROTO_IGMP@;
+#pragma D binding "1.5" IPPROTO_GGP
+inline int IPPROTO_GGP = @IPPROTO_GGP@;
+#pragma D binding "1.5" IPPROTO_ENCAP
+inline int IPPROTO_ENCAP = @IPPROTO_ENCAP@;
+#pragma D binding "1.5" IPPROTO_TCP
+inline int IPPROTO_TCP = @IPPROTO_TCP@;
+#pragma D binding "1.5" IPPROTO_EGP
+inline int IPPROTO_EGP = @IPPROTO_EGP@;
+#pragma D binding "1.5" IPPROTO_PUP
+inline int IPPROTO_PUP = @IPPROTO_PUP@;
+#pragma D binding "1.5" IPPROTO_UDP
+inline int IPPROTO_UDP = @IPPROTO_UDP@;
+#pragma D binding "1.5" IPPROTO_IDP
+inline int IPPROTO_IDP = @IPPROTO_IDP@;
+#pragma D binding "1.5" IPPROTO_IPV6
+inline int IPPROTO_IPV6 = @IPPROTO_IPV6@;
+#pragma D binding "1.5" IPPROTO_ROUTING
+inline int IPPROTO_ROUTING = @IPPROTO_ROUTING@;
+#pragma D binding "1.5" IPPROTO_FRAGMENT
+inline int IPPROTO_FRAGMENT = @IPPROTO_FRAGMENT@;
+#pragma D binding "1.5" IPPROTO_RSVP
+inline int IPPROTO_RSVP = @IPPROTO_RSVP@;
+#pragma D binding "1.5" IPPROTO_ESP
+inline int IPPROTO_ESP = @IPPROTO_ESP@;
+#pragma D binding "1.5" IPPROTO_AH
+inline int IPPROTO_AH = @IPPROTO_AH@;
+#pragma D binding "1.5" IPPROTO_ICMPV6
+inline int IPPROTO_ICMPV6 = @IPPROTO_ICMPV6@;
+#pragma D binding "1.5" IPPROTO_NONE
+inline int IPPROTO_NONE = @IPPROTO_NONE@;
+#pragma D binding "1.5" IPPROTO_DSTOPTS
+inline int IPPROTO_DSTOPTS = @IPPROTO_DSTOPTS@;
+#pragma D binding "1.5" IPPROTO_HELLO
+inline int IPPROTO_HELLO = @IPPROTO_HELLO@;
+#pragma D binding "1.5" IPPROTO_ND
+inline int IPPROTO_ND = @IPPROTO_ND@;
+#pragma D binding "1.5" IPPROTO_EON
+inline int IPPROTO_EON = @IPPROTO_EON@;
+#pragma D binding "1.5" IPPROTO_OSPF
+inline int IPPROTO_OSPF = @IPPROTO_OSPF@;
+#pragma D binding "1.5" IPPROTO_PIM
+inline int IPPROTO_PIM = @IPPROTO_PIM@;
+#pragma D binding "1.5" IPPROTO_SCTP
+inline int IPPROTO_SCTP = @IPPROTO_SCTP@;
+#pragma D binding "1.5" IPPROTO_RAW
+inline int IPPROTO_RAW = @IPPROTO_RAW@;
+#pragma D binding "1.5" IPPROTO_MAX
+inline int IPPROTO_MAX = @IPPROTO_MAX@;
+
+/*
+ * pktinfo is where packet ID info can be made available for deeper
+ * analysis if packet IDs become supported by the kernel in the future.
+ * The pkt_addr member is currently always NULL.
+ */
+typedef struct pktinfo {
+	uintptr_t pkt_addr;
+} pktinfo_t;
+
+/*
+ * csinfo is where connection state info is made available.
+ */
+typedef struct csinfo {
+	uintptr_t cs_addr;
+	uint64_t cs_cid;
+	pid_t cs_pid;
+	zoneid_t cs_zoneid;
+} csinfo_t;
+
+/*
+ * ipinfo contains common IP info for both IPv4 and IPv6.
+ */
+typedef struct ipinfo {
+	uint8_t ip_ver;			/* IP version (4, 6) */
+	uint32_t ip_plength;		/* payload length */
+	string ip_saddr;		/* source address */
+	string ip_daddr;		/* destination address */
+} ipinfo_t;
+
+/*
+ * ifinfo contains network interface info.
+ */
+typedef struct ifinfo {
+	string if_name;			/* interface name */
+	int8_t if_local;		/* is delivered locally */
+	netstackid_t if_ipstack;	/* ipstack ID */
+	uintptr_t if_addr;		/* pointer to raw ill_t */
+} ifinfo_t;
+
+/*
+ * ipv4info is a translated version of the IPv4 header (with raw pointer).
+ * These values are NULL if the packet is not IPv4.
+ */
+typedef struct ipv4info {
+	uint8_t ipv4_ver;		/* IP version (4) */
+	uint8_t ipv4_ihl;		/* header length, bytes */
+	uint8_t ipv4_tos;		/* type of service field */
+	uint16_t ipv4_length;		/* length (header + payload) */
+	uint16_t ipv4_ident;		/* identification */
+	uint8_t ipv4_flags;		/* IP flags */
+	uint16_t ipv4_offset;		/* fragment offset */
+	uint8_t ipv4_ttl;		/* time to live */
+	uint8_t ipv4_protocol;		/* next level protocol */
+	string ipv4_protostr;		/* next level protocol, as a string */
+	uint16_t ipv4_checksum;		/* header checksum */
+	ipaddr_t ipv4_src;		/* source address */
+	ipaddr_t ipv4_dst;		/* destination address */
+	string ipv4_saddr;		/* source address, string */
+	string ipv4_daddr;		/* destination address, string */
+	ipha_t *ipv4_hdr;		/* pointer to raw header */
+} ipv4info_t;
+
+/*
+ * ipv6info is a translated version of the IPv6 header (with raw pointer).
+ * These values are NULL if the packet is not IPv6.
+ */
+typedef struct ipv6info {
+	uint8_t ipv6_ver;		/* IP version (6) */
+	uint8_t ipv6_tclass;		/* traffic class */
+	uint32_t ipv6_flow;		/* flow label */
+	uint16_t ipv6_plen;		/* payload length */
+	uint8_t ipv6_nexthdr;		/* next header protocol */
+	string ipv6_nextstr;		/* next header protocol, as a string */
+	uint8_t ipv6_hlim;		/* hop limit */
+	in6_addr_t *ipv6_src;		/* source address */
+	in6_addr_t *ipv6_dst;		/* destination address */
+	string ipv6_saddr;		/* source address, string */
+	string ipv6_daddr;		/* destination address, string */
+	ip6_t *ipv6_hdr;		/* pointer to raw header */
+} ipv6info_t;
+
+/*
+ * void_ip_t is a void pointer to either an IPv4 or IPv6 header.  It has
+ * its own type name so that a translator can be determined.
+ */
+typedef uintptr_t void_ip_t;
+
+/*
+ * __dtrace_ipsr_ill_t is used by the translator to take an ill_t plus an
+ * additional arg6 from the ip:::send and ip:::recieve probes, and translate
+ * them to an ifinfo_t.
+ */
+typedef ill_t __dtrace_ipsr_ill_t;
+
+/*
+ * __dtrace_tcp_void_ip_t is used by the translator to take either the
+ * non-NULL void_ip_t * passed in or, if it is NULL, uses arg3 (tcp_t *)
+ * from the tcp:::send and tcp:::recieve probes to translate to an ipinfo_t.
+ * When no headers are available in the TCP fusion case for tcp:::send
+ * and tcp:::receive case, this allows us to present the consumer with header
+ * data based on the tcp_t * content in order to hide the implementation
+ * details of TCP fusion.
+ */
+typedef void * __dtrace_tcp_void_ip_t;
+
+#pragma D binding "1.5" translator
+translator pktinfo_t < mblk_t *M > {
+	pkt_addr = NULL;
+};
+
+#pragma D binding "1.5" translator
+translator csinfo_t < conn_t *C > {
+	cs_addr = NULL;
+};
+
+#pragma D binding "1.6.3" translator
+translator csinfo_t < ip_xmit_attr_t *C > {
+	cs_addr = (uintptr_t)C;
+	cs_cid = C ? C->ixa_conn_id : NULL;
+	cs_pid = C ? C->ixa_cpid : -1;
+	cs_zoneid = C ?
+	    (C->ixa_ipst == NULL || C->ixa_ipst->ips_netstack == NULL ||
+	    C->ixa_ipst->ips_netstack->netstack_stackid ==
+	    @GLOBAL_NETSTACKID@ ||
+	    C->ixa_cred == NULL ||
+	    C->ixa_cred->cr_zone == NULL ||
+	    C->ixa_cred->cr_uid == -1 ?
+	    C->ixa_zoneid : C->ixa_cred->cr_zone->zone_id) : -1;
+};
+
+#pragma D binding "1.5" translator
+translator ipinfo_t < ipha_t *I > {
+	ip_ver = I->ipha_version_and_hdr_length >> 4;
+	ip_plength = ntohs(I->ipha_length) -
+	    ((I->ipha_version_and_hdr_length & 0xf) << 2);
+	ip_saddr = inet_ntoa(&I->ipha_src);
+	ip_daddr = inet_ntoa(&I->ipha_dst);
+};
+
+#pragma D binding "1.5" translator
+translator ipinfo_t < ip6_t *I > {
+	ip_ver = *(uint8_t *)I >> 4;
+	ip_plength = ntohs(I->ip6_ctlun.ip6_un1.ip6_un1_plen);
+	ip_saddr = inet_ntoa6(&I->ip6_src);
+	ip_daddr = inet_ntoa6(&I->ip6_dst);
+};
+
+#pragma D binding "1.5" translator
+translator ipinfo_t < void_ip_t *I > {
+	ip_ver = I != NULL ? *(uint8_t *)I >> 4 : 0;
+	ip_plength = I != NULL ? (*(uint8_t *)I >> 4 == 4 ?
+	    ntohs(((ipha_t *)I)->ipha_length) -
+	    ((((ipha_t *)I)->ipha_version_and_hdr_length & 0xf) << 2) :
+	    *(uint8_t *)I >> 4 == 6 ?
+	    ntohs(((ip6_t *)I)->ip6_ctlun.ip6_un1.ip6_un1_plen) : 0) : 0;
+	ip_saddr = I != NULL ? (*(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_src) : *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_src) : "<unknown>") : "<unknown>";
+	ip_daddr = I != NULL ? (*(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_dst) : *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_dst) : "<unknown>") : "<unknown>";
+};
+
+#pragma D binding "1.5" translator
+translator ifinfo_t < __dtrace_ipsr_ill_t *I > {
+	if_name = I != NULL ? stringof(I->ill_name) : "<null>";
+	if_ipstack = I != NULL ? I->ill_ipst->ips_netstack->netstack_stackid
+	    : 0;
+	if_local = arg6;		/* probe dependent */
+	if_addr = (uintptr_t)I;
+};
+
+/*
+ * Translate to an ipinfo_t * from either the non-NULL void_ip_t * passed in,
+ * or use arg3 (tcp_t *) to fabricate ip header info.
+ */
+#pragma D binding "1.6.3" translator
+translator ipinfo_t < __dtrace_tcp_void_ip_t *I > {
+	ip_ver = I != NULL ? *(uint8_t *)I >> 4 :
+	    arg3 != NULL ? ((tcp_t *)arg3)->tcp_connp->conn_ipversion : 0;
+	ip_plength =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    ntohs(((ipha_t *)I)->ipha_length) -
+	    ((((ipha_t *)I)->ipha_version_and_hdr_length & 0xf) << 2) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    ntohs(((ip6_t *)I)->ip6_ctlun.ip6_un1.ip6_un1_plen) :
+	    I != NULL ? 0 :
+	    arg3 != NULL && probename == "send" ?
+	    ((tcp_t *)arg3)->tcp_last_sent_len + @TCP_MIN_HEADER_LENGTH@ :
+	    arg3 != NULL && probename == "receive" ?
+	    ((tcp_t *)arg3)->tcp_last_recv_len + @TCP_MIN_HEADER_LENGTH@ :
+	    0;
+	ip_saddr =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_src) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_src) :
+	    I != NULL ? "<unknown>" :
+	    arg3 != NULL && probename == "send" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_laddr):
+	    arg3 != NULL && probename == "receive" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_faddr):
+	    "<unknown>";
+	ip_daddr =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_dst) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_dst) :
+	    I != NULL ? "<unknown>" :
+	    arg3 != NULL && probename == "send" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_faddr):
+	    arg3 != NULL && probename == "receive" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_laddr):
+	    "<unknown>";
+};
+
+#pragma D binding "1.5" translator
+translator ipv4info_t < ipha_t *I > {
+	ipv4_ver = I != NULL ? I->ipha_version_and_hdr_length >> 4 : 0;
+	ipv4_ihl = I != NULL ? (I->ipha_version_and_hdr_length & 0xf) << 2 : 0;
+	ipv4_tos = I != NULL ? I->ipha_type_of_service : 0;
+	ipv4_length = I != NULL ? ntohs(I->ipha_length) : 0;
+	ipv4_ident = I != NULL ? ntohs(I->ipha_ident) : 0;
+	ipv4_flags = I != NULL ? ntohs(I->ipha_fragment_offset_and_flags) >>
+	    12 : 0;
+	ipv4_offset = I != NULL ? ntohs(I->ipha_fragment_offset_and_flags) &
+	    0x0fff : 0;
+	ipv4_ttl = I != NULL ? I->ipha_ttl : 0;
+	ipv4_protocol = I != NULL ? I->ipha_protocol : 0;
+	ipv4_protostr = I == NULL ? "<null>" :
+	    I->ipha_protocol == IPPROTO_TCP     ? "TCP"    :
+	    I->ipha_protocol == IPPROTO_UDP     ? "UDP"    :
+	    I->ipha_protocol == IPPROTO_IP      ? "IP"     :
+	    I->ipha_protocol == IPPROTO_ICMP    ? "ICMP"   :
+	    I->ipha_protocol == IPPROTO_IGMP    ? "IGMP"   :
+	    I->ipha_protocol == IPPROTO_EGP     ? "EGP"    :
+	    I->ipha_protocol == IPPROTO_IPV6    ? "IPv6"   :
+	    I->ipha_protocol == IPPROTO_ROUTING ? "ROUTE"  :
+	    I->ipha_protocol == IPPROTO_ESP     ? "ESP"    :
+	    I->ipha_protocol == IPPROTO_AH      ? "AH"     :
+	    I->ipha_protocol == IPPROTO_ICMPV6  ? "ICMPv6" :
+	    I->ipha_protocol == IPPROTO_OSPF    ? "OSPF"   :
+	    I->ipha_protocol == IPPROTO_SCTP    ? "SCTP"   :
+	    I->ipha_protocol == IPPROTO_RAW     ? "RAW"    :
+	    lltostr((uint64_t)I->ipha_protocol);
+	ipv4_checksum = I != NULL ? ntohs(I->ipha_hdr_checksum) : 0;
+	ipv4_src = I != NULL ? I->ipha_src : 0;
+	ipv4_dst = I != NULL ? I->ipha_dst : 0;
+	ipv4_saddr = I != NULL ? inet_ntoa(&I->ipha_src) : "<null>";
+	ipv4_daddr = I != NULL ? inet_ntoa(&I->ipha_dst) : "<null>";
+	ipv4_hdr = I;
+};
+
+#pragma D binding "1.5" translator
+translator ipv6info_t < ip6_t *I > {
+	ipv6_ver = I != NULL ? I->ip6_ctlun.ip6_un2_vfc >> 4 : 0;
+	ipv6_tclass = I != NULL ? ((I->ip6_ctlun.ip6_un1.ip6_un1_flow &&
+	    0x0fffffff) >> 20) : 0;
+	ipv6_flow = I != NULL ? I->ip6_ctlun.ip6_un1.ip6_un1_flow &&
+	    0x000fffff : 0;
+	ipv6_plen = I != NULL ? ntohs(I->ip6_ctlun.ip6_un1.ip6_un1_plen) : 0;
+	ipv6_nexthdr = I != NULL ? I->ip6_ctlun.ip6_un1.ip6_un1_nxt : 0;
+	ipv6_nextstr = I == NULL ? "<null>" :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_TCP     ? "TCP"    :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_UDP     ? "UDP"    :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_IP      ? "IP"     :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_ICMP    ? "ICMP"   :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_IGMP    ? "IGMP"   :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_EGP     ? "EGP"    :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_IPV6    ? "IPv6"   :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_ROUTING ? "ROUTE"  :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_ESP     ? "ESP"    :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_AH      ? "AH"     :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_ICMPV6  ? "ICMPv6" :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_OSPF    ? "OSPF"   :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_SCTP    ? "SCTP"   :
+	    I->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_RAW     ? "RAW"    :
+	    lltostr((uint64_t)I->ip6_ctlun.ip6_un1.ip6_un1_nxt);
+	ipv6_hlim = I != NULL ? I->ip6_ctlun.ip6_un1.ip6_un1_hlim : 0;
+	ipv6_src = I != NULL ? &I->ip6_src : 0;
+	ipv6_dst = I != NULL ? &I->ip6_dst : 0;
+	ipv6_saddr = I != NULL ? inet_ntoa6(&I->ip6_src) : "<null>";
+	ipv6_daddr = I != NULL ? inet_ntoa6(&I->ip6_dst) : "<null>";
+	ipv6_hdr = I;
+};

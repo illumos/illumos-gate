@@ -1,0 +1,81 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * sca500.esc: Deimos eversholt source code
+ */
+
+#pragma dictionary "SCA500"
+
+/*
+ * For Deimos, there is one ASRU that includes both the driver and the card, 
+ * and there are two FRUs, the driver and the card.
+ */
+
+#define P pcibus/pcidev/pcifn
+
+asru P;
+fru P;
+
+/*
+ * The hardware card may generate faults.
+ * The driver passes the user data to the hardware and returns the hardware
+ * generated results to the user. It does check input and output data errors.
+ * However, it returns these errors to the calling application. Since the 
+ * driver itself does not do any data manipulation or generation, it does not
+ * have upsets.
+ */
+
+/*
+ * Declare faults
+ */
+event fault.io.sca500.hw@P, FITrate=50, ASRU=P, FRU=P;
+
+/*
+ * Hardware faults lead to the following error
+ */
+event error.io.sca500.hw.device@P;		/* DMA device errors */
+event error.io.sca500.hw.timeout@P;		/* Device hang */
+
+/*
+ * Declare ereports
+ */
+event ereport.io.sca500.hw.device@P;
+event ereport.io.sca500.hw.timeout@P;
+
+/*
+ * Declear event propagations for faults
+ */
+prop fault.io.sca500.hw@P(0)
+		-> error.io.sca500.hw.device@P,
+		    error.io.sca500.hw.timeout@P;
+
+prop error.io.sca500.hw.device@P
+		-> ereport.io.sca500.hw.device@P;
+prop error.io.sca500.hw.timeout@P
+		-> ereport.io.sca500.hw.timeout@P;

@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+include $(SRC)/Makefile.master
+
+ROOTDIR=	$(ROOT)/usr/lib/brand
+ROOTTEMPLATEDIR=	$(ROOT)/etc/zones
+ROOTBRANDDIR=	$(ROOTDIR)/$(BRAND)
+ROOTBRANDDIR64=	$(ROOTDIR)/$(BRAND)/$(MACH64)
+ROOTSHAREDDIR=	$(ROOTDIR)/shared
+ETCBRANDDIR=	$(ROOT)/etc/brand/$(BRAND)
+
+ROOTPROGS=	$(PROGS:%=$(ROOTBRANDDIR)/%)
+ROOTTXTS=	$(TXTS:%=$(ROOTBRANDDIR)/%)
+ROOTXMLDOCS=	$(XMLDOCS:%=$(ROOTBRANDDIR)/%)
+ROOTSHARED=	$(SHARED:%=$(ROOTSHAREDDIR)/%)
+ETCUSER=	$(USERFILES:%=$(ETCBRANDDIR)/%)
+
+BRAND_SHARED=	$(SRC)/lib/brand/shared
+
+ROOTTEMPLATES=	$(TEMPLATES:%=$(ROOTTEMPLATEDIR)/%)
+
+$(ROOTBRANDDIR) :=	FILEMODE = 755
+
+$(ROOTXMLDOCS) :=	FILEMODE = 444
+
+$(ROOTSHARED) :=	FILEMODE = 755
+
+$(ROOTTEMPLATEDIR) :=	FILEMODE = 755
+
+$(ROOTTEMPLATES) :=	FILEMODE = 444
+
+$(ROOTTXTS) :=	FILEMODE = 444
+
+$(ROOTPROGS) :=	FILEMODE = 755
+
+$(ROOTBRANDDIR)/% $(ROOTBRANDDIR64)/% $(ROOTTEMPLATEDIR)/% $(ROOTSHAREDDIR)/% $(ETCBRANDDIR)/%: %
+	$(INS.file)
+
+$(ETCUSER) :=	FILEMODE = 644
+$(ETCUSER) :=	OWNER = root
+$(ETCUSER) :=	GROUP = sys
+
+.SUFFIXES:	.ksh
+
+.ksh:
+	$(RM) $@
+	$(CAT) $< > $@
+	$(CHMOD) +x $@

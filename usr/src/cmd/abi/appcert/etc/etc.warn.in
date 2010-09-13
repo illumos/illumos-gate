@@ -1,0 +1,90 @@
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# syntax:
+#WARNING:<label>:<1-line-desc>:<lib>|<sym>|<caller>,...:<text>
+# or
+#WARNING:<label>:<1-line-desc>:MATCH <expression>:<text>
+# 
+# the label's and 1-line-desc's must be unique.
+# the warning matches if any of the <lib>|<sym>|<caller> in the
+# comma separated list match.
+# "\" may be used to continue a line. the newline is replaced by " ".
+# Another way to quote a block of text is to sandwich it between
+# single "-". The newline previous to the 1st "-" must be "\" quoted.
+# Special keywords in <expression>:
+#	file =~ -> $file =~ where $file is `/bin/file /path/to/object`
+#	dump =~ -> $dump =~ where $dump is `/usr/ccs/bin/dump /path/to/object`
+#	needed =~ -> $needed =~ where $needed is a list of all ldd needed libs.
+#	syms =~ -> $syms =~ where $syms is a string of the direct symbols.
+#
+# Note: if <lib> is a full path (contains /) that symlinks are not
+# automatically handled (as they are for the models and the tweaks), so
+# you have to list all likely symbolic links in the check (see ptrace ex.)
+#
+###############################################################################
+WARNING:sys_errlist:gettext("references sys_errlist/sys_nerr"):libc.so.1|sys_errlist|*DIRECT*,libc.so.1|sys_nerr|*DIRECT*:
+###############################################################################
+WARNING:libkvm:gettext("calls libkvm kernel interfaces"):libkvm.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libproc:gettext("calls libproc interfaces"):libproc.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libxgl:gettext("calls libxgl graphics library"):libxgl.so.3|*|*DIRECT*:
+###############################################################################
+WARNING:libxil:gettext("calls libxil imaging library"):libxil.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libkrb:gettext("calls libkrb kerberos library"):libkrb.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libauth:gettext("calls libauth library"):libauth.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libdevfsevent:gettext("calls libdevfsevent library"):libdevfsevent.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:libdhcp:gettext("calls libdhcp.so.2 library"):libdhcp.so.2|*|*DIRECT*:
+###############################################################################
+WARNING:libami:gettext("calls libami library"):libami.so.1|*|*DIRECT*,libami-global.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:ALT_USAGE _XtwaitForSomething:gettext("calls incompatible _XtwaitForSomething"):libXt.so.*|_XtwaitForSomething|*DIRECT*:
+###############################################################################
+WARNING:sunos4x:gettext("SunOS 4.x a.out binary"):MATCH file=~/Sun demand paged|pure SPARC/:
+###############################################################################
+WARNING:fork1_forkall:gettext("non-POSIX libthread fork call"):MATCH dump=~/NEEDED\s*libthread\.so\.1/ && !(needed=~/libpthread\.so\.1/) && syms=~/\b(fork|_fork)\b/:
+###############################################################################
+WARNING:sysmem:gettext("calls deprecated sysmem/asysmem"):libadm.so.1|sysmem|*DIRECT*,libadm.so.1|asysmem|*DIRECT*:
+###############################################################################
+WARNING:_lwp_create:gettext("uses lightweight processes directly"):libc.so.1|_lwp_create|*DIRECT*,libc.so.1|_lwp_detach|*DIRECT*,libc.so.1|_lwp_exit|*DIRECT*,libc.so.1|_lwp_getprivate|*DIRECT*,libc.so.1|_lwp_makecontext|*DIRECT*,libc.so.1|_lwp_setprivate|*DIRECT*,libc.so.1|_lwp_wait|*DIRECT*:
+###############################################################################
+WARNING:libldap.so.3:gettext("calls obsolete LDAP library libldap.so.3"):libldap.so.3|*|*DIRECT*:
+###############################################################################
+WARNING:libxfn:gettext("calls obsolete federated naming library libxfn.so"):libxfn.so.1|*|*DIRECT*,libxfn.so.2|*|*DIRECT*:
+###############################################################################
+WARNING:libXinput:gettext("calls obsolete input library libXinput.so.0"):libXinput.so.0|*|*DIRECT*:
+###############################################################################
+WARNING:libkcs:gettext("calls KCMS library libkcs.so.1"):libkcs.so.1|*|*DIRECT*:
+###############################################################################
+WARNING:64-bit-ptrace:gettext("calls 64-bit ptrace(2) interface"):/usr/lib/sparcv9/libc.so.1|ptrace|*DIRECT*,/usr/lib/64/libc.so.1|ptrace|*DIRECT*:
+###############################################################################
+WARNING:makecontext:gettext("possible makecontext(3C) source incompatibility"):libc.so.1|makecontext|*DIRECT*:
+###############################################################################
+WARNING:librac:gettext("calls obsolete RPC library librac.so.1"):librac.so.1|*|*DIRECT*:

@@ -1,0 +1,486 @@
+#!/usr/bin/perl -w
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# The fan topologies can be quite complicated, but are ultimately regular.  This
+# perl file uses some simplified internal structures to generate an .xml file
+# without the maintenance overhead.
+#
+
+use Getopt::Std;
+use strict;
+
+#
+# Master table of platforms.
+#
+my @platforms = (
+    #
+    # Galaxy 1/2 platforms.
+    #
+    # These systems have 2 fan-connector boards.  Each fan-connector board has 3
+    # fan modules.  Each fan module is an individual FRU.  The fan-connector
+    # boards are also FRUs.
+    #
+    {
+	set => "Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|" .
+	    "Sun-Fire-X4100-M2|Sun-Fire-X4200-M2",
+	topology => [
+	    {
+		label => "FT %d",
+		count => 2,
+		fru => "self"
+	    }, {
+	        fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		count => 3,
+		label => "FT %d FM %d",
+		entity_ref => "ft%d.fm%d.led",
+		entity_ref_nparams => 2,
+		fm_service_indctr => "ft%d.fm%d.led",
+		fru => "self"
+	    }
+	]
+    },
+
+    #
+    # Thumper platforms
+    #
+    # These systems have 5 fan modules, with each fan module containing 2 fans.
+    # The FRUs for the individual fans are the containing fan module.
+    #
+    {
+	set => "Sun-Fire-X4500|Sun-Fire-X4540",
+	topology => [
+	    {
+	        fac_enum => 0,
+		provider => "fac_prov_ipmi",
+		label => "FT %d",
+		count => 5,
+		fru => "self",
+		entity_ref => "FT%d/PRSNT,ft%d.prsnt",
+		entity_ref_nparams => 1,
+		fm_service_indctr => "FT%d/SVC,ft%d.service.led",
+		fm_ok2rm_indctr => "FT%d/OK,ft%d.ok2rm.led",
+	    }, {
+	        fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		count => 2,
+		entity_ref => "FT%d/FAN%d/TACH,ft%d.f%d.speed",
+		entity_ref_nparams => 2,
+		fru => "parent"
+	    }
+	]
+    },
+
+    #
+    # Fan Module/Fan topology for all G1N/G2N platforms.
+    #
+    # There are two fan boards, which are FRU's.  Each fan board has
+    # 3 fan modules for a total of 6 fan modules, with each fan module
+    # containing 2 fans.  The FRU's for the individual fans are the
+    # containing fan module.
+    #
+    # Unfortunately, the IPMI topology on these systems is rather broken, and
+    # all the SDRs that should be separate entities in fact refer to the same
+    # entity IDs.  So we have to use the alternative 'entity_present' option
+    # using a single SDR record.
+    #
+    {
+	set => "Sun-Fire-X4240|Sun-Fire-X4440",
+	topology => [
+	    {
+		count => 2,
+		label => "FANBD%d",
+		fru => "self"
+	    }, {
+		label => "FANBD%d FM%d",
+		count => 3,
+		fru => "self",
+		provider => "fac_prov_ipmi",
+		entity_present => "FB%d/FM%d/PRSNT,fb%d.fm%d.prsnt",
+		fm_service_indctr=> "FB%d/FM%d/SERVICE,fb%d.fm%d.led",
+		entity_ref_nparams => 2
+	    }, {
+		fac_enum => 1,
+		count => 2,
+		fru => "parent",
+		provider => "fac_prov_ipmi",
+		entity_ref => "FB%d/FM%d/F%d/TACH,fb%d.fm%d.f%d.speed",
+		entity_present => "FB%d/FM%d/PRSNT,fb%d.fm%d.prsnt",
+		entity_ref_nparams => 3
+	    }
+
+	]
+    },
+
+    #
+    # Fan Module/Fan topology for the Sun Fire X4600/X4600 M2 platforms.
+    #
+    # These systems have 4 fan assemblies with a single fan per assembly.
+    # Each fan assembly is a FRU.  The fan assemblies have a service LED
+    # but no other indicators.
+    #
+    {
+	set => "Sun-Fire-X4600|Sun-Fire-X4600-M2",
+	topology => [
+	    {
+	        fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		count => 4,
+		label => "FT %d",
+		fru => "self",
+		entity_ref => "ft%d.fm0.prsnt",
+		entity_ref_nparams => 1,
+		fm_service_indctr => "ft%d.fm0.led"
+	    }	
+	]
+    },
+
+    #
+    # Fan Module/Fan topology for Sun Fire X4140.
+    #
+    # There are two fan boards, which are FRU's.  The first fanboard has 4
+    # fanmodules (which are also FRU's).  The second fan board has 3 fan
+    # modules.  Each fanmodule contains two fans.
+    #
+    {
+	set => "Sun-Fire-X4140",
+	topology => [
+	    {
+		count => 2,
+		label => "FANBD%d",
+		fru => "self",
+	    }, {
+		fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		label => "FANBD%d FM%d",
+		count => 4,
+		fru => "self",
+		fm_service_indctr=> "FB%d/FM%d/SERVICE,fb%d.fm%d.led",
+		entity_ref_nparams => 2
+	    }, {
+		fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		count => 2,
+		fru => "parent",
+		entity_ref => "FB%d/FM%d/F%d/TACH,fb%d.fm%d.f%d.speed",
+		entity_ref_nparams => 3
+	    }
+
+	]
+    },
+    #
+    # Fan Module/Fan topology for the Sun Fire X4150.
+    #
+    # There are two fan boards, which are FRU's.  The first fanboard has 4
+    # fanmodules (which are also FRU's).  The second fan board has 3 fan
+    # modules.  Each fanmodule contains two fans.
+    #
+    {
+	set => "SUN-FIRE-X4150",
+	topology => [
+	    {
+		count => 2,
+		label => "FANBD%d",
+		fru => "self",
+		entity_present => "FB%d/PRSRNT"
+	    }, {
+		label => "FANBD%d FM%d",
+		count => 4,
+		fru => "self",
+		provider => "fac_prov_ipmi",
+		entity_ref => "FB%d/FM%d/PRSNT",
+		fm_service_indctr=> "",
+		entity_ref_nparams => 2
+	    }, {
+		fac_enum => 1,
+		count => 2,
+		fru => "parent",
+		provider => "fac_prov_ipmi",
+		entity_ref => "FB%d/FM%d/F%d/TACH",
+		entity_ref_nparams => 3
+	    }
+
+	]
+    },
+    #
+    # Fan Module/Fan topology for Duradi 2U.
+    #
+    # There are two fan boards, which are FRU's.  Both fanboards have 3
+    # fanmodules (which are also FRU's). Each fanmodule contains two fans.
+    #
+    {
+	set => "SUN-FIRE-X4250|SUN-FIRE-X4450",
+	topology => [
+	    {
+		count => 2,
+		label => "FANBD%d",
+		fru => "self",
+		entity_present => "FB%d/PRSRNT"
+	    }, {
+		label => "FANBD%d FM%d",
+		count => 3,
+		fru => "self",
+		provider => "fac_prov_ipmi",
+		entity_ref => "FB%d/FM%d/PRSNT",
+		fm_service_indctr=> "",
+		entity_ref_nparams => 2
+	    }, {
+		fac_enum => 1,
+		count => 2,
+		fru => "parent",
+		provider => "fac_prov_ipmi",
+		entity_ref => "FB%d/FM%d/F%d/TACH",
+		entity_ref_nparams => 3
+	    }
+
+	]
+    }
+);
+
+#
+# Process an entry in the topology list.  We are passed the indentation level,
+# the current topology array, the set list, and any pushed indices.  This is
+# called recursively.
+#
+sub process_topology
+{
+	my ($indent, $toporef, $set, @indices) = @_;
+	my @topo = @$toporef;
+	my $level = shift @topo;
+	my $type = $#topo == -1 ? "fan" : "fanmodule";
+
+	printf("%*s<range name='%s' min='%d' max='%d'>\n",
+	    $indent, "", $type, 0, $level->{count} - 1);
+	$indent += 2;
+
+	for (my $i = 0; $i < $level->{count}; $i++) {
+		#
+		# Special case code for the 1U version of Durado and Duradi,
+		# both of which have an assymetric fan topology
+		#
+		last if ((($set eq "SUN-FIRE-X4150") || ($set eq "Sun-Fire-X4140"))
+		    && ($type eq "fanmodule") && ($#indices == 0)
+		    && ($indices[0] == 1) && ($i == 3));
+
+		push @indices, $i;
+
+		printf("%*s<node instance='%d'>\n", $indent, "", $i);
+
+		$indent += 2;
+
+		# Facility enumerator
+		if ($level->{fac_enum}) {
+			printf("%*s<fac-enum provider='",
+			    $indent, "");
+			printf($level->{provider});
+			printf("' />\n");
+		}
+
+		# Facility nodes for service and ok2rm LED's
+		if ($level->{fm_service_indctr}) {
+			printf("%*s<facility name='service' type='indicator' ".
+			    "provider='fac_prov_ipmi' >\n", $indent+2, "");
+			printf("%*s<propgroup name='facility' version='1' ".
+			    "name-stability='Private' data-stability='Private' >\n",
+			    $indent+4, "");
+			printf("%*s<propval name='type' type='uint32' ".
+			    "value='0' />\n", $indent+6, "");
+			printf("%*s<propmethod name='ipmi_entity' version='0' ".
+			    "propname='entity_ref' proptype='string_array' >\n",
+			    $indent+6, "");
+
+			printf("%*s<argval name='format' type='string_array'>\n",
+			    $indent+8, "");
+			my @refs = split(/\,/, $level->{fm_service_indctr});
+			foreach my $ref (@refs) {
+				printf("%*s<argitem value='", $indent+10, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			
+			printf("%*s</argval>\n", $indent+8, "");
+			printf("%*s<argval name='offset' type='uint32' ".
+			    "value='0' />\n", $indent+8, "");
+			printf("%*s<argval name='nparams' type='uint32' ".
+			    "value='%d' />\n", $indent+8, "",
+			    $level->{entity_ref_nparams});
+			printf("%*s</propmethod>\n", $indent+6, "");
+			printf("%*s<propmethod name='ipmi_indicator_mode' ".
+			    "version='0' propname='mode' proptype='uint32' ".
+			    "mutable='1' >\n", $indent+6, "");
+			printf("%*s</propmethod>\n", $indent+6, "");
+			printf("%*s</propgroup>\n", $indent+4, "");
+			printf("%*s</facility>\n", $indent+2, "");
+		}
+		if ($level->{fm_ok2rm_indctr}) {
+			printf("%*s<facility name='ok2rm' type='indicator' ".
+			    "provider='fac_prov_ipmi' >\n", $indent+2, "");
+			printf("%*s<propgroup name='facility' version='1' ".
+			    "name-stability='Private' data-stability='Private' >\n",
+			    $indent+4, "");
+			printf("%*s<propval name='type' type='uint32' ".
+			    "value='2' />\n", $indent+6, "");
+			printf("%*s<propmethod name='ipmi_entity' version='0' ".
+			    "propname='entity_ref' proptype='string_array' >\n",
+			    $indent+6, "");
+
+			printf("%*s<argval name='format' type='string_array'>\n",
+			    $indent+8, "");
+			my @refs = split(/\,/, $level->{fm_ok2rm_indctr});
+			foreach my $ref (@refs) {
+				printf("%*s<argitem value='", $indent+10, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</argval>\n", $indent+8, "");
+			printf("%*s<argval name='offset' type='uint32' ".
+			    "value='0' />\n", $indent+8, "");
+			printf("%*s<argval name='nparams' type='uint32' ".
+			    "value='%d' />\n", $indent+8, "",
+			    $level->{entity_ref_nparams});
+			printf("%*s</propmethod>\n", $indent+6, "");
+			printf("%*s<propmethod name='ipmi_indicator_mode' ".
+			    "version='0' propname='mode' proptype='uint32' mutable='1' >\n",
+			    $indent+6, "");
+			printf("%*s</propmethod>\n", $indent+6, "");
+			printf("%*s</propgroup>\n", $indent+4, "");
+			printf("%*s</facility>\n", $indent+2, "");
+		}
+
+		# Protocol properties (label, fmri)
+		printf("%*s<propgroup name='protocol' version='1' " .
+		    "name-stability='Private' data-stability='Private'>\n",
+		    $indent, "");
+
+		$indent += 2;
+
+		if ($level->{label}) {
+			printf("%*s<propval name='label' type='string' " .
+			    "value='", $indent, "");
+			printf($level->{label}, @indices);
+			printf("' />\n");
+		}
+
+		printf("%*s<propmethod name='ipmi_fru_fmri' " .
+		    "version='0' propname='FRU' proptype='fmri'>\n",
+		    $indent, "");
+		printf("%*s<argval name='entity' type='string' " .
+		    "value='%s' />\n", $indent + 2, "", $level->{fru});
+		printf("%*s</propmethod>\n", $indent, "");
+
+		$indent -= 2;
+
+		printf("%*s</propgroup>\n", $indent, "");
+
+		#
+		# Entity references (if any)
+		#
+		if ($level->{entity_ref}) {
+			my $val = $level->{entity_ref};
+			printf("%*s<propgroup name='ipmi' version='1' " .
+			    "name-stability='Private' " .
+			    "data-stability='Private' >\n", $indent, "");
+
+			printf("%*s<propval name='entity_ref' ".
+			    "type='string_array'>\n", $indent + 2, "");
+			my @refs = split(/\,/, $val);
+			foreach my $ref (@refs) {
+				printf("%*s<propitem value='", $indent+4, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</propval>\n", $indent+2, "");
+			printf("%*s</propgroup>\n", $indent, "");
+		}
+		if ($level->{entity_present}) {
+			my $val = $level->{entity_present};
+			printf("%*s<propgroup name='ipmi' version='1' " .
+			    "name-stability='Private' " .
+			    "data-stability='Private' >\n", $indent, "");
+
+			printf("%*s<propval name='entity_present' " .
+			    "type='string_array'>\n", $indent + 2, "");
+			my @refs = split(/\,/, $val);
+			foreach my $ref (@refs) {
+				printf("%*s<propitem value='", $indent+4, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</propval>\n", $indent+4, "");
+			printf("%*s</propgroup>\n", $indent, "");
+		}
+
+		#
+		# Post-process IPMI enumerator method
+		#
+		printf("%*s<enum-method name='ipmi' version='1' ".
+		    "/>\n", $indent, "");
+
+		#
+		# Children (if any)
+		#
+		if ($#topo != -1) {
+			printf("%*s<dependents grouping='children'>\n",
+			    $indent, "");
+			process_topology($indent + 2, \@topo, $set, @indices);
+			printf("%*s</dependents>\n", $indent, "");
+		}
+
+		$indent -= 2;
+
+		printf("%*s</node>\n", $indent, "");
+		pop @indices;
+	}
+
+	$indent -= 2;
+	printf("%*s</range>\n", $indent, "");
+}
+
+#
+# Process a single platform file.
+#
+sub process_platform
+{
+	my ($desc) = @_;
+	my $indent = 2;
+
+	printf("%*s<set type='product' setlist='%s'>\n", $indent, "",
+	    $desc->{set});
+
+	process_topology($indent + 2, $desc->{topology}, $desc->{set});
+
+	printf("%*s</set>\n", $indent, "");
+}
+
+print "<topology name='fan' scheme='hc'>\n";
+
+my $desc;
+foreach $desc (@platforms) {
+	process_platform($desc);
+}
+
+print "</topology>\n";

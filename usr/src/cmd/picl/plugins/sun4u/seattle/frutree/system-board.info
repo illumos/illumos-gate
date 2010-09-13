@@ -1,0 +1,938 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This file creates the system board structure
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * Motherboard properties
+ */
+name:/frutree/chassis/MB
+    NODE system-board fru
+	NODE SC location
+    	    PROP Label string r 0 "SC"
+	    NODE sc fru
+	    ENDNODE
+	ENDNODE
+        NODE P0 location
+            PROP SlotType string r 0 "cpu"
+            PROP Label string r 0 "P0"
+        ENDNODE
+        NODE P1 location
+            PROP SlotType string r 0 "cpu"
+            PROP Label string r 0 "P1"
+        ENDNODE
+	NODE HDDBP location
+    	    PROP Label string r 0 "HDDBP"
+       	    REFNODE disk-backplane-1 fru WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+       	    REFNODE disk-backplane-3 fru WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+	ENDNODE
+        NODE RMD0 location
+            PROP SlotType string r 0 "dvd-slot"
+            PROP Label string r 0 "RMD0"
+        ENDNODE
+	NODE SCC location
+    	    PROP Label string r 0 "SCC"
+	    NODE system-config-chip fru
+	    ENDNODE
+	ENDNODE
+    	NODE RISER-RIGHT location
+    	    PROP Label string r 0 "RISER-RIGHT"
+    	ENDNODE
+    	NODE RISER-LEFT location
+    	    PROP Label string r 0 "RISER-LEFT"
+    	ENDNODE
+	NODE USB0 location
+            PROP Label string r 0 "USB0"
+        ENDNODE
+        NODE USB1 location
+            PROP Label string r 0 "USB1"
+        ENDNODE
+	NODE FIOB location
+    	    PROP Label string r 0 "FIOB"
+	    REFNODE front-io-board-1 fru WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+	    REFNODE front-io-board-2 fru WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+	ENDNODE
+	NODE BATTERY location
+    	    PROP Label string r 0 "BATTERY"
+	    NODE battery fru
+	    ENDNODE
+	ENDNODE
+    ENDNODE
+
+/*
+ * motherboard seeprom source
+ */
+name:/frutree/chassis/MB/system-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/motherboard-fru-prom@0,a2
+
+name:/platform/i2c@1f,530000/motherboard-fru-prom@0,a2
+	REFPROP _fru_parent /frutree/chassis/MB/system-board
+
+/*
+ * Processor 0
+ */
+name:/frutree/chassis/MB/system-board/P0
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi@0,0
+name:/frutree/chassis/MB/system-board/P0/cpu
+        NODE B0 location
+            PROP Label string r 0 "B0"
+            NODE bank fru
+                NODE D0 location
+                ENDNODE
+                NODE D1 location
+                ENDNODE
+            ENDNODE
+        ENDNODE
+        NODE B1 location
+            PROP Label string r 0 "B1"
+            NODE bank fru
+                NODE D0 location
+                ENDNODE
+                NODE D1 location
+                ENDNODE
+            ENDNODE
+        ENDNODE
+
+/*
+ * Processor 1
+ */
+name:/frutree/chassis/MB/system-board/P1
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi@1,0
+name:/frutree/chassis/MB/system-board/P1/cpu
+        NODE B0 location
+            PROP Label string r 0 "B0"
+            NODE bank fru
+                NODE D0 location
+                ENDNODE
+                NODE D1 location
+                ENDNODE
+            ENDNODE
+        ENDNODE
+        NODE B1 location
+            PROP Label string r 0 "B1"
+            NODE bank fru
+                NODE D0 location
+                ENDNODE
+                NODE D1 location
+                ENDNODE
+            ENDNODE
+        ENDNODE
+/*
+ * Processor 0 memory
+ */
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/*
+ * Processor 1 memory
+ */
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/*
+ * Dimm nodes
+ */
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,e0
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,e2
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,e4
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,e6
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,e8
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,ea
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,ec
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,ee
+
+/* Populate all possible nodes in the devtree with a status of "okay".
+ * This will get overridden by ASR.  If the dimm slots are not fully
+ * populated then no extra nodes or properties are created.
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+
+/*
+ * DIMM seeprom sources
+ */
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,e0
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,e2
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,e4
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,e6
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,e8
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,ea
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,ec
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/dimm-spd@0,ee
+
+/*
+ * DIMM FRU parents
+ */
+name:/platform/i2c@1f,530000/dimm-spd@0,e0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,e2
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,e4
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,e6
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,e8
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,ea
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,ec
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,530000/dimm-spd@0,ee
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1/mem-module
+
+name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P0/cpu
+
+name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P1/cpu
+
+name:/platform/SUNW,UltraSPARC-IIIi@0,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P0/cpu
+
+name:/platform/SUNW,UltraSPARC-IIIi@1,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P1/cpu
+/*
+ * DIMM parents
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1/mem-module
+/*
+ * create reference properties for motherboard pci devices
+ */
+_class:/jbus/pciex@1e,600000
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+_class:/jbus/pciex@1f,700000
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+
+/*
+ * Front IO Board 1U
+ */
+name:/frutree/chassis/MB/system-board/FIOB/front-io-board-1
+	NODE USB2 location
+	    PROP Label string r 0 "USB2"
+	ENDNODE
+	NODE FLEDB location
+	    PROP Label string r 0 "FLEDB"
+	    NODE front-led-board fru
+	    ENDNODE
+	ENDNODE
+	NODE FCB0 location
+	    PROP Label string r 0 "FCB0"
+	    NODE fan-connector-board fru
+	    ENDNODE
+	ENDNODE
+	NODE FCB1 location
+	    PROP Label string r 0 "FCB1"
+	    NODE fan-connector-board fru
+	    ENDNODE
+	ENDNODE
+
+/*
+ * Front IO Board 2U
+ */
+
+name:/frutree/chassis/MB/system-board/FIOB/front-io-board-2
+	NODE USB2 location
+	    PROP Label string r 0 "USB2"
+	ENDNODE
+	NODE USB3 location
+	    PROP Label string r 0 "USB3"
+	ENDNODE
+	NODE FLEDB location
+	    PROP Label string r 0 "FLEDB"
+	    NODE front-led-board fru
+	    ENDNODE
+	ENDNODE
+	NODE FCB0 location
+	    PROP Label string r 0 "FCB0"
+	    NODE fan-connector-board fru
+	    ENDNODE
+	ENDNODE
+	NODE FCB1 location
+	    PROP Label string r 0 "FCB1"
+	    NODE fan-connector-board fru
+	    ENDNODE
+	ENDNODE
+
+/*
+ * PDB nodes for 1U and 2U. Note that we should have only one of these
+ * two nodes for each platform (1U/2U).
+ */
+name:/frutree/chassis/PDB/power-distribution-board
+	REFNODE FT6 location WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+	REFNODE HDDFB location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+
+name:/frutree/chassis/PDB/power-distribution-board/HDDFB
+	PROP Label string r 0 "HDDFB"
+	NODE fan-connector-board fru
+	ENDNODE
+
+/* 
+ * Add dvdrom fru nodes for disks which are present
+ */
+name:/frutree/chassis/MB/system-board/RMD0
+	REFNODE removable-media fru WITH name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+
+/*
+ * HDDBP
+ */
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
+	NODE HDD0 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD0"
+	ENDNODE
+	NODE HDD1 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD1"
+	ENDNODE
+
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
+
+name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
+
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+	NODE HDD0 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD0"
+	ENDNODE
+	NODE HDD1 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD1"
+	ENDNODE
+	NODE HDD2 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD2"
+	ENDNODE
+	NODE HDD3 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD3"
+	ENDNODE
+
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
+
+name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+
+/* add disk fru nodes for disks which are present */
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1/HDD0
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@0,0
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1/HDD1
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@1,0
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD0
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@0,0
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD1
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@1,0
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD2
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@2,0
+name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD3
+	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@3,0
+
+
+/*
+ * System Fans for Seattle 1U
+ */
+#ifndef FCB0_1U
+#define FCB0_1U /frutree/chassis/MB/system-board/FIOB/front-io-board-1/FCB0/fan-connector-board
+#endif
+
+#ifndef FCB1_1U
+#define FCB1_1U /frutree/chassis/MB/system-board/FIOB/front-io-board-1/FCB1/fan-connector-board
+#endif
+
+#ifndef PDB_1U
+#define PDB_1U /frutree/chassis/PDB/power-distribution-board
+#endif
+
+/*
+ * As per FSD rev 0.19, in Seattle 1U, two fans are integrated into
+ * a single assembly and share a connector. We assume therefore that
+ * every fan tray in Seattle 1U contains both fans, so the presence
+ * of either fan node (under RMCLOMV) is indicative of the presence
+ * of the containing fan tray. In other words, either we have the
+ * fan tray with both fans present, or we have no fan tray at all.
+ */
+name:FCB0_1U
+    NODE FT0 location
+	PROP Label string r 0 "FT0"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft0_f0
+    ENDNODE
+    NODE FT1 location
+	PROP Label string r 0 "FT1"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft1_f0
+    ENDNODE
+    NODE FT2 location
+	PROP Label string r 0 "FT2"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft2_f0
+    ENDNODE
+
+name:FCB1_1U
+    NODE FT3 location
+	PROP Label string r 0 "FT3"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft3_f0
+    ENDNODE
+    NODE FT4 location
+	PROP Label string r 0 "FT4"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft4_f0
+    ENDNODE
+    NODE FT5 location
+	PROP Label string r 0 "FT5"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft5_f0
+    ENDNODE
+
+name:PDB_1U/FT6
+    PROP Label string r 0 "FT6"
+    PROP SlotType string r 0 "fan-tray"
+    REFNODE fan-tray fru WITH name:RMCLOMV/pdb_ft6_f0
+
+/*
+ * Create fan nodes for Seattle 1U
+ *
+ * Note that although we could create the F0 and F1 nodes on each
+ * tray conditionally, based on the ftN_f0 and ftN_f1 rmclomv nodes,
+ * it won't add any value; we've already based the creation of the
+ * fan-tray node to the existence of ftN_f0.
+ */
+name:FCB0_1U/FT0/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB0_1U/FT1/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB0_1U/FT2/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT3/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT4/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT5/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:PDB_1U/FT6/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+/*
+ * System Fans for Seattle 2U
+ */
+#ifndef FCB0_2U
+#define FCB0_2U /frutree/chassis/MB/system-board/FIOB/front-io-board-2/FCB0/fan-connector-board
+#endif
+
+#ifndef FCB1_2U
+#define FCB1_2U /frutree/chassis/MB/system-board/FIOB/front-io-board-2/FCB1/fan-connector-board
+#endif
+
+#ifndef PDB_2U
+#define PDB_2U /frutree/chassis/PDB/power-distribution-board/HDDFB/fan-connector-board
+#endif
+
+/*
+ * In Seattle 2U, each fan assembly has only one fan (except for the pdb),
+ * so the presence of f0 is indicative of the presence of the fan tray.
+ */
+name:FCB0_2U
+    NODE FT0 location
+	PROP Label string r 0 "FT0"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft0_f0
+    ENDNODE
+    NODE FT1 location
+	PROP Label string r 0 "FT1"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft1_f0
+    ENDNODE
+    NODE FT2 location
+	PROP Label string r 0 "FT2"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft2_f0
+    ENDNODE
+
+name:FCB1_2U
+    NODE FT3 location
+	PROP Label string r 0 "FT3"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft3_f0
+    ENDNODE
+    NODE FT4 location
+	PROP Label string r 0 "FT4"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft4_f0
+    ENDNODE
+    NODE FT5 location
+	PROP Label string r 0 "FT5"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft5_f0
+    ENDNODE
+
+name:PDB_2U
+    NODE FT6 location
+	PROP Label string r 0 "FT6"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/pdb_hddfb_ft6_f0
+    ENDNODE
+
+/*
+ * Create fan nodes for Seattle 2U
+ */
+name:FCB0_2U/FT0/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB0_2U/FT1/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB0_2U/FT2/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT3/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT4/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT5/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:PDB_2U/FT6/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+/*
+ * PCI Riser Card Right
+ */
+
+#ifndef PCI_R
+#define PCI_R /frutree/chassis/MB/system-board/RISER-RIGHT
+#endif
+
+name:PCI_R
+	REFNODE pci-riser-board fru WITH name:/platform/i2c@1f,530000/riser-fru-prom@0,aa
+
+name:PCI_R/pci-riser-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/riser-fru-prom@0,aa
+	NODE PCI0 location
+	    PROP Label string r 0 "PCI0"
+	    PROP SlotType string r 0 "pci-e"
+	ENDNODE
+	REFNODE PCI2 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+
+name:/platform/i2c@1f,530000/riser-fru-prom@0,aa
+	REFPROP _fru_parent PCI_R/pci-riser-board
+
+name:PCI_R/pci-riser-board/PCI2
+	PROP Label string r 0 "PCI2"
+	PROP SlotType string r 0 "pci-e"
+
+/*
+ * PCI Riser Card Left
+ */
+
+#ifndef PCI_L
+#define PCI_L /frutree/chassis/MB/system-board/RISER-LEFT
+#endif
+
+name:PCI_L
+	REFNODE pci-riser-board fru WITH name:/platform/i2c@1f,530000/riser-fru-prom@0,a8
+
+name:PCI_L/pci-riser-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/riser-fru-prom@0,a8
+
+name:/platform/i2c@1f,530000/riser-fru-prom@0,a8
+	REFPROP _fru_parent PCI_L/pci-riser-board
+
+name:PCI_L/pci-riser-board
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+
+name:PCI_L/pci-riser-board/PCI1
+	PROP Label string r 0 "PCI1"
+	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl?DeviceID=1
+
+name:PCI_L/pci-riser-board
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+	REFNODE PCI3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+
+name:PCI_L/pci-riser-board/PCI3
+	PROP Label string r 0 "PCI3"
+	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pci@0/picl?DeviceID=2
+
+name:PCI_L/pci-riser-board/PCI1
+	PROP Label string r 0 "PCI1"
+	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pci@0,2/picl?DeviceID=1
+
+/*
+ * Populate PCI_R slots
+ */
+name:PCI_R/pci-riser-board/PCI0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
+name:PCI_R/pci-riser-board/PCI2
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl?DeviceID=0
+
+/*
+ * _fru_parent PCIEX devices
+ */
+
+/* 1UEER, 2UEER: PCI0 */
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,7
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+
+/* 2UEER: PCI2 */
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,1
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,2
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,3
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,4
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,5
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,6
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,7
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+
+/* 1UEEL: PCI1 */
+_class:/jbus/pciex@1f,700000/picl@0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+
+/* 2UEEL: PCI1 */
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+
+/* 2UEEL: PCI3 */
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+
+/*
+ * _fru_parent PCI-X devices
+ */
+
+/* 1UXXL: PCI1 */
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pci@0/pci@8/picl@1,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+
+/* 2UEXL-I: PCI1 */
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pci@0,2/picl@1,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+
+/* 2UEXL-I: PCI3 */
+_class:/jbus/pciex@1f,700000/pci@0/picl@2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pci@0/picl@2,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card

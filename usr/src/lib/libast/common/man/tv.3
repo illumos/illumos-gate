@@ -1,0 +1,173 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH TM 3
+.SH NAME
+tv \- high resolution time support
+.SH SYNOPSIS
+.L "#include <tv.h>"
+.SH DESCRIPTION
+The
+.I tv
+library supports high resolution
+.B Tv_t
+time specifications.
+.SS Tv_t
+contains these elements:
+.TP
+.L unsigned
+.L _ast_int4_t
+.L tv_sec
+Seconds since the epoch.
+.TP
+.L unsigned
+.L _ast_int4_t
+.L tv_nsec
+Nanosecond resolution.
+.PP
+In practice resolution is much coarser than 1 nanosecond.
+Systems that only support 1 second resolution always set
+.L tv_nsec
+to 0.
+.SS "int tvgettime(Tv_t* tv)"
+Sets
+.L tv
+to the current time.
+.L 0
+is returned on success,
+.L -1
+on error.
+.SS "int tvsettime(const Tv_t* tv)"
+Sets the system time to
+.LR tv .
+The caller must have sufficient privilege.
+.L 0
+is returned on success,
+.L -1
+on error.
+.SS "int tvcmp(const Tv_t* av, const Tv_t* bv)"
+Compares the times
+.L av
+and
+.L bv
+and returns
+.L -1
+if
+.L av
+is less than
+.LR bv ,
+.L 0
+if
+.L av
+is equal to
+.LR bv ,
+and
+.L 1
+if
+.L av
+is greater than
+.LR bv .
+.SS "time_t tvgetatime(const struct stat* st, Tv_t* tv)"
+.SS "time_t tvgetmtime(const struct stat* st, Tv_t* tv)"
+.SS "time_t tvgetctime(const struct stat* st, Tv_t* tv)"
+These macros set
+.L tv
+to the
+.L st
+the access, modify, or change time, respectively.
+The seconds portion of
+.L tv
+is returned.
+.SS "time_t tvsetatime(struct stat* st, const Tv_t* tv)"
+.SS "time_t tvsetmtime(struct stat* st, const Tv_t* tv)"
+.SS "time_t tvsetctime(struct stat* st, const Tv_t* tv)"
+These macros set the
+.L st
+access, modify, or change time, respectively, to
+.LR tv .
+The seconds portion of
+.L tv
+is returned.
+.SS "int tvtouch(const char* path, const Tv_t* av, const Tv_t* mv, const Tv_t* cv, int copy)"
+Sets the file
+.L path
+access time from
+.LR av ,
+modify time from
+.LR mv ,
+and change time from
+.LR cv .
+Any of
+.LR av ,
+.LR mv ,
+and
+.L cv
+may be 0; the corresponding file time will retain the previous value if
+.L path
+exists and
+.L copy
+is
+.L 1 ;
+otherwise the corresponding file time will be set to the current time.
+.L 0
+is returned on success,
+.L -1
+on error.
+.SS "int tvsleep(const Tv_t* tv, Tv_t* rv)"
+Pauses execution for
+.L tv
+time.
+.L 0
+is returned if the full
+.L tv
+amount has expired.
+Otherwise
+.L -1
+is returned and
+.LR rv ,
+if not 0, is set to the sleep time remaining.
+.SH "RETURN VALUE"
+Except for
+.LR tvcmp() ,
+an error return of
+.L -1
+also sets
+.L errno
+to the corresponding error code.
+.SH "SEE ALSO"
+tm(3)

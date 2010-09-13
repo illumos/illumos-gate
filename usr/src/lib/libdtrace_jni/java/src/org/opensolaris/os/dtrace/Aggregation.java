@@ -1,0 +1,377 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ */
+package org.opensolaris.os.dtrace;
+
+import java.util.*;
+import java.beans.*;
+import java.io.*;
+
+/**
+ * A snapshot of a DTrace aggregation.  The name of an {@code
+ * Aggregation} instance matches the source declaration, for example
+ * <pre>        {@code @a[execname] = count();}</pre>
+ * results in an {@code Aggregation} named "a" (the name does not
+ * include the preceding {@code @}).  For convenience, a single
+ * aggregation can remain unnamed (multiple aggregations in the same D
+ * program need distinct names).  The unnamed aggregation results in an
+ * {@code Aggregation} instance whose name is the empty string, for
+ * example
+ * <pre>        {@code @[execname] = count();}</pre>
+ * An aggregation can list more than one variable in square brackets in
+ * order to accumulate a value for each unique combination, or {@link
+ * Tuple}.  Each tuple instance is associated with its accumulated
+ * {@link AggregationValue} in an {@link AggregationRecord}.  For
+ * example
+ * <pre>        {@code @counts[execname, probefunc, cpu] = count();}</pre>
+ * results in an {@code Aggregation} named "counts" containing records
+ * each pairing a {@link CountValue} to a three-element {@code Tuple}.
+ * It is also possible to omit the square brackets, for example
+ * <pre>        {@code @a = count();}</pre>
+ * results in an {@code Aggregation} named "a" with only a single record
+ * keyed to the empty tuple ({@link Tuple#EMPTY}).
+ * <p>
+ * For more information, see the <a
+ * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlh7?a=view>
+ * <b>Aggregations</b></a> chapter of the <i>Solaris Dynamic Tracing
+ * Guide</i>.  Also, the <a
+ * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlfv?a=view>
+ * <b>Built-in Variables</b></a> section of the <b>Variables</b> chapter
+ * describes variables like {@code execname}, {@code probefunc}, and
+ * {@code cpu} useful for aggregating.
+ * <p>
+ * Immutable.  Supports persistence using {@link java.beans.XMLEncoder}.
+ *
+ * @see Aggregate
+ * @see PrintaRecord
+ *
+ * @author Tom Erickson
+ */
+public final class Aggregation implements Serializable {
+    static final long serialVersionUID = 2340811719178724026L;
+
+    static {
+	try {
+	    BeanInfo info = Introspector.getBeanInfo(Aggregation.class);
+	    PersistenceDelegate persistenceDelegate =
+		    new DefaultPersistenceDelegate(
+		    new String[] {"name", "ID", "records"})
+	    {
+		@Override
+		protected boolean
+		mutatesTo(Object oldInstance, Object newInstance)
+		{
+		    return ((newInstance != null) && (oldInstance != null) &&
+			    (oldInstance.getClass() == newInstance.getClass()));
+		}
+	    };
+	    BeanDescriptor d = info.getBeanDescriptor();
+	    d.setValue("persistenceDelegate", persistenceDelegate);
+	} catch (IntrospectionException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    /** @serial */
+    private String name;
+    /** @serial */
+    private final long id;
+    private transient Map <Tuple, AggregationRecord> map;
+
+    /**
+     * Package-level access, called by Aggregate
+     */
+    Aggregation(String aggregationName, long aggregationID)
+    {
+	name = Aggregate.filterUnnamedAggregationName(aggregationName);
+	id = aggregationID;
+	map = new HashMap <Tuple, AggregationRecord> ();
+    }
+
+    /**
+     * Creates an aggregation with the given name, ID, and records.
+     * Supports XML persistence.
+     *
+     * @param aggregationName the name of this aggregation, empty string
+     * if this aggregation is unnamed
+     * @param aggregationID ID generated from a sequence by the native
+     * DTrace library
+     * @param aggregationRecords unordered collection of records
+     * belonging to this aggregation
+     * @throws NullPointerException if the specified name or list of
+     * records is {@code null}
+     * @throws IllegalArgumentException if any record has an empty
+     * tuple, unless it is the only record in the given collection (only
+     * a singleton generated by an aggregation without square brackets
+     * uses {@link Tuple#EMPTY} as a key)
+     * @see #getRecord(Tuple key)
+     */
+    public
+    Aggregation(String aggregationName, long aggregationID,
+	    Collection <AggregationRecord> aggregationRecords)
+    {
+	name = Aggregate.filterUnnamedAggregationName(aggregationName);
+	id = aggregationID;
+	mapRecords(aggregationRecords);
+	validate();
+    }
+
+    // assumes map is not yet created
+    private void
+    mapRecords(Collection <AggregationRecord> records)
+    {
+	int capacity = (int)(((float)records.size() * 3.0f) / 2.0f);
+	// avoid rehashing and optimize lookup; will never be modified
+	map = new HashMap <Tuple, AggregationRecord> (capacity, 1.0f);
+	for (AggregationRecord record : records) {
+	    map.put(record.getTuple(), record);
+	}
+    }
+
+    private final void
+    validate()
+    {
+	if (name == null) {
+	    throw new NullPointerException("name is null");
+	}
+	for (AggregationRecord r : map.values()) {
+	    if ((r.getTuple().size() == 0) && (map.size() > 1)) {
+		throw new IllegalArgumentException("empty tuple " +
+			"allowed only in singleton aggregation");
+	    }
+	}
+    }
+
+    /**
+     * Gets the name of this aggregation.
+     *
+     * @return the name of this aggregation exactly as it appears in the
+     * D program minus the preceding {@code @}, or an empty string if
+     * the aggregation is unnamed, for example:
+     * <pre>		{@code @[execname] = count();}</pre>
+     */
+    public String
+    getName()
+    {
+	return name;
+    }
+
+    /**
+     * Gets the D compiler-generated ID of this aggregation.
+     *
+     * @return the D compiler-generated ID
+     */
+    public long
+    getID()
+    {
+	return id;
+    }
+
+    /**
+     * Gets an unordered list of this aggregation's records. The list is
+     * sortable using {@link java.util.Collections#sort(List list,
+     * Comparator c)} with any user-defined ordering. Modifying the
+     * returned list has no effect on this aggregation. Supports XML
+     * persistence.
+     *
+     * @return a newly created list that copies this aggregation's
+     * records by reference in no particular order
+     * @see Aggregate#getRecords()
+     * @see Aggregate#getOrderedRecords()
+     */
+    public List <AggregationRecord>
+    getRecords()
+    {
+	List <AggregationRecord> list =
+		new ArrayList <AggregationRecord> (map.values());
+	return list;
+    }
+
+    /**
+     * Package level access, called by Aggregate and PrintaRecord.
+     *
+     * @throws IllegalArgumentException if this aggregation already
+     * contains a record with the same tuple key as the given record
+     */
+    void
+    addRecord(AggregationRecord record)
+    {
+	Tuple key = record.getTuple();
+	if (map.put(key, record) != null) {
+	    throw new IllegalArgumentException("already contains a record " +
+		    "with tuple " + key);
+	}
+    }
+
+    /**
+     * Gets a read-only {@code Map} view of this aggregation.
+     *
+     * @return a read-only {@code Map} view of this aggregation
+     */
+    public Map <Tuple, AggregationRecord>
+    asMap()
+    {
+	return Collections. <Tuple, AggregationRecord> unmodifiableMap(map);
+    }
+
+    /**
+     * Compares the specified object with this aggregation for equality.
+     * Defines equality as having equal names and equal records.
+     *
+     * @return {@code true} if and only if the specified object is an
+     * {@code Aggregation} with the same name as this aggregation and
+     * the {@code Map} views of both aggregations returned by {@link
+     * #asMap()} are equal as defined by {@link
+     * AbstractMap#equals(Object o) AbstractMap.equals()}
+     */
+    @Override
+    public boolean
+    equals(Object o)
+    {
+	if (o instanceof Aggregation) {
+	    Aggregation a = (Aggregation)o;
+	    return (name.equals(a.name) &&
+		    (map.equals(a.map))); // same mappings
+	}
+	return false;
+    }
+
+    /**
+     * Overridden to ensure that equal aggregations have equal hash
+     * codes.
+     */
+    @Override
+    public int
+    hashCode()
+    {
+	int hash = 17;
+	hash = (37 * hash) + name.hashCode();
+	hash = (37 * hash) + map.hashCode();
+	return hash;
+    }
+
+    /**
+     * Gets the record associated with the given key, or the singleton
+     * record of an aggregation declared without square brackets if
+     * {@code key} is {@code null} or empty.
+     *
+     * @param key  The record key, or an empty tuple (see {@link
+     * Tuple#EMPTY}) to obtain the value from a <i>singleton</i> (a
+     * non-keyed instance with only a single value) generated from a
+     * DTrace aggregation declarated without square brackets, for
+     * example:
+     * <pre>		{@code @a = count();}</pre>
+     * @return the record associated with the given key, or {@code null}
+     * if no record in this aggregation is associated with the given key
+     */
+    public AggregationRecord
+    getRecord(Tuple key)
+    {
+	if (key == null) {
+	    key = Tuple.EMPTY;
+	}
+	return map.get(key);
+    }
+
+    /**
+     * Serialize this {@code Aggregation} instance.
+     *
+     * @serialData Serialized fields are emitted, followed by a {@link
+     * java.util.List} of {@link AggregationRecord} instances.
+     */
+    private void
+    writeObject(ObjectOutputStream s) throws IOException
+    {
+	s.defaultWriteObject();
+	s.writeObject(getRecords());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void
+    readObject(ObjectInputStream s)
+            throws IOException, ClassNotFoundException
+    {
+	s.defaultReadObject();
+	// cannot cast to parametric type without compiler warning
+	List <AggregationRecord> records = (List)s.readObject();
+	// load serialized form into private map as a defensive copy
+	mapRecords(records);
+	// Check class invariants (only after defensive copy)
+	name = Aggregate.filterUnnamedAggregationName(name);
+	try {
+	    validate();
+	} catch (Exception e) {
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
+	}
+    }
+
+    /**
+     * Gets a string representation of this aggregation useful for
+     * logging and not intended for display.  The exact details of the
+     * representation are unspecified and subject to change, but the
+     * following format may be regarded as typical:
+     * <pre><code>
+     * class-name[property1 = value1, property2 = value2]
+     * </code></pre>
+     */
+    @Override
+    public String
+    toString()
+    {
+	StringBuilder buf = new StringBuilder();
+	buf.append(Aggregation.class.getName());
+	buf.append("[name = ");
+	buf.append(name);
+	buf.append(", id = ");
+	buf.append(id);
+	buf.append(", records = ");
+	List <AggregationRecord> recordList = getRecords();
+	// Sort by tuple so that equal aggregations have equal strings
+	Collections.sort(recordList, new Comparator <AggregationRecord> () {
+	    public int compare(AggregationRecord r1, AggregationRecord r2) {
+		Tuple t1 = r1.getTuple();
+		Tuple t2 = r2.getTuple();
+		return t1.compareTo(t2);
+	    }
+	});
+	buf.append('[');
+	boolean first = true;
+	for (AggregationRecord record : recordList) {
+	    if (first) {
+		first = false;
+	    } else {
+		buf.append(", ");
+	    }
+	    buf.append(record);
+	}
+	buf.append(']');
+	return buf.toString();
+    }
+}

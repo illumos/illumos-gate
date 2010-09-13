@@ -1,0 +1,956 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+-->
+
+<topology name='chip' scheme='hc'>
+
+    <range name='chip' min='0' max='256'>
+
+        <set type='product'
+	    setlist='Sun-Fire(TM)-X2100|W1100z-2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </set> 
+        <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
+	    
+	    <fac-enum provider='fac_prov_ipmi' />
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
+
+	    <fac-enum provider='fac_prov_ipmi' />
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='cpu%d.vpd' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+
+        </set> 
+        <set type='product'
+	    setlist='X2100-M2|Sun-Blade-X8440-Server-Module'>
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+        </set> 
+
+        <set type='product'
+	    setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+	    <fac-enum provider='fac_prov_ipmi' />
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+	    <!--
+	       chip service LED
+	    -->
+            <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			    <argitem value='MB/P%d/SVC' />
+			</argval>
+                        <argval name='offset' type='uint32' value='0' />
+                        <argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1'>
+                    </propmethod>
+                </propgroup>
+            </facility>
+        </set> 
+        <set type='product' setlist='Sun-Fire-X4500'>
+            <fac-enum provider='fac_prov_ipmi' />
+            <!--
+               chip FRU label
+            -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+                            propname='label' proptype='string' >
+
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+                            propname='entity_ref' proptype='string_array' >
+
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+	    </propgroup>
+            <!--
+               chip service LED
+            -->
+            <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.fail.led' />
+			</argval>
+                        <argval name='offset' type='uint32' value='0' />
+                        <argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+            </facility>
+        </set>
+ 
+        <set type='product' setlist='Sun-Fire-X4540'>
+	    <fac-enum provider='fac_prov_ipmi' />
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+	    <!--
+	       chip service LED
+	    -->
+            <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='P%d/SVC' />
+			    <argitem value='p%d.led' />
+			</argval>
+                        <argval name='offset' type='uint32' value='0' />
+                        <argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+            </facility>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+	    <fac-enum provider='fac_prov_ipmi' />
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='1' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+	    <!--
+	       chip service LED
+	    -->
+            <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			</argval>
+                        <argval name='offset' type='uint32' value='0' />
+                        <argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+            </facility>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-X4450|SUN-FIRE-X4450'>
+	    <fac-enum provider='fac_prov_ipmi' />
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X6450-Server-Module|SUN-BLADE-X6450-SERVER-MODULE|Sun-Blade-X6450|SUN-BLADE-X6450'>
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X8450-Server-Module|SUN-BLADE-X8450-SERVER-MODULE'>
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+	    
+	    <fac-enum provider='fac_prov_ipmi' />
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='g4_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %c' />
+
+                </propmethod>
+
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
+            </propgroup>
+	    <!--
+	       chip service LED
+	    -->
+            <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_entity' version='0' propname='entity_ref'
+		       proptype='string_array' >
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			</argval>
+                        <argval name='offset' type='uint32' value='0' />
+                        <argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+            </facility>
+ 
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X8420-Server-Module|Sun-Blade-X8440-Server-Module|SUN-BLADE-X8440-SERVER-MODULE'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='a4fplus_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </set> 
+
+    <dependents grouping='children'>
+
+        <range name='memory-controller' min='0' max='16'>
+        <dependents grouping='children'>
+
+            <range name='dram-channel' min='0' max='3'>
+            <dependents grouping='children'>
+	    
+                <range name='chip-select' min='0' max='7'>
+                    <set type='product' setlist='Sun-Blade-X8440-Server-Module|Sun-Fire-X4600-M2'>
+		    
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                                <argval name='format' type='string'
+			            value='CPU %d DIMM %d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+
+                        </propgroup>
+
+                    </set>
+
+		  <!--
+	       		Lets consider both upper and lower case formats for the product name
+			Since few X6240 test systems had SMB_TYPE_SYSTEM set to 
+			all upper case characters in SMBIOS
+		  -->
+          	  <set type='product' setlist='SUN-BLADE-X6240-SERVER-MODULE|Sun-Blade-X6240-Server-Module'>
+
+	                <fac-enum provider='fac_prov_ipmi' />
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+                               data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+                                    propname='label' proptype='string' >
+
+                                <argval name='format' type='string'
+                                    value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+                            </propmethod>
+
+                            <propmethod name='get_dimm_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' />
+
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+                        </propgroup>
+
+                    </set>
+
+		  <!--
+	       		Lets consider both upper and lower case formats for the product name
+			Since few X6440 test systems had SMB_TYPE_SYSTEM set to 
+			all upper case characters in SMBIOS
+		  -->
+                  <set type='product' setlist='SUN-BLADE-X6440-SERVER-MODULE|Sun-Blade-X6440-Server-Module'>
+
+	                <fac-enum provider='fac_prov_ipmi' />
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+                               data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+                                    propname='label' proptype='string' >
+
+                                <argval name='format' type='string'
+                                    value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+                            </propmethod>
+
+                            <propmethod name='get_dimm_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' />
+
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+                        </propgroup>
+
+                    </set>
+
+
+                    <set type='product' setlist='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+		    
+	                <fac-enum provider='fac_prov_ipmi' />
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                                <argval name='format' type='string'
+			            value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+                            <propmethod name='get_dimm_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' />
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+                        </propgroup>
+
+                    </set>
+		</range>
+            </dependents>
+	    </range>
+
+            <range name='dimm' min='0' max='16'>
+
+                <set type='product' setlist='Sun-Ultra-20-Workstation|Sun-Fire(TM)-X2100'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='DIMM %d' />
+                            <argval name='offset' type='uint32' value='1' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </set> 
+                <set type='product' setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
+		    
+		    <fac-enum provider='fac_prov_ipmi' />
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='forward' />
+                            <argval name='dimms_per_chip' type='uint32'
+			        value='4' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string'
+				    nonvolatile='1' />
+
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                            <argval name='format' type='string_array'>
+			        <argitem value='cpu%d.mem%d.vpd' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                    </propgroup>
+                </set>
+                <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
+		    
+		    <fac-enum provider='fac_prov_ipmi' />
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='forward' />
+                            <argval name='dimms_per_chip' type='uint32'
+			        value='4' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string'
+				    nonvolatile='1' />
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                    </propgroup>
+                    <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                        <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                          <propval name='type' type='uint32' value='0' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+                          </propmethod>
+                          <propmethod name='ipmi_indicator_mode' version='0'
+                             propname='mode' proptype='uint32' mutable='1' >
+                          </propmethod>
+                       </propgroup>
+                    </facility>
+                </set>
+                <set type='product' setlist='Sun-Fire-X4500'>
+		    
+		    <fac-enum provider='fac_prov_ipmi' />
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='forward' />
+                            <argval name='dimms_per_chip' type='uint32'
+			        value='4' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string'
+				    nonvolatile='1' />
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                            <argval name='format' type='string_array'> 
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                    </propgroup>
+                    <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                        <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                          <propval name='type' type='uint32' value='0' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+                            
+			    <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fail.led' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+                          </propmethod>
+                          <propmethod name='ipmi_indicator_mode' version='0'
+                             propname='mode' proptype='uint32' mutable='1' >
+                          </propmethod>
+                       </propgroup>
+                    </facility>
+                </set>
+                <set type='product' setlist='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+		    
+		    <fac-enum provider='fac_prov_ipmi' />
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='g12f_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d %c%d' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string'
+				    nonvolatile='1' />
+
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                    </propgroup>
+		    <!--
+		      DIMM service LED
+		    -->
+                    <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                        <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                          <propval name='type' type='uint32' value='0' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+			      
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+                          </propmethod>
+                          <propmethod name='ipmi_indicator_mode' version='0'
+                             propname='mode' proptype='uint32' mutable='1' >
+                          </propmethod>
+                       </propgroup>
+                    </facility>
+                </set>
+                <set type='product' setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+		    
+		    <fac-enum provider='fac_prov_ipmi' />
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='g4_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='%s DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string'
+				    nonvolatile='1' />
+
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                            <argval name='format' type='string_array'> 
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                    </propgroup>
+		    <!--
+		      DIMM service LED
+		    -->
+                    <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                        <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                          <propval name='type' type='uint32' value='0' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
+                            <argval name='offset' type='uint32' value='0' />
+                          </propmethod>
+                          <propmethod name='ipmi_indicator_mode' version='0'
+                             propname='mode' proptype='uint32' mutable='1' >
+                          </propmethod>
+                       </propgroup>
+                    </facility>
+
+                </set>
+                <set type='product'
+		    setlist='Sun-Ultra-40-M2-Workstation'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='seq_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='reverse' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </set>
+                <set type='product'
+		    setlist='X2100-M2'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='seq_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='B0D%d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='reverse' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+               </set>
+
+            </range>
+
+        </dependents>
+        </range>
+
+    </dependents>
+    </range>
+
+</topology>

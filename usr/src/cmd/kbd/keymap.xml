@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for establishing hardware keyboard defaults.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:keymap'>
+
+<service
+	name='system/keymap'
+	type='service'
+	version='1'>
+
+	<single_instance />
+
+	<dependency
+		name='usr'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/usr' />
+	</dependency>
+
+	<dependent
+		name='keymap_single-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/single-user' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/keymap'
+		timeout_seconds='0' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='60' />
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring'
+			value='transient' />
+	</property_group>
+
+	<instance name='default' enabled='false'>
+		<property_group name='keymap' type='system'>
+			<propval name='keyboard_abort' type='astring' value='enable' />
+			<propval name='keyclick' type='boolean' value='false' />
+			<propval name='repeat_delay' type='integer' value='500' />
+			<propval name='repeat_rate' type='integer' value='40' />
+			<propval name='layout' type='astring' value='US-English' />
+			<propval name='kbd_beeper_freq' type='integer' value='2000' />
+			<propval name='console_beeper_freq' type='integer' value='900' />
+		</property_group>
+	</instance>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>keyboard defaults
+				</loctext>
+		</common_name>
+
+		<documentation>
+			<manpage
+				title='kbd'
+				section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+
+		<pg_pattern name='keymap' type='system'>
+			<description>
+				<loctext xml:lang='C'>
+					Default keyboard configurations
+				</loctext>
+			</description>
+			<prop_pattern name='keyboard_abort' type='astring' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The behavior of keyboard abort sequence
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='keyclick' type='boolean' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The keyclick behavior
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='repeat_delay' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The autorepeat delay	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='repeat_rate' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The autorepeat rate	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='layout' type='astring' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The keyboard layout	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='kbd_beeper_freq' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						Keyboard beeper frequency	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+				<constraints>
+					<range min="0" max="32767"/>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='console_beeper_freq' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						Console beeper frequency	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+				<constraints>
+					<range min="0" max="32767"/>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
+	</template>
+</service>
+
+</service_bundle>

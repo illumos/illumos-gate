@@ -1,0 +1,140 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	fmd_buf_create			{ TYPE = function; FLAGS = extern };
+	fmd_buf_destroy			{ TYPE = function; FLAGS = extern };
+	fmd_buf_read			{ TYPE = function; FLAGS = extern };
+	fmd_buf_size			{ TYPE = function; FLAGS = extern };
+	fmd_buf_write			{ TYPE = function; FLAGS = extern };
+
+	fmd_case_add_ereport		{ TYPE = function; FLAGS = extern };
+	fmd_case_add_serd		{ TYPE = function; FLAGS = extern };
+	fmd_case_add_suspect		{ TYPE = function; FLAGS = extern };
+	fmd_case_close			{ TYPE = function; FLAGS = extern };
+	fmd_case_closed			{ TYPE = function; FLAGS = extern };
+	fmd_case_getprincipal		{ TYPE = function; FLAGS = extern };
+	fmd_case_getspecific		{ TYPE = function; FLAGS = extern };
+	fmd_case_next			{ TYPE = function; FLAGS = extern };
+	fmd_case_open			{ TYPE = function; FLAGS = extern };
+	fmd_case_open_uuid		{ TYPE = function; FLAGS = extern };
+	fmd_case_prev			{ TYPE = function; FLAGS = extern };
+	fmd_case_reset			{ TYPE = function; FLAGS = extern };
+	fmd_case_setprincipal		{ TYPE = function; FLAGS = extern };
+	fmd_case_setspecific		{ TYPE = function; FLAGS = extern };
+	fmd_case_solve			{ TYPE = function; FLAGS = extern };
+	fmd_case_solved			{ TYPE = function; FLAGS = extern };
+	fmd_case_uuclose		{ TYPE = function; FLAGS = extern };
+	fmd_case_uuclosed		{ TYPE = function; FLAGS = extern };
+	fmd_case_uuid			{ TYPE = function; FLAGS = extern };
+	fmd_case_uuisresolved		{ TYPE = function; FLAGS = extern };
+	fmd_case_uulookup		{ TYPE = function; FLAGS = extern };
+	fmd_case_uuresolved		{ TYPE = function; FLAGS = extern };
+
+	fmd_doorthr_create		{ TYPE = function; FLAGS = extern };
+	fmd_doorthr_setup		{ TYPE = function; FLAGS = extern };
+
+	fmd_event_local			{ TYPE = function; FLAGS = extern };
+	fmd_event_ena_create		{ TYPE = function; FLAGS = extern };
+
+	fmd_hdl_abort			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_alloc			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_debug			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_error			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_free			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_fmauth			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_getspecific		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_modauth			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_opendict		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_register		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_setspecific		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_strdup			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_strfree			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_subscribe		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_topo_hold		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_topo_rele		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_unregister		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_unsubscribe		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_vabort			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_vdebug			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_verror			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_zalloc			{ TYPE = function; FLAGS = extern };
+
+	fmd_nvl_alloc			{ TYPE = function; FLAGS = extern };
+	fmd_nvl_class_match		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_create_defect		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_create_fault		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_dup			{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_expand		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_present		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_replaced		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_unusable		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_retire		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_unretire		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_service_state	{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_has_fault		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_contains		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_fmri_translate		{ TYPE = function; FLAGS = extern };
+
+	fmd_prop_free_string		{ TYPE = function; FLAGS = extern };
+	fmd_prop_get_int32		{ TYPE = function; FLAGS = extern };
+	fmd_prop_get_int64		{ TYPE = function; FLAGS = extern };
+	fmd_prop_get_string		{ TYPE = function; FLAGS = extern };
+
+	fmd_repair_fru			{ TYPE = function; FLAGS = extern };
+	fmd_repair_asru			{ TYPE = function; FLAGS = extern };
+
+	fmd_serd_create			{ TYPE = function; FLAGS = extern };
+	fmd_serd_destroy		{ TYPE = function; FLAGS = extern };
+	fmd_serd_exists			{ TYPE = function; FLAGS = extern };
+	fmd_serd_fired			{ TYPE = function; FLAGS = extern };
+	fmd_serd_reset			{ TYPE = function; FLAGS = extern };
+	fmd_serd_record			{ TYPE = function; FLAGS = extern };
+	fmd_serd_empty			{ TYPE = function; FLAGS = extern };
+
+	fmd_stat_create			{ TYPE = function; FLAGS = extern };
+	fmd_stat_destroy		{ TYPE = function; FLAGS = extern };
+	fmd_stat_setstr			{ TYPE = function; FLAGS = extern };
+
+	fmd_thr_create			{ TYPE = function; FLAGS = extern };
+	fmd_thr_destroy			{ TYPE = function; FLAGS = extern };
+	fmd_thr_signal			{ TYPE = function; FLAGS = extern };
+	fmd_thr_checkpoint		{ TYPE = function; FLAGS = extern };
+
+	fmd_timer_install		{ TYPE = function; FLAGS = extern };
+	fmd_timer_remove		{ TYPE = function; FLAGS = extern };
+
+	fmd_xprt_close			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_error			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_getspecific		{ TYPE = function; FLAGS = extern };
+	fmd_xprt_log			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_open			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_post			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_resume			{ TYPE = function; FLAGS = extern };
+	fmd_xprt_setspecific		{ TYPE = function; FLAGS = extern };
+	fmd_xprt_suspend		{ TYPE = function; FLAGS = extern };
+	fmd_xprt_translate		{ TYPE = function; FLAGS = extern };
+	fmd_xprt_add_domain		{ TYPE = function; FLAGS = extern };
+};

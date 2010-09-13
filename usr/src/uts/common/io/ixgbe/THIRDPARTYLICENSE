@@ -1,0 +1,26 @@
+DO NOT TRANSLATE OR LOCALIZE.
+
+The following software may be included in this product: <Common
+Driver Code for the Intel(R) 82598 10GbE Controller>; Use of any
+of this software is governed by the terms of the license below:
+
+-------------------Begin Text Block------------------
+Common Driver Code for the Intel(R) 82598 10GbE Controller
+
+Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+
+The contents of this software are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this software except in compliance with the
+License.
+
+You can obtain a copy of the license at:
+    http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When using or redistributing this software, you may do so under the
+License only and provided that the software includes this
+Text Block.  No other modification of this Text Block is permitted.
+--------------------End Text Block-------------------
+

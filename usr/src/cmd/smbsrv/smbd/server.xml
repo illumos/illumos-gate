@@ -1,0 +1,255 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+
+NOTE:  This service manifest is not editable; its contents will
+be overwritten by package or patch operations, including
+operating system upgrade.  Make customizations in a different
+file.
+
+-->
+
+<service_bundle type='manifest' name='SUNWsmbsr:smb-server'>
+
+<!-- 1. Name the service to 'network/smb/server' -->
+<service
+    name='network/smb/server'
+    type='service'
+    version='1'>
+
+	<!-- 2. Create default service instance. -->
+	<create_default_instance enabled='false' />
+
+	<!-- 3. Service has single instance -->
+	<single_instance/>
+
+	<!-- 4. Identify dependencies -->
+
+	<dependency name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network'/>
+	</dependency>
+
+	<!-- Must have all local filesystems mounted before we share them -->
+	<dependency name='filesystem-local'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/local'/>
+	</dependency>
+
+	<!-- Must have idmap service started -->
+	<dependency name='idmap'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/idmap:default'/>
+	</dependency>
+
+	<!--
+	    Want to make sure that the network/shares/group service
+	    starts after the smb/server service.  It needs to be
+	    optional in order to not cause failure if smb is
+	    disabled.
+	-->
+	<dependent name='groups'
+	    grouping="optional_all"
+	    restart_on='error' >
+		    <service_fmri value='svc:/network/shares/group'/>
+	</dependent>
+
+	<!-- 5. Identify start/stop/refresh methods -->
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/smbsrv/smbd %m'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential
+				user='root'
+				group='sys'
+				privileges='all' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60' />
+
+	<property_group name='general' type='framework'>
+		<!-- To Start/Stop/Refresh the service -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.smb' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.smb' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='ipf_method' type='astring'
+		    value='/lib/svc/method/svc-smbd ipfilter' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
+
+	<property_group name='read' type='application'>
+		<!-- To read protected parameters -->
+		<propval name='read_authorization' type='astring'
+			value='solaris.smf.read.smb' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.smb' />
+		<propval name='machine_passwd' type='astring' value='' />
+	</property_group>
+
+	<!-- SMB service-specific general configuration defaults -->
+	<property_group name='smbd' type='application'>
+		<stability value='Evolving' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.smb' />
+		<propval name='oplock_enable' type='boolean'
+			value='true' override='true'/>
+		<propval name='autohome_map' type='astring'
+			value='/etc' override='true'/>
+		<propval name='domain_sid' type='astring'
+			value='' override='true'/>
+		<propval name='domain_member' type='boolean'
+			value='false' override='true'/>
+		<propval name='domain_name' type='astring'
+			value='WORKGROUP' override='true'/>
+		<propval name='fqdn' type='astring'
+			value='' override='true'/>
+		<propval name='forest' type='astring'
+			value='' override='true'/>
+		<propval name='domain_guid' type='astring'
+			value='' override='true'/>
+		<propval name='pdc' type='astring'
+			value='' override='true'/>
+		<propval name='wins_server_1' type='astring'
+			value='' override='true'/>
+		<propval name='wins_server_2' type='astring'
+			value='' override='true'/>
+		<propval name='wins_exclude' type='astring'
+			value='' override='true'/>
+		<propval name='max_workers' type='integer'
+			value='1024' override='true'/>
+		<propval name='max_connections' type='integer'
+			value='100000' override='true'/>
+		<propval name='keep_alive' type='integer'
+			value='5400' override='true'/>
+		<propval name='restrict_anonymous' type='boolean'
+			value='false' override='true'/>
+		<propval name='signing_enabled' type='boolean'
+			value='false' override='true'/>
+		<propval name='signing_required' type='boolean'
+			value='false' override='true'/>
+		<propval name='signing_check' type='boolean'
+			value='false' override='true'/>
+		<propval name='sync_enable' type='boolean'
+			value='false' override='true'/>
+		<propval name='security' type='astring'
+			value='workgroup' override='true'/>
+		<propval name='netbios_scope' type='astring'
+			value='' override='true'/>
+		<propval name='system_comment' type='astring'
+			value='' override='true'/>
+		<propval name='lmauth_level' type='integer'
+			value='4' override='true'/>
+		<propval name='ads_site' type='astring'
+			value='' override='true'/>
+		<propval name='ddns_enable' type='boolean'
+			value='false' override='true'/>
+		<propval name='kpasswd_server' type='astring'
+			value='' override='true'/>
+		<propval name='kpasswd_domain' type='astring'
+			value='' override='true'/>
+		<propval name='kpasswd_seqnum' type='integer'
+			value='0' override='true'/>
+		<propval name='netlogon_seqnum' type='integer'
+			value='0' override='true'/>
+		<propval name='ipv6_enable' type='boolean'
+			value='false' override='true'/>
+		<propval name='sv_version' type='astring'
+			value='5.0' override='true'/>
+		<propval name='dfs_stdroot_num' type='integer'
+			value='0' override='true'/>
+	</property_group>
+
+	<!-- SMB service-specific shares exec configuration defaults -->
+	<property_group name='exec' type='application'>
+		<stability value='Evolving' />
+		<propval name='map' type='astring'
+			value='' override='true'/>
+		<propval name='unmap' type='astring'
+			value='' override='true'/>
+		<propval name='disposition' type='astring'
+			value='' override='true'/>
+	</property_group>
+
+	<!-- 6. Identify faults to be ignored. -->
+	<!-- 7. Identify service model. Default service model is 'contract' -->
+	<!-- 8. Identify dependents.
+		For Solaris NAS, we may want to have the smbd service start,
+		before it reaches the svc:/milestone/multi-user-server
+		milestone.
+		<dependent
+			name='smb-server_multi-user-server'
+			grouping='optional_all'
+			restart_on='none'>
+			<service_fmri value=
+			    'svc:/milestone/multi-user-server'/>
+		</dependent>
+	-->
+	<!-- 9. Insert service milestones. None. -->
+
+	<stability value='Evolving' />
+
+	<!-- 10. Create Service Template information -->
+	<template>
+		<common_name>
+			<loctext xml:lang='C'> smbd daemon</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='smbd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

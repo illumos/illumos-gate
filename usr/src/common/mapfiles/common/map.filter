@@ -1,0 +1,58 @@
+#
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# A default mapfile for optimizing the creation of a filter shared object.
+# Creates a single, read-only, executable text segment to catch all loadable
+# sections.
+#
+# Filters that consist solely of a symbol table can be built directly from
+# ld(1) so that no .init/.fini sections are created.  Although the filter can
+# be constructed as a single read-only segment, the execute attribute of the
+# segment is maintained to allow for simple .init processing (i.e., .init
+# processing that requires no relocations), and to accommodate older versions
+# of dbx that produce warning messages if they find objects without traditional
+# text segments.
+#
+# If a filter is required to execute .init code that references global data
+# then the filter will require relocation (i.e., it will have to be written to
+# by ld.so.1).  Filters of this sort should *not* use this mapfile.
+#
+# This compaction of a filter into a single segment allows ld.so.1 to optimize
+# its processing of a filter.  If the filter is small enough this segment may
+# be handled in a single page mapping (for example libdl.so.1).
+#
+# The assignment of all allocatable sections to this segment insures that the
+# .dynamic, and any .data or .bss sections, become part of the text.  Note that
+# the compiler has a habit of generating empty .data and .bss sections.
+#
+# Override the default alignment so that this single paged object can be mapped
+# more flexibly.
+
+$mapfile_version 2
+
+LOAD_SEGMENT filter {
+	FLAGS = READ EXECUTE;
+	ALIGN = 0x1000;
+	ASSIGN_SECTION {
+		FLAGS = ALLOC;
+	};
+};

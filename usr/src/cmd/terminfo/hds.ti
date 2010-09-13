@@ -1,0 +1,313 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
+# # --------------------------------
+#
+# concept: (HUMAN DESIGNED SYSTEMS)
+#
+# Manufacturer:	HUMAN DESIGNED SYSTEMS
+# Class:	III
+# 
+# Info:
+#	There seem to be a number of different versions of the C108 PROMS
+#	(with bug fixes in its Z-80 program).
+#	
+#	The first one that we had would lock out the keyboard of you
+#	sent lots of short lines (like /usr/dict/words) at 9600 baud.
+#	Try that on your C108 and see if it sends a ^S when you type it.
+#	If so, you have an old version of the PROMs.
+#	
+#	You should configure the C108 to send ^S/^Q before running this.
+#	It is much faster (at 9600 baud) than the c100 because the delays
+#	are not fixed.
+#	new status line display entries for c108-8p:
+#	is3 - init str #3 - setup term for status display - 
+#	set programmer mode, select window 2, define window at last 
+#	line of memory, set bkgnd stat mesg there, select window 0.
+#	
+#	tsl - to status line - select window 2, home cursor, erase to 
+#	end-of-window, 1/2 bright on, goto(line#0, col#?)
+#	
+#	fsl - from status line - 1/2 bright off, select window 0
+#	
+#	dsl - disable status display - set bkgnd status mesg with 
+#	illegal window #
+#	
+#	There are probably more function keys that should be added but 
+#	I don't know what they are.
+#
+c108|concept108|c108-8p|concept108-8p|concept 108 w/8 pages,
+	is3=\EU\E z"\Ev^A\177 !p\E ;"\E z \Ev  ^A\177p\Ep\n,
+	rmcup=\Ev  ^A\177p\Ep\r\n, use=c108-4p,
+c108+acs|alternate charset defns for c108,
+	acsc=l\\qLkTxUmMjE, rmacs=\Ej , smacs=\Ej!,
+c108-4p-acs|c108-4p w/ acs,
+	use=c108+acs, use=c108-4p,
+c108-8p-acs|c108-8p w/ acs,
+	use=c108+acs, use=c108-8p,
+c108-rv-8p-acs|c108-rv-8p w/ acs,
+	use=c108+acs, use=c108-rv-8p,
+c108-4p|concept108-4p|concept 108 w/4 pages,
+	hs, eslok, dch1=\E\s1$<16*>,
+	tsl=\E z"\E?\E^E\EE\Ea %+ , fsl=\Ee\E z , dsl=\E ;\177,
+	is3=\EU\E z"\Ev\177 !p\E ;"\E z \Ev  ^A p\Ep\n,
+	xon, is1=\EK\E!\E F,
+	smcup=\EU\Ev  8p\Ep\r\E^U, rmcup=\Ev  ^A p\Ep\r\n,
+	cvvis=\EW, cnorm=\Ew,
+# Info:
+#	No delays needed on c108 because of ^S/^Q handshaking
+#
+	pb@, cr=^M, ind=^J,
+	cup=\Ea%p1%?%p1%{95}%>%t^A%{96}%-%;%' '%+%c%p2%?%p2%{95}%>%t^A%{96}%-%;%' '%+%c,
+	use=c100,
+c108-rv|c108-rv-8p|concept 108 w/8 pages in reverse video,
+	smcup=\EU\Ev  8p\Ep\r, rmcup=\Ev  ^B p\Ep\r\n, use=c108-rv-4p, 
+c108-rv-4p|concept108-rv-|concept108rv4p|concept 108 w/4 pages in reverse video,
+	flash=\EK$<50>\Ek, is1=\Ek, smso=\EE, rmso=\Ee,
+	use=c108-4p, 
+c108-rv-4p-acs|c108-rv-4p w/ acs,
+	use=c108+acs, use=c108-rv-4p,
+c108-na|c108-na-8p|c108-8p-na|concept108-na-|concept108na8p|concept 108 w/8 pages no arrows,
+	kf7=\E;, kf8=\E<, kf9=\E=,
+	smkx@, rmkx@, use=c108-8p,
+c108-na-acs|c108-na w/ acs,
+	use=c108+acs, use=c108-na,
+c108-rv-na|c108-rv-na-8p|c108-8p-rv-na|concept 108 8 pages no arrows rev video,
+	kf7=\E;, kf8=\E<, kf9=\E=,
+	smkx@, rmkx@, use=c108-rv-8p,
+c108-rv-na-acs|c108-na w/ acs,
+	use=c108+acs, use=c108-rv-na,
+c108-w|c108-w-8p|concept108-w-8|concept108-w8p|concept 108 w/8 pages in wide mode,
+	is1=\E F\E",
+	smcup=\EU\Ev  8^AD\Ep\r, rmcup=\Ev  ^A0^AD\Ep\r\n,
+	cols#132, use=c108-8p,
+c108-w-acs|c108-w w/ acs,
+	use=c108+acs, use=c108-w,
+# Info:
+#	Concept 100:
+#	These have only window relative cursor addressing, not screen 
+#	relative. To get it to work right here, smcup/rmcup (which 
+#	were invented for the # concept) lock you into a one page 
+#	window for screen style programs.
+#	
+#	To get out of the one page window, we use a clever trick:
+#	we set the window size to zero ("\Ev    " in rmcup) which the 
+#	terminal recognizes as an error and resets the window to all 
+#	of memory.
+#	
+#	This trick works on c100 but does not on c108, sigh.
+#	
+#	Some tty drivers use cr3 for concept, others use nl3, hence 
+#	the delays on cr and ind below. This padding is only needed at 
+#	9600 baud. One or the other is commented out depending on 
+#	local conventions.
+#	
+#	2 ms padding on rmcup isn't always enough. 6 works fine. Maybe 
+#	less than 6 but more than 2 will work.
+#	
+#	Note: can't use function keys f7-f10 because they are 
+#	indistinguishable from arrow keys (!), also, del char and 
+#	clear eol use xon/xoff so they probably won't work very well.
+#	
+#	Also note that we don't define insrt/del char/delline/eop/send 
+#	because they don't transmit unless we reset them - I figured 
+#	it was a bad idea to clobber their definitions.
+#	
+#	The mc5 sequence changes the escape character to ^^ so that 
+#	escapes will be passed through to the printer. Only trouble 
+#	is that ^^ won't be - ^^ was chosen to be unlikely. 
+#	Unfortunately, if you're sending raster bits through to be 
+#	plotted, any character you choose will be likely, so we lose.
+#
+c100|concept100|concept|c104|c100-4p|hds concept 100,
+	is2=\EU\Ef\E7\E5\E8\El\ENH\E\0\Eo&\0\Eo'\E\Eo!\0\E^G!\E^HA@ \E4#:"\E:a\E4#;"\E:b\E4#<"\E:c,
+	is1=\EK, is3=\Ev    $<6>\Ep\n,
+#	cr=^M, ind=^J$<9>,
+	cr=$<9>^M, ind=^J,
+	bel=^G, cud1=^J, clear=\E?\E^E$<2*>,
+	smcup=\EU\Ev  8p\Ep\r\E^U$<16>, rmcup=\Ev    $<6>\Ep\r\n,
+	il1=\E^R$<3*>, am, cub1=^H, ed=\E^E$<16*>, el=\E^U$<16>,
+	cup=\Ea%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\E^Q$<16*>, dl1=\E^B$<3*>,
+	rmir=\E\s\s, eo, smir=\E^P, ip=$<16*>, lines#24, mir, cuf1=\E=,
+	ht=\t$<8>, kbs=^h, ul, cuu1=\E;, smul=\EG, rmul=\Eg,
+	xenl, flash=\Ek$<20>\EK, pb#9600, vt#8,
+	smul=\EG, rmul=\Eg, smso=\ED, rmso=\Ed,
+	dim=\EE, rev=\ED, blink=\EC, prot=\EI, invis=\EH, sgr0=\EN@,
+	rep=\Er%p1%c%p2%' '%+%c$<.2*>, smkx=\EX, rmkx=\Ex,
+	kcuu1=\E;, kcud1=\E<, kcub1=\E>, kcuf1=\E=, khome=\E?, kcbt=\E',
+	kf1=\E5, kf2=\E6, kf3=\E7, kf4=\E8, kf5=\E9,
+	kf6=\E:a, kf7=\E:b, kf8=\E:c,
+	kich1=\E^P, krmir=\E\0, kdch1=\E^Q, kil1=\E^R, kdl1=\E^B,
+	kel=\E^S, ked=\E^C, kpp=\E., knp=\E-, kind=\E[, kri=\E\\,
+	khts=\E], kctab=\E_,
+# Info:
+#	\EQ"\EY(^W (send anything from printer to host, for xon/xoff) 
+#	cannot be # in is2 because it will hang a c100 with no printer 
+#	if sent twice.
+#
+	mc5=\EQ"\EY(^W\EYD\Eo ^^, mc4=^^o \E\EQ!\EYP^W,
+c100-rv|c100-rv-4p|c100-rv-4p-pp|concept100-rv|c100 rev video,
+	is1=\Ek, flash=\EK$<20>\Ek, cvvis@, cnorm@,
+	smso=\EE, rmso=\Ee, use=c100,
+c100-rv-na|c100-rv-4p-na|c100 with no arrows,
+	smkx@, rmkx@, use=c100-rv,
+oc100|oconcept|c100-1p|old 1 page concept 100,
+	in, is3@, use=c100,
+# Info:
+#	
+#	ht through el included to specify padding needed in raw mode.
+#
+avt-ns|concept avt with status lins disabled,
+	am, eo, mir, ul, xenl, xon,
+	cols#80, it#8, lines#24, lm#192,
+	bel=^G, blink=\E[5m, bold=\E[1m, cbt=\E[Z,
+	clear=\E[H\E[J$<38>, cnorm=\E[=119l, cr=\r,
+	csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	cvvis=\E[=119h, dch1=\E[P, dim=\E[1!{,
+	dl=\E[%p1%dM$<4*>, dl1=\E[M$<4>, ed=\E[J$<96>,
+	el=\E[K$<6>, home=\E[H, hpa=\E[%p1%{1}%+%dG,
+	ht=\t$<4>, hts=\EH, ich=\E[%p1%d@, ich1=\E[@,
+	il=\E[%p1%dL$<4*>, il1=\E[L$<4>, ind=\n$<8>,
+	invis=\E8m, ip=$<4>, is1=\E[=103l\E[=205l,
+	is2=\E[1*q\E[2!t\E[7!t\E[=4;101;119;122l\E[=107;118;207h\E)1\E[1Q\EW\E[!y\E[!z\E>\E[0:0:32!r\E[0*w\E[w\E2\r\n\E[2;27!t,
+	kbs=\b, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C,
+	kcuu1=\E[A, kdch1=\E^B\r, ked=\E^D\r, kf1=\EOP,
+	kf2=\EOQ, kf3=\EOR, kf4=\EOS, khome=\E[H,
+	kich1=\E^A\r, kil1=\E^C\r, ll=\E[24H, mc0=\E[0i,
+	mc4=\E[4i, mc5=\E[5i, pfloc=\E[%p1%d;0u#%p2%s#,
+	pfx=\E[%p1%d;1u#%p2%s#, prot=\E[99m, rc=\E8,
+	rep=%p1%c\E[%p2%{1}%-%db, rev=\E[7m, ri=\EM$<4>,
+	rmacs=^N$<1>, rmcup=\E[w\E2\r\n, rmir=\E4l,
+	rmkx=\E[!z\E[0;2u, rmso=\E[7!{, rmul=\E[4!{, sc=\E7,
+	sgr=\E[%?%p1%t7;%;%?%p2%t4;%;%?%p3%t7;%;%?%p4%t5;%;%?%p6%t1;%;m,
+	sgr0=\E[m, smacs=^O$<1>, smcup=\E[=4l\E[1;24w\E2\r,
+	smir=\E1, smkx=\E[1!z\E[0;3u, smso=\E[7m, smul=\E[4m,
+	tbc=\E[2g, vpa=\E[%p1%{1}%+%dd,
+avt-rv-ns|concept avt in reverse video mode/no status line,
+	is1=\E[=103l\E[=205h, flash=\E[=205l$<50>\E[=205h, use=avt-ns,
+avt-w-ns|concept avt in 132 column mode/no status line,
+	is1=\E[=103h\E[=205l, smcup=\E[H\E[1;24;1;132w, use=avt-ns,
+avt-w-rv-ns|concept avt in 132 column mode/no status line,
+	is1=\E[=103h\E[=205h, smcup=\E[H\E[1;24;1;132w,
+	flash=\E[=205l$<50>\E[=205h, use=avt-ns,
+# Info:
+#	Concept AVT with status line. We get the status line using the
+#	"Background status line" feature of the terminal. We swipe the
+#	first line of memory in window 2 for the status line, keeping
+#	191 lines of memory and 24 screen lines for regular use.
+#	The first line is used instead of the last so that this works
+#	on both 4 and 8 page AVT's. (Note the lm#191 or 192 - this
+#	assumes an 8 page AVT but lm isn't currently used anywhere.)
+#
+avt+s|concept avt status line changes,
+	is3=\E[2w\E[2!w\E[1;1;1;80w\E[H\E[2*w\E[1!w\E2\r\n,
+	tsl=\E[2;1!w\E[;%p1%dH\E[2K, fsl=\E[1;1!w, eslok, hs,
+	dsl=\E[0*w, lm#191, smcup=\E[2;25w\E2\r, rmcup=\E[2w\E2\r\n,
+	.wind=\E[%i%p1%{1}%+%d;%p2%d;%p3%{01}%+%d;%p4%{01}%+%dw,
+avt|c5|avt-s|conceptavt|concept-avt| avt w/4 or 8 pages/80 columns,
+	use=avt+s, use=avt-ns,
+avt-rv|avt-s-rv|avt-rv-s|concept avt in reverse video w/status line,
+	is1=\E[=103l\E[=205h, flash=\E[=205l$<50>\E[=205h,
+	use=avt+s, use=avt-ns,
+avt-w|avt-w-s|concept avt in 132 column mode w/with status line,
+	is1=\E[=103h\E[=205l, smcup=\E[H\E[1;24;1;132w,
+	use=avt+s, use=avt-ns,
+avt-w-rv|avt-rv-w|avt-w-s-rv|avt-w-rv-s|avt 132 cols w/status line,
+	is1=\E[=103h\E[=205h, smcup=\E[H\E[1;24;1;132w,
+	flash=\E[=205l$<50>\E[=205h,
+	use=avt+s, use=avt-ns,
+# HDS 200 terminals 
+#
+# if=hds give 3 screens of 24 lines each
+# sets up for 3 inputs. F10 selects input channel 1
+#			F11 selects input channel 2
+#			F12 selects input channel 3
+# if=hds3 give 3 screens-> F10 17 lines F12 has 7 lines and F11 has 24 lines
+# sets up for 3 inputs. F10 selects input channel 1
+#			F11 selects input channel 3
+#			F12 selects input channel 2
+#
+#
+hds200|generic hds 200,
+	am,	xenl,	mir,	ul, xon, km, nxon, hs,
+	cols#80,	lines#24, xmc#1, it#8, wsl#60,
+	bel=^G,	cr=\r,	clear=\E[H\E[J,
+	el=\E[K,	ed=\E[J,	cup=\E[%i%p1%02d;%p2%02dH,
+	cud1=\n,	home=$<8*>\E[H,	cub1=\b,
+	cnorm=\E[=119l,	cuf1=\E[C,	cuu1=\E[A,
+	cvvis=\E[=119h,	dch1=\E[P,	dl1=\E[M,
+	smir=\E1,	smso=\E[7m,	smul=\E[4m,
+	rmir=\E1,	rmso=\E[m,	rmul=\E[m,
+	is1=\E[1*q\E[2!t\E[7!t\E[=4;101;103;119l\E[=107;118;207h\E)1\E[1Q\EW\E[0:0:32!r\E2\r\n,	if=/usr/share/lib/tabset/hds,	il1=\E[L,
+	kbs=\b,		nel=\r\n,	ind=\n,
+	kcub1=\E[D, 	kcud1=\E[B,	kcuf1=\E[C,
+	kcuu1=\E[A,	khome=\E[H, 
+#
+#
+hds17|hds 17,
+	lines#17,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	if=/usr/share/lib/tabset/hds3,	kbs=\b,
+	kcud1=\n,	kcub1=\b,	nel=\r\n,
+	ind=\n,	use=hds200,
+hds24|hds 24,
+	lines#24,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	if=/usr/share/lib/tabset/hds3,	kbs=\b,
+	kcud1=\n,	kcub1=\b,	nel=\r\n,
+	ind=\n,	use=hds200,
+hds7|hds 7,
+	lines#7,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	if=/usr/share/lib/tabset/hds3,	kbs=\b,
+	kcud1=\n,	kcub1=\b,	nel=\r\n,
+	ind=\n,	use=hds200,
+hds-w|hds wide,
+	cols#132,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	kbs=\b,	kcud1=\n,
+	kcub1=\b,	nel=\r\n,	ind=\n,
+	use=hds200,
+hds17-w| hds 17 wide,
+	cols#132,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	kbs=\b,	kcud1=\n,
+	kcub1=\b,	nel=\r\n,	ind=\n,
+	use=hds17,
+hds24-w|hds 24 wide,
+	cols#132,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	kbs=\b,	kcud1=\n,
+	kcub1=\b,	nel=\r\n,	ind=\n,
+	use=hds24,
+hds7-w|hds 7 wide,
+	cols#132,
+	bel=^G,	cr=\r,	cud1=\n,
+	cub1=\b,	kbs=\b,	kcud1=\n,
+	kcub1=\b,	nel=\r\n,	ind=\n,
+	use=hds7,

@@ -1,0 +1,80 @@
+
+This file describe the layout of device information files in the hal
+source tree and their three different applications. It should serve as
+a brief guide for IHV's and third party open source projects on how to
+integrate with hal.
+
+Said third parties need to name their files in a unique manner using
+the following format: <organization>-[<model>]-[<purpose>].fdi. As a
+device information file can be used to match several models the model
+field may be omitted (the <purpose> field may be useful if the <model>
+field is omitted). The filename of a device information file must
+contain only lowercase alphanumeric characters, the '-' and '_'
+characters, and not any whitespace.
+
+Device information files are processed in the following order:
+
+1. Preprobing
+-------------
+
+Contains device information files that are used to handle exceptional
+conditions such as telling hal to ignore a device and all children
+(using info.ignore), run programs to upload firmware or configure
+the device in an otherwise non-standard way that is incompatible with
+probing routines in hal (using info.callouts.preprobing) [1].
+
+These files are processed BEFORE the device have been been probed.
+
+Subdirs are installed in $(sysconfdir)/hal/preprobe (e.g. /etc/hal/preprobe)
+
+  preprobe
+  |-- 10osvendor    # From the hal tarball and/or supplied by the os vendor
+  |                 # -> installs into /usr/share/hal/fdi/preprobe/10osvendor
+  |-- 20thirdparty  # 3rd party projects and IHV's install here
+  |                 # -> installs into /usr/share/hal/fdi/preprobe/20thirdparty
+  `-- 30user        # Installed by the user/admin
+                    # -> installs into /etc/hal/fdi/preprobe/
+
+[1] : http://lists.freedesktop.org/archives/hal/2004-August/000858.html
+
+2. Information
+--------------
+
+Contains device information files that describe hardware such as what
+kind of media a card reader uses (compact flash, memorystick etc),
+what out-of-tree kernel drivers are needed, whether the device is a
+camera and not just a harddrive.
+
+These files are processed AFTER the device have been probed but before
+any policy device information files.
+
+Subdirs are installed in $(datadir)/hal/fdi (e.g. /usr/share/hal/fdi)
+
+  information
+  |-- 10freedesktop # From the hal tarball
+  |                 # -> installs into /usr/share/hal/fdi/information/10freedesktop
+  |-- 20thirdparty  # 3rd party projects and IHV's install here
+  |                 # -> installs into /usr/share/hal/fdi/information/20thirdparty
+  `-- 30user        # Installed by the user/admin
+                    # -> installs into /etc/hal/fdi/information
+
+
+3. Policy
+---------
+
+Contains device information files that describe policy for hardware
+such as what callouts and addons to run for a device.
+
+These files are processed AFTER the device have been been probed and
+also AFTER the information device files have been processed
+
+Subdirs are installed in $(sysconfdir)/hal/policy (e.g. /etc/hal/policy)
+
+  policy
+  |-- 10osvendor    # From the hal tarball and/or supplied by the os vendor
+  |                 # -> installs into /usr/share/hal/fdi/policy/10freedesktop
+  |-- 20thirdparty  # 3rd party projects and IHV's install here
+  |                 # -> installs into /usr/share/hal/fdi/policy/20thirdparty
+  `-- 30user        # Installed by the user/admin
+                    # -> installs into /etc/hal/fdi/policy
+  

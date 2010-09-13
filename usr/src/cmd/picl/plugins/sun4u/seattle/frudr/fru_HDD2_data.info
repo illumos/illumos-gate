@@ -1,0 +1,88 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This configuration file is parsed by PICL plugin envmon in response
+ * to a PICL_FRU_ADDED event for HDD2
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+#ifndef DISKBP3
+#define DISKBP3 /frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+#endif
+
+name:DISKBP3/HDD2/disk
+TABLE Devices
+ROW
+PROP Class string r 0 "block"
+REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@2,0
+ENDROW
+ENDTABLE
+
+name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@2,0
+	REFPROP _fru_parent name:DISKBP3/HDD2/disk
+name:DISKBP3/HDD2/disk
+	PROP OperationalStatus string r 0 "present"

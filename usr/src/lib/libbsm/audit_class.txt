@@ -1,0 +1,72 @@
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# User Level Class Masks
+#
+# Developers: If you change this file you must also edit audit.h.
+#
+# "Meta-classes" can be created; these are supersets composed of multiple base
+# classes, and thus will have more than 1 bit in its mask. See "ad", "all",
+# "am", and "pc" below for examples.
+#
+# The "no" (invalid) class below is commonly (but not exclusively) used in
+# audit_event for obsolete events.
+#
+#
+# File Format:
+#
+#	mask:name:description
+#
+0x00000000:no:invalid class
+0x00000001:fr:file read
+0x00000002:fw:file write
+0x00000004:fa:file attribute access
+0x00000008:fm:file attribute modify
+0x00000010:fc:file create
+0x00000020:fd:file delete
+0x00000040:cl:file close
+0x00000100:nt:network
+0x00000200:ip:ipc
+0x00000400:na:non-attribute
+0x00001000:lo:login or logout
+0x00004000:ap:application
+0x00008000:cy:cryptographic
+0x00010000:ss:change system state
+0x00020000:as:system-wide administration
+0x00040000:ua:user administration
+0x00070000:am:administrative (meta-class)
+0x00080000:aa:audit utilization
+0x000f0000:ad:old administrative (meta-class)
+0x00100000:ps:process start/stop
+0x00200000:pm:process modify
+0x00300000:pc:process (meta-class)
+0x00400000:xp:X - privileged/administrative operations
+0x00800000:xc:X - object create/destroy
+0x01000000:xs:X - operations that always silently fail, if bad
+0x01c00000:xx:X - all X events (meta-class)
+0x20000000:io:ioctl
+0x40000000:ex:exec
+0x80000000:ot:other
+0xffffffff:all:all classes (meta-class)

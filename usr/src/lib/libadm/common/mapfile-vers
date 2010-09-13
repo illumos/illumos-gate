@@ -1,0 +1,201 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	read_extvtoc;
+	write_extvtoc;
+} SUNW_1.1;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	pkgdir;
+	read_vtoc;
+	write_vtoc;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_adddevtabrec;
+	_adddgrptabrec;
+	allocmenu;
+	ckdate;
+	ckdate_err;
+	ckdate_hlp;
+	ckdate_val;
+	ckgid;
+	ckgid_dsp;
+	ckgid_err;
+	ckgid_hlp;
+	ckgid_val;
+	ckindent;
+	ckint;
+	ckint_err;
+	ckint_hlp;
+	ckint_val;
+	ckitem;
+	ckitem_err;
+	ckitem_hlp;
+	ckkeywd;
+	ckpath;
+	ckpath_err;
+	ckpath_hlp;
+	ckpath_stx;
+	ckpath_val;
+	ckquit;
+	ckrange;
+	ckrange_err;
+	ckrange_hlp;
+	ckrange_val;
+	ckstr;
+	ckstr_err;
+	ckstr_hlp;
+	ckstr_val;
+	cktime;
+	cktime_err;
+	cktime_hlp;
+	cktime_val;
+	ckuid;
+	ckuid_dsp;
+	ckuid_err;
+	ckuid_hlp;
+	ckuid_val;
+	ckwidth;
+	ckyorn;
+	ckyorn_err;
+	ckyorn_hlp;
+	ckyorn_val;
+	devattr;
+	devfree;
+	devreserv;
+	_devtabpath;
+	_dgrptabpath;
+	_enddevtab;
+	fpkginfo;
+	fpkginst;
+	fpkgparam;
+	get_ABI_namelngth;
+	getdev;
+	getdgrp;
+	getfullblkname;
+	getfullrawname;
+	getinput;
+	get_install_root;
+	get_PKGADM;
+	get_PKGLOC;
+	get_PKGOLD;
+	getvol;
+	_getvol;
+	listdev;
+	listdgrp;
+	_moddevtabrec;
+	_opendevtab;
+	_opendgrptab;
+	pkgfile;
+	pkginfo;
+	pkginfofind;
+	pkgnmchk;
+	pkgparam;
+	printmenu;
+	puterror;
+	puthelp;
+	putprmpt;
+	puttext;
+	reservdev;
+	_rmdevtabattrs;
+	_rmdevtabrec;
+	_rmdgrpmems;
+	_rmdgrptabrec;
+	_rsvtabpath;
+	set_ABI_namelngth;
+	set_install_root;
+	setinvis;
+	setitem;
+	set_PKGADM;
+	set_PKGLOC;
+	set_PKGpaths;
+	_validalias;
+    local:
+	*;
+};
+
+
+$if _sparc || (_x86 && _ELF32)
+# The following applies to sparc (32/64-bit), and 32-bit x86:
+#
+# It was a mistake ever to have exported these symbols from libadm.
+# They are now being redirected to libgen where they really belong,
+# except for 'circf' and 'sed', which do not exist in libgen and
+# are being retained as dummy variables in libadm.
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	circf;
+	sed;
+	nbra		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x4 };
+$if _ELF32
+	loc1		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x4 };
+	loc2		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x4 };
+	locs		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x4 };
+$elif _ELF64
+	loc1		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x8 };
+	loc2		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x8 };
+	locs		{ TYPE = DATA; FILTER = libgen.so.1; SIZE = 0x8 };
+$else
+$error unknown ELFCLASS
+$endif
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	advance		{ TYPE = FUNCTION; FILTER = libgen.so.1 };
+	compile		{ TYPE = FUNCTION; FILTER = libgen.so.1 };
+	step		{ TYPE = FUNCTION; FILTER = libgen.so.1 };
+};
+$endif

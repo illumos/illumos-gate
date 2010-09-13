@@ -1,0 +1,320 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.16	*/
+# # --------------------------------
+#
+# tektronix: TEKTRONIX
+#
+# Manufacturer:	TEKTRONIX
+# Class:	III
+tek4107|tek4109|4107|4109|tektronix terminals 4107 4109,
+	am, mir, msgr, ul, xenl, xt, 
+	cvvis=\E%!3,
+	cnorm=\E%!0,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK,
+	clear=\ELZ, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#79, lines#29,
+	cuf1=\EC, ht=^I, it#8, ri=\EI, cuu1=\EA,
+	kcuu1=\EA, kcud1=\EB, kcuf1=\EC, kcub1=\ED, kbs=^H,
+	smso=\E%!1\E[7;5m$<2>\E%!0,
+	rmso=\E%!1\E[m$<2>\E%!0,
+	smul=\E%!1\E[4m$<2>\E%!0,
+	rmul=\E%!1\E[m$<2>\E%!0,
+	bold=\E%!1\E[1m$<2>\E%!0,
+	rev=\E%!1\E[7m$<2>\E%0,
+	blink=\E%!1\E[5m$<2>\E%!0,
+	dim=\E%!1\E[<0m$<2>\E%!0,
+	sgr0=\E%!1\E[m$<2>\E%!0,
+	sgr=\E%%!1\E[%?%p1%t;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;%?%p6%t;1%;m\E%%!0,
+tek4105|4105|tektronix 4105,
+	am, il1=\E[1L, ed=\E[J, el=\E[K, clear=\E[2J\E[H,
+	cup=\E[%i%p1%2d;%p2%2dH,
+	cols#79, lines#29,
+	dch1=\E[1P, dl1=\E[1M,
+	home=\E[H, smir=\E[4h, rmir=\E[4l, mir,
+	cuf1=\E[1C, cud1=\E[1B, cuu1=\E[1A,
+	smacs=\E[1m, rmacs=\E[0m, msgr,
+	rmso=\E[=0;<1m, smso=\E[=2;<3m,
+	ul, smul=\E[=5;<2m, rmul=\E[=0;<1m,
+	is1=\E%!1\E[0m,
+	rev=\E[=1;<3m, bold=\E[=7;<4m, invis=\E[=6;<5, dim=\E[=1;<6m,
+	blink=\E[=3;<7m, sgr0=\E[=0;<1m,
+	smcup=\E%!1\E[?6l\E[2J, xenl, xt,
+	msgr, mir, kbs=^h, kcuu1=\E[1A, kcud1=\E[1B,
+	kcub1=\E[1D, kcuf1=\E[1C,
+	is2=\E%!1\E[?6141\E[0m,
+	cbt=\E[Z, cr=^M, ri=\E[T, ind=\E[S, it#8,
+	tbc=\E[1g, ht=^I, bel=^G,
+
+tek|tek4012|4012|tektronix 4012,
+	cr=^M, cud1=^J, bel=^G, ff=^L$<1000>,
+	is2=\E^O, cub1=^H, clear=\E^L$<1000>, cols#75, lines#35, os,
+tek4013|4013|tektronix 4013,
+	smacs=\E^N, rmacs=\E^O, use=4012,
+tek4014|4014|tektronix 4014,
+	is2=\E^O\E9, cols#81, lines#38, use=tek4012,
+tek4015|4015|tektronix 4015,
+	smacs=\E^N, rmacs=\E^O, use=4014,
+tek4014-sm|4014-sm|tektronix 4014 in small font,
+	is2=\E^O\E\072, cols#121, lines#58, use=tek4014,
+tek4015-sm|4015-sm|tektronix 4015 in small font,
+	smacs=\E^N, rmacs=\E^O, use=4014-sm,
+tek4023|4023|tex|tektronix 4023,
+	cr=^M, cud1=^J, ind=^J, bel=^G, smso=^_P, rmso=^_@,
+	cup=\034%p2%' '%+%c%p1%' '%+%c, cuf1=\t, cub1=^H,
+	clear=\E^L$<4>, cols#80, lines#24, am, vt#4,
+# Info:
+#	It is recommended that you run the 4025 at 4800 baud or less;
+#	various bugs in the terminal appear at 9600.  It wedges at the
+#	bottom of memory (try "cat /usr/dict/words"); ^S and ^Q typed
+#	on keyboard don't work.  You have to hit BREAK twice to get
+#	one break at any speed - this is a documented feature.
+#	Can't use cursor motion because it's memory relative, and 
+#	because it only works in the workspace, not the monitor.  
+#	Same for home. Likewise, standout only works in the workspace.
+#	
+#	el was commented out since vi and rogue seem to work better 
+#	simulating it with lots of spaces!
+#	
+#	il1 and il had 145ms of padding, but that slowed down vi's ^U 
+#	and didn't seem necessary.
+#
+4025|4027|4024|tek4025|tek4027|tek4024|4025cu|4027cu|tektronix 4024/4025/4027,
+	cr=^M, ind=^F^J, cud1=^F^J, bel=^G, am, da, db, ht=^I, it#8,
+	cub1=^H, lm#0, lines#34, cols#80, clear=^_era\r\n\n,
+	is2=\41com 31\r\n^_sto 9 17 25 33 41 49 57 65 73\r,
+	smkx=^_lea p4 /h/\r^_lea p8 /k/\r^_lea p6 / /\r^_lea p2 /j/\r^_lea f5 /H/\r,
+	rmkx=^_lea p2\r^_lea p4\r^_lea p6\r^_lea p8\r^_lea f5\r,
+	cuu1=^K, cuf1=^_rig\r,
+	ed=^_dli 50\r, cmdch=^_,
+	dch1=^_dch\r, ich1=^_ich\r ^H,
+	il1=^_up\r^_ili\r, dl1=^_dli\r^F,
+	il=^_up\r^_ili %p1%d\r, dl=^_dli %p1%d\r^F,
+	cuu=^_up %p1%d\r, cud=^_dow %p1%d\r,
+	cub=^_lef %p1%d\r, cuf=^_rig %p1%d\r,
+tek4025-17|4025-17|4027-17|tek 4025 17 line window,
+	lines#17, use=4025,
+tek4025-17-ws|4025-17-ws|4025-17ws|4027-17-ws|tek 4025 17 line window in workspace,
+	is2=\41com 31\r\n^_sto 9 17 25 33 41 49 57 65 73\r^_wor 17\r^_mon 17\r,
+	smcup=^_wor h\r, rmcup=^_mon h\r, smso=^_att e\r, rmso=^_att s\r, use=4025-17,
+tek4025-ex|4025-ex|4025ex|4027-ex|tek 4025 w/!,
+	smcup=\41com 31\r, rmcup=^_com 33\r,
+	is2=^_com 33\r\n\41sto 9 17 25 33 41 49 57 65 73\r, use=4025,
+tek4105-30|4105-30|4015 emulating 30 line vt100,
+	am, mir, msgr, xenl, xon,
+	cols#80, it#8, lines#30, vt#3,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m$<2>, bold=\E[1m$<2>,
+	clear=\E[H\E[J$<50>, cr=\r, csr=\E[%i%p1%d;%p2%dr,
+	cub=\E[%p1%dD, cub1=\b, cud=\E[%p1%dB, cud1=\n,
+	cuf=\E[%p1%dC, cuf1=\E[C$<2>,
+	cup=\E[%i%p1%d;%p2%dH$<5>, cuu=\E[%p1%dA,
+	cuu1=\E[A$<2>, ed=\E[J$<50>, el=\E[K$<3>,
+	el1=\E[1K$<3>, enacs=\E(B\E)0, home=\E[H, ht=\t,
+	hts=\EH, ind=\n, ka1=\EOq, ka3=\EOs, kb2=\EOr, kbs=\b,
+	kc1=\EOp, kc3=\EOn, kcub1=\EOD, kcud1=\EOB,
+	kcuf1=\EOC, kcuu1=\EOA, kent=\EOM, kf0=\EOy, kf1=\EOP,
+	kf10=\EOx, kf2=\EOQ, kf3=\EOR, kf4=\EOS, kf5=\EOt,
+	kf6=\EOu, kf7=\EOv, kf8=\EOl, kf9=\EOw, rc=\E8,
+	rev=\E[7m$<2>, ri=\EM$<5>, rmacs=^O, rmkx=\E[?1l\E>,
+	rmso=\E[m$<2>, rmul=\E[m$<2>,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, sc=\E7,
+	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t^N%e^O%;,
+	sgr0=\E[m^O$<2>, smacs=^N, smkx=\E[?1h\E=,
+	smso=\E[1;7m$<2>, smul=\E[4m$<2>, tbc=\E[3g,
+# Info:
+#	The 4110 series may be a wonderful graphics series, but they 
+#	make the 4025 look good for screen editing. 
+#	
+#	In the dialog area, you can't move the cursor off the bottom 
+#	line. 
+#	
+#	Out of the dialog area, ^K moves it up, but there is no way 
+#	to scroll.
+#	
+#	Note that there is a floppy for free from Tek that makes the 
+#	4112 emulate the vt52 (use the vt52 termcap). There is also
+#	an expected enhancement that will use ANSI standard sequences.
+#	
+#	4112 in non-dialog area pretending to scroll. It really wraps 
+#	but vi is said to work (more or less) in this mode.
+#	
+#	'vi' works reasonably well with this entry.
+#
+4112|4112-nd|4113|4114|tek4112|tektronix 4110 series,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cuu1=^K, cub1=^H,
+	am, clear=\E^L, lines#34, cols#80,
+	smcup=\EKA0\ELV0\EMG0, rmcup=\EKA1\ELV1,
+tek4112-d|4112-d|tek 4112 in dialog area,
+	am, clear=\ELZ, lines#34, cols#80, cuu1=^K,
+tek4112-5|4112-5|4112 in 5 line dialog area,
+	lines#5, use=4112,
+tek4115|4115|tektronix 4115,
+	am, xon,
+	cols#80, lines#34,
+	bel=^G, blink=\E[5m, bold=\E[1m, cbt=\E[Z,
+	clear=\E[H\E[J, cr=\r, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	dch1=\E[P, dl=\E[%p1%dM, dl1=\E[M, ed=\E[J, el=\E[K,
+	home=\E[H, hpa=\E[%p1%{1}%+%dG, ht=\t, hts=\EH,
+	ich=\E[%p1%d@, ich1=\E[@, il=\E[%p1%dL, il1=\E[L,
+	ind=\n, invis=\E[8m, kbs=\b, kcub1=\E[D, kcud1=\E[B,
+	kcuf1=\E[C, kcuu1=\E[A, khome=\E[H,
+	rep=%p1%c\E[%p2%{1}%-%db, rev=\E[7m, rmso=\E[m,
+	rmul=\E[m,
+	sgr=\E[%?%p1%t7;%;%?%p2%t4;%;%?%p3%t7;%;%?%p4%t5;%;%?%p6%t1;%;m,
+	sgr0=\E[0m, smso=\E[7m, smul=\E[4m, tbc=\E[2g,
+	vpa=\E[%p1%{1}%+%dd,
+# Info:
+#	t500 is a local entry for the oddball Tek 500 owned by Fluke 
+#	Labs
+#
+t500|Tek series 500,
+	cr=^M, ind=^J, cud1=^J, bel=^G,
+	lines#25, cols#80, cub1=^H, cup=\E=%p1%p1%' '%+%c%p2%' '%+%c,
+	clear=^E$<20>, home=^T, bw, am, 
+# Info:
+#	I added the is string - straight Unix has ESC ; in the login 
+#	string which sets a ct8500 into monitor mode (aka 4025 snoopy 
+#	mode). The is string here cleans up a few things (but not 
+#	everything).
+#
+ct8500|tektronix ct8500,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cr=^M, cud1=^J, ind=^J, bel=^G,
+	il1=\E^L, am, cub1=^H, cbt=\E^I, bw, ed=\E^U, el=\E^T,
+	clear=\E^E, cup=\E|%p1%' '%+%c%p2%' '%+%c, cols#80,
+	da, db, dch1=\E^],
+	dl1=\E^M, ich1=\E^\, lines#25, cuf1=\ES, ht=^I, ri=\E^A, rmso=\E ,
+	smso=\E$, rmul=\E , cuu1=\ER, smul=\E\041, is2=^_\EZ\Ek,
+	sgr0=\E\s,
+
+#
+#	Tektronix 4205 terminal.  This entry contains information required
+#	by color curses
+#
+
+tek4205|4205|tektronix 4205,
+
+#	am is not defined because the wrap around occurs not when the char.
+#	is placed in the 80'th column, but when we are attempting to type
+#	the 81'st character on the line.
+
+# 	bold, dim, and standout are simulated by colors and thus not allowed
+#	with colors
+
+	am, xenl, msgr, mir, ccc,
+	cols#80, lines#30, it#8, colors#8, pairs#64, ncv#49,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+        il1=\E[1L, ed=\E[J, el=\E[K, clear=\E[2J\E[H, 
+	il=\E[%p1%dL,
+	cup=\E[%i%p1%d;%p2%dH,
+	dch1=\E[1P, dl1=\E[1M,
+	home=\E[H, smir=\E[4h, rmir=\E[4l, 
+	cuf1=\E[C, cud1=\E[B, cuu1=\E[A, cub1=\E[D,
+	cuf=\E[%p1%dC, cud=\E[%p1%dB, cuu=\E[%p1%dA, cub=\E[%p1%dD,
+	ech=\E%p1%dX, el1=\E[1K, ich=\E[%p1%d@, 
+	smacs=, rmacs=, enacs=\E)0,
+	rmso=\E[=0;<1m, smso=\E[=2;<3m,
+	smul=\E[4m, rmul=\E[24m,
+	is1=\E%!0\ETM1\E%!1\E[0m,
+	rev=\E[7m, bold=\E[=7;<4m, invis=\E[=6;<5, dim=\E[=1;<6m,
+	blink=\E[5m, sgr0=\E[=0;<1m\E[24;25;27m,
+	smcup=\E%%!1\E[?6l\E[2J, 
+	kbs=^h, kcuu1=\E[A, kcud1=\E[B,
+	kcub1=\E[D, kcuf1=\E[C,
+	.is2=\E%%!1\E[?6141\E[0m,
+	cbt=\E[Z, cr=^M, ind=\ED, ri=\EM,
+	tbc=\E[1g, ht=^I, bel=^G,
+
+#	tektroinix color table is mapped into the RGB color table
+
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	setb=\E[4%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	setf=\E[3%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+#	All colors are reset to factory specifications
+
+	oc=\E%!0
+	      \ETFB0
+		0000
+		1F4F4F4
+		2F400
+		30F40
+		4A4C<F4
+		50F4F4
+		6F40F4
+		7F4F40
+	    \E%!1,
+	op=\E[39;40m,
+
+#	using RGB notation to define colors.  for arguments 1-3 the interval
+#	(0-1000) is broken into 8 smaller sub-intervals (125).  Each sub-
+#	interval then maps into pre-defined value.
+
+	initc=\E%%!0
+	      \ETF4
+	         %?%p1%{0}%=%t0
+		 %e%p1%{1}%=%t4
+		 %e%p1%{2}%=%t3
+		 %e%p1%{3}%=%t5
+		 %e%p1%{4}%=%t2
+		 %e%p1%{5}%=%t6
+		 %e%p1%{6}%=%t7
+		 %e1%;
+		  %?%p2%{125}%<%t0
+		  %e%p2%{250}%<%tA2
+		  %e%p2%{375}%<%tA?
+		  %e%p2%{500}%<%tC8
+		  %e%p2%{625}%<%tD4
+		  %e%p2%{750}%<%tE1
+		  %e%p2%{875}%<%tE:
+		  %eF4%;
+		  %?%p3%{125}%<%t0
+		  %e%p3%{250}%<%tA2
+		  %e%p3%{375}%<%tA?
+		  %e%p3%{500}%<%tC8
+		  %e%p3%{625}%<%tD4
+		  %e%p3%{750}%<%tE1
+		  %e%p3%{875}%<%tE:
+		  %eF4%;
+		  %?%p4%{125}%<%t0
+		  %e%p4%{250}%<%tA2
+		  %e%p4%{375}%<%tA?
+		  %e%p4%{500}%<%tC8
+		  %e%p4%{625}%<%tD4
+		  %e%p4%{750}%<%tE1
+		  %e%p4%{875}%<%tE:
+		  %eF4%;
+	      \E%%!1,
+	kf0=\EOA, kf1=\EOB, kf2=\EOC, kf3=\EOD,
+	kf4=\EP, kf5=\EQ, kf6=\ER, kf7=\ES,

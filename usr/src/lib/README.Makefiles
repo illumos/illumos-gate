@@ -1,0 +1,647 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+Writing Library Makefiles in ON
+===============================
+
+Introduction
+------------
+
+This document guides you through the gnarly process of writing library
+Makefiles for the ON consolidation.  It assumes that you're comfortable with
+make(1) and are somewhat familiar with the ON Makefile standards outlined in
+/shared/ON/general_docs/make_std.txt.
+
+Makefile Overview
+-----------------
+
+Your library should consist of a hierarchical collection of Makefiles:
+
+	lib/<library>/Makefile:
+
+	  This is your library's top-level Makefile.  It should contain rules
+	  for building any ISA-independent targets, such as installing header
+	  files and building message catalogs, but should defer all other
+	  targets to ISA-specific Makefiles.
+
+	lib/<library>/Makefile.com
+
+	  This is your library's common Makefile.  It should contain rules
+	  and macros which are common to all ISAs. This Makefile should never
+	  be built explicitly, but instead should be included (using the make
+	  include mechanism) by all of your ISA-specific Makefiles.
+
+	lib/<library>/<isa>/Makefile
+
+	  These are your library's ISA-specific Makefiles, one per ISA
+	  (usually sparc and i386, and often sparcv9 and amd64).  These
+	  Makefiles should include your common Makefile and then provide any
+	  needed ISA-specific rules and definitions, perhaps overriding those
+	  provided in your common Makefile.
+
+To simplify their maintenance and construction, $(SRC)/lib has a handful of
+provided Makefiles that yours must include; the examples provided throughout
+the document will show how to use them.  Please be sure to consult these
+Makefiles before introducing your own custom build macros or rules.
+
+	lib/Makefile.lib:
+
+	  This contains the bulk of the macros for building shared objects.
+
+	lib/Makefile.lib.64
+
+	  This contains macros for building 64-bit objects, and should be
+	  included in Makefiles for 64-bit native ISAs.
+
+	lib/Makefile.rootfs
+
+	  This contains macro overrides for libraries that install into /lib
+	  (rather than /usr/lib).
+
+	lib/Makefile.targ
+
+	  This contains rules for building shared objects.
+
+The remainder of this document discusses how to write each of your Makefiles
+in detail, and provides examples from the libinetutil library.
+
+The Library Top-level Makefile
+------------------------------
+
+As described above, your top-level library Makefile should contain
+rules for building ISA-independent targets, but should defer the
+building of all other targets to ISA-specific Makefiles.  The
+ISA-independent targets usually consist of:
+
+	install_h
+
+	  Install all library header files into the proto area.
+	  Can be omitted if your library has no header files.
+
+	check
+
+	  Check all library header files for hdrchk compliance.
+	  Can be omitted if your library has no header files.
+
+	_msg
+
+	  Build and install a message catalog.
+	  Can be omitted if your library has no message catalog.
+
+Of course, other targets (such as `cstyle') are fine as well, as long as
+they are ISA-independent.
+
+The ROOTHDRS and CHECKHDRS targets are provided in lib/Makefile.lib to make
+it easy for you to install and check your library's header files.  To use
+these targets, your Makefile must set the HDRS to the list of your library's
+header files to install and HDRDIR to the their location in the source tree.
+In addition, if your header files need to be installed in a location other
+than $(ROOT)/usr/include, your Makefile must also set ROOTHDRDIR to the
+appropriate location in the proto area.  Once HDRS, HDRDIR and (optionally)
+ROOTHDRDIR have been set, your Makefile need only contain
+
+	  install_h: $(ROOTHDRS)
+
+	  check: $(CHECKHDRS)
+
+to bind the provided targets to the standard `install_h' and `check' rules.
+
+Similar rules are provided (in $(SRC)/Makefile.msg.targ) to make it easy for
+you to build and install message catalogs from your library's source files.
+
+To install a catalog into the catalog directory in the proto area, define the
+POFILE macro to be the name of your catalog, and specify that the _msg target
+depends on $(MSGDOMAINPOFILE).  The examples below should clarify this.
+
+To build a message catalog from arbitrarily many message source files, use
+the BUILDPO.msgfiles macro.
+
+	  include ../Makefile.lib
+
+	  POFILE =	  libfoo.po
+	  MSGFILES =	  $(OBJECTS:%.o=%.i)
+
+	  # ...
+
+	  $(POFILE): $(MSGFILES)
+		$(BUILDPO.msgfiles)
+
+	  _msg: $(MSGDOMAINPOFILE)
+
+	  include $(SRC)/Makefile.msg.targ
+
+Note that this example doesn't use grep to find message files, since that can
+mask unreferenced files, and potentially lead to the inclusion of unwanted
+messages or omission of intended messages in the catalogs.  As such, MSGFILES
+should be derived from a known list of objects or sources.
+
+It is usually preferable to run the source through the C preprocessor prior
+to extracting messages.  To do this, use the ".i" suffix, as shown in the
+above example.  If you need to skip the C preprocessor, just use the native
+(.[ch]) suffix.
+
+The only time you shouldn't use BUILDPO.msgfiles as the preferred means of
+extracting messages is when you're extracting them from shell scripts; in
+that case, you can use the BUILDPO.pofiles macro as explained below.
+
+To build a message catalog from other message catalogs, or from source files
+that include shell scripts, use the BUILDPO.pofiles macro:
+
+	  include ../Makefile.lib
+
+	  SUBDIRS =	  $(MACH)
+
+	  POFILE =	  libfoo.po
+	  POFILES =	  $(SUBDIRS:%=%/_%.po)
+
+	  _msg :=	  TARGET = _msg
+
+	  # ...
+
+	  $(POFILE): $(POFILES)
+		$(BUILDPO.pofiles)
+
+	  _msg: $(MSGDOMAINPOFILE)
+
+	  include $(SRC)/Makefile.msg.targ
+
+The Makefile above would work in conjunction with the following in its
+subdirectories' Makefiles:
+
+	  POFILE =	  _thissubdir.po
+	  MSGFILES =	  $(OBJECTS:%.o=%.i)
+
+	  $(POFILE):	  $(MSGFILES)
+		  $(BUILDPO.msgfiles)
+
+	  _msg:		  $(POFILE)
+
+	  include $(SRC)/Makefile.msg.targ
+
+Since this POFILE will be combined with those in other subdirectories by the
+parent Makefile and that merged file will be installed into the proto area
+via MSGDOMAINPOFILE, there is no need to use MSGDOMAINPOFILE in this Makefile
+(in fact, using it would lead to duplicate messages in the catalog).
+
+When using any of these targets, keep in mind that other macros, like
+XGETFLAGS and TEXT_DOMAIN may also be set in your Makefile to override or
+augment the defaults provided in higher-level Makefiles.
+
+As previously mentioned, you should defer all ISA-specific targets to your
+ISA-specific Makefiles.  You can do this by:
+
+	1. Setting SUBDIRS to the list of directories to descend into:
+
+		SUBDIRS = $(MACH)
+
+	   Note that if your library is also built 64-bit, then you should
+	   also specify
+
+		$(BUILD64)SUBDIRS += $(MACH64)
+
+	   so that SUBDIRS contains $(MACH64) if and only if you're compiling
+	   on a 64-bit ISA.
+
+	2. Providing a common "descend into SUBDIRS" rule:
+
+		$(SUBDIRS): FRC
+			@cd $@; pwd; $(MAKE) $(TARGET)
+
+		FRC:
+
+	3. Providing a collection of conditional assignments that set TARGET
+	   appropriately:
+
+		all	:= TARGET= all
+		clean	:= TARGET= clean
+		clobber := TARGET= clobber
+		install := TARGET= install
+		lint	:= TARGET= lint
+
+	   The order doesn't matter, but alphabetical is preferable.
+
+	4. Having the aforementioned targets depend on SUBDIRS:
+
+		all clean clobber install lint: $(SUBDIRS)
+
+	   The `all' target must be listed first so that make uses it as the
+	   default target; the others might as well be listed alphabetically.
+
+As an example of how all of this goes together, here's libinetutil's
+top-level library Makefile (license notice and copyright omitted):
+
+	include ../Makefile.lib
+
+	HDRS =		libinetutil.h
+	HDRDIR =	common
+	SUBDIRS =	$(MACH)
+	$(BUILD64)SUBDIRS += $(MACH64)
+
+	all :=		TARGET = all
+	clean :=	TARGET = clean
+	clobber :=	TARGET = clobber
+	install :=	TARGET = install
+	lint :=		TARGET = lint
+
+	.KEEP_STATE:
+
+	all clean clobber install lint: $(SUBDIRS)
+
+	install_h:	$(ROOTHDRS)
+
+	check:		$(CHECKHDRS)
+
+	$(SUBDIRS): FRC
+		@cd $@; pwd; $(MAKE) $(TARGET)
+
+	FRC:
+
+	include ../Makefile.targ
+
+The Common Makefile
+-------------------
+
+In concept, your common Makefile should contain all of the rules and
+definitions that are the same on all ISAs.  However, for reasons of
+maintainability and cleanliness, you're encouraged to place even
+ISA-dependent rules and definitions, as long you express them in an
+ISA-independent way (e.g., by using $(MACH), $(TARGETMACH), and their kin).
+(TARGETMACH is the same as MACH for 32-bit targets, and the same as MACH64
+for 64-bit targets).
+
+The common Makefile can be conceptually split up into four sections:
+
+	1. A copyright and comments section.  Please see the prototype
+	   files in usr/src/prototypes for examples of how to format the
+	   copyright message properly.  For brevity and clarity, this
+	   section has been omitted from the examples shown here.
+
+	2. A list of macros that must be defined prior to the inclusion of
+	   Makefile.lib.  This section is conceptually terminated by the
+	   inclusion of Makefile.lib, followed, if necessary, by the
+	   inclusion of Makefile.rootfs (only if the library is to be
+	   installed in /lib rather than the default /usr/lib).
+
+	3. A list of macros that need not be defined prior to the inclusion
+	   of Makefile.lib (or which must be defined following the inclusion
+	   of Makefile.lib, to override or augment its definitions).  This
+	   section is conceptually terminated by the .KEEP_STATE directive.
+
+	4. A list of targets.
+
+The first section is self-explanatory.  The second typically consists of the
+following macros:
+
+	LIBRARY
+
+	  Set to the name of the static version of your library, such
+	  as `libinetutil.a'.  You should always specify the `.a' suffix,
+	  since pattern-matching rules in higher-level Makefiles rely on it,
+	  even though static libraries are not normally built in ON, and
+	  are never installed in the proto area.  Note that the LIBS macro
+	  (described below) controls the types of libraries that are built
+	  when building your library.
+
+	  If you are building a loadable module (i.e., a shared object that
+	  is only linked at runtime with dlopen(3dl)), specify the name of
+	  the loadable module with a `.a' suffix, such as `devfsadm_mod.a'.
+
+	VERS
+
+	  Set to the version of your shared library, such as `.1'.  You
+	  actually do not need to set this prior to the inclusion of
+	  Makefile.lib, but it is good practice to do so since VERS and
+	  LIBRARY are so closely related.
+
+	OBJECTS
+
+	  Set to the list of object files contained in your library, such as
+	  `a.o b.o'.  Usually, this will be the same as your library's source
+	  files (except with .o extensions), but if your library compiles
+	  source files outside of the library directory itself, it will
+	  differ.  We'll see an example of this with libinetutil.
+
+The third section typically consists of the following macros:
+
+	LIBS
+
+	  Set to the list of the types of libraries to build when building
+	  your library.  For dynamic libraries, you should set this to
+	  `$(DYNLIB) $(LINTLIB)' so that a dynamic library and lint library
+	  are built.  For loadable modules, you should just list DYNLIB,
+	  since there's no point in building a lint library for libraries
+	  that are never linked at compile-time.
+
+	  If your library needs to be built as a static library (typically
+	  to be used in other parts of the build), you should set LIBS to
+	  `$(LIBRARY)'.  However, you should do this only when absolutely
+	  necessary, and you must *never* ship static libraries to customers.
+
+	ROOTLIBDIR (if your library installs to a nonstandard directory)
+
+	  Set to the directory your 32-bit shared objects will install into
+	  with the standard $(ROOTxxx) macros.  Since this defaults to
+	  $(ROOT)/usr/lib ($(ROOT)/lib if you included Makefile.rootfs),
+	  you usually do not need to set this.
+
+	ROOTLIBDIR64 (if your library installs to a nonstandard directory)
+
+	  Set to the directory your 64-bit shared objects will install into
+	  with the standard $(ROOTxxx64) macros.  Since this defaults to
+	  $(ROOT)/usr/lib/$(MACH64) ($(ROOT)/lib/$(MACH64) if you included
+	  Makefile.rootfs), you usually do not need to set this.
+
+	SRCDIR
+
+	  Set to the directory containing your library's source files, such
+	  as `../common'.  Because this Makefile is actually included from
+	  your ISA-specific Makefiles, make sure you specify the directory
+	  relative to your library's <isa> directory.
+
+	SRCS (if necessary)
+
+	  Set to the list of source files required to build your library.
+	  This defaults to $(OBJECTS:%.o=$(SRCDIR)/%.c) in Makefile.lib, so
+	  you only need to set this when source files from directories other
+	  than SRCDIR are needed.  Keep in mind that SRCS should be set to a
+	  list of source file *pathnames*, not just a list of filenames.
+
+	LINTLIB-specific SRCS (required if building a lint library)
+
+	  Set to a special "lint stubs" file to use when constructing your
+	  library's lint library.  The lint stubs file must be used to
+	  guarantee that programs that link against your library will be able
+	  to lint clean.  To do this, you must conditionally set SRCS to use
+	  your stubs file by specifying `LINTLIB := SRCS= $(SRCDIR)/$(LINTSRC)'
+	  in your Makefile.  Of course, you do not need to set this if your
+	  library does not build a lint library.
+
+	LDLIBS
+
+	  Appended with the list of libraries and library directories needed
+	  to build your library; minimally "-lc".  Note that this should
+	  *never* be set, since that will inadvertently clear the library
+	  search path, causing the linker to look in the wrong place for
+	  the libraries.
+
+	  Since lint targets also make use of LDLIBS, LDLIBS *must* only
+	  contain -l and -L directives; all other link-related directives
+	  should be put in DYNFLAGS (if they apply only to shared object
+	  construction) or LDFLAGS (if they apply in general).
+
+	MAPFILES (if necessary)
+
+	  Set to the list of mapfiles used to link each ISA-specific version
+	  of your library.  This defaults to `$(SRCDIR)/mapfile-vers' in
+	  Makefile.lib, so you only need to change this if you have additional
+	  mapfiles or your mapfile doesn't follow the standard naming
+	  convention.  If you have supplemental ISA-dependent mapfiles that
+	  reside in the respective <isa> directories, you can augment
+	  MAPFILES like this:
+
+		MAPFILES += mapfile-vers
+
+	CPPFLAGS (if necessary)
+
+	   Appended with any flags that need to be passed to the C
+	   preprocessor (typically -D and -I flags).  Since lint macros use
+	   CPPFLAGS, CPPFLAGS *must* only contain directives known to the C
+	   preprocessor.  When compiling MT-safe code, CPPFLAGS *must*
+	   include -D_REENTRANT.  When compiling large file aware code,
+	   CPPFLAGS *must* include -D_FILE_OFFSET_BITS=64.
+
+	CFLAGS
+
+	   Appended with any flags that need to be passed to the C compiler.
+	   Minimally, append `$(CCVERBOSE)'.  Keep in mind that you should
+	   add any C preprocessor flags to CPPFLAGS, not CFLAGS.
+
+	CFLAGS64 (if necessary)
+
+	   Appended with any flags that need to be passed to the C compiler
+	   when compiling 64-bit code.  Since all 64-bit code is compiled
+	   $(CCVERBOSE), you usually do not need to modify CFLAGS64.
+
+ 	COPTFLAG (if necessary)
+
+	   Set to control the optimization level used by the C compiler when
+	   compiling 32-bit code.  You should only set this if absolutely
+	   necessary, and it should only contain optimization-related
+	   settings (or -g).
+
+ 	COPTFLAG64 (if necessary)
+
+	   Set to control the optimization level used by the C compiler when
+	   compiling 64-bit code.  You should only set this if absolutely
+	   necessary, and it should only contain optimization-related
+	   settings (or -g).
+
+	LINTFLAGS (if necessary)
+
+	   Appended with any flags that need to be passed to lint when
+	   linting 32-bit code.  You should only modify LINTFLAGS in
+	   rare instances where your code cannot (or should not) be fixed.
+
+	LINTFLAGS64 (if necessary)
+
+	   Appended with any flags that need to be passed to lint when
+	   linting 64-bit code.  You should only modify LINTFLAGS64 in
+	   rare instances where your code cannot (or should not) be fixed.
+
+Of course, you may use other macros as necessary.
+
+The fourth section typically consists of the following targets:
+
+	all
+
+	  Build all of the types of the libraries named by LIBS.  Must always
+	  be the first real target in common Makefile.  Since the
+	  higher-level Makefiles already contain rules to build all of the
+	  different types of libraries, you can usually just specify
+
+		all: $(LIBS)
+
+	  though it should be listed as an empty target if LIBS is set by your
+	  ISA-specific Makefiles (see above).
+
+	lint
+
+	  Use the `lintcheck' rule provided by lib/Makefile.targ to lint the
+	  actual library sources.  Historically, this target has also been
+	  used to build the lint library (using LINTLIB), but that usage is
+	  now discouraged.  Thus, this rule should be specified as
+
+		lint: lintcheck
+
+Conspicuously absent from this section are the `clean' and `clobber' targets.
+These targets are already provided by lib/Makefile.targ and thus should not
+be provided by your common Makefile.  Instead, your common Makefile should
+list any additional files to remove during a `clean' and `clobber' by
+appending to the CLEANFILES and CLOBBERFILES macros.
+
+Once again, here's libinetutil's common Makefile, which shows how many of
+these directives go together.  Note that Makefile.rootfs is included to
+cause libinetutil.so.1 to be installed in /lib rather than /usr/lib:
+
+	LIBRARY =	libinetutil.a
+	VERS =		.1
+	OBJECTS =	octet.o inetutil4.o ifspec.o ifaddrlist.o eh.o tq.o
+
+	include ../../Makefile.lib
+	include ../../Makefile.rootfs
+
+	LIBS =		$(DYNLIB) $(LINTLIB)
+
+	SRCDIR =	../common
+	COMDIR =	$(SRC)/common/net/dhcp
+	SRCS =		$(COMDIR)/octet.c $(SRCDIR)/inetutil4.c \
+			$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
+			$(SRCDIR)/ifaddrlist.c
+
+	$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
+	LDLIBS +=	-lsocket -lc
+
+	CFLAGS +=	$(CCVERBOSE)
+	CPPFLAGS +=	-I$(SRCDIR)
+
+	.KEEP_STATE:
+
+	all: $(LIBS)
+
+	lint: lintcheck
+
+	pics/%.o: $(COMDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+	include ../../Makefile.targ
+
+The mapfile for libinetutil is named `mapfile-vers' and resides in $(SRCDIR),
+so the MAPFILES definition is omitted, defaulting to $(SRCDIR)/mapfile-vers.
+
+Note that for libinetutil, not all of the object files come from SRCDIR.  To
+support this, an alternate source file directory named COMDIR is defined, and
+the source files listed in SRCS are specified using both COMDIR and SRCDIR.
+Additionally, a special build rule is provided to build object files from the
+sources in COMDIR; the rule uses COMPILE.c and POST_PROCESS_O so that any
+changes to the compilation and object-post-processing phases will be
+automatically picked up.
+
+The ISA-Specific Makefiles
+--------------------------
+
+As the name implies, your ISA-specific Makefiles should contain macros and
+rules that cannot be expressed in an ISA-independent way.  Usually, the only
+rule you will need to put here is `install', which has different dependencies
+for 32-bit and 64-bit libraries.  For instance, here are the ISA-specific
+Makefiles for libinetutil:
+
+	sparc/Makefile:
+
+		include ../Makefile.com
+
+		install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+	sparcv9/Makefile:
+
+		include ../Makefile.com
+		include ../../Makefile.lib.64
+
+		install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
+	i386/Makefile:
+
+		include ../Makefile.com
+
+		install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+	amd64/Makefile:
+
+		include ../Makefile.com
+		include ../../Makefile.lib.64
+
+		install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
+Observe that there is no .KEEP_STATE directive in these Makefiles, since all
+of these Makefiles include libinetutil/Makefile.com, and it already has a
+.KEEP_STATE directive.  Also, note that the 64-bit Makefiles also include
+Makefile.lib.64, which overrides some of the definitions contained in the
+higher level Makefiles included by the common Makefile so that 64-bit
+compiles work correctly.
+
+CTF Data in Libraries
+---------------------
+
+By default, all position-independent objects are built with CTF data using
+ctfconvert, which is then merged together using ctfmerge when the shared
+object is built.  All C-source objects processed via ctfmerge need to be
+processed via ctfconvert or the build will fail.  Objects built from non-C
+sources (such as assembly or C++) are silently ignored for CTF processing.
+
+Filter libraries that have no source files will need to explicitly disable
+CTF by setting CTFMERGE_LIB to ":"; see libw/Makefile.com for an example.
+
+More Information
+----------------
+
+Other issues and questions will undoubtedly arise while you work on your
+library's Makefiles.  To help in this regard, a number of libraries of
+varying complexity have been updated to follow the guidelines and practices
+outlined in this document:
+
+	lib/libdhcputil
+
+	  Example of a simple 32-bit only library.
+
+	lib/libdhcpagent
+
+	  Example of a simple 32-bit only library that obtains its sources
+	  from multiple directories.
+
+	lib/ncad_addr
+
+	  Example of a simple loadable module.
+
+	lib/libipmp
+
+	  Example of a simple library that builds a message catalog.
+
+	lib/libdhcpsvc
+
+	  Example of a Makefile hierarchy for a library and a collection
+	  of related pluggable modules.
+
+	lib/lvm
+
+	  Example of a Makefile hierarchy for a collection of related
+	  libraries and pluggable modules.
+
+	  Also an example of a Makefile hierarchy that supports the
+	  _dc target for domain and category specific messages.
+
+Of course, if you still have questions, please do not hesitate to send email
+to the ON gatekeepers.

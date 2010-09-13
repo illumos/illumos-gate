@@ -1,0 +1,289 @@
+*** socket.c.org	Fri Mar 21 19:27:25 1997
+--- socket.c	Mon Sep 27 17:21:46 1999
+***************
+*** 74,82 ****
+  void    sock_host(request)
+  struct request_info *request;
+  {
+!     static struct sockaddr_in client;
+!     static struct sockaddr_in server;
+!     int     len;
+      char    buf[BUFSIZ];
+      int     fd = request->fd;
+  
+--- 74,81 ----
+  void    sock_host(request)
+  struct request_info *request;
+  {
+!     static struct sockaddr_gen client;
+!     static struct sockaddr_gen server;
+      char    buf[BUFSIZ];
+      int     fd = request->fd;
+  
+***************
+*** 91,102 ****
+       * broken library code.
+       */
+  
+!     len = sizeof(client);
+!     if (getpeername(fd, (struct sockaddr *) & client, &len) < 0) {
+  	request->sink = sock_sink;
+! 	len = sizeof(client);
+  	if (recvfrom(fd, buf, sizeof(buf), MSG_PEEK,
+! 		     (struct sockaddr *) & client, &len) < 0) {
+  	    tcpd_warn("can't get client address: %m");
+  	    return;				/* give up */
+  	}
+--- 90,102 ----
+       * broken library code.
+       */
+  
+!     client.sg_len = sizeof(client.sg_addr);
+!     if (getpeername(fd, (struct sockaddr *) ADDRP(client),
+! 	    &client.sg_len) < 0) {
+  	request->sink = sock_sink;
+! 	client.sg_len = sizeof(client.sg_addr);
+  	if (recvfrom(fd, buf, sizeof(buf), MSG_PEEK,
+! 		 (struct sockaddr *) ADDRP(client), &client.sg_len) < 0) {
+  	    tcpd_warn("can't get client address: %m");
+  	    return;				/* give up */
+  	}
+***************
+*** 104,110 ****
+  	memset(buf, 0 sizeof(buf));
+  #endif
+      }
+!     request->client->sin = &client;
+  
+      /*
+       * Determine the server binding. This is used for client username
+--- 104,111 ----
+  	memset(buf, 0 sizeof(buf));
+  #endif
+      }
+!     sockgen_simplify(&client);
+!     request->client->sag = &client;
+  
+      /*
+       * Determine the server binding. This is used for client username
+***************
+*** 112,123 ****
+       * address or name.
+       */
+  
+!     len = sizeof(server);
+!     if (getsockname(fd, (struct sockaddr *) & server, &len) < 0) {
+  	tcpd_warn("getsockname: %m");
+  	return;
+      }
+!     request->server->sin = &server;
+  }
+  
+  /* sock_hostaddr - map endpoint address to printable form */
+--- 113,126 ----
+       * address or name.
+       */
+  
+!     server.sg_len = sizeof(server.sg_addr);
+!     if (getsockname(fd, (struct sockaddr *) ADDRP(server), 
+! 	    &server.sg_len) < 0) {
+  	tcpd_warn("getsockname: %m");
+  	return;
+      }
+!     sockgen_simplify(&server);
+!     request->server->sag = &server;
+  }
+  
+  /* sock_hostaddr - map endpoint address to printable form */
+***************
+*** 125,134 ****
+  void    sock_hostaddr(host)
+  struct host_info *host;
+  {
+!     struct sockaddr_in *sin = host->sin;
+  
+!     if (sin != 0)
+! 	STRN_CPY(host->addr, inet_ntoa(sin->sin_addr), sizeof(host->addr));
+  }
+  
+  /* sock_hostname - map endpoint address to host name */
+--- 128,142 ----
+  void    sock_hostaddr(host)
+  struct host_info *host;
+  {
+!     struct sockaddr_gen *sag = host->sag;
+  
+!     if (sag != 0)
+! #ifdef HAVE_IPV6
+! 	
+! 	(void) inet_ntop(FAMILY(*sag), FADDRP(*sag), host->addr, sizeof(host->addr));
+! #else
+! 	STRN_CPY(host->addr, inet_ntoa(sag->sg_sin.sin_addr), sizeof(host->addr));
+! #endif
+  }
+  
+  /* sock_hostname - map endpoint address to host name */
+***************
+*** 136,142 ****
+  void    sock_hostname(host)
+  struct host_info *host;
+  {
+!     struct sockaddr_in *sin = host->sin;
+      struct hostent *hp;
+      int     i;
+  
+--- 144,150 ----
+  void    sock_hostname(host)
+  struct host_info *host;
+  {
+!     struct sockaddr_gen *sag = host->sag;
+      struct hostent *hp;
+      int     i;
+  
+***************
+*** 146,155 ****
+       * not work the other way around: gethostbyname("INADDR_ANY") fails. We
+       * have to special-case 0.0.0.0, in order to avoid false alerts from the
+       * host name/address checking code below.
+       */
+!     if (sin != 0 && sin->sin_addr.s_addr != 0
+! 	&& (hp = gethostbyaddr((char *) &(sin->sin_addr),
+! 			       sizeof(sin->sin_addr), AF_INET)) != 0) {
+  
+  	STRN_CPY(host->name, hp->h_name, sizeof(host->name));
+  
+--- 154,165 ----
+       * not work the other way around: gethostbyname("INADDR_ANY") fails. We
+       * have to special-case 0.0.0.0, in order to avoid false alerts from the
+       * host name/address checking code below.
++      *
++      * We assume this works correctly in the INET6 case.
+       */
+!     if (sag != 0
+! 	&& (FAMILY(*sag) != AF_INET || sag->sg_sin.sin_addr.s_addr != 0)
+! 	&& (hp = gethostbyaddr(FADDRP(*sag), FSIZE(*sag), FAMILY(*sag))) != 0) {
+  
+  	STRN_CPY(host->name, hp->h_name, sizeof(host->name));
+  
+***************
+*** 166,172 ****
+  	 * we're in big trouble anyway.
+  	 */
+  
+! 	if ((hp = gethostbyname(host->name)) == 0) {
+  
+  	    /*
+  	     * Unable to verify that the host name matches the address. This
+--- 176,188 ----
+  	 * we're in big trouble anyway.
+  	 */
+  
+! #ifdef HAVE_IPV6
+! 	if (FAMILY(*sag) != AF_INET)
+! 	    hp = getipnodebyname(host->name, FAMILY(*sag), AI_DEFAULT, 0);
+! 	else
+! #endif
+! 	    hp = gethostbyname(host->name);
+! 	if (hp == 0) {
+  
+  	    /*
+  	     * Unable to verify that the host name matches the address. This
+***************
+*** 189,194 ****
+--- 205,213 ----
+  		      host->name, STRING_LENGTH, hp->h_name);
+  
+  	} else {
++ #ifdef HAVE_IPV6
++ 	    char buf[INET6_ADDRSTRLEN];
++ #endif
+  
+  	    /*
+  	     * The address should be a member of the address list returned by
+***************
+*** 199,207 ****
+  
+  	    for (i = 0; hp->h_addr_list[i]; i++) {
+  		if (memcmp(hp->h_addr_list[i],
+! 			   (char *) &sin->sin_addr,
+! 			   sizeof(sin->sin_addr)) == 0)
+  		    return;			/* name is good, keep it */
+  	    }
+  
+  	    /*
+--- 218,231 ----
+  
+  	    for (i = 0; hp->h_addr_list[i]; i++) {
+  		if (memcmp(hp->h_addr_list[i],
+! 			   (char *) FADDRP(*sag),
+! 			   FSIZE(*sag)) == 0) {
+! #ifdef HAVE_IPV6
+! 		    if (hp != 0 && FAMILY(*sag) != AF_INET)
+! 			freehostent(hp);
+! #endif
+  		    return;			/* name is good, keep it */
++ 		}
+  	    }
+  
+  	    /*
+***************
+*** 209,218 ****
+  	     * someone has messed up. Perhaps someone compromised a name
+  	     * server.
+  	     */
+- 
+  	    tcpd_warn("host name/address mismatch: %s != %.*s",
+! 		      inet_ntoa(sin->sin_addr), STRING_LENGTH, hp->h_name);
+  	}
+  	strcpy(host->name, paranoid);		/* name is bad, clobber it */
+      }
+  }
+--- 233,250 ----
+  	     * someone has messed up. Perhaps someone compromised a name
+  	     * server.
+  	     */
+  	    tcpd_warn("host name/address mismatch: %s != %.*s",
+! #ifdef HAVE_IPV6
+! 		      inet_ntop(FAMILY(*sag), FADDRP(*sag), buf, sizeof(buf)),
+! #else
+! 		      inet_ntoa(sag->sg_sin.sin_addr),
+! #endif
+! 		      STRING_LENGTH, hp->h_name);
+  	}
++ #ifdef HAVE_IPV6
++ 	if (hp != 0 && FAMILY(*sag) != AF_INET)
++ 	    freehostent(hp);
++ #endif
+  	strcpy(host->name, paranoid);		/* name is bad, clobber it */
+      }
+  }
+***************
+*** 232,235 ****
+--- 264,290 ----
+       */
+  
+      (void) recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr *) & sin, &size);
++ }
++ 
++ void sockgen_simplify(sg)
++ sockaddr_gen *sg;
++ {
++ #ifdef HAVE_IPV6
++     if (sg->sg_family == AF_INET6 &&
++ 	IN6_IS_ADDR_V4MAPPED(&sg->sg_sin6.sin6_addr)) {
++ 	    struct sockaddr_in v4_addr;
++ 
++ #ifdef IN6_V4MAPPED_TO_INADDR
++ 	    IN6_V4MAPPED_TO_INADDR(&sg->sg_sin6.sin6_addr, &v4_addr.sin_addr);
++ #else
++ 	    IN6_MAPPED_TO_V4(&sg->sg_sin6.sin6_addr, &v4_addr.sin_addr);
++ #endif
++ 	    v4_addr.sin_port = sg->sg_sin6.sin6_port;
++ 	    v4_addr.sin_family = AF_INET;
++ 	    memcpy(&sg->sg_sin,&v4_addr, sizeof(v4_addr));
++ 	    sg->sg_len = sizeof(struct in_addr);
++     }
++ #else
++     return;
++ #endif
+  }

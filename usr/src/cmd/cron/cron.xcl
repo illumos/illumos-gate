@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+msgid  ""
+msgid  "/etc/cron.d/at.allow"
+msgid  "/etc/cron.d/at.deny"
+msgid  "cklmsrf:p:q:t:"
+msgid  " "
+msgid  "DATEMSK"
+msgid  "%-5d"
+msgid  "/var/spool/cron/atjobs"
+msgid  "_at"
+msgid  "/"
+msgid  "%s"
+msgid  "/etc/cron.d/.proto"
+msgid  "%s.%c"
+msgid  "r"
+msgid  "at: %s: %s\n"
+msgid  "%a %b %e %H:%M:%S %Y"
+msgid  "%s/%ld.%c"
+msgid  "at: %s\n"
+msgid  "at> "
+msgid  "/bin/csh"
+msgid  "/bin/ksh"
+msgid  "/bin/sh"
+msgid  "SHELL"
+msgid  "$SHELL"
+msgid  "/sh"
+msgid  "/ksh"
+msgid  ": %s job\n"
+msgid  "batch"
+msgid  "at"
+msgid  "stdin"
+msgid  "yes"
+msgid  "no"
+msgid  "export %s; %s='%s'\n"
+msgid  "w"
+msgid  "%o"
+msgid  "ulimit %ld\n"
+msgid  "<EOT>\n"
+msgid  ":%lu"
+msgid  "at: %s: "
+msgid  "%s\t%s\n"
+msgid  ""
+msgid  "elr"
+msgid  "/etc/cron.d/cron.allow"
+msgid  "/etc/cron.d/cron.deny"
+msgid  "/var/spool/cron/crontabs"
+msgid  "/"
+msgid  "r"
+msgid  "/tmp/crontabXXXXXX"
+msgid  "w"
+msgid  "VISUAL"
+msgid  "EDITOR"
+msgid  "ed"
+msgid  "%s %s"
+msgid  "crontab: %s: %s\n"
+msgid  "%-5d"
+msgid  "_cron"
+msgid  "crontab: %s\n"
+msgid  "/etc/cron.d/FIFO"
+msgid  "/usr/bin/pwd"
+msgid  "user = %s\t%s\t%s\n"
+msgid  "malloc"
+msgid  "calloc"
+msgid  "%s/%s%d"
+msgid  "%1024s"
+msgid  "%*[^\n]\n"
+msgid  "cron"
+msgid  "vi"
+msgid  "solaris.jobs.admin"

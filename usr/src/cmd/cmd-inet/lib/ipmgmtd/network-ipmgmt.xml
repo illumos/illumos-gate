@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:ipmgmtd'>
+
+<service
+	name='network/ip-interface-management'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance />
+
+	<dependent name='ipmgmt-loopback'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/loopback' />
+	</dependent>
+
+        <dependent name='ipmgmt-physical'
+                grouping='require_all'
+                restart_on='none'>
+                <service_fmri value='svc:/network/physical' />
+        </dependent>
+
+        <dependent name='ipmgmt-iptun'
+                grouping='require_all'
+                restart_on='none'>
+                <service_fmri value='svc:/network/iptun' />
+        </dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/net-ipmgmt'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='5' />
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				IP interface management
+			</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+				Create IP interfaces, apply
+				TCP/IP properties and manage
+				address object mappings.
+			</loctext>
+		</description>
+		<documentation>
+			<manpage title='ipadm' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

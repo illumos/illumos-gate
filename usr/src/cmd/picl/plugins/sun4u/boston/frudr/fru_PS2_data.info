@@ -1,0 +1,144 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This configuration file is parsed by PICL frudr plugin in response
+ * to a PICL_FRU_ADDED event for PS2
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M%	%I%	%E% SMI")
+
+#ifndef RMCLOMV
+#define	RMCLOMV	/platform/ebus@1f,464000/rmc-comm@0,c28000/SUNW,rmclomv
+#endif	/* RMCLOMV */
+
+name:/frutree/chassis/PS2/power-supply
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/power-supply-fru-prom@0,52
+TABLE Devices
+ROW
+PROP Class string r 0 "led"
+REFPROP _led_ name:RMCLOMV/ps2_pok
+ENDROW
+ROW
+PROP Class string r 0 "led"
+REFPROP _led_ name:RMCLOMV/ps2_stby
+ENDROW
+ROW
+PROP Class string r 0 "led"
+REFPROP _led_ name:RMCLOMV/ps2_service
+ENDROW
+ROW
+PROP Class string r 0 "voltage-indicator"
+REFPROP _voltage-indicator_ name:RMCLOMV/ps2_ff_pok
+ENDROW
+ROW
+PROP Class string r 0 "voltage-indicator"
+REFPROP _voltage-indicator_ name:RMCLOMV/ps2_p_pwr
+ENDROW
+ROW
+PROP Class string r 0 "voltage-indicator"
+REFPROP _voltage-indicator_ name:RMCLOMV/ps2_ff_uv
+ENDROW
+ROW
+PROP Class string r 0 "voltage-indicator"
+REFPROP _voltage-indicator_ name:RMCLOMV/ps2_ff_ov
+ENDROW
+ROW
+PROP Class string r 0 "current-indicator"
+REFPROP _current-indicator_ name:RMCLOMV/ps2_ff_oc
+ENDROW
+ROW
+PROP Class string r 0 "temperature-indicator"
+REFPROP _temperature-indicator_ name:RMCLOMV/ps2_ff_ot
+ENDROW
+ROW
+PROP Class string r 0 "fan"
+REFPROP _fan_ name:RMCLOMV/ps2_ff_fan
+ENDROW
+ENDTABLE
+
+name:/platform/i2c@1f,520000/power-supply-fru-prom@0,52
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+        PROP FRUDevicePath string r 0 "/devices/i2c@1f,520000/power-supply-fru-prom@0,52:power-supply-fru-prom"
+
+name:RMCLOMV/ps2_pok
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_stby
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_service
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_pok
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_p_pwr
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_uv
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_ov
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_oc
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_ot
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
+name:RMCLOMV/ps2_ff_fan
+	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply

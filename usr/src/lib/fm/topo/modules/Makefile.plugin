@@ -1,0 +1,120 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+.KEEP_STATE:
+.SUFFIXES:
+
+MODCLASS = plugins
+
+include ../../../../Makefile.lib
+include ../../../../../Makefile.lib
+
+#
+# Set PROG and OBJS based on the values of MODULE and SRCS.  We expect that
+# these macros to be defined by the Makefile that is including this file.
+#
+# SHAREDSRCS is used to share sources between multiple libtopo modules.
+#
+SRCS = $(MODULESRCS:%.c=%.c) $(SHAREDSRCS:%.c=../../common/$(SHAREDMODULE)/%.c)
+PROG = $(MODULE:%=%.so)
+OBJS = $(MODULESRCS:%.c=%.o) $(SHAREDSRCS:%.c=%.o)
+
+#
+# Set ROOTPROG and ROOTCONF based on the values of MODULE, CLASS, and PLATFORMS
+# We expect these macros to be defined by the Makefile that is including us.
+#
+common_ROOTPROG = $(ROOT)/usr/lib/fm/topo/plugins/$(PROG)
+arch_ROOTPROG = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/plugins/$(PROG)
+plat_ROOTPROG = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(PROG))
+ROOTPROG = $($(CLASS)_ROOTPROG)
+
+common_ROOTCONF = $(ROOT)/usr/lib/fm/topo/plugins/$(CONF)
+arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/plugins/$(CONF)
+plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(CONF))
+ROOTCONF = $($(CLASS)_ROOTCONF)
+
+LINTFLAGS = -msux
+LINTFILES = $(SRCS:%.c=%.ln)
+
+APIMAP = ../../../libtopo/common/topo_mod.map
+MAPFILES =		# use APIMAP instead
+
+C99MODE  = $(C99_ENABLE)
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
+CFLAGS += -G $(XREGSFLAG)
+
+CPPFLAGS += -I.
+CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
+LDFLAGS += $(ZIGNORE) -M$(APIMAP)
+LDLIBS += -L$(ROOTLIBDIR)/fm -ltopo -lnvpair -lc
+DYNFLAGS += -R/usr/lib/fm
+
+all: $(PROG)
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJS) $(LINTFILES)
+
+$(PROG): $(OBJS) $(APIMAP)
+	$(LINK.c) $(DYNFLAGS) $(OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+	$(POST_PROCESS_SO)
+
+%.o: ../../common/$(MODULE)/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../../common/$(SHAREDMODULE)/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+clean:
+	$(RM) $(OBJS) $(LINTFILES) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(PROG)
+
+%.ln: ../../common/$(MODULE)/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.c
+	$(LINT.c) -c $<
+
+lint: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
+
+check:	$(CHECKHDRS)
+
+install_h:
+
+$(ROOTPROG): $$(@D) $(PROG)
+	$(RM) $@; $(INS) -s -m 0555 -f $(@D) $(PROG)
+
+install: $(ROOTPROG)
+
+include ../../../Makefile.rootdirs

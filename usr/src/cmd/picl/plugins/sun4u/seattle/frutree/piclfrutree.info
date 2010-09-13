@@ -1,0 +1,126 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * There are a lot of nodes below the rmclomv node, define a shortname
+ */
+#define	RMCLOMV	/platform/ebus@1f,464000/rmc-comm@2,0/SUNW,rmclomv
+
+
+VERSION 1.1
+VERBOSE 1
+NODE frutree picl
+    NODE chassis fru
+    /*
+     * SunMC physical view view_points for this platform
+     * This will get moved to a separate SunMC physical view plugin later.
+     */
+    PROP ViewPoints string r 0 "front rear side"
+	NODE MB location
+	    PROP SlotType string r 0 "system-board"
+    	    PROP Label string r 0 "MB"
+	ENDNODE
+	NODE PS0 location
+	    PROP SlotType string r 0 "power-supply"
+	    PROP Label string r 0 "PS0"
+	ENDNODE
+	NODE PS1 location
+	    PROP SlotType string r 0 "power-supply"
+	    PROP Label string r 0 "PS1"
+	ENDNODE
+	NODE PDB location 
+	    PROP SlotType string r 0 "PDB"
+	    PROP Label string r 0 "PDB"
+	ENDNODE
+	NODE SYSCTRL location	
+	    PROP Label string r 0 "SYSCTRL"
+        ENDNODE
+    ENDNODE
+ENDNODE
+
+/*
+ * add power-supply nodes if their fru-proms are visible
+ */
+name:/frutree/chassis/PS0
+	REFNODE power-supply fru WITH name:/platform/i2c@1f,530000/power-supply-fru-prom@0,6c
+name:/frutree/chassis/PS1
+	REFNODE power-supply fru WITH name:/platform/i2c@1f,530000/power-supply-fru-prom@0,6e
+
+/* chassis fruid prom */
+name:/frutree/chassis/PDB
+	REFNODE power-distribution-board fru WITH name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
+
+name:/frutree/chassis/PDB/power-distribution-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
+
+name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
+	REFPROP _fru_parent /frutree/chassis/PDB/power-distribution-board
+
+#include "system-board.info"
+#include <fru_SC_data.info>
+#include <SB-tables.info>

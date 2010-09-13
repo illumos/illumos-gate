@@ -1,0 +1,170 @@
+ * Copyright 1989,1990,1995 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+
+ * Copyright 1987-2004 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+
+ * Copyright (C) 1989-1995 by the Massachusetts Institute of Technology,
+ * Cambridge, MA, USA.  All Rights Reserved.
+ *
+ * This software is being provided to you, the LICENSEE, by the
+ * Massachusetts Institute of Technology (M.I.T.) under the following
+ * license.  By obtaining, using and/or copying this software, you agree
+ * that you have read, understood, and will comply with these terms and
+ * conditions:
+ *
+ * Export of this software from the United States of America may
+ * require a specific license from the United States Government.
+ * It is the responsibility of any person or organization contemplating
+ * export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify and distribute
+ * this software and its documentation for any purpose and without fee or
+ * royalty is hereby granted, provided that you agree to comply with the
+ * following copyright notice and statements, including the disclaimer, and
+ * that the same appear on ALL copies of the software and documentation,
+ * including modifications that you make for internal use or for
+ * distribution:
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS", AND M.I.T. MAKES NO REPRESENTATIONS
+ * OR WARRANTIES, EXPRESS OR IMPLIED.  By way of example, but not
+ * limitation, M.I.T. MAKES NO REPRESENTATIONS OR WARRANTIES OF
+ * MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF
+ * THE LICENSED SOFTWARE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY
+ * PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+ *
+ * The name of the Massachusetts Institute of Technology or M.I.T. may NOT
+ * be used in advertising or publicity pertaining to distribution of the
+ * software.  Title to copyright in this software and any associated
+ * documentation shall at all times remain with M.I.T., and USER agrees to
+ * preserve same.
+
+ ** Copyright (C) 1990, RSA Data Security, Inc. All rights reserved. **
+ **                                                                  **
+ ** License to copy and use this software is granted provided that   **
+ ** it is identified as the "RSA Data Security, Inc. MD4 Message     **
+ ** Digest Algorithm" in all material mentioning or referencing this **
+ ** software or this function.                                       **
+ **                                                                  **
+ ** License is also granted to make and use derivative works         **
+ ** provided that such works are identified as "derived from the RSA **
+ ** Data Security, Inc. MD4 Message Digest Algorithm" in all         **
+ ** material mentioning or referencing the derived work.             **
+ **                                                                  **
+ ** RSA Data Security, Inc. makes no representations concerning      **
+ ** either the merchantability of this software or the suitability   **
+ ** of this software for any particular purpose.  It is provided "as **
+ ** is" without express or implied warranty of any kind.             **
+ **                                                                  **
+ ** These notices must be retained in any copies of any part of this **
+ ** documentation and/or software.                                   **
+
+ * Copyright 1993,1995 by OpenVision Technologies, Inc.
+ *
+ * Permission to use, copy, modify, distribute, and sell this software
+ * and its documentation for any purpose is hereby granted without fee,
+ * provided that the above copyright notice appears in all copies and
+ * that both that copyright notice and this permission notice appear in
+ * supporting documentation, and that the name of OpenVision not be used
+ * in advertising or publicity pertaining to distribution of the software
+ * without specific, written prior permission. OpenVision makes no
+ * representations about the suitability of this software for any
+ * purpose.  It is provided "as is" without express or implied warranty.
+ *
+ * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+ * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+ * USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+
+ * Copyright (C) 1998 by the FundsXpress, INC.
+ * 
+ * All rights reserved.
+ * 
+ * Export of this software from the United States of America may require
+ * a specific license from the United States Government.  It is the
+ * responsibility of any person or organization contemplating export to
+ * obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of FundsXpress. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  FundsXpress makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ * 
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+ * Copyright (c) 2002 Naval Research Laboratory (NRL/CCS)
+ *
+ * Permission to use, copy, modify and distribute this software and its
+ * documentation is hereby granted, provided that both the copyright
+ * notice and this permission notice appear in all copies of the software,
+ * derivative works or modified versions, and any portions thereof.
+ * 
+ * NRL ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
+ * DISCLAIMS ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER
+ * RESULTING FROM THE USE OF THIS SOFTWARE.
+
+ * Copyright 1995 by Richard P. Basch.  All Rights Reserved.
+ * Copyright 1995 by Lehman Brothers, Inc.  All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of Richard P. Basch, Lehman Brothers and M.I.T. not be used
+ * in advertising or publicity pertaining to distribution of the software
+ * without specific, written prior permission.  Richard P. Basch,
+ * Lehman Brothers and M.I.T. make no representations about the suitability
+ * of this software for any purpose.  It is provided "as is" without
+ * express or implied warranty.

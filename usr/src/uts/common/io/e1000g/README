@@ -1,0 +1,769 @@
+#
+# This file is provided under a CDDLv1 license.  When using or
+# redistributing this file, you may do so under this license.
+# In redistributing this file this license must be included
+# and no other modification of this header file is permitted.
+#
+# CDDL LICENSE SUMMARY
+#
+# Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
+#
+# The contents of this file are subject to the terms of Version
+# 1.0 of the Common Development and Distribution License (the "License").
+#
+# You should have received a copy of the License with this software.
+# You can obtain a copy of the License at
+#	http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#
+
+
+
+4.0.4 code drop from Intel on 1/30/2003
+=======================================
+  This version is used as the base for putback into both s10 and
+  s9u4. 
+
+  Following changes were done to this code base before putting
+  back into solaris trees (S10 & S9U4):
+
+  1) Changes to e1000_hw.c to remove build warnings
+
+     + diff /home/naroori/grizzly/sources/e1000g/1_4.0.4/e1000_hw.c .
+     2616c2616
+     <  phy_info->downshift = hw->speed_downgraded;
+     ---
+     >  phy_info->downshift = (int)hw->speed_downgraded;
+     2684c2684
+     <  phy_info->downshift = hw->speed_downgraded;
+     ---
+     >  phy_info->downshift = (int)hw->speed_downgraded;
+
+  2) Changes to e1000g_dlpi.c for ipv6 plumbing problem and 
+     problem with default MTU size of 2024.
+
+     + diff /home/naroori/grizzly/sources/e1000g/1_4.0.4/e1000g_dlpi.c .
+     313a314
+     >  /* the following causes problem with ipv6 plumbing...
+     314a316
+     >  */
+     628c630,632
+     <    if (Adapter->Shared.max_frame_size == FRAME_SIZE_UPTO_16K)
+     ---
+     >    if (Adapter->Shared.max_frame_size == ETHERMTU) {
+     >    }
+     >    else if (Adapter->Shared.max_frame_size == FRAME_SIZE_UPTO_16K) {
+     630c634,635
+     <    else
+     ---
+     >    }
+     >    else  {
+     631a637
+     >    }
+
+  3) Changes to e1000g_main.c for version string modification,
+     removing console messages on bootup and problems with default
+     MTU size of 2024.
+
+     + diff /home/naroori/grizzly/sources/e1000g/1_4.0.4/e1000g_main.c .
+     59c59
+     < static char e1000g_version[]="Driver Ver. 4.0.4-beta";
+     ---
+     > static char e1000g_version[]="Driver Ver. 4.0.4";
+     937c937
+     <        e1000g_log(Adapter,CE_CONT,"\n%s, %s\n",AdapterName,e1000g_version);
+     ---
+     >        cmn_err(CE_CONT,"!%s, %s\n",AdapterName,e1000g_version);
+     3000c3000
+     <        Adapter->Shared.max_frame_size = FRAME_SIZE_UPTO_2K;
+     ---
+     >        Adapter->Shared.max_frame_size = ETHERMTU;
+     3013c3013
+     <        Adapter->Shared.max_frame_size = FRAME_SIZE_UPTO_2K;
+     ---
+     >        Adapter->Shared.max_frame_size = ETHERMTU;
+
+
+
+Bug fixes to 4.0.4:
+===================
+   1) bug#4829398 code cleanup for ethernet bootup messages
+
+
+4.0.12 code drop from Intel on 3/18/2003
+========================================
+
+  This drop had extensive changes from 4.0.4. Many changes after 
+  4.0.4 were realted to new hardware (a.k.a. BayCity chipset), 
+  not relevant to Grizzly.After looking at the changelog from Intel, 
+  we decided not to do a putback but rather take only high priority 
+  fixes from this drop and generate a new version 4.0.4.1.
+
+  Here is the changelog supplied by Intel for this drop:
+
+    ________________________________________________________________________
+    Component Name: Unix-Solaris_8254x_BayCity_Intel
+    Description: Bay City software component for gigabit products
+    ________________________________________________________________________
+
+
+    ---Version: 4.0.13  Date: 3/14/2003 5:00:00 PM---
+    Added transmit mutex locking to the 82547 workaround code.
+
+    ---Version: 4.0.12  Date: 3/10/2003 8:01:00 PM---
+    Added new shared code with LED link speed fix
+
+    ---Version: 4.0.11  Date: 3/7/2003 5:57:00 PM---
+    Updated the Tanacross FIFO hang workaround to reset FIFO pointers instead of sending autonomous packets.
+
+    ---Version: 4.0.10  Date: 3/4/2003 2:39:00 PM---
+    Removed an extra sdu adjustment that was left in by accident 
+
+    ---Version: 4.0.9   Date: 3/4/2003 11:13:00 AM---
+    Removed the first call to adapter_stop.  This was called before the HW struct was properly initialized, and could cause hangs. 
+
+    Changed reported ethernet sdu from 2024 to 1500, as driver could be configured for invalid frame MTU sizes in Solaris 9.
+
+    Added Tanacross workaround for FIFO hang.
+
+    ---Version: 4.0.8   Date: 2/25/2003 2:27:00 PM---
+    Shared code update including Phy init script.
+    Smartspeed workaround added.  e1000g_smartspeed called from LocalTimer function every two seconds when link is down. 
+
+    ---Version: 4.0.7   Date: 2/18/2003 11:41:00 AM---
+    Updated to include bug fixes from the shared code.
+
+    ---Version: 4.0.5   Date: 1/31/2003 10:13:00 AM---
+    Support for new hardware changes
+    Removed the extra ack sent at the end of the attach_req routine.  This extra ack previously made IPv6 plumbing on Solaris 9 fail. 
+
+
+4.0.4.1 
+=======
+   This version is not an Intel drop but 4.0.4 merged with two
+   high priority fixes from 4.0.12. We will give back the 4.0.4.1 
+   driver back to Intel, per their request, so they have the exact 
+   code that we are releasing through Solaris.
+
+   The following are the two fixes selected for inclusion from
+   4.0.12 codebase:
+
+   1) Removing the first call to adapter_stop as discussed in
+      4.0.12 changelog.
+
+   2) Corrections to MTU size calculations first introduced
+      in our 4.0.4 putback to bring them into sync with 4.0.12
+      MTU size calculations.
+
+   We also added README file (current file you are reading) during
+   this putback.
+
+4.0.4.2 
+=======
+  This version has the following fixes:
+
+  1) bug#4857098: e1000g driver assumes another intel card as its own.
+     The fix involved eliminating 1009, 1012, 1015, 1016, 1017 
+     device-ids from e1000g nodelist so that they do not conflict 
+     with iprb's subsystem-ids.
+
+     This fix has to be reverted later once we have a proper fix for
+     bug#4859426.
+
+   2) bug#4853683: e1000g lacks a large number of expected kstats
+      The fix involved three steps: a) Renaming some of the existing
+      kstats to comply with WDD documentation b) Computing some of
+      those which are not being tracked c) Supplying zero for the rest
+      the error stats which are not being tracked.
+
+      This fix has to be revisited to improvise the statistics in 
+      future.
+     
+   3) bug#4862529: System panics during configuring devices on a Dell 4-way 
+      servers. The fix involved removing all the devic-ids from nodelist
+      except for 1010. This means that we support now only the grizzly 
+      on-board gigabit chipset and "Intel Pro/1000 MT Dual Server Adapter". 
+    
+      This fix has to be reverted later once we have a proper fix for
+      bug#4859426.
+
+4.0.4.3 
+=======
+  This version has the following fixes:
+
+  1) bug#4874857: ipv6 ping fails on bootup for e1000g.
+	 The fix involved implementing multicast tables both at per stream
+	 level and per device level.
+
+  2) bug#4875743: null pointer dereference in ddi_dma_addr_bind_handle.
+	 The fix involved adding LastTxDescriptorBuf to struct e1000g and
+	 handling consequent proper calculations for LastTxDescriptor.
+
+  3) bug#4882541: setting up ethernet address causes machine to panic.
+     The fix involved removing a spurious log message which was causing
+	 the panic.
+
+  4) bug#4883302: Reinstate the removed device-ids - phase 2.
+	 The fix involved some chip initializations to handle 1000 id.
+
+  5) bug#4919285: device id 8086,100e needs to be added
+	 The fix needed for the Intel Precision 350 workstation
+
+4.2.11
+======
+
+We need to sync up with the latest Intel code base for e1000g driver.
+
+Intel is currently at version 4.2.11 while we are on 4.0.4 branch.
+The exact version under 4.0.4 branch is 4.0.4.3. Since we are on
+the branch while Intel is working on the main trunk, we have had
+lot of friction in getting timely fixes from Intel. The current
+syncing up with their main trunk lets us a smooth migration path.
+
+The new code base  also would provide us with support for additional
+cards including Quad port cards (See bugs: 4921433, 4914460).
+In our old 4.0.4 branch, we had to drop support for a lot of cards
+for various problems; with the current syncing up, we would be able
+to support so many various cards except for the cards clashing with
+iprb driver.
+
+The new code base also has support for additional new chipsets. The code
+base also benefits from any fixes to the shared code base with other
+operating system drivers.
+
+The new codebase also has lot of cleanups in terms of various #ifdefs
+and should be much simpler to maintain.
+
+So the list of actual ids take out are:
+1009
+1012
+1013
+1015
+1016
+1017
+
+4.2.15
+======
+This intel code drop addresses the following bug:
+
+    4909863: Bad trap panic in e1000g_rtn_buf
+
+4.2.16
+======
+  This version has the following fix:
+   4932422 interconnect remains faulted after adapter disconnected and then reconnected
+
+Notes on packaging:
+===================
+   Intel names the package as INTCGigaE while we chose to rename
+   it as SUNWintgige as per Sun packaging conventions.
+
+4.2.17
+======
+  This version has the following fixes:
+   4971416 e1000g seems to hang system when no network connected
+   4997067 e1000gattach panicks when the going gets tough
+   4990064 e1000g leaks memory when it runs out of transmit descriptors
+
+4.2.17.1
+======
+  This version has the following fix:
+   5014625 e1000g driver panicked when snoop(1M) exited
+
+4.2.17.2
+======
+  This version has the following fix:
+   4940870 e1000g: Dependence on instance initialization order disables .conf properties   
+   5033616 e1000g panicked after rem_drv while some service still binds to the driver
+   5037062 strings have crept back in e1000g/adpu320 related mutex_init()s
+   5050268 Some e1000g flag operations are not correct.
+
+4.2.17.3
+======
+  This version has the following fix:
+   5067162 e1000g cannot transmit heavy UDP
+
+4.2.17.4
+======
+  This version has the following fix:
+   5010052 The stress load/unload test of Intel PWLA8494MT Quad Port NIC causes system hung
+   5050265 E1000g does not support IPV6 fast path. This will impact IPV6 performance.
+   5050369 E1000g locks the system if plumb/unplumb under heavy workload and snoop.
+   5050415 E1000g will accepts ethernet packets which are not addressed to it.
+   5055132 E1000g crashes when injected with Jumbo Frame packets.
+
+4.2.17.5
+======
+  This version has the following fix:
+   6175307 system crash with memory size of 11GB
+   6176031 the sequence of releasing resource error in e1000gattach
+   6180180 PktAlloc - Could not bind rbuf packet as single frag. Count - 2
+   6185022 Port hang when unplumb interface under heavy traffic
+
+4.2.17.6
+======
+  This version has the following fix:
+   6196426 e1000g should support NICs that use the internal serdes for external connectivity
+
+4.2.17.7
+======
+  This version has the following fix:
+   4921433 e1000g: Should not probe by using VID/DID table to identify adapters
+
+4.2.17.8
+======
+  This version has the following fix:
+   6213101 64bit DMA max address space should be supported by e1000g driver
+   6215261 e1000g driver 211% slower in AMD64 than 32 bit e1000g driver (S10_73, Single CPU V20z)
+
+4.2.17.9
+======
+  This version has the following fix:
+   6256212 fix for 6213101 breaks e1000g for 32-bit kernels on machines with >4GB of physical memory
+
+4.2.17.10
+======
+  This version has the following fix:
+   6203602 e1000g needs to support the Intel PCI-E card
+   6217046 we need to merge the Intel code (version 4.2.28) into e1000g
+
+5.0.0
+======
+  This version has the following fix:
+   PSARC/2005/470 E1000g Nemo Migration
+   6221079 e1000g driver interface conversion from DLPI to GLD3.0(nemo)
+   6224901 e1000g fails to configure VLANs on a Sun v65x
+   6286414 snmp: ifOperStatus for e1000g driver doesn't change when cable is unplugged.
+   6238486 e1000g: poor performance in web server benchmark, high CPU utilization noted
+   6293265 e1000g_intr doesn't use mutex at all
+   6304657 e1000g_PktAlloc_buffers() causes a panic when ddi_dma_addr_bind_handle() fails.
+   4913292 e1000g: does not support PSARC 2003/264 Extended IP cksum_offload
+   5071610 e1000g can't send any packets after a jumbo-packet forwarding test.
+   5082975 in Jumbo enable mode, netperf indicates a lower throughput, compared to Jumbo of
+   5085394 e1000g driver hangs system during 64byte stress testing
+   6174349 netlb support needed for Solaris e1000g driver
+   6207682 e1000g needs link up/down support
+   6211068 e1000g has some input error packets during stress test
+   6212810 e1000g caught sending unsolicited M_PROTO/M_PCPROTO messages
+   6219298 warnings about "inconsistent getinfo(9E) implementation"
+   6226217 e1000g should support trunking
+   6239279 Network stess test fail on 82545GM chip on IBM Blade HS40
+   6242612 e1000g needs to support SPARC
+   6247936 In e1000g transmission, ddi_dma_addr_bind_handle() returns more cookies than speficied
+   6273730 e1000g causes memory leaks within Freelist_alloc and PktAlloc_buffers
+   5073739 find some memory leaks after load_unload test
+   6287250 e1000g may need to use new Intel-recommended semaphore mechanism
+
+5.0.1
+======
+  This version has the following fix:
+   6313609 2-port Intel NIC (part# 370-6687) performs poorly compared to 1-port Intel NIC (part# 370-6685)
+   6315002 gcc and e1000g don't get along
+
+5.0.2
+======
+  This version has the following fix:
+   6319100 Tier0 Ontario machine does not boot net with sparc e1000g driver substitution for sparc ipge driver
+
+5.0.3
+======
+  This version has the following fix:
+   6327693 e1000g should use MSIs when possible
+   6333461 panic[cpu0]/thread=d63f4de0: assertion failed: !dma->dp_inuse, file: ../../i86pc/io/rootnex.c
+
+5.0.4
+======
+  This version has the following fix:
+   6351378 e1000g panic seen after bfu'ing latest onnv nightly
+
+5.0.5
+======
+  This version has the following fix:
+   6303973 System hard hangs when sharing interrupts (in PIC) mode
+   6323732 e1000g reports incorrect packet statistics
+   6333880 Customer is requesting driver for a newIntel 82573 NIC
+   6336163 netlb support needed for Solaris (sparc) e1000g driver
+   6339377 e1000g.conf needs to be simplified
+   6350407 e1000 card in Gateway E2300 does not actually send packets in S10U1
+   6364052 e1000g driver should provide interface to ndd utility
+   6367490 e1000g has problem in deliver UDP fragment with addin card
+
+5.0.6
+======
+  This version has the following fix:
+   4967732 e1000g: high mutex contention in e1000g_start
+   6316907 e1000g: bcopy() brings better performance in transmitting and receiving small packet
+   6371753 aggregation of e1000g NICs fails to provide connectivity unless snoop is running
+   6397163 Jumbo frame statistics always counts zero with e1000g driver
+   6401903 Memory leak in e1000g driver
+
+5.0.7
+======
+  This version has the following fix:
+   6337450 e1000g interfaces take much much longer to plumb than bge interfaces on the V40.
+   6392401 Intel Ophir (82571) e1000g driver fails to attach on sun4u Boston with snv_33
+   6401659 vlan header getting corrupted due to memmove in e1000g sendPacket
+   6407374 e1000g still uses some old ddi interrupt routines that need to be changed
+   6411339 BAD TRAP: e1000g_fill_tx_ring NULL pointer dereference
+
+5.0.8
+======
+  This version has the following fix:
+   6399084 ipmp doesn't work with e1000g
+   6412153 ndd force speed is not consistent with e1000g.conf and e1000g(7D)
+   6415019 system panic when plumb e1000g interface up on SPARC
+   6415416 netlbtest does not run on Intel(R) PRO/1000 Network controller
+
+5.0.9
+======
+  This version has the following fix:
+  6337987 Serial Over Lan issue when e1000g driver is used
+
+5.1.0
+======
+  This version has the following fix:
+  PSARC/2006/248 Nemo MAC-Type Plugin Architecture
+  PSARC/2006/249 Nemo Changes for Binary Compatibility
+  6384371 GLDv3 only supports Ethernet
+  6242059 nemo drivers must not know the size of the mac_t structure
+  6226635 MAC stats interface could cause problems with binary compatibility
+
+5.1.1
+======
+  This version has the following fix:
+   6384266 e1000g driver should provide external loopback support
+   6428883 NEM e1000g drive netlbtest intermittent failed when running Sunvts FUNC test with cputest,vmemtest..
+   6430731 e1000g.conf file removed on upgrade
+   6431317 add support for intel Pro/1000 PT Adapter
+   6433236 Update the e1000g driver with the latest shared code from Intel
+   6439589 e1000g: whines about checksum capability, unclear what user should do
+   6441386 The default value of some e1000g parameters may impact rx performance
+   6445239 assertion failed: cookie_count == 1, file: ../../common/io/e1000g/e1000g_alloc.c, line: 422
+   6447914 e1000g should support setting of multiple unicast addresses
+   6449595 Ophir LAA driver workaround is not working for e1000g Driver
+
+5.1.2
+======
+  This version has the following fix:
+   6450683 Boston panics with e1000g under stress
+   6463536 BAD TRAP panic for removing aggregation
+   6463756 e1000g - link_speed / kstat output
+   6464426 e1000g driver needs a workaround to solve an ESB2 hardware issue
+
+5.1.3
+======
+  This version has the following fix:
+   6436387 e1000g panic while using cfgadm to unconfigure the pcie slot
+   6460403 disconnect of pcieX that has ophir with network if plumbed crashes the system
+   6466962 S10u2 e1000g 5.0.9 adv_autoneg_cap is not reflected on the kstat -p
+   6470233 e1000g_fill_tx_ring doesn't always update TDT properly
+
+5.1.4
+======
+  This version has the following fix:
+   6462893 HCTS network test failed on thumper machine due to e1000g issue
+   6467860 e1000g configured/used as cluster interconnect goes up and down when connected back to back
+
+5.1.5
+======
+  This version has the following fix:
+   6479912 Interrupt throttling tunable needed
+   6492025 northstar MMF e1000g external loopback fail.
+
+5.1.6
+======
+  This version has the following fix:
+   6482530 Need Ethernet driver for Intel G965 chipset
+   6491179 link aggregation with e1000g does not work unless snoop is running
+   6494743 e1000g 5.1.4 driver does not work with s11_52
+   6502458 e1000g is open source, move the source from usr/closed to use/src
+   6505360 e1000g Makefile should not include "-N drv/dld" in the LDFLAGS
+
+5.1.7
+======
+  This version has the following fix:
+   6454375 e1000g link flaps at initialization, triggering failovers
+   6472255 e1000g can't restore to 1000M with ndd setting
+   6496763 e1000g should free packets when link is down
+   6501294 "eeprom checksum failed" with pci8086,108c device
+   6504688 e1000g.conf settings are inconsistent with ndd output
+   6505445 e1000g : when all advertised capabilities are set to 0, ndd puts all of them 1
+   6519690 e1000g should not print the link up/down messages to console
+   6531474 Fatal PCIe Fabric Error panics on T2000 when using jumbo frames on e1000g interfaces
+   6535712 e1000g: the processing of the checksum flags should be protected by tx_lock
+
+5.1.8
+======
+  This version has the following fix:
+   6548711 e1000g: recursive mutex_enter in e1000g_link_check() on ESB2 platforms
+   6550086 e1000g: detaching driver immediately after attach induces panic
+
+5.1.9
+======
+  This version has the following fix:
+   6507422 Dynamic Reconfiguration detach fails for e1000g
+
+5.1.10
+======
+  This version has the following fix:
+   6490623 Some networking problems with Solaris_b44_64 domU(using solaris_b44_64 dom0)
+   6510396 system panicked in e1000g_82547_timeout
+   6554976 e1000g driver does not support 10D5 device - Sun Pentwater PEM quad port
+
+5.1.11
+======
+  This version has the following fix:
+   6552853 system panics in e1000g_alloc_dvma_buffer during hotplug testing
+
+5.2.0
+======
+  This version has the following fix:
+   6535620 e1000g needs to support ICH9 devices
+   6572330 e1000g: integrate the latest Intel refactored shared code
+   6573381 e1000g receiving VLAN tagged frames does not do hardware checksumming
+
+5.2.1
+======
+  This version has the following fix:
+   6594676 e1000g should free private dips while no rx buffers are held by upper layer
+
+5.2.2
+======
+  This version has the following fix:
+   6480448 Sunvts netlbtest external loopback failed on 82546 chipset
+   6521984 Sunvts netlbtest failed on Northstar QGE cards
+   6531842 e1000g link goes down and up frequently on T2000 systems
+   6540535 Sunvts netlbtest internal loopback failed on ophir devices
+   6579605 Sunvts netlbtest internal loopback failed on Northstar fiber card
+   6595668 e1000g postinstall script missed 5 device ids which had been supported by shared code
+
+5.2.3
+======
+  This version has the following fix:
+   6335851 e1000g needs to support FMA
+   6605171 WARNING: pciex8086,105e - e1000g[0] : Initialize hw failed
+
+5.2.4
+======
+  This version has the following fix:
+   6619929 Sunvts test on Northstar QGC EM failed for "Not received any packets in loopback mode".
+   6541233 e1000g driver performs 33X Slower for Tibco RV when running Multiple RVDs
+   6572343 e1000g: needs to improve the ip forwarding performance
+   6637039 e1000g_recycle() missed a mutex_exit()
+
+5.2.5
+======
+  This version has the following fix:
+   6648775 e1000g: pci8086,10be - e1000g[0]: Identify hardware failed
+
+5.2.6
+======
+  This version has the following fix:
+   6633239 e1000g: link flaps observed on Galaxy(X4100) systems running 64-bit kernel
+
+5.2.7
+======
+  This version has the following fix:
+   6673650 e1000g needs to support Brussels
+
+5.2.8
+======
+  This version has the following fix:
+   6674179 SunFire X4150 panics at e1000g_receive
+   6679136 E1000g with patch 128028-03 will not allow pause frames to be set
+   6687947 e1000g needs to integrate the latest Intel shared code to support ICH9m
+   6699622 e1000g: add support for network device in new development machine
+
+5.2.9
+======
+   6665738 e1000g issues with some Ethernet controllers
+   6713685 e1000g:one device id macro should be renamed
+
+5.2.10
+======
+  This version has the following fixes:
+   6335837 e1000g needs to support LSO
+   6637659 e1000g has problem on transmit hardware checksum support
+
+5.2.11
+======
+  This version has the following fixes:
+   6698039 e1000g tx doesn't work on the specific chipset since snv_88
+   6597545 e1000g ESB2 serdes device pciex8086,1098 hangs in network testing
+   6693205 running sunvts7.0 on Generic s10u5build10 causes unix:cmi_mca_panic on thumper
+   6694279 e1000g driver: internal loopback mode support needed for nic ESB-2
+   6721574 max number of segments in e1000g_tx_dma_attr need to be updated when LSO is supported
+
+5.2.12
+======
+  This version has the following fix:
+   6634746 e1000g is missing lint target in Makefile
+   6705005 e1000g LINK/ACT LED behaviour is not consistent with the EEPROM default
+   6738552 e1000g rx_lock is not initialized and destroyed in the code
+
+5.2.13
+======
+  This version has the following fix:
+   6666998 Add support for ICH10 in e1000g driver
+   6709230 Requesting driver support in e1000g for new Intel(R) single port MAC/PHY NIC
+   6727113 e1000g performance regression is observed with large connection and packet size if LSO is enabled
+   6756917 LSO is not enabled on some e1000g chips
+
+5.2.14
+======
+  This version has the following fix:
+   6713032 e1000g port hang, no xmit, no recv
+   6767201 e1000g default_mtu does not coincide with max_frame_size on some chipsets when set via e1000g.conf
+
+5.3.1
+======
+  This version has the following fix:
+   6779610 e1000g fails to attach post-6713032 due to memory allocation failures on some chipsets
+
+5.3.2
+======
+  This version has the following fix:
+   6779494 e1000g need to sync with sol_anvik_patch shared code from Intel
+   6758857 fmadm reporting undiagnosable problems in snv_99
+   6698312 starcat panicked with "bad mutex" while running SUNWsgdr
+   6759330 PIT: panic during first reboot after successful pkgadd during osinstall
+   6776453 Monza(CP3260): loopback test fails on e1000g serdes ports
+
+5.3.3
+======
+  This version has the following fix:
+   6791863 sync up flow control code with Intel latest shared code
+
+5.3.4
+======
+  This version has the following fix:
+   6699662 global e1000g rwlock prevents scaling on multiple interfaces
+   6781905 super slow throughput on e1000g 82541 and 82547 chips
+   6786783 e1000g needs to have a new tx stall detection mechanism to cover 82546 errata No.18
+
+5.3.5
+======
+  This version has the following fix:
+   6732858 panic in e1000g_free_dma_buffer
+
+5.3.6
+======
+  This version has the following fixes:
+   6589577 Huron does not discard and does transmit frames greater than maxFrameSize
+   6809729 Panic in function 'e1000g_rxfree_func' on T2000
+   6809877 e1000g E1000G_IPALIGNROOM code can be rewritten
+
+5.3.7
+======
+  This version has the following fix:
+   6812227 e1000g(intel 82571 adapter) must support MTU size of 9216
+
+5.3.8
+======
+  This version has the following fixes:
+   6775380 the e1000g link hung at "up" state after down and unplumb the interface
+   6816786 e1000g panics on Lenovo X301 with snv_109
+
+5.3.9
+====
+  This version has the following fix:
+   6680929 dladm should print POSSIBLE values for properties like mtu by contacting the driver.
+
+5.3.10
+====
+  This version has the following fix:
+   6841089 Customer wants to be able to set MAX_NUM_MULTICAST_ADDRESSES above 256 on e1000g driver
+
+5.3.11
+====
+  This version has the following fix:
+   6848586 rw_enter()/rw_exit() could be called on uninitialized rw lock
+
+5.3.12
+====
+  This version has the following fixes:
+   6846262 T2000 fma shows fault.io.pciex.device-interr in snv_115
+   6870404 e1000g_reset can call e1000g_start after releasing dma resources
+
+5.3.13
+====
+  This version has the following fixes:
+   6681751 e1000g minor_perm inconsistent between package postinstall script and default minor_perm file
+   6855964 e1000g driver corrupting LSO packets causes chipset hang and significant performance regression
+
+5.3.14
+====
+  This version has the following fixes:
+   6820747 kstat output incorrect for MMF version of e1000g making it impossible to troubleshoot
+   6847888 HW initialization updates for 82541 and 82547 chips
+
+5.3.15
+======
+  This version has the following fixes:
+   6797885 need to add support for network device (8086,10ea) in a new Intel system
+   6803799 need to add network device support (8086,10ef) for a new Intel system
+   6808388 e1000g inteface experience packet lost when switch between joining and leaving a multicast stream
+
+5.3.16
+======
+  This version has the following fixes:
+   6881588 e1000g functions should return when e1000g_check_dma_handle() fails
+   6888320 e1000g emits scary mutex message on the console
+
+5.3.17
+======
+  This version has the following fixes:
+   6893285 e1000g 'pciex8086,105e' with PHY type igp I/O devices have been retired
+   6895459 e1000g share code update v3-1-10-1
+
+5.3.18
+======
+  This version has the following fix:
+   6894476 e1000g is not lint clean
+
+5.3.19
+======
+  This version has the following fix:
+   6877343 e1000g's default tx/rx resource consumption too high for jumbograms
+
+5.3.20
+======
+  This version has the following fixes:
+   6901523 e1000g does not return failure when setting external loopback fails
+   6903712 Cannot install on DQ45EK system due to e1000g driver alias
+   6909097 e1000g specifies incorrect flag when allocating tx DMA buffers
+   6909553 e1000g stall reset leaves GLDv3 link state as "unknown"
+
+5.3.21
+======
+  This version has the following fix:
+   6909134 e1000g doesn't use ddi_get/ddi_put to access its IO space
+
+5.3.22
+======
+  This version has the following fixes:
+   6903292 Running flag not set on IPMP underlying e1000g interfaces
+   6913835 e1000g driver passes bad messages up the stack when jumbograms received
+   6919873 panic: BAD TRAP: type=e (#pf Page fault) in module "e1000g" during ifconfig plumb group ipmp0
+
+5.3.23
+=====
+  This version has the following fixes:
+   6838180 tcp corruption seen with northstar cards
+   6925276 e1000g not consistent with link_lock usage
+   6933844 NULL ptr deref in e1000g_rx_setup() due to inconsistency between recv_list & rx_desc_num
+
+5.3.24
+=====
+  This version has the following fixes:
+   6861114 System Panics with FMA ereport.io.fire.epkt
+   6876953 Memory leaks found in e1000g_alloc_rx_sw_packet on snv_111b
+   6945160 netlbtest fails with Can't set loopback mode on device e1000g6
+   6960959 panic in e1000g_receive
+   6965855 e1000g(intel 82571 adapter) needs to support MTU size of 9000
+   6967530 Need version in e1000g driver
+   6967873 e1000g needs to clear the link-down status when being unplumbed

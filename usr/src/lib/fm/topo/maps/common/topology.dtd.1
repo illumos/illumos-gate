@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+-->
+
+<!--
+  Topology description DTD
+
+    Most attributes are string values (or an individual string from a
+    restricted set), but attributes with a specific type requirement are
+    noted in the comment describing the element.
+-->
+
+<!--
+  XInclude support
+
+    Topologies may be composed via the xi:include tag.
+    libtopo interfaces enforce that all composed topologies be of the
+    same scheme.
+-->
+
+<!ELEMENT xi:include
+	(xi:fallback) >
+
+<!ATTLIST xi:include
+  href CDATA #REQUIRED
+  parse (xml|text) "xml"
+  encoding CDATA #IMPLIED
+  xmlns:xi CDATA #FIXED "http://www.w3.org/2001/XInclude"
+  >
+
+<!ELEMENT xi:fallback
+  ANY
+  >
+<!ATTLIST xi:fallback
+  xmlns:xi CDATA #FIXED "http://www.w3.org/2001/XInclude"
+  >
+
+<!-- Properties and property groups -->
+
+<!--
+  propval
+
+ 	This element is for a singly valued property within a property group.
+
+	Its attributes are
+
+		name	The name of this property.
+
+		type	The data type for this property.
+		
+		value	The value for this property.  Must match type
+			restriction of type attribute.
+			
+			This is optional for array types
+			
+-->
+
+<!ELEMENT propval (propitem*) >
+
+<!ATTLIST propval
+	name		CDATA #REQUIRED
+	type		( int32 | uint32 | int64 | uint64 |
+			  string | fmri | int32_array | uint32_array |
+			  int64_array | uint64_array | string_array |
+			  fmri_array ) #REQUIRED
+	value		CDATA "" >
+<!--
+  propitem
+
+ 	This element is an optional child element of propval and is used to
+	specify the values for array elements
+
+	Its attributes are
+
+		value	The value for this property.  Must match type
+			restriction of type attribute.
+			
+-->
+
+<!ELEMENT propitem EMPTY >
+
+<!ATTLIST propitem
+	value		CDATA #REQUIRED >
+
+
+<!--
+  propgroup
+
+	This element is for a set of related properties on a topo node
+	It contains an optional stability element, as well as
+	zero or more property-containing elements.
+
+	Its attributes are
+
+		name		The name of this property group.
+		name-stability	Stability level of the property group name
+		data-stability	Stability level of the property names and
+				content
+		version		Version of the propery group definition
+
+-->
+
+<!ELEMENT propgroup
+	( propval*, propmethod* ) >
+
+<!ATTLIST propgroup
+	name		CDATA #REQUIRED
+	version		CDATA #REQUIRED
+	name-stability	( Private | Standard | Stable | Evolving | Unstable |
+                        External | Obsolete ) #REQUIRED
+	data-stability	( Private | Standard | Stable | Evolving | Unstable |
+                        External | Obsolete ) #REQUIRED >
+
+<!--
+  set
+	This element is for associating ranges, nodes or property groups
+	according to a set type.
+
+	Its attributes are
+
+		type	The type of this property group set.  'product' is the
+			only set type currently supported.
+		setlist	The list of set types.
+
+-->
+
+<!ELEMENT set
+	 ( range*, fac-enum?, propgroup*, facility*, set* ) >
+
+<!ATTLIST set
+	type	( product ) #REQUIRED
+	setlist	CDATA #REQUIRED >
+
+<!--
+  propmap
+	This element is for specifying an additional topo map file for
+	properties assigned to a given range.
+
+	Its attributes are
+
+		name		Name of map file
+-->
+
+<!ELEMENT propmap EMPTY >
+
+<!ATTLIST propmap
+	name		CDATA #REQUIRED >
+
+<!-- Methods -->
+
+<!--
+  argval
+ 
+	A propmethod argument. It has two attributes:
+ 
+		name    The name of the argument.
+		type    The data type of the argument.
+		value	The value for this argument.  Must match type
+			restriction of type attribute.
+			
+			This attribute is optional for array types
+-->
+
+<!ELEMENT argval (argitem*) >
+
+<!ATTLIST argval
+        name            CDATA #REQUIRED
+	type		( int32 | uint32 | int64 | uint64 |
+			  string | fmri | int32_array | uint32_array |
+			  int64_array | uint64_array | string_array |
+			  fmri_array ) #REQUIRED
+        value           CDATA "">
+
+<!--
+  argitem
+
+ 	This element is an optional child element of argval and is used to
+	specify the values for array elements
+
+	Its attributes are
+
+		value	The value for this property.  Must match type
+			restriction of type attribute.
+			
+-->
+
+<!ELEMENT argitem EMPTY >
+
+<!ATTLIST argitem
+	value		CDATA #REQUIRED >
+
+
+<!--
+   propmethod
+
+	This element is for properties that can only be determined dynamically
+	from a plugin.
+
+	Its attributes are
+
+      		name		Name of the method
+      		version		Version of the method API
+      		propname	Name of the property to create
+		proptype	Type of the property to create
+		mutable         optional: default is false (0)
+		nonvolatile     optional: default is false (0)
+-->
+
+<!ELEMENT propmethod
+	( argval* ) >
+
+<!ATTLIST propmethod
+	name		CDATA #REQUIRED
+	version		CDATA #REQUIRED
+	propname	CDATA #REQUIRED
+	proptype	CDATA #REQUIRED
+	mutable		(0|1) "0"
+	nonvolatile	(0|1) "0" >
+
+<!--
+  enum-method
+
+	This element describes the enumeration method used to
+	populate a composition of topo nodes for a given range of topology
+	nodes. 
+
+	Its attributes are
+
+		name	Name of the module exporting an enumeration method.
+
+		version Version of the libtopo API
+
+-->
+
+<!ELEMENT enum-method EMPTY >
+
+<!ATTLIST enum-method
+	name		CDATA #REQUIRED
+	version		CDATA #REQUIRED >
+
+<!--
+  node
+
+	This element identifies a topology node instance.
+
+	Its attributes are
+
+		instance The instance number of the node
+
+-->
+
+<!ELEMENT node
+	( fac-enum?, facility*, propgroup*, set*, enum-method*, dependents? ) >
+
+<!ATTLIST node
+	instance	CDATA #REQUIRED >
+
+<!--
+  dependents
+
+	Ranges may have a number of "dependent" ranges, linked to
+	the original range hierarchically as children or as a list, siblings. 
+
+	Its attribute is:
+		grouping	children | siblings
+-->
+
+<!ELEMENT dependents 
+	(( range | xi:include )*, set*) >
+
+<!ATTLIST dependents 
+	grouping ( children | siblings ) #REQUIRED >
+
+<!--
+  range
+
+    This element identifies a range of possible topology nodes.
+
+    Its attributes are
+
+	name	The common name of all the possible topo nodes
+
+	min	The smallest allowed instance number for an
+		actual topo node.
+
+	max	The largest allowed instance number for an
+		actual topo node.
+-->
+
+<!ELEMENT range
+	( enum-method?, propmap?, fac-enum?, facility*, node*, propgroup*, set*,
+	    dependents* ) >
+
+<!ATTLIST range
+	name		CDATA #REQUIRED
+	min		CDATA #REQUIRED
+	max		CDATA #REQUIRED >
+
+<!--
+  facility
+
+    This element identifies a single facility node instance
+
+    Its attributes are
+
+	name	The name of the facility node
+
+	type	The type of facility node: either "sensor" or "indicator"
+
+	provider	The name of the facility provider module that
+	                implements the methods for this node or range
+-->
+
+<!ELEMENT facility
+	( propgroup* ) >
+
+<!ATTLIST facility
+	name		CDATA #REQUIRED
+	type		(sensor | indicator) #REQUIRED
+	provider	CDATA #REQUIRED >
+
+<!--
+  fac-enum
+
+    This element identifies a facility provider module that
+    implements a facility enumeration method for the enclosing
+    node or range.
+
+    Its attributes are
+
+	provider	The name of the facility provider module that
+	                implements the facility enumerator method for
+			the parent node or range
+-->
+
+<!ELEMENT fac-enum EMPTY >
+
+<!ATTLIST fac-enum provider CDATA #REQUIRED >
+
+<!--
+  topology
+
+	This is the root-level for the scheme-specific topology
+
+	Its attributes are:
+		name	topology name
+		scheme 	( hc | dev  ) 
+-->
+
+<!ELEMENT topology
+	((range* | xi:include*), set*)>
+
+<!ATTLIST topology
+	name	CDATA #REQUIRED
+	scheme (hc | dev) #REQUIRED >

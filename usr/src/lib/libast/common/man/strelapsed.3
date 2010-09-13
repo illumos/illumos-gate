@@ -1,0 +1,77 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH STRELAPSED 3
+.SH NAME
+strelapsed \- parse elapsed time expression
+.SH SYNOPSIS
+.L "unsigned long strelapsed(char* buf, char** next, int persec)"
+.SH DESCRIPTION
+.I strelapsed
+returns a pointer to a string representation of the elapsed time for
+.L (count/persec)
+seconds.
+The two largest time units are used, limiting the return value length
+to at most 6 characters.
+The units are:
+.TP
+.B s
+seconds
+.TP
+.B m
+minutes
+.TP
+.B h
+hours
+.TP
+.B days
+.TP
+.B weeks
+.TP
+.B M
+months
+.TP
+.B Y
+years
+.TP
+.B S
+scores
+.SH "SEE ALSO"
+strelapsed(3)
+.SH CAVEATS
+The return value points to a static area that is overwritten on each call.

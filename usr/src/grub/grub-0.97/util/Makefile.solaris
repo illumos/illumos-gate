@@ -1,0 +1,81 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+
+INCLUDES	= -I. -I.. -I../lib -I../docs
+LIBCOMMON	= ../lib/libcommon.a
+
+# Build these only if the OPTION_UTILS on is on (blank).
+$(OPTION_UTILS)PROGRAMS = mbchk
+
+
+# Build these only if the OPTION_UTILS on is on (blank).
+# Will be installed.
+$(OPTION_UTILS)INSTALL_SCRIPTS = grub-install		\
+				 grub-md5-crypt		\
+				 grub-set-default	\
+				 grub-terminfo
+# Won't be installed.
+$(OPTION_UTILS)NOINSTALL_SCRIPTS = grub-image
+
+SCRIPTS		= $(INSTALL_SCRIPTS) $(NOINSTALL_SCRIPTS)
+
+
+INSTALL_BINDIR	= $(ROOT_PLAT_GRUB)/bin
+INSTALL_SBINDIR	= $(ROOT_PLAT_GRUB)/sbin
+
+INSTALL_TARGETS	= $(PROGRAMS:%=$(INSTALL_BINDIR)/%) \
+		  $(INSTALL_SCRIPTS:%=$(INSTALL_SBINDIR)/%)
+
+$(INSTALL_BINDIR)/%  := FILEMODE = 0555
+$(INSTALL_SBINDIR)/% := FILEMODE = 0555
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/util
+SRC_FILES	= Makefile.am Makefile.in grub-image.in grub-install.in \
+		  grub-md5-crypt.in grub-set-default.in grub-terminfo.in \
+		  mbchk.c mkbimage
+
+INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all: $(PROGRAMS) $(SCRIPTS)
+
+$(PROGRAMS): $$@.o
+	$(RM) $@
+	$(LINK) -o $@ $@.o $(LIBCOMMON)
+
+$(SCRIPTS): $$@.in ../config.status.solaris
+	cd .. && ./config.status.solaris util/$@
+
+
+install: all $(INSTALL_TARGETS)
+
+$(INSTALL_BINDIR)/%: $(INSTALL_BINDIR) %
+	$(INS.file)
+
+$(INSTALL_SBINDIR)/%: $(INSTALL_SBINDIR) %
+	$(INS.file)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(INSTALL_BINDIR) $(INSTALL_SBINDIR) $(SRC_DIR):
+	$(INS.dir)
+
+
+clean: _FORCE
+	$(RM) *.o $(NOINSTALL_SCRIPTS)
+
+clobber: clean
+	$(RM) $(PROGRAMS) $(INSTALL_SCRIPTS)
+
+_FORCE:

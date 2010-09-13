@@ -1,0 +1,63 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+s/yyback/fruback/g
+s/yybgin/frubgin/g
+s/yycrank/frucrank/g
+s/yyerror/fruerror/g
+s/yyestate/fruestate/g
+s/yyextra/fruextra/g
+s/yyfnd/frufnd/g
+s/yyin/fruin/g
+s/yyinput/fruinput/g
+s/yyleng/fruleng/g
+s/yylex/frulex/g
+s/yylineno/frulineno/g
+s/yylook/frulook/g
+s/yylsp/frulsp/g
+s/yylstate/frulstate/g
+s/yytext/frutext/g
+s/yylval/frulval/g
+s/yymatch/frumatch/g
+s/yymorfg/frumorfg/g
+s/yyolsp/fruolsp/g
+s/yyout/fruout/g
+s/yyoutput/fruoutput/g
+s/yyprevious/fruprevious/g
+s/yysbuf/frusbuf/g
+s/yysptr/frusptr/g
+s/yysvec/frusvec/g
+s/yytchar/frutchar/g
+s/yytop/frutop/g
+s/yyunput/fruunput/g
+s/yyvstop/fruvstop/g
+s/yywrap/fruwrap/g
+s/yyracc/fruracc/g
+s/yyreject/frureject/g
+s/yywoutput/fruwoutput/g
+s/yywinput/fruwinput/g
+s/yyless/fruless/g

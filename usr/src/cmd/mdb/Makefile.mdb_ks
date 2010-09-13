@@ -1,0 +1,59 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# mdb_ks, as used in kmdb, requires some special care and feeding during the
+# build process.  This common Makefile allows us to avoid having to maintain
+# two copies - one for SPARC, and one for Intel.
+#
+
+#
+# mdb_ks shouldn't be installed as a standalone module for kmdb.
+#
+ROOTTGTS_kvm_type = mdb
+
+#
+# mdb_ks must be built before kmdb, and thus cannot use the link test, which
+# can only be run after kmdb has been built.
+#
+KMDB_LINKTEST =
+
+#
+# We need to override the module mapfile, since it would prevent us from
+# exporting mdb_ks symbols.
+#
+MAPFILE =
+
+#
+# mdb_ks's init and fini routines won't be called as part of module (un)loading,
+# because it'll be part of kmdb.  As such, we need to call them directly.
+# Calling _mdb_init and _mdb_fini directly seems vile, so we'll give them
+# sensible prefixes first.
+#
+kmod/mdb_ks.o := CPPFLAGS += -D_mdb_init=mdb_ks_init -D_mdb_fini=mdb_ks_fini
+

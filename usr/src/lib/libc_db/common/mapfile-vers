@@ -1,0 +1,133 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	td_thr_tlsbase;
+} SUNW_1.2;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.2 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	td_sync_get_info;
+	td_sync_setstate;
+	td_sync_waiters;
+	td_ta_clear_event;
+	td_ta_enable_stats;
+	td_ta_event_addr;
+	td_ta_event_getmsg;
+	td_ta_get_stats;
+	td_ta_map_addr2sync;
+	td_ta_reset_stats;
+	td_ta_setconcurrency;
+	td_ta_set_event;
+	td_ta_sync_iter;
+	td_thr_clear_event;
+	td_thr_dbresume;
+	td_thr_dbsuspend;
+	td_thr_event_enable;
+	td_thr_event_getmsg;
+	td_thr_lockowner;
+	td_thr_set_event;
+	td_thr_sleepinfo;
+} SUNW_0.9;
+
+SYMBOL_VERSION SUNW_0.9 {
+    global:
+	td_init;
+	td_log;
+	td_ta_delete;
+	td_ta_get_nthreads;
+	td_ta_get_ph;
+	td_ta_map_id2thr;
+	td_ta_map_lwp2thr;
+	td_ta_new;
+	td_ta_thr_iter;
+	td_ta_tsd_iter;
+	td_thr_getfpregs;
+	td_thr_getgregs;
+	td_thr_get_info;
+	td_thr_getxregs;
+	td_thr_getxregsize;
+	td_thr_setfpregs;
+	td_thr_setgregs;
+	td_thr_setprio;
+	td_thr_setsigpending;
+	td_thr_setxregs;
+	td_thr_sigsetmask;
+	td_thr_tsd;
+	td_thr_validate;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	td_sync_get_stats;
+	td_ta_sync_tracking_enable;
+    local:
+	*;
+};
+
+# External interface requirements
+
+SYMBOL_SCOPE {
+    global:
+	ps_lcontinue		{ FLAGS = EXTERN };
+	ps_lgetfpregs		{ FLAGS = EXTERN };
+	ps_lgetregs		{ FLAGS = EXTERN };
+	ps_lgetxregs		{ FLAGS = EXTERN };
+	ps_lgetxregsize		{ FLAGS = EXTERN };
+	ps_lsetfpregs		{ FLAGS = EXTERN };
+	ps_lsetregs		{ FLAGS = EXTERN };
+	ps_lsetxregs		{ FLAGS = EXTERN };
+	ps_lstop		{ FLAGS = EXTERN };
+	ps_pcontinue		{ FLAGS = EXTERN };
+	ps_pdread		{ FLAGS = EXTERN };
+	ps_pdwrite		{ FLAGS = EXTERN };
+	ps_pglobal_lookup	{ FLAGS = EXTERN };
+	ps_pstop		{ FLAGS = EXTERN };
+};

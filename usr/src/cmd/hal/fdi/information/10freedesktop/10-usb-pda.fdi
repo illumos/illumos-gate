@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <!-- Pocket PC PDAs -->
+  <device>
+    <match key="info.capabilities" contains="serial">
+      <match key="@serial.physical_device:info.linux.driver" string="ipaq">
+	<append key="info.capabilities" type="strlist">pda</append>
+	<merge key="pda.platform" type="string">pocketpc</merge>
+	<merge key="info.product" type="string">Pocket PC PDA</merge>
+	<merge key="pda.pocketpc.hotsync_interface" type="copy_property">serial.device</merge>
+      </match>
+    </match>
+  </device>
+
+  <!--
+    on Sony Clie 3.5 devices we need to mark port 0 instead of port 1. For
+    this reason, we mark the usb interface with port number to use (FIXME: is
+    there a better solution?). However, we should also do this for clies that
+    have been upgraded to a later version of OS, but I'm not sure if those have
+    the same product id - in that case this would not work for them. The driver
+    doumentation however advertises that the information about what port should
+    be used is written to syslog, perhaps we can somehow get that information
+    from the driver directly?)
+  -->
+  <device>
+    <match key="info.capabilities" contains="serial">
+      <match key="@serial.physical_device:info.linux.driver" string="visor">
+	<match key="@serial.physical_device:usb.vendor_id" int="0x054c">
+  	  <!-- Sony Clie 3.5 -->
+          <match key="@serial.physical_device:usb.product_id" int="0x0038">
+            <match key="serial.port" int="0">
+              <append key="info.capabilities" type="strlist">pda</append>
+              <merge key="pda.platform" type="string">palm</merge>
+              <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+            </match>
+          </match>
+  	  <!-- Sony Clie SJ-22 -->
+          <match key="@serial.physical_device:usb.product_id" int="0x0066">
+            <match key="serial.port" int="0">
+              <append key="info.capabilities" type="strlist">pda</append>
+              <merge key="pda.platform" type="string">palm</merge>
+              <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+            </match>
+          </match>
+	</match>
+      </match>
+    </match>
+  </device>
+  
+  <!-- Handspring -->
+  <device>
+    <match key="info.capabilities" contains="serial">
+      <match key="@serial.physical_device:info.linux.driver" string="visor">
+	<match key="@serial.physical_device:usb.vendor_id" int="0x082d">
+  	  <!-- Visor -->
+          <match key="@serial.physical_device:usb.product_id" int="0x0100">
+            <match key="serial.port" int="1">
+              <append key="info.capabilities" type="strlist">pda</append>
+              <merge key="pda.platform" type="string">palm</merge>
+              <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+            </match>
+          </match>
+	</match>
+      </match>
+    </match>
+  </device>
+  
+  <!-- Known Palm PDAs from Palm, Inc. -->
+  <device>
+    <match key="info.capabilities" contains="serial">
+      <match key="@serial.physical_device:info.linux.driver" string="visor">
+	<match key="@serial.physical_device:usb.vendor_id" int="0x0830">
+  	  <!-- Palm m130 -->
+          <match key="@serial.physical_device:usb.product_id" int="0x0050">
+            <match key="serial.port" int="0">
+              <append key="info.capabilities" type="strlist">pda</append>
+              <merge key="pda.platform" type="string">palm</merge>
+              <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+            </match>
+          </match>
+  	  <!-- Tungsten T5 -->
+          <match key="@serial.physical_device:usb.product_id" int="0x0061">
+            <match key="serial.port" int="1">
+              <append key="info.capabilities" type="strlist">pda</append>
+              <merge key="pda.platform" type="string">palm</merge>
+              <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+            </match>
+          </match>
+	</match>
+      </match>
+    </match>
+  </device>
+  
+  <!-- All the other PalmOS PDAs as fallback -->
+  <device>
+    <match key="info.capabilities" contains="serial">
+      <match key="@serial.physical_device:info.linux.driver" string="visor">
+	<match key="pda.platform" exists="false">
+          <match key="serial.port" int="0">
+            <append key="info.capabilities" type="strlist">pda</append>
+            <merge key="pda.platform" type="string">palm</merge>
+            <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+          </match>
+          <match key="serial.port" int="1">
+            <append key="info.capabilities" type="strlist">pda</append>
+            <merge key="pda.platform" type="string">palm</merge>
+            <merge key="pda.palm.hotsync_interface" type="copy_property">serial.device</merge>
+          </match>
+	</match>
+      </match>
+    </match>
+  </device>
+  
+</deviceinfo>
+

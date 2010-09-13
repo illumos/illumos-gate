@@ -1,0 +1,61 @@
+/*
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
+/* All Rights Reserved */
+
+/*
+ * Copyright (c) 1980 Regents of the University of California.
+ * All rights reserved.  The Berkeley software License Agreement
+ * specifies the terms and conditions for redistribution.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * External variables for the curses library
+ */
+
+/*LINTLIBRARY*/
+
+#include	"file64.h"
+#include	<curses.h>
+#include	<stdio.h>
+#include	<stdarg.h>
+
+extern bool	_echoit, _rawmode, My_term, _endwin;
+
+extern char	ttytype[50], *_unctrl[];
+
+extern int	_tty_ch, LINES, COLS;
+
+extern SGTTY	_tty;
+
+
+/* these are only for building libcurses */
+/* but, they could have been used by existing applications */
+extern int	_sprintw(WINDOW *, char *, va_list);
+extern int	_putchar(char);
+extern int	_sscans(WINDOW *, char *, va_list);
+extern void	_swflags_(WINDOW *);
+extern void	_set_subwin_(WINDOW *, WINDOW *);
+extern void	_id_subwins(WINDOW *);
+
+/* this could have been used by existing applications */
+extern void	tstp(void);
+extern int	gettmode(void);
+
+/* this one should be in /usr/include/term.h __STDC__, it is a bug there */
+extern char	*tgoto(char *, int, int);
+
+#ifdef DEBUG
+#define	outf	_outf
+
+FILE		*outf;
+#endif
+
+/* inter-library dependency */
+
+extern int _doscan(FILE *, const char *, va_list);

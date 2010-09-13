@@ -1,0 +1,137 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+msgid  "#\n"
+       "# Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.\n"
+       "# Use is subject to license terms.\n"
+       "#\n"
+       "#pragma ident	\"@(#)power.conf	2.1	02/03/04 SMI\"\n"
+       "#\n"
+       "# Power Management Configuration File\n"
+       "#\n\n"
+msgid  "/etc/.cpr_config"
+msgid  "/etc/.tmp.conf.XXXXXX"
+msgid  "/etc/power.conf-Orig"
+msgid  "/etc/power.conf"
+msgid  "%s: "
+msgid  "\"%s\" line %d, "
+msgid  "/dev/pm"
+msgid  "/var/run/powerd.pid"
+msgid  "got powerd pid %ld\n"
+msgid  "/usr/lib/power/powerd"
+msgid  "/usr/bin/cp"
+msgid  "filter: set \"%s\", selected %d\n"
+msgid  "none"
+msgid  "\nscanning set is %s\n"
+msgid  "both"
+msgid  "search: %s\n"
+msgid  "skipped"
+msgid  "retained"
+msgid  "\nconf not written, "
+       "(cpr perm %d update %d), (pm perm %d update %d)\n"
+msgid  "stat"
+msgid  "chmod"
+msgid  "chown"
+msgid  "rename"
+msgid  "\n\"%s\" renamed to \"%s\"\n"
+msgid  ""
+msgid  "ruid %d, perms: cpr %d, pm %d\n"
+msgid  "%s\n"
+msgid  "# Auto-Shutdown\t\tIdle(min)\tStart/Finish(hh:mm)\tBehavior\n"
+msgid  "cpr"
+msgid  "pm"
+msgid  "autopm"
+msgid  "autoshutdown"
+msgid  "device-dependency-property"
+msgid  "device-dependency"
+msgid  "device-thresholds"
+msgid  "diskreads"
+msgid  "idlecheck"
+msgid  "loadaverage"
+msgid  "nfsreqs"
+msgid  "system-threshold"
+msgid  "ttychars"
+msgid  "set_perm: \"%s\", value \"%s\"\n"
+msgid  "NULL"
+msgid  "all"
+msgid  "console-owner"
+msgid  ", "
+msgid  "match_user: cmp (\"%s\", \"%s\")\n"
+msgid  "/etc/default/power"
+msgid  "/dev/console"
+msgid  "PMCHANGEPERM="
+msgid  "CPRCHANGEPERM="
+msgid  " \t\n"
+msgid  "\nline %d, found %d args:\n"
+msgid  "    \"%s\"\n"
+msgid  "\nnow parsing \"%s\"...\n"
+msgid  "\nline %d, blank...\n"
+msgid  "\nline %d, comment...\n"
+msgid  "+"
+msgid  "==> handler skipped: %s_perm %d, "
+       "def_src %d, alt %d\n"
+msgid  "always-on"
+msgid  "disable"
+msgid  "enable"
+msgid  "%d:%d"
+msgid  "autowakeup"
+msgid  "default"
+msgid  "noshutdown"
+msgid  "shutdown"
+msgid  "unconfigured"
+msgid  "idle %d, start %d:%02d, finish %d:%02d\n"
+msgid  "%s: \"%s\"\n"
+msgid  "/devices"
+msgid  "pm ioctl, cmd %d, errno %d\n"
+       "kept \"%s\", keeper \"%s\"\n"
+msgid  "got scaled value %d\n"
+msgid  "threshold list"
+msgid  "idle path"
+msgid  "cpu-threshold"
+msgid  "cpupm"
+msgid  "-d"
+msgid  "S3-support"
+msgid  "autoS3"
+msgid  "S3-support-enable"
+msgid  "S3-support-disable"
+msgid  "??"
+msgid  "S3_helper(%s, %s, %s, %s, %s, %s)\n"
+msgid  "acpi"
+msgid  "S3"
+msgid  "value.l %lx\n"
+msgid  "preferred_pm_profile"
+msgid  "Manufacturer: %s\n"
+msgid  "Product: %s\n"
+msgid  "Sun Microsystems"
+msgid  "S3-support"
+msgid  "S3-support-enable"
+msgid  "S3-support-disable"
+msgid  "autoS3"
+msgid  "S3-autoenable"
+msgid  "S3-autodisable"
+msgid  "autopm-enable"
+msgid  "autopm-disable"

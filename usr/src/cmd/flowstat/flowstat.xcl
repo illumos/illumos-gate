@@ -1,0 +1,73 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+msgid  " %.2f"
+msgid  " %6.2lf%c"
+msgid  " %7.0lf%c"
+msgid  " %s"
+msgid  "-h"
+msgid  ": %s\n"
+msgid  ":rtApSi:o:u:l:h"
+msgid  ""
+msgid  "\n"
+msgid  "\t%15llu\n"
+msgid  "\t%15s"
+msgid  "# Time"
+msgid  "%.0lf"
+msgid  "%llu"
+msgid  "%m/%d/%Y"
+msgid  "%s Mbps"
+msgid  "%s: "
+msgid  "%s: warning: "
+msgid  "%s"
+msgid  "%s\n"
+msgid  "%T"
+msgid  "all"
+msgid  "B"
+msgid  "BANDWIDTH"
+msgid  "das:e:o:f:F:"
+msgid  "DURATION"
+msgid  "END"
+msgid  "flow,duration,ipackets,rbytes,opackets,obytes,bandwidth"
+msgid  "flow,ipkts,rbytes,ierrs,opkts,obytes,oerrs"
+msgid  "flow,ipkts,rbytes,ierrs"
+msgid  "flow,opkts,obytes,oerrs"
+msgid  "flow,start,end,rbytes,obytes,bandwidth"
+msgid  "FLOW"
+msgid  "G"
+msgid  "gnuplot"
+msgid  "IERRS"
+msgid  "IPACKETS"
+msgid  "IPKTS"
+msgid  "K"
+msgid  "M"
+msgid  "OBYTES"
+msgid  "OERRS"
+msgid  "OPACKETS"
+msgid  "OPKTS"
+msgid  "P"
+msgid  "RBYTES"
+msgid  "START"
+msgid  "T"

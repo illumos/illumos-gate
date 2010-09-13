@@ -1,0 +1,212 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+# This mapfile is shared by all of the elfedit modules.
+# These sharable objects only export two functions,
+# elfedit[32|64]_init. Everything else is reduced to
+# local scope.
+#
+# The routines exported by elfedit for use by the modules
+# are also defined here, using the PARENT mapfile keyword.
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+	global:
+		# Standard init routines exported by every module
+		elfedit32_init;
+		elfedit64_init;
+
+
+		# liblddbg dbg_print() function
+		dbg_print			{ FLAGS = PARENT NODIRECT };
+
+
+		# Core API
+		elfedit_command_usage		{ FLAGS = PARENT };
+		elfedit_cpl_match		{ FLAGS = PARENT };
+		elfedit_cpl_ndx			{ FLAGS = PARENT };
+		elfedit_elferr			{ FLAGS = PARENT };
+		elfedit_flags			{ FLAGS = PARENT };
+		elfedit_malloc			{ FLAGS = PARENT };
+		elfedit_msg			{ FLAGS = PARENT };
+		elfedit_outstyle		{ FLAGS = PARENT };
+		elfedit_pager_init		{ FLAGS = PARENT };
+		elfedit_printf			{ FLAGS = PARENT };
+		elfedit_realloc			{ FLAGS = PARENT };
+		elfedit_str_to_c_literal	{ FLAGS = PARENT };
+		elfedit_write			{ FLAGS = PARENT };
+
+
+
+		# ato[u]i routines
+		elfedit_const_to_atoui		{ FLAGS = PARENT };
+
+		elfedit_atoi			{ FLAGS = PARENT };
+		elfedit_atoui			{ FLAGS = PARENT };
+		elfedit_atoconst		{ FLAGS = PARENT };
+
+		elfedit_atoi2			{ FLAGS = PARENT };
+		elfedit_atoui2			{ FLAGS = PARENT };
+		elfedit_atoconst2		{ FLAGS = PARENT };
+
+		elfedit_atoi_range		{ FLAGS = PARENT };
+		elfedit_atoui_range		{ FLAGS = PARENT };
+		elfedit_atoconst_range		{ FLAGS = PARENT };
+
+		elfedit_atoi_range2		{ FLAGS = PARENT };
+		elfedit_atoui_range2		{ FLAGS = PARENT };
+		elfedit_atoconst_range2		{ FLAGS = PARENT };
+
+		elfedit_atoi_value_to_str	{ FLAGS = PARENT };
+		elfedit_atoui_value_to_str	{ FLAGS = PARENT };
+		elfedit_atoconst_value_to_str	{ FLAGS = PARENT };
+
+		elfedit_cpl_atoi		{ FLAGS = PARENT };
+		elfedit_cpl_atoui		{ FLAGS = PARENT };
+		elfedit_cpl_atoconst		{ FLAGS = PARENT };
+
+
+
+		# Convenience functions built on top of the ato[u]i routines
+		elfedit_atobool			{ FLAGS = PARENT };
+		elfedit_atoshndx		{ FLAGS = PARENT };
+
+
+
+		# Getopt
+		elfedit_getopt_init		{ FLAGS = PARENT };
+		elfedit_getopt			{ FLAGS = PARENT };
+
+
+
+		# Utilities
+		elfedit_array_elts_delete	{ FLAGS = PARENT };
+
+		elfedit_array_elts_move		{ FLAGS = PARENT };
+
+		elfedit_bits_set		{ FLAGS = PARENT };
+
+		elfedit32_dyn_elt_init		{ FLAGS = PARENT };
+		elfedit64_dyn_elt_init		{ FLAGS = PARENT };
+
+		elfedit32_dyn_elt_save		{ FLAGS = PARENT };
+		elfedit64_dyn_elt_save		{ FLAGS = PARENT };
+
+		elfedit32_dyn_offset_to_str	{ FLAGS = PARENT };
+		elfedit64_dyn_offset_to_str	{ FLAGS = PARENT };
+
+		elfedit32_dynstr_getpad		{ FLAGS = PARENT };
+		elfedit64_dynstr_getpad		{ FLAGS = PARENT };
+
+		elfedit32_dynstr_insert		{ FLAGS = PARENT };
+		elfedit64_dynstr_insert		{ FLAGS = PARENT };
+
+		elfedit32_modified_data		{ FLAGS = PARENT };
+		elfedit64_modified_data		{ FLAGS = PARENT };
+
+		elfedit32_modified_ehdr		{ FLAGS = PARENT };
+		elfedit64_modified_ehdr		{ FLAGS = PARENT };
+
+		elfedit32_modified_phdr		{ FLAGS = PARENT };
+		elfedit64_modified_phdr		{ FLAGS = PARENT };
+
+		elfedit32_modified_shdr		{ FLAGS = PARENT };
+		elfedit64_modified_shdr		{ FLAGS = PARENT };
+
+		elfedit32_name_to_shndx		{ FLAGS = PARENT };
+		elfedit64_name_to_shndx		{ FLAGS = PARENT };
+
+		elfedit32_name_to_symndx	{ FLAGS = PARENT };
+		elfedit64_name_to_symndx	{ FLAGS = PARENT };
+
+		elfedit32_offset_to_str		{ FLAGS = PARENT };
+		elfedit64_offset_to_str		{ FLAGS = PARENT };
+
+		elfedit32_sec_findstr		{ FLAGS = PARENT };
+		elfedit64_sec_findstr		{ FLAGS = PARENT };
+
+		elfedit32_sec_get		{ FLAGS = PARENT };
+		elfedit64_sec_get		{ FLAGS = PARENT };
+
+		elfedit32_sec_getcap		{ FLAGS = PARENT };
+		elfedit64_sec_getcap		{ FLAGS = PARENT };
+
+		elfedit32_sec_getdyn		{ FLAGS = PARENT };
+		elfedit64_sec_getdyn		{ FLAGS = PARENT };
+
+		elfedit32_sec_getstr		{ FLAGS = PARENT };
+		elfedit64_sec_getstr		{ FLAGS = PARENT };
+
+		elfedit32_sec_getsyminfo	{ FLAGS = PARENT };
+		elfedit64_sec_getsyminfo	{ FLAGS = PARENT };
+
+		elfedit32_sec_getsymtab		{ FLAGS = PARENT };
+		elfedit64_sec_getsymtab		{ FLAGS = PARENT };
+
+		elfedit32_sec_getversym		{ FLAGS = PARENT };
+		elfedit64_sec_getversym		{ FLAGS = PARENT };
+
+		elfedit32_sec_getxshndx		{ FLAGS = PARENT };
+		elfedit64_sec_getxshndx		{ FLAGS = PARENT };
+
+		elfedit32_sec_issymtab		{ FLAGS = PARENT };
+		elfedit64_sec_issymtab		{ FLAGS = PARENT };
+
+		elfedit32_shndx_to_name		{ FLAGS = PARENT };
+		elfedit64_shndx_to_name		{ FLAGS = PARENT };
+
+		elfedit32_sec_msgprefix		{ FLAGS = PARENT };
+		elfedit64_sec_msgprefix		{ FLAGS = PARENT };
+
+		elfedit32_strtab_insert		{ FLAGS = PARENT };
+		elfedit64_strtab_insert		{ FLAGS = PARENT };
+
+		elfedit32_strtab_insert_test	{ FLAGS = PARENT };
+		elfedit64_strtab_insert_test	{ FLAGS = PARENT };
+
+		elfedit32_test_osabi		{ FLAGS = PARENT };
+		elfedit64_test_osabi		{ FLAGS = PARENT };
+
+		elfedit32_type_to_shndx		{ FLAGS = PARENT };
+		elfedit64_type_to_shndx		{ FLAGS = PARENT };
+
+	local:
+		*;
+};

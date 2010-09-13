@@ -1,0 +1,525 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
+			SOLARIS USB BANDWIDTH ANALYSIS
+			
+1.Introduction
+
+  This document discuss the USB bandwidth allocation scheme, and the protocol 
+  overheads used for both full and high speed host controller drivers. This
+  information is derived from the USB 2.0 specification, the "Bandwidth Analysis
+  Whitepaper" which is posted on www.usb.org, and other resources.
+
+  The target audience for this whitepaper are USB software & hardware designers 
+  and engineers, and other interested people. The reader should be familiar with
+  the Universal Serial Bus Specification version 2.0, the OpenHCI Specification
+  1.0a and the Enhanced HCI Specification 1.0. 
+
+2.Full speed bus
+
+  The following overheads, formulas and scheme are applicable both to full speed
+  host controllers and also to high speed hub Transaction Translators (TT),
+  which perform full/low speed transactions.
+
+  o Timing and data rate calculations
+
+    - Timing calculations
+
+      1 sec			1000 ms or 1000000000 ns
+      1 ms			1 frame
+
+    - Data rate calculations
+
+      1 ms			1500 bytes or 12000 bits (per  frame)
+      668 ns			1 byte or 8 bits
+
+      1 full speed bit time	83.54 ns
+              
+  o Protocol Overheads and Bandwidth numbers
+
+    - Protocol Overheads
+
+      (Refer 5.11.3 section of USB2.0 specification & page 2 of USB Bandwidth
+       Analysis document)
+
+      Non Isochronous	  	9107 ns			14 bytes
+      Isochronous Output	6265 ns			10 bytes
+      Isochronous Input	        7268 ns			11 bytes
+      Low-speed overhead       64060 ns			97 bytes
+      Hub LS overhead*	         668 ns	 	 	 1 byte
+      SOF		        4010 ns 	 	 6 bytes
+      EOF		        2673 ns		 	 4 bytes
+
+      Host Delay*		Specific to hardware    18 bytes
+      Low-Speed clock*		Slower than Full speed	 8
+	
+    - Bandwidth numbers
+
+      (Refer 7.3.5 section of OHCI specification 1.0a & page 2 of USB Bandwidth
+       Analysis document) 
+
+      Maximum bandwidth available		      1500 bytes/frame
+      Maximum Non Periodic bandwidth	  	       197 bytes/frame
+      Maximum Periodic bandwidth		      1293 bytes/frame
+
+      NOTE:
+
+      1.Hub specific low speed overhead
+
+        The time provided by the Host Controller for hubs to enable Low Speed
+        ports. The minimum of 4 full speed bit time.
+
+        overhead = 2 x Hub_LS_Setup
+                 = 2 x (4 x 83.54) =  668.32 Nano seconds  = 1 byte.
+              
+      2.Host delay will be specific to particular hardware. The following host
+        delay is for RIO USB OHCI host controller (Provided by Ken Ward - RIO
+        USB hardware person). The following is just an example how to calculate 
+        "host delay" for given USB host controller implementation.
+
+        Ex: Assuming ED (Endpoint Descriptor)/TD's (Transfer Descriptor) are not
+            streaming in Schizo (PCI bridge) and no cache hits for an ED or TD:
+
+            To read an ED or TD or data:
+
+            PCI_ARB_DELAY + PCI_ADDRESS + SCHIZO_RETRY
+            PCI_ARB_DELAY + PCI_ADDRESS + SCHIZO_TRDY +
+			DATA +  Core_overhead
+
+            Where,
+
+	    PCI_ARB_DELAY = 2000ns
+	    PCI_ADDRESS = 30ns
+	    SCHIZO RETRY = 60ns
+	    SCHIZO TRDY = 60ns
+	    DATA = 240ns (Always read 64 bytes ...)
+	    Core Overhead =240 + 30 * (MPS/4) + 83.54 * (MPS/4) + 4 * 83.54
+	    =  ~3400ns
+
+	    now multiply by 3 for ED+TD+DATA = 10200ns = ~128 bits or 16 bytes.
+
+	    This is probably on the optimistic side, only using 2us for the
+	    PCI_ARB_DELAY.
+
+	If there is a USB cache hit, the time it takes for an ED or TD is:
+
+	CORE SYNC DELAY + CACHE_HIT CHECK + 30 * (MPS/4) + CORE OVERHEAD
+
+	240 + 30 + 120 + 1000ns ~ 1400ns , or ~ 2 bytes
+
+        Total Host delay will be 18 bytes.
+
+      3.The Low-Speed clock is eight times slower than full speed  i.e. 1/8th of
+        the full speed.
+
+      4.For non-periodic transfers, reserve for at least one low-speed device
+        transaction per frame. According to the USB Bandwidth Analysis white
+        paper and also as per OHCI Specification 1.0a, section 7.3.5, page 123,
+        one low-speed transaction takes  0x628h full speed bits (197 bytes),
+        which comes to around 13% of USB frame time.
+              
+     5. Maximum Periodic bandwidth is calculated using the following formula
+
+        Maximum Periodic bandwidth  = Maximum bandwidth available
+        - SOF - EOF -  Maximum Non Periodic bandwidth.
+
+  o Bus Transaction Formulas
+
+    (Refer 5.11.3 section of USB2.0 specification)
+
+    - Full-Speed:
+
+      Protocol overhead + ((MaxPacketSize * 7) / 6 ) + Host_Delay
+
+    - Low-Speed:
+
+      Protocol overhead + Hub LS overhead + 
+		(Low-Speed clock  * ((MaxPacketSize * 7) / 6 )) + Host_Delay
+
+  o Periodic Schedule
+
+    The figure 5.5 in OHCI specification 1.0a gives you information on periodic 
+    scheduling, different polling intervals that are supported, & other details 
+    for the OHCI host controller.
+
+    - The host controller processes one interrupt endpoint descriptor list every
+      frame. The lower five bits of the current frame number us  used as an
+      index into an array of 32 interrupt endpoint descriptor lists or periodic
+      frame lists found in the HCCA (Host controller communication area). This
+      means each list is revisited once every 32ms. The host controller driver
+      sets up the interrupt lists to visit any given endpoint descriptor in as
+      many lists as necessary to provide the interrupt granularity required for 
+      that endpoint. See figure 5.5 in OHCI specification 1.0a.
+        
+    - Isochronous endpoint descriptors are added at the end of 1ms interrupt 
+      endpoint descriptors.
+
+    - The host controller driver maintains an array of 32 frame bandwidth lists 
+      to save bandwidth allocated in each USB frame.
+
+      Please refer section 5.2.7.2 of OHCI specification 1.0a, page 61 for more 
+      details.
+
+  o Bandwidth Allocation Scheme
+
+    The OHCI host controller driver will go through the following steps to
+    allocate bandwidth needed for  an interrupt or isochronous endpoint as
+    follows
+
+    - Calculate the bandwidth required for the given endpoint using the bus
+      transaction formula and protocol overhead calculations mentioned in
+      previous section.
+
+    - Compare the bandwidth available in the least allocated frame list out of
+      the 32 frame bandwidth lists, against the bandwidth required by this
+      endpoint. If this exceeds the limit, then, an return error.
+
+    - Find out the static node to which the given endpoint needs to be linked
+      so that it will be polled as per the required polling interval. This value
+      varies based on polling interval and current bandwidth load on this
+      schedule. See figure 5.5 in OHCI specification 1.0a.
+
+      Ex: If a polling interval is 4ms, then, the endpoint will be linked to one
+          of the four static nodes (range 3-6) in the 4ms column of figure 5.5
+          in OHCI specification 1.0a.
+
+    - Depending on the polling interval, we need to add the above calculated
+      bandwidth to one or more frame bandwidth lists. Before adding, we need to 
+      double check the availability of bandwidth in those respective lists. If
+      this exceeds the limit, then, return an error. Add this bandwidth to all
+      the required frame bandwidth lists.
+
+      Ex: Assume a give polling interval of 4 and a static node value of 3.
+          In this case, we need to add required bandwidth to 0,4,8,12,16,20,24,
+          28 frame bandwidth lists. 
+
+
+3.High speed bus
+
+  o Timing and data rate calculations
+
+    - Timing calculations
+
+      1 sec			1000 ms
+      125 us			1 uframe
+      1 ms			1 frame or 8  uframes
+
+    - Data rate calculations
+
+      125 us			7500 bytes (per uframe)
+      16.66 ns			1 byte or 8 bits
+
+      1 high speed bit time	2.083 ns
+
+  o Protocol Overheads and Bandwidth numbers
+
+    - Protocol Overheads
+
+      (Refer 5.11.3, 8.4.2.2 and 8.4.2.3 sections of USB2.0 specification)
+
+      Non Isochronous	  	917 ns			55 bytes
+      Isochronous 		634 ns			38 bytes
+
+      Start split  overhead 	 67 ns		  	 4 bytes
+      Complete split  overhead 	 67 ns		  	 4 bytes
+
+      SOF		  	200 ns			12 bytes
+      EOF		       1667 ns 			70 bytes
+
+      Host Delay*		 Specific to hardware 	18 bytes
+
+    - Bandwidth numbers
+
+      (Refer 5.5.4 section of USB2.0 specification)
+
+      Maximum bandwidth available		      7500 bytes/uframe
+      Maximum Non Periodic bandwidth*		      1500 bytes/uframe
+      Maximum Periodic bandwidth*		      5918 bytes/uframe
+
+      NOTE:
+
+      1.Host delay will be specific to particular hardware. 
+
+      2.As per USB 2.0 specification section 5.5.4, 20% of bus time is reserved
+        for the non-periodic high-speed transfers, where as periodic high-speed
+        transfers will get 80% of the bus time. In one micro-frame or 125us, we
+        can transfer 7500 bytes or 60,000 bits. So 20% of 7500 is 1500 bytes.
+
+      3.Maximum Periodic bandwidth is calculated using the following formula
+
+        Maximum Periodic bandwidth  = Maximum bandwidth available
+		- SOF - EOF -  Maximum Non Periodic bandwidth.
+
+  o Bus Transaction Formulas
+
+    (Refer 5.11.3 8.4.2.2 and 8.4.2.3 sections of USB2.0 specification) 
+
+    - High-Speed (Non-Split transactions):
+
+      (Protocol overhead + ((MaxPacketSize * 7) / 6 ) +
+		Host_Delay) x Number of transactions per micro-frame
+
+    - High-Speed (Split transaction - Device to Host):
+
+      Start Split transaction:
+
+      Protocol overhead  + Host_Delay + Start split overhead
+
+      Complete Split transaction:
+
+      Protocol overhead  + ((MaxPacketSize * 7) / 6 ) +
+		Host_Delay + Complete split overhead
+
+    - High-Speed (Split transaction - Host to Device):
+
+      Start Split transaction:
+
+      Protocol overhead + ((MaxPacketSize * 7) / 6 ) +
+		Host_Delay) + Start split overhead
+
+      Complete Split transaction:
+
+      Protocol overhead  + Host_Delay + Complete split overhead
+
+
+  o Interrupt schedule or Start and Complete split masks
+
+    (Refer 3.6.2 & 4.12.2 sections of EHCI 1.0 specification)
+
+    - Interrupt schedule or Start split mask
+
+      This field  is used for for high, full and low speed usb device interrupt 
+      and isochronous endpoints. This will tell the host controller which micro-
+      frame of a given usb frame to initiate a high speed interrupt and
+      isochronous transaction. For full/low speed devices, it will tell when to 
+      initiate a "start split" transaction.
+
+	ehci_start_split_mask[15] = /* One byte field */
+	/*
+	 * For all low/full speed devices, and  for  high speed devices with
+	 * a polling interval greater than or equal to 8us (125us).
+	 */
+	{0x01,	/*  00000001 */
+	0x02,	/*  00000010 */
+	0x04,	/*  00000100 */
+	0x08,	/*  00001000 */
+	0x10,	/*  00010000 */
+	0x20,	/*  00100000 */
+	0x40,	/*  01000000 */
+	0x80,	/*  10000000 */
+
+	/* For high speed devices with a polling interval of 4us. */
+	0x11,	/* 00010001 */
+	0x22,	/* 00100010 */
+	0x44,	/* 01000100 */
+	0x88,	/* 10001000 */
+
+	/* For high speed devices with a polling interval of 2us. */
+	0x55,	/* 01010101 */
+	0xaa,	/* 10101010 */
+
+	/* For high speed devices with a polling interval of 1us. */
+	0xff };	/* 11111111 */
+
+    - Complete split mask
+
+      This field is used only for full/low speed usb device interrupt and
+      isochronous endpoints. It will tell the host controller which micro frame 
+      to initiate a "complete split" transaction. Complete split transactions
+      can to be retried for up to 3 times. So bandwidth for complete split
+      transaction is reserved in 3 consecutive micro frames 
+
+	ehci_complete_split_mask[8] = /* One byte field */
+	/* Only full/low speed devices */ 
+	{0x0e,	/*  00001110 */
+	0x1c,	/*  00011100 */
+	0x38,	/*  00111000 */
+	0x70,	/*  01110000 */
+	0xe0,	/*  11100000 */
+	Reserved ,	/*  Need FSTN feature  */
+	Reserved ,	/*  Need FSTN feature  */
+	Reserved};	/*  Need FSTN feature */
+      
+  o Periodic Schedule
+
+    The figure 4.8 in EHCI specification gives you information on periodic
+    scheduling, different polling intervals that are supported, and other
+    details for the EHCI host controller.
+
+    - The high speed host controller can support 256, 512 or 1024 periodic frame
+      lists. By default all host controllers will support 1024 frame lists. In
+      our implementation, we support 1024 frame lists and we do this by first
+      constructing 32 periodic frame lists and duplicating the same periodic
+      frame lists for a total of 32 times. See figure 4.8 in EHCI specification.
+
+    - The host controller traverses the periodic schedule by constructing an
+      array offset reference from the PERIODICLISTBASE & the FRINDEX registers.
+      It fetches the element and begins traversing the graph of linked schedule
+      data structure. See fig 4.8 in EHCI specification.
+
+    - The host controller processes one interrupt endpoint descriptor list every
+      micro frame (125us). This means same list is revisited 8 times in a frame.
+
+    - The host controller driver sets up the interrupt lists to visit any given 
+      endpoint descriptor in as many lists as necessary to provide the interrupt
+      granularity required for that endpoint.
+
+    - For isochronous transfers, we use only transfer descriptors but no
+      endpoint descriptors as in OHCI. Transfer descriptors are added at the
+      beginning of the periodic schedule.
+
+    - For EHCI, the bandwidth requirement is depends on the usb device speed
+      i.e.
+
+      For a high speed usb device, you only need high speed bandwidth. For a
+      full/low speed device connected through a high speed hub, you need both
+      high speed bandwidth and TT (transaction translator) bandwidth. 
+
+      High speed bandwidth information is saved in an EHCI data structure and TT
+      bandwidth is saved in the high speed hub's usb device data structure. Each
+      TT acts as a full speed host controller & its bandwidth allocation scheme 
+      overhead calculations and other details are similar to those of a full
+      speed  host controller. Refer to the "Full speed bus" section for more
+      details.
+
+    - The EHCI host controller driver maintains an array of 32 frame lists to
+      store high speed bandwidth allocated in each  frame and also each frame
+      list has eight micro frame lists, which saves bandwidth allocated in each
+      micro frame of  that particular frame.
+
+  o Bandwidth Allocation Scheme
+
+    (Refer 3.6.2 & 4.12.2 sections of EHCI 1.0 specification)
+
+    High speed Non Split Transaction (for High speed devices only):
+
+    For a given high speed interrupt or isochronous endpoint, the EHCI host
+    controller driver will go through the following steps to allocate
+    bandwidth needed for this endpoint.
+
+    - Calculate the bandwidth required for given endpoint using the formula and 
+      overhead calculations mentioned in previous section.
+
+    - Compare the bandwidth available in the least allocated frame list out of
+      the 32 frame lists against the bandwidth required by this endpoint. If
+      this exceeds the limit, then, return an error.
+
+    - Map a given high speed endpoint's polling interval in micro seconds to an 
+      interrupt list path based on a millisecond value. For example, an endpoint
+      with a polling interval of 16us will map to an interrupt list path of 2ms.
+
+    - Find out the static node to which the given endpoint needs to be linked
+      so that it will be polled at its required polling interval. This varies
+      based on polling interval and current bandwidth load on this schedule.
+
+      Ex: If a polling interval is 32us and its corresponding frame polling
+          interval will be 4ms, then the endpoint will be linked to one of the
+          four static nodes (range 3-6) in the 4ms column of figure 4.8 in EHCI 
+          specification.
+
+    - Depending on the polling interval, we need to add the above calculated
+      bandwidth to one or more frame bandwidth lists, and also to one or more
+      micro frame bandwidth lists for that particular frame bandwidth list.
+      Before adding, we need to double check the availability of bandwidth in
+      those respective lists. If needed bandwidth is not available, then,
+      return an error. Otherwise add this bandwidth to all the required frame
+      and micro frame lists.
+
+      Ex: Assume given endpoint's polling interval is 32us and static node value
+          is 3. In this case, we need to add required bandwidth to 0,4,8,12,16,
+          20,24,28 frame bandwidth lists and micro bandwidth information is
+          saved using ehci_start_split_masks matrix. For this example, we need
+          to use any one of the 15 entries to save micro frame bandwidth.
+
+      High speed split transactions (for full and low speed devices only):
+
+      For a given full/low speed interrupt or isochronous endpoint, we need both
+      high speed and TT bandwidths. The TT bandwidth allocation is same as full
+      speed bus bandwidth allocation. Please refer to the "full speed bus"
+      bandwidth allocation section for more details.
+
+      The EHCI driver will go through the following steps to allocate high speed
+      bandwidth needed for  this full/low speed endpoint.
+
+      - Calculate the bandwidth required for a given endpoint using the formula 
+        and overhead calculations mentioned in previous section. In this case,
+        we need to calculate bandwidth needed both for Start and Complete start 
+        transactions separately.
+
+      - Compare the bandwidth available in the least allocated frame list out of
+        32 frame lists against the bandwidth required by this endpoint. If this
+        exceeds the limit, then, return an error.
+
+      - Find out the static node to which the given endpoint needs to be linked 
+        so that it will be polled as per the required polling interval. This
+        value varies based on polling interval and current bandwidth load on
+        this schedule.
+
+        Ex: If a polling interval is  4ms, then the endpoint will be linked to
+            one of the four static nodes (range 3-6) in the 4ms column of figure
+            4.8 in EHCI specification.
+
+      - Depending on the polling interval, we need to add the above calculated
+        Start and Complete split transactions bandwidth to one or more frame
+        bandwidth lists and also to one or more micro frame bandwidth lists for 
+        that particular frame bandwidth list. In this case, the Start split
+        transaction needs bandwidth in one micro frame, where as the Complete
+        split transaction needs bandwidth in next three subsequent micro frames
+        of that particular frame or next frame. Before adding, we need to double
+        check the availability of bandwidth in those respective lists. If needed
+        bandwidth is not available, then, return an error. Otherwise add this
+        bandwidth to all the required lists. 
+
+        Ex: Assume give polling interval is 4ms and static node value is 3. In
+            this case, we need to add required Start and Complete split
+            bandwidth to the 0,4,8,12,16,20,24,28  frame bandwidth lists. The
+            micro frame bandwidth lists is stored using ehci_start_split_mask & 
+            ehci_complete_split_mask matrices. In this case, we need to use any 
+            of the first 8 entries to save micro frame bandwidth.
+
+            Assume we found that the following micro frame bandwidth lists of  
+            0,4,8,12,16,20,24,28 frame lists can be used for this endpoint.
+            It means, we need to initiate "start split transaction" in first
+            micro frame of 0,4,8,12,16,20,24,28 frames.
+
+            Start split mask = 0x01,	/*  00000001 */
+
+            For this "start split mask",  the "complete split mask" should be
+
+	    Complete split mask = 0x0e, /*  00001110 */
+
+	    It means try "complete split transactions" in second, third or
+            fourth micro frames of 0,4,8,12,16,20,24,28 frames.
+             
+4.Reference
+
+  - USB2.0, OHCI and EHCI Specifications
+
+    http://www.usb.org/developers/docs
+
+  - USB bandwidth analysis from Intel
+
+    http://www.usb.org/developers/whitepapers

@@ -1,0 +1,41 @@
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# This is portable object file is used for testing libfmd_msg.  It
+# is not delivered in any package.
+#
+
+msgid "TEST-8000-08.type"
+msgstr "Defect"
+msgid "TEST-8000-08.severity"
+msgstr "Minor"
+msgid "TEST-8000-08.description"
+msgstr "This entry tests URL variable expansion - url = %s"
+msgid "TEST-8000-08.response"
+msgstr "This entry tests the percent character escape sequence: %%"
+msgid "TEST-8000-08.impact"
+msgstr "This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>"
+msgid "TEST-8000-08.action"
+msgstr "Variable expansion for arrays: index = %<test_arr[1].index>"
+

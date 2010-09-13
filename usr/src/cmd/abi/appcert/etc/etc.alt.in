@@ -1,0 +1,49 @@
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# syntax:
+#ALT_USAGE:<tag>:<1-line-desc>:<lib>:<sym>[|<sym>...]:<text>
+# 
+# the label's and 1-line-desc's must be unique.
+# later <lib> basename may be added.
+# "\" may be used to continue a line. the newline is replaced by " ".
+# Another way to quote a block of text is to sandwich it between
+# single "-". The newline previous to the 1st "-" must be "\" quoted.
+# Special keywords in <expression>:
+#	file =~ -> $file =~ where $file is `/bin/file /path/to/object`
+#	dump =~ -> $dump =~ where $dump is `/usr/ccs/bin/dump /path/to/object`
+#	needed =~ -> $needed =~ where $needed is a list of all needed libs.
+#
+#
+###############################################################################
+ALT_USAGE:libsocket_strong_symbols:libsocket.so weak/strong pairs:libsocket.so.1:_socket|_connect|_recv|_setsockopt|_getsockopt|_getsockname|_getpeername|_bind|_accept|_send|_socketpair|_shutdown|_sendto|_sendmsg|_recvmsg|_recvfrom|_listen|_setpeername|_socketpair_bsd|_socket_bsd:
+###############################################################################
+ALT_USAGE:inadvertant_static_linking:static linking inadevertantly brings in private symbols:*:__getcontext|__sigaction|__threaded|_bufsync|_cerror|_dgettext|_doprnt|_doscan|_ecvt|_fcvt|_findbuf|_findiop|_getsp|_memcmp|_memmove|_memset|_mutex_unlock|_psignal|_realbufend|_setbufend|_siguhandler|_smbuf|_thr_getspecific|_thr_keycreate|_thr_main|_thr_setspecific|_xflsbuf|gtty|stty:
+###############################################################################
+ALT_USAGE:getdomainname:possible getdomainname() replacements:libnsl.so.1:getdomainname:
+###############################################################################
+ALT_USAGE:__rpc_createerr:rpc_createerr can be a macro from <rpc/clnt.h>:libnsl.so.1:__rpc_createerr:

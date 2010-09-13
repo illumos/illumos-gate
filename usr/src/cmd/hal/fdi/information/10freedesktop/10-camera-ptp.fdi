@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+  <device>
+    <match key="info.subsystem" string="usb">
+      <match key="usb.interface.class" int="0x06">
+        <match key="usb.interface.subclass" int="0x01">
+          <match key="usb.interface.protocol" int="0x01">
+            <merge key="info.category" type="string">camera</merge>
+	    <append key="info.capabilities" type="strlist">camera</append>
+            <merge key="camera.access_method" type="string">ptp</merge>
+          </match>
+        </match>
+      </match>
+    </match>
+  </device>
+</deviceinfo>

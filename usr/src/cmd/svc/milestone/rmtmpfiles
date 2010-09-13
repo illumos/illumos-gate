@@ -1,0 +1,87 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+
+# For modifying the behavior of rmtmpfiles, do not edit this script.
+# Instead use svccfg(1m) to modify the SMF repository.  To achieve
+# traditional System V treatment of /var/tmp, invoke the following
+# commands.:
+#
+# # svccfg
+# svc:> select system/rmtmpfiles
+# svc:/system/rmtmpfiles> setprop options/clean_vartmp="true"
+# svc:/system/rmtmpfiles> select default
+# svc:/system/rmtmpfiles:default> refresh
+# svc:/system/rmtmpfiles:default> exit
+#
+
+# Traditional SunOS 4.x behavior has been to not remove directories in
+# the /tmp directory; only simple files were removed. This lead to an
+# inconsistency when the tmpfs file system was used (which isn't persistent
+# across boots. The following adopts the traditional System V behavior
+# of removing everything in /tmp, unless /tmp or any of its subdirectories
+# are mount points for another filesystem.
+
+/sbin/mount | /usr/bin/egrep '^/tmp(/| )' >/dev/null 2>&1 || {
+	if [ -h /tmp ]; then
+		# Just remove files under directory if symbolic link
+		/usr/bin/rm -rf /tmp/*
+	else
+		/usr/bin/rm -rf /tmp
+		/usr/bin/mkdir -m 1777 /tmp
+		/usr/bin/chown root:sys /tmp
+	fi
+}
+
+# Clean up /etc directory
+
+for file in /etc/rem_name_to_major /etc/nologin; do
+	[ -f $file ] && /usr/bin/rm -f $file
+done
+
+# Traditional SunOS 4.x behavior has been to not alter the contents of
+# /var/tmp (/usr/tmp) at boot time. This behavior is maintained as the
+# current default behavior. If the traditional System V behavior of
+# removing everything in /var/tmp is desired then clean up /var/tmp,
+# unless /var/tmp or any of its subdirectories are mount points for
+# another filesystem.
+
+CLEAN_VARTMP=`svcprop -c -p options/clean_vartmp $SMF_FMRI`
+if [ "$CLEAN_VARTMP" = "true" ]; then
+    /sbin/mount | /usr/bin/egrep '^/var/tmp(/| )' >/dev/null 2>&1 || {
+	cd /var/tmp || exit 0
+
+	# We carefully remove all files except the Ex* files (editor
+	# temporary files), which expreserve will process later (in
+	# S89PRESERVE).  Of course, it would be simpler to just run
+	# expreserve before this script, but that doesn't work --
+	# expreserve requires the name service, which is not available
+	# until much later.
+
+	/usr/bin/ls -a | /usr/bin/egrep -v '^(Ex.*|\.|\.\.)$' |
+	    /usr/bin/xargs /usr/bin/rm -rf -- 2>/dev/null
+    }
+fi
+
+exit 0

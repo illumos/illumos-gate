@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# This is the supplemental list of functions in the 32-bit sparc libc that
+# historically have had synonym names with a leading underscore, as in:
+#	open64()
+#	_open64()
+# See the 'syn_common' file in the parent directory
+# for the list of names common to all ISAs.
+#
+
+__makecontext_v2
+alphasort64
+attropen64
+creat64
+fstat64
+fstatat64
+fstatvfs64
+ftruncate64
+ftw64
+getdents64
+getrlimit64
+install_utrap
+lockf64
+lseek64
+lstat64
+mkstemp64
+mkstemps64
+mmap64
+nftw64
+open64
+openat64
+pread64
+ptrace
+pwrite64
+readdir64
+readdir64_r
+s_fcntl
+scandir64
+setrlimit64
+stat64
+statvfs64
+tell64
+truncate64

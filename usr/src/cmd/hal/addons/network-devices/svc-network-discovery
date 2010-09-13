@@ -1,0 +1,117 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+
+METHOD=${1}
+INSTANCE=${2}
+
+DBUS_DESTINATION="org.freedesktop.Hal"
+MESSAGE_PREFIX="org.freedesktop.Hal.Device.NetworkDiscovery"
+OBJECT_PATH="/org/freedesktop/Hal/devices/network_attached"
+SMF_PROPERTY_GROUP="config"
+HAL_PROPERTY_GROUP="network_discovery"
+SVCS=/usr/bin/svcs
+
+usage() {
+	echo "Usage: $0 { start | stop | refresh } { snmp }"
+	exit $SMF_EXIT_ERR_FATAL
+}
+
+execute() {
+	echo "$*"
+	$*
+
+	return $?
+}
+
+start_snmp() {
+	interval=`/bin/svcprop -p config/interval ${SMF_FMRI} 2>/dev/null`
+	community=`/bin/svcprop -p config/community ${SMF_FMRI} 2>/dev/null`
+	network=`/bin/svcprop -p config/network ${SMF_FMRI} 2>/dev/null`
+	MESSAGE="${MESSAGE_PREFIX}.EnablePrinterScanningViaSNMP"
+	MESSAGE="${MESSAGE} int32:${interval:-60}"
+	MESSAGE="${MESSAGE} string:${community:-public}"
+	MESSAGE="${MESSAGE} string:${network:-0.0.0.0}"
+
+	execute /usr/bin/dbus-send --system --print-reply \
+		--dest=${DBUS_DESTINATION} --type=method_call ${OBJECT_PATH} \
+		${MESSAGE}
+	return $?
+}
+
+stop_snmp() {
+	MESSAGE="${MESSAGE_PREFIX}.DisablePrinterScanningViaSNMP"
+
+	execute /usr/bin/dbus-send --system --print-reply \
+		--dest=${DBUS_DESTINATION} --type=method_call ${OBJECT_PATH} \
+		${MESSAGE}
+	return $?
+}
+
+refresh_snmp() {
+	community=`/bin/svcprop -p config/community ${SMF_FMRI} 2>/dev/null`
+	network=`/bin/svcprop -p config/network ${SMF_FMRI} 2>/dev/null`
+	MESSAGE="${MESSAGE_PREFIX}.EnablePrinterScanningViaSNMP"
+	MESSAGE="${MESSAGE} string:${community:-public}"
+	MESSAGE="${MESSAGE} string:${network:-0.0.0.0}"
+
+	execute /usr/bin/dbus-send --system --print-reply \
+		--dest=${DBUS_DESTINATION} --type=method_call ${OBJECT_PATH} \
+		${MESSAGE}
+	return $?
+}
+
+case "${METHOD}" in
+	'start')
+		;;
+	'stop')
+		count=`$SVCS -o STATE hal 2>>/dev/null | grep -c "^online"`
+		if [ $count -eq 0 ] ; then
+			exit 0	# if HAL isn't running, there is nothing to do
+		fi
+		;;
+	'refresh')
+		;;
+	*)
+		usage
+		;;
+esac
+
+case "${INSTANCE}" in
+	'snmp')
+		;;
+	*)
+		usage
+		;;
+esac
+
+${METHOD}_${INSTANCE}
+exit_code=$?
+
+exit $exit_code

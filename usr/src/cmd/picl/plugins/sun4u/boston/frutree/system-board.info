@@ -1,0 +1,619 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This file creates the system board structure
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M%	%I%	%E% SMI")
+
+/*
+ * motherboard seeprom source
+ */
+name:/frutree/chassis/MB/system-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/motherboard-fru-prom@0,aa
+
+name:/platform/i2c@1f,520000/motherboard-fru-prom@0,aa
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+
+
+/*
+ * RMC Board Seeprom Source
+ */
+name:/frutree/chassis/MB/system-board/SC/service-processor
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/rmc-fru-prom@0,a8
+
+name:/platform/i2c@1f,520000/rmc-fru-prom@0,a8
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/SC/service-processor
+
+
+/*
+ * FIOB Board Seeprom Source
+ */
+name:/frutree/chassis/MB/system-board/FIOB/front-IO-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/front-io-fru-prom@0,4e
+
+name:/platform/i2c@1f,520000/front-io-fru-prom@0,4e
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/FIOB/front-IO-board
+
+
+/*
+ * PDB fru/serial number prom and parent
+ */
+name:/frutree/chassis/PDB/power-distribution-board
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/pdb-fru-prom@0,da
+
+name:/platform/i2c@1f,520000/pdb-fru-prom@0,da
+	REFPROP _fru_parent name:/frutree/chassis/PDB/power-distribution-board
+
+
+/*
+ * HDDBP Board Seeprom Source and fru parent
+ */
+name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller/HDDBP/disk-backplane-8
+    PROP FRUDataAvailable void r
+    REFPROP _seeprom_source name:/platform/i2c@1f,520000/sas-backplane-fru-prom@0,48
+
+name:/platform/i2c@1f,520000/sas-backplane-fru-prom@0,48
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller/HDDBP/disk-backplane-8
+
+
+/*
+ * HDDCNTRL Board Seeprom Source
+ *
+ * Note: see piclfrutree.info for fruid prom info
+ */
+name:/platform/i2c@1f,520000/sas-ctrl-fru-prom@0,46
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller
+
+
+/*
+ * Proccessor Board 0
+ */
+name:/frutree/chassis/MB/system-board/C0
+	REFNODE cpu-module fru WITH name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,b8
+name:/frutree/chassis/MB/system-board/C0/cpu-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,b8
+
+name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,b8
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module
+
+/*
+ * Proccessor Board 1
+ */
+name:/frutree/chassis/MB/system-board/C1
+	REFNODE cpu-module fru WITH name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,c8
+name:/frutree/chassis/MB/system-board/C1/cpu-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,c8
+
+name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,c8
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module
+
+/*
+ * Proccessor Board 2
+ */
+name:/frutree/chassis/MB/system-board/C2
+	REFNODE cpu-module fru WITH name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,e8
+name:/frutree/chassis/MB/system-board/C2/cpu-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,e8
+
+name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,e8
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module
+
+/*
+ * Proccessor Board 3
+ */
+name:/frutree/chassis/MB/system-board/C3
+	REFNODE cpu-module fru WITH name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,98
+name:/frutree/chassis/MB/system-board/C3/cpu-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,98
+
+name:/platform/i2c@1f,520000/cpu-fru-prom?UnitAddress=0,98
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module
+
+/*
+ * Processors
+ */
+name:/frutree/chassis/MB/system-board/C0/cpu-module
+	REFNODE P0 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0
+	PROP SlotType string r 0 "cpu"
+	PROP Label string r 0 "P0"
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@0,0
+
+name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@0,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C1/cpu-module
+	REFNODE P0 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0
+	PROP SlotType string r 0 "cpu"
+	PROP Label string r 0 "P0"
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@1,0
+
+name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@1,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C2/cpu-module
+	REFNODE P0 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0
+	PROP SlotType string r 0 "cpu"
+	PROP Label string r 0 "P0"
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@2,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@2,0
+
+name:/platform/SUNW,UltraSPARC-IIIi+@2,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@2,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C3/cpu-module
+	REFNODE P0 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0
+	PROP SlotType string r 0 "cpu"
+	PROP Label string r 0 "P0"
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@3,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@3,0
+
+name:/platform/SUNW,UltraSPARC-IIIi+@3,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@3,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+
+
+/************************************
+ * CPU Board 0 Processor 0
+ ************************************/
+name:/platform/i2c@1f,520000/temperature?UnitAddress=0,10
+	REFPROP _location_parent /frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+	REFNODE B0 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0
+	PROP Label string r 0 "B0"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+	REFNODE B1 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1
+	PROP Label string r 0 "B1"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+
+/************************************
+ * CPU Board 1 Processor 0
+ ************************************/
+name:/platform/i2c@1f,520000/temperature?UnitAddress=0,30
+	REFPROP _location_parent /frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+	REFNODE B0 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0
+	PROP Label string r 0 "B0"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+	REFNODE B1 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1
+	PROP Label string r 0 "B1"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+
+/************************************
+ * CPU Board 2 Processor 0
+ ************************************/
+name:/platform/i2c@1f,520000/temperature?UnitAddress=0,50
+	REFPROP _location_parent /frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+	REFNODE B0 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0
+	PROP Label string r 0 "B0"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+	REFNODE B1 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1
+	PROP Label string r 0 "B1"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+
+/************************************
+ * CPU Board 3 Processor 0
+ ************************************/
+name:/platform/i2c@1f,520000/temperature?UnitAddress=0,70
+	REFPROP _location_parent /frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+	REFNODE B0 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0
+	PROP Label string r 0 "B0"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+	REFNODE B1 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1
+	PROP Label string r 0 "B1"
+	REFNODE bank location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank
+	REFNODE D0 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+	REFNODE D1 location WITH name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+
+/************************************
+ * CPU Board 0 Processor 0 memory
+ ************************************/
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/************************************
+ * CPU Board 1 Processor 0 memory
+ ************************************/
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/************************************
+ * CPU Board 2 Processor 0 memory
+ ************************************/
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/************************************
+ * CPU Board 3 Processor 0 memory
+ ************************************/
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D0"
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1
+	PROP SlotType string r 0 "memory-module"
+	PROP Label string r 0 "D1"
+
+/************************************
+ * Dimm nodes
+ ************************************/
+/*
+ * Board 0 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b0
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b2
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b4
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b6
+/*
+ * Board 1 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c0
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c2
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c4
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c6
+/*
+ * Board 2 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e0
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e2
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e4
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e6
+/*
+ * Board 3 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,90
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,92
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,94
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1
+	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,96
+
+/*********************************************
+ * DIMM seeprom sources and operational status
+ *********************************************/
+
+/* Fill in a status of "ok" for all possible dimms in the platform
+ * tree.  This status may be overridden by ASR with "disabled" or "unused".
+ * If a slot is actually not populated then no nodes/status properties
+ * actually get created.
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+
+/*
+ * Board 0 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b0
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b2
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b4
+name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,b6
+/*
+ * Board 1 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c0
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c2
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c4
+name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,c6
+/*
+ * Board 2 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e0
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e2
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e4
+name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,e6
+/*
+ * Board 3 CPU 0
+ */
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,90
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,92
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,94
+name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1/mem-module
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,96
+
+/************************************
+ * DIMM FRU parents
+ ***********************************/
+/*
+ * Board 0 CPU 0
+ */
+name:/platform/i2c@1f,520000/dimm-spd@0,b0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,b2
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,b4
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,b6
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 1 CPU 0
+ */
+name:/platform/i2c@1f,520000/dimm-spd@0,c0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,c2
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,c4
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,c6
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 2 CPU 0
+ */
+name:/platform/i2c@1f,520000/dimm-spd@0,e0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,e2
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,e4
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,e6
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 3 CPU 0
+ */
+name:/platform/i2c@1f,520000/dimm-spd@0,90
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,92
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,94
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/i2c@1f,520000/dimm-spd@0,96
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1/mem-module
+
+/************************************
+ * DIMM parents
+ ***********************************/
+/*
+ * Board 0 CPU 0
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 1 CPU 0
+ */
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 2 CPU 0
+ */
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank/D1/mem-module
+/*
+ * Board 3 CPU 0
+ */
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D0/mem-module
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B0/bank/D1/mem-module
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0/mem-module
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1/mem-module
+
+/*
+ * create reference properties for motherboard pci devices
+ */
+_class:/jbus/pciex@1e,600000
+	REFPROP	_fru_parent name:/frutree/chassis/MB/system-board
+_class:/jbus/pciex@1f,700000
+	REFPROP	_fru_parent name:/frutree/chassis/MB/system-board

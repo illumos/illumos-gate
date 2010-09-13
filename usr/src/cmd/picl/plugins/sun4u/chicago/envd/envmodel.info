@@ -1,0 +1,201 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This is the environmental plug-in configuration file for
+ * Chicago platform.
+ */
+
+VERSION 1.1
+
+VERBOSE 1
+
+/*
+ * Fan names and ids
+ */
+#define	ENV_SYSTEM_FAN0		system-fan0
+#define	ENV_SYSTEM_FAN1		system-fan1
+#define	ENV_SYSTEM_FAN2		system-fan2
+#define	ENV_SYSTEM_FAN3		system-fan3
+#define	ENV_SYSTEM_FAN4		system-fan4
+
+#define	SYSTEM_FAN0_ID		0
+#define	SYSTEM_FAN1_ID		1
+#define	SYSTEM_FAN2_ID		2
+#define	SYSTEM_FAN3_ID		3
+#define	SYSTEM_FAN4_ID		4
+
+/*
+ * Sensor names and ids
+ */
+#define	SENSOR_CPU0		cpu0
+#define	SENSOR_CPU1		cpu1
+#define	SENSOR_MB		MotherBoard
+#define	SENSOR_ADT7462		ADT7462
+#define	SENSOR_LM95221		LM95221
+#define	SENSOR_FIRE		FireASIC
+#define	SENSOR_LSI1064		LSI1064
+#define	SENSOR_FRONT_PANEL	Front_panel
+#define	SENSOR_PSU		PSU
+
+#define	CPU0_SENSOR_ID		0
+#define	CPU1_SENSOR_ID		1
+#define	ADT7462_SENSOR_ID	2
+#define	MB_SENSOR_ID		3
+#define	LM95221_SENSOR_ID	4
+#define	FIRE_SENSOR_ID		5
+#define	LSI1064_SENSOR_ID	6
+#define	FRONT_PANEL_SENSOR_ID	7
+#define	PSU_SENSOR_ID		8
+
+/* 
+ * Hard disk sensor names and ids
+ */
+#define	ENV_DISK0		hard-disk0
+#define	ENV_DISK1		hard-disk1
+#define ENV_DISK2		hard-disk2
+#define ENV_DISK3		hard-disk3
+
+#define	DISK0_ID		0
+#define	DISK1_ID		1
+#define DISK2_ID		2
+#define DISK3_ID		3
+
+/*
+ * Publish the labels for sensors and fans
+ */
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_CPU0
+    PROP Label string r 0 "cpu0-sensor"
+    PROP ID int r 4 CPU0_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_CPU1
+    PROP Label string r 0 "cpu1-sensor"
+    PROP ID int r 4 CPU1_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_MB
+    PROP Label string r 0 "mb-sensor"
+    PROP ID int r 4 MB_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_ADT7462
+    PROP Label string r 0 "adt7462-sensor"
+    PROP ID int r 4 ADT7462_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_LM95221
+    PROP Label string r 0 "lm95221-sensor"
+    PROP ID int r 4 LM95221_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_FIRE
+    PROP Label string r 0 "fire-sensor"
+    PROP ID int r 4 FIRE_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_LSI1064
+    PROP Label string r 0 "lsi1064-sensor"
+    PROP ID int r 4 LSI1064_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_FRONT_PANEL
+    PROP Label string r 0 "front_panel-sensor"
+    PROP ID int r 4 FRONT_PANEL_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_PSU
+    PROP Label string r 0 "psu-sensor"
+    PROP ID int r 4 PSU_SENSOR_ID
+
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN0
+    PROP Label string r 0 "cpu0-fan"
+    PROP ID int r 4 SYSTEM_FAN0_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN1
+    PROP Label string r 0 "cpu1-fan"
+    PROP ID int r 4 SYSTEM_FAN1_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN2
+    PROP Label string r 0 "pci-fan"
+    PROP ID int r 4 SYSTEM_FAN2_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN3
+    PROP Label string r 0 "system-fan3"
+    PROP ID int r 4 SYSTEM_FAN3_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN4
+    PROP Label string r 0 "system-fan4"
+    PROP ID int r 4 SYSTEM_FAN4_ID
+
+/*
+ * Internal hard disks
+ */
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0/ENV_DISK0
+    PROP Label string r 0 "hard-disk0"
+    PROP ID int r 4 DISK0_ID
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0/ENV_DISK1
+    PROP Label string r 0 "hard-disk1"
+    PROP ID int r 4 DISK1_ID
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0/ENV_DISK2
+    PROP Label string r 0 "hard-disk2"
+    PROP ID int r 4 DISK2_ID
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0/ENV_DISK3
+    PROP Label string r 0 "hard-disk3"
+    PROP ID int r 4 DISK3_ID
+
+/*
+ * Associate the environmental information with devices.
+ */
+
+/*
+ * CPU 0 environmental information
+ */
+_class:/jbus/cpu?ID=0
+TABLE Environment
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/ebus@1f,464000/env-monitor@3,0/SENSOR_CPU0
+    ENDROW
+    ROW
+        PROP Class string r 0 "fan"
+        REFPROP _fan_ /platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN0
+    ENDROW
+ENDTABLE
+
+/*
+ * CPU 1 environmental information
+ */
+_class:/jbus/cpu?ID=1
+TABLE Environment
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/ebus@1f,464000/env-monitor@3,0/SENSOR_CPU1
+    ENDROW
+    ROW
+        PROP Class string r 0 "fan"
+        REFPROP _fan_ /platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN1
+    ENDROW
+ENDTABLE

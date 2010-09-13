@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deviceinfo version="0.2">
+  <device>
+    <!-- To reduce HAL's probing effect on systems with massive fixed storage -->
+    <!-- we ignore fixed storage devices altogether -->
+    <match key="storage.removable" bool="false">
+      <match key="storage.hotpluggable" bool="false">
+        <merge key="info.ignore" type="bool">true</merge>
+      </match>
+    </match>
+
+  </device>
+</deviceinfo>

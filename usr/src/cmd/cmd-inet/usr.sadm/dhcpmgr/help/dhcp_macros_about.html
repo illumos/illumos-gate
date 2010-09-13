@@ -1,0 +1,296 @@
+<!--
+  -- ident	"%Z%%M%	%I%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+  -- Use is subject to license terms.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: About Macros and Options</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=645>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+	<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_solaris_about.html">Solaris DHCP</A><BR>
+	<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">About Macros<BR>
+	&nbsp;&nbsp;<A HREF="dhcp_main_hlp.html">Getting Help</A><P>
+	<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relays</STRONG></A><P>
+	<A HREF="dhcp_net_ref.html"><STRONG>Networks</STRONG></A><P>
+	<A HREF="dhcp_addr_ref.html"><STRONG>Addresses</STRONG></A><P>
+	<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+	<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>		
+	<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><P>
+	<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+		</td>
+	
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+<td colspan=1 valign="top" bgcolor="#ffffff" width=495>
+
+
+	
+<P>&nbsp;</P>
+
+<h1>About Macros and Options</H1>
+
+
+In a DHCP environment, <em>macros</em> are containers for <em>option values</em> that are
+passed as configuration parameters from the DHCP server to the DHCP client. For example,
+you might define a macro that contains options specifying a DNS server and print server
+to be used by all clients using IP addresses owned by a particular DHCP server.<p>
+
+<em>Options</em> specify the format in which option values are 
+defined in the DHCP server's <tt>dhcptab</tt> (in which all DHCP 
+options and macros are stored). For example, option category, data type, vendor, and granularity all determine the <em>shape</em> of the options 
+contained in your macros. Creating and modifying options is described 
+further in the help pages for <a href="dhcp_option_create.html">Create Option</a> and
+<a href="dhcp_option_mod.html">Modify Option</a>.<p>
+
+<h1>
+         Macro Processing
+      </h1>
+      <p>
+         Remember the following points when naming DHCP macros and adding
+         options to macros:
+      </p>
+      <ol>
+         <li>
+            <strong>Automatic processing</strong> occurs for Client Class,
+            Network, and Client ID category macros when the macro category
+            matches the client's class, network address, or client
+            identifier.
+            <br>
+         </li>
+         <li>
+            <strong>Macro categories</strong> determine the order in which
+            macros are processed automatically.
+             <br>
+         </li>
+         <li>
+            <strong>Macro names</strong> determine macro categories, with the
+            exception of IP address macros, which are categorized by their
+            assignment to an IP address.<br>
+            
+             <p>
+               For most macros, make your macro names <strong>match the names
+               of the resources or devices</strong> to which you want the
+               macros to apply. For example:
+            </p>
+            <br>
+            <table cellpadding="4" cellspacing="4" border="1">
+               <tr>
+                  <td bgcolor="#CCCFFF" valign="middle" align="left">
+                     <p>
+                        For Clients...
+                     </p>
+                  </td>
+                  <td bgcolor="#CCCFFF" valign="middle" align="left">
+                     <p>
+                        Name Your Macro
+                     </p>
+                  </td>
+               </tr>
+               <tr>
+                  <td valign="top">
+                     <p>
+                        Of a particular client class
+                     </p>
+                  </td>
+                  <td valign="top">
+                     <p>
+                        Same name as the DHCP client's client class. The
+                        client class is determined by the client vendor. For
+                        example, the client class name for a Sun Blade <sup><font
+                        size="-2"> TM</font></sup> 150 client is SUNW,Sun-Blade-100 so
+                        you must name your macro <tt> SUNW.Sun-Blade-100</tt> . On 
+                        Solaris DHCP client systems, you
+                        can determine the client class by typing the command
+                        <tt> uname -i</tt> on the client machine. Note that
+                        macro names cannot contain commas; if a comma appears
+                        in the client class, replace it with a period in the
+                        macro name.
+                     </p>
+                  </td>
+               </tr>
+               <tr>
+                  <td valign="top">
+                     <p>
+                        On a particular network
+                     </p>
+                  </td>
+                  <td valign="top">
+                     <p>
+                        Same as the IP address of the network through which the
+                        client is connecting; for example, name your macro <tt>
+                        10.0.0.0</tt>.
+                     </p>
+                  </td>
+               </tr>
+               <tr>
+                  <td valign="top">
+                     <p>
+                        Using a particular IP Address
+                     </p>
+                  </td>
+                  <td valign="top">
+                     <p>
+                        Any name, but using the DHCP server's hostname or IP
+                        address is recommended; for example, name your macro
+                        <tt> shiva</tt> or <tt> 125.53.224.45</tt> . This kind
+                        of macro is valuable for use as a configuration macro
+                        for all clients obtaining configuration information
+                        from this DHCP server.
+                     </p>
+                  </td>
+               </tr>
+               <tr>
+                  <td valign="top">
+                     <p>
+                        Identified by a particular client ID
+                     </p>
+                  </td>
+                  <td valign="top">
+                     <p>
+                        Same as the unique client identifier; for example,
+                        name your macro <tt> 010800201112B7</tt> .
+                     </p>
+                  </td>
+               </tr>
+            </table>
+            <br>
+         </li>
+         <li>
+            <strong>Order is important.</strong> The order in which macros are
+            processed is significant. If an option is contained in more than
+            one macro, the option value passed to the client is the value
+            assigned in the macro processed last. Macros are processed in the
+            order shown in the illustration.<br>
+            <br>
+             
+            <p>
+               <img src="art/macroflow.gif"  alt="order of macro processing" vspace="0" hspace="0" border="0"
+               height="225" width="400">
+            </p>
+            <p>
+               As shown in the illustration, macro processing progresses from
+               the general to the specific.
+            </p>
+            <ul type="disc">
+               <li>
+                  <p>
+                     Client Class macros are processed first.<br>
+                  </p>
+               </li>
+               <li>
+                  <p>
+                     Network macros are processed second, superseding any
+                     competing settings in Client Class macros.<br>
+                  </p>
+               </li>
+               <li>
+                  <p>
+                     IP Address macros are processed third, superseding any
+                     competing settings in previous macros.<br>
+                  </p>
+               </li>
+               <li>
+                  <p>
+                     Client ID macros are processed last, superseding any
+                     competing settings in all previous macros.<br>
+                  </p>
+               </li>
+            </ul>
+          </li>
+         <li>
+			<p>
+            <strong>Macros can include other macros.</strong> Regardless of a
+            macro's category, it can include other macros so that, for example,
+            a client class macro could be called from an IP Address macro.<br>
+            <br>
+         </li>
+      </ol>
+      <p>
+          
+      </p>
+      <br>
+	&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+
+<p>&nbsp;</p>
+	
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

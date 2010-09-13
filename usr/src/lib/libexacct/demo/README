@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+1. Introduction
+
+This directory contains  source code for the "exdump"  utility that uses
+libexacct to print the content  of extended accounting files produced by
+the kernel.
+
+This  utility   demonstrates  how  developers  can  use   the  libexacct
+programming API to extract  extended accounting data. libexacct(3LIB) is
+the only interface for reading and  writing  files  in  variable  length
+general-purpose accounting file format  used  by  the  kernel  to  store
+various types of accounting data.
+
+2. Configuration
+
+Exdump can be compiled as either a 32-bit or 64-bit application; because
+exacct is endian-neutral, exdump can read exacct files from either SPARC
+or Intel sources on SPARC or Intel platforms. exdump prints one line for
+each record it encounters in the exacct file.  
+
+The Makefile contained in this directory is set up to use the C compiler
+(cc) and lint  utility found in your  $PATH.  If you wish  to change the
+configuration, edit  the CC  and LINT macro  definitions in  Makefile to
+point to the appropriate pathnames.
+
+3. Targets
+
+The Makefile in this directory supports the following targets:
+
+	make all (default)	- build exdump executable
+	make lint		- run lint against exdump
+	make clean		- remove object files
+	make clobber		- remove objects, and lint files
+
+To  build the  exdump,  execute  "make" in  this  directory.  This  will
+execute the default "make all" target.
+
+4. References
+
+Exacct files:	/var/adm/exacct/proc, /var/adm/exacct/task
+Man pages:	acctadm(1M), libexacct(3LIB)
+Documentation:	"System Administration Guide:
+		Resource Management and Network Services"
+		"System Administration Guide: IP Services"

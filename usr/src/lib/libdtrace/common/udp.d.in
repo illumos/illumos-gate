@@ -1,0 +1,73 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+#pragma D depends_on module unix
+#pragma D depends_on provider udp
+
+inline int UDPH_SIZE = @UDPH_SIZE@;
+#pragma D binding "1.6.3" UDPH_SIZE
+
+/*
+ * udpinfo is the UDP header fields.
+ */
+typedef struct udpinfo {
+	uint16_t udp_sport;		/* source port */
+	uint16_t udp_dport;		/* destination port */
+	uint16_t udp_length;		/* total length */
+	uint16_t udp_checksum;          /* headers + data checksum */
+	udpha_t *udp_hdr;		/* raw UDP header */
+} udpinfo_t;
+
+/*
+ * udpsinfo contains stable UDP details from udp_t.
+ */
+typedef struct udpsinfo {
+	uintptr_t udps_addr;
+	uint16_t udps_lport;		/* local port */
+	uint16_t udps_rport;		/* remote port */
+	string udps_laddr;		/* local address, as a string */
+	string udps_raddr;		/* remote address, as a string */
+} udpsinfo_t;
+
+#pragma D binding "1.6.3" translator
+translator udpinfo_t < udpha_t *U > {
+	udp_sport = ntohs(U->uha_src_port);
+	udp_dport = ntohs(U->uha_dst_port);
+	udp_length = ntohs(U->uha_length);
+	udp_checksum = ntohs(U->uha_checksum);
+	udp_hdr = U;
+};
+
+#pragma D binding "1.6.3" translator
+translator udpsinfo_t < udp_t *U > {
+	udps_addr = (uintptr_t)U;
+	udps_lport = U ?
+	    ntohs(U->udp_connp->u_port.connu_ports.connu_lport) : 0;
+	udps_rport = U ?
+	    ntohs(U->udp_connp->u_port.connu_ports.connu_fport) : 0;
+	udps_laddr = U ?
+	    inet_ntoa6(&U->udp_connp->connua_v6addr.connua_laddr) : "<unknown>";
+	udps_raddr = U ?
+	    inet_ntoa6(&U->udp_connp->connua_v6addr.connua_faddr) : "<unknown>";
+};

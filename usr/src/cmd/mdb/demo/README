@@ -1,0 +1,161 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+1. Introduction
+
+This directory contains source code for sample debugger modules for the Modular
+Debugger (MDB).  These modules demonstrate how developers can use the MDB
+programming API to extend the capabilities of MDB itself.  MDB is an extensible
+utility for low-level debugging and editing of the live operating system,
+operating system crash dumps, user processes, user process core dumps, and
+object files.  For a more detailed description of MDB features and documentation
+for the MDB programming API, refer to the manual, "Solaris Modular Debugger
+Guide".  This document is available on-line at http://docs.sun.com.
+
+2. Configuration
+
+As the files in this directory are owned by the administrator, you should make
+a copy of this directory to your home directory or other location before you
+begin experimenting with MDB.  If you wish to change the configuration, edit
+the CC and LINT macro definitions in Makefile.sparc, Makefile.sparcv9, 
+Makefile.i386 and Makefile.amd64 to point to the appropriate pathnames.
+The Makefiles contained in this directory are set up to use the C compiler (cc)
+and lint utility found in your $PATH.  These four Makefiles can also be used
+to define base compiler settings for the corresponding instruction set
+architecture (ISA):
+
+	Makefile.sparc		- rules for building 32-bit SPARC objects
+	Makefile.sparcv9	- rules for building 64-bit SPARC objects
+	Makefile.i386		- rules for building 32-bit x86 objects
+	Makefile.amd64		- rules for building 64-bit x86 objects
+
+The Makefile.common file adds common compiler and linker flags to these base
+definitions, and defines the rules for building the example modules.  You will
+not need to change any of the definitions here in order to build the examples.
+If you wish to construct additional modules of your own, edit the MODULES macro
+at the top of Makefile.common.  For example, if you create a new module source
+file common/mymodule.c, you should change:
+
+<	MODULES = example1.so example2.so
+
+to:
+
+>	MODULES = example1.so example2.so mymodule.so
+
+and then execute "make".
+
+3. Targets
+
+The Makefile in this directory supports the following targets:
+
+	make all (default)	- build all modules for the current machine
+	make clean		- remove object files from build directories
+	make clean.lint		- remove lint files from build directories
+	make clobber		- remove objects, modules, and lint files
+	make lint		- run lint against each example module
+
+To build the example modules, execute "make" in this directory.  This will
+execute the default "make all" target.
+
+4. Loading Modules
+
+After you successfully compile the example modules, the module object files
+reside in one or more of the i386/, amd64/, sparc/, and sparcv9/ subdirectories
+depending on the ISAs supported on your machine.  In order to load the example
+modules, you can either use the ::load built-in dcmd with the absolute pathname
+of a given module, or you can adjust the module library path to include the
+directory where your modules are located.  This can be done using the ::set -L
+built-in dcmd.  For example:
+
+	> ::set -L %o:/usr/demo/mdb/%i
+	> ::load example1
+
+The %o token expands to the old value of the path.  The %i token expands to
+the appropriate ISA name.  You can restore this setting each time you use
+MDB by adding the ::set directive to your $HOME/.mdbrc file.  This file, if
+present, is processed automatically each time you start the debugger.
+
+5. Example 1: Echo and Vmstat
+
+The first example module provides the source code for two example loadable
+dcmds.  ::simple_echo is a command to echo back its arguments, similar to
+/usr/bin/echo or MDB's built-in ::echo dcmd.  ::vminfo is a command to read
+and print the kernel's global virtual memory statistics structure.  This
+example introduces the basic structure of an MDB module and demonstrates some
+simple argument processing.  In order to use ::vminfo, you will need to apply
+MDB to a crash dump of your system, or to the live kernel.  To apply MDB to a
+crash dump, you might execute:
+
+	$ mdb unix.0 vmcore.0
+
+To apply MDB to the live kernel, become super-user and then execute:
+
+	# mdb -k
+
+6. Example 2: Proc Walker and PS
+
+The second example module provides a more realistic example of something you
+might want to do with MDB: print a formatted table of active processes,
+similar to the /usr/bin/ps command or MDB's ::ps dcmd.  This example
+introduces the concept of a walker, a set of functions which describe how to
+iterate over a data structure, and them demonstrates how the ::simple_ps
+dcmd can be built using this walker.  Using the simple_proc walker, you can
+obtain a listing of kernel proc_t addresses:
+
+	> ::load example2
+	> ::walk simple_proc
+	71690a80
+	7168ee40
+	71611898
+	[ ... ]
+	7103b178
+	7103b888
+	1041ce20
+
+Using the ::simple_ps dcmd you can obtain a formatted listing of processes:
+
+	> ::simple_ps
+	PID COMM
+	285 sh
+	271 mibiisa
+	269 ttymon
+	[ ... ]
+
+7. Packaging and Installation
+
+If you are a software developer, you may wish to develop and deliver MDB
+modules along with your software products in order to facilitate analysis
+of software problems at customer sites.  Your completed MDB modules should
+be packaged along with your software and delivered into the appropriate
+MDB module directory.  For kernel debugging modules, your module should
+be delivered in one of the following directories:
+
+	/usr/lib/mdb/kvm
+	/usr/platform/`uname -i`/lib/mdb/kvm
+
+and should be named after your kernel module.  For example, the "ip" kernel
+module has a debugging module named "ip.so".

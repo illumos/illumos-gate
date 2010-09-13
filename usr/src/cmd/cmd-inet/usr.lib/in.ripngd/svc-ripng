@@ -1,0 +1,75 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/routing_include.sh
+
+smf_configure_ip || exit $SMF_EXIT_OK
+
+daemon_args=`get_daemon_args $SMF_FMRI`
+options="sqp:Ptv"
+
+#
+# Handle upgrade - routing/daemon-args property must be mapped to properties
+# in routeadm property group.  Note the SMF-incompatible -t option is not
+# supported, since it requires that in.ripngd run in the foreground.
+#
+if [ -n "$daemon_args" ]; then
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "q" quiet_mode true false
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "s" supply_routes true false
+	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "p" udp_port 521
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "P" poison_reverse false true
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "v" verbose true false
+	set_daemon_nonoption_properties "$SMF_FMRI" "$daemon_args" \
+	    "$options" "log_file"
+	clear_daemon_args $SMF_FMRI
+fi
+
+#
+# Assemble arguments to daemon from properties
+#
+args="`get_daemon_option_from_boolean_property $SMF_FMRI \
+	quiet_mode -q true`"
+args="$args `get_daemon_option_from_boolean_property $SMF_FMRI \
+	supply_routes -s true`"
+args="$args `get_daemon_option_from_property $SMF_FMRI udp_port p 521`"
+args="$args `get_daemon_option_from_boolean_property $SMF_FMRI \
+	poison_reverse -P false`"
+args="$args `get_daemon_option_from_boolean_property $SMF_FMRI \
+	verbose -v true`"
+args="$args `get_daemon_nonoption_property $SMF_FMRI log_file`"
+
+/usr/lib/inet/in.ripngd $args
+
+[ "$?" = 0 ] || exit $SMF_EXIT_ERR_FATAL
+
+exit "$SMF_EXIT_OK"

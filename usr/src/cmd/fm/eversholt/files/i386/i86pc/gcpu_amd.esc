@@ -1,0 +1,194 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * Eversholt rules for generic AMD with on-chip memory-controller(s), as seen
+ * in AMD family 0xf and 0x10.
+ *
+ * In the absence of any model-specific support, any memory errors that
+ * are observed via MCA (typically through an on-chip memory-controller)
+ * will surface as ereport.cpu.generic-x86.bus_interconnect_memory[_uc]
+ * ereports and are diagnosed via generic rules in gcpu.esc.
+ *
+ * If full model-specific support is available, including full NorthBridge
+ * support, then memory ereports will surface in a more-specific subclass
+ * such as ereport.cpu.amd.mem_ce; these are diagnosed in amd64.esc.
+ *
+ * In the case where some "vendor generic" support is present, memory errors
+ * are reported as ereport.cpu.generic-x86.mem_{ce,ue} and include a
+ * syndrome and syndrome-type, and usually also a resource FMRI to identify
+ * the affected resource.  In the AMD case a resource FMRI is included for
+ * those chip versions that include an Online Spare Control register; this
+ * register provides counts of ECC errors seen per channel and chip-select
+ * on a NorthBridge node.  The resource FMRI has form
+ * 	hc:///motherboard/chip/memory-controller/dram-channel/chip-select
+ * in these cases.
+ */
+
+#pragma dictionary "GMCA"
+
+/*
+ * The number of pages that must be faulted on a chip-select for repeated
+ * correctable errors before we will consider one of the component dimms
+ * faulty.
+ */
+#define	CS_DIMMSB_THRESH	64
+
+/*
+ * The maximum number of pages we will diagnose as faulty on any one
+ * chip-select (must be at least CS_PAGEFLT_THRESH).  If a chip-select
+ * has a fault that will affect zillions of pages this limit stops us
+ * diagnosing excessive numbers of page faults.
+ */
+#define	CS_PAGEFLT_MAX		(2 * CS_DIMMSB_THRESH)
+
+/*
+ * SERD paramters for individual page faults.  When more than PAGE_SB_COUNT
+ * correctable ereports are experienced on a single chip-select within
+ * PAGE_SB_TIME the engine will fire and we will fault the most recent
+ * page.
+ */
+#define	PAGE_SB_COUNT		3
+#define	PAGE_SB_TIME		24h
+
+#define	CSPATH	chip/memory-controller/dram-channel/chip-select
+
+/*
+ * ADDR_VALID is true if the ereport payload includes IA32_MCi_ADDR.
+ */
+#define	ADDR_VALID (payloadprop_defined("IA32_MCi_ADDR"))
+
+/*
+ * CONTAINS_CS is true if the resource nvlist array exists and one of its
+ * members matches the chip-select path.  This is used to constrain
+ * propogations to those for which a resource element matches the
+ * chip-select path of the propogation.  This is necessary because the
+ * detector element of memory ereports is a cpu and not the chip-select itself.
+ */
+#define	CONTAINS_CS (payloadprop_contains("resource", asru(CSPATH)))
+
+#define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("IA32_MCi_ADDR"))) 
+/* Generic memory ereports. */
+event ereport.cpu.generic-x86.mem_ce@chip/core/strand { within(1s) };
+event ereport.cpu.generic-x86.mem_ue@chip/core/strand { within(1s) };
+
+/*
+ *	 ========= Propogations for correctable memory faults ==========
+ *	|								|	
+ *	| Discard mem_ce with no resource in the ereport payload.	|
+ *	| Discard mem_ce with no address info - we can't fault the	|
+ *	| corresponding page without it.				|
+ *	|								|
+ *	| For a mem_ce ereport detected by a given chip/cpu (as per	|
+ *	| the payload detector info) whose resource payload member	|
+ *	| includes a chip/memory-controller/dram-channel/chip-select	|
+ *	| (CSPATH) for the same chip number, diagnose to an fault event	|
+ *	| associated with a per-CSPATH SERD engine as long as we are	|
+ *	| below the page fault limit for this CSPATH (defined below);	|
+ *	| if we are over that limit then discard the event since we	|
+ *	| will already have faulted a dimm and there is no point in	|
+ *	| continuing to diagnose endless page faults from a dimm with	|
+ *	| something like a pin failure.					|
+ *	|								|
+ *	| When the per-CSPATH SERD engine fires we fault the page	|
+ *	| containing the address included in the ereport that caused	|
+ *	| the trip, and increment a per-CSPATH counter to count page	|
+ *	| faults on that chip-select from repeated correctable errors.	|
+ *	|								|
+ *	| A dimm_ce fault is diagnosed when we have faulted an		|
+ *	| excessive number of page_ce faults on a chip-select - more	|
+ *	| than CE_DIMMSB_THRESH.					|
+ *	|===============================================================| 
+ */
+
+#define	CS_PGFLT_LIMIT_REACHED (count(stat.cepgflt@CSPATH) > CS_PAGEFLT_MAX)
+#define	CS_DIMMSB_THRESH_REACHED \
+	(count(stat.cepgflt@CSPATH) >= CS_DIMMSB_THRESH)
+
+engine stat.cepgflt@CSPATH;
+engine serd.memory.generic-x86.page_ce@CSPATH, N=PAGE_SB_COUNT, T=PAGE_SB_TIME;
+event fault.memory.generic-x86.page_ce@CSPATH,
+    message=0, response=0,		/* do not message individual pageflts */
+    count=stat.cepgflt@CSPATH,		/* increment on pageflt diagnosis */
+    engine=serd.memory.generic-x86.page_ce@CSPATH;
+engine serd.memory.generic-x86.dimm_ce@CSPATH, N=PAGE_SB_COUNT, T=PAGE_SB_TIME;
+event fault.memory.generic-x86.dimm_ce@CSPATH,
+    engine=serd.memory.generic-x86.dimm_ce@CSPATH;
+
+prop fault.memory.generic-x86.page_ce@CSPATH
+    { ADDR_VALID && CONTAINS_CS && !CS_PGFLT_LIMIT_REACHED && SET_ADDR } (1)->
+    ereport.cpu.generic-x86.mem_ce@chip/core<>/strand<>;
+
+prop fault.memory.generic-x86.dimm_ce@CSPATH
+    { ADDR_VALID && CONTAINS_CS && CS_DIMMSB_THRESH_REACHED } (1)->
+    ereport.cpu.generic-x86.mem_ce@chip/core<>/strand<>;
+
+event upset.memory.generic-x86.discard@chip/core/strand;
+prop upset.memory.generic-x86.discard@chip/core/strand
+    { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
+    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
+
+/*
+ *	 ========= Propogations for uncorrectable page faults ==========
+ *	|								|
+ *	| A UE produces an immediate page fault.
+ *	|===============================================================| 
+ */
+
+event fault.memory.generic-x86.page_ue@CSPATH,
+    message=0, response=0,		/* do not message individual pageflts */
+    count=stat.cepgflt@CSPATH;		/* increment on pageflt diagnosis */
+event fault.memory.generic-x86.dimm_ue@CSPATH;
+
+prop fault.memory.generic-x86.page_ue@CSPATH
+    { ADDR_VALID && CONTAINS_CS && SET_ADDR } (1)->
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
+
+prop fault.memory.generic-x86.dimm_ue@CSPATH
+    { ADDR_VALID && CONTAINS_CS } (1)->
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
+
+event upset.memory.generic-x86.discard3@CSPATH;
+prop upset.memory.generic-x86.discard3@CSPATH
+    { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
+
+/*
+ *	 ========= Propogations for GART Table Walk Errors =============
+ *	|								|
+ *	| These are usually due to software mis-programming of the GART	|
+ *	| TLB rather than from hardware errors.  It would be incorrect	|
+ *	| to fault and potentially offline a cpu in response to these	|
+ *	| so they have their own fault class to facilitate us ignoring	|
+ *	| them.								|
+ *	|===============================================================| 
+ */
+
+event ereport.cpu.generic-x86.gart_tbl_walk@chip/core/strand { within(1s) };
+event upset.cpu.generic-x86.gart_tbl_walk@chip/core/strand;
+
+prop upset.cpu.generic-x86.gart_tbl_walk@chip/core/strand (1)->
+    ereport.cpu.generic-x86.gart_tbl_walk@chip/core/strand;

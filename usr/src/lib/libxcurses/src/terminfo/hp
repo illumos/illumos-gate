@@ -1,0 +1,153 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996, by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# hp: HEWLETT PACKARD
+#
+# Note: no "home" on HP's since that homes to top of memory, not screen.
+# Due to severe 2621 braindamage, the only way to get the arrow keys to
+# transmit anything at all is to turn on the function key labels
+# (f1-f8) with smkx, and even then the poor user has to hold down shift!
+# The default 2621 turns off the labels except when it has to to enable
+# the function keys.  If your installation prefers labels on all the time,
+# or off all the time (at the "expense" of the function keys) move the
+# 2621-nl or 2621-wl labels to the front using reorder.
+# Note: there are newer ROM's for 2621's that allow you to set strap A
+# so the regular arrow keys xmit \EA, etc, as with the 2645.  However,
+# even with this strap set, the terminal stops xmitting if you reset it,
+# until you unset and reset the strap!  Since there is no way to set/unset
+# the strap with an escape sequence, we don't use it in the default.
+# If you like, you can use 2621-ba (braindamaged arrow keys).
+hp2621-ba|2621-ba|2621 w/new rom and strap A set,
+	smkx@, rmkx@,
+	kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\Eh, use=hp2621,
+# 2621 with labels on all the time - normal outside vi, function inside vi.
+hp2621-wl|2621-wl|hp 2621 w/labels,
+	is2=\E&jA\r, rmkx=\E&jA, use=hp2621-fl,
+# 2621 with function labels.  Most of the time they are off,
+# but inside vi, the function key labels appear.  You have to
+# hold down shift to get them to xmit.
+hp2621-fl|2621|hp2621|hp2621a|hp2621p|2621a|2621p|2621-fl|2621A|2621P|hp 2621,
+	is2=\E&j@\r, cbt=\Ei, cup=\E&a%p2%dc%p1%dY,
+	dch1=\EP$<2>, ip=$<2>, pb#19200,
+	smso=\E&dD, rmso=\E&d@, smul=\E&dD, rmul=\E&d@, sgr0=\E&d@, xhp@,
+	khome=\Ep\r, kcuu1=\Et\r, kcub1=\Eu\r, kcuf1=\Ev\r, kcud1=\Ew\r,
+	kf1=\Ep\r, kf2=\Eq\r, kf3=\Er\r, kf4=\Es\r, kf5=\Et\r, kf6=\Eu\r,
+	kf7=\Ev\r, kf8=\Ew\r, smkx=\E&jB, rmkx=\E&j@, ht=^I$<2>, xon, use=hp,
+# 2621k45: untested
+2621k45|hp2621k45|k45|hp 2621 with 45 keyboard,
+	kbs=^H, kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\Eh,
+	smkx=\E&s1A, rmkx=\E&s0A, use=2621,
+# This terminal should be used at 4800 baud or less.  It needs padding for
+# plain characters at 9600, I guessed at an appropriate cr delay.
+# It really wants ^E/^F handshaking, but that doesn't work well even if
+# you write software to support it.
+2645|hp2645|hp45|hp 264x series,
+	dim=\E&dH, rev=\E&dB, smul=\E&dD, blink=\E&dA, sgr0=\E&d@,
+	sgr=\E&d%'@'%?%p1%t%'B'%|%;%?%p2%t%'D'%|%;%?%p3%t%'B'%|%;%?%p4%t%'A'%|%;%?%p5%t%'H'%|%;%?%p6%t%'B'%|%;%c,
+	kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\Eh,
+	smkx=\E&s1A, rmkx=\E&s0A, knp=\EU, kpp=\EV, kri=\ET, kind=\ES,
+	kil1=\EL, kdl1=\EM, kich1=\EQ, kdch1=\EP,
+	kel=\EK, ked=\EJ, krmir=\ER, pb#9600, cr=^M$<20>, use=hp,
+hp|hewlett-packard,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL, am, cub1=^H,
+	ed=\EJ, el=\EK, hpa=\E&a%p1%dC, clear=\EH\EJ,
+	cup=\E&a%p2%dc%p1%dY$<6>, cols#80, vpa=\E&a%p1%dY, lm#0, da, db,
+	dch1=\EP, dl1=\EM, rmir=\ER, smir=\EQ, kbs=^H, lines#24, mir,
+	cuf1=\EC, ht=^I, rmso=\E&d@, smso=\E&dJ,
+	smul=\E&dD, rmul=\E&d@, cuu1=\EA, xhp, vt#6,
+hp-0|hewlett-packard for testing of curses and the like,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cuf1=\EC,
+	cub1=^H, clear=\EH\EJ, home=\E&a0c0Y, cols#80, lines#24,
+hp-1,
+	ht=^I, cuu1=\EA, use=hp-0,
+hp-2,
+	cup=\E&a%p2%dc%p1%dY$<6>, use=hp-1,
+hp-3,
+	ed=\EJ, el=\EK, use=hp-2,
+# This entry does not use any of the fancy windowing stuff of the 2626.
+# Indeed, terminfo does not yet handle such stuff.  Since changing any window
+# clears memory, it is probably not possible to use this for screen opt.
+# ed is incredibly slow most of the time - I am guessing at the exact padding.
+# Since the terminal uses xoff/xon this is intended only for cost computation,
+# so that the terminal will prefer el or even dl1 which is probably faster!
+hp2626|hp2626a|hp2626p|2626|2626a|2626p|2626A|2626P|hp 2626,
+	dch1=\EP$<2>, ip=$<2>, rmso=\E&d@, smso=\E&dB, ed=\EJ$<500>,
+	rev=\E&dB, smul=\E&dD, blink=\E&dA, invis=\E&dS, sgr0=\E&d@,
+	rmul=\E&d@,
+	sgr=\E&d%'@'%?%p1%t%'B'%|%;%?%p2%t%'D'%|%;%?%p3%t%'B'%|%;%?%p4%t%'A'%|%;%c,
+	khome=\Eh, kcuu1=\EA, kcub1=\ED, kcuf1=\EC, kcud1=\EB,
+	smkx=\E&s1A, rmkx=\E&s0A, knp=\EU, kpp=\EV, kri=\ET,
+	kind=\ES, kil1=\EL, kdl1=\EM, kich1=\EQ, kdch1=\EP,
+	kel=\EK, ked=\EJ, krmir=\ER,
+	ind=\ES, ht=^I$<2>, xhp, use=2621,
+# This entry is for sysline.  It allocates a 23 line window with a 115 line
+# workspace for regular use, and a 1 line window for the status line.
+# This assumes port 2 is being used.
+# Turn off horizontal line, Create ws #1 with 115 lines,
+# Create ws #2 with 1 line, Create window #1 lines 1-23,
+# Create window #2 lines 24-24, Attach cursor to workspace #1.
+# Note that this clears the tabs so it must be done by tset before
+# it sets the tabs.
+2626-23|hp 2626 using only 23 lines,
+	tsl=\E&w7f2p2I\E&w4f2I\r\EK\E&a%p1%dC,
+	fsl=\E&d@\E&w7f2p1I\E&w4f1I, eslok, hs,
+	is1=\E&q3t0{0H \E&w0f115n1I \E&w0f1n2I
+	\E&w2f1i0d0u22l0S \E&w2f2i0d23u23l0S \E&w7f2p1I \r,
+	lines#23, use=2626,
+# Force terminal back to 24 lines after being 23.
+2626-24|hp 2626 using all 24 lines,
+	is1=\E&q3t0{0H \E&w0f118n1I \E&w0f1n2I
+	\E&w2f1i0d0u23l0S \E&w3f2I \E&w7f2p1I \r,
+	use=2626,
+# Various entries useful for small windows on 2626.
+2626-12,
+	lines#12, use=2626,
+2626-12x40,
+	cols#40, lines#12, use=2626,
+2626-x40,
+	cols#40, use=2626,
+2626-11,
+	lines#11, use=2626-23,
+# cD is a pain - but it only screws up at 9600 baud.
+# You should use this terminal at 4800 baud or less.
+hp2648|hp2648a|2648a|2648A|2648|HP 2648a graphics terminal,
+	clear=\EH\EJ$<50>, cup=\E&a%p2%dc%p1%dY$<20>,
+	dch1=\EP$<7>, ip=$<5>, use=2645,
+# 2640a doesn't have the Y cursor addressing feature, and C is memory relative
+# instead of screen relative, as we need.
+2640|hp2640a|2640a|hp 2640a,
+	cup@, smkx@, rmkx@, use=2645,
+2640b|hp2640b|2644a|hp2644a|hp 264x series,
+	smkx@, rmkx@, use=2645,
+# 2621 using all 48 lines of memory, only 24 visible at any time.  Untested.
+2621-48|48 line 2621,
+	lines#48, home=\EH, cup=\E&a%p2%dc%p1%dR, use=2621,
+# 2621 with no labels ever.  Also prevents vi delays on escape.
+hp2621-nl|2621-nl|hp 2621 with no labels,
+	smkx@, rmkx@, khome@, kcuu1@, kcub1@, kcuf1@, kcud1@, use=hp2621-fl,
+# Needed for UCB ARPAVAX console, since lsi-11 expands tabs (wrong).
+hp2621-nt|2621-nt|hp 2621 w/no tabs,
+	ht@, use=hp2621,

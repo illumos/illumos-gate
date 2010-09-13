@@ -1,0 +1,192 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<!--
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+ 
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+    Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+    Default service profile, containing a typical set of active service
+    instances.
+
+    NOTE:  Service profiles delivered by this package are not editable,
+    and their contents will be overwritten by package or patch
+    operations, including operating system upgrade.  Make customizations
+    in a different file.  The paths, /etc/svc/profile/site.xml and
+    /var/svc/profile/site.xml, are distinguished location for site-specific
+    service profiles, treated otherwise equivalently to this file.
+-->
+<service_bundle type='profile' name='generic_open'
+	 xmlns:xi='http://www.w3.org/2003/XInclude' >
+  <!--
+      Include name service profile, as set by system id tools.
+  -->
+  <xi:include href='file:/etc/svc/profile/name_service.xml' />
+
+  <!--
+      svc.startd(1M) services
+  -->
+  <service name='system/coreadm' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/cron' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/cryptosvc' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/dbus' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/extended-accounting' version='1' type='service'>
+    <instance name='flow'    enabled='false'/>
+    <instance name='process' enabled='false'/>
+    <instance name='task'    enabled='false'/>
+    <instance name='net'    enabled='false'/>
+  </service>
+  <service name='system/hal' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/identity' version='1' type='service'>
+    <instance name='domain' enabled='true'/>
+  </service>
+  <service name='system/intrd' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/keymap' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/picl' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/sac' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/scheduler' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/system-log' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/utmp' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/zones' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/rpc/bind' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/name-service-cache' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/status' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/nlockmgr' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/client' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/server' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/cbd' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/nfs/mapid' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/smb/client' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/ssh' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/smtp' version='1' type='service'>
+    <instance name='sendmail' enabled='true'/>
+  </service>
+  <service name='network/sendmail-client' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/inetd' version='1' type='restarter'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/filesystem/autofs' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/filesystem/rmvolmgr' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/power' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/dns/multicast' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='application/management/net-snmp' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/management/seaport' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/management/snmpdx' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/management/wbem' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/print/ppd-cache-update' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/stosreg' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+
+  <!--
+      Enable GDM services.
+  -->
+  <service name='application/graphical-login/gdm' version='1'
+    type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+
+  <service name='application/x11/xfs' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+
+  <!--
+      Enable VNC config service for xVM
+  -->
+  <service name='system/xvm/vnc-config' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='system/xvm/ipagent' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <!--
+      Include inetd(1M) services profile.
+  -->
+  <xi:include href='file:/etc/svc/profile/inetd_services.xml' />
+</service_bundle>

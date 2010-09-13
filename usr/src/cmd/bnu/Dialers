@@ -1,0 +1,364 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Each caller type that appears in the Devices file (5th field)
+# should appear in this file except for the built in callers.
+# Each line consists of three parts:
+# - the name of the caller
+# - the translation table for the phone number to translate from
+#   the 801 codes (=-) to the code for the particular device
+# - a chat script (same format and meaning as the login scripts
+#   that appear in the Systems file.
+#
+# Meaning of some of the escape characters:
+# \p - pause (approximately 1/4-1/2 second delay)
+# \d - delay (2 seconds)
+# \D - phone number/token
+# \T - phone number with Dialcodes and character translation
+# \N - null byte
+# \K - insert a BREAK
+# \E - turn on echo checking (for slow devices)
+# \e - turn off echo checking
+# \r - carriage return
+# \c - no new-line
+# \n - send new-line
+# \nnn - send octal number
+#
+# See the Administration Documentation for more details.
+#
+# NOTE: blank lines and lines that begin with a <space>, <tab>, or # are ignored
+
+penril	=W-P	"" \d > Q\c : \d- > s\p9\c )-W\p\r\ds\p9\c-) y\c : \E\TP > 9\c OK
+ventel	=&-%	"" \r\p\r\c $ <K\T%%\r>\c ONLINE!
+vadic	=K-K	"" \005\p *-\005\p-*\005\p-* D\p BER? \E\T\e \r\c LINE
+develcon ""	"" \pr\ps\c est:\007 \E\D\e \n\007
+micom	""	"" \s\c NAME? \D\r\c GO
+direct
+##########
+#	The following entry is for use with direct connections
+#	using ttymon with the -b and -r options on both ends,
+#	or the old uugetty with the -r option.
+##########
+uudirect ""	"" \r\d in:--in:
+
+#  Rixon Intelligent Modem -- modem should be set up in the Rixon 
+#  mode and not the Hayes mode.
+#
+rixon	=&-%	"" \r\r\d $ s9\c )-W\r\ds9\c-) s\c : \T\r\c $ 9\c LINE
+
+#   Hayes Smartmodem -- modem should be set with the configuration
+#   switches as follows:
+#
+#       S1 - UP		S2 - UP		S3 - DOWN	S4 - UP
+#       S5 - UP		S6 - DOWN	S7 - ?		S8 - DOWN
+#
+hayes	=,-,	"" \dA\pTE1V1X1Q0S2=255S12=255\r\c OK\r \EATDT\T\r\c CONNECT
+
+#   USR Courier V.32 and Sportster
+#   Set the switches as follows:
+#
+#   1 2 3 4 5 6 7 8 9 10
+#   U U D U U U D D D U		Courier
+#   U U D U U U U D		Sportster
+#
+usrv32-ec =,-,	"" \dA\pTE1V1X1Q0S2=255S12=255&A0&H1&M5&B2\r\c OK\r \EATDT\T\r\c CONNECT STTY=crtscts,crtsxoff
+usrv32-nec =,-,	"" \dA\pTE1V1X1Q0S2=255S12=255&A0&H1&M0&B0\r\c OK\r \EATDT\T\r\c CONNECT STTY=crtscts,crtsxoff
+
+#   Telebit TrailBlazer
+#
+tb1200	=W-,	"" \dA\pA\pA\pTE1V1X1Q0S2=255S12=255S50=2\r\c OK\r \EATDT\T\r\c CONNECT\s1200
+tb2400	=W-,	"" \dA\pA\pA\pTE1V1X1Q0S2=255S12=255S50=3\r\c OK\r \EATDT\T\r\c CONNECT\s2400
+tbfast	=W-,	"" \dA\pA\pA\pTE1V1X1Q0S2=255S12=255S50=255\r\c OK\r \EATDT\T\r\c CONNECT\sFAST
+
+#   Telebit T1600
+#
+tb9600-ec =W-,	"" \dA\pA\pA\pTE1V1X1Q0S2=255S12=255S50=6\r\c OK\r \EATDT\T\r\c CONNECT\s9600 STTY=crtscts,crtsxoff
+tb9600-nec =W-,	"" \dA\pA\pA\pTE1V1X1Q0S2=255S12=255S50=6S180=0\r\c OK\r \EATDT\T\r\c CONNECT\s9600 STTY=crtscts,crtsxoff
+
+##########
+#   AT&T Programmable 300/1200 Modem Model 4000
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=,-,		Use comma for secondary dial tone & for pause
+#	""		expect nothing
+#	ATZ\r\p\p	enter command mode, reset modem, 
+#	OK\r		expect modem to reply OK
+#	ATZ\r		enter command mode, reset modem
+#	OK\r		expect modem to reply OK
+#	\E		turn on echo check mode
+#	ATDT\T\r\c	enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	\T\r\c		phone number to dial
+#	CONNECT		expect "CONNECT" from modem when connected
+##########
+att4000 =,-, ""  ATZ\r\p\p  OK\r ATZ\r OK\r\c \EATDT\T\r\c CONNECT
+
+##########
+#   AT&T Model 4024 Modem
+#
+#	For normal operation, dip switch 4 should be CLOSED.
+#	This disables ENTER INTERACTIVE WITH <CR>.
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=,-,		Use comma for secondary dial tone & for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset modem, set options to default
+#	o12=y,		set option 12 to 'y' (transparent data mode)
+#	o4=n\r\c	set option 4 to 'n' (don't disconnect on rcvd spaces)
+#	\006		expect ACK from modem
+#	atT\T\r\c	enter command mode, tone dial the number
+#	ed		expect "ed" (actually "Answered")
+#
+#			Once transparent data mode is enabled, you
+#			cannot enter the interactive mode from the data mode.
+##########
+att4024 =+-, "" atzod,o12=y,o4=n\r\c \006 atT\T\r\c ed
+
+##########
+#  AT&T DATAPHONE II 2212C Modem
+#
+#	For normal operation, dip switch 4 should be CLOSED.
+#	This disables ENTER INTERACTIVE WITH <CR>.
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset modem, set options to default
+#	o12=y,		set option 12 to 'y' (transparent data mode)
+#	o4=n,		set option 4 to 'n' (don't disconnect on rcvd spaces)
+#	\006		Wait for ACK
+#	atT\T\r\c	enter command mode, tone dial the number
+#	ed		expect "ed" (actually "Answered")
+#
+#			Once transparent data mode is enabled, you
+#			cannot enter the interactive mode from the data mode.
+##########
+att2212c =+-, "" atzod,o12=y,o4=n\r\c \006 atT\T\r\c ed
+att2212C =+-, "" atzod,o12=y,o4=n\r\c \006 atT\T\r\c ed
+
+##########
+#  AT&T DATAPHONE II 2224B Modem
+#
+#	For normal operation dip switch S1 switch 2 should be OPEN.
+#	This disables ENTER INTERACTIVE WITH <CR>.
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atT\T\r\c	enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	ed		expect "ed" (actually "Answered")
+##########
+att2224b =+-, "" atT\T\r\c ed
+att2224B =+-, "" atT\T\r\c ed
+
+##########
+#  AT&T DATAPHONE II 2224CEO Modem
+#
+#	The 2224CEO Modem supports MNP error control protocol.
+#	This entry will use MNP if it is also available on the
+#	remote end.
+#
+#	For normal operation, dip switch S1 switch 3 should be UP.
+#	This disables ENTER INTERACTIVE WITH <CR>.
+#
+#	When used with an EPORTS board on a 3B2, it is recommended that
+#	hardware flow control be enabled on the board and that the
+#	corresponding second set of entries below be used.
+#	(i.e. change \\q0 to \\q3 below - use CTS/RTS flow control)
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset options to default values,
+#	o12=y,		set option 12 to 'y' (transparent data mode)
+#	o4=n,		set option 4 to 'n' (don't disconnect on rcvd spaces)
+#	\\n3		select normal operating mode
+#	\\c1		modem does not buffer data
+#	\\j0		do not autobaud modem serial port
+#	\\q0		no flow control
+#	\\g0\r\c	no modem port flow control
+#	\006		Wait for ACK
+#	atT\T\r\c	enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	Connected	expect "ed" (actually "Connected")
+#
+#			Once transparent data mode is enabled, you
+#			cannot enter the interactive mode from the data mode.
+##########
+att2224ceo =+-, "" atzod,o12=y,o4=n,\\n3\\c1\\j0\\q0\\g0\r\c \006 atT\T\r\c Connected
+att2224CEO =+-, "" atzod,o12=y,o4=n,\\n3\\c1\\j0\\q0\\g0\r\c \006 atT\T\r\c Connected
+#att2224ceo =+-, "" atzod,o12=y,o4=n,\\n3\\c1\\j0\\q3\\g0\r\c \006 atT\T\r\c Connected
+#att2224CEO =+-, "" atzod,o12=y,o4=n,\\n3\\c1\\j0\\q3\\g0\r\c \006 atT\T\r\c Connected
+
+##########
+#  AT&T DATAPHONE II 2224G Modem
+#
+#	The 2224G Modem supports MNP error control protocol.
+#	This entry will use MNP if it is also available on the
+#	remote end.
+#
+#	For normal operation, dip switch S1 switch 3 should be RIGHT.
+#	This disables ENTER INTERACTIVE WITH <CR>.
+#
+#	When used with an EPORTS board on a 3B2, it is recommended that
+#	hardware flow control be enabled on the board and that the
+#	corresponding second set of entries below be used.
+#	(i.e. change \\q0 to \\q3 below - use CTS/RTS flow control)
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset options to default values,
+#	o12=y,		set option 12 to 'y' (transparent data mode)
+#	o4=n,		set option 4 to 'n' (don't disconnect on rcvd spaces)
+#	o1=n\r\c	set option 1 to 'n' (don't wait for far end sense first)
+#	\006		Wait for ACK
+#	atz		enter command mode
+#	\\n3		select auto-reliable operating mode
+#	\\c1		select auto-reliable buffering scheme 1
+#	\\j0		do not autobaud modem serial port
+#	\\q0		no flow control
+#	\\g0\r\c	no modem port flow control
+#	\datT\T\r\c	delay, enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	Connected	expect "Connected"
+#
+#			Once transparent data mode is enabled, you
+#			cannot enter the interactive mode from the data mode.
+##########
+att2224g =+-, "" atzod,o12=y,o4=n,o1=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+att2224G =+-, "" atzod,o12=y,o4=n,o1=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+#att2224g =+-, "" atzod,o12=y,o4=n,o1=n\r\c \006 atz\\n3\\c1\\j0\\q3\\g0\r\c "" \datT\T\r\c Connected
+#att2224G =+-, "" atzod,o12=y,o4=n,o1=n\r\c \006 atz\\n3\\c1\\j0\\q3\\g0\r\c "" \datT\T\r\c Connected
+
+##########
+#  AT&T DATAPHONE II 2224 Modem
+#
+#	This entry is for 2224 with the optional automatic caller.
+#	Is is provided only to provide compatibility with previous
+#	releases. The entry for the specific model modem you own
+#	should be found above.
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	\r\c		send carriage return to enter interactive mode
+#	:--:		expect colon.  if don't see it, send newline
+#			and expect colon again.
+#	T\T\r\c		dial the given number, using touch-tone signaling
+#			(change the first T to P if you want to use pulse
+#			dialing).
+#	red		expect "red" (actually "Answered")
+##########
+att2224	=+-,	"" \r\c :--: T\T\r\c red
+
+##########
+#  AT&T DATAPHONE II 2248A Modem
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset modem, set options to default
+#	o12=y\r\c	set option 12 to 'y' (transparent data mode)
+#	\006		Wait for ACK
+#	atT\T\r\c	enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	Connected	expect "Connected"
+#
+##########
+att2248a =+-, "" atzod,o12=y\r\c \006 atT\T\r\c Connected
+att2248A =+-, "" atzod,o12=y\r\c \006 atT\T\r\c Connected
+
+##########
+#  AT&T DATAPHONE II 2296A Modem
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	=+-,		'+' for secondary dial tone, ',' for pause
+#	""		expect nothing
+#	atzod,		enter command mode, reset options to default values,
+#	o12=y,		set option 12 to 'y' (transparent data mode)
+#	o50=y,		set option 50 to 'y'
+#	o51=n,		set option 51 to 'n' (don't strap CTS/RTS)
+#	o55=n,		set option 55 to 'n' (CD does not indicate carrier)
+#	o69=n,\r\c	set option 69 to 'n' 
+#	\006		Wait for ACK
+#	atz		enter command mode
+#	\\n3		select auto-reliable operating mode
+#	\\c1		select auto-reliable buffering scheme 1
+#	\\j0		do not autobaud modem serial port
+#	\\q0		no flow control
+#	\\g0\r\c	no modem port flow control
+#	\datT\T\r\c	delay, enter command mode, tone dial the number
+#			(substitute 'P' for first 'T' for pulse dialing)
+#	Connected	expect "Connected"
+#
+#	When used with an EPORTS board on a 3B2, it is recommended that
+#	hardware flow control be enabled on the board and that the
+#	corresponding second set of entries below be used.
+#	(i.e. change \\q0 to \\q3 below - use CTS/RTS flow control)
+#
+##########
+att2296a =+-, "" atzod,o12=y,o50=y,o51=n,o55=n,o69=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+att2296A =+-, "" atzod,o12=y,o50=y,o51=n,o55=n,o69=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+#att2296a =+-, "" atzod,o12=y,o50=y,o51=n,o55=n,o69=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+#att2296A =+-, "" atzod,o12=y,o50=y,o51=n,o55=n,o69=n\r\c \006 atz\\n3\\c1\\j0\\q0\\g0\r\c "" \datT\T\r\c Connected
+
+##########
+#  Network Listener Service
+#  The format of the request to the listener is
+#		NLPS:000:001:<service_code>\N\c
+#  where <service_code> determines what server the listener invokes.
+#  The entry below asks for service code 1.
+#
+#  If cu & uucico use different service codes, you will have to use 
+#  separate Dialers files (e.g., Dialers.cico and Dialers.cu).
+#  See comments in Sysfiles for instructions.
+##########
+nls	""	"" NLPS:000:001:1\N\c
+
+##########
+# DATAKIT(r) serial port connection script
+#
+#	Commands:	Explanation:
+#	------------	---------------------------------------------------
+#	""		no special character translation table
+#	""		expect nothing
+#	\d		delay to give some settling time
+#	TION:--TION:	wait for the DESTINATION: prompt, if it does not come
+#			send a carriage return and wait again.
+#	\D		send the specified token
+##########
+datakit	""	"" \d TION:--TION: \D

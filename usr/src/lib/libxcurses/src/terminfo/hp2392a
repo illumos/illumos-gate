@@ -1,0 +1,148 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+2392|hp2392|hp2392a|HP 2392a Terminal,
+#
+#  Terminal initialization.  
+#
+#  Make sure that we're in character mode, no auto line feed, disable
+#  system function key labels, and set tab-stops.  See "tput init".
+#
+	is2=\E&k0B\E&k0A\E&j@,
+	if=/usr/lib/tabset/hptabs,
+
+	.msgr,
+	am,
+	km,
+	da,
+	db,
+	.mir,
+	cols#80,
+	lines#24,
+	lm#0,
+	vt#6,
+#
+#  Margins.
+#
+	smgl=\E4,
+	smgr=\E5,
+	mgc=\E9,
+#
+#  Tabs.
+#
+#  The use of ht and cbt is not recommend, unless it is possible to guarantee
+#  that tab-stops are set correctly, since there are no hardware tabs.  On an 
+#  hp2392a terminal if there are no tab-stops, then <tab> behaves like a 
+#  <newline>.
+#
+	.cbt=\Ei,
+	.ht=\t,
+	tbc=\E3,
+	hts=\E1,
+
+	bel=\a,
+	cr=\r,
+#
+#  Cursor motion.
+#
+#  Use screen relative cursor motion; not absolute or memory relative.
+#
+	hpa=\E&a%p1%dC,
+	vpa=\E&a%p1%dY,
+	smcup=\E&s1A,
+	cup=\E&a%p2%dc%p1%dY,
+	rmcup=\E&s0A,
+	cud1=\EB,
+	cub1=\b,
+	cuf1=\EC,
+	cuu1=\EA,
+	ind=\n,
+#
+#  home and ll position the cursor at the top and bottom of display memory 
+#  rather than just the screen.  This means we can't use them.
+#
+	.home=\Eh,
+	.ll=\EF,
+#
+#  Edit operations.
+#
+	clear=\E&a0c0Y\EJ,
+	dch1=\EP,
+	dl1=\EM,
+	el=\EK,
+	ed=\EJ,
+	il1=\EL,
+	smir=\EQ,
+	rmir=\ER,
+	ip=$<2>,
+#
+#  Attributes.
+#
+#  Standout 	= dim inverse
+#
+	xhp,
+	blink=\E&dA,
+	dim=\E&dH,
+	rev=\E&dB,
+	smso=\E&dJ,
+	smul=\E&dD,
+	rmso=\E&d@,
+	rmul=\E&d@,
+	sgr=\E&d%'@'%?%p1%t%'J'%|%;%?%p2%t%'D'%|%;%?%p3%t%'B'%|%;%?%p4%t%'A'%|%;%?%p5%t%'H'%|%;%c%p9%t^N%e^O%;,
+	sgr0=\E&d@,
+#
+#  Keys.
+#
+#  NOTE if the user changes the function key transmit sequences on the
+#  terminal from the default values expected for kf1 to kf8 (see below), 
+#  then the function keys will never be recognised and mapped to their
+#  respective KEY_F(1) to KEY_F(8) constants in Curses (and Vi). 
+#
+	kbs=\b,
+	kcud1=\EB,
+	khome=\Eh,
+	kll=\EF,
+	kcub1=\ED,
+	kcuf1=\EC,
+	kcuu1=\EA,
+	kcbt=\Ei,
+	knp=\EU,
+	kpp=\EV,
+	kdl1=\EM,
+	kdch1=\EP,
+	kil1=\EL,
+	kich1=\EQ,
+	kclr=\EJ,
+	kel=\EK,
+	kf1=\Ep,
+	kf2=\Eq,
+	kf3=\Er,
+	kf4=\Es,
+	kf5=\Et,
+	kf6=\Eu,
+	kf7=\Ev,
+	kf8=\Ew,
+

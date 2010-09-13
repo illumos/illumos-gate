@@ -1,0 +1,148 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef DEF_XML_ROOT
+#define	DEF_XML_ROOT(ISNS_DATA, VENDOR, SMI, VERSION, ONE_DOT_O)
+#endif
+
+#ifndef DEF_XML_DATA
+#define DEF_XML_DATA(TAG, TYPE, ARG1, ARG2)
+#endif
+
+#ifndef DEF_XML_PROP
+#define	DEF_XML_PROP(INDEX, TYPE, NAME, TAG, ID)
+#endif
+
+/*
+ * The root element.
+ */
+DEF_XML_ROOT("isns_data",
+	"vendor", "Sun Microsystems, Inc.",
+	"version", "1.0")
+
+/*
+ * iSNS objects.
+ */
+DEF_XML_DATA("pg",          "oabcd",    OBJ_PG,          'a')
+DEF_XML_DATA("portal",      "oefg",     OBJ_PORTAL,      'e')
+DEF_XML_DATA("iscsi",       "ohi",      OBJ_ISCSI,       'h')
+DEF_XML_DATA("entity",      "ojk",      OBJ_ENTITY,      'j')
+DEF_XML_DATA("dd",          "olm",      OBJ_DD,          'l')
+DEF_XML_DATA("dds",         "ono",      OBJ_DDS,         'n')
+DEF_XML_DATA("assoc_iscsi", "opq",      OBJ_ASSOC_ISCSI, 'p')
+DEF_XML_DATA("assoc_dd",    "or",       OBJ_ASSOC_DD,    'r')
+
+/*
+ * UID attributes and key attributes of iSNS objects.
+ */
+DEF_XML_PROP('a', 'u', "uid",        ISNS_PG_INDEX_ATTR_ID,
+	ATTR_INDEX_PG(ISNS_PG_INDEX_ATTR_ID))
+DEF_XML_PROP('b', 's', "pg_iscsi",   ISNS_PG_ISCSI_NAME_ATTR_ID,
+	ATTR_INDEX_PG(ISNS_PG_ISCSI_NAME_ATTR_ID))
+DEF_XML_PROP('c', 'p', "pg_ip",      ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
+	ATTR_INDEX_PG(ISNS_PG_PORTAL_IP_ADDR_ATTR_ID))
+DEF_XML_PROP('d', 'u', "pg_port",    ISNS_PG_PORTAL_PORT_ATTR_ID,
+	ATTR_INDEX_PG(ISNS_PG_PORTAL_PORT_ATTR_ID))
+DEF_XML_PROP('e', 'u', "uid",        ISNS_PORTAL_INDEX_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_PORTAL_INDEX_ATTR_ID))
+DEF_XML_PROP('f', 'p', "ip",         ISNS_PORTAL_IP_ADDR_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_PORTAL_IP_ADDR_ATTR_ID))
+DEF_XML_PROP('g', 'u', "port",       ISNS_PORTAL_PORT_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_PORTAL_PORT_ATTR_ID))
+DEF_XML_PROP('h', 'u', "uid",        ISNS_ISCSI_NODE_INDEX_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_NODE_INDEX_ATTR_ID))
+DEF_XML_PROP('i', 's', "name",       ISNS_ISCSI_NAME_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_NAME_ATTR_ID))
+DEF_XML_PROP('j', 'u', "uid",        ISNS_ENTITY_INDEX_ATTR_ID,
+	ATTR_INDEX_ENTITY(ISNS_ENTITY_INDEX_ATTR_ID))
+DEF_XML_PROP('k', 's', "eid",        ISNS_EID_ATTR_ID,
+	ATTR_INDEX_ENTITY(ISNS_EID_ATTR_ID))
+DEF_XML_PROP('l', 'u', "uid",        ISNS_DD_ID_ATTR_ID,
+	ATTR_INDEX_DD(ISNS_DD_ID_ATTR_ID))
+DEF_XML_PROP('m', 's', "name",       ISNS_DD_NAME_ATTR_ID,
+	ATTR_INDEX_DD(ISNS_DD_NAME_ATTR_ID))
+DEF_XML_PROP('n', 'u', "uid",        ISNS_DD_SET_ID_ATTR_ID,
+	ATTR_INDEX_DDS(ISNS_DD_SET_ID_ATTR_ID))
+DEF_XML_PROP('o', 's', "name",       ISNS_DD_SET_NAME_ATTR_ID,
+	ATTR_INDEX_DDS(ISNS_DD_SET_NAME_ATTR_ID))
+DEF_XML_PROP('p', 'u', "iscsi_uid",  ISNS_DD_ISCSI_INDEX_ATTR_ID,
+	ATTR_INDEX_ASSOC_ISCSI(ISNS_DD_ISCSI_INDEX_ATTR_ID))
+DEF_XML_PROP('q', 's', "iscsi_name", ISNS_DD_ISCSI_NAME_ATTR_ID,
+	ATTR_INDEX_ASSOC_ISCSI(ISNS_DD_ISCSI_NAME_ATTR_ID))
+DEF_XML_PROP('r', 'u', "dd_uid",     ISNS_DD_ID_ATTR_ID,
+	ATTR_INDEX_ASSOC_DD(ISNS_DD_ID_ATTR_ID))
+
+/*
+ * Attributes for Portal Group object.
+ */
+DEF_XML_DATA("pgt",      "u", ISNS_PG_TAG_ATTR_ID,
+	ATTR_INDEX_PG(ISNS_PG_TAG_ATTR_ID))
+
+/*
+ * Attributes for Portal object.
+ */
+DEF_XML_DATA("name",     "s", ISNS_PORTAL_NAME_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_PORTAL_NAME_ATTR_ID))
+DEF_XML_DATA("esi_int",  "u", ISNS_ESI_INTERVAL_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_ESI_INTERVAL_ATTR_ID))
+DEF_XML_DATA("esi",      "u", ISNS_ESI_PORT_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_ESI_PORT_ATTR_ID))
+DEF_XML_DATA("scn",      "u", ISNS_SCN_PORT_ATTR_ID,
+	ATTR_INDEX_PORTAL(ISNS_SCN_PORT_ATTR_ID))
+
+/*
+ * Attributes for Storage Node object.
+ */
+DEF_XML_DATA("type",     "u", ISNS_ISCSI_NODE_TYPE_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_NODE_TYPE_ATTR_ID))
+DEF_XML_DATA("alias",    "s", ISNS_ISCSI_ALIAS_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_ALIAS_ATTR_ID))
+DEF_XML_DATA("scn_bmp",  "u", ISNS_ISCSI_SCN_BITMAP_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_SCN_BITMAP_ATTR_ID))
+DEF_XML_DATA("auth",     "s", ISNS_ISCSI_AUTH_METHOD_ATTR_ID,
+	ATTR_INDEX_ISCSI(ISNS_ISCSI_AUTH_METHOD_ATTR_ID))
+
+/*
+ * Attributes for Network Entity object.
+ */
+DEF_XML_DATA("protocol", "u", ISNS_ENTITY_PROTOCOL_ATTR_ID,
+	ATTR_INDEX_ENTITY(ISNS_ENTITY_PROTOCOL_ATTR_ID))
+DEF_XML_DATA("period",   "u", ISNS_ENTITY_REG_PERIOD_ATTR_ID,
+	ATTR_INDEX_ENTITY(ISNS_ENTITY_REG_PERIOD_ATTR_ID))
+
+/*
+ * Attributes for Discovery Domain object.
+ */
+
+/*
+ * Attributes for Discovery Domain Set object.
+ */
+DEF_XML_DATA("status",   "u", ISNS_DD_SET_STATUS_ATTR_ID,
+	ATTR_INDEX_DDS(ISNS_DD_SET_STATUS_ATTR_ID))
+
+#undef	DEF_XML_ROOT
+#undef	DEF_XML_DATA
+#undef	DEF_XML_PROP

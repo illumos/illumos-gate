@@ -1,0 +1,607 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#
+# Generic interface definition for usr/src/cmd/sgs/liblddbg.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_4.83 {
+	global:
+		dbg_desc {	# interposed - ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
+		dbg_print {	# interposed - ld(1) and ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
+
+		Dbg_args_file;
+		Dbg_args_guidance_unknown;
+		Dbg_args_option;
+		Dbg_args_str2chr;
+		Dbg_args_Wldel;
+		Dbg_audit_activity;
+		Dbg_audit_ignore;
+		Dbg_audit_interface;
+		Dbg_audit_lib;
+		Dbg_audit_objclose;
+		Dbg_audit_objfilter;
+		Dbg_audit_objopen;
+		Dbg_audit_objsearch;
+		Dbg_audit_pltenter;
+		Dbg_audit_pltexit;
+		Dbg_audit_preinit;
+		Dbg_audit_symbind;
+		Dbg_audit_skip;
+		Dbg_audit_terminate;
+		Dbg_audit_version;
+
+		Dbg_basic_collect;
+		Dbg_basic_create;
+		Dbg_basic_files;
+		Dbg_basic_finish;
+		Dbg_basic_options;
+		Dbg_basic_relocate;
+		Dbg_basic_validate;
+
+		Dbg_help;
+		Dbg_setup;
+		Dbg_state_str;
+		Dbg_version;
+
+		Dbg32_bind_global;
+		Dbg64_bind_global;
+		Dbg32_bind_plt_summary;
+		Dbg64_bind_plt_summary;
+		Dbg64_bind_pltpad_from;
+		Dbg64_bind_pltpad_to;
+		Dbg32_bind_reject;
+		Dbg64_bind_reject;
+		Dbg32_bind_weak;
+		Dbg64_bind_weak;
+
+		Dbg32_cap_candidate;
+		Dbg64_cap_candidate;
+		Dbg32_cap_filter;
+		Dbg64_cap_filter;
+		Dbg32_cap_id;
+		Dbg64_cap_id;
+		Dbg32_cap_identical;
+		Dbg64_cap_identical;
+		Dbg32_cap_mapfile_title;
+		Dbg64_cap_mapfile_title;
+		Dbg32_cap_post_title;
+		Dbg64_cap_post_title;
+		Dbg32_cap_ptr_entry;
+		Dbg64_cap_ptr_entry;
+		Dbg32_cap_sec_title;
+		Dbg64_cap_sec_title;
+		Dbg32_cap_val;
+		Dbg64_cap_val;
+		Dbg32_cap_val_entry;
+		Dbg64_cap_val_entry;
+
+		Dbg32_dl_dladdr;
+		Dbg64_dl_dladdr;
+		Dbg32_dl_dlclose;
+		Dbg64_dl_dlclose;
+		Dbg32_dl_dldump;
+		Dbg64_dl_dldump;
+		Dbg32_dl_dlerror;
+		Dbg64_dl_dlerror;
+		Dbg32_dl_dlinfo;
+		Dbg64_dl_dlinfo;
+		Dbg32_dl_dlopen;
+		Dbg64_dl_dlopen;
+		Dbg32_dl_dlsym;
+		Dbg64_dl_dlsym;
+		Dbg32_dl_iphdr_callback;
+		Dbg64_dl_iphdr_callback;
+		Dbg32_dl_iphdr_enter;
+		Dbg64_dl_iphdr_enter;
+		Dbg32_dl_iphdr_mapchange;
+		Dbg64_dl_iphdr_mapchange;
+		Dbg32_dl_iphdr_unmap_ret;
+		Dbg64_dl_iphdr_unmap_ret;
+
+		Dbg32_demangle_name;
+		Dbg64_demangle_name;
+
+		Dbg32_ent_print;
+		Dbg64_ent_print;
+
+		Dbg32_file_analyze;
+		Dbg64_file_analyze;
+		Dbg32_file_aout;
+		Dbg64_file_aout;
+		Dbg32_file_ar;
+		Dbg64_file_ar;
+		Dbg32_file_ar_rescan;
+		Dbg64_file_ar_rescan;
+		Dbg32_file_bind_entry;
+		Dbg64_file_bind_entry;
+		Dbg32_file_bindings;
+		Dbg64_file_bindings;
+		Dbg32_file_bindings_done;
+		Dbg64_file_bindings_done;
+		Dbg32_file_cntl;
+		Dbg64_file_cntl;
+		Dbg32_file_config_dis;
+		Dbg64_file_config_dis;
+		Dbg32_file_config_obj;
+		Dbg64_file_config_obj;
+		Dbg32_file_deferred;
+		Dbg64_file_deferred;
+		Dbg32_file_del_rescan;
+		Dbg64_file_del_rescan;
+		Dbg32_file_delete;
+		Dbg64_file_delete;
+		Dbg32_file_elf;
+		Dbg64_file_elf;
+		Dbg32_file_cleanup;
+		Dbg64_file_cleanup;
+		Dbg32_file_filtee;
+		Dbg64_file_filtee;
+		Dbg32_file_filter;
+		Dbg64_file_filter;
+		Dbg32_file_fixname;
+		Dbg64_file_fixname;
+		Dbg32_file_generic;
+		Dbg64_file_generic;
+		Dbg32_file_hdl_action;
+		Dbg64_file_hdl_action;
+		Dbg32_file_hdl_collect;
+		Dbg64_file_hdl_collect;
+		Dbg32_file_hdl_title;
+		Dbg64_file_hdl_title;
+		Dbg32_file_lazyload;
+		Dbg64_file_lazyload;
+		Dbg32_file_ldso;
+		Dbg64_file_ldso;
+		Dbg32_file_mmapobj;
+		Dbg64_file_mmapobj;
+		Dbg32_file_mode_promote;
+		Dbg64_file_mode_promote;
+		Dbg32_file_modified;
+		Dbg64_file_modified;
+		Dbg32_file_needed;
+		Dbg64_file_needed;
+		Dbg32_file_output;
+		Dbg64_file_output;
+		Dbg32_file_preload;
+		Dbg64_file_preload;
+		Dbg32_file_prot;
+		Dbg64_file_prot;
+		Dbg32_file_rejected;
+		Dbg64_file_rejected;
+		Dbg32_file_reuse;
+		Dbg64_file_reuse;
+		Dbg32_file_skip;
+		Dbg64_file_skip;
+
+		Dbg32_got_display;
+		Dbg64_got_display;
+
+		Dbg32_libs_audit;
+		Dbg64_libs_audit;
+		Dbg32_libs_find;
+		Dbg64_libs_find;
+		Dbg32_libs_found;
+		Dbg64_libs_found;
+		Dbg32_libs_insecure;
+		Dbg64_libs_insecure;
+		Dbg32_libs_init;
+		Dbg64_libs_init;
+		Dbg32_libs_l;
+		Dbg64_libs_l;
+		Dbg32_libs_path;
+		Dbg64_libs_path;
+		Dbg32_libs_req;
+		Dbg64_libs_req;
+		Dbg32_libs_update;
+		Dbg64_libs_update;
+		Dbg32_libs_yp;
+		Dbg64_libs_yp;
+		Dbg32_libs_ylu;
+		Dbg64_libs_ylu;
+
+		Dbg32_map_cexp_id;
+		Dbg64_map_cexp_id;
+		Dbg32_map_dv;
+		Dbg64_map_dv;
+		Dbg32_map_dv_entry;
+		Dbg64_map_dv_entry;
+		Dbg32_map_ent;
+		Dbg64_map_ent;
+		Dbg32_map_ent_ord_title;
+		Dbg64_map_ent_ord_title;
+		Dbg32_map_hdr_noalloc;
+		Dbg64_map_hdr_noalloc;
+		Dbg32_map_parse;
+		Dbg64_map_parse;
+		Dbg32_map_pass;
+		Dbg64_map_pass;
+		Dbg32_map_post_title;
+		Dbg64_map_post_title;
+		Dbg32_map_seg;
+		Dbg64_map_seg;
+		Dbg32_map_seg_order;
+		Dbg64_map_seg_order;
+		Dbg32_map_seg_os_order;
+		Dbg64_map_seg_os_order;
+		Dbg32_map_size_new;
+		Dbg64_map_size_new;
+		Dbg32_map_size_old;
+		Dbg64_map_size_old;
+		Dbg32_map_sort_seg;
+		Dbg64_map_sort_seg;
+		Dbg32_map_sort_title;
+		Dbg64_map_sort_title;
+		Dbg32_map_symbol;
+		Dbg64_map_symbol;
+		Dbg32_map_version;
+		Dbg64_map_version;
+
+		Dbg32_move_adjexpandreloc;
+		Dbg64_move_adjexpandreloc;
+		Dbg32_move_adjmovereloc;
+		Dbg64_move_adjmovereloc;
+		Dbg32_move_bad;
+		Dbg64_move_bad;
+		Dbg32_move_data;
+		Dbg64_move_data;
+		Dbg32_move_entry1;
+		Dbg64_move_entry1;
+		Dbg32_move_entry2;
+		Dbg64_move_entry2;
+		Dbg32_move_expand;
+		Dbg64_move_expand;
+		Dbg32_move_input;
+		Dbg64_move_input;
+		Dbg32_move_outmove;
+		Dbg64_move_outmove;
+		Dbg32_move_outsctadj;
+		Dbg64_move_outsctadj;
+		Dbg32_move_parexpn;
+		Dbg64_move_parexpn;
+
+		Dbg32_reloc_apply_reg;
+		Dbg64_reloc_apply_reg;
+		Dbg32_reloc_apply_val;
+		Dbg64_reloc_apply_val;
+		Dbg32_reloc_ars_entry;
+		Dbg64_reloc_ars_entry;
+		Dbg32_reloc_copy;
+		Dbg64_reloc_copy;
+		Dbg32_reloc_discard;
+		Dbg64_reloc_discard;
+		Dbg32_reloc_doact;
+		Dbg64_reloc_doact;
+		Dbg32_reloc_doact_title;
+		Dbg64_reloc_doact_title;
+		Dbg32_reloc_dooutrel;
+		Dbg64_reloc_dooutrel;
+		Dbg32_reloc_entry;
+		Dbg64_reloc_entry;
+		Dbg32_reloc_error;
+		Dbg64_reloc_error;
+		Dbg32_reloc_generate;
+		Dbg64_reloc_generate;
+		Dbg32_reloc_in;
+		Dbg64_reloc_in;
+		Dbg32_reloc_ors_entry;
+		Dbg64_reloc_ors_entry;
+		Dbg32_reloc_out;
+		Dbg64_reloc_out;
+		Dbg32_reloc_proc;
+		Dbg64_reloc_proc;
+		Dbg32_reloc_run;
+		Dbg64_reloc_run;
+		Dbg32_reloc_sloppycomdat;
+		Dbg64_reloc_sloppycomdat;
+		Dbg32_reloc_transition;
+		Dbg64_reloc_transition;
+
+		Dbg32_sec_added;
+		Dbg64_sec_added;
+		Dbg32_sec_backing;
+		Dbg64_sec_backing;
+		Dbg32_sec_created;
+		Dbg64_sec_created;
+		Dbg32_sec_discarded;
+		Dbg64_sec_discarded;
+		Dbg32_sec_genstr_compress;
+		Dbg64_sec_genstr_compress;
+		Dbg32_sec_group;
+		Dbg64_sec_group;
+		Dbg32_sec_gnu_comdat;
+		Dbg64_sec_gnu_comdat;
+		Dbg32_sec_in;
+		Dbg64_sec_in;
+		Dbg32_sec_order_error;
+		Dbg64_sec_order_error;
+		Dbg32_sec_order_list;
+		Dbg64_sec_order_list;
+		Dbg32_sec_redirected;
+		Dbg64_sec_redirected;
+		Dbg32_sec_strtab;
+		Dbg64_sec_strtab;
+		Dbg32_sec_unsup_strmerge;
+		Dbg64_sec_unsup_strmerge;
+
+		Dbg32_seg_entry;
+		Dbg64_seg_entry;
+		Dbg32_seg_list;
+		Dbg64_seg_list;
+		Dbg32_seg_os;
+		Dbg64_seg_os;
+		Dbg32_seg_title;
+		Dbg64_seg_title;
+
+		Dbg32_shdr_modified;
+		Dbg64_shdr_modified;
+
+		Dbg32_statistics_ar;
+		Dbg64_statistics_ar;
+		Dbg32_statistics_ld;
+		Dbg64_statistics_ld;
+
+		Dbg32_support_action;
+		Dbg64_support_action;
+		Dbg32_support_load;
+		Dbg64_support_load;
+		Dbg32_support_req;
+		Dbg64_support_req;
+		Dbg32_support_vnone;
+		Dbg64_support_vnone;
+
+		Dbg32_syminfo_entry;
+		Dbg64_syminfo_entry;
+		Dbg32_syminfo_title;
+		Dbg64_syminfo_title;
+
+		Dbg32_syms_ar_checking;
+		Dbg64_syms_ar_checking;
+		Dbg32_syms_ar_force;
+		Dbg64_syms_ar_force;
+		Dbg32_syms_ar_resolve;
+		Dbg64_syms_ar_resolve;
+		Dbg32_syms_ar_skip;
+		Dbg64_syms_ar_skip;
+		Dbg32_syms_ar_title;
+		Dbg64_syms_ar_title;
+		Dbg32_syms_cap_convert;
+		Dbg64_syms_cap_convert;
+		Dbg32_syms_cap_local;
+		Dbg64_syms_cap_local;
+		Dbg32_syms_cap_lookup;
+		Dbg64_syms_cap_lookup;
+		Dbg32_syms_cap_title;
+		Dbg64_syms_cap_title;
+		Dbg32_syms_copy_reloc;
+		Dbg64_syms_copy_reloc;
+		Dbg32_syms_created;
+		Dbg64_syms_created;
+		Dbg32_syms_discarded;
+		Dbg64_syms_discarded;
+		Dbg32_syms_dup_discarded;
+		Dbg64_syms_dup_discarded;
+		Dbg32_syms_dup_sort_addr;
+		Dbg64_syms_dup_sort_addr;
+		Dbg32_syms_entered;
+		Dbg64_syms_entered;
+		Dbg32_syms_entry;
+		Dbg64_syms_entry;
+		Dbg32_syms_global;
+		Dbg64_syms_global;
+		Dbg32_syms_ignore;
+		Dbg64_syms_ignore;
+		Dbg32_syms_ignore_gnuver;
+		Dbg64_syms_ignore_gnuver;
+		Dbg32_syms_lazy_rescan;
+		Dbg64_syms_lazy_rescan;
+		Dbg32_syms_lookup;
+		Dbg64_syms_lookup;
+		Dbg32_syms_lookup_aout;
+		Dbg32_syms_new;
+		Dbg64_syms_new;
+		Dbg32_syms_old;
+		Dbg64_syms_old;
+		Dbg32_syms_process;
+		Dbg64_syms_process;
+		Dbg32_syms_reduce;
+		Dbg64_syms_reduce;
+		Dbg32_syms_resolved;
+		Dbg64_syms_resolved;
+		Dbg32_syms_resolving;
+		Dbg64_syms_resolving;
+		Dbg32_syms_sec_entry;
+		Dbg64_syms_sec_entry;
+		Dbg32_syms_sec_title;
+		Dbg64_syms_sec_title;
+		Dbg32_syms_spec_title;
+		Dbg64_syms_spec_title;
+		Dbg32_syms_updated;
+		Dbg64_syms_updated;
+		Dbg32_syms_up_title;
+		Dbg64_syms_up_title;
+		Dbg32_syms_wrap;
+		Dbg64_syms_wrap;
+
+		Dbg_tls_modactivity;
+		Dbg_tls_static_block;
+		Dbg_tls_static_resv;
+
+		Dbg32_util_call_array;
+		Dbg64_util_call_array;
+		Dbg32_util_call_fini;
+		Dbg64_util_call_fini;
+		Dbg32_util_call_init;
+		Dbg64_util_call_init;
+		Dbg32_util_call_main;
+		Dbg64_util_call_main;
+		Dbg32_util_collect;
+		Dbg64_util_collect;
+		Dbg32_util_dbnotify;
+		Dbg64_util_dbnotify;
+		Dbg32_util_edge_in;
+		Dbg64_util_edge_in;
+		Dbg32_util_edge_out;
+		Dbg64_util_edge_out;
+		Dbg32_util_lcinterface;
+		Dbg64_util_lcinterface;
+		Dbg32_util_intoolate;
+		Dbg64_util_intoolate;
+		Dbg32_util_nl;
+		Dbg64_util_nl;
+		Dbg32_util_no_init;
+		Dbg64_util_no_init;
+		Dbg32_util_scc_entry;
+		Dbg64_util_scc_entry;
+		Dbg32_util_scc_title;
+		Dbg64_util_scc_title;
+		Dbg32_util_str;
+		Dbg64_util_str;
+
+		Dbg32_unused_file;
+		Dbg64_unused_file;
+		Dbg32_unused_lcinterface;
+		Dbg64_unused_lcinterface;
+		Dbg32_unused_path;
+		Dbg64_unused_path;
+		Dbg32_unused_sec;
+		Dbg64_unused_sec;
+		Dbg32_unused_unref;
+		Dbg64_unused_unref;
+
+		Dbg32_ver_avail_entry;
+		Dbg64_ver_avail_entry;
+		Dbg32_ver_avail_title;
+		Dbg64_ver_avail_title;
+		Dbg32_ver_def_title;
+		Dbg64_ver_def_title;
+		Dbg32_ver_desc_entry;
+		Dbg64_ver_desc_entry;
+		Dbg32_ver_need_done;
+		Dbg64_ver_need_done;
+		Dbg32_ver_need_entry;
+		Dbg64_ver_need_entry;
+		Dbg32_ver_need_title;
+		Dbg64_ver_need_title;
+		Dbg32_ver_nointerface;
+		Dbg64_ver_nointerface;
+		Dbg32_ver_symbol;
+		Dbg64_ver_symbol;
+
+} SUNWprivate_3.23;
+
+
+# The following interfaces are used by various parts of the link-editors and
+# elfdump(1).  The link-editors are always packaged together but there
+# seems to be a variety of old elfdump's lying around.  elfdump only uses
+# this interface, and thus by separating in from the ever changing Dbg_*
+# interfaces we can provide a stable versioning environment for this utility.
+
+SYMBOL_VERSION SUNWprivate_3.23 {
+	global:
+		Elf_syminfo_entry;
+		Elf_syminfo_title;
+
+		Elf32_cap_entry;
+		Elf64_cap_entry;
+		Elf32_cap_title;
+		Elf64_cap_title;
+
+		Elf32_demangle_name;
+		Elf64_demangle_name;
+		Elf32_dyn_entry;
+		Elf64_dyn_entry;
+		Elf32_dyn_null_entry;
+		Elf64_dyn_null_entry;
+		Elf32_dyn_title;
+		Elf64_dyn_title;
+
+		Elf32_ehdr;
+		Elf64_ehdr;
+
+		Elf32_got_entry;
+		Elf64_got_entry;
+		Elf32_got_title;
+		Elf64_got_title;
+
+		Elf32_phdr;
+		Elf64_phdr;
+
+		Elf32_reloc_apply_reg;
+		Elf64_reloc_apply_reg;
+		Elf32_reloc_apply_val;
+		Elf64_reloc_apply_val;
+		Elf32_reloc_entry_1;
+		Elf64_reloc_entry_1;
+		Elf32_reloc_entry_2;
+		Elf64_reloc_entry_2;
+		Elf32_reloc_title;
+		Elf64_reloc_title;
+
+		Elf32_shdr;
+		Elf64_shdr;
+
+		Elf32_syms_table_title;
+		Elf64_syms_table_title;
+		Elf32_syms_table_entry;
+		Elf64_syms_table_entry;
+
+		Elf32_ver_def_title;
+		Elf64_ver_def_title;
+		Elf32_ver_line_1;
+		Elf64_ver_line_1;
+		Elf32_ver_line_2;
+		Elf64_ver_line_2;
+		Elf32_ver_line_3;
+		Elf64_ver_line_3;
+		Elf32_ver_line_4;
+		Elf64_ver_line_4;
+		Elf32_ver_line_5;
+		Elf64_ver_line_5;
+		Elf32_ver_need_title;
+		Elf64_ver_need_title;
+
+	local:
+		*;
+};

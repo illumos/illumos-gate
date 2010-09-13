@@ -1,0 +1,82 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	dfs_get_referrals;
+	dfs_info_free;
+	dssetup_check_service;
+	dssetup_clear_domain_info;
+	lsa_lookup_name;
+	lsa_lookup_sid;
+	mlsvc_disconnect;
+	mlsvc_fini;
+	mlsvc_init;
+	mlsvc_join;
+	mlsvc_netlogon;
+	smb_autohome_add;
+	smb_autohome_remove;
+	smb_locate_dc;
+	smb_logon;
+	smb_logon_abort;
+	smb_quota_free;
+	smb_quota_query;
+	smb_quota_set;
+	smb_shr_add;
+	smb_shr_count;
+	smb_shr_exec;
+	smb_shr_get;
+	smb_shr_hostaccess;
+	smb_shr_iterate;
+	smb_shr_iterinit;
+	smb_shr_list;
+	smb_shr_load;
+	smb_shr_modify;
+	smb_shr_remove;
+	smb_shr_rename;
+	smb_shr_sa_csc_name;
+	smb_shr_start;
+	smb_shr_stop;
+	smb_token_destroy;
+	smb_token_log;
+	spoolss_register_copyfile;
+    local:
+	*;
+};

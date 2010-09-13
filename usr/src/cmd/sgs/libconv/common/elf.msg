@@ -1,0 +1,348 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+@ MSG_ELFCLASSNONE_CF		"ELFCLASSNONE"			# 0
+@ MSG_ELFCLASSNONE_DMP			"None"
+@ MSG_ELFCLASSNONE_NF			"none"
+@ MSG_ELFCLASS32_CF		"ELFCLASS32"			# 1
+@ MSG_ELFCLASS32_DMP			"32-bit"
+@ MSG_ELFCLASS32_NF			"32"
+@ MSG_ELFCLASS64_CF		"ELFCLASS64"			# 2
+@ MSG_ELFCLASS64_DMP			"64-bit"
+@ MSG_ELFCLASS64_NF			"64"
+
+@ MSG_ELFDATANONE_CF		"ELFDATANONE"			# 0
+@ MSG_ELFDATANONE_DMP			"None"
+@ MSG_ELFDATANONE_NF			"none"
+@ MSG_ELFDATA2LSB_CF		"ELFDATA2LSB"			# 1
+@ MSG_ELFDATA2LSB_DMP			"2LSB"
+@ MSG_ELFDATA2LSB_FIL			"LSB"
+@ MSG_ELFDATA2LSB_NF			"lsb"
+@ MSG_ELFDATA2MSB_CF		"ELFDATA2MSB"			# 2
+@ MSG_ELFDATA2MSB_DMP			"2MSB"
+@ MSG_ELFDATA2MSB_FIL			"MSB"
+@ MSG_ELFDATA2MSB_NF			"msb"
+
+@ MSG_EM_NONE_CF		"EM_NONE"			# 0
+@ MSG_EM_NONE_NF			"none"
+@ MSG_EM_NONE_DMP			"No mach"
+@ MSG_EM_M32_CF			"EM_M32"			# 1
+@ MSG_EM_M32_NF				"m32"
+@ MSG_EM_M32_DMP			"WE32100"
+@ MSG_EM_SPARC_CF		"EM_SPARC"			# 2
+@ MSG_EM_SPARC_NF			"sparc"
+@ MSG_EM_SPARC_DMP			"SPARC"
+@ MSG_EM_386_CF			"EM_386"			# 3
+@ MSG_EM_386_NF				"386"
+@ MSG_EM_386_DMP			"80386"
+@ MSG_EM_68K_CF			"EM_68K"			# 4
+@ MSG_EM_68K_DMP			"68000"
+@ MSG_EM_68K_NF				"68k"
+@ MSG_EM_88K_CF			"EM_88K"			# 5
+@ MSG_EM_88K_NF				"88k"
+@ MSG_EM_88K_DMP			"88000"
+@ MSG_EM_486_CF			"EM_486"			# 6
+@ MSG_EM_486_NF				"486"
+@ MSG_EM_486_DMP			"80486"
+@ MSG_EM_860_CF			"EM_860"			# 7
+@ MSG_EM_860_NF				"860"
+@ MSG_EM_860_DMP			"i860"
+@ MSG_EM_MIPS_CF		"EM_MIPS"			# 8
+@ MSG_EM_MIPS_NF			"mips"
+@ MSG_EM_MIPS_DMP			"RS3000_BE"
+@ MSG_EM_S370_CF			"EM_S370"		# 9
+@ MSG_EM_S370_NF			"s370"
+@ MSG_EM_MIPS_RS3_LE_CF		"EM_MIPS_RS3_LE"		# 10
+@ MSG_EM_MIPS_RS3_LE_NF			"mips_rs3_le"
+@ MSG_EM_MIPS_RS3_LE_DMP		"RS3000_LE"
+@ MSG_EM_RS6000_CF		"EM_RS6000"			# 11
+@ MSG_EM_RS6000_NF			"rs6000"
+@ MSG_EM_RS6000_DMP			"RS6000"
+@ MSG_EM_PA_RISC_CF		"EM_PA_RISC"			# 15
+@ MSG_EM_PA_RISC_NF			"pa_risc"
+@ MSG_EM_PA_RISC_DMP			"PA_RISC"
+@ MSG_EM_NCUBE_CF		"EM_nCUBE"			# 16
+@ MSG_EM_NCUBE_NF			"ncube"
+@ MSG_EM_NCUBE_DMP			"nCUBE"
+@ MSG_EM_VPP500_CF		"EM_VPP500"			# 17
+@ MSG_EM_VPP500_NF			"vpp500"
+@ MSG_EM_VPP500_DMP			"VPP500"
+@ MSG_EM_SPARC32PLUS_CF		"EM_SPARC32PLUS"		# 18
+@ MSG_EM_SPARC32PLUS_NF			"sparc32plus"
+@ MSG_EM_SPARC32PLUS_DMP		"SPARC32PLUS"
+@ MSG_EM_960_CF			"EM_960"			# 19
+@ MSG_EM_960_NF				"960"
+@ MSG_EM_PPC_CF			"EM_PPC"			# 20
+@ MSG_EM_PPC_NF				"ppc"
+@ MSG_EM_PPC_DMP			"PowerPC"
+@ MSG_EM_PPC64_CF		"EM_PPC64"			# 21
+@ MSG_EM_PPC64_NF			"ppc64"
+@ MSG_EM_PPC64_DMP			"PowerPC64"
+@ MSG_EM_S390_CF		"EM_S390"			# 22
+@ MSG_EM_S390_NF			"s390"
+@ MSG_EM_V800_CF		"EM_V800"			# 36
+@ MSG_EM_V800_NF			"v800"
+@ MSG_EM_FR20_CF		"EM_FR20"			# 37
+@ MSG_EM_FR20_NF			"fr20"
+@ MSG_EM_RH32_CF		"EM_RH32"			# 38
+@ MSG_EM_RH32_NF			"rh32"
+@ MSG_EM_RCE_CF			"EM_RCE"			# 39
+@ MSG_EM_RCE_NF				"rce"
+@ MSG_EM_ARM_CF			"EM_ARM"			# 40
+@ MSG_EM_ARM_NF				"arm"
+@ MSG_EM_ARM_DMP			"ARM"
+@ MSG_EM_ALPHA_CF		"EM_ALPHA"			# 41
+@ MSG_EM_ALPHA_NF			"alpha"
+@ MSG_EM_ALPHA_DMP			"Alpha"
+@ MSG_EM_SH_CF			"EM_SH"				# 42
+@ MSG_EM_SH_NF				"sh"
+@ MSG_EM_SPARCV9_CF		"EM_SPARCV9"			# 43
+@ MSG_EM_SPARCV9_NF			"sparcv9"
+@ MSG_EM_SPARCV9_DMP			"SPARCV9"
+@ MSG_EM_TRICORE_CF		"EM_TRICORE"			# 44
+@ MSG_EM_TRICORE_NF			"tricore"
+@ MSG_EM_ARC_CF			"EM_ARC"			# 45
+@ MSG_EM_ARC_NF				"arc"
+@ MSG_EM_H8_300_CF		"EM_H8_300"			# 46
+@ MSG_EM_H8_300_NF			"h8_300"
+@ MSG_EM_H8_300H_CF		"EM_H8_300H"			# 47
+@ MSG_EM_H8_300H_NF			"h8_300h"
+@ MSG_EM_H8S_CF			"EM_H8S"			# 48
+@ MSG_EM_H8S_NF				"h8s"
+@ MSG_EM_H8_500_CF		"EM_H8_500"			# 49
+@ MSG_EM_H8_500_NF			"h8_500"
+@ MSG_EM_IA_64_CF		"EM_IA_64"			# 50
+@ MSG_EM_IA_64_NF			"ia_64"
+@ MSG_EM_IA_64_DMP			"IA_64"
+@ MSG_EM_MIPS_X_CF		"EM_MIPS_X"			# 51
+@ MSG_EM_MIPS_X_NF			"mips_x"
+@ MSG_EM_COLDFIRE_CF		"EM_COLDFIRE"			# 52
+@ MSG_EM_COLDFIRE_NF			"coldfire"
+@ MSG_EM_68HC12_CF		"EM_68HC12"			# 53
+@ MSG_EM_68HC12_NF			"68hc12"
+@ MSG_EM_MMA_CF			"EM_MMA"			# 54
+@ MSG_EM_MMA_NF				"mma"
+@ MSG_EM_PCP_CF			"EM_PCP"			# 55
+@ MSG_EM_PCP_NF				"pcp"
+@ MSG_EM_NCPU_CF		"EM_NCPU"			# 56
+@ MSG_EM_NCPU_NF			"ncpu"
+@ MSG_EM_NDR1_CF		"EM_NDR1"			# 57
+@ MSG_EM_NDR1_NF			"ndr1"
+@ MSG_EM_STARCORE_CF		"EM_STARCORE"			# 58
+@ MSG_EM_STARCORE_NF			"starcore"
+@ MSG_EM_ME16_CF		"EM_ME16"			# 59
+@ MSG_EM_ME16_NF			"me16"
+@ MSG_EM_ST100_CF		"EM_ST100"			# 60
+@ MSG_EM_ST100_NF			"st100"
+@ MSG_EM_TINYJ_CF		"EM_TINYJ"			# 61
+@ MSG_EM_TINYJ_NF			"tinyj"
+@ MSG_EM_AMD64_CF		"EM_AMD64"			# 62
+@ MSG_EM_AMD64_NF			"amd64"
+@ MSG_EM_AMD64_DMP			"AMD64"
+@ MSG_EM_PDSP_CF		"EM_PDSP"			# 63
+@ MSG_EM_PDSP_NF			"pdsp"
+@ MSG_EM_FX66_CF		"EM_FX66"			# 66
+@ MSG_EM_FX66_NF			"fx66"
+@ MSG_EM_ST9PLUS_CF		"EM_ST9PLUS"			# 67
+@ MSG_EM_ST9PLUS_NF			"st9plus"
+@ MSG_EM_ST7_CF			"EM_ST7"			# 68
+@ MSG_EM_ST7_NF				"st7"
+@ MSG_EM_68HC16_CF		"EM_68HC16"			# 69
+@ MSG_EM_68HC16_NF			"68hc16"
+@ MSG_EM_68HC11_CF		"EM_68HC11"			# 70
+@ MSG_EM_68HC11_NF			"68hc11"
+@ MSG_EM_68HC08_CF		"EM_68HC08"			# 71
+@ MSG_EM_68HC08_NF			"68hc08"
+@ MSG_EM_68HC05_CF		"EM_68HC05"			# 72
+@ MSG_EM_68HC05_NF			"68hc05"
+@ MSG_EM_SVX_CF			"EM_SVX"			# 73
+@ MSG_EM_SVX_NF				"svx"
+@ MSG_EM_ST19_CF		"EM_ST19"			# 74
+@ MSG_EM_ST19_NF			"st19"
+@ MSG_EM_VAX_CF			"EM_VAX"			# 75
+@ MSG_EM_VAX_NF				"vax"
+@ MSG_EM_VAX_DMP			"VAX"
+@ MSG_EM_CRIS_CF		"EM_CRIS"			# 76
+@ MSG_EM_CRIS_NF			"cris"
+@ MSG_EM_JAVELIN_CF		"EM_JAVELIN"			# 77
+@ MSG_EM_JAVELIN_NF			"javelin"
+@ MSG_EM_FIREPATH_CF		"EM_FIREPATH"			# 78
+@ MSG_EM_FIREPATH_NF			"firepath"
+@ MSG_EM_ZSP_CF			"EM_ZSP"			# 79
+@ MSG_EM_ZSP_NF				"zsp"
+@ MSG_EM_MMIX_CF		"EM_MMIX"			# 80
+@ MSG_EM_MMIX_NF			"mmix"
+@ MSG_EM_HUANY_CF		"EM_HUANY"			# 81
+@ MSG_EM_HUANY_NF			"huany"
+@ MSG_EM_PRISM_CF		"EM_PRISM"			# 82
+@ MSG_EM_PRISM_NF			"prism"
+@ MSG_EM_AVR_CF			"EM_AVR"			# 83
+@ MSG_EM_AVR_NF				"avr"
+@ MSG_EM_FR30_CF		"EM_FR30"			# 84
+@ MSG_EM_FR30_NF			"fr30"
+@ MSG_EM_D10V_CF		"EM_D10V"			# 85
+@ MSG_EM_D10V_NF			"d10v"
+@ MSG_EM_D30V_CF		"EM_D30V"			# 86
+@ MSG_EM_D30V_NF			"d30v"
+@ MSG_EM_V850_CF		"EM_V850"			# 87
+@ MSG_EM_V850_NF			"v850"
+@ MSG_EM_M32R_CF		"EM_M32R"			# 88
+@ MSG_EM_M32R_NF			"m32r"
+@ MSG_EM_MN10300_CF		"EM_MN10300"			# 89
+@ MSG_EM_MN10300_NF			"mn10300"
+@ MSG_EM_MN10200_CF		"EM_MN10200"			# 90
+@ MSG_EM_MN10200_NF			"mn10200"
+@ MSG_EM_PJ_CF			"EM_PJ"				# 91
+@ MSG_EM_PJ_NF				"pj"
+@ MSG_EM_OPENRISC_CF		"EM_OPENRISC"			# 92
+@ MSG_EM_OPENRISC_NF			"openrisc"
+@ MSG_EM_ARC_A5_CF		"EM_ARC_A5"			# 93
+@ MSG_EM_ARC_A5_NF			"arc_a5"
+@ MSG_EM_XTENSA_CF		"EM_XTENSA"			# 94
+@ MSG_EM_XTENSA_NF			"xtensa"
+
+
+@ MSG_EI_MAG0_CF		"EI_MAG0"			# 0
+@ MSG_EI_MAG0_NF			"mag0"
+@ MSG_EI_MAG1_CF		"EI_MAG1"			# 1
+@ MSG_EI_MAG1_NF			"mag1"
+@ MSG_EI_MAG2_CF		"EI_MAG2"			# 2
+@ MSG_EI_MAG2_NF			"mag2"
+@ MSG_EI_MAG3_CF		"EI_MAG3"			# 3
+@ MSG_EI_MAG3_NF			"mag3"
+@ MSG_EI_CLASS_CF		"EI_CLASS"			# 4
+@ MSG_EI_CLASS_NF			"class"
+@ MSG_EI_DATA_CF		"EI_DATA"			# 5
+@ MSG_EI_DATA_NF			"data"
+@ MSG_EI_VERSION_CF		"EI_VERSION"			# 6
+@ MSG_EI_VERSION_NF			"version"
+@ MSG_EI_OSABI_CF		"EI_OSABI"			# 7
+@ MSG_EI_OSABI_NF			"osabi"
+@ MSG_EI_ABIVERSION_CF		"EI_ABIVERSION"			# 8
+@ MSG_EI_ABIVERSION_NF			"abiversion"
+
+@ MSG_ET_NONE_CF		"ET_NONE"			# 1
+@ MSG_ET_NONE_NF			"none"
+@ MSG_ET_NONE_DMP			"None"
+@ MSG_ET_REL_CF			"ET_REL"			# 2
+@ MSG_ET_REL_NF				"rel"
+@ MSG_ET_REL_DMP			"Reloc"
+@ MSG_ET_EXEC_CF		"ET_EXEC"			# 3
+@ MSG_ET_EXEC_NF			"exec"
+@ MSG_ET_EXEC_DMP			"Exec"
+@ MSG_ET_DYN_CF			"ET_DYN"			# 4
+@ MSG_ET_DYN_NF				"dyn"
+@ MSG_ET_DYN_DMP			"Dyn"
+@ MSG_ET_CORE_CF		"ET_CORE"			# 5
+@ MSG_ET_CORE_NF			"core"
+@ MSG_ET_CORE_DMP			"Core"
+@ MSG_ET_SUNWPSEUDO_CF		"ET_SUNWPSEUDO"			# 0xfeff
+@ MSG_ET_SUNWPSEUDO_NF			"sunwpseudo"
+@ MSG_ET_SUNWPSEUDO_DMP			"SUNWPseudo"
+
+@ MSG_EV_NONE_CF		"EV_NONE"			# 0
+@ MSG_EV_NONE_NF			"none"
+@ MSG_EV_NONE_DMP			"Invalid"
+@ MSG_EV_CURRENT_CF		"EV_CURRENT"			# 1
+@ MSG_EV_CURRENT_NF			"current"
+@ MSG_EV_CURRENT_DMP			"Current"
+
+# Elf header EF_* flags
+
+@ MSG_EF_SPARC_32PLUS_CF	"EF_SPARC_32PLUS"		# 0x000100
+@ MSG_EF_SPARC_32PLUS_NF		"sparc_32plus"
+@ MSG_EF_SPARC_SUN_US1_CF	"EF_SPARC_SUN_US1"		# 0x000200
+@ MSG_EF_SPARC_SUN_US1_NF		"sparc_sun_us1"
+@ MSG_EF_SPARC_HAL_R1_CF	"EF_SPARC_HAL_R1"		# 0x000400
+@ MSG_EF_SPARC_HAL_R1_NF		"sparc_hal_r1"
+@ MSG_EF_SPARC_SUN_US3_CF	"EF_SPARC_SUN_US3"		# x000800
+@ MSG_EF_SPARC_SUN_US3_NF		"sparc_sun_us3"
+@ MSG_EF_SPARCV9_TSO_CF		"EF_SPARCV9_TSO"		# 0x0
+@ MSG_EF_SPARCV9_TSO_NF			"sparcv9_tso"
+@ MSG_EF_SPARCV9_PSO_CF		"EF_SPARCV9_PSO"		# 0x1
+@ MSG_EF_SPARCV9_PSO_NF			"sparcv9_pso"
+@ MSG_EF_SPARCV9_RMO_CF		"EF_SPARCV9_RMO"		# 0x2
+@ MSG_EF_SPARCV9_RMO_NF			"sparcv9_rmo"
+
+@ MSG_OSABI_NONE_CF		"ELFOSABI_NONE"			#0
+@ MSG_OSABI_NONE_NF			"none"
+@ MSG_OSABI_NONE_DMP			"Generic SYSV"
+@ MSG_OSABI_SYSV_CF		"ELFOSABI_SYSV"
+@ MSG_OSABI_SYSV_NF			"sysv"
+@ MSG_OSABI_HPUX_CF		"ELFOSABI_HPUX"			#1
+@ MSG_OSABI_HPUX_NF			"hpux"
+@ MSG_OSABI_HPUX_DMP			"HP-UX"
+@ MSG_OSABI_NETBSD_CF		"ELFOSABI_NETBSD"		#2
+@ MSG_OSABI_NETBSD_NF			"netbsd"
+@ MSG_OSABI_NETBSD_DMP			"NetBSD"
+@ MSG_OSABI_LINUX_CF		"ELFOSABI_LINUX"		#3
+@ MSG_OSABI_LINUX_NF			"linux"
+@ MSG_OSABI_LINUX_DMP			"Linux"
+@ MSG_OSABI_SOLARIS_CF		"ELFOSABI_SOLARIS"		#6
+@ MSG_OSABI_SOLARIS_NF			"solaris"
+@ MSG_OSABI_SOLARIS_DMP			"Solaris"
+@ MSG_OSABI_AIX_CF		"ELFOSABI_AIX"			#7
+@ MSG_OSABI_AIX_NF			"aix"
+@ MSG_OSABI_AIX_DMP			"AIX"
+@ MSG_OSABI_IRIX_CF		"ELFOSABI_IRIX"			#8
+@ MSG_OSABI_IRIX_NF			"irix"
+@ MSG_OSABI_IRIX_DMP			"IRIX"
+@ MSG_OSABI_FREEBSD_CF		"ELFOSABI_FREEBSD"		#9
+@ MSG_OSABI_FREEBSD_NF			"freebsd"
+@ MSG_OSABI_FREEBSD_DMP			"FreeBSD"
+@ MSG_OSABI_TRU64_CF		"ELFOSABI_TRU64"		#10
+@ MSG_OSABI_TRU64_NF			"tru64"
+@ MSG_OSABI_TRU64_DMP			"Tru64"
+@ MSG_OSABI_MODESTO_CF		"ELFOSABI_MODESTO"		#11
+@ MSG_OSABI_MODESTO_NF			"modesto"
+@ MSG_OSABI_MODESTO_DMP			"Modesto"
+@ MSG_OSABI_OPENBSD_CF		"ELFOSABI_OPENBSD"		#12
+@ MSG_OSABI_OPENBSD_NF			"openbsd"
+@ MSG_OSABI_OPENBSD_DMP			"OpenBSD"
+@ MSG_OSABI_OPENVMS_CF		"ELFOSABI_OPENVMS"		#13
+@ MSG_OSABI_OPENVMS_NF			"openvms"
+@ MSG_OSABI_OPENVMS_DMP			"OpenVMS"
+@ MSG_OSABI_NSK_CF		"ELFOSABI_NSK"			#14
+@ MSG_OSABI_NSK_NF			"nsk"
+@ MSG_OSABI_NSK_DMP			"NSK"
+@ MSG_OSABI_AROS_CF		"ELFOSABI_AROS"			#15
+@ MSG_OSABI_AROS_NF			"aros"
+@ MSG_OSABI_AROS_DMP			"Amiga Research OS"
+@ MSG_OSABI_ARM_CF		"ELFOSABI_ARM"			#97
+@ MSG_OSABI_ARM_NF			"arm"
+@ MSG_OSABI_ARM_DMP			"ARM"
+@ MSG_OSABI_STANDALONE_CF	"ELFOSABI_STANDALONE"		#255
+@ MSG_OSABI_STANDALONE_NF		"standalone"
+@ MSG_OSABI_STANDALONE_DMP		"Standalone"
+
+@ MSG_EAV_SUNW_NONE_CF		"EAV_SUNW_NONE"			# 0
+@ MSG_EAV_SUNW_NONE_NF			"none"
+@ MSG_EAV_SUNW_CURRENT_CF	"EAV_SUNW_CURRENT"		# 1
+@ MSG_EAV_SUNW_CURRENT_NF		"current"
+
+@ MSG_GBL_ZERO		"0"
+
+@ MSG_STR_EMPTY		""

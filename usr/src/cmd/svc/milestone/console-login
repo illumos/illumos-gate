@@ -1,0 +1,84 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# This method script manages all vt logins including system
+# console login.
+#
+# For modifying parameters passed to ttymon, do not edit
+# this script. Instead use svccfg(1m) to modify the SMF
+# repository. For example:
+#
+# # svccfg
+# svc:> select system/console-login
+# svc:/system/console-login> setprop ttymon/terminal_type = "xterm"
+# svc:/system/console-login> exit
+
+. /lib/svc/share/smf_include.sh
+
+if [ "$1" != "default" ]; then
+	if smf_dont_configure_vt; then
+		/usr/sbin/svcadm disable $SMF_FMRI
+		exit $SMF_EXIT_OK
+	fi
+fi
+
+getproparg() {
+	val=`svcprop -p $2 $SMF_FMRI`
+	[ -n "$val" ] && [ "$val" != "\"\"" ] && echo $1 $val
+}
+
+args="-g"
+
+val=`svcprop -p ttymon/device $SMF_FMRI`
+# if this isn't set, recover a little
+[ -z "$val" ] && val="/dev/console"
+
+if [ "$val" = "/dev/vt/1" ]; then
+	echo "ERROR: ttymon/device cannot be configured to /dev/vt/1."
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+args="$args -d $val"
+
+args="$args `getproparg -l ttymon/label`"
+
+args="$args `getproparg -T ttymon/terminal_type`"
+
+args="$args `getproparg -m ttymon/modules`"
+
+val=`svcprop -p ttymon/nohangup $SMF_FMRI`
+[ "$val" = "true" ] && args="$args -h"
+
+val=`svcprop -p ttymon/timeout $SMF_FMRI`
+[ -n "$val" -a "$val" != "0" ] && args="$args -t $val"
+
+val=`svcprop -p ttymon/prompt $SMF_FMRI`
+if [ -n "$val" ]; then
+	prompt=`eval echo $val`
+	exec /usr/lib/saf/ttymon $args -p "`eval echo $prompt` "
+else
+	exec /usr/lib/saf/ttymon $args
+fi

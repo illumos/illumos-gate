@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+Elimination of /usr/kvm
+=======================
+
+Copyright (c) 1995-2000 by Sun Microsystems, Inc.
+All rights reserved.
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+As of Solaris 2.5, the /usr/kvm directory is no longer needed by the
+operating environment.  The mount point continues to be provided for
+backward compatibility although all of the contents have been removed.
+
+In earlier releases, /usr/kvm contained the platform specific implementations
+of programs and libraries.  The interface to these platform specific
+implementations was generally advertized to be in a platform independent
+directory and a symbolic link was used to bind the advertized platform
+independent interface to the platform specific implementation in /usr/kvm.
+
+Implementation		Interface(s)
+
+/usr/kvm/adb		/usr/bin/adb
+
+/usr/kvm/arch		/usr/ucb/arch
+
+			Note: Source Compatibility Package Component
+
+/usr/kvm/crash		/usr/bin/mdb
+
+			Note: Solaris Modular Debugger Guide describes how to
+			transition from crash(1M) to mdb(1).
+
+/usr/kvm/eeprom		/usr/sbin/eeprom
+
+/usr/kvm/i286,i386,i486,i860,i86pc,iAPX286,m68k,mc68000,mc68010,mc68020,
+	mc68030,mc68040,sparc,sun,sun2,sun3,sun3x,sun4,sun4c,sun4d,sun4e,
+	sun4m,u370,u3b,u3b15,u3b2,u3b5,vax
+			/usr/bin/i286,i386,i486,i860,i86pc,iAPX286,m68k,
+			mc68000,mc68010,mc68020,mc68030,mc68040,sparc,sun,
+			sun2,sun3,sun3x,sun4,sun4c,sun4d,sun4e,sun4m,u370,
+			u3b,u3b15,u3b2,u3b5,vax
+
+			Note:	These are documented on the machid(1) manual
+				page.  These are fully deprecated interfaces.
+
+/usr/kvm/libkvm.a	/usr/lib/libkvm.a
+
+			Note:	/usr/lib/libkvm.a is no longer a component
+				of SunOS.
+
+/usr/kvm/libkvm.so.1	/usr/lib/libkvm.so.1
+/usr/kvm/libkvm.so	/usr/lib/libkvm.so
+
+
+The following platform specific objects were also delivered in previous
+releases of SunOS.  They are only of use with specific platforms and
+it was always documented that the path to these objects was uncommitted.
+
+2.4 (and earlier)	2.5
+
+/usr/kvm/cg14config	/usr/platform/sun4m/sbin/cg14config	sun4m only
+
+/usr/kvm/sxconfig	/usr/platform/sun4m/sbin/sxconfig	sun4m only
+
+/usr/kvm/prtdiag	/usr/platform/sun4d/sbin/prtdiag	sun4d only
+

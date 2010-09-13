@@ -1,0 +1,118 @@
+.fp 5 CW
+.TH SFDISC 3 "16 June 1993"
+.SH NAME
+\fBsfdisc\fR \- \fBsfio\fP disciplines
+.SH SYNOPSIS
+.de Tp
+.fl
+.ne 2
+.TP
+..
+.de Ss
+.fl
+.ne 2
+.SS "\\$1"
+..
+.ta 1.0i 2.0i 3.0i 4.0i 5.0i
+.nf
+.ft 5
+#include	<sfdisc.h>
+
+extern Sfdisc_t*	dcnewskable(Sfio_t* f);
+extern int		dcdelskable(Sfdisc_t* disc);
+
+extern Sfdisc_t*	dcnewtee(Sfio_t* tee);
+extern int		dcdeltee(Sfdisc_t* disc);
+
+extern Sfdisc_t*	dcnewfilter(char* cmd);
+extern int		dcdelfilter(Sfdisc_t* disc);
+
+extern Sfdisc_t*	dcnewsubstream(Sfio_t* f, long offset, long extent);
+extern int		dcdelsubstream(Sfdisc_t* disc);
+
+extern Sfdisc_t*	dcnewlzw(void);
+extern int		dcdellzw(Sfdisc_t* disc);
+
+extern Sfdisc_t*	dcnewunion(Sfio_t** flist, int n);
+extern int		dcdelunion(Sfdisc_t* disc);
+.ft 1
+.fi
+.SH DESCRIPTION
+.PP
+I/O disciplines are used to extend the data processing power of
+\fIsfio\fP streams. The convention for using the disciplines
+in this package is to use the call \f5dcnewXXX()\fP to create
+a discipline of the type \f5XXX\fP and to use \f5dcdelXXX()\fP
+to destroy it.
+A discipline is enable by inserting it into the desired
+stream using the \f5sfdisc()\fP call. A discipline can be used on only
+one stream. It is unsafe to share a discipline on two or more streams
+since the discipline may maintain states between successive IO calls.
+For multiple uses, \f5dcnewXXX()\fP should be used
+to create a distinct discipline for each stream.
+Each discipline structure is equipped with an exception handler
+that causes self-destruction when the associated stream is closed.
+.PP
+.Ss "  Sfdisc_t* dcnewskable(Sfio_t* f);"
+.Ss "  int dcdelskable(Sfdisc_t* disc);"
+\f5dcnewskable()\fP creates a discipline that when inserted
+on the stream \f5f\fP will ensure that \f5f\fP is seekable.
+If \f5f\fP is originally unseekable, data will be shadowed
+in a temporary file stream to allow seekability.
+\f5dcnewskable()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.Ss "  Sfdisc_t* dcnewtee(Sfio_t* tee);"
+.Ss "  int dcdeltee(Sfdisc_t* disc);"
+\f5dcnewtee()\fP creates a discipline that
+when inserted into a stream \f5f\fP will duplicate to the stream \f5tee\fP
+any data written to \f5f\fP.
+\f5dcnewtee()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.Ss "  Sfdisc_t* dcnewfilter(char* cmd);"
+.Ss "  int dcdelfilter(Sfdisc_t* disc);"
+\f5dcnewfilter()\fP creates a discipline that
+when inserted into a stream \f5f\fP will run the command \f5cmd\fP
+to process any input data before making it available to the application.
+For example, \f5dcnewfilter("uncompress")\fP is an equivalent but slower
+alternative to the lzw discipline below.
+\f5dcnewfilter()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.Ss "  Sfdisc_t* dcnewsubstream(Sfio_t* base, long offset, long extent);"
+.Ss "  int dcdelsubstream(Sfdisc_t* disc);"
+\f5dcnewsubstream()\fP creates a discipline that
+reserves a portion of the stream \f5base\fP starting at \f5offset\fP
+with length \f5extent\fP and makes this portion appear as if it is
+a stream. When this discipline is inserted into a stream, it will make
+cause all IO operations on this stream to take place in the reserved
+portion of the \f5base\fP stream.
+\f5dcnewsubstream()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.Ss "  Sfdisc_t* dcnewlzw(void);
+.Ss "  int dcdellzw(Sfdisc_t* disc);"
+\f5dcnewlzw()\fP creates a discipline that when inserted into
+a stream \f5f\fP will run the \fBuncompress\fP algorithm
+on input data from \f5f\fP before making it available to the
+application. This is useful to allow applications to process
+data from a file packed with the UNIX \fBcompress\fP utility
+as if the data is in plain text.
+\f5dcnewlzw()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.Ss "  Sfdisc_t* dcnewunion(Sfio_t** list, int n);
+.Ss "  int dcdelunion(Sfdisc_t* disc);"
+\f5dcnewunion()\fP creates a discipline that concatenates
+input data from all \f5n\fP streams in \f5list\fP.
+When inserted into a stream \f5f\fP, this discipline will cause
+all input operations on \f5f\fP to come from the merged data stream.
+\f5dcnewunion()\fP returns the discipline on success and \f5NULL\fP on failure.
+
+.SH ACKNOWLEDGMENTS
+Dave Korn contributed the substream discipline.
+Jim Arnold contributed the lzw discipline.
+
+.SH NOTES
+Since we are not sure of the legal responsibilities concerning the lzw patent,
+the lzw discipline is not currently distributed with any release of sfio
+outside of AT&T.
+
+.SH AUTHOR
+Kiem-Phong Vo, kpv@research.att.com.

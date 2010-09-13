@@ -1,0 +1,39 @@
+#
+# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# lib/krb5/Makefile.targ
+#
+# included to define local library targets
+#
+
+include $(SRC)/lib/Makefile.targ
+
+pics/%.o: ../%.c
+	$(COMPILE.c)  -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(KADM5DIR)/%.c
+	$(COMPILE.c)  -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/$(COMMONOBJS): $(COMMONSRCS)
+	$(COMPILE.c) -o $@ $(COMMONSRCS)
+
+_msg: $(MSGDOMAIN) .WAIT $(POFILE)
+	$(RM) $(MSGDOMAIN)/$(POFILE)
+	$(CP) $(POFILE) $(MSGDOMAIN)
+
+$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
+
+$(MSGDOMAIN):
+	$(INS.dir)
+
+# install rule for lint library target
+$(ROOTLINTDIR)/%: ./%
+	$(INS.file)

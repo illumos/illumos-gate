@@ -1,0 +1,134 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+   X4GRP-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+       ;
+
+   x4grp MODULE-IDENTITY
+       LAST-UPDATED "9508170000Z"
+       ORGANIZATION "SunSoft"
+       CONTACT-INFO
+         ""
+       DESCRIPTION
+         "The MIB module describing X.400 Groups of Users"
+       ::= { private-mibs 2 }
+
+
+--
+--	x4grpTable
+--
+
+   x4grpTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF X4grpEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information specific to a X.400 Group of Users."
+       ::= {x4grp 1}
+
+   x4grpEntry OBJECT-TYPE
+       SYNTAX X4grpEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each X.400 Group of Users."
+       INDEX {x4grpIndex}
+       ::= {x4grpTable 1}
+
+   X4grpEntry ::= SEQUENCE {
+       x4grpIndex
+         INTEGER,
+       x4grpName
+         DisplayString
+   }
+
+   x4grpIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "A integer that uniquely identify an X.400 Group of Users."
+       ::= {x4grpEntry 1}
+
+   x4grpName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The name of the X.400 Group of Users."
+       ::= {x4grpEntry 2}
+
+
+--
+--	x4grpMappingTable
+--
+
+   x4grpMappingTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF X4gMappingEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "This table allows to correlate the x4grpTable, msUserTable,
+         and the mtaGroupTable."
+       ::= {x4grp 2}
+
+   x4grpMappingEntry OBJECT-TYPE
+       SYNTAX X4gMappingEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each User."
+       INDEX {x4grpIndex, x4grpMappingMSIndex, x4grpMappingMTAIndex}
+       ::= {x4grpMappingTable 1}
+
+   X4gMappingEntry ::= SEQUENCE {
+       x4grpMappingMSIndex
+         INTEGER,
+       x4grpMappingMTAIndex
+         INTEGER
+   }
+
+   x4grpMappingMSIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The value of msUserIndex."
+       ::= {x4grpMappingEntry 1}
+
+   x4grpMappingMTAIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The value of mtaGroupIndex."
+       ::= {x4grpMappingEntry 2}
+
+   END
+

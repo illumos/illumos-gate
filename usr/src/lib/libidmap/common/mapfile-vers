@@ -1,0 +1,141 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	directory_canon_from_group_name;
+	directory_canon_from_name;
+	directory_canon_from_user_name;
+	directory_close;
+	directory_error;
+	directory_error_code;
+	directory_error_free;
+	directory_error_from_rpc;
+	directory_error_is_instance_of;
+	directory_error_param;
+	directory_error_printable;
+	directory_error_to_rpc;
+	directory_free;
+	directory_get_v;
+	directory_name_from_sid;
+	directory_open;
+	directory_sid_from_group_name;
+	directory_sid_from_name;
+	directory_sid_from_user_name;
+	idmap_cache_get_data;		# used by idmap test suite
+	idmap_flush;
+	idmap_free;
+	idmap_get_create;
+	idmap_get_destroy;
+	idmap_get_gidbysid;
+	idmap_get_mappings;
+	idmap_get_pidbysid;
+	idmap_get_prop_ds;
+	idmap_get_prop_str;
+	idmap_get_sidbygid;
+	idmap_get_sidbyuid;
+	idmap_get_u2w_mapping;
+	idmap_get_uidbysid;
+	idmap_get_w2u_mapping;
+	idmap_getext_gidbysid;
+	idmap_getext_pidbysid;
+	idmap_getext_sidbygid;
+	idmap_getext_sidbyuid;
+	idmap_getext_uidbysid;
+	idmap_getgidbywinname;
+	idmap_getuidbywinname;
+	idmap_getwinnamebygid;
+	idmap_getwinnamebyuid;
+	idmap_how_clear;
+	idmap_info_free;
+	idmap_info_mov;
+	idmap_iter_destroy;
+	idmap_iter_mappings;
+	idmap_iter_namerules;
+	idmap_iter_next_mapping;
+	idmap_iter_next_namerule;
+	idmap_namerule_cpy;
+	idmap_set_logger;
+	idmap_stat2string;
+	idmap_stat4prot;
+	idmap_string2stat;
+	idmap_trace_print;
+	idmap_trace_print_1;
+	idmap_udt_add_namerule;
+	idmap_udt_commit;
+	idmap_udt_create;
+	idmap_udt_destroy;
+	idmap_udt_flush_namerules;
+	idmap_udt_get_conflict_rule;
+	idmap_udt_get_error_index;
+	idmap_udt_get_error_rule;
+	idmap_udt_rm_namerule;
+	sid_free;
+	sid_from_le;
+	sid_fromstr;
+	sid_len;
+	sid_to_le;
+	sid_tostr;
+	sized_array;
+	sized_array_free;
+	sized_array_n;
+	xdr_directory_entry_rpc;
+	xdr_directory_get_common_1_argument;
+	xdr_directory_results_rpc;
+	xdr_idmap_flush_op;
+	xdr_idmap_id_res;
+	xdr_idmap_ids_res;
+	xdr_idmap_list_mappings_1_argument;
+	xdr_idmap_list_namerules_1_argument;
+	xdr_idmap_mapping;
+	xdr_idmap_mapping_batch;
+	xdr_idmap_mappings_res;
+	xdr_idmap_namerule;
+	xdr_idmap_namerules_res;
+	xdr_idmap_prop_res;
+	xdr_idmap_prop_type;
+	xdr_idmap_retcode;
+	xdr_idmap_update_batch;
+	xdr_idmap_update_res;
+
+    local:
+	*;
+};

@@ -1,0 +1,72 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	dhcp_ipc_accept;
+	dhcp_ipc_alloc_reply;
+	dhcp_ipc_alloc_request;
+	dhcp_ipc_close;
+	dhcp_ipc_get_data;
+	dhcp_ipc_getinfo;
+	dhcp_ipc_init;
+	dhcp_ipc_make_request;
+	dhcp_ipc_recv_request;
+	dhcp_ipc_send_reply;
+	dhcp_ipc_strerror;
+	dhcp_ipc_type_to_string;
+	dhcp_start_agent;
+	dhcp_state_to_string;
+	dhcp_status_hdr_string;
+	dhcp_status_reply_to_string;
+	dhcp_string_to_request;
+	ifname_to_hostconf;
+	read_hostconf;
+	remove_hostconf;
+	write_hostconf;
+	read_stable_duid;
+	write_stable_duid;
+	make_stable_duid;
+	read_stable_iaid;
+	write_stable_iaid;
+	make_stable_iaid;
+    local:
+	*;
+};

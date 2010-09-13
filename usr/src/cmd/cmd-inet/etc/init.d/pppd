@@ -1,0 +1,95 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH=/sbin:/usr/bin:/usr/sbin; export PATH
+PPPDIR=/etc/ppp; export PPPDIR
+
+case "$1" in
+'start')
+	if [ ! -x /usr/bin/pppd -o ! -c /dev/sppp ]; then
+		echo "$0: Solaris PPP has not been correctly installed on"
+		echo "$0: this system.  Required files are missing."
+		exit 1
+	fi
+	if [ -f $PPPDIR/ifconfig ]; then
+		. $PPPDIR/ifconfig
+	fi
+	if [ -f $PPPDIR/demand ]; then
+		. $PPPDIR/demand
+	fi
+	if [ -f $PPPDIR/pppoe.if ] && [ -x /usr/sbin/sppptun ]; then
+		sed -e 's/^#.*//;s/\([^\\]\)#.*/\1/;s/[	 ]*$//;s/^[	]*//' \
+		    $PPPDIR/pppoe.if | \
+		while read intf saps sapd; do
+			if [ "$intf" ]; then
+				[ -z "$saps" ] || saps="-s $saps"
+				/usr/sbin/sppptun plumb $saps pppoe $intf
+				[ -z "$sapd" ] || sapd="-s $sapd"
+				/usr/sbin/sppptun plumb $sapd pppoed $intf
+			fi
+		done
+	fi
+	if [ -f $PPPDIR/pppoe ] && [ -x /usr/lib/inet/pppoed ]; then
+		/usr/lib/inet/pppoed >/dev/null
+	fi
+       	;;
+
+'stop')
+	/usr/bin/pkill -z `/sbin/zonename` -x pppd && sleep 1
+	/usr/bin/pkill -z `/sbin/zonename` -x pppoed
+
+	# Use ifconfig to make the interfaces down just in case
+	if [ -f $PPPDIR/ifconfig ]; then
+        	nawk '/ifconfig[	]*sppp/ { \
+			system("ifconfig " $2 " down"); \
+			system("ifconfig " $2 " unplumb"); \
+			next; \
+		} \
+        	/ifconfig/ { \
+			$3 = "removeif"; \
+			NF = 4; \
+			system($0); \
+		}' < $PPPDIR/ifconfig
+	fi
+
+	if [ -f $PPPDIR/pppoe.if ] && [ -x /usr/sbin/sppptun ]; then
+		sed -e 's/^#.*//;s/\([^\\]\)#.*/\1/;s/[	 ]*$//;s/^[	]*//' \
+		    $PPPDIR/pppoe.if | \
+		while read intf rest; do
+			if [ "$intf" ]; then
+				/usr/sbin/sppptun unplumb ${intf}:pppoe
+				/usr/sbin/sppptun unplumb ${intf}:pppoed
+			fi
+		done
+	fi
+       	;;
+
+*)
+        echo "Usage: $0 { start | stop }"
+        exit 1
+        ;;
+esac
+exit 0

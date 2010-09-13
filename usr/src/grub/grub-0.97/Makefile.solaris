@@ -1,0 +1,55 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../Makefile.grub
+include Makefile.solaris.defs
+
+.KEEP_STATE:
+
+SUBDIRS		= netboot stage2 stage1 lib grub util docs
+
+#
+# Source files to be installed in $(SRC_DIR).
+# NOTE: although it's under SCCS, config.h is not included here because
+#       it's automatically generated when configure is run.
+#
+SRC_DIR		= $(ROOT_SRC)
+
+SRC_FILES	= AUTHORS BUGS COPYING ChangeLog INSTALL MAINTENANCE \
+		  Makefile.am Makefile.in NEWS README THANKS TODO \
+		  acinclude.m4 aclocal.m4 config.h.in configure.ac stamp-h.in
+INST_FILES	= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+SRC_EXECS	= compile config.guess config.sub configure depcomp \
+		  install-sh missing mkinstalldirs
+INST_EXECS	= $(SRC_EXECS:%=$(SRC_DIR)/%)
+$(INST_EXECS)	:= FILEMODE = 755
+
+
+INSTALL_TARGETS	= $(INST_FILES) $(INST_EXECS)
+
+all	:= TARGET = all
+install	:= TARGET = install
+clean	:= TARGET = clean
+clobber	:= TARGET = clobber
+
+
+all install clean clobber: $(SUBDIRS)
+
+$(SUBDIRS): _FORCE
+	@cd $@; pwd; $(MAKE) -f Makefile.solaris $(TARGET)
+
+
+install: $(INSTALL_TARGETS)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(SRC_DIR):
+	$(INS.dir)
+
+
+_FORCE:

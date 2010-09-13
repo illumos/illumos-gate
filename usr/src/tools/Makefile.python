@@ -1,0 +1,107 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# This Makefile provides a framework for building the onbld python
+# modules with multiple versions of python.
+#
+# It expects as input:
+#
+#    PYSRCS   - List of python source files, these are also delivered as
+#               build product.
+#	      
+#    PYOBJS   - List of compiled python (.pyc) files, with no directory prefix
+#	      
+#    PYTOPDIR - Absolute (including $(ROOT)) path to which files will
+#               be installed, up until the version specific component.
+#	      
+#    PYMODDIR - Relative path to which files will be installed, below
+#               the version specific component.
+#
+#    For example, to install to /opt/onbld/lib/onbld/python*/bar/
+#
+#          PYTOPDIR = $(ROOTONBLDLIB)
+#          PYMODDIR = bar
+#
+#
+# It provides as output:
+#
+#    ROOTPYFILES - The list of $(ROOT)-relative paths to which python
+#                  source and binary files will be installed.  Your
+#                  Makefile's 'install' target should depend upon
+#                  this.
+#
+#    PYVERSOBJS  - The list of paths to compiled python build products,
+#                  including their subdirectory.
+#
+#    pyclobber   - A target on which 'clobber' should depend, which
+#                  removes the per-version python directories and the
+#                  output within them.
+#
+
+PYFILES = $(PYSRCS) $(PYOBJS)
+
+ROOTPYDIR_24 = $(PYTOPDIR)/python2.4/$(PYMODDIR)
+ROOTPYFILES_24 = $(PYFILES:%=$(ROOTPYDIR_24)/%)
+
+ROOTPYDIR_26 = $(PYTOPDIR)/python2.6/$(PYMODDIR)
+ROOTPYFILES_26	= $(PYFILES:%=$(ROOTPYDIR_26)/%)
+
+ROOTPYFILES = $(ROOTPYFILES_24) $(ROOTPYFILES_26)
+$(ROOTPYFILES) := FILEMODE = 0444
+
+PYVERSDIRS = python2.4 python2.6
+
+PY24OBJS = $(PYOBJS:%=python2.4/%)
+$(PY24OBJS) := PYTHON = $(PYTHON_24)
+
+PY26OBJS = $(PYOBJS:%=python2.6/%)
+$(PY26OBJS) := PYTHON = $(PYTHON_26)
+
+PYVERSOBJS = $(PY24OBJS) $(PY26OBJS)
+
+CLOBBERFILES += $(PYVERSOBJS)
+CLOBBERDIRS += $(PYVERSDIRS)
+
+.KEEP_STATE:
+
+python2.4/%.pyc python2.6/%.pyc: %.py
+	@[ -d $(@D) ] || mkdir $(@D)
+	$(RM) $@
+	$(PYTHON) -mpy_compile $<
+	$(MV) $(*).pyc $@
+
+$(ROOTPYDIR_24)/%.pyc: python2.4/%.pyc
+	$(INS.pyfile)
+
+$(ROOTPYDIR_26)/%.pyc: python2.6/%.pyc
+	$(INS.pyfile)
+
+$(ROOTPYDIR_24)/%.py $(ROOTPYDIR_26)/%.py: %.py
+	$(INS.pyfile)
+
+pyclobber:
+	$(RM) $(CLOBBERFILES)
+	$(RM) -rf $(CLOBBERDIRS)

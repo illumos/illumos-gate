@@ -1,0 +1,135 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Generic interface definition for usr/src/cmd/sgs/rtld.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+#
+# All symbols in ld.so.1 are private as no-one should bind to these directly.
+#
+SYMBOL_VERSION SUNWprivate_1.3 {
+	protected:
+		 dladdr;		# Standard dlopen(3x) family
+		 dladdr1;
+		 dldump;
+		 dlclose;
+		 dlerror;
+		 dlinfo;
+		 dlopen;
+		 dlmopen;
+		 dlsym;
+
+		_dladdr;		# these should not exist
+		_dladdr1;
+		_dldump;
+		_dlclose;
+		_dlerror;
+		_dlinfo;
+		_dlopen;
+		_dlmopen;
+		_dlsym;
+
+		_ld_libc;		# provides libc initialization
+
+		_elf_rtbndr;		# dbx expects to find these
+		 elf_rtbndr;
+		_rt_boot;		# Provides basic adb symbol offsets
+
+		 rtld_db_dlactivity;	# Required to support librtld_db
+		 rtld_db_preinit;
+		 rtld_db_postinit;
+		 r_debug;
+
+		 elf_plt_write;
+		 is_so_loaded;
+		 lml_main;
+		 lookup_sym;
+
+		 alist_append;		# librtld support
+		 ld_entry_cnt;
+		 dbg_desc;		# Diagnostic support
+		 dbg_print;
+		 eprintf;		# Error message printing
+		 veprintf;
+
+		 dgettext;		# Messaging support
+		 strerror;
+
+		 calloc;		# Memory management (mapmalloc).
+		 free;
+		 malloc;
+		 realloc;
+
+		_environ;		# PLT tracing getenv() support.
+		 environ;
+
+		 memcpy;		# Some routines are useful for support
+		 snprintf;		# libraries such as liblddbg.
+		 sprintf;		# Note that some of these functions
+		 strcat;		# (like sprintf) may have reduced
+		 strcmp;		# functionality over libc, as a simpler
+		 strcpy;		# implementation is provided in ld.so.1.
+		 strlen;
+		 strrchr;
+		 strtok_r;
+	      ___errno;
+		 qsort;
+		dl_iterate_phdr;
+
+$if _x86 && _ELF64
+		# amd64 ABI exception unwinding
+		_dlamd64getunwind;
+		dlamd64getunwind;
+$endif
+
+		# doXX_reloc_rtld and relocXX_table are required to
+		# support librtld.so.
+$if _ELF32
+		do32_reloc_rtld;
+		reloc32_table;
+$elif _ELF64
+		do64_reloc_rtld;
+		reloc64_table;
+$else
+$error unknown ELFCLASS
+$endif
+	local:
+		*;
+};

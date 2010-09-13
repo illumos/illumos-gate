@@ -1,0 +1,254 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * There are a lot of nodes below the rmclomv node, define a shortname
+ * Likewise for disks
+ */
+#ifndef RMCLOMV
+#define	RMCLOMV	/platform/ebus@1f,464000/rmc-comm@2,0/SUNW,rmclomv
+#endif
+
+#ifndef DISKBP1
+#define DISKBP1 /frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
+#endif
+
+#ifndef DISKBP3
+#define DISKBP3 /frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+#endif
+
+/*
+ * add disk leds
+ */
+name:DISKBP1/HDD0
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd0_act
+	REFPROP _location_parent name:DISKBP1/HDD0
+name:RMCLOMV/hdd0_service
+	REFPROP _location_parent name:DISKBP1/HDD0
+name:RMCLOMV/hdd0_ok2rm
+	REFPROP _location_parent name:DISKBP1/HDD0
+
+name:DISKBP1/HDD1
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd1_act
+	REFPROP _location_parent name:DISKBP1/HDD1
+name:RMCLOMV/hdd1_service
+	REFPROP _location_parent name:DISKBP1/HDD1
+name:RMCLOMV/hdd1_ok2rm
+	REFPROP _location_parent name:DISKBP1/HDD1
+
+name:DISKBP3/HDD0
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd0_act
+	REFPROP _location_parent name:DISKBP3/HDD0
+name:RMCLOMV/hdd0_service
+	REFPROP _location_parent name:DISKBP3/HDD0
+name:RMCLOMV/hdd0_ok2rm
+	REFPROP _location_parent name:DISKBP3/HDD0
+
+name:DISKBP3/HDD1
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd1_act
+	REFPROP _location_parent name:DISKBP3/HDD1
+name:RMCLOMV/hdd1_service
+	REFPROP _location_parent name:DISKBP3/HDD1
+name:RMCLOMV/hdd1_ok2rm
+	REFPROP _location_parent name:DISKBP3/HDD1
+
+name:DISKBP3/HDD2
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd2_act
+	REFPROP _location_parent name:DISKBP3/HDD2
+name:RMCLOMV/hdd2_service
+	REFPROP _location_parent name:DISKBP3/HDD2
+name:RMCLOMV/hdd2_ok2rm
+	REFPROP _location_parent name:DISKBP3/HDD2
+
+name:DISKBP3/HDD3
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd3_act
+	REFPROP _location_parent name:DISKBP3/HDD3
+name:RMCLOMV/hdd3_service
+	REFPROP _location_parent name:DISKBP3/HDD3
+name:RMCLOMV/hdd3_ok2rm
+	REFPROP _location_parent name:DISKBP3/HDD3
+
+/* add disk Device tables and _fru_parent refprops */
+#include "fru_HDD0_data.info"
+#include "fru_HDD1_data.info"
+#include "fru_HDD2_data.info"
+#include "fru_HDD3_data.info"
+
+/*
+ * power supplies
+ */
+#include "fru_PS0_data.info"
+#include "fru_PS1_data.info"
+
+/*
+ * USB ports
+ */
+#include "fru_usb-a-1_data.info"
+#include "fru_usb-a-2_data.info"
+#include "fru_usb-a-3_data.info"
+#include "fru_usb-a-4_data.info"
+
+/*
+ * fans
+ */
+#include "fru_FT0_data.info"
+#include "fru_FT1_data.info"
+#include "fru_FT2_data.info"
+#include "fru_FT3_data.info"
+#include "fru_FT4_data.info"
+#include "fru_FT5_data.info"
+#include "fru_FT6_data.info"

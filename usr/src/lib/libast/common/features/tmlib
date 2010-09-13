@@ -1,0 +1,45 @@
+set	prototyped
+
+_cc_export_dynamic = note{ probe CC.EXPORT.DYNAMIC supported }end run{
+	case `{ probe -l C make cc | grep '^CC.EXPORT.DYNAMIC = .'; } 2>/dev/null` in
+	'')	exit 1 ;;
+	esac
+}end
+
+tst	tzset_environ note{ tzset() bypasses user getenv() }end execute{
+	#if _UWIN || !_cc_export_dynamic
+	int main()
+	{
+		return 0;
+	}
+	#else
+	#include <time.h>
+	extern char**	environ;
+	extern char*	tzname[2];
+	#if _STD_
+	extern char* getenv(char* s)
+	#else
+	extern char* getenv(s)
+	char*	s;
+	#endif
+	{
+		return "foo0bar";
+	}
+	int main()
+	{
+		tzset();
+		return tzname[0] && !strcmp(tzname[0], "foo") &&
+		       tzname[1] && !strcmp(tzname[1], "bar");
+	}
+	#endif
+}end
+
+if ( _tzset_environ ) {
+	#define tmlocaltime(p)		_tm_localtime(p)
+
+	extern struct tm*		_tm_localtime(const time_t*);
+}
+else {
+	#define tmlocaltime(p)		localtime(p)
+}
+endif

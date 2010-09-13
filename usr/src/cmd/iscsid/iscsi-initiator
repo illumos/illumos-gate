@@ -1,0 +1,243 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# Start/stop iscsi initiator service
+#
+. /lib/svc/share/smf_include.sh
+
+#	checkmessage "fsck_device | mount_point"
+#
+# Simple auxilary routine to the shell function checkfs. Prints out
+# instructions for a manual file system check before entering the shell.
+#
+checkmessage() {
+	echo "" > /dev/console
+	if [ "$1" != "" ] ; then
+		echo "WARNING - Unable to repair one or more \c" \
+			> /dev/console
+		echo "of the following filesystem(s):" > /dev/console
+		echo "\t$1" > /dev/console
+	else
+            	echo "WARNING - Unable to repair one or more filesystems." \
+			> /dev/console
+	fi
+        echo "Run fsck manually (fsck filesystem...)." > /dev/console
+	echo "" > /dev/console
+}
+
+#
+#	checkfs raw_device fstype mountpoint
+#
+# Check the file system specified. The return codes from fsck have the
+# following meanings.
+#	 0 - file system is unmounted and okay
+#	32 - file system is unmounted and needs checking (fsck -m only)
+#	33 - file system is already mounted
+#	34 - cannot stat device
+#	36 - uncorrectable errors detected - terminate normally (4.1 code 8)
+#	37 - a signal was caught during processing (4.1 exit 12)
+#	39 - uncorrectable errors detected - terminate rightaway (4.1 code 8)
+#	40 - for root, same as 0 (used by rcS to remount root)
+#
+checkfs() {
+        /usr/sbin/fsck -F $2 -m $1  >/dev/null 2>&1
+
+	if [ $? -ne 0 ]
+	then
+           	# Determine fsck options by file system type
+		case "$2" in
+		ufs)	foptions="-o p"
+                        ;;
+		*)	foptions="-y"
+                        ;;
+		esac
+
+		echo "The "$3" file system ("$1") is being checked."
+		/usr/sbin/fsck -F $2 ${foptions} $1
+
+       		case $? in
+		0|40)	# file system OK
+			;;
+
+		*)	# couldn't fix the file system
+			echo "/usr/sbin/fsck failed with exit code "$?"."
+                        checkmessage "$1"
+                        ;;
+		esac
+	fi
+}
+
+
+mount_iscsi() {
+	err=0
+	iscsilist=""
+        exec < /etc/vfstab
+	while  read special fsckdev mountp fstype fsckpass automnt mntopts; do
+		case $special in
+			'#'* | '' )	# Ignore comments, empty lines.
+					continue
+					;;
+		'-')		# Ignore "no-action" lines.
+					continue
+					;;
+		esac
+		if [ "$automnt" != "iscsi" ]; then
+			continue
+		fi
+		if [ "$fstype" = "-" ]; then
+			echo "iscsi-initiator: FSType of iscsi LUN \c" 1>&2
+			echo "$special cannot be identified" 1>&2
+			continue
+		fi
+
+		#
+		# Ignore entries already mounted
+		#
+		/usr/bin/grep "	$mountp	" /etc/mnttab >/dev/null \
+		2>&1 && continue
+
+		#
+		# Can't fsck if no fsckdev is specified
+		#
+		if [ "$fsckdev" = "-" ]; then
+			iscsilist="$iscsilist $mountp"
+			continue
+		fi
+
+		#
+		# fsck everything else:
+ 		#
+	 	# fsck -m simply returns true if the filesystem is
+		# suitable for mounting.
+	 	#
+		/usr/sbin/fsck -m -F $fstype $fsckdev >/dev/null 2>&1
+		case $? in
+		0|40)	iscsilist="$iscsilist $mountp"
+			continue
+			;;
+		32)	checkfs $fsckdev $fstype $mountp
+			iscsilist="$iscsilist $mountp"
+			continue
+			;;
+		33)	# already mounted
+			echo "$special already mounted"
+			;;
+		34)	# bogus special device
+			echo "Cannot stat $fsckdev - ignoring"
+			err=1
+			;;
+		*)	# uncorrectable errors
+			echo "$fsckdev uncorrectable error"
+			err=1
+			;;
+		esac
+	done
+
+	[ -z "$iscsilist" ] || /sbin/mount -a $iscsilist
+	for iscsilun in $iscsilist
+	do
+		/usr/bin/grep "	$iscsilun	" /etc/mnttab >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Fail to mount $iscsilun"
+			err=1
+		fi
+	done
+	return $err
+}
+
+umount_iscsi () {
+	#
+	# Generate iscsi mountp list from /etc/vfstab
+	exec < /etc/vfstab
+	while  read special fsckdev mountp fstype fsckpass automnt mntopts; do
+		case $special in
+			'#'* | '')      continue;;  # Ignore comments,
+						    # empty lines.
+			'-')            continue;;  # Ignore "no-action lines.
+		esac
+		if [ "$automnt" != "iscsi" ]; then
+			continue
+		fi
+		/usr/bin/grep "	$mountp	" /etc/mnttab >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			continue
+		fi
+		iscsilist="$iscsilist $mountp"
+	done
+
+	if [ -n "$iscsilist" ]; then
+		umount -a $iscsilist 1>&2
+		rc=$?
+	else
+		rc=0;
+	fi
+	return $rc
+}
+
+case "$1" in
+'start')
+	/usr/bin/pgrep -P 1 -x iscsid
+	if [ $? -ne 0 ]; then
+		/lib/svc/method/iscsid
+	fi
+	if [ $? -eq 0 ]; then
+		delay=60
+		while [ $delay -gt 0 ]; do
+			delay=`expr $delay - 1`
+			mount_iscsi
+			if [ $? -eq 1 ]; then
+				if [ $delay -gt 0 ]; then
+					sleep 1
+					continue
+				else
+					echo "iscsi-initiator: mount iscsi \c"
+					echo "lun in /etc/vfstab fail."
+					umount_iscsi
+					exit $SMF_EXIT_ERR_CONFIG
+				fi
+			else
+				exit $SMF_EXIT_OK
+			fi
+		done
+	else
+		exit $?
+	fi
+	;;
+
+'stop')
+	umount_iscsi
+	/usr/bin/pkill -P 1 -x iscsid
+	exit 0
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit $SMF_EXIT_OK
+

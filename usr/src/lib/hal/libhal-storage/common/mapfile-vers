@@ -1,0 +1,133 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	libhal_storage_policy_new;
+	libhal_storage_policy_free;
+	libhal_storage_policy_set_icon_path;
+	libhal_storage_policy_set_icon_mapping;
+	libhal_storage_policy_lookup_icon;
+	libhal_drive_from_udi;
+	libhal_drive_from_device_file;
+	libhal_drive_free;
+	libhal_drive_is_hotpluggable;
+	libhal_drive_uses_removable_media;
+	libhal_drive_no_partitions_hint;
+	libhal_drive_requires_eject;
+	libhal_drive_get_type;
+	libhal_drive_get_bus;
+	libhal_drive_get_cdrom_caps;
+	libhal_drive_get_device_major;
+	libhal_drive_get_device_minor;
+	libhal_drive_get_type_textual;
+	libhal_drive_get_device_file;
+	libhal_drive_get_udi;
+	libhal_drive_get_serial;
+	libhal_drive_get_firmware_version;
+	libhal_drive_get_model;
+	libhal_drive_get_vendor;
+	libhal_drive_get_physical_device_udi;
+	libhal_drive_get_dedicated_icon_drive;
+	libhal_drive_get_dedicated_icon_volume;
+	libhal_drive_get_partition_scheme;
+	libhal_drive_policy_compute_display_name;
+	libhal_drive_policy_compute_icon_name;
+	libhal_drive_policy_is_mountable;
+	libhal_drive_policy_get_desired_mount_point;
+	libhal_drive_policy_get_mount_options;
+	libhal_drive_policy_get_mount_fs;
+	libhal_drive_find_all_volumes;
+	libhal_drive_policy_default_get_mount_root;
+	libhal_drive_policy_default_use_managed_keyword;
+	libhal_drive_policy_default_get_managed_keyword_primary;
+	libhal_drive_policy_default_get_managed_keyword_secondary;
+	libhal_volume_from_udi;
+	libhal_volume_from_device_file;
+	libhal_volume_free;
+	libhal_volume_get_size;
+	libhal_volume_get_disc_capacity;
+	libhal_volume_get_udi;
+	libhal_volume_get_device_file;
+	libhal_volume_get_device_major;
+	libhal_volume_get_device_minor;
+	libhal_volume_get_fstype;
+	libhal_volume_get_fsversion;
+	libhal_volume_get_fsusage;
+	libhal_volume_is_mounted;
+	libhal_volume_is_mounted_read_only;
+	libhal_volume_is_partition;
+	libhal_volume_is_disc;
+	libhal_volume_get_partition_number;
+	libhal_volume_get_label;
+	libhal_volume_get_mount_point;
+	libhal_volume_get_uuid;
+	libhal_volume_get_storage_device_udi;
+	libhal_volume_crypto_get_backing_volume_udi;
+	libhal_volume_crypto_get_clear_volume_udi;
+	libhal_volume_disc_has_audio;
+	libhal_volume_disc_has_data;
+	libhal_volume_disc_is_blank;
+	libhal_volume_disc_is_rewritable;
+	libhal_volume_disc_is_appendable;
+	libhal_volume_get_disc_type;
+	libhal_volume_get_msdos_part_table_type;
+	libhal_volume_get_partition_scheme;
+	libhal_volume_get_partition_type;
+	libhal_volume_get_partition_label;
+	libhal_volume_get_partition_uuid;
+	libhal_volume_get_partition_flags;
+	libhal_volume_should_ignore;
+	libhal_volume_policy_compute_size_as_string;
+	libhal_volume_policy_compute_display_name;
+	libhal_volume_policy_compute_icon_name;
+	libhal_volume_policy_should_be_visible;
+	libhal_volume_policy_is_mountable;
+	libhal_volume_policy_get_desired_mount_point;
+	libhal_volume_policy_get_mount_options;
+	libhal_volume_policy_get_mount_fs;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	SUNWprivate_1.1;
+    local:
+	*;
+};

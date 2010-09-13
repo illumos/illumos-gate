@@ -1,0 +1,90 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+# This script is the shared method script for the legacy ipv4/ipv6
+# routing services.
+
+. /lib/svc/share/smf_include.sh
+
+daemon_prog=`/usr/sbin/svccfg -s $SMF_FMRI listprop routeadm/daemon | \
+	/usr/bin/nawk '{ for (i = 3; i <= NF; i++) printf $i" " }' | \
+	/usr/bin/nawk '{ sub(/^\"/,""); sub(/\"[ \t]*$/,""); print }'`
+daemon_args=`/usr/sbin/svccfg -s $SMF_FMRI listprop routeadm/daemon-args | \
+	/usr/bin/nawk '{ for (i = 3; i <= NF; i++) printf $i" " }' | \
+	/usr/bin/nawk '{ sub(/^\"/,""); sub(/\"[ \t]*$/,""); print }'`
+daemon_stop=`/usr/sbin/svccfg -s $SMF_FMRI listprop routeadm/daemon-stop-cmd | \
+	/usr/bin/nawk '{ for (i = 3; i <= NF; i++) printf $i" " }' | \
+	/usr/bin/nawk '{ sub(/^\"/,""); sub(/\"[ \t]*$/,""); print }'`
+
+method="$1"
+proto="$2"
+
+case "$method" in
+'start' )
+	# No legacy daemon specified.
+	if [ -z "$daemon_prog" ]; then
+		echo "${proto}-routing-daemon not specified by routeadm."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+	# No legacy stop command specified.
+	if [ -z "$daemon_stop" ]; then
+		echo "${proto}-routing-stop-cmd not specified by routeadm."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+	smf_configure_ip || exit $SMF_EXIT_OK
+
+	# Run daemon - fail if it does not successfully daemonize.
+	eval "$daemon_prog $daemon_args"
+	if [ "$?" != "0" ]; then
+		echo "Error: $daemon $daemon_args failed to daemonize."
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+	# Create pidfile.
+	daemon_name=`/usr/bin/basename $daemon_prog`
+	if smf_is_globalzone; then
+		/usr/bin/pgrep -P 1 -z `smf_zonename` -f $daemon_prog > \
+			/var/tmp/${daemon_name}.pid
+	else
+		/usr/bin/pgrep -z `smf_zonename` -f $daemon_prog > \
+			/var/tmp/${daemon_name}.pid
+	fi
+	;;
+'stop' )
+	smf_configure_ip || exit $SMF_EXIT_OK
+
+	# Stop daemon - ignore result.
+	if [ -n "$daemon_stop" ]; then
+		eval "$daemon_stop"
+	fi
+	;;
+'*' )
+	echo "Usage: $0 { start | stop }"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
+esac
+
+exit "$SMF_EXIT_OK"

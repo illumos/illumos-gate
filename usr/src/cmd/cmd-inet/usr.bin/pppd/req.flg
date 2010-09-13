@@ -1,0 +1,7 @@
+#!/bin/sh
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+
+echo_file usr/src/lib/Makefile.lib
+echo_file usr/src/lib/Makefile.targ

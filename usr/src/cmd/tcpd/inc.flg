@@ -1,0 +1,7 @@
+#!/bin/sh
+#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+
+echo_file usr/src/lib/libwrap/mystdarg.h
+echo_file usr/src/lib/libwrap/patchlevel.h

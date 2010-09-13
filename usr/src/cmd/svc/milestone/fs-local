@@ -1,0 +1,115 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+
+result=$SMF_EXIT_OK
+mntretry=0
+
+# Mount all local filesystems.
+
+cd /; /sbin/mountall -l >/var/run/fs-local 2>&1
+rc=$?
+if [ $rc -eq 111 ]; then
+	#
+	#  The only failures were lofs mounts, we can try again
+	#  after zfs is mounted, there is a chance a lofs mount
+	#  failed due to it depending on a zfs not yet mounted.
+	#
+	mntretry=1
+elif [ $rc -ne 0 ]; then
+	cat /var/run/fs-local >/dev/msglog
+	msg="WARNING: /sbin/mountall -l failed: exit status $rc"
+	echo $msg
+	echo "$SMF_FMRI:" $msg >/dev/msglog
+	result=$SMF_EXIT_ERR_FATAL
+fi
+rm -f /var/run/fs-local
+
+#
+# If there are non-global UFS filesystems with quotas, check and enable them.
+#
+
+# vlist is the non-global filesystems in vfstab requesting quotas
+vlist=`/usr/bin/nawk '$1 !~ /^(#|-)/ && $4 == "ufs" {
+	if (match($7, "(^|,)(quota|rq)(,|$)") != 0 &&
+	    match($7, "(^|,)global(,|$)") == 0) print $1; }' /etc/vfstab`
+
+if [ -n "$vlist" ]; then
+	# mlist is the filesystems in mnttab that are ufs, mounted rw,
+	# and without quotas turned on
+	mlist=`/usr/sbin/mount -p | /usr/bin/nawk '$4 == "ufs" {
+		if (match($7, "(^|,)ro(,|$)") == 0) print $1; }'`
+
+	# qlist is the intersection of vlist and mlist
+	qlist=`echo "$vlist\n-\n$mlist" | \
+		/usr/bin/nawk '{if ($1 == "-") { mlist = 1; }
+			else if (mlist == 0) { vlist[$1] = 1; }
+			else if (vlist[$1]) { print $1; } }'`
+
+	#
+	# Just check and enable the non-global UFS file systems with quotas
+	# enabled. Note that "quotacheck -a" and "quotaon -a" will try
+	# to process all UFS entries with quotas rather than excluding
+	# the entries with the global option (the global entries are handled
+	# later in another script if the cluster package is installed).
+	#
+	if [ -n "$qlist" ]; then
+		echo 'Checking UFS quotas: \c'
+		/usr/sbin/quotacheck -p $qlist
+		echo 'done.'
+		/usr/sbin/quotaon $qlist
+	fi
+fi
+
+# Mount all ZFS filesystems.
+
+if [ -x /usr/sbin/zfs ]; then
+	/usr/sbin/zfs mount -va >/dev/msglog 2>&1
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		msg="WARNING: /usr/sbin/zfs mount -a failed: exit status $rc"
+		echo $msg
+		echo "$SMF_FMRI:" $msg >/dev/msglog
+		result=$SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+if [ $result = $SMF_EXIT_OK -a $mntretry -eq 1 ]
+then
+	cd /; /sbin/mountall -l >/dev/msglog
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		msg="WARNING: /sbin/mountall -l failed: exit status $rc"
+		echo $msg
+		echo "$SMF_FMRI:" $msg >/dev/msglog
+		result=$SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+# Add swap filesystems
+/sbin/swapadd >/dev/null 2>&1
+
+exit $result

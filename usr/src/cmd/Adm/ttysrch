@@ -1,0 +1,58 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	This file is used by ttyname(3C) to minimize search time
+#	during attempts to determine the name of a terminal device.
+#
+#	This is done by providing the names of directories which
+#	are most likely to contain device entries for terminal
+#	devices. These directories will be searched in the order
+#	listed prior to an exhaustive search of the rest of /dev.
+#
+#	Each line contains the name of a directory (which must
+#	begin with "/dev") and (optionally) a set of flags which
+#	modify the criteria used to determine a match. By default,
+#	an exact match requires that the major/minor device number
+#	(the M flag), the file system identifier (the F flag), and
+#	the inode number (the I flag) all match.  Normally, a partial
+#	match on the major/minor device and the file system identifier
+#	is accepted only after exhausting all entries under /dev.
+#	By specifying only the M and F flags, an exact match will
+#	be accepted regardless of the value of the inode number as
+#	soon as it is found.  This is especially useful for cloned
+#	devices, which generally will not match inode numbers.
+#
+#	For additional information see ttysrch(4).
+#
+# EXAMPLE:
+#
+#	/dev/slan	MF
+#
+#	This would improve performance for Starlan network connections
+#	if all Starlan network clone device entries were contained
+#	in the /dev/slan directory.
+#
+/dev/pts
+/dev/vt
+/dev/term
+/dev/zcons

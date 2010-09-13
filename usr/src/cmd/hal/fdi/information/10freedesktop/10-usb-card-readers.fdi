@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?> <!-- -*- xml -*- --> 
+
+<deviceinfo version="0.2">
+  <device>
+
+    <!-- Should probably move to separate file for pcmcia devices -->
+    <match key="storage.bus" string="pcmcia">
+      <match key="storage.model" contains="FLASH">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>
+    </match>
+
+    <!-- Should probably move to separate file for firewire devices -->
+    <match key="storage.bus" string="ieee1394">
+      <match key="storage.model" string="FWIRE CF READER">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>
+    </match>
+
+    <!-- Generic catch all -->
+    <match key="storage.bus" string="usb">
+      <match key="storage.model" contains="HS-CF">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>      
+      <match key="storage.model" contains="HS-MS">
+        <merge key="storage.drive_type" type="string">memory_stick</merge>
+      </match>      
+      <match key="storage.model" contains="HS-SM">
+        <merge key="storage.drive_type" type="string">smart_media</merge>
+      </match>      
+      <match key="storage.model" contains="HS-SD/MMC">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>      
+
+      <!-- Another common theme -->
+      <match key="storage.model" contains="USB CF Reader">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>      
+      <match key="storage.model" contains="USB MS Reader">
+        <merge key="storage.drive_type" type="string">memory_stick</merge>
+      </match>      
+      <match key="storage.model" contains="USB SM Reader">
+        <merge key="storage.drive_type" type="string">smart_media</merge>
+      </match>      
+      <match key="storage.model" contains="USB SD Reader">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>      
+
+      <!-- Yet another common theme -->
+      <match key="storage.model" contains="Reader-CF">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>
+      <match key="storage.model" contains="Reader-MS">
+        <merge key="storage.drive_type" type="string">memory_stick</merge>
+      </match>
+      <match key="storage.model" contains="Reader-SM">
+        <merge key="storage.drive_type" type="string">smart_media</merge>
+      </match>
+      <match key="storage.model" contains="Reader-SD">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>
+
+      <!-- Yet another common theme -->
+      <match key="storage.model" contains="Storage-CFC">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>
+      <match key="storage.model" contains="Storage-MSC">
+        <merge key="storage.drive_type" type="string">memory_stick</merge>
+      </match>
+      <match key="storage.model" contains="Storage-SMC">
+        <merge key="storage.drive_type" type="string">smart_media</merge>
+      </match>
+      <match key="storage.model" contains="Storage-MMC">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>
+      <match key="storage.model" contains="Storage-SDC">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>
+
+      <!-- Some noname USB2.0 Card Reader -->
+      <match key="storage.model" string="IC1210        CF">
+        <merge key="storage.drive_type" type="string">compact_flash</merge>
+      </match>
+      <match key="storage.model" string="IC1210        MS">
+        <merge key="storage.drive_type" type="string">memory_stick</merge>
+      </match>
+      <match key="storage.model" string="IC1210        SM">
+        <merge key="storage.drive_type" type="string">smart_media</merge>
+      </match>
+      <match key="storage.model" string="IC1210    MMC/SD">
+        <merge key="storage.drive_type" type="string">sd_mmc</merge>
+      </match>
+
+      <!-- Lexar CF Reader -->
+      <match key="@storage.physical_device:usb.vendor_id" int="0x05dc">
+        <match key="@storage.physical_device:usb.product_id" int="0x0002">
+          <merge key="storage.drive_type" type="string">compact_flash</merge>
+        </match>
+      </match>
+
+      <!-- SanDisk ImageMate II CF Reader -->
+      <match key="@storage.physical_device:usb.vendor_id" int="0x0781">
+        <match key="@storage.physical_device:usb.product_id" int="0x0002">
+          <merge key="storage.drive_type" type="string">compact_flash</merge>
+        </match>
+      </match>
+
+      <!-- Sony Ericsson Handys with Memory Stick (Duo) -->
+      <match key="@storage.physical_device:usb.vendor_id" int="0xfce">
+        <!-- K750i -->
+	<match key="@storage.physical_device:usb.product_id" int="0xd016">
+          <merge key="storage.drive_type" type="string">memory_stick</merge>
+          <merge key="info.vendor" type="copy_property">@storage.physical_device:usb.vendor</merge>
+          <merge key="storage.vendor" type="copy_property">@storage.physical_device:usb.vendor</merge>
+	</match>
+	<!-- General match-->
+	<match key="storage.model" contains="Memory Stick">
+          <merge key="storage.drive_type" type="string">memory_stick</merge>
+          <merge key="info.vendor" type="copy_property">@storage.physical_device:usb.vendor</merge>
+          <merge key="storage.vendor" type="copy_property">@storage.physical_device:usb.vendor</merge>
+	</match>
+      </match>
+
+    </match>
+
+  </device>
+</deviceinfo>

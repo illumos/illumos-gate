@@ -1,0 +1,176 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+This describes some private interfaces currently provided by praudit.
+In the future these may be provided by libbsm instead.  Note that
+these interfaces are MT-Safe.
+
+
+NAME
+     print_audit, print_audit_buf  -  format and print audit trail data
+     print_audit_xml_prolog,
+     print_audit_xml_ending,
+     print_audit_xml_prolog_buf,
+     print_audit_xml_ending_buf    - print audit XML prolog and ending
+
+SYNOPSIS
+     int print_audit(const int flags, const char *separator);
+
+     int print_audit_buf(char **in_buf, int *in_buf_len, char **out_buf,
+	int *out_buf_len, const int flags, const char *separator);
+
+     void print_audit_xml_prolog(void);
+     void print_audit_xml_ending(void);
+     int print_audit_xml_prolog_buf(char *out_buf, const int out_buf_len);
+     int print_audit_xml_ending_buf(char *out_buf, const int out_buf_len);
+
+DESCRIPTION
+     print_audit() formats binary audit data from stdin and prints in
+     ASCII on stdout. print_audit_buf() formats binary audit data from
+     in_buf and copies in ASCII to out_buf, terminating with a null
+     byte.
+
+     print_audit_xml_prolog and print_audit_xml_prolog_buf will print
+     only the audit XML prolog. The XML, prolog includes identification
+     of the DTD which is used to parse the XML, and also identifies the
+     stylesheet which is used to view the XML conveniently (for example
+     in a browser which supports these features).
+
+     print_audit_xml_ending and print_audit_xml_ending_buf print only
+     the XML ending which completes the audit XML.
+
+PARAMETERS
+     flags - specifies the types of formatting to be done:
+
+     PRF_DEFAULTM
+	   Default formatting.  By default, times, user  and  group  IDs
+	   (UIDs and GIDs, respectively) are converted to their ASCII
+	   representation. Record type and  event fields  are converted
+	   to their  ASCII representation. If any other flags are
+	   specified they will override this flag.
+
+     PRF_RAWM
+           Print records in their raw form. Times,   UIDs,  GIDs,
+           record  types,  and  events are displayed as integers.
+           This value and PRF_SHORTM are exclusive. If  both
+           are used, no processing is done and EINVAL is returned.
+
+     PRF_SHORTM
+           Print records in their short form. All numeric  fields
+           are  converted to ASCII and displayed. The short ASCII
+           representations for the record type and  event  fields
+           are   used.   This  value an PRF_RAWM are exclusive. If
+	   both are used, no processing is done and EINVAL is returned.
+
+     PRF_XMLM
+           Print records in XML format. "tags" are included in the
+           output to identify tokens and fields within tokens.
+	   Output will not include an XML prolog or ending which
+           are required to from complete, valid XML. The various
+           print XML prolog and ending functions described here
+           must be used separately from print_audit and print_audit_buf
+           to accomplish that.
+
+     PRF_ONELINE
+           Prints one line per record. The record type and  event
+           fields  are  always  converted  to  their  short ASCII
+           representation as is done for the -s option.
+
+
+     separator -
+	if non-NULL, this is used as the field delimiter instead of the
+	default delimiter, which is the comma.  The maximum size of a
+	delimiter is three characters (not counting the required
+	null-terminator).  Note that the delimiter is not meaningful
+	and this parameter is ignored when flags specifies XML format.
+
+     in_buf, in_buf_len,
+     out_buf, out_buf_len  -
+	pointers to the start of input and output buffers and their lengths.
+	See Return Values for details about how these are used.
+
+
+RETURN VALUES
+     print_audit() and print_audit_buf() return:
+     0     on success.
+     -1    on failure and set errno to indicate the error:
+
+     EINVAL - invalid input flags, delimiter, or error parsing the
+	      binary audit data.
+
+     ENOSPC - output buffer too small.
+
+     EIO    - input exhausted before end of an audit record.
+
+     EPERM  - internal or other unexpected error.
+
+     Partial results may also be returned for these errors.
+
+
+     The following parameters are always returned:
+
+     out_buf_len -
+
+     updated to reflect size of output successfully produced. If
+     non-zero, this will include the single terminating null byte.
+
+
+     Upon return of partial results, these parameters will also be
+     updated to reflect status (up to the end of the last completed
+     audit record from the input):
+
+     in_buf, in_buf_len -
+
+     updated to reflect amount of input successfully consumed.  in_buf
+     will point to the next byte which has not been processed.
+     in_buf_len will be set to the remaining size from this address to
+     the end of the original buffer.
+
+
+     print_audit_xml_prolog_buf and print_audit_xml_ending_buf return:
+     0     on success.
+     -1    on failure and set errno to indicate the error:
+
+     ENOSPC - output buffer too small.
+
+
+EXAMPLES
+       The following code fragment takes audit input from stdin, and
+       will print on stdout complete XML including a prolog:
+
+	print_audit_xml_prolog();
+
+	/*
+	 * Format audit data from stdin and print to stdout.
+	 */
+	retstat = print_audit(PRF_XMLM | PRF_ONELINE, NULL);
+
+	if (retstat == 0)
+		print_audit_xml_ending();
+
+

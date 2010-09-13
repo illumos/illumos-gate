@@ -1,0 +1,107 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# MDB modules used for debugging user processes that every ISA's build
+# subdirectory will need to build.
+#
+ 
+COMMON_MODULES_PROC = \
+	dof \
+	libavl \
+	libc \
+	libcmdutils \
+	libnvpair \
+	libproc \
+	libpython2.6 \
+	libsysevent \
+	libtopo \
+	libumem \
+	libuutil \
+	libzpool \
+	mdb_ds \
+	mdb_test
+
+#
+# MDB modules used for debugging user processes which are only 32-bit
+#
+COMMON_MODULES_PROC_32BIT = \
+	svc.configd \
+	svc.startd
+
+#
+# MDB modules used for debugging kernels.
+#
+COMMON_MODULES_KVM = \
+	arp \
+	cpc \
+	crypto	\
+	dtrace	\
+	emlxs \
+	fcip \
+	fcp \
+	fctl \
+	genunix \
+	hook \
+	neti \
+	idm \
+	ii \
+	ip \
+	ipc \
+	ipp \
+	krtld \
+	lofs \
+	logindmux \
+	mac \
+	md \
+	mpt_sas \
+	mr_sas \
+	nca \
+	nsctl \
+	nsmb \
+	pmcs \
+	ptm \
+	qlc \
+	random \
+	rdc \
+	s1394 \
+	scsi_vhci \
+	sctp \
+	sd \
+	sdbc \
+	smbfs \
+	smbsrv \
+	sockfs \
+	specfs \
+	sppp \
+	srpt \
+	stmf \
+	stmf_sbd \
+	sv \
+	ufs \
+	usba \
+	zfs
+
+CLOSED_COMMON_MODULES_KVM = \
+	mpt \
+	nfs
+
+include $(SRC)/Makefile.master

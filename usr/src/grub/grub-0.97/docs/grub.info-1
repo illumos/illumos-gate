@@ -1,0 +1,1338 @@
+This is grub.info, produced by makeinfo version 4.0 from grub.texi.
+
+INFO-DIR-SECTION Kernel
+START-INFO-DIR-ENTRY
+* GRUB: (grub).                 The GRand Unified Bootloader
+* grub-install: (grub)Invoking grub-install.    Install GRUB on your drive
+* grub-md5-crypt: (grub)Invoking grub-md5-crypt.        Encrypt a password
+                                                        in MD5 format
+* grub-terminfo: (grub)Invoking grub-terminfo.  Generate a terminfo
+                                                command from a
+                                                terminfo name
+* grub-set-default: (grub)Invoking grub-set-default.    Set a default boot
+                                                        entry
+* mbchk: (grub)Invoking mbchk.  Check for the format of a Multiboot kernel
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1999,2000,2001,2002,2004 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: grub.info,  Node: Top,  Next: Introduction,  Up: (dir)
+
+GRUB manual
+***********
+
+   This is the documentation of GNU GRUB, the GRand Unified Bootloader,
+a flexible and powerful boot loader program for PCs.
+
+   This edition documents version 0.95.
+
+* Menu:
+
+* Introduction::                Capturing the spirit of GRUB
+* Naming convention::           Names of your drives in GRUB
+* Installation::                Installing GRUB on your drive
+* Booting::                     How to boot different operating systems
+* Configuration::               Writing your own configuration file
+* Network::                     Downloading OS images from a network
+* Serial terminal::             Using GRUB via a serial line
+* Preset Menu::                 Embedding a configuration file into GRUB
+* Security::                    Improving the security
+* Images::                      GRUB image files
+* Filesystem::                  Filesystem syntax and semantics
+* Interface::                   The menu and the command-line
+* Commands::                    The list of available builtin commands
+* Troubleshooting::             Error messages produced by GRUB
+* Invoking the grub shell::     How to use the grub shell
+* Invoking grub-install::       How to use the GRUB installer
+* Invoking grub-md5-crypt::     How to generate a cryptic password
+* Invoking grub-terminfo::      How to generate a terminfo command
+* Invoking grub-set-default::   How to set a default boot entry
+* Invoking mbchk::              How to use the Multiboot checker
+* Obtaining and Building GRUB:: How to obtain and build GRUB
+* Reporting bugs::              Where you should send a bug report
+* Future::                      Some future plans on GRUB
+* Internals::                   Hacking GRUB
+* Index::
+
+
+File: grub.info,  Node: Introduction,  Next: Naming convention,  Prev: Top,  Up: Top
+
+Introduction to GRUB
+********************
+
+* Menu:
+
+* Overview::                    What exactly GRUB is and how to use it
+* History::                     From maggot to house fly
+* Features::                    GRUB features
+* Role of a boot loader::       The role of a boot loader
+
+
+File: grub.info,  Node: Overview,  Next: History,  Up: Introduction
+
+Overview
+========
+
+   Briefly, a "boot loader" is the first software program that runs when
+a computer starts.  It is responsible for loading and transferring
+control to an operating system "kernel" software (such as Linux or GNU
+Mach).  The kernel, in turn, initializes the rest of the operating
+system (e.g. a GNU system).
+
+   GNU GRUB is a very powerful boot loader, which can load a wide
+variety of free operating systems, as well as proprietary operating
+systems with chain-loading(1) (*note Overview-Footnote-1::). GRUB is
+designed to address the complexity of booting a personal computer; both
+the program and this manual are tightly bound to that computer platform,
+although porting to other platforms may be addressed in the future.
+
+   One of the important features in GRUB is flexibility; GRUB
+understands filesystems and kernel executable formats, so you can load
+an arbitrary operating system the way you like, without recording the
+physical position of your kernel on the disk. Thus you can load the
+kernel just by specifying its file name and the drive and partition
+where the kernel resides.
+
+   When booting with GRUB, you can use either a command-line interface
+(*note Command-line interface::), or a menu interface (*note Menu
+interface::). Using the command-line interface, you type the drive
+specification and file name of the kernel manually. In the menu
+interface, you just select an OS using the arrow keys. The menu is
+based on a configuration file which you prepare beforehand (*note
+Configuration::). While in the menu, you can switch to the command-line
+mode, and vice-versa. You can even edit menu entries before using them.
+
+   In the following chapters, you will learn how to specify a drive, a
+partition, and a file name (*note Naming convention::) to GRUB, how to
+install GRUB on your drive (*note Installation::), and how to boot your
+OSes (*note Booting::), step by step.
+
+   Besides the GRUB boot loader itself, there is a "grub shell" `grub'
+(*note Invoking the grub shell::) which can be run when you are in your
+operating system. It emulates the boot loader and can be used for
+installing the boot loader.
+
+
+File: grub.info,  Node: Overview-Footnotes,  Up: Overview
+
+   (1) "chain-load" is the mechanism for loading unsupported operating
+systems by loading another boot loader. It is typically used for
+loading DOS or Windows.
+
+
+File: grub.info,  Node: History,  Next: Features,  Prev: Overview,  Up: Introduction
+
+History of GRUB
+===============
+
+   GRUB originated in 1995 when Erich Boleyn was trying to boot the GNU
+Hurd with the University of Utah's Mach 4 microkernel (now known as GNU
+Mach).  Erich and Brian Ford designed the Multiboot Specification
+(*note Multiboot Specification: (multiboot)Top.), because they were
+determined not to add to the large number of mutually-incompatible PC
+boot methods.
+
+   Erich then began modifying the FreeBSD boot loader so that it would
+understand Multiboot. He soon realized that it would be a lot easier to
+write his own boot loader from scratch than to keep working on the
+FreeBSD boot loader, and so GRUB was born.
+
+   Erich added many features to GRUB, but other priorities prevented him
+from keeping up with the demands of its quickly-expanding user base. In
+1999, Gordon Matzigkeit and Yoshinori K. Okuji adopted GRUB as an
+official GNU package, and opened its development by making the latest
+sources available via anonymous CVS. *Note Obtaining and Building
+GRUB::, for more information.
+
+
+File: grub.info,  Node: Features,  Next: Role of a boot loader,  Prev: History,  Up: Introduction
+
+GRUB features
+=============
+
+   The primary requirement for GRUB is that it be compliant with the
+"Multiboot Specification", which is described in *Note Multiboot
+Specification: (multiboot)Top.
+
+   The other goals, listed in approximate order of importance, are:
+
+   * Basic functions must be straightforward for end-users.
+
+   * Rich functionality to support kernel experts and designers.
+
+   * Backward compatibility for booting FreeBSD, NetBSD, OpenBSD, and
+     Linux. Proprietary kernels (such as DOS, Windows NT, and OS/2) are
+     supported via a chain-loading function.
+
+   Except for specific compatibility modes (chain-loading and the Linux
+"piggyback" format), all kernels will be started in much the same state
+as in the Multiboot Specification. Only kernels loaded at 1 megabyte or
+above are presently supported. Any attempt to load below that boundary
+will simply result in immediate failure and an error message reporting
+the problem.
+
+   In addition to the requirements above, GRUB has the following
+features (note that the Multiboot Specification doesn't require all the
+features that GRUB supports):
+
+Recognize multiple executable formats
+     Support many of the "a.out" variants plus "ELF". Symbol tables are
+     also loaded.
+
+Support non-Multiboot kernels
+     Support many of the various free 32-bit kernels that lack Multiboot
+     compliance (primarily FreeBSD, NetBSD, OpenBSD, and Linux).
+     Chain-loading of other boot loaders is also supported.
+
+Load multiples modules
+     Fully support the Multiboot feature of loading multiple modules.
+
+Load a configuration file
+     Support a human-readable text configuration file with preset boot
+     commands. You can also load another configuration file dynamically
+     and embed a preset configuration file in a GRUB image file. The
+     list of commands (*note Commands::) are a superset of those
+     supported on the command-line. An example configuration file is
+     provided in *Note Configuration::.
+
+Provide a menu interface
+     A menu interface listing preset boot commands, with a programmable
+     timeout, is available. There is no fixed limit on the number of
+     boot entries, and the current implementation has space for several
+     hundred.
+
+Have a flexible command-line interface
+     A fairly flexible command-line interface, accessible from the menu,
+     is available to edit any preset commands, or write a new boot
+     command set from scratch. If no configuration file is present,
+     GRUB drops to the command-line.
+
+     The list of commands (*note Commands::) are a subset of those
+     supported for configuration files. Editing commands closely
+     resembles the Bash command-line (*note Bash: (features)Command
+     Line Editing.), with <TAB>-completion of commands, devices,
+     partitions, and files in a directory depending on context.
+
+Support multiple filesystem types
+     Support multiple filesystem types transparently, plus a useful
+     explicit blocklist notation. The currently supported filesystem
+     types are "BSD FFS", "DOS FAT16 and FAT32", "Minix fs", "Linux
+     ext2fs", "ReiserFS", "JFS", "XFS", and "VSTa fs". *Note
+     Filesystem::, for more information.
+
+Support automatic decompression
+     Can decompress files which were compressed by `gzip'. This
+     function is both automatic and transparent to the user (i.e. all
+     functions operate upon the uncompressed contents of the specified
+     files). This greatly reduces a file size and loading time, a
+     particularly great benefit for floppies.(1) (*note
+     Features-Footnote-1::)
+
+     It is conceivable that some kernel modules should be loaded in a
+     compressed state, so a different module-loading command can be
+     specified to avoid uncompressing the modules.
+
+Access data on any installed device
+     Support reading data from any or all floppies or hard disk(s)
+     recognized by the BIOS, independent of the setting of the root
+     device.
+
+Be independent of drive geometry translations
+     Unlike many other boot loaders, GRUB makes the particular drive
+     translation irrelevant. A drive installed and running with one
+     translation may be converted to another translation without any
+     adverse effects or changes in GRUB's configuration.
+
+Detect all installed RAM
+     GRUB can generally find all the installed RAM on a PC-compatible
+     machine. It uses an advanced BIOS query technique for finding all
+     memory regions. As described on the Multiboot Specification (*note
+     Multiboot Specification: (multiboot)Top.), not all kernels make
+     use of this information, but GRUB provides it for those who do.
+
+Support Logical Block Address mode
+     In traditional disk calls (called "CHS mode"), there is a geometry
+     translation problem, that is, the BIOS cannot access over 1024
+     cylinders, so the accessible space is limited to at least 508 MB
+     and to at most 8GB. GRUB can't universally solve this problem, as
+     there is no standard interface used in all machines. However,
+     several newer machines have the new interface, Logical Block
+     Address ("LBA") mode. GRUB automatically detects if LBA mode is
+     available and uses it if available. In LBA mode, GRUB can access
+     the entire disk.
+
+Support network booting
+     GRUB is basically a disk-based boot loader but also has network
+     support. You can load OS images from a network by using the "TFTP"
+     protocol.
+
+Support remote terminals
+     To support computers with no console, GRUB provides remote terminal
+     support, so that you can control GRUB from a remote host. Only
+     serial terminal support is implemented at the moment.
+
+
+File: grub.info,  Node: Features-Footnotes,  Up: Features
+
+   (1) There are a few pathological cases where loading a very badly
+organized ELF kernel might take longer, but in practice this never
+happen.
+
+
+File: grub.info,  Node: Role of a boot loader,  Prev: Features,  Up: Introduction
+
+The role of a boot loader
+=========================
+
+   The following is a quotation from Gordon Matzigkeit, a GRUB fanatic:
+
+     Some people like to acknowledge both the operating system and
+     kernel when they talk about their computers, so they might say
+     they use "GNU/Linux" or "GNU/Hurd".  Other people seem to think
+     that the kernel is the most important part of the system, so they
+     like to call their GNU operating systems "Linux systems."
+
+     I, personally, believe that this is a grave injustice, because the
+     _boot loader_ is the most important software of all. I used to
+     refer to the above systems as either "LILO"(1) (*note Role of a
+     boot loader-Footnote-1::) or "GRUB" systems.
+
+     Unfortunately, nobody ever understood what I was talking about;
+     now I just use the word "GNU" as a pseudonym for GRUB.
+
+     So, if you ever hear people talking about their alleged "GNU"
+     systems, remember that they are actually paying homage to the best
+     boot loader around... GRUB!
+
+   We, the GRUB maintainers, do not (usually) encourage Gordon's level
+of fanaticism, but it helps to remember that boot loaders deserve
+recognition.  We hope that you enjoy using GNU GRUB as much as we did
+writing it.
+
+
+File: grub.info,  Node: Role of a boot loader-Footnotes,  Up: Role of a boot loader
+
+   (1) The LInux LOader, a boot loader that everybody uses, but nobody
+likes.
+
+
+File: grub.info,  Node: Naming convention,  Next: Installation,  Prev: Introduction,  Up: Top
+
+Naming convention
+*****************
+
+   The device syntax used in GRUB is a wee bit different from what you
+may have seen before in your operating system(s), and you need to know
+it so that you can specify a drive/partition.
+
+   Look at the following examples and explanations:
+
+     (fd0)
+
+   First of all, GRUB requires that the device name be enclosed with
+`(' and `)'. The `fd' part means that it is a floppy disk. The number
+`0' is the drive number, which is counted from _zero_. This expression
+means that GRUB will use the whole floppy disk.
+
+     (hd0,1)
+
+   Here, `hd' means it is a hard disk drive. The first integer `0'
+indicates the drive number, that is, the first hard disk, while the
+second integer, `1', indicates the partition number (or the PC slice
+number in the BSD terminology). Once again, please note that the
+partition numbers are counted from _zero_, not from one. This
+expression means the second partition of the first hard disk drive. In
+this case, GRUB uses one partition of the disk, instead of the whole
+disk.
+
+     (hd0,4)
+
+   This specifies the first "extended partition" of the first hard disk
+drive. Note that the partition numbers for extended partitions are
+counted from `4', regardless of the actual number of primary partitions
+on your hard disk.
+
+     (hd1,a)
+
+   This means the BSD `a' partition of the second hard disk. If you
+need to specify which PC slice number should be used, use something
+like this: `(hd1,0,a)'. If the PC slice number is omitted, GRUB
+searches for the first PC slice which has a BSD `a' partition.
+
+   Of course, to actually access the disks or partitions with GRUB, you
+need to use the device specification in a command, like `root (fd0)' or
+`unhide (hd0,2)'. To help you find out which number specifies a
+partition you want, the GRUB command-line (*note Command-line
+interface::) options have argument completion. This means that, for
+example, you only need to type
+
+     root (
+
+   followed by a <TAB>, and GRUB will display the list of drives,
+partitions, or file names. So it should be quite easy to determine the
+name of your target partition, even with minimal knowledge of the
+syntax.
+
+   Note that GRUB does _not_ distinguish IDE from SCSI - it simply
+counts the drive numbers from zero, regardless of their type. Normally,
+any IDE drive number is less than any SCSI drive number, although that
+is not true if you change the boot sequence by swapping IDE and SCSI
+drives in your BIOS.
+
+   Now the question is, how to specify a file? Again, consider an
+example:
+
+     (hd0,0)/vmlinuz
+
+   This specifies the file named `vmlinuz', found on the first
+partition of the first hard disk drive. Note that the argument
+completion works with file names, too.
+
+   That was easy, admit it. Now read the next chapter, to find out how
+to actually install GRUB on your drive.
+
+
+File: grub.info,  Node: Installation,  Next: Booting,  Prev: Naming convention,  Up: Top
+
+Installation
+************
+
+   In order to install GRUB as your boot loader, you need to first
+install the GRUB system and utilities under your UNIX-like operating
+system (*note Obtaining and Building GRUB::). You can do this either
+from the source tarball, or as a package for your OS.
+
+   After you have done that, you need to install the boot loader on a
+drive (floppy or hard disk). There are two ways of doing that - either
+using the utility `grub-install' (*note Invoking grub-install::) on a
+UNIX-like OS, or by running GRUB itself from a floppy. These are quite
+similar, however the utility might probe a wrong BIOS drive, so you
+should be careful.
+
+   Also, if you install GRUB on a UNIX-like OS, please make sure that
+you have an emergency boot disk ready, so that you can rescue your
+computer if, by any chance, your hard drive becomes unusable
+(unbootable).
+
+   GRUB comes with boot images, which are normally put in the directory
+`/usr/lib/grub/i386-pc'. If you do not use grub-install, then you need
+to copy the files `stage1', `stage2', and `*stage1_5' to the directory
+`/boot/grub', and run the `grub-set-default' (*note Invoking
+grub-set-default::) if you intend to use `default saved' (*note
+default::) in your configuration file. Hereafter, the directory where
+GRUB images are initially placed (normally `/usr/lib/grub/i386-pc')
+will be called the "image directory", and the directory where the boot
+loader needs to find them (usually `/boot/grub') will be called the
+"boot directory".
+
+* Menu:
+
+* Creating a GRUB boot floppy::
+* Installing GRUB natively::
+* Installing GRUB using grub-install::
+* Making a GRUB bootable CD-ROM::
+
+
+File: grub.info,  Node: Creating a GRUB boot floppy,  Next: Installing GRUB natively,  Up: Installation
+
+Creating a GRUB boot floppy
+===========================
+
+   To create a GRUB boot floppy, you need to take the files `stage1'
+and `stage2' from the image directory, and write them to the first and
+the second block of the floppy disk, respectively.
+
+   *Caution:* This procedure will destroy any data currently stored on
+the floppy.
+
+   On a UNIX-like operating system, that is done with the following
+commands:
+
+     # cd /usr/lib/grub/i386-pc
+     # dd if=stage1 of=/dev/fd0 bs=512 count=1
+     1+0 records in
+     1+0 records out
+     # dd if=stage2 of=/dev/fd0 bs=512 seek=1
+     153+1 records in
+     153+1 records out
+     #
+
+   The device file name may be different. Consult the manual for your
+OS.
+
+
+File: grub.info,  Node: Installing GRUB natively,  Next: Installing GRUB using grub-install,  Prev: Creating a GRUB boot floppy,  Up: Installation
+
+Installing GRUB natively
+========================
+
+   *Caution:* Installing GRUB's stage1 in this manner will erase the
+normal boot-sector used by an OS.
+
+   GRUB can currently boot GNU Mach, Linux, FreeBSD, NetBSD, and OpenBSD
+directly, so using it on a boot sector (the first sector of a
+partition) should be okay. But generally, it would be a good idea to
+back up the first sector of the partition on which you are installing
+GRUB's stage1. This isn't as important if you are installing GRUB on
+the first sector of a hard disk, since it's easy to reinitialize it
+(e.g. by running `FDISK /MBR' from DOS).
+
+   If you decide to install GRUB in the native environment, which is
+definitely desirable, you'll need to create a GRUB boot disk, and
+reboot your computer with it. Otherwise, see *Note Installing GRUB
+using grub-install::.
+
+   Once started, GRUB will show the command-line interface (*note
+Command-line interface::). First, set the GRUB's "root device"(1)
+(*note Installing GRUB natively-Footnote-1::) to the partition
+containing the boot directory, like this:
+
+     grub> root (hd0,0)
+
+   If you are not sure which partition actually holds this directory,
+use the command `find' (*note find::), like this:
+
+     grub> find /boot/grub/stage1
+
+   This will search for the file name `/boot/grub/stage1' and show the
+devices which contain the file.
+
+   Once you've set the root device correctly, run the command `setup'
+(*note setup::):
+
+     grub> setup (hd0)
+
+   This command will install the GRUB boot loader on the Master Boot
+Record (MBR) of the first drive. If you want to put GRUB into the boot
+sector of a partition instead of putting it in the MBR, specify the
+partition into which you want to install GRUB:
+
+     grub> setup (hd0,0)
+
+   If you install GRUB into a partition or a drive other than the first
+one, you must chain-load GRUB from another boot loader. Refer to the
+manual for the boot loader to know how to chain-load GRUB.
+
+   After using the setup command, you will boot into GRUB without the
+GRUB floppy. See the chapter *Note Booting:: to find out how to boot
+your operating systems from GRUB.
+
+
+File: grub.info,  Node: Installing GRUB natively-Footnotes,  Up: Installing GRUB natively
+
+   (1) Note that GRUB's root device doesn't necessarily mean your OS's
+root partition; if you need to specify a root partition for your OS,
+add the argument into the command `kernel'.
+
+
+File: grub.info,  Node: Installing GRUB using grub-install,  Next: Making a GRUB bootable CD-ROM,  Prev: Installing GRUB natively,  Up: Installation
+
+Installing GRUB using grub-install
+==================================
+
+   *Caution:* This procedure is definitely less safe, because there are
+several ways in which your computer can become unbootable. For example,
+most operating systems don't tell GRUB how to map BIOS drives to OS
+devices correctly--GRUB merely "guesses" the mapping. This will succeed
+in most cases, but not always. Therefore, GRUB provides you with a map
+file called the "device map", which you must fix if it is wrong. *Note
+Device map::, for more details.
+
+   If you still do want to install GRUB under a UNIX-like OS (such as
+GNU), invoke the program `grub-install' (*note Invoking grub-install::)
+as the superuser ("root").
+
+   The usage is basically very simple. You only need to specify one
+argument to the program, namely, where to install the boot loader. The
+argument can be either a device file (like `/dev/hda') or a partition
+specified in GRUB's notation. For example, under Linux the following
+will install GRUB into the MBR of the first IDE disk:
+
+     # grub-install /dev/hda
+
+   Likewise, under GNU/Hurd, this has the same effect:
+
+     # grub-install /dev/hd0
+
+   If it is the first BIOS drive, this is the same as well:
+
+     # grub-install '(hd0)'
+
+   Or you can omit the parentheses:
+
+     # grub-install hd0
+
+   But all the above examples assume that GRUB should use images under
+the root directory. If you want GRUB to use images under a directory
+other than the root directory, you need to specify the option
+`--root-directory'. The typical usage is that you create a GRUB boot
+floppy with a filesystem. Here is an example:
+
+     # mke2fs /dev/fd0
+     # mount -t ext2 /dev/fd0 /mnt
+     # grub-install --root-directory=/mnt fd0
+     # umount /mnt
+
+   Another example is when you have a separate boot partition which is
+mounted at `/boot'. Since GRUB is a boot loader, it doesn't know
+anything about mountpoints at all. Thus, you need to run `grub-install'
+like this:
+
+     # grub-install --root-directory=/boot /dev/hda
+
+   By the way, as noted above, it is quite difficult to guess BIOS
+drives correctly under a UNIX-like OS. Thus, `grub-install' will prompt
+you to check if it could really guess the correct mappings, after the
+installation. The format is defined in *Note Device map::. Please be
+quite careful. If the output is wrong, it is unlikely that your
+computer will be able to boot with no problem.
+
+   Note that `grub-install' is actually just a shell script and the
+real task is done by the grub shell `grub' (*note Invoking the grub
+shell::). Therefore, you may run `grub' directly to install GRUB,
+without using `grub-install'. Don't do that, however, unless you are
+very familiar with the internals of GRUB. Installing a boot loader on a
+running OS may be extremely dangerous.
+
+
+File: grub.info,  Node: Making a GRUB bootable CD-ROM,  Prev: Installing GRUB using grub-install,  Up: Installation
+
+Making a GRUB bootable CD-ROM
+=============================
+
+   GRUB supports the "no emulation mode" in the El Torito
+specification(1) (*note Making a GRUB bootable CD-ROM-Footnote-1::).
+This means that you can use the whole CD-ROM from GRUB and you don't
+have to make a floppy or hard disk image file, which can cause
+compatibility problems.
+
+   For booting from a CD-ROM, GRUB uses a special Stage 2 called
+`stage2_eltorito'. The only GRUB files you need to have in your
+bootable CD-ROM are this `stage2_eltorito' and optionally a config file
+`menu.lst'. You don't need to use `stage1' or `stage2', because El
+Torito is quite different from the standard boot process.
+
+   Here is an example of procedures to make a bootable CD-ROM image.
+First, make a top directory for the bootable image, say, `iso':
+
+     $ mkdir iso
+
+   Make a directory for GRUB:
+
+     $ mkdir -p iso/boot/grub
+
+   Copy the file `stage2_eltorito':
+
+     $ cp /usr/lib/grub/i386-pc/stage2_eltorito iso/boot/grub
+
+   If desired, make the config file `menu.lst' under `iso/boot/grub'
+(*note Configuration::), and copy any files and directories for the
+disc to the directory `iso/'.
+
+   Finally, make a ISO9660 image file like this:
+
+     $ mkisofs -R -b boot/grub/stage2_eltorito -no-emul-boot \
+         -boot-load-size 4 -boot-info-table -o grub.iso iso
+
+   This produces a file named `grub.iso', which then can be burned into
+a CD (or a DVD).  `mkisofs' has already set up the disc to boot from
+the `boot/grub/stage2_eltorito' file, so there is no need to setup GRUB
+on the disc.  (Note that the `-boot-load-size 4' bit is required for
+compatibility with the BIOS on many older machines.)
+
+   You can use the device `(cd)' to access a CD-ROM in your config
+file. This is not required; GRUB automatically sets the root device to
+`(cd)' when booted from a CD-ROM. It is only necessary to refer to
+`(cd)' if you want to access other drives as well.
+
+
+File: grub.info,  Node: Making a GRUB bootable CD-ROM-Footnotes,  Up: Making a GRUB bootable CD-ROM
+
+   (1) El Torito is a specification for bootable CD using BIOS
+functions.
+
+
+File: grub.info,  Node: Booting,  Next: Configuration,  Prev: Installation,  Up: Top
+
+Booting
+*******
+
+   GRUB can load Multiboot-compliant kernels in a consistent way, but
+for some free operating systems you need to use some OS-specific magic.
+
+* Menu:
+
+* General boot methods::        How to boot OSes with GRUB generally
+* OS-specific notes::           Notes on some operating systems
+* Making your system robust::   How to make your system robust
+
+
+File: grub.info,  Node: General boot methods,  Next: OS-specific notes,  Up: Booting
+
+How to boot operating systems
+=============================
+
+   GRUB has two distinct boot methods. One of the two is to load an
+operating system directly, and the other is to chain-load another boot
+loader which then will load an operating system actually. Generally
+speaking, the former is more desirable, because you don't need to
+install or maintain other boot loaders and GRUB is flexible enough to
+load an operating system from an arbitrary disk/partition. However, the
+latter is sometimes required, since GRUB doesn't support all the
+existing operating systems natively.
+
+* Menu:
+
+* Loading an operating system directly::
+* Chain-loading::
+
+
+File: grub.info,  Node: Loading an operating system directly,  Next: Chain-loading,  Up: General boot methods
+
+How to boot an OS directly with GRUB
+------------------------------------
+
+   Multiboot (*note Multiboot Specification: (multiboot)Top.) is the
+native format supported by GRUB.  For the sake of convenience, there is
+also support for Linux, FreeBSD, NetBSD and OpenBSD. If you want to
+boot other operating systems, you will have to chain-load them (*note
+Chain-loading::).
+
+   Generally, GRUB can boot any Multiboot-compliant OS in the following
+steps:
+
+  1. Set GRUB's root device to the drive where the OS images are stored
+     with the command `root' (*note root::).
+
+  2. Load the kernel image with the command `kernel' (*note kernel::).
+
+  3. If you need modules, load them with the command `module' (*note
+     module::) or `modulenounzip' (*note modulenounzip::).
+
+  4. Run the command `boot' (*note boot::).
+
+   Linux, FreeBSD, NetBSD and OpenBSD can be booted in a similar
+manner. You load a kernel image with the command `kernel' and then run
+the command `boot'. If the kernel requires some parameters, just append
+the parameters to `kernel', after the file name of the kernel. Also,
+please refer to *Note OS-specific notes::, for information on your
+OS-specific issues.
+
+
+File: grub.info,  Node: Chain-loading,  Prev: Loading an operating system directly,  Up: General boot methods
+
+Load another boot loader to boot unsupported operating systems
+--------------------------------------------------------------
+
+   If you want to boot an unsupported operating system (e.g. Windows
+95), chain-load a boot loader for the operating system. Normally, the
+boot loader is embedded in the "boot sector" of the partition on which
+the operating system is installed.
+
+  1. Set GRUB's root device to the partition by the command
+     `rootnoverify' (*note rootnoverify::):
+
+          grub> rootnoverify (hd0,0)
+
+  2. Set the "active" flag in the partition using the command
+     `makeactive'(1) (*note Chain-loading-Footnote-1::) (*note
+     makeactive::):
+
+          grub> makeactive
+
+  3. Load the boot loader with the command `chainloader' (*note
+     chainloader::):
+
+          grub> chainloader +1
+
+     `+1' indicates that GRUB should read one sector from the start of
+     the partition. The complete description about this syntax can be
+     found in *Note Block list syntax::.
+
+  4. Run the command `boot' (*note boot::).
+
+   However, DOS and Windows have some deficiencies, so you might have to
+use more complicated instructions. *Note DOS/Windows::, for more
+information.
+
+
+File: grub.info,  Node: Chain-loading-Footnotes,  Up: Chain-loading
+
+   (1) This is not necessary for most of the modern operating systems.
+
+
+File: grub.info,  Node: OS-specific notes,  Next: Making your system robust,  Prev: General boot methods,  Up: Booting
+
+Some caveats on OS-specific issues
+==================================
+
+   Here, we describe some caveats on several operating systems.
+
+* Menu:
+
+* GNU/Hurd::
+* GNU/Linux::
+* FreeBSD::
+* NetBSD::
+* OpenBSD::
+* DOS/Windows::
+* SCO UnixWare::
+* QNX::
+
+
+File: grub.info,  Node: GNU/Hurd,  Next: GNU/Linux,  Up: OS-specific notes
+
+GNU/Hurd
+--------
+
+   Since GNU/Hurd is Multiboot-compliant, it is easy to boot it; there
+is nothing special about it. But do not forget that you have to specify
+a root partition to the kernel.
+
+  1. Set GRUB's root device to the same drive as GNU/Hurd's. Probably
+     the command `find /boot/gnumach' or similar can help you (*note
+     find::).
+
+  2. Load the kernel and the module, like this:
+
+          grub> kernel /boot/gnumach root=hd0s1
+          grub> module /boot/serverboot
+
+  3. Run the command `boot' (*note boot::).
+
+
+File: grub.info,  Node: GNU/Linux,  Next: FreeBSD,  Prev: GNU/Hurd,  Up: OS-specific notes
+
+GNU/Linux
+---------
+
+   It is relatively easy to boot GNU/Linux from GRUB, because it
+somewhat resembles to boot a Multiboot-compliant OS.
+
+  1. Set GRUB's root device to the same drive as GNU/Linux's. Probably
+     the command `find /vmlinuz' or similar can help you (*note find::).
+
+  2. Load the kernel:
+
+          grub> kernel /vmlinuz root=/dev/hda1
+
+     If you need to specify some kernel parameters, just append them to
+     the command. For example, to set `vga' to `ext', do this:
+
+          grub> kernel /vmlinuz root=/dev/hda1 vga=ext
+
+     See the documentation in the Linux source tree for complete
+     information on the available options.
+
+  3. If you use an initrd, execute the command `initrd' (*note
+     initrd::) after `kernel':
+
+          grub> initrd /initrd
+
+  4. Finally, run the command `boot' (*note boot::).
+
+   *Caution:* If you use an initrd and specify the `mem=' option to the
+kernel to let it use less than actual memory size, you will also have
+to specify the same memory size to GRUB. To let GRUB know the size, run
+the command `uppermem' _before_ loading the kernel. *Note uppermem::,
+for more information.
+
+
+File: grub.info,  Node: FreeBSD,  Next: NetBSD,  Prev: GNU/Linux,  Up: OS-specific notes
+
+FreeBSD
+-------
+
+   GRUB can load the kernel directly, either in ELF or a.out format. But
+this is not recommended, since FreeBSD's bootstrap interface sometimes
+changes heavily, so GRUB can't guarantee to pass kernel parameters
+correctly.
+
+   Thus, we'd recommend loading the very flexible loader `/boot/loader'
+instead. See this example:
+
+     grub> root (hd0,a)
+     grub> kernel /boot/loader
+     grub> boot
+
+
+File: grub.info,  Node: NetBSD,  Next: OpenBSD,  Prev: FreeBSD,  Up: OS-specific notes
+
+NetBSD
+------
+
+   GRUB can load NetBSD a.out and ELF directly, follow these steps:
+
+  1. Set GRUB's root device with `root' (*note root::).
+
+  2. Load the kernel with `kernel' (*note kernel::). You should append
+     the ugly option `--type=netbsd', if you want to load an ELF
+     kernel, like this:
+
+          grub> kernel --type=netbsd /netbsd-elf
+
+  3. Run `boot' (*note boot::).
+
+   For now, however, GRUB doesn't allow you to pass kernel parameters,
+so it may be better to chain-load it instead. For more information,
+please see *Note Chain-loading::.
+
+
+File: grub.info,  Node: OpenBSD,  Next: DOS/Windows,  Prev: NetBSD,  Up: OS-specific notes
+
+OpenBSD
+-------
+
+   The booting instruction is exactly the same as for NetBSD (*note
+NetBSD::).
+
+
+File: grub.info,  Node: DOS/Windows,  Next: SCO UnixWare,  Prev: OpenBSD,  Up: OS-specific notes
+
+DOS/Windows
+-----------
+
+   GRUB cannot boot DOS or Windows directly, so you must chain-load them
+(*note Chain-loading::). However, their boot loaders have some critical
+deficiencies, so it may not work to just chain-load them. To overcome
+the problems, GRUB provides you with two helper functions.
+
+   If you have installed DOS (or Windows) on a non-first hard disk, you
+have to use the disk swapping technique, because that OS cannot boot
+from any disks but the first one. The workaround used in GRUB is the
+command `map' (*note map::), like this:
+
+     grub> map (hd0) (hd1)
+     grub> map (hd1) (hd0)
+
+   This performs a "virtual" swap between your first and second hard
+drive.
+
+   *Caution:* This is effective only if DOS (or Windows) uses BIOS to
+access the swapped disks. If that OS uses a special driver for the
+disks, this probably won't work.
+
+   Another problem arises if you installed more than one set of
+DOS/Windows onto one disk, because they could be confused if there are
+more than one primary partitions for DOS/Windows. Certainly you should
+avoid doing this, but there is a solution if you do want to do so. Use
+the partition hiding/unhiding technique.
+
+   If GRUB "hide"s a DOS (or Windows) partition (*note hide::), DOS (or
+Windows) will ignore the partition. If GRUB "unhide"s a DOS (or
+Windows) partition (*note unhide::), DOS (or Windows) will detect the
+partition. Thus, if you have installed DOS (or Windows) on the first
+and the second partition of the first hard disk, and you want to boot
+the copy on the first partition, do the following:
+
+     grub> unhide (hd0,0)
+     grub> hide (hd0,1)
+     grub> rootnoverify (hd0,0)
+     grub> chainloader +1
+     grub> makeactive
+     grub> boot
+
+
+File: grub.info,  Node: SCO UnixWare,  Next: QNX,  Prev: DOS/Windows,  Up: OS-specific notes
+
+SCO UnixWare
+------------
+
+   It is known that the signature in the boot loader for SCO UnixWare is
+wrong, so you will have to specify the option `--force' to
+`chainloader' (*note chainloader::), like this:
+
+     grub> rootnoverify (hd1,0)
+     grub> chainloader --force +1
+     grub> makeactive
+     grub> boot
+
+
+File: grub.info,  Node: QNX,  Prev: SCO UnixWare,  Up: OS-specific notes
+
+QNX
+---
+
+   QNX seems to use a bigger boot loader, so you need to boot it up,
+like this:
+
+     grub> rootnoverify (hd1,1)
+     grub> chainloader +4
+     grub> boot
+
+
+File: grub.info,  Node: Making your system robust,  Prev: OS-specific notes,  Up: Booting
+
+How to make your system robust
+==============================
+
+   When you test a new kernel or a new OS, it is important to make sure
+that your computer can boot even if the new system is unbootable. This
+is crucial especially if you maintain servers or remote systems. To
+accomplish this goal, you need to set up two things:
+
+  1. You must maintain a system which is always bootable. For instance,
+     if you test a new kernel, you need to keep a working kernel in a
+     different place. And, it would sometimes be very nice to even have
+     a complete copy of a working system in a different partition or
+     disk.
+
+  2. You must direct GRUB to boot a working system when the new system
+     fails. This is possible with the "fallback" system in GRUB.
+
+   The former requirement is very specific to each OS, so this
+documentation does not cover that topic. It is better to consult some
+backup tools.
+
+   So let's see the GRUB part. There are two possibilities: one of them
+is quite simple but not very robust, and the other is a bit complex to
+set up but probably the best solution to make sure that your system can
+start as long as GRUB itself is bootable.
+
+* Menu:
+
+* Booting once-only::
+* Booting fallback systems::
+
+
+File: grub.info,  Node: Booting once-only,  Next: Booting fallback systems,  Up: Making your system robust
+
+Booting once-only
+-----------------
+
+   You can teach GRUB to boot an entry only at next boot time. Suppose
+that your have an old kernel `old_kernel' and a new kernel
+`new_kernel'. You know that `old_kernel' can boot your system
+correctly, and you want to test `new_kernel'.
+
+   To ensure that your system will go back to the old kernel even if the
+new kernel fails (e.g. it panics), you can specify that GRUB should try
+the new kernel only once and boot the old kernel after that.
+
+   First, modify your configuration file. Here is an example:
+
+     default saved        # This is important!!!
+     timeout 10
+     
+     title the old kernel
+     root (hd0,0)
+     kernel /old_kernel
+     savedefault
+     
+     title the new kernel
+     root (hd0,0)
+     kernel /new_kernel
+     savedefault 0         # This is important!!!
+
+   Note that this configuration file uses `default saved' (*note
+default::) at the head and `savedefault 0' (*note savedefault::) in the
+entry for the new kernel. This means that GRUB boots a saved entry by
+default, and booting the entry for the new kernel saves `0' as the
+saved entry.
+
+   With this configuration file, after all, GRUB always tries to boot
+the old kernel after it booted the new one, because `0' is the entry of
+`the old kernel'.
+
+   The next step is to tell GRUB to boot the new kernel at next boot
+time. For this, execute `grub-set-default' (*note Invoking
+grub-set-default::):
+
+     # grub-set-default 1
+
+   This command sets the saved entry to `1', that is, to the new kernel.
+
+   This method is useful, but still not very robust, because GRUB stops
+booting, if there is any error in the boot entry, such that the new
+kernel has an invalid executable format. Thus, it it even better to use
+the "fallback" mechanism of GRUB. Look at next subsection for this
+feature.
+
+
+File: grub.info,  Node: Booting fallback systems,  Prev: Booting once-only,  Up: Making your system robust
+
+Booting fallback systems
+------------------------
+
+   GRUB supports a fallback mechanism of booting one or more other
+entries if a default boot entry fails. You can specify multiple
+fallback entries if you wish.
+
+   Suppose that you have three systems, `A', `B' and `C'. `A' is a
+system which you want to boot by default. `B' is a backup system which
+is supposed to boot safely. `C' is another backup system which is used
+in case where `B' is broken.
+
+   Then you may want GRUB to boot the first system which is bootable
+among `A', `B' and `C'. A configuration file can be written in this way:
+
+     default saved        # This is important!!!
+     timeout 10
+     fallback 1 2         # This is important!!!
+     
+     title A
+     root (hd0,0)
+     kernel /kernel
+     savedefault fallback # This is important!!!
+     
+     title B
+     root (hd1,0)
+     kernel /kernel
+     savedefault fallback # This is important!!!
+     
+     title C
+     root (hd2,0)
+     kernel /kernel
+     savedefault
+
+   Note that `default saved' (*note default::), `fallback 1 2' and
+`savedefault fallback' are used. GRUB will boot a saved entry by
+default and save a fallback entry as next boot entry with this
+configuration.
+
+   When GRUB tries to boot `A', GRUB saves `1' as next boot entry,
+because the command `fallback' specifies that `1' is the first fallback
+entry. The entry `1' is `B', so GRUB will try to boot `B' at next boot
+time.
+
+   Likewise, when GRUB tries to boot `B', GRUB saves `2' as next boot
+entry, because `fallback' specifies `2' as next fallback entry. This
+makes sure that GRUB will boot `C' after booting `B'.
+
+   It is noteworthy that GRUB uses fallback entries both when GRUB
+itself fails in booting an entry and when `A' or `B' fails in starting
+up your system. So this solution ensures that your system is started
+even if GRUB cannot find your kernel or if your kernel panics.
+
+   However, you need to run `grub-set-default' (*note Invoking
+grub-set-default::) when `A' starts correctly or you fix `A' after it
+crashes, since GRUB always sets next boot entry to a fallback entry.
+You should run this command in a startup script such as `rc.local' to
+boot `A' by default:
+
+     # grub-set-default 0
+
+   where `0' is the number of the boot entry for the system `A'.
+
+   If you want to see what is current default entry, you can look at the
+file `/boot/grub/default' (or `/grub/default' in some systems). Because
+this file is plain-text, you can just `cat' this file. But it is
+strongly recommended *not to modify this file directly*, because GRUB
+may fail in saving a default entry in this file, if you change this
+file in an unintended manner. Therefore, you should use
+`grub-set-default' when you need to change the default entry.
+
+
+File: grub.info,  Node: Configuration,  Next: Network,  Prev: Booting,  Up: Top
+
+Configuration
+*************
+
+   You've probably noticed that you need to type several commands to
+boot your OS. There's a solution to that - GRUB provides a menu
+interface (*note Menu interface::) from which you can select an item
+(using arrow keys) that will do everything to boot an OS.
+
+   To enable the menu, you need a configuration file, `menu.lst' under
+the boot directory. We'll analyze an example file.
+
+   The file first contains some general settings, the menu interface
+related options. You can put these commands (*note Menu-specific
+commands::) before any of the items (starting with `title' (*note
+title::)).
+
+     #
+     # Sample boot menu configuration file
+     #
+
+   As you may have guessed, these lines are comments. Lines starting
+with a hash character (`#'), and blank lines, are ignored by GRUB.
+
+     # By default, boot the first entry.
+     default 0
+
+   The first entry (here, counting starts with number zero, not one!)
+will be the default choice.
+
+     # Boot automatically after 30 secs.
+     timeout 30
+
+   As the comment says, GRUB will boot automatically in 30 seconds,
+unless interrupted with a keypress.
+
+     # Fallback to the second entry.
+     fallback 1
+
+   If, for any reason, the default entry doesn't work, fall back to the
+second one (this is rarely used, for obvious reasons).
+
+   Note that the complete descriptions of these commands, which are menu
+interface specific, can be found in *Note Menu-specific commands::.
+Other descriptions can be found in *Note Commands::.
+
+   Now, on to the actual OS definitions. You will see that each entry
+begins with a special command, `title' (*note title::), and the action
+is described after it. Note that there is no command `boot' (*note
+boot::) at the  end of each item. That is because GRUB automatically
+executes `boot' if it loads other commands successfully.
+
+   The argument for the command `title' is used to display a short
+title/description of the entry in the menu. Since `title' displays the
+argument as is, you can write basically anything there.
+
+     # For booting GNU/Hurd
+     title  GNU/Hurd
+     root   (hd0,0)
+     kernel /boot/gnumach.gz root=hd0s1
+     module /boot/serverboot.gz
+
+   This boots GNU/Hurd from the first hard disk.
+
+     # For booting GNU/Linux
+     title  GNU/Linux
+     kernel (hd1,0)/vmlinuz root=/dev/hdb1
+
+   This boots GNU/Linux, but from the second hard disk.
+
+     # For booting Mach (getting kernel from floppy)
+     title  Utah Mach4 multiboot
+     root   (hd0,2)
+     pause  Insert the diskette now^G!!
+     kernel (fd0)/boot/kernel root=hd0s3
+     module (fd0)/boot/bootstrap
+
+   This boots Mach with a kernel on a floppy, but the root filesystem at
+hd0s3. It also contains a `pause' line (*note pause::), which will
+cause GRUB to display a prompt and delay, before actually executing the
+rest of the commands and booting.
+
+     # For booting FreeBSD
+     title  FreeBSD
+     root   (hd0,2,a)
+     kernel /boot/loader
+
+   This item will boot FreeBSD kernel loaded from the `a' partition of
+the third PC slice of the first hard disk.
+
+     # For booting OS/2
+     title OS/2
+     root  (hd0,1)
+     makeactive
+     # chainload OS/2 bootloader from the first sector
+     chainloader +1
+     # This is similar to "chainload", but loads a specific file
+     #chainloader /boot/chain.os2
+
+   This will boot OS/2, using a chain-loader (*note Chain-loading::).
+
+     # For booting Windows NT or Windows95
+     title Windows NT / Windows 95 boot menu
+     root        (hd0,0)
+     makeactive
+     chainloader +1
+     # For loading DOS if Windows NT is installed
+     # chainload /bootsect.dos
+
+   The same as the above, but for Windows.
+
+     # For installing GRUB into the hard disk
+     title Install GRUB into the hard disk
+     root    (hd0,0)
+     setup   (hd0)
+
+   This will just (re)install GRUB onto the hard disk.
+
+     # Change the colors.
+     title Change the colors
+     color light-green/brown blink-red/blue
+
+   In the last entry, the command `color' is used (*note color::), to
+change the menu colors (try it!). This command is somewhat special,
+because it can be used both in the command-line and in the menu. GRUB
+has several such commands, see *Note General commands::.
+
+   We hope that you now understand how to use the basic features of
+GRUB. To learn more about GRUB, see the following chapters.
+
+
+File: grub.info,  Node: Network,  Next: Serial terminal,  Prev: Configuration,  Up: Top
+
+Downloading OS images from a network
+************************************
+
+   Although GRUB is a disk-based boot loader, it does provide network
+support. To use the network support, you need to enable at least one
+network driver in the GRUB build process. For more information please
+see `netboot/README.netboot' in the source distribution.
+
+* Menu:
+
+* General usage of network support::
+* Diskless::
+
+
+File: grub.info,  Node: General usage of network support,  Next: Diskless,  Up: Network
+
+How to set up your network
+==========================
+
+   GRUB requires a file server and optionally a server that will assign
+an IP address to the machine on which GRUB is running. For the former,
+only TFTP is supported at the moment. The latter is either BOOTP, DHCP
+or a RARP server(1) (*note General usage of network
+support-Footnote-1::). It is not necessary to run both the servers on
+one computer. How to configure these servers is beyond the scope of this
+document, so please refer to the manuals specific to those
+protocols/servers.
+
+   If you decided to use a server to assign an IP address, set up the
+server and run `bootp' (*note bootp::), `dhcp' (*note dhcp::) or `rarp'
+(*note rarp::) for BOOTP, DHCP or RARP, respectively. Each command will
+show an assigned IP address, a netmask, an IP address for your TFTP
+server and a gateway. If any of the addresses is wrong or it causes an
+error, probably the configuration of your servers isn't set up properly.
+
+   Otherwise, run `ifconfig', like this:
+
+     grub> ifconfig --address=192.168.110.23 --server=192.168.110.14
+
+   You can also use `ifconfig' in conjuction with `bootp', `dhcp' or
+`rarp' (e.g. to reassign the server address manually). *Note
+ifconfig::, for more details.
+
+   Finally, download your OS images from your network. The network can
+be accessed using the network drive `(nd)'. Everything else is very
+similar to the normal instructions (*note Booting::).
+
+   Here is an example:
+
+     grub> bootp
+     Probing... [NE*000]
+     NE2000 base ...
+     Address: 192.168.110.23    Netmask: 255.255.255.0
+     Server: 192.168.110.14     Gateway: 192.168.110.1
+     
+     grub> root (nd)
+     grub> kernel /tftproot/gnumach.gz root=sd0s1
+     grub> module /tftproot/serverboot.gz
+     grub> boot
+
+
+File: grub.info,  Node: General usage of network support-Footnotes,  Up: General usage of network support
+
+   (1) RARP is not advised, since it cannot serve much information
+

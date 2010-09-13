@@ -1,0 +1,377 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# The following terminfo entries are directly from:
+#	Wyse Technology
+#	3571 North First Street
+#	San Jose, CA 95134
+#
+
+
+#TITLE:  TERMINFO ENTRY WY30
+#DATE:   8/5/93
+#
+#	   Although the Wyse 30 can support more than one attribute
+#	it requires magic cookies to do so.  Many applications do not
+#	function well with magic cookies.  The following terminfo uses
+#	the protect mode to support one attribute (reverse) without cookies.
+#	If more than one attribute is needed then the wy30-mc terminfo
+#	should be used.
+#
+wy30|wyse30|Wyse 30,
+	acsc=0wa_h[jukslrmqnxqzttuyv]wpxv, am, bel=^G, bw, cbt=\EI, civis=\E`0,
+	clear=\E*$<80>, cnorm=\E`1, cols#80, cr=^M, cub1=^H, cud1=^J, cuf1=^L,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, cuu1=^K, dch1=\EW$<10>, dl1=\ER$<1>,
+	dsl=\EF^M, ed=\EY$<80>, el=\ET, fsl=^M, home=^^, hs, ht=^I$<1>,
+	hts=\E1, ich1=\EQ, il1=\EE$<2>, ind=^J$<2>, ip=$<2>,
+	is2=\E'\E(\E\^3\E`9^N^T, it#8, kbs=^H, kcbt=\EI, kcub1=^H, kcud1=^J,
+	kcuf1=^L, kcuu1=^K, kdch1=\EW, kdl1=\ER, ked=\EY, kel=\ET, kent=\E7,
+	kf1=^A@^M, kf2=^AA^M, kf3=^AB^M, kf4=^AC^M, kf5=^AD^M, kf6=^AE^M,
+	kf7=^AF^M, kf8=^AG^M, kHOM=\E{, khome=^^, kich1=\EQ, kil1=\EE, knp=\EK,
+	kpp=\EJ, krpl=\Er, lh#1, lines#24, ll=^^^K, lw#8, mc0=\EP, mc4=^T,
+	mc5=^X, mc5i, mir, nel=^M^J, nlab#8, pfx=\Ez%p1%'?'%+%c%p2%s\177,
+	pln=\Ez%p1%'/'%+%c%p2%s^M, prot=\E`7\E), ri=\Ej$<3>, rev=\E`6\E),
+	rmacs=\EH^C, rmir=\Er, rmln=\EA11, rmso=\E(, sgr0=\E(\EH^C,
+	smacs=\EH^B, smir=\Eq, smln=\EA10, smso=\E`6\E), tbc=\E0, tsl=\EF,
+	wsl#45, xon,
+#
+#	This terminal description uses the non-hidden attribute mode
+#	(with magic cookie).
+#
+wy30-mc|wyse30-mc|wyse 30 with magic cookies,
+	xmc#1, ma@, msgr@,
+	blink=\EG2, dim=\EGp, invis=\EG1, prot=\EG0\E), rev=\EG4,
+	rmacs=\EG0\EH^C, rmcup=\EG0, rmso=\EG0, rmul=\EG0,
+	sgr=\EG%'0'%?%p2%p6%|%t%{8}%|%;%?%p1%p3%|%p6%|%t%{4}%|%;%?%p4%t%{2}%|%;%?%p1%p5%|%t%{64}%|%;%?%p7%t%{1}%|%;%c%?%p8%t\E)%e\E(%;%?%p9%t\EH^B%e\EH^C%;,
+	sgr0=\EG0\E(\EH^C, smacs=\EG0\EH^B, smso=\EG4, smul=\EG8,
+	use=wy30,
+#	The manditorary pause used by flash does not work with
+#	older versions of terminfo.  If you see this effect then
+#	unset xon and delete the / from the delay.
+#	i.e. change $<100/> to $<100>
+wy30-vb|wyse30-vb|wyse 30 Visable bell,
+	flash=\E`8$<100/>\E`9,
+	use=wy30,
+#
+#	Aug 5, 1993 by Terry Liang
+# 	Terminfo entry for wy30+ is the same as that for wy30.
+#
+wy30p|wyse30p|Wyse 30 plus,
+	use=wy30,
+wy30p-mc|wyse30p-mc|wyse 30 plus with magic cookies,
+	use=wy30-mc,
+wy30p-vb|wyse30p-vb|wyse 30 plus Visable bell,
+	use=wy30-vb,
+
+#
+#	Wyse 50
+#
+wyse50|wy50|wyse-50|wy-50|Wyse WY-50,
+	am, bw, hs, mir, xon,
+	cols#80, lines#24, xmc#1,
+	bel=^G, cbt=\EI, civis=\E`0, clear=\E*$<20>,
+	cnorm=\E`1, cr=\r, cub1=\b, cud1=\n, cuf1=\f,
+	cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	dch1=\EW$<1>, dl1=\ER, dsl=\EF\r, ed=\Ey$<20>, el=\Et,
+	fsl=\r, home=^^, ht=\t, hts=\E1, il1=\EE, ind=\n,
+	ip=$<1>, is1=\E`:\E`9$<30>, is2=^N^T\E'\E(, kbs=\b,
+	kcbt=\EI, kcub1=\b, kcud1=\n, kcuf1=\f, kcuu1=^K,
+	kdch1=\EW, kdl1=\ER, kf1=^A@\r, kf2=^AA\r, kf3=^AB\r,
+	kf4=^AC\r, kf5=^AD\r, kf6=^AE\r, kf7=^AF\r, kf8=^AG\r,
+	kf9=^AH\r, khome=^^, kil1=\EE, ri=\Ej,
+	rmacs=\EG0\EH^C, rmir=\Er, rmso=\EG0, rmul=\EG0,
+	smacs=\EG0\EH^B, smir=\Eq, smso=\EGt, smul=\EG8,
+	tbc=\E0, tsl=\EF,
+wyse50-vb|wy50-vb|wyse-50-vb|wy-50-vb|Wyse 50 Visable bell,
+	flash=\E`8\E`:\E`9,
+	use=wy50,
+wy50-w|wyse50-w|wyse-50-w|wy-50-w|wyse 50 132-column,
+	cols#132,
+	cup=\Ea%i%p1%dR%p2%dC, dch1=\EW$<2>, is1=\E`;\E`9,
+	use=wy50,
+wy50-wvb|wyse50-wvb|wy-50-wvb|wyse-50-wvb|Wyse 50 132-column Visable bell,
+	cols#132,
+	cup=\Ea%i%p1%dR%p2%dC, dch1=\EW$<2>,
+	flash=\E`8\E`;\E`9, is1=\E`;\E`9,
+	use=wy50,
+#
+#	The Wyse 60 is like the Wyse 50 but with more padding.
+#	The reset strings are slow and the pad times very depending
+#	on other parameters such as font loading.  I have tried
+#	to follow the following outline:
+#		rs1 -> set personality
+#		rs2 -> set number of columns
+#		rs3 -> set number of lines
+#		is1 -> select the proper font
+#		is2 -> do the initialization
+#		is3 -> If this string is empty then rs3 gets sent.
+#		       So I do some initialization here.
+#
+#	The Wyse 60's that have vt100 emulation are slower than the
+#	older Wyse 60's.  This change happened mid-1987.
+#	The capabilities effected are (dch1) (dl1) (il1) (ind) (ri)
+#
+###################################################################
+###	Note:                                                   ###
+###	   The Wyse 60 runs faster when the XON/XOFF            ###
+###	   handshake is turned off.                             ###
+###################################################################
+wy60|wyse60|Wyse 60,
+	am, bw, hs, km, mir, msgr, xon,
+	cols#80, lines#24,
+	bel=^G, cbt=\EI, civis=\E`0, clear=\E*$<100>,
+	cnorm=\E`1, cr=\r, cub1=\b, cud1=\n, cuf1=\f,
+	cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	dch1=\EW$<11>, dl1=\ER$<5>, dsl=\EF\r, ed=\Ey$<100>,
+	el=\Et, fsl=\r, home=^^, ht=\t, hts=\E1, il1=\EE$<4>,
+	ind=\n, ip=$<3>, is1=\EcB0\EcC1,
+	is2=\Ed$\EcD\E'\Er\EH^C\Ed/\EO\Ee1\Ed*\E`@\E`9\E`1^N^T,
+	kbs=\b, kcbt=\EI, kcub1=\b, kcud1=\n, kcuf1=\f,
+	kcuu1=^K, kdch1=\EW, kdl1=\ER, kf1=^A@\r, kf2=^AA\r,
+	kf3=^AB\r, kf4=^AC\r, kf5=^AD\r, kf6=^AE\r, kf7=^AF\r,
+	kf8=^AG\r, kf9=^AH\r, khome=^^, kil1=\EE, ri=\Ej$<7>,
+	rmacs=\EH^C, rmir=\Er, rmso=\EG0, rmul=\EG0,
+	rs1=\E~!\E~4$<150>, rs2=\EeF$<150>,
+	rs3=\EwG\Ee($<200>, smacs=\EH^B, smir=\Eq, smso=\EGt,
+	smul=\EG8, tbc=\E0, tsl=\EF,
+wy60-w|wyse60-w|wyse 60 132-column,
+	cols#132,
+	cup=\Ea%i%p1%dR%p2%dC, dch1=\EW$<16>, ip=$<5>,
+	rs2=\EeF\E`;$<300>,
+	use=wy60,
+wy60-25|wyse60-25|wyse 60 80-column 25-lines,
+	lines#25,
+	rs3=\EwG\Ee)$<200>,
+	use=wy60,
+wy60-25-w|wyse60-25-w|wyse 60 132-column 25-lines,
+	lines#25,
+	rs3=\EwG\Ee)$<200>,
+	use=wy60-w,
+wy60-42|wyse60-42|wyse 60 80-column 42-lines,
+	lines#42,
+	clear=\E*$<260>, cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c$<2>,
+	dch1=\EW$<16>, dl1=\ER$<11>, ed=\Ey$<260>,
+	il1=\EE$<11>, ip=$<5>, is1=\EcB2\EcC3, ri=\Ej$<10>,
+	rs3=\Ee*$<150>,
+	use=wy60,
+wy60-42-w|wyse60-42-w|wyse 60 132-column 42-lines,
+	cols#132,
+	cup=\Ea%i%p1%dR%p2%dC$<2>, dch1=\EW$<19>, home=^^$<2>,
+	ip=$<6>, rs2=\EeF\E`;$<300>,
+	use=wy60-42,
+wy60-43|wyse60-43|wyse 60 80-column 43-lines,
+	lines#43,
+	rs3=\Ee+$<150>,
+	use=wy60-42,
+wy60-43-w|wyse60-43-w|wyse 60 132-column 43-lines,
+	lines#43,
+	rs3=\Ee+$<150>,
+	use=wy60-42-w,
+wy60-vb|wyse60-vb|Wyse 60 Visable bell,
+	flash=\E`8\E`9,
+	use=wy60,
+wy60-w-vb|wy60-wvb|wyse60-wvb|Wyse 60 132-column Visable bell,
+	flash=\E`8\E`9,
+	use=wy60-w,
+#
+#	Wyse 60 in economy mode with 2 pages of memory
+#	It may be useful to assign two function keys with the
+#	values  \E=(\s  look at old data in page 1
+#	        \E=W,   look at bottem of page 1
+wy60-2p|wyse 60 with 2 pages of memory,
+	is2=\Ed$\EcD\E'\Er\EH^C\Ed/\EO\Ee1\Ed*\E`@\E`9\E`1\EwJ\Ew1^N^T$<150>,
+	rmcup=\Ew1, rs2=\EeG$<150>, smcup=\Ew0,
+	use=wy60,
+#
+######################################################################
+#
+#	The Wyse-99GT looks at lot like the Wyse 60 except that it
+#	does not have the 42/43 line mode.  In the Wyse-60 the "lines"
+#	setup parameter controls the number of lines on the screen.
+#	For the Wyse 99GT the "lines" setup parameter controls the
+#	number of lines in a page.  The screen can display 25 lines max.
+#	    The Wyse-99GT also has personalities for the VT220 and
+#	Tektronix 4014.  But this has no bearing on the native mode.
+#
+wy99gt|wyse99gt|Wyse 99gt,
+	clear=\E*$<130>, dch1=\EW$<5>, dl1=\ER$<3>,
+	ed=\Ey$<130>, il1=\EE$<3>, ip=$<2>, ri=\Ej$<3>,
+	rs2=\E`:$<150>,
+	use=wy60,
+wy99gt-w|wyse99gt-w|wyse 99gt 132-column,
+	cols#132,
+	clear=\E*$<160>, cup=\Ea%i%p1%dR%p2%dC$<2>,
+	dch1=\EW$<9>, ed=\Ey$<160>, ip=$<4>, rs2=\E`;$<150>,
+	use=wy99gt,
+wy99gt-25|wyse99gt-25|wyse 99gt 80-column 25-lines,
+	lines#25,
+	rs3=\EwG\Ee)$<200>,
+	use=wy99gt,
+wy99gt-25-w|wyse99gt-25-w|wyse 99gt 132-column 25-lines,
+	lines#25,
+	use=wy99gt-w,
+wy99gt-vb|wyse99gt-vb|Wyse 99gt Visable bell,
+	flash=\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`9,
+	use=wy99gt,
+wy99gt-w-vb|wy99gt-wvb|wyse99gt-wvb,
+	flash=\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`8\E`9,
+	use=wy99gt-w,
+wy99gt-2p|wyse 99gt with 2 pages of memory,
+	rmcup=\Ew0, smcup=\Ew1,
+	use=wy99gt,
+#
+#	The Wyse 75 is a vt100 lookalike without advanced video.
+#
+#	   The Wyse 75 can support one attribute (e.g. Dim, Inverse,
+#	Underline) without magic cookies.  The following description
+#	uses this capability, but when more than one attribute is
+#	put on the screen at once, all attributes will be changed
+#	to be the same as the last attribute given.
+#	   The Wyse 75 can support more attributes when used with magic
+#	cookies.  The wy75-mc terminal description uses magic cookies
+#	to correctly handle multiple attributes on a screen.
+#
+wy75|wyse75|wyse 75,
+	am, hs, mir, msgr, xenl, xon,
+	cols#80, lines#24, pb#1201,
+	bel=^G, cbt=\E[1Z, civis=\E[?25l, clear=\E[H\E[J$<30>,
+	cnorm=\E[?25h, cr=\r, csr=\E[%i%p1%d;%p2%dr$<2>,
+	cub=\E[%p1%dD, cub1=\b, cud=\E[%p1%dB, cud1=\n,
+	cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH,
+	cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP$<3*>,
+	dch1=\E[P$<3>, dl=\E[%p1%dM$<1*>, dl1=\E[M,
+	dsl=\E[>\,^A^A\E[>-^A^A, ed=\E[J$<30>, el=\E[K$<3>,
+	fsl=^A, home=\E[H, hpa=\E[%i%p1%dG, ht=\t, hts=\EH,
+	ich=\E[%p1%d@$<1*>, il=\E[%p1%dL$<2*>, il1=\E[L$<2>,
+	ind=\n, ip=$<1>, is2=\E>\E[?7;?8h\E[4;?1l^O\E)0,
+	kbs=\b, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C,
+	kcuu1=\E[A, kdl1=\E[M, kel=\E[K, khome=\E[H,
+	kil1=\E[L, rc=\E8, ri=\EM$<2>, rmacs=^O, rmir=\E[4l,
+	rmkx=\E[?1l\E>, rmso=\E[0m, rmul=\E[0m,
+	rs1=\E7\E[1;24r\E8,
+	rs2=\E[0m\E[35;?7;?8h\E[30;?1l$<20>, rs3=\E[?3l$<80>,
+	sc=\E7, smacs=\E[0m^N, smir=\E[4h,
+	smkx=\E[?1l\E[?7h\E=, smso=\E[1t\E[7m,
+	smul=\E[2t\E[4m, tbc=\E[3g, tsl=\E[>\,^A,
+#
+#	This terminal description used the non-hidden attribute mode
+#	(with magic cookie).
+#
+wy75-mc|wyse75-mc|wyse 75 with magic cookies,
+	msgr@,
+	xmc#1,
+	rmacs=\E[0p^O, rmso=\E[0p, rmul=\E[0p,
+	rs2=\E[0p\E[35;?7;?8h\E[30;?1l$<20>, smacs=\E[0p^N,
+	smso=\E[17p, smul=\E[8p,
+	use=wy75,
+wy75-vb|wyse75-vb|wyse 75 with visible bell,
+	flash=\E[30h\E\,\E[30l,
+	use=wy75,
+wy75-w|wyse75-w|wyse 75 in 132 column mode,
+	cols#132,
+	rs3=\E[?3h$<80>,
+	use=wy75,
+wy75-wvb|wyse75-wvb|wyse 75 with visible bell 132 columns,
+	cols#132,
+	flash=\E[30h\E\,\E[30l, rs3=\E[?3h$<80>,
+	use=wy75,
+#
+#	Wyse 85 emulating a vt220 7 bit mode.
+#		24 line screen with status line.
+#
+#	The vt220 mode permits more function keys but it wipes out
+#	the escape key.  I strongly reccomend that f11 be set to
+#	escape (esc).
+#	The terminal may have to be set for 8 data bits and 2 stop
+#	bits for the arrow keys to work.
+#	The Wyse 85 runs faster with XON/XOFF enabled.  Also the
+#	(dch) and (ich) work best when XON/XOFF is set.  (ich) and
+#	(dch) leave trash on the screen when used without XON/XOFF.
+#
+wy85|wyse85|wyse 85,
+	am, hs, mir, msgr, xenl, xon,
+	cols#80, lines#24,
+	bel=^G, cbt=\E[Z, civis=\E[?25l, clear=\E[H\E[J$<80>,
+	cnorm=\E[?25h, cr=\r, csr=\E[%i%p1%d;%p2%dr,
+	cub=\E[%p1%dD, cub1=\b, cud=\E[%p1%dB, cud1=\E[B,
+	cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH$<1>,
+	cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP$<7*>,
+	dch1=\E[P$<4>, dl=\E[%p1%dM$<3*>, dl1=\E[M$<3>,
+	dsl=\E[40l, ed=\E[J$<80>, el=\E[K$<7>,
+	fsl=\E[1;24r\E8, home=\E[H, ht=\t, hts=\EH,
+	ich=\E[%p1%d@$<4*>, il=\E[%p1%dL$<5*>, il1=\E[L$<5>,
+	ind=\E[B, ip=$<4>, is1=\E[62;1"p\E7\E[?6l\E8\E[?5W,
+	is2=\E[2;4;20;30l\E[?1;4;10;16l\E[12;36h\E[?7;8;25h$<30>,
+	kbs=\b, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C,
+	kcuu1=\E[A, kf1=\EOP, kf2=\EOQ, kf3=\EOR, kf4=\EOS,
+	khome=\E[26~, lf1=PF1, lf2=PF2, lf3=PF3, lf4=PF4,
+	rc=\E8, ri=\EM$<3>, rmacs=^O, rmir=\E[4l, rmkx=\E>,
+	rmso=\E[m, rmul=\E[m,
+	rs1=\E<\E[3;13l\E[!p\E7\E[1;24r\E8\E(B,
+	rs2=\E[35h\E[?3l$<70>, sc=\E7, smacs=^N, smir=\E[4h,
+	smkx=\E[?1l\E=, smso=\E[1m, smul=\E[4m, tbc=\E[3g,
+	tsl=\E[40h\E7\E[25;%i%p1%dH,
+#
+#	Wyse 85 with visual bell.
+wy85-vb|wyse85-vb|wyse 85 with visible bell,
+	flash=\E[30h\E\,\E[30l,
+	use=wy85,
+#
+#	Wyse 85 in 132-column mode.
+wy85-w|wyse85-w|wyse 85 in 132-column mode,
+	cols#132,
+	rs2=\E[35h\E[?3h$<120>,
+	use=wy85,
+#
+#	Wyse 85 in 132-column mode with visual bell.
+wy85-wvb|wyse85-wvb|wyse 85 with visible bell 132-columns,
+	flash=\E[30h\E\,\E[30l,
+	use=wy85,
+#
+wy925|wyse925|Wyse-50 emulating tvi925,
+	xenl@,
+	use=tvi925,
+#
+wy50vp|wyse-vp|Wyse 50 in ADDS Viewpoint emulation mode with "enhance" on,
+	am, xon,
+	cols#80, lines#24,
+	bel=^G, clear=\f, cr=\r, cub1=\b, cud1=\n, cuf1=^F,
+	cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^Z, dch1=\EW,
+	dl1=\El, ed=\Ek, el=\EK, home=^A, ht=\t,
+	if=/usr/share/lib/tabset/wyse-adds, il1=\EM, ind=\n,
+	is2=\E`:\E`9^O\Er, kcub1=^U, kcud1=\n, kcuf1=^F,
+	kcuu1=^Z, khome=^A, ll=^A^Z, rmir=\Er, rmso=^O,
+	rmul=^O, rs2=\E`:\E`9^O\Er, smir=\Eq, smso=^N,
+	smul=^N,
+#
+wy50vp-nk|wyse-vp-nk|Wyse 50 in ADDS Viewpoint enhanced mode with no cursor keys,
+	kcub1@, kcud1@, kcuf1@, kcuu1@, khome@,
+	use=wy50vp,

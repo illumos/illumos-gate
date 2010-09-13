@@ -1,0 +1,272 @@
+set	prototyped
+iff	AST_SYS
+ref	-D_def_map_ast
+
+print	#if __mips == 2 && !defined(_NO_LARGEFILE64_SOURCE)
+print	#define	_NO_LARGEFILE64_SOURCE	1
+print	#endif
+print	#if !defined(_NO_LARGEFILE64_SOURCE) && _typ_off64_t && _lib_lseek64 && _lib_stat64
+print	#if !defined(_LARGEFILE64_SOURCE)
+print	#define _LARGEFILE64_SOURCE	1
+print	#endif
+print	#if !defined(_LARGEFILE_SOURCE)
+print	#define _LARGEFILE_SOURCE	1
+print	#endif
+print	#else
+print	#undef	_LARGEFILE64_SOURCE
+print	#undef	_LARGEFILE_SOURCE
+print	#undef	_typ_off64_t
+print	#undef	_typ_struct_dirent64
+print	#undef	_lib_creat64
+print	#undef	_lib_fstat64
+print	#undef	_lib_fstatvfs64
+print	#undef	_lib_ftruncate64
+print	#undef	_lib_lseek64
+print	#undef	_lib_lstat64
+print	#undef	_lib_mmap64
+print	#undef	_lib_open64
+print	#undef	_lib_readdir64
+print	#undef	_lib_stat64
+print	#undef	_lib_statvfs64
+print	#undef	_lib_truncate64
+print	#endif
+
+print	#if defined(__STDC__) && !defined(__USE_FIXED_PROTOTYPES__)
+print	#define __USE_FIXED_PROTOTYPES__	1	/* kick gcc out of the past */
+print	#endif
+
+header	stdlib.h
+header	stddef.h
+header	sys/types.h
+header	stdint.h
+header	inttypes.h
+header	string.h
+header	unistd.h
+header	limits.h
+header	fcntl.h
+header	locale.h
+
+typ dev_t,nlink_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef short $v;"
+	echo "#endif"
+}end
+typ gid_t,mode_t,uid_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef unsigned short $v;"
+	echo "#endif"
+}end
+typ wchar_t stdio.h wchar.h fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef unsigned short $v;"
+	echo "#endif"
+}end
+typ pid_t,ssize_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef int $v;"
+	echo "#endif"
+}end
+typ wint_t stdio.h wchar.h fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef int $v;"
+	echo "#endif"
+}end
+typ socklen_t sys/socket.h fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef int $v;"
+	echo "#endif"
+}end
+typ size_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef unsigned int $v;"
+	echo "#endif"
+}end
+typ clock_t,ino_t,off_t,ptrdiff_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef long $v;"
+	echo "#endif"
+}end
+typ time_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef unsigned long $v;"
+	echo "#endif"
+}end
+typ div_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef struct { int quot; int rem; } $v;"
+	echo "#endif"
+}end
+typ ldiv_t fail{
+	echo "#ifndef $m"
+	echo "#define $m	1"
+	echo "typedef struct { long quot; long rem; } $v;"
+	echo "#endif"
+}end
+tst	typ_signed_size_t output{
+	#include <sys/types.h>
+	int
+	main()
+	{
+		unsigned long u = ~0;
+		size_t s = ~0;
+		if (s >= 0)
+			return 1;
+		printf("#if !defined(__cplusplus) && !defined(c_plusplus) && !defined(_typ_signed_size_t)\n/* what dipsticks made size_t signed? sun. */\ntypedef unsigned %s _ast_size_t;\n#undef\tsize_t\n#define size_t\t_ast_size_t\n#endif\n", u == (unsigned long)s ? "long" : "int");
+		return 0;
+	}
+}end
+
+define	offsetof	(type,member)	((size_t)&(((type*)0)->member))
+define	EXIT_FAILURE	1
+define	EXIT_SUCCESS	0
+define	MB_CUR_MAX	1
+define	RAND_MAX	32767
+
+define	STDIN_FILENO	0
+define	STDOUT_FILENO	1
+define	STDERR_FILENO	2
+
+define	NULL		0
+
+define	SEEK_SET	0
+define	SEEK_CUR	1
+define	SEEK_END	2
+
+define	F_OK		0
+define	X_OK		1
+define	W_OK		2
+define	R_OK		4
+
+print	#if _BLD_ast && defined(__EXPORT__)
+print	#define extern	__EXPORT__
+print	#endif
+
+extern	_exit		void		(int)
+extern	abort		void		(void)
+extern	abs		int		(int)
+extern	access		int		(const char*, int)
+extern	alarm		unsigned	(unsigned)
+extern	atexit		int		(void(*)(void))
+extern	atof		double		(const char*)
+extern	atoi		int		(const char*)
+extern	atol		long		(const char*)
+extern	bsearch		void*		(const void*, const void*, size_t, size_t, int(*)(const void*, const void*))
+extern	calloc		void*		(size_t, size_t)
+extern	cfree		void		(void*)
+extern	chdir		int		(const char*)
+extern	chown		int		(const char*, uid_t, gid_t)
+extern	close		int		(int)
+extern	confstr		size_t		(int, char*, size_t)
+extern	div		div_t		(int, int)
+extern	dup		int		(int)
+extern	dup2		int		(int, int)
+extern	eaccess		int		(const char*, int)
+extern	execl		int		(const char*, const char*, ...)
+extern	execle		int		(const char*, const char*, ...)
+extern	execlp		int		(const char*, const char*, ...)
+extern	execv		int		(const char*, char* const[])
+extern	execve		int		(const char*, char* const[], char* const[])
+extern	execve		int		(const char*, char* const[], char* const[])
+extern	execvp		int		(const char*, char* const[])
+extern	execvpe		int		(const char*, char* const[], char* const[])
+extern	exit		void		(int)
+extern	fork		pid_t		(void)
+extern	fpathconf	long		(int, int)
+extern	free		void		(void*)
+extern	fsync		int		(int)
+extern	ftruncate	int		(int, off_t)
+extern	getcwd		char*		(char*, size_t)
+extern	getegid		gid_t		(void)
+extern	getenv		char*		(const char*)
+extern	geteuid		uid_t		(void)
+extern	getgid		gid_t		(void)
+extern	getgroups	int		(int, gid_t[])
+extern	getlogin	char*		(void)
+extern	getpgrp		pid_t		(void)
+extern	getpid		pid_t		(void)
+extern	getppid		pid_t		(void)
+extern	gettxt		char*		(const char*, const char*)
+extern	getuid		uid_t		(void)
+extern	isatty		int		(int)
+extern	labs		long		(long)
+extern	ldiv		ldiv_t		(long, long)
+extern	link		int		(const char*, const char*)
+extern	lseek		off_t		(int, off_t, int)
+extern	malloc		void*		(size_t)
+extern	mblen		int		(const char*, size_t)
+extern	mbstowcs	size_t		(wchar_t*, const char*, size_t)
+extern	mbtowc		int		(wchar_t*, const char*, size_t)
+extern	memalign	void*		(size_t, size_t)
+extern	memccpy		void*		(void*, const void*, int, size_t)
+extern	memchr		void*		(const void*, int, size_t)
+extern	memcmp		int		(const void*, const void*, size_t)
+extern	memcpy		void*		(void*, const void*, size_t)
+extern	memmove		void*		(void*, const void*, size_t)
+extern	memset		void*		(void*, int, size_t)
+extern	pathconf	long		(const char*, int)
+extern	pause		int		(void)
+extern	pipe		int		(int[])
+extern	pvalloc		void*		(size_t)
+extern	qsort		void		(void*, size_t, size_t, int(*)(const void*, const void*))
+extern	rand		int		(void)
+extern	read		ssize_t		(int, void*, size_t)
+extern	realloc		void*		(void*, size_t)
+extern	realpath	char*		(const char*, char*)
+extern	resolvepath	char*		(const char*, char*, size_t)
+extern	rmdir		int		(const char*)
+extern	setgid		int		(gid_t)
+extern	setpgid		int		(pid_t, pid_t)
+extern	setsid		pid_t		(void)
+extern	setuid		int		(uid_t)
+extern	sleep		unsigned		(unsigned int)
+extern	spawnveg	pid_t		(const char*, char* const[], char* const[], pid_t)
+extern	srand		void		(unsigned int)
+extern	strcasecmp	int		(const char*, const char*)
+extern	strcat		char*		(char*, const char*)
+extern	strchr		char*		(const char*, int)
+extern	strcmp		int		(const char*, const char*)
+extern	strcoll		int		(const char*, const char*)
+extern	strcpy		char*		(char*, const char*)
+extern	strcspn		size_t		(const char*, const char*)
+extern	strdup		char*		(const char*)
+extern	strlcat		size_t		(char*, const char*, size_t)
+extern	strlcpy		size_t		(char*, const char*, size_t)
+extern	strlen		size_t		(const char*)
+extern	strncasecmp	int		(const char*, const char*, size_t)
+extern	strncat		char*		(char*, const char*, size_t)
+extern	strncmp		int		(const char*, const char*, size_t)
+extern	strncpy		char*		(char*, const char*, size_t)
+extern	strpbrk		char*		(const char*, const char*)
+extern	strrchr		char*		(const char*, int)
+extern	strspn		size_t		(const char*, const char*)
+extern	strstr		char*		(const char*, const char*)
+extern	strtok		char*		(char*, const char*)
+extern	strxfrm		size_t		(char*, const char*, size_t)
+extern	swab		void		(const void*, void*, ssize_t)
+extern	sysconf		long		(int)
+extern	system		int		(const char*)
+extern	tcgetpgrp	pid_t		(int)
+extern	tcsetpgrp	int		(int, pid_t)
+extern	truncate	int		(const char*, off_t)
+extern	ttyname		char*		(int)
+extern	unlink		int		(const char*)
+extern	valloc		void*		(size_t)
+extern	wcstombs	size_t		(char*, const wchar_t*, size_t)
+extern	wctomb		int		(char*, wchar_t)
+extern	write		ssize_t		(int, const void*, size_t)
+
+print	#undef	extern
+
+# <stdarg.h> is handled by proto so this must be after the last test
+
+print	#include <stdarg.h>

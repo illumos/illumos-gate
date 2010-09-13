@@ -1,0 +1,77 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# /etc/nsswitch.ad:
+#
+# An example file that could be copied over to /etc/nsswitch.conf; it
+# uses Microsoft's Active Directory (AD) for passwd and group; DNS for
+# hosts lookups; and files for the remaining databases.
+#
+# AD name service currently only supports passwd(4) and group(4)
+# databases.
+#
+# Other name service databases such as audit_user(4) and user_attr(4)
+# that follow passwd entry in nsswitch.conf are not supported by AD.
+# If the AD backend is processed (based on the configuration) it will
+# return NOT FOUND for these databases.
+#
+# Since AD name service is not yet a complete Solaris solution, please
+# add other name service(s) as appropriate to the lines in this file.
+#
+# "hosts:" and "services:" in this file are used only if the
+# /etc/netconfig file has a "-" for nametoaddr_libs of "inet" transports.
+
+# DNS service expects that an instance of svc:/network/dns/client be
+# enabled and online.
+
+passwd:     files ad
+group:      files ad
+
+# Note that IPv4 addresses are searched for in all of the ipnodes databases
+# before searching the hosts databases.
+hosts:      files dns
+ipnodes:   files dns
+
+networks:   files
+protocols:  files
+rpc:        files
+ethers:     files
+netmasks:   files
+bootparams: files
+publickey:  files
+# At present there isn't a 'files' backend for netgroup;  the system will 
+#   figure it out pretty quickly, and won't use netgroups at all.
+netgroup:   files
+automount:  files
+aliases:    files
+services:   files
+printers:	user files
+
+auth_attr:  files
+prof_attr:  files
+project:    files
+
+tnrhtp:     files
+tnrhdb:     files

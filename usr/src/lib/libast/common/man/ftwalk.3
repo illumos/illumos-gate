@@ -1,0 +1,235 @@
+.fp 5 CW
+.TH FTWALK 3
+.SH NAME
+\fBftwalk\fR \- file tree walker
+.SH SYNOPSIS
+.ta .75i 1.5i 2.25i 3i 3.75i 4.5i 5.25i 6i
+.PP
+.nf
+\f5
+#include <ftwalk.h>
+
+int ftwalk(char* path, int (*userf)(struct FTW* ftw), int options,
+       int (*comparf)(struct FTW* ftw1, struct FTW* ftw2));
+
+
+int ftwflags(void);
+\fR
+.fi
+.SH DESCRIPTION
+.PP
+\fIFtwalk\fR traverses a directory hierarchy using depth-first search.
+Upon visiting each file or directory in the hierarchy, it calls
+the user function \fIuserf\fP to process that file or directory.
+On a directory object, \fIuserf\fR may be called twice, once in preorder
+and once in postorder.
+On a terminal object such as a file or an unreadable directory,
+\fIuserf\fP is called only once.
+Cycles due to hard links or symbolic links are detected
+to avoid infinite loops.
+.PP
+\fIPath\fR is the starting point of the search.
+It may be an absolute path name or a path name relative to
+the current directory.
+If \fIpath\fR is a null pointer or points to an empty string, it is treated
+as if it points to the current (dot) directory.
+.PP
+\fIOptions\fR consists of zero or more of the following bits:
+.IP
+FTW_CHILDREN:
+This implies preorder calls to \fIuserf\fR on directory objects.
+On such a call to \fIuserf\fR,
+the field \fIftw->link\fR (below) points to a link list of
+the children of the respective directory.
+Upon returning from \fIuserf\fP,
+if the field \fIftw->status\fR of any child object
+is set to FTW_SKIP (below), that child is pruned from the search.
+.IP
+FTW_DELAY: When \fBFTW_CHILDREN\fP is turned on,
+the fields \fIftw->statb\fP (\fIstruct stat\fP) of children objects
+remain undefined until these objects are visited.
+.IP
+FTW_DOT: Do not use \fIchdir\fR(2) during the traversal.
+Normally \fIchdir\fR is used so that
+the base name of the object about to be processed can be used
+in accessing its data.
+This can enhance \fIftwalk\fR efficiency but certain program effects
+such as core dumps may be generated in unexpected places
+or may not even be generated at all.
+Whenever \fIchdir\fR generates an error, if possible,
+the current directory is restored to the starting directory
+(see FTW_NAME and FTW_PATH).
+.IP
+FTW_MULTIPLE: The \fIpath\fP argument is treated as a \fIchar**\fP
+pointer to a null-terminated array of path names.
+All hierarchies rooted at these paths will be searched
+.IP
+FTW_POST: Calls to the user function are issued only in postorder.
+That is, \fIuserf\fP is called on a directory only after its descendants have
+been processed.
+The absence of this bit indicates that calls to the user functions
+are issued in preorder. That is, \fIuserf\fP is
+called on a directory before its descendants  are processed.
+.IP
+FTW_PHYSICAL: Use \fIlstat\fR(2) instead of \fIstat\fR(2) to get
+file status and allow detection of symbolic links.
+In addition, if each component
+of the absolute path to the starting object has search permission,
+the absolute path is used for early detection of cycles.
+.IP
+FTW_META|FTW_PHYSICAL: Use \fIstat\fR(2) for top level file status and
+\fIlstat\fR(2) for all other files.
+Used to implement the POSIX
+.B \-H
+option for commands like
+.IR ls .
+.IP
+FTW_TWICE: Calls to the user function are issued in both preorder and postorder
+for directory objects.
+.IP
+FTW_USER: The first of 6 user defined option bits.
+These bits are ignored by \fIftwalk\fP.
+.PP
+\fIUserf\fR is a user supplied function that is
+called upon different visits of an object.
+If the return value of \fIuserf\fR is non-zero,
+\fIftwalk\fR returns immediately with the same value.
+The \fIuserf\fP prototype is:
+.PP
+.nf
+	int userf(struct FTW* ftw)
+.fi
+.PP
+\fBstruct FTW\fP contains at least the following elements:
+.PP
+.nf
+    struct FTW*    link;    /* link list of children */
+    struct FTW*    parent;  /* parent object on the search path */
+    union
+    {
+    long           number;  /* local number */
+    void*          pointer; /* local pointer */
+    }              local;   /* user defined */
+    struct stat    statb;   /* stat buffer of this object */
+    char*          path;    /* full pathname */
+    short          pathlen; /* strlen(path) */
+    unsigned short info;    /* type of object */
+    unsigned short status;  /* status of object */ 
+    short          level;   /* depth of object on the search path */
+    short          namelen; /* strlen(name) */
+    char           name[];  /* file name of object */
+.fi
+.PP
+The \fIlink\fR field is normally NULL.
+If the option FTW_CHILDREN was turned on,
+it points to the start of the list of children
+of the directory being visited in preorder.
+Finally, if the directory being visited causes a cycle,
+\fIlink\fR points to the object on the search path that is
+identical to this directory. Note that if FTW_PHYSICAL was turned on,
+this may point to a directory that is an ancestor of the starting
+object.
+.PP
+The \fIparent\fR field points to the parent object
+on the search path. For convenience, a parent object is also supplied for
+the starting object.
+In this case, except for the \fIlocal\fR field which is initialized
+to 0 and the \fIlevel\fR field which contains a negative number,
+the rest of the structure may be undefined.
+.PP
+The \fIinfo\fR field indicates the type of the object
+being visited and the type of the visit. The types are:
+.IP
+FTW_D: A directory being visited in preorder, i.e.,
+none of its children has been visited by the search.
+.IP
+FTW_DNX: A directory being visited in preorder that does not have
+search permission.
+.IP
+FTW_DP: A directory being visited in postorder, i.e., all of its
+descendants have been completely processed.
+.IP
+FTW_DC: A directory that causes cycles. This is a terminal object.
+.IP
+FTW_DNR: A directory that cannot be opened for reading. This is a terminal object.
+.IP
+FTW_F: An ordinary file.
+.IP
+FTW_SL: A symbolic link.
+Unless FTW_FOLLOW (below) is issued by the user function,
+this object is terminal.
+.IP
+FTW_NS: \fIStat\fR failed on this object.
+The stat buffer \fIstatb\fR is undefined.
+This object is terminal.
+.PP
+The \fIstatus\fR field of \fIstruct FTW\fR is used to communicate information
+between \fIftwalk\fR and \fIuserf\fR. On calls to \fIuserf\fR, it has one of
+two values:
+.IP
+FTW_NAME: The name of the object as defined in \fIftw->name\fR should be used for
+accessing its file information. This is because \fIchdir\fR(2) has been used
+to set the current directory to a suitable place (see FTW_CHDIR).
+.IP
+FTW_PATH: The argument \fIpath\fR of \fIuserf\fR should be used
+for accessing the file information of the object.
+.PP
+Upon returning, \fIuserf\fR may set the \fIstatus\fR field
+to one of the following values:
+.IP
+FTW_AGAIN: If this is a directory object being visited in postorder,
+it will be processed \fIagain\fR as if it had not been visited.
+.IP
+FTW_NOPOST: If this is a directory object being visited in preorder,
+the user function will not be called on its postorder visit.
+.IP
+FTW_SKIP: This object and its descendants are pruned from the search.
+.IP
+FTW_FOLLOW: If this object is a symbolic link,
+follow the link to its physical counterpart.
+.PP
+\fIComparf\fR, if not NULL, is a pointer to a function
+used to define a search ordering for children of a directory.
+If FTW_CHILDREN is turned on, the ordering of the children of
+a directory is done before the preorder call to \fIuserf\fR on that directory.
+Therefore, in that case, \fIftw->link\fR will point to the smallest child.
+.PP
+The \fIcomparf\fP prototype is:
+.PP
+.nf
+	int comparf(struct FTW* ftw1, struct FTW* ftw2)
+.fi
+.PP
+\fIComparf\fR should return a value <0, 0, or >0 to indicate whether
+\fIftw1\fR is considered smaller, equal, or larger than \fIftw2\fR.
+.PP
+\fIFtwalk\fR normally returns 0.
+On hard errors such as running out of memory, it returns -1.
+\fIFtwalk\fR may also return other values as discussed with respect
+to \fIuserf\fR. 
+.PP
+\fIFtwflags\fR returns a combination of \fB0, FTW_META, FTW_PHYSICAL\fR
+according to the
+preferences specified by
+\fBastconf("PATH_RESOLVE",0,0)\fR:
+.TP
+.B logical
+0
+.TP
+.B metaphysical
+.B "FTW_META|FTW_PHYSICAL"
+.TP
+.B physical
+.B FTW_PHYSICAL
+.SH HISTORY
+\fIFtwalk\fR performs similar functions as that of
+the routine \fIftw\fR provided in System V.
+However, it is more general than \fIftw\fR
+and suitable for use as a base in implementing
+popular tools such as \fIls, find, tar, du,\fR and \fIrm\fR.
+\fIFtwalk\fR also handles symbolic links and hard links gracefully.
+.SH AUTHORS
+Phong Vo, Glenn Fowler, Dave Korn
+.SH SEE ALSO
+find(1), rm(1), du(1), ls(1), tar(1), stat(2), symlink(2),
+astfeature(3), ftw(3), pathcd(3)

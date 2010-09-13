@@ -1,0 +1,881 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.15	*/
+# # PC - Personal Computers and Workstations emulating terminals.
+#
+# Manufacturer:	PERSONAL COMPUTER TERMINALS
+# Class:	III
+# 
+# Info:
+#	This category is strange. The typical personal computer offers 
+#	a program to emulate a "terminal" without documenting any 
+#	escape sequences.
+#	
+#	I don't have any direct personal experience with these, but 
+#	my impression is that the terminal emulator emulates an 
+#	ultra-dumb terminal, with the cursor cemented to the bottom 
+#	line, and no escape sequences.
+#	
+#	Many of the entries below were found in random places with 
+#	no indication of who they came from or how. In many cases, I 
+#	believe what has happened is that someone wrote their own 
+#	terminal emulator program, which understood some control 
+#	characters or escape sequences, and made their own entries.
+#	
+#	GENERIC PERSONAL COMPUTER
+#
+pc|any personal computer emulating a terminal,
+	am,
+	cols#40,
+	bel=^G, cr=\r, cud1=\n, ind=\n,
+apple-soroc|apple emulating soroc 120,
+	am,
+	cols#80, lines#24,
+	bel=^G, clear=\E*$<300>, cr=\r, cub1=\b, cud1=\n,
+	cuf1=\f, cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	ed=\EY, el=\ET, home=^^, ind=\n, kcub1=\b, kcud1=\n,
+	kcuf1=\f, kcuu1=^K,
+# Info:
+#	For those of you with either Programma's Pie or Hayden's Pie, 
+#	I'm including a patch for DOS which allows them to function 
+#	interactively as a terminal, with data transfer.
+#	 
+#	The following termcap entry works only with an Apple ][+ that is
+#	equipped with a Videx 80 collumn card in slot 3. A special 
+#	routine must be installed at the apple end to enable scroll 
+#	down, here indicated with a ^U. The Videx card must have 
+#	inverse char set.
+#
+apple|apple-v80|Apple][+ w/Videx80 & custom scroll down,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cols#80, lines#24, cub1=^H$<10>,
+	smacs=^z2, rmacs=^z3, cup=\015\036%r%p1%' '%+%c%p2%' '%+%c$<6>,
+	el=\035$<6>, home=\031$<50>, smso=^z3, rmso=^z2,
+	cuf1=\034, cud1=\012, cuu1=\037, clear=\014$<40*>,
+	xenl, am, ri=\020, ed=\013$<20*>,
+# Info: 
+#	--------------------------------------------------------------
+#	 
+#	Pieterm is written using Lisa 2.5. If any of the opcodes used 
+#	are confusing, refer to hex values in the left most column.
+#	 
+#	 
+#     1           TTL "PIETERM 1.0
+#     2           NLS
+#     3  ;
+#     4  ; PIETERM: A program which patches 48k DOS 3.3 to allow
+#     5  ;          Programma Pie, and Hayden Pie to function in
+#     6  ;          a terminal mode.
+#     7  ;
+#     8  ; ASSUMES: Videx 80 collumn Videoterm in slot 3.
+#     9  ;          1200 baud Serial Card in slot 2.
+#    10  ;          DOS 3.3 unmodified at $9D00 (master or slave)
+#    11  ;
+#    12  ; TO USE:  Either from the Command level of Pie, or in a
+#    13  ;          "HELLO" program, "BRUN PIETERM,A$6000".
+#    14  ;          To enter terminal mode, from the Command level
+#    15  ;          of Pie, enter "TERM" or "TERM ".
+#    16  ; "TERM"   Sends a carriage return before entering terminal
+#    17  ;          mode. Best for reentering csh.
+#    18  ; "TERM "  Sends a ^D character before entering
+#    19  ;          terminal mode. For example, "TERM " should be
+#    20  ;          entered if returning to a cat>filename.
+#    21  ;
+#    22  ; RETURN:  To return to the command level of Pie from the
+#    23  ;          terminal mode, enter "^@". With an upper case
+#    24  ;          locked keyboard, that is control-shift-P. With
+#    25  ;          and Enhanser II lower case keyboard, that is ^0.
+#    26  ;
+#    27  ; SENDING: From the Command level of Pie, indicated by
+#    28  ;          "Command:" (csh indicated by %), enter:
+#    29  ;
+#    30  ;                 Command:TERM
+#    31  ;                 % stty -echo;cat>filename;stty echo
+#    32  ;                 % ^@
+#    33  ;                 Command:>#2
+#    34  ;                 Command:TERM 
+#    35  ;                             ^__space
+#    36  ;
+#    37  ; RECEIVING:      % wc filename
+#    38  ;                 46 123 4567 filename
+#    39  ;                 % sleep 20;cat filename
+#    40  ;                 ^@
+#    41  ;                 Command:(1,46)<#2
+#    42  ;
+#    43  ; BUGS:    Extra linefeeds are sent both ways. A filter program
+#    44  ;          at the UN*X end is required to strip every other \n.
+#    45  ;          Arg "^J" Arg "" ^W^X will globally illiminate them
+#    46  ;          within Pie.
+#    47  ;
+#    48  ;          Since the Patch program overwrites the INIT portion
+#    49  ;          of DOS, it must be brun every boot. A zap utility
+#    50  ;          may be used to modify DOS directly on the disk.
+#    51  ;
+#    52  ;          Pie gives no indication of what is going on. This
+#    53  ;          takes a little getting used to. It is possible to
+#    54  ;          get so involved with what you are doing in Pie, that
+#    55  ;          you forget you are logged on.
+#    56  ;
+#    57  ;          Because of the limitation of Pie's buffer, large
+#    58  ;          file need to be transfered in chunks.
+#    59  ;
+#    60  ;          --------------------------------
+#    61  ;
+#    62  ;
+# 0800             63  ;
+# 06F8             64  NO       EQU $6F8            ; address specific to videx
+# 0638             65  START    EQU NO-$C0          ; card in slot 3. See
+# C080             66  DEV0     EQU $C080           ; reference manual.
+# C081             67  DEV1     EQU $C081
+# 03B8             68  BASEL    EQU $478-$C0
+# CA2E             69  BASCLC1  EQU $CA2E
+# 0438             70  BASEH    EQU $4F8-$C0
+# 0800             71  ;
+# C0AE             72  STATUS   EQU $C0AE           ; Serial card specific to
+# C0AF             73  DATAPORT EQU $C0AF           ; slot 2. Adjust as needed.
+# 0800             74  ;
+# FDED             75  COUT     EQU $FDED           ; Stdout
+# 0800             76  ;
+# A884             77  PUTNAME  EQU $A884           ; DOS patch addresses
+# A909             78  PUTTOKEN EQU $A909
+# 9D1E             79  PUTADR   EQU $9D1E
+# AE8E             80  PUTPATCH EQU $AE8E
+# 0800             81  ;
+# 6000             82           ORG $6000
+# 6000             83           OBJ $800
+# 6000             84  ;
+# 6000 4C 0B 60    85           JMP MAIN
+# 6003             86  ;
+# 6003 54 45 52    87  NAME     DCI 'TERM'          ; hi-bit off except last
+# 6006 CD 
+# 6007 40 70       88  TOKEN    HEX 4070            ; need-filename optional
+# 6009 8D AE       89  ADRESS   ADR PUTPATCH-1
+# 600B             90  ;
+# 600B             91  MAIN:
+# 600B A2 04       92           LDX 4
+# 600D BD 02 60    93  ^1       LDA NAME-1,X
+# 6010 9D 83 A8    94           STA PUTNAME-1,X
+# 6013 CA          95           DEX 
+# 6014 D0 F7       96           BNE <1
+# 6016 E8          97           INX 
+# 6017 BD 07 60    98  ^2       LDA TOKEN,X
+# 601A 9D 09 A9    99           STA PUTTOKEN,X
+# 601D BD 09 60   100           LDA ADRESS,X
+# 6020 9D 1E 9D   101           STA PUTADR,X
+# 6023 CA         102           DEX 
+# 6024 10 F1      103           BPL <2
+# 6026 A2 73      104           LDX #ENDPATCH-PATCH+1
+# 6028 BD 32 60   105  ^3       LDA PATCH,X
+# 602B 9D 8E AE   106           STA PUTPATCH,X
+# 602E CA         107           DEX 
+# 602F 10 F7      108           BPL <3
+# 6031 60         109           RTS 
+# 6032            110  ;
+# 6032            111  PATCH:
+# 6032            112           PHS PUTPATCH
+# AE8E            113  ;
+# AE8E A2 8D      114           LDX #$8D
+# AE90 AD 04 02   115           LDA INBUFF+4
+# AE93 C9 A0      116           CMP #" "
+# AE95 D0 02      117           BNE >0
+# AE97 A2 84      118           LDX #$84
+# AE99 8A         119  ^0       TXA 
+# AE9A 4C BD AE   120           JMP SENDIT
+# AE9D AD AE C0   121  RECEIVE  LDA STATUS
+# AEA0 29 01      122           AND #$01
+# AEA2 F0 0C      123           BEQ SEND
+# AEA4 AD AF C0   124           LDA DATAPORT
+# AEA7 29 7F      125           AND #$7F
+# AEA9 C9 10      126           CMP #$10
+# AEAB F0 1F      127           BEQ SCROLLD
+# AEAD 20 ED FD   128  PRINTIT  JSR COUT
+# AEB0 AD 00 C0   129  SEND     LDA $C000
+# AEB3 10 E8      130           BPL RECEIVE
+# AEB5 8D 10 C0   131           STA $C010
+# AEB8 29 7F      132           AND #$7F
+# AEBA D0 01      133           BNE SENDIT
+# AEBC 60         134           RTS 
+# AEBD 48         135  SENDIT   PHA 
+# AEBE AD AE C0   136  S0       LDA STATUS
+# AEC1 29 02      137           AND #$02
+# AEC3 F0 F9      138           BEQ S0
+# AEC5 68         139           PLA 
+# AEC6 8D AF C0   140           STA DATAPORT
+# AEC9 4C 9D AE   141           JMP RECEIVE
+# AECC 38         142  SCROLLD  SEC 
+# AECD A2 C3      143           LDX #$C3            ; for slot 3
+# AECF AC F8 06   144           LDY NO
+# AED2 BD 38 06   145           LDA START,X
+# AED5 E9 05      146           SBC #$05
+# AED7 29 7F      147           AND #$7F
+# AED9 9D 38 06   148           STA START,X
+# AEDC 20 2E CA   149           JSR BASCLC1
+# AEDF A9 0D      150           LDA #$0D
+# AEE1 99 80 C0   151           STA DEV0,Y
+# AEE4 BD B8 03   152           LDA BASEL,X
+# AEE7 99 81 C0   153           STA DEV1,Y
+# AEEA A9 0C      154           LDA #$0C
+# AEEC 99 80 C0   155           STA DEV0,Y
+# AEEF BD 38 04   156           LDA BASEH,X
+# AEF2 99 81 C0   157           STA DEV1,Y
+# AEF5 A9 19      158           LDA #$19            ; home cursor
+# AEF7 20 ED FD   159           JSR COUT
+# AEFA A9 1D      160           LDA #$1D            ; ceol
+# AEFC 20 ED FD   161           JSR COUT
+# AEFF 4C 9D AE   162           JMP RECEIVE
+# AF02            163  ;
+# AF02            164           DPH 
+# 60A6            165           ORG $6000+*-$800
+# 60A6            166           OBJ *
+# 60A6            167  ;
+# 60A6            168  ENDPATCH:
+# 60A6            169           END 
+# ATT
+#
+# Info:
+#	The official PC terminal emulator program of the AT&T Product 
+#	Centers.
+#	
+#	Note - insert mode commented out - doesn't seem to work on 
+#	AT&T PC.
+#
+simterm|attpc running simterm,
+	am,
+	cols#80, lines#24,
+	bel=^G, clear=\EH\EJ, cr=\r, cub1=\b, cud1=\EB,
+	cuf1=\EC, cup=\E=%p1%' '%+%c%p2%' '%+%c, cuu1=\EA,
+	dch1=\ER, dl1=\EM, ed=\EJ, el=\EK, home=\EH, il1=\EL,
+	ind=\n, rmcup=\EVE, .rmir=\EE, .rmso=\E&d@, smcup=\EVS,
+	smir=\EQ, smso=\E&dB,
+# Info:
+#
+vic20|vic|vic Personal Computer,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, clear=^K^L, home=^L,
+	lines#20, cuu1=^^, cuf1=^\, cols#22,
+# Info:
+#	(Dan Ingold)
+#	
+#	Following is a TERMCAP entry for the Datapoint UNITRM18 
+#	asynchronous terminal emulation program. It has only been 
+#	tested out at 1200 baud, however, so I don't know if the 
+#	delays are correct.
+#	
+#	[what is control "="?  keys send different codes from functions? - mrh]
+#
+unitrm18|datapoint 'UNITRM18' terminal emulator,
+	cr=^M, ind=^J, cud1=^J, bel=^G, am, cub1=^y,
+	ed=^?, el=^>, clear=^=^?$<12.5>, cols#80, cud1=^k, home=^=,
+	kcuu1=^x, kcud1=^r, kcub1=^t, kcuf1=^v, lines#24, cuf1=^x, cuu1=^z, 
+# Info:
+#	FLORIDA COMPUTER GRAPHICS
+#	Florida Computer Graphics Beacon System, using terminal emulator
+#	program "host.com", as provided by FCG.  Entry provided by
+#	David Bryant (cbosg!djb) 1/7/83.
+#	This description is for an early release of the "host" program.
+#	Known bug: ed clears the whole screen, so it's commented out.
+#
+beacon|FCG Beacon System,
+	cr=^M, cud1=^J, ind=^J, cols#80, lines#32, clear=\EZ$<10>,
+	cub1=^H, cup=\E=%p1%' '%+%c%p2%' '%+%c$<20>, cuf1=\EV, cuu1=\EU, el=\ET,
+	.ed=\EY, dch1=\EW, ich1=\EQ, dl1=\ER, il1=\EE,
+	smcup=\ESTART^M\E2\0540^M\E12^M\EEND^M$<10>,
+	bel=\ESTART^M\E37^M\EEND^M$<1>, home=\EH$<10>,
+	am, da, db, 
+	rev=\ESTART^M\E59\0541^M\EEND^M,
+	smso=\ESTART^M\E70\0546^M\EEND^M$<20>,
+	rmso=\ESTART^M\E70\0540^M\EEND^M$<20>,
+	smul=\ESTART^M\E60\0541^M\EEND^M, 
+	rmul=\ESTART^M\E60\0540^M\EEND^M, 
+	blink=\ESTART^M\E61\0541^M\EEND^M, 
+	sgr0=\ESTART^M\E78^M\E70\0540^M\EEND^M$<20>,
+# Info:
+#	This doesn't work because the cursor position isn't saved 
+#	with the window.
+#
+beacon-s|FCG Beacon System with status line,
+	lines#31, eslok, hs,
+	tsl=\ESTART^M\E45\0541^M\E41\054%p1%d\0541^M\EEND^M$<10>,
+	fsl=\ESTART^M\E45\0540^M\EEND^M$<10>,
+	is2=\ESTART^M\E45\0540^M\E65\05431^M\E66\05445^M\E45\0541^M\E65\0541^M\E66\0541^M\E45\0540^M\EEND^M$<30>,
+	use=beacon,
+# Info:
+#	Here is the xtalk termcap. I mostly use the terminfo (curses) 
+#	version myself since I am working at BTL where they have a 
+#	certain bias. I am sending the terminfo version too, so that 
+#	you can compare them if there are any undiscovered glitches 
+#	in the termcap version due to insufficient testing.
+#	
+#	First the termcap version --
+#	
+#	d0|vt100|vt100-am|vt100|dec vt100:\
+#		:cr=^M:do=^J:nl=^J:bl=^G:co#80:li#24:cl=50\E[;H\E[2J:\
+#		:le=^H:bs:am:cm=5\E[i2252;787036H:nd=2\E[C:up=2\E[A:\
+#		:ce=3\E[K:cd=50\E[J:so=2\E[7m:se=2\E[m:us=2\E[4m:ue=2\E[m:\
+#		:md=2\E[1m:mr=2\E[7m:mb=2\E[5m:me=2\E[m:is=\E[1;24r\E[24;1H:\
+#		:rs=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h:ks=\E[?1h\E=:ke=\E[?1l\E>:\
+#		:rf=/usr/share/lib/tabset/vt100:ku=\EOA:kd=\EOB:kr=\EOC:kl=\EOD:kb=^H:\
+#		:ho=\E[H:k1=\EOP:k2=\EOQ:k3=\EOR:k4=\EOS:ta=^I:pt:sr=5\EM:vt#3:xn:\
+#		:sc=\E7:rc=\E8:cs=\E[i2252;787036r:
+#	d1|xtalk|IBM PC with xtalk:\
+#		:sc@:rc@:cs@:am@:xn@:al=99\E[L:dl=99\E[M:tc=vt100-am:
+#	
+#	The problem is in the "xtalk" entry. The "am" auto-margin 
+#	flag should not be turned off as shown above. The following 
+#	is the corrected "xtalk" entry.
+#	
+#	d1|xtalk|IBM PC with xtalk:\
+#		:sc@:rc@:cs@:xn@:al=99\E[L:dl=99\E[M:tc=vt100-am:
+#	
+#	This is the shell script that I execute from my profile when I 
+#	login from xtalk --
+#	
+#	# set auto margins
+#	echo '\033[?7h\c'
+#	#set up tab stops
+#	stty -tabs
+#	echo '\033[3g'
+#	for i in 1 2 3 4 5 6 7 8 9
+#	do
+#	echo '        \033H\c'
+#	done
+#	stty tabs
+#	echo
+#	
+#	
+#	Now the terminfo version (This is the input to the 'tic' 
+#	compiler) --
+#	
+#	Vanilla vt100 definitions.
+#	vt100|vt100-am|dec vt100,
+#		cr=^M, cud1=^J, ind=^J, bel=^G, cols#80, lines#24, it#8,
+#		clear=\E[H\E[2J$<50>, cub1=^H, am, cup=\E[ip12252;p2787036H$<5>,
+#		cuf1=\E[C$<2>, cuu1=\E[A$<2>, el=\E[K$<3>, ed=\E[J$<50>,
+#		cud=\E[p12252B, cuu=\E[p1787036A, cub=\E[p1787088D, cuf=\E[p1787036C, 
+#		smso=\E[7m$<2>, rmso=\E[m$<2>, smul=\E[4m$<2>, rmul=\E[m$<2>,
+#		bold=\E[1m$<2>, rev=\E[7m$<2>, blink=\E[5m$<2>, sgr0=\E[m$<2>,
+#		sgr=\E[?p1t;7;?p2t;4;?p3t;7;?p4t;5;?p6t;1;m,
+#		rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, smkx=\E[?1h\E=, rmkx=\E[?1l\E>,
+#		tbc=\E[3g, hts=\EH, home=\E[H,
+#		kcuu1=\EOA, kcud1=\EOB, kcuf1=\EOC, kcub1=\EOD, kbs=^H,
+#		kf1=\EOP, kf2=\EOQ, kf3=\EOR, kf4=\EOS, ht=^I, ri=\EM$<5>,
+#		vt#3, xenl, xon, sc=\E7, rc=\E8, csr=\E[ip12252;p2787036r,
+#	
+#	
+#	ibm xtalk terminal simulator -- similar to but dumber than 
+#	vanilla vt100
+#			Enjoy!
+#			Rick Thomas
+#			ihnp4!btlunix!rbt
+#			(201)-522-6062
+#			
+#	PS -- I just got word that there is a new revision of xtalk 
+#	(3.5 I think they said) that is supposed to fix the vt100 
+#	emulation problems.
+#
+xtalk|IBM PC with xtalk communication program,
+	am, mir, msgr, xon,
+	cols#80, it#8, lines#24, vt#3, xmc#1,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, clear=\E[H\E[J$<50>, cr=\r, cub=\E[%p1%dD,
+	cub1=\b, cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC,
+	cuf1=\E[C$<2>, cup=\E[%i%p1%d;%p2%dH$<5>,
+	cuu=\E[%p1%dA, cuu1=\E[A$<2>, dl1=\E[M$<99>,
+	ed=\E[J$<50>, el=\E[K$<3>, el1=\E[1K$<3>,
+	enacs=\E(B\E)0, home=\E[H, ht=\t, hts=\EH,
+	il1=\E[L$<99>, ind=\n, ka1=\EOq, ka3=\EOs, kb2=\EOr,
+	kbs=\b, kc1=\EOp, kc3=\EOn, kcub1=\EOD, kcud1=\EOB,
+	kcuf1=\EOC, kcuu1=\EOA, kent=\EOM, kf0=\EOy, kf1=\EOP,
+	kf10=\EOx, kf2=\EOQ, kf3=\EOR, kf4=\EOS, kf5=\EOt,
+	kf6=\EOu, kf7=\EOv, kf8=\EOl, kf9=\EOw, ri=\EM$<5>,
+	rmacs=^O, rmkx=\E[?1l\E>, rmso=\E[m\s,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, smacs=^N,
+	smkx=\E[?1h\E=, smso=\E[7m\s, tbc=\E[3g,
+#	
+# Info: 
+#	\EI gets you out of inverse video mode.
+#
+# Info:
+#	IBM
+#	Thu May  5 19:35:27 1983
+#
+ibmpc|ibm-pc|ibm5051|5051|IBM Personal Computer,
+	cud1=^J, ind=^J$<10>, bel=^G, smir=\200R, am, cub1=^],
+	kcud1=^_, clear=^L^K, cr=^M^^, home=^K, lines#24, cuu1=^^,
+	cuf1=^\, cols#80,
+# Info:
+#	According to the Coherent 2.3 manual, the PC console is similar
+#	to a z19. The differences seem to be (1) 25 lines, (2) no status
+#	line, (3) standout is broken, (4) ins/del line is broken, (5)
+#	has blinking and bold.
+#
+pc-coherent|pcz19|coherent|IBM PC console running Coherent,
+	cr=^M, cud1=^J, ind=^J, bel=^G, .il1=\EL$<1*>, am, cub1=^H,
+	ed=\EJ, el=\EK, clear=\EE, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80,
+	dch1=\EN, .dl1=\EM$<1*>, cud1=\EB, rmir=\EO, home=\EH, smir=\E@,
+	lines#25, mir, cuf1=\EC, ht=^I, it#8,
+	ri=\EI, rmso=\Eq, smso=\Ep, cuu1=\EA,
+	kbs=^h, kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\EH,
+# Info:
+#	According to the Venix 1.1 manual, the PC console is similar
+#	to a DEC vt52. Differences seem to be (1) arrow keys send 
+#	different strings, (2) enhanced standout, (3) added 
+#	insert/delete line.
+#	
+#	Note in particular that it doesn't have automatic margins (ick).
+#	There are other keys (f1-f10, pgup, pgdn, backtab, insch,delch)
+#	which I don't have time to add now.
+#
+pc-venix|venix|IBM PC console running Venix,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK,
+	clear=\EH\EJ, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80, lines#25,
+	cuf1=\EC, ht=^I, it#8, ri=\EI, cuu1=\EA,
+	kcuu1=\EH, kcud1=\EP, kcuf1=\EM, kcub1=\EK, kbs=^H,
+	il1=\EL, dl1=\EM, khome=\EG,
+ibm|ibm3101|3101|i3101|IBM 3101-10,
+	am,
+	cols#80, lines#24,
+	bel=^G, clear=\EK, cr=\r, cub1=\b, cud1=\n, cuf1=\EC,
+	cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=\EA, ed=\EJ,
+	el=\EI, home=\EH, ht=\t, hts=\E0, tbc=\EH,
+	ind=\n, kcub1=\ED, kcud1=\EB, kcuf1=\EC, kcuu1=\EA,
+ibm-system1|system1|ibm system/1 computer,
+	ind=^J, bel=^G, xt, am, cub1=^H,
+	cup=^E%p1%' '%+%c%p2%' '%+%c, clear=^Z,
+	cols#80, home=^K, lines#24, cuf1=^\, cuu1=^^, 
+megatek|Pegasus Work Station Terminal Emulator,
+	cols#83, lines#60, os, am,
+# Info:
+#	sol and Microkit are for Corey - 6/11/82 - NS
+#
+microkit|mkt|microkit terminal computer,
+	cr=^M, ind=^J, cud1=^J, bel=^G,
+	il1=\El, am, cub1=^H, ed=\Ej, el=\Ek, clear=\Ee,
+	cup=\Ey%p1%' '%+%c%p2%' '%+%c, cols#40, dch1=\En, dl1=\Em,
+	rmir=\Eo, home=\Eh, smir=\E@, lines#23, mir,
+	cuf1=\Ec, cuu1=\Ea, ht=^I, cvvis=^N^Lzv, cnorm=\Ex,
+	kcuu1=\Eu, kcud1=\Ed, kcub1=\El, kcuf1=\Er, khome=\Eh, xenl, 
+# Info:
+#	OSBORNE
+#	Thu Jul  7 03:55:16 1983
+#	
+#	As an aside, be careful; it may sound like an anomaly on the 
+#	Osborne, but with the 80-column upgrade, it's too easy to 
+#	enter lines >80 columns!
+#	
+#	I've already had several comments...
+#	The Osborne-1 with the 80-col option is capable of being 
+#	52,80, or 104 characters wide; default to 80 for compatibility 
+#	with most systems.
+#	
+#	The tab is destructive on the Ozzie; make sure to 'stty -tabs'.
+#
+ozzie|osborne|osborne1|osborne 1,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE, cub1=^H, el=\ET,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=^Z, cols#104, dch1=\EW, dl1=\ER,
+	kcuu1=^K, kcud1=^J, kcub1=^H, kcuf1=^L, cud1=^J, cuf1=^L,
+	ich1=\EQ, lines#24, cuu1=^K, msgr, smso=\E), rmso=\E(,
+	ul, smul=\El, rmul=\Em, xt,
+# Info:
+#	SOL
+#	I don't know which, if either, of these sol's to believe.
+#	^S is an arrow key!  
+#
+sol|sol1|,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, cup=\E^1%p1%c\E^2%p2%c,
+	clear=^K, home=^N, cols#64, lines#16, cuf1=^S, cuu1=^W,
+	kcub1=^A, kcuf1=^S, kcuu1=^W, kcud1=^Z,
+# Info:
+#	sol and Microkit are for Corey - 6/11/82 - NS
+#
+sol2|sol terminal computer,
+	cr=^M, ind=^J$<20>, cud1=^J, bel=^G,
+	il1=20\EL, am, cub1=^H, ed=20\EJ, el=\EK, clear=20\EE,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#64, dch1=\EN, dl1=20\EM,
+	rmir=\EO, home=\EH, smir=\E@, lines#16, mir, cuf1=\EC,
+	cuu1=\EA, ht=^I, cvvis=^N^Lv, cnorm=\EX,
+	kcuu1=\EU, kcud1=\ED, kcub1=\EL, kcuf1=\ER, khome=\EH, xenl, 
+# Info:
+#	SUN
+#	smcup/rmcup control # lines scrolled on linefeed. The sun 2 
+#	seems to handle this well with it set to 1, so both force this. 
+#	rmcup could use 0 or 3 just as well, I suppose.
+#
+sun|sun1|sun2|Sun Microsystems Inc. workstation,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, km, cub1=^H, clear=^L,
+	lines#34, cols#80, cup=\E[%i%p1%d;%p2%dH, cuf1=\E[C, cuu1=\E[A,
+	el=\E[K, ed=\E[J, il=\E[%p1%dL, dl=\E[%p1%dM, ich=\E[%p1%d@,
+	dch=\E[%p1%dP, kcub1=\E[D, kcud1=\E[B, kcuu1=\E[A, kcuf1=\E[C,
+	kf1=\E[224z, kf2=\E[225z, kf3=\E[226z, kf4=\E[227z,
+	kf5=\E[228z, kf6=\E[229z, kf7=\E[230z, kf8=\E[231z,
+	kf9=\E[232z, ht=^I, il1=\E[L, dl1=\E[M, rs2=\E[s,
+	smso=\E[7m, rmso=\E[m, smul=\E[4m, rmul=\E[m, bold=\E[1m,
+	rev=\E[7m, sgr0=\E[m,
+	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;m,
+	msgr, ich1=\E[@, dch1=\E[P, home=\E[H,
+sun-s|Sun Microsystems Workstation window with status line,
+	hs, tsl=\E]l, fsl=\E\\, dsl=\E]l\E\\, use=sun,
+sun-e-s|sun-s-e|Sun Microsystems Workstation with status hacked for emacs,
+	hs, tsl=\E]l, fsl=\E\\, dsl=\E]l\E\\, use=sun-e,
+sun-48|Sun 48-line window,
+	lines#48, cols#80, use=sun,
+sun-34|Sun 34-line window,
+	lines#34, cols#80, use=sun,
+sun-24|Sun 24-line window,
+	lines#24, cols#80, use=sun,
+sun-17|Sun 17-line window,
+	lines#17, cols#80, use=sun,
+sun-12|Sun 12-line window,
+	lines#12, cols#80, use=sun,
+sun-1|Sun 1-line window for sysline,
+	lines#1, cols#80, eslok, hs, tsl=\r, fsl=\E[K, dsl=^L, use=sun,
+# emacs runs faster without insert character
+sun-nic|sune|sun-e|Sun Microsystems Workstation console without insert character,
+	ich1@, use=sun,
+sun-cmd|Sun Microsystems Workstation console with scrollable history,
+	rmcup=\E[>4h, smcup=\E[>4l, use=sun,
+sun-na|Sun Microsystems Workstation console with no arrow keys,
+	kcuu1@, kcud1@, kcub1@, kcuf1@, use=sun,
+sun-color|Sun Workstation console with color text support,
+	colors#8, ncv#3, pairs#64,
+	op=\E[0m,
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	setb=\E[4%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	setf=\E[3%?%p1%{1}%=%t4
+		 %e%p1%{3}%=%t6
+		 %e%p1%{4}%=%t1
+		 %e%p1%{6}%=%t3
+		 %e%p1%d%;m,
+	use=sun,
+# Info:
+#	X
+#	Latest and greatest "xterm" entry from X11R5
+#
+xterm|vs100|xterm terminal emulator,
+	ind=^J, cols#80, lines#65,
+	clear=\E[H\E[2J, cub1=^H, am, cup=\E[%i%p1%d;%p2%dH,
+	cuf1=\E[C, cuu1=\E[A, el=\E[K, ed=\E[J,
+	cud=\E[%p1%dB, cuu=\E[%p1%dA, cub=\E[%p1%dD,
+	cuf=\E[%p1%dC, km,
+	smso=\E[7m, rmso=\E[m, smul=\E[4m, rmul=\E[m,
+	bold=\E[1m, rev=\E[7m, blink=\E[5m, sgr0=\E[m,
+	rs1=\E>\E[1;3;4;5;6l\E[?7h\E[m\E[r\E[2J\E[H, rs2=@,
+	kf1=\E[11~, kf2=\E[12~, kf3=\E[13~, kf4=\E[14~, kf5=\E[15~,
+	kf6=\E[17~, kf7=\E[18~, kf8=\E[19~, kf9=\E[20~, kf0=\E[21~,
+	ht=^I, ri=\EM, vt@, xon@, csr=\E[%i%p1%d;%p2%dr,
+	il=\E[%p1%dL, dl=\E[%p1%dM, il1=\E[L, dl1=\E[M,
+	ich=\E[%p1%d@, dch=\E[%p1%dP, ich1=\E[@, dch1=\E[P,
+	rmcup=\E[2J\E[?47l\E8, smcup=\E7\E[?47h,
+	use=vt100-am,
+xterms|vs100s|xterm terminal emulator (small screen 24x80),
+	cols#80, lines#24,
+	use=xterm,
+xpcterm|X PC-compatible terminal,
+	am, xon, cols#80, lines#25, colors#8, pairs#64, ncv#3,
+	cbt=^], bel=^G, cr=^M, clear=\e[2J\e[H, el=\e[K, ed=\e[J,
+	cup=\e[%i%p1%d;%p2%dH, cud1=\e[B, home=\e[H, cub1=\e[D, cuf1=\e[C,
+	cuu1=\e[A, dch1=\e[P, dl1=\e[M, smacs=\e[12m, blink=\e[5m,
+	bold=\e[1m, invis=\e[8m, rev=\e[7m, smso=\e[7m, smul=\e[4m,
+	rmacs=\e[10m, sgr0=\e[0;10m, rmso=\e[m, rmul=\e[m, is2=\e[0;10;39m,
+	ich1=\e[@, il1=\e[L, kbs=^H, kdch1=\177, kcud1=\e[B,
+	kf1=\eOP, kf2=\eOQ, kf3=\eOR, kf4=\eOS, kf5=\eOT,
+	kf6=\eOU, kf7=\eOV, kf8=\eOW, kf9=\eOX, kf10=\eOY,
+	khome=\e[H, kich1=\e[@, kcub1=\e[D, knp=\e[U, kpp=\e[V,
+	kcuf1=\e[C, kcuu1=\e[A, dch=\e[%p1%dP, dl=\e[%p1%dM,
+	cud=\e[%p1%dB, ich=\e[%p1%d@, indn=\e[%p1%dS, il=\e[%p1%dL,
+	cub=\e[%p1%dD, cuf=\e[%p1%dC, rin=\e[%p1%dT, cuu=\e[%p1%dA,
+	ind=\e[S, ri=\e[T,
+	sgr=\e[0%?%p1%p3%|%t;7%;%?%p2%t;4%;%?%p4%t;5%;%?%p6%t;1%;%?%p7%t;8%;%?%p9%t;12%e;10%;m,
+	ht=^I,
+	acsc=``a1fxgqh0jYk?lZm@nEooppqDrrsstCu4vAwBx3yyzz{{||}}~~,
+	kcbt=^], kend=\e[Y, kf11=\eOZ, kf12=\eOA, op=\e[0m,
+	setf=\e[%?%p1%{0}%=%t30m%e%p1%{1}%=%t34m%e%p1%{2}%=%t32m%e%p1%{3}%=%t36m%e%p1%{4}%=%t31m%e%p1%{5}%=%t35m%e%p1%{6}%=%t33m%e%p1%{6}%=%t33m%e%p1%{7}%=%t37m%;,
+	setb=\e[%?%p1%{0}%=%t40m%e%p1%{1}%=%t44m%e%p1%{2}%=%t42m%e%p1%{3}%=%t46m%e%p1%{4}%=%t41m%e%p1%{5}%=%t45m%e%p1%{6}%=%t43m%e%p1%{7}%=%t47m%;,
+xpcterms|X PC-compatible terminal (small) (X Window System),
+	lines#25, use=xpcterm,
+
+terak|Terak emulating Datamedia 1520,
+	am, xenl,
+	cols#80, lines#24,
+	bel=^G, clear=\f, cr=\r, cub1=\b, cud1=\n, cuf1=^\,
+	cup=^^%p2%'\s'%+%c%p1%'\s'%+%c, cuu1=^_, ed=^K, el=^],
+	home=^Y, ht=\t, ind=\n, kcub1=\b, kcud1=\n, kcuf1=^\,
+	kcuu1=^_, khome=^Y,
+trs80|trs-80|trs80-1|Radio Shack TRS-80 model I,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	am, cub1=^H, cols#64, lines#16,
+# Info:
+#
+trs16|trs80-16|trs-80 model 16 console,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL, am, cub1=^H, ed=\EJ,
+	el=\EK, clear=^L, cup=\EY%p1%' '%+%c%p2%' '%+%c, cuu1=\EA,
+	cols#80, dch1=\EQ, dl1=\EM,
+	cud1=\EB, ich1=\EP, home=\EH, kbs=^H, kcud1=\EB,
+	kcub1=\ED, kcuf1=\EC, kcuu1=\EA, kf0=^A, kf1=^B,
+	lines#24, cuf1=\EC, ht=^I, rmso=\ER@, xmc#0, smso=\ERD,
+	kf2=^D, kf3=^L, kf4=^U, kf5=^P, kf6=^N, kf7=^S,
+# Info:
+#	Radio Shack model 100 running standard TELCOM Rom program 
+#	hacking by <and flames to> Yerazuws@RPI, Bownesrm@RPI 1/8/84
+#	tested at 300 baud (foneline), remember to set the 100's RS-232
+#	to ignore parity (eg. config to 37I1N) if you want to
+#	run Emacs (which this termcap description will, quite nicely!)
+#	
+#	 From: jgc@sunrise.UUCP Mon, 11-Jul-83 17:33:49 EDT
+#	   esc A  - cursor up
+#	   esc B  - cursor down
+#	   esc C  - cursor right
+#	   esc D  - cursor left
+#	   esc E  - clear screen and home cursor
+#	   esc H  - home cursor
+#	   esc J  - erase to end of screen
+#	   esc K  - erase to end of line
+#	   esc L  - insert line
+#	   esc M  - delete line
+#	   esc P  - turn on cursor
+#	   esc Q  - turn off cursor
+#	   esc T  - sets system line (?)
+#	   esc U  - resets system line (?)
+#	   esc V  - turn off LCD (?)
+#	   esc W  - turn on LCD (?)
+#	   esc Y row column - cursor motion (:cm=\EY%+ %+ :)
+#	   esc j  - clear screen, don't move cursor
+#	   esc l  - erase line, don't move cursor
+#	   esc p  - begin reverse video
+#	   esc q  - end reverse video
+#	   esc del - change char under cursor to space
+#
+trs80-100|trs100|trs-100|MZ|m-100|m100| Radio Shack Model 100,
+	cr=^M, cud1=^J, ind=^J, bel=^G, ed=\EJ, el=\EK, cub1=^H, am,
+	dl1=\EM$<5>, il1=\EL$<7>, cuu1=\EA, cuf1=\EC,
+	cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c,
+	lines#8, cols#40, smso=\Ep, rmso=\Eq,
+	kcuu1=^^, kcud1=^_, kcub1=^], kcuf1=^\, kbs=^H,
+	home=\EH, clear=\EE, civis=\EQ, cnorm=\EP,
+trs2|trsII|trs80II|Radio Shack Model II using P&T CP/M,
+	am, msgr, cols#80, lines#24,
+	bel=^G, clear=^L, cr=^M, cub1=^H, cud1=^_, cuf1=^],
+	cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c, dl1=^K, ed=^B, el=^A,
+	home=^F, ht=^I, il1=^D, ind=^_, kbs=^H, kcub1=^\,
+	kcud1=^_, kcuf1=^], kcuu1=^^, rmso=^O, smso=^N,
+# XEROX
+x820|820|820-2|Xerox 820,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c,
+	clear=1^Z, ed=^Q, el=^X, cols#80, home=^^, lines#24,
+	cuf1=^L, cuu1=^K,
+
+# COLOR EMULATORS
+
+gs6300|emots|AT&T PC6300 with EMOTS Terminal Emulator,
+
+# background color erase
+
+	am, msgr, xon, bce,
+	cols#80, it#8, lines#24, colors#8, pairs#64,
+	acsc=\,\,..--++``aaffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[H\E[J,
+	cr=\r, cub=\E[%p1%dD, cub1=\b, cud=\E[%p1%dB, cud1=\n,
+	cuf=\E[%p1%dC, cuf1=\E[C, cup=\E[%i%p1%d;%p2%dH,
+	cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP, dch1=\E[P,
+	dl=\E[%p1%dM, dl1=\E[M, ed=\E[J, el=\E[K, .el1=\E[1K,
+	home=\E[H, ht=\t, ich=\E[%p1%d@, ich1=\E[@,
+	il=\E[%p1%dL, il1=\E[L, ind=\n, is2=\E[0m, kbs=\b,
+	kcbt=^R\t, kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C,
+	kcuu1=\E[A, kf1=\E[0s, kf2=\E[24s, kf3=\E[1s,
+	kf4=\E[23s, kf5=\E[2s, kf6=\E[22s, kf7=\E[3s,
+	kf8=\E[21s, khome=\E[H, mc4=\E[4i, mc5=\E[5i,
+	rev=\E[7m, ri=\E[L, rmacs=\E[10m, rmln=\E|, rs1=\Ec,
+	sgr0=\E[m\E[10m, smacs=\E[11m, smso=\E[1m, smul=\E[4m,
+
+#	color information.  blue foreground is simulated with cyan
+
+	op=\E[?;m,
+	setf=\E[?%?%p1%{0}%=%t0
+		 %e%p1%{1}%=%t2
+		 %e%p1%{1}%-%d%;m,
+	setb=\E[?;%p1%dm,
+
+
+pc52|dec vt52 for PC,
+
+#	background color erase
+
+	am, msgr, bce,
+	cols#80, it#8, lines#25,
+
+# 	bold means: white on black bold, so it not allowed with colors
+# 	rev meand: black on white, also not allowed
+#	smso and dim are simulated with colors, ditto
+#	smul is allowed, even though it always means white foreground:
+#	it is too important.
+
+	colors#8, pairs#64, ncv#53,
+	bel=^G, blink=\Eo, bold=\Ebo\Ec0, clear=\EH\EJ, cr=\r,
+	cub1=\b, cud1=\n, cuf1=\EC,
+	cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=\EA,
+	dim=\Eb3\Ec0, dl1=\EM, ed=\EJ, el=\EK, ht=\t, il1=\EL,
+	ind=\n, kbs=\b, kcub1=\EL, kcud1=\ED, kcuf1=\ER,
+	kcuu1=\EU, kf1=\Ea, kf10=\Ej, kf2=\Eb, kf3=\Ec,
+	kf4=\Ed, kf5=\Ee, kf6=\Ef, kf7=\Eg, kf8=\Eh, kf9=\Ei,
+	rev=\Ep, ri=\EI, rmso=\Eb7\Ec0, sgr0=\Eb7\Ec0\Et, smso=\Eb6\Ec4,
+	smul=\Es,
+
+#	color information.  blue foreground is simulated with cyan
+
+	op=\Eb7\Ec0,
+	setf=\Eb%?%p1%{1}%=%t3
+	        %e%p1%d%;,
+	setb=\Ec%p1%d,
+
+
+# CTRM terminal emulator
+
+ctrm|C terminal emulator,
+
+	am, xon,
+
+# back_color_erase
+# underlining is not allowed with colors: first, is is simulated by 
+# black on white, second, it disables background color manipulations.
+
+	bce,
+	cols#80, lh#0, lines#24, lm#0, lw#0, nlab#0, colors#8, pairs#64,
+	pb#19200, vt#6, ncv#2,
+	bel=^G, cbt=\Ei, clear=\EH\EJ, cr=\r, cub1=\b,
+	cud1=\n, cuf1=\EC, cup=\E&a%p2%dc%p1%dY, cuu1=\EA,
+	dch1=\EP$<2>, dl1=\EM, ed=\EJ, el=\EK, hpa=\E&a%p1%dC,
+	ht=\t$<2>, hts=\E1, il1=\EL, ind=\n, ip=$<2>,
+	is2=\E&jA\r, kbs=\b, kcub1=\Eu\r, kcud1=\Ew\r,
+	kcuf1=\Ev\r, kcuu1=\Et\r, kf1=\Ep\r, kf2=\Eq\r,
+	kf3=\Er\r, kf4=\Es\r, kf5=\Et\r, kf6=\Eu\r, kf7=\Ev\r,
+	kf8=\Ew\r, khome=\Ep\r, rmir=\ER, rmkx=\E&jA, smir=\EQ,
+	smkx=\E&jB, smso=\E&dD, smul=\E&dD, tbc=\E3,
+	vpa=\E&a%p1%dY,
+
+# BLINKING, REVERSE and BOLD are allowed with colors,
+# so we have to save their status in the static registers A, B and H
+# respectively, to be able to restore them when color changes
+# (because any color change turns off ALL attributes)
+
+	blink=\E&dA%{1}%PA,
+
+# "enter_bold_mode" and "enter_reverse_mode" sequences alternates modes,
+# rather then simply  entering them.  Thus we have to check the
+# static register B and H to determine the status, before sending the 
+# escape sequence.
+
+	rev=%?%gB%{0}%=%t\E&dB%{1}%PB%;,
+	bold=%?%gH%{0}%=%t\E&dH%{1}%PH%;,
+
+	smul=\E&dD,
+
+# sgr0 now must set the status of all 3 register (A,B,H) to zero
+# and then reset colors
+
+	sgr0=\E&d@%{0}%PA%{0}%PB%{0}%PH,
+
+# implementation of the protect mode would badly penalize the performance.
+# we would have to use \E&bn sequence to turn off colors (as well as all
+# other attributes), and keep the status of protect mode in yet another
+# static variable.  If someone really need this mode, they would have to
+# create another terminfo entry.
+
+	sgr=\E&d@%{0}%PA%{0}%PB%{0}%PD%{0}%PH
+		 %?%p1%p3%p5%|%|%t\E&dB%{1}%PB%;
+		 %?%p4%t\E&dA%{1}%PA%;
+		 %?%p6%t\E&dH%{1}%PH%;
+		 %?%p2%t\E&dD%;,
+
+# original color-pair: white on black.
+# store the information about colors into static registers
+
+	op=\E&bn\E&bB\E&bG\E&bR
+	    %{0}%PX%{0}%PY%{0}%PZ
+	    %{1}%PW%{1}%PV%{1}%PU,
+
+# set foreground color.  it performs the following steps.
+#   1) turn off all attributes
+#   2) turn on the background and video attribues that have been turned
+#      on before (this information is stored in static registers X,Y,Z,A,B,H,D).
+#   3) turn on foreground attributes
+#   4) store information about foreground into U,V,W static registers
+
+	setf=\E&bn
+		%?%gA%t\E&dA%;
+		%?%gB%t\E&dB%;
+		%?%gH%t\E&dH%;
+		%?%gX%t\E&br%;
+		%?%gY%t\E&bg%;
+		%?%gZ%t\E&bb%;
+
+		%?%p1%{1}%&%t\E&bB%{1}%e%{0}%;%PW
+		%?%p1%{2}%&%t\E&bG%{1}%e%{0}%;%PV
+		%?%p1%{4}%&%t\E&bR%{1}%e%{0}%;%PU,
+
+# turn on background: similar to turn on foreground above
+
+	setb=\E&bn
+		%?%gA%t\E&dA%;
+		%?%gB%t\E&dB%;
+		%?%gH%t\E&dH%;
+		%?%gU%t\E&bR%;
+		%?%gV%t\E&bG%;
+		%?%gW%t\E&bB%;
+
+		%?%p1%{1}%&%t\E&bb%{1}%e%{0}%;%PZ
+		%?%p1%{2}%&%t\E&bg%{1}%e%{0}%;%PY
+		%?%p1%{4}%&%t\E&br%{1}%e%{0}%;%PX,
+
+# Info:
+#	CDE's dtterm terminal emulator entry from Martin Knutson
+#
+dtterm|CDE terminal emulator,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~, am, bel=^G, 
+	blink=\E[5m, bold=\E[1m, civis=\E[?25l, clear=\E[H\E[J, cnorm=\E[?25h, 
+	colors#8, cols#80, cr=\r, csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, 
+	cub1=\b, cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C, 
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP, 
+	dch1=\E[P, dim=\E[2m, dl=\E[%p1%dM, dl1=\E[M, ech=\E[%p1%dX, ed=\E[J, 
+	el=\E[K, el1=\E[1K, flash=\E[?5h$<200>\E[?5l, home=\E[H, ht=\t, 
+	hts=\EH, ich=\E[%p1%d@, il=\E[%p1%dL, il1=\E[L, ind=\ED, invis=\E[8m, 
+	is2=\E\sF\E>\E[?1l\E[?7h\E[?45l, it#8, kbs=\b, kcub1=\E[D, kcud1=\E[B, 
+	kcuf1=\E[C, kcuu1=\E[A, kdch1=\E[3~, kf1=\E[11~, kf2=\E[12~, 
+	kf3=\E[13~, kf4=\E[14~, kf5=\E[15~, kf6=\E[17~, kf7=\E[18~, 
+	kf8=\E[19~, kf9=\E[20~, kf10=\E[21~, kf11=\E[23~, kf12=\E[24~, 
+	kf13=\E[25~, kf14=\E[26~, kf15=\E[28~, kf16=\E[29~, kf17=\E[31~, 
+	kf18=\E[32~, kf19=\E[33~, kf20=\E[34~, kfnd=\E[1~, khlp=\E[28~, 
+	kich1=\E[2~, knp=\E[6~, kpp=\E[5~, kslt=\E[4~, lines#24, lm#0, mir, 
+	msgr, nel=\EE, op=\E[39;49m, pairs#8, rc=\E8, rev=\E[7m, ri=\EM, 
+	rmacs=^O, rmam=\E[?7l, rmir=\E[4l, rmso=\E[22;27m, rmul=\E[24m, 
+	sc=\E7, setab=\E[%p1%{40}%+%dm, setaf=\E[%p1%{30}%+%dm, 
+	sgr=\E[0%?%p1%t;2;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?%p6%t;1%;%?%p7%t;8%;m%?%p9%t^N%e^O%;, 
+	sgr0=\E[0m, smacs=^N, smam=\E[?7h, smir=\E[4h, smso=\E[2;7m, 
+	smul=\E[4m, tbc=\E[3g, xenl, xon, 

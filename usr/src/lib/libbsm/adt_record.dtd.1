@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+-->
+
+
+<!--Entity Definitions-->
+
+<!-- timeattr or iso8601
+
+timeattr:
+	the time/date to the second in strftime(3C) default format,
+	followed by milliseconds offset.
+
+	Example:	time="Mon May 06 12:10:18 2002" msec="750"
+
+iso8601:
+	ISO 8601 standard format date time and timezone;
+	YYYY-MM-DD HH:MM:SS.sss +/-HH:MM; year, month, day 24 hour time with
+	milliseconds + or - offset from Universal Time (UTC, aka GMT)
+	
+	Example:        iso8601="2003-09-17 16:47:41.831 -07:00"
+
+-->
+<!ENTITY % timeattr	"time		CDATA #IMPLIED
+			msec		CDATA #IMPLIED">
+
+<!ENTITY % iso8601	"iso8601	CDATA #IMPLIED">
+
+<!-- xinfo	Generic info for X related tokens.  -->
+<!ENTITY % xinfo	"xid		CDATA #REQUIRED
+			xcreator-uid	CDATA #REQUIRED">
+
+<!-- reserved_toks 
+
+This represents the set of "reserved" tokens whose placement is
+fixed.
+
+-->
+<!ENTITY % reserved_toks	"(
+			file			|
+			record			|
+			host			|
+			sequence
+			)
+">
+
+<!-- normaltoks 
+
+This represents the set of all tokens other than the "reserved"
+tokens.
+
+-->
+<!ENTITY % normaltoks	"(
+			acl			|
+			arbitrary		|
+			argument		|
+			attribute		|
+			cmd			|
+			exit			|
+			exec_args		|
+			exec_env		|
+			fmri			|
+			group			|
+			ip			|
+			ip_address		|
+			IPC			|
+			IPC_perm		|
+			ip_port			|
+			liaison			|
+			opaque			|
+			path			|
+			path_attr		|
+			privilege		|
+			process			|
+			return			|
+			sensitivity_label	|
+			old_socket		|
+			socket			|
+			subject			|
+			text			|
+			user			|
+			use_of_authorization	|
+			use_of_privilege	|
+			X_atom			|
+			X_client		|
+			X_color_map		|
+			X_cursor		|
+			X_font			|
+			X_graphic_context	|
+			X_pixmap		|
+			X_property		|
+			X_selection		|
+			X_window		|
+			zone
+			)
+">
+
+<!--Element Definitions-->
+
+<!--
+
+The main element, "audit", consists of a sequence of file & record tokens.
+
+-->
+<!ELEMENT audit (file | record)*>
+
+<!-- file token -->
+<!ELEMENT file		(#PCDATA)>
+<!ATTLIST file		%iso8601;>
+
+
+<!-- record token
+
+Audit records will have this general layout of tokens after the
+first token (which is the record token):
+	(tokens),subject,group,(tokens),return,sequence,host
+
+(all tokens after the record token are optional; the host token is unused.)
+
+-->
+<!ELEMENT record (
+		(%normaltoks;)*,
+		sequence?,
+		host?
+	)
+>
+<!ATTLIST record
+		version		CDATA #REQUIRED
+		event		CDATA #REQUIRED
+		modifier	CDATA #IMPLIED
+		host		CDATA #IMPLIED
+		%iso8601;
+>
+
+<!-- text token -->
+<!ELEMENT text		(#PCDATA)>
+
+<!-- user token -->
+<!ELEMENT user	EMPTY>
+<!ATTLIST user
+		uid		CDATA #REQUIRED
+		username	CDATA #REQUIRED
+>
+
+<!-- path token -->
+<!ELEMENT path		(#PCDATA)>
+
+<!-- path_attr token -->
+<!ELEMENT path_attr		(xattr*)>
+<!ELEMENT xattr			(#PCDATA)>
+
+<!-- host token -->
+<!ELEMENT host		(#PCDATA)>
+
+<!-- subject token -->
+<!ELEMENT subject	EMPTY>
+<!ATTLIST subject
+		audit-uid	CDATA #REQUIRED
+		uid		CDATA #REQUIRED
+		gid		CDATA #REQUIRED
+		ruid		CDATA #REQUIRED
+		rgid		CDATA #REQUIRED
+		pid		CDATA #REQUIRED
+		sid		CDATA #REQUIRED
+		tid		CDATA #REQUIRED
+>
+
+<!-- process token -->
+<!ELEMENT process	EMPTY>
+<!ATTLIST process
+		audit-uid	CDATA #REQUIRED
+		uid		CDATA #REQUIRED
+		gid		CDATA #REQUIRED
+		ruid		CDATA #REQUIRED
+		rgid		CDATA #REQUIRED
+		pid		CDATA #REQUIRED
+		sid		CDATA #REQUIRED
+		tid		CDATA #REQUIRED
+>
+
+<!-- return token -->
+<!ELEMENT return		EMPTY>
+<!ATTLIST return
+		errval		CDATA #REQUIRED
+		retval		CDATA #REQUIRED
+>
+
+<!-- exit token -->
+<!ELEMENT exit			EMPTY>
+<!ATTLIST exit
+		errval		CDATA #REQUIRED
+		retval		CDATA #REQUIRED
+>
+
+<!-- sequence token -->
+<!ELEMENT sequence		EMPTY>
+<!ATTLIST sequence
+		seq-num		CDATA #REQUIRED
+>
+
+<!-- fmri token -->
+<!ELEMENT fmri			(#PCDATA)>
+
+<!-- group token -->
+<!ELEMENT group			(gid)*>
+<!ELEMENT gid			(#PCDATA)>
+
+<!-- opaque token -->
+<!ELEMENT opaque		(#PCDATA)>
+
+<!-- liaison token -->
+<!-- (NOTE: liaison is obsolete and is no longer generated -->
+<!ELEMENT liaison		(#PCDATA)>
+
+<!-- argument token -->
+<!ELEMENT argument		EMPTY>
+<!ATTLIST argument
+		arg-num		CDATA #REQUIRED
+		value		CDATA #REQUIRED
+		desc		CDATA #REQUIRED
+>
+
+<!-- attribute token -->
+<!ELEMENT attribute		EMPTY>
+<!ATTLIST attribute
+		mode		CDATA #REQUIRED
+		uid		CDATA #REQUIRED
+		gid		CDATA #REQUIRED
+		fsid		CDATA #REQUIRED
+		nodeid		CDATA #REQUIRED
+		device		CDATA #REQUIRED
+>
+
+<!-- cmd token -->
+<!ELEMENT cmd			(argv*, arge*)>
+<!ELEMENT argv			(#PCDATA)>
+<!ELEMENT arge			(#PCDATA)>
+
+<!-- exec_args token -->
+<!ELEMENT exec_args		(arg*)>
+<!ELEMENT arg			(#PCDATA)>
+
+<!-- exec_env token -->
+<!ELEMENT exec_env		(env*)>
+<!ELEMENT env			(#PCDATA)>
+
+<!-- arbitrary token -->
+<!ELEMENT arbitrary		(#PCDATA)>
+<!ATTLIST arbitrary
+		print		CDATA #REQUIRED
+		type		CDATA #REQUIRED
+		count		CDATA #REQUIRED
+>
+
+<!-- privilege token -->
+<!ELEMENT privilege		(#PCDATA)>
+<!ATTLIST privilege
+		set-type	CDATA #REQUIRED
+>
+
+<!-- use_of_privilege token -->
+<!ELEMENT use_of_privilege	(#PCDATA)>
+<!ATTLIST use_of_privilege
+		result		CDATA #REQUIRED
+>
+
+<!-- sensitivity_label token -->
+<!ELEMENT sensitivity_label	(#PCDATA)>
+
+<!-- use_of_authorization token -->
+<!ELEMENT use_of_authorization	(#PCDATA)>
+
+<!-- IPC token -->
+<!ELEMENT IPC			EMPTY>
+<!ATTLIST IPC
+		ipc-type	CDATA #REQUIRED
+		ipc-id		CDATA #REQUIRED
+>
+
+<!-- IPC_perm token -->
+<!ELEMENT IPC_perm		EMPTY>
+<!ATTLIST IPC_perm
+		uid		CDATA #REQUIRED
+		gid		CDATA #REQUIRED
+		creator-uid	CDATA #REQUIRED
+		creator-gid	CDATA #REQUIRED
+		mode		CDATA #REQUIRED
+		seq		CDATA #REQUIRED
+		key		CDATA #REQUIRED
+>
+
+<!-- ip_address token -->
+<!ELEMENT ip_address		(#PCDATA)>
+
+<!-- ip_port token -->
+<!-- (NOTE: ip_port is obsolete and is no longer generated -->
+<!ELEMENT ip_port		(#PCDATA)>
+
+<!-- ip token -->
+<!-- (NOTE: ip is obsolete and is no longer generated -->
+<!ELEMENT ip			EMPTY>
+<!ATTLIST ip
+		version		CDATA #REQUIRED
+		service_type	CDATA #REQUIRED
+		len		CDATA #REQUIRED
+		id		CDATA #REQUIRED
+		offset		CDATA #REQUIRED
+		time_to_live	CDATA #REQUIRED
+		protocol	CDATA #REQUIRED
+		cksum		CDATA #REQUIRED
+		src_addr	CDATA #REQUIRED
+		dest_addr	CDATA #REQUIRED
+>
+
+<!-- old_socket token -->
+<!ELEMENT old_socket		EMPTY>
+<!ATTLIST old_socket
+		type		CDATA #REQUIRED
+		port		CDATA #REQUIRED
+		addr		CDATA #REQUIRED
+>
+
+<!-- socket token -->
+<!ELEMENT socket		EMPTY>
+<!ATTLIST socket
+		sock_domain	CDATA #REQUIRED
+		sock_type	CDATA #REQUIRED
+		lport		CDATA #REQUIRED
+		laddr		CDATA #REQUIRED
+		fport		CDATA #REQUIRED
+		faddr		CDATA #REQUIRED
+>
+
+<!-- acl token -->
+<!ELEMENT acl			EMPTY>
+<!ATTLIST acl
+		type		CDATA #IMPLIED
+		value		CDATA #IMPLIED
+		mode		CDATA #IMPLIED
+		flags		CDATA #IMPLIED
+		id		CDATA #IMPLIED
+		access_mask	CDATA #IMPLIED
+>
+
+<!-- tid token -->
+<!-- future intent: contain one of ipadr | MTUadr | device -->
+<!ELEMENT tid			(ipadr*)>
+<!ATTLIST tid
+		type		CDATA #REQUIRED
+>
+
+<!-- ipadr content of tid token -->
+<!ELEMENT ipadr			EMPTY>
+<!ATTLIST ipadr
+		local-port	CDATA #REQUIRED
+		remote-port	CDATA #REQUIRED
+		host		CDATA #REQUIRED
+>
+
+<!-- X_atom token -->
+<!ELEMENT X_atom		(#PCDATA)>
+
+<!-- X_color_map token -->
+<!ELEMENT X_color_map		EMPTY>
+<!ATTLIST X_color_map		%xinfo;>
+
+<!-- X_cursor token -->
+<!ELEMENT X_cursor		EMPTY>
+<!ATTLIST X_cursor		%xinfo;>
+
+<!-- X_font token -->
+<!ELEMENT X_font		EMPTY>
+<!ATTLIST X_font		%xinfo;>
+
+<!-- X_graphic_context token -->
+<!ELEMENT X_graphic_context	EMPTY>
+<!ATTLIST X_graphic_context	%xinfo;>
+
+<!-- X_pixmap token -->
+<!ELEMENT X_pixmap		EMPTY>
+<!ATTLIST X_pixmap		%xinfo;>
+
+<!-- X_window token -->
+<!ELEMENT X_window		EMPTY>
+<!ATTLIST X_window		%xinfo;>
+
+<!-- X_property token -->
+<!ELEMENT X_property		(#PCDATA)>
+<!ATTLIST X_property		%xinfo;>
+
+<!-- X_client token -->
+<!ELEMENT X_client		(#PCDATA)>
+
+<!-- X_selection token -->
+<!ELEMENT X_selection		(xsel_text, xsel_type, xsel_data)>
+<!ELEMENT x_sel_text		(#PCDATA)>
+<!ELEMENT x_sel_type		(#PCDATA)>
+<!ELEMENT x_sel_data		(#PCDATA)>
+
+<!-- zonename token -->
+<!ELEMENT zone			EMPTY>
+<!ATTLIST zone
+		name		CDATA #REQUIRED
+>

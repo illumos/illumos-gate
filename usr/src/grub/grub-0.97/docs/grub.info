@@ -1,0 +1,4455 @@
+This is ../../docs/grub.info, produced by makeinfo version 4.8 from
+../../docs/grub.texi.
+
+INFO-DIR-SECTION Kernel
+START-INFO-DIR-ENTRY
+* GRUB: (grub).                 The GRand Unified Bootloader
+* grub-install: (grub)Invoking grub-install.    Install GRUB on your drive
+* grub-md5-crypt: (grub)Invoking grub-md5-crypt.        Encrypt a password
+                                                        in MD5 format
+* grub-terminfo: (grub)Invoking grub-terminfo.  Generate a terminfo
+                                                command from a
+                                                terminfo name
+* grub-set-default: (grub)Invoking grub-set-default.    Set a default boot
+                                                        entry
+* mbchk: (grub)Invoking mbchk.  Check for the format of a Multiboot kernel
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1999,2000,2001,2002,2004 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: grub.info,  Node: Top,  Next: Introduction,  Up: (dir)
+
+GRUB manual
+***********
+
+This is the documentation of GNU GRUB, the GRand Unified Bootloader, a
+flexible and powerful boot loader program for PCs.
+
+   This edition documents version 0.97.
+
+* Menu:
+
+* Introduction::                Capturing the spirit of GRUB
+* Naming convention::           Names of your drives in GRUB
+* Installation::                Installing GRUB on your drive
+* Booting::                     How to boot different operating systems
+* Configuration::               Writing your own configuration file
+* Network::                     Downloading OS images from a network
+* Serial terminal::             Using GRUB via a serial line
+* Preset Menu::                 Embedding a configuration file into GRUB
+* Security::                    Improving the security
+* Images::                      GRUB image files
+* Filesystem::                  Filesystem syntax and semantics
+* Interface::                   The menu and the command-line
+* Commands::                    The list of available builtin commands
+* Troubleshooting::             Error messages produced by GRUB
+* Invoking the grub shell::     How to use the grub shell
+* Invoking grub-install::       How to use the GRUB installer
+* Invoking grub-md5-crypt::     How to generate a cryptic password
+* Invoking grub-terminfo::      How to generate a terminfo command
+* Invoking grub-set-default::   How to set a default boot entry
+* Invoking mbchk::              How to use the Multiboot checker
+* Obtaining and Building GRUB:: How to obtain and build GRUB
+* Reporting bugs::              Where you should send a bug report
+* Future::                      Some future plans on GRUB
+* Internals::                   Hacking GRUB
+* Index::
+
+
+File: grub.info,  Node: Introduction,  Next: Naming convention,  Prev: Top,  Up: Top
+
+1 Introduction to GRUB
+**********************
+
+* Menu:
+
+* Overview::                    What exactly GRUB is and how to use it
+* History::                     From maggot to house fly
+* Features::                    GRUB features
+* Role of a boot loader::       The role of a boot loader
+
+
+File: grub.info,  Node: Overview,  Next: History,  Up: Introduction
+
+1.1 Overview
+============
+
+Briefly, a "boot loader" is the first software program that runs when a
+computer starts.  It is responsible for loading and transferring
+control to an operating system "kernel" software (such as Linux or GNU
+Mach).  The kernel, in turn, initializes the rest of the operating
+system (e.g. a GNU system).
+
+   GNU GRUB is a very powerful boot loader, which can load a wide
+variety of free operating systems, as well as proprietary operating
+systems with chain-loading(1) (*note Overview-Footnote-1::). GRUB is
+designed to address the complexity of booting a personal computer; both
+the program and this manual are tightly bound to that computer platform,
+although porting to other platforms may be addressed in the future.
+
+   One of the important features in GRUB is flexibility; GRUB
+understands filesystems and kernel executable formats, so you can load
+an arbitrary operating system the way you like, without recording the
+physical position of your kernel on the disk. Thus you can load the
+kernel just by specifying its file name and the drive and partition
+where the kernel resides.
+
+   When booting with GRUB, you can use either a command-line interface
+(*note Command-line interface::), or a menu interface (*note Menu
+interface::). Using the command-line interface, you type the drive
+specification and file name of the kernel manually. In the menu
+interface, you just select an OS using the arrow keys. The menu is
+based on a configuration file which you prepare beforehand (*note
+Configuration::). While in the menu, you can switch to the command-line
+mode, and vice-versa. You can even edit menu entries before using them.
+
+   In the following chapters, you will learn how to specify a drive, a
+partition, and a file name (*note Naming convention::) to GRUB, how to
+install GRUB on your drive (*note Installation::), and how to boot your
+OSes (*note Booting::), step by step.
+
+   Besides the GRUB boot loader itself, there is a "grub shell" `grub'
+(*note Invoking the grub shell::) which can be run when you are in your
+operating system. It emulates the boot loader and can be used for
+installing the boot loader.
+
+
+File: grub.info,  Node: Overview-Footnotes,  Up: Overview
+
+   (1) "chain-load" is the mechanism for loading unsupported operating
+systems by loading another boot loader. It is typically used for
+loading DOS or Windows.
+
+
+File: grub.info,  Node: History,  Next: Features,  Prev: Overview,  Up: Introduction
+
+1.2 History of GRUB
+===================
+
+GRUB originated in 1995 when Erich Boleyn was trying to boot the GNU
+Hurd with the University of Utah's Mach 4 microkernel (now known as GNU
+Mach).  Erich and Brian Ford designed the Multiboot Specification
+(*note Multiboot Specification: (multiboot)Top.), because they were
+determined not to add to the large number of mutually-incompatible PC
+boot methods.
+
+   Erich then began modifying the FreeBSD boot loader so that it would
+understand Multiboot. He soon realized that it would be a lot easier to
+write his own boot loader from scratch than to keep working on the
+FreeBSD boot loader, and so GRUB was born.
+
+   Erich added many features to GRUB, but other priorities prevented him
+from keeping up with the demands of its quickly-expanding user base. In
+1999, Gordon Matzigkeit and Yoshinori K. Okuji adopted GRUB as an
+official GNU package, and opened its development by making the latest
+sources available via anonymous CVS. *Note Obtaining and Building
+GRUB::, for more information.
+
+
+File: grub.info,  Node: Features,  Next: Role of a boot loader,  Prev: History,  Up: Introduction
+
+1.3 GRUB features
+=================
+
+The primary requirement for GRUB is that it be compliant with the
+"Multiboot Specification", which is described in *Note Multiboot
+Specification: (multiboot)Top.
+
+   The other goals, listed in approximate order of importance, are:
+
+   * Basic functions must be straightforward for end-users.
+
+   * Rich functionality to support kernel experts and designers.
+
+   * Backward compatibility for booting FreeBSD, NetBSD, OpenBSD, and
+     Linux. Proprietary kernels (such as DOS, Windows NT, and OS/2) are
+     supported via a chain-loading function.
+
+   Except for specific compatibility modes (chain-loading and the Linux
+"piggyback" format), all kernels will be started in much the same state
+as in the Multiboot Specification. Only kernels loaded at 1 megabyte or
+above are presently supported. Any attempt to load below that boundary
+will simply result in immediate failure and an error message reporting
+the problem.
+
+   In addition to the requirements above, GRUB has the following
+features (note that the Multiboot Specification doesn't require all the
+features that GRUB supports):
+
+Recognize multiple executable formats
+     Support many of the "a.out" variants plus "ELF". Symbol tables are
+     also loaded.
+
+Support non-Multiboot kernels
+     Support many of the various free 32-bit kernels that lack Multiboot
+     compliance (primarily FreeBSD, NetBSD, OpenBSD, and Linux).
+     Chain-loading of other boot loaders is also supported.
+
+Load multiples modules
+     Fully support the Multiboot feature of loading multiple modules.
+
+Load a configuration file
+     Support a human-readable text configuration file with preset boot
+     commands. You can also load another configuration file dynamically
+     and embed a preset configuration file in a GRUB image file. The
+     list of commands (*note Commands::) are a superset of those
+     supported on the command-line. An example configuration file is
+     provided in *Note Configuration::.
+
+Provide a menu interface
+     A menu interface listing preset boot commands, with a programmable
+     timeout, is available. There is no fixed limit on the number of
+     boot entries, and the current implementation has space for several
+     hundred.
+
+Have a flexible command-line interface
+     A fairly flexible command-line interface, accessible from the menu,
+     is available to edit any preset commands, or write a new boot
+     command set from scratch. If no configuration file is present,
+     GRUB drops to the command-line.
+
+     The list of commands (*note Commands::) are a subset of those
+     supported for configuration files. Editing commands closely
+     resembles the Bash command-line (*note Bash: (features)Command
+     Line Editing.), with <TAB>-completion of commands, devices,
+     partitions, and files in a directory depending on context.
+
+Support multiple filesystem types
+     Support multiple filesystem types transparently, plus a useful
+     explicit blocklist notation. The currently supported filesystem
+     types are "BSD FFS", "DOS FAT16 and FAT32", "Minix fs", "Linux
+     ext2fs", "ReiserFS", "JFS", "XFS", and "VSTa fs". *Note
+     Filesystem::, for more information.
+
+Support automatic decompression
+     Can decompress files which were compressed by `gzip'. This
+     function is both automatic and transparent to the user (i.e. all
+     functions operate upon the uncompressed contents of the specified
+     files). This greatly reduces a file size and loading time, a
+     particularly great benefit for floppies.(1) (*note
+     Features-Footnote-1::)
+
+     It is conceivable that some kernel modules should be loaded in a
+     compressed state, so a different module-loading command can be
+     specified to avoid uncompressing the modules.
+
+Access data on any installed device
+     Support reading data from any or all floppies or hard disk(s)
+     recognized by the BIOS, independent of the setting of the root
+     device.
+
+Be independent of drive geometry translations
+     Unlike many other boot loaders, GRUB makes the particular drive
+     translation irrelevant. A drive installed and running with one
+     translation may be converted to another translation without any
+     adverse effects or changes in GRUB's configuration.
+
+Detect all installed RAM
+     GRUB can generally find all the installed RAM on a PC-compatible
+     machine. It uses an advanced BIOS query technique for finding all
+     memory regions. As described on the Multiboot Specification (*note
+     Multiboot Specification: (multiboot)Top.), not all kernels make
+     use of this information, but GRUB provides it for those who do.
+
+Support Logical Block Address mode
+     In traditional disk calls (called "CHS mode"), there is a geometry
+     translation problem, that is, the BIOS cannot access over 1024
+     cylinders, so the accessible space is limited to at least 508 MB
+     and to at most 8GB. GRUB can't universally solve this problem, as
+     there is no standard interface used in all machines. However,
+     several newer machines have the new interface, Logical Block
+     Address ("LBA") mode. GRUB automatically detects if LBA mode is
+     available and uses it if available. In LBA mode, GRUB can access
+     the entire disk.
+
+Support network booting
+     GRUB is basically a disk-based boot loader but also has network
+     support. You can load OS images from a network by using the "TFTP"
+     protocol.
+
+Support remote terminals
+     To support computers with no console, GRUB provides remote terminal
+     support, so that you can control GRUB from a remote host. Only
+     serial terminal support is implemented at the moment.
+
+
+File: grub.info,  Node: Features-Footnotes,  Up: Features
+
+   (1) There are a few pathological cases where loading a very badly
+organized ELF kernel might take longer, but in practice this never
+happen.
+
+
+File: grub.info,  Node: Role of a boot loader,  Prev: Features,  Up: Introduction
+
+1.4 The role of a boot loader
+=============================
+
+The following is a quotation from Gordon Matzigkeit, a GRUB fanatic:
+
+     Some people like to acknowledge both the operating system and
+     kernel when they talk about their computers, so they might say
+     they use "GNU/Linux" or "GNU/Hurd".  Other people seem to think
+     that the kernel is the most important part of the system, so they
+     like to call their GNU operating systems "Linux systems."
+
+     I, personally, believe that this is a grave injustice, because the
+     _boot loader_ is the most important software of all. I used to
+     refer to the above systems as either "LILO"(1) (*note Role of a
+     boot loader-Footnote-1::) or "GRUB" systems.
+
+     Unfortunately, nobody ever understood what I was talking about;
+     now I just use the word "GNU" as a pseudonym for GRUB.
+
+     So, if you ever hear people talking about their alleged "GNU"
+     systems, remember that they are actually paying homage to the best
+     boot loader around... GRUB!
+
+   We, the GRUB maintainers, do not (usually) encourage Gordon's level
+of fanaticism, but it helps to remember that boot loaders deserve
+recognition.  We hope that you enjoy using GNU GRUB as much as we did
+writing it.
+
+
+File: grub.info,  Node: Role of a boot loader-Footnotes,  Up: Role of a boot loader
+
+   (1) The LInux LOader, a boot loader that everybody uses, but nobody
+likes.
+
+
+File: grub.info,  Node: Naming convention,  Next: Installation,  Prev: Introduction,  Up: Top
+
+2 Naming convention
+*******************
+
+The device syntax used in GRUB is a wee bit different from what you may
+have seen before in your operating system(s), and you need to know it so
+that you can specify a drive/partition.
+
+   Look at the following examples and explanations:
+
+     (fd0)
+
+   First of all, GRUB requires that the device name be enclosed with
+`(' and `)'. The `fd' part means that it is a floppy disk. The number
+`0' is the drive number, which is counted from _zero_. This expression
+means that GRUB will use the whole floppy disk.
+
+     (hd0,1)
+
+   Here, `hd' means it is a hard disk drive. The first integer `0'
+indicates the drive number, that is, the first hard disk, while the
+second integer, `1', indicates the partition number (or the PC slice
+number in the BSD terminology). Once again, please note that the
+partition numbers are counted from _zero_, not from one. This
+expression means the second partition of the first hard disk drive. In
+this case, GRUB uses one partition of the disk, instead of the whole
+disk.
+
+     (hd0,4)
+
+   This specifies the first "extended partition" of the first hard disk
+drive. Note that the partition numbers for extended partitions are
+counted from `4', regardless of the actual number of primary partitions
+on your hard disk.
+
+     (hd1,a)
+
+   This means the BSD `a' partition of the second hard disk. If you
+need to specify which PC slice number should be used, use something
+like this: `(hd1,0,a)'. If the PC slice number is omitted, GRUB
+searches for the first PC slice which has a BSD `a' partition.
+
+   Of course, to actually access the disks or partitions with GRUB, you
+need to use the device specification in a command, like `root (fd0)' or
+`unhide (hd0,2)'. To help you find out which number specifies a
+partition you want, the GRUB command-line (*note Command-line
+interface::) options have argument completion. This means that, for
+example, you only need to type
+
+     root (
+
+   followed by a <TAB>, and GRUB will display the list of drives,
+partitions, or file names. So it should be quite easy to determine the
+name of your target partition, even with minimal knowledge of the
+syntax.
+
+   Note that GRUB does _not_ distinguish IDE from SCSI - it simply
+counts the drive numbers from zero, regardless of their type. Normally,
+any IDE drive number is less than any SCSI drive number, although that
+is not true if you change the boot sequence by swapping IDE and SCSI
+drives in your BIOS.
+
+   Now the question is, how to specify a file? Again, consider an
+example:
+
+     (hd0,0)/vmlinuz
+
+   This specifies the file named `vmlinuz', found on the first
+partition of the first hard disk drive. Note that the argument
+completion works with file names, too.
+
+   That was easy, admit it. Now read the next chapter, to find out how
+to actually install GRUB on your drive.
+
+
+File: grub.info,  Node: Installation,  Next: Booting,  Prev: Naming convention,  Up: Top
+
+3 Installation
+**************
+
+In order to install GRUB as your boot loader, you need to first install
+the GRUB system and utilities under your UNIX-like operating system
+(*note Obtaining and Building GRUB::). You can do this either from the
+source tarball, or as a package for your OS.
+
+   After you have done that, you need to install the boot loader on a
+drive (floppy or hard disk). There are two ways of doing that - either
+using the utility `grub-install' (*note Invoking grub-install::) on a
+UNIX-like OS, or by running GRUB itself from a floppy. These are quite
+similar, however the utility might probe a wrong BIOS drive, so you
+should be careful.
+
+   Also, if you install GRUB on a UNIX-like OS, please make sure that
+you have an emergency boot disk ready, so that you can rescue your
+computer if, by any chance, your hard drive becomes unusable
+(unbootable).
+
+   GRUB comes with boot images, which are normally put in the directory
+`/usr/lib/grub/i386-pc'. If you do not use grub-install, then you need
+to copy the files `stage1', `stage2', and `*stage1_5' to the directory
+`/boot/grub', and run the `grub-set-default' (*note Invoking
+grub-set-default::) if you intend to use `default saved' (*note
+default::) in your configuration file. Hereafter, the directory where
+GRUB images are initially placed (normally `/usr/lib/grub/i386-pc')
+will be called the "image directory", and the directory where the boot
+loader needs to find them (usually `/boot/grub') will be called the
+"boot directory".
+
+* Menu:
+
+* Creating a GRUB boot floppy::
+* Installing GRUB natively::
+* Installing GRUB using grub-install::
+* Making a GRUB bootable CD-ROM::
+
+
+File: grub.info,  Node: Creating a GRUB boot floppy,  Next: Installing GRUB natively,  Up: Installation
+
+3.1 Creating a GRUB boot floppy
+===============================
+
+To create a GRUB boot floppy, you need to take the files `stage1' and
+`stage2' from the image directory, and write them to the first and the
+second block of the floppy disk, respectively.
+
+   *Caution:* This procedure will destroy any data currently stored on
+the floppy.
+
+   On a UNIX-like operating system, that is done with the following
+commands:
+
+     # cd /usr/lib/grub/i386-pc
+     # dd if=stage1 of=/dev/fd0 bs=512 count=1
+     1+0 records in
+     1+0 records out
+     # dd if=stage2 of=/dev/fd0 bs=512 seek=1
+     153+1 records in
+     153+1 records out
+     #
+
+   The device file name may be different. Consult the manual for your
+OS.
+
+
+File: grub.info,  Node: Installing GRUB natively,  Next: Installing GRUB using grub-install,  Prev: Creating a GRUB boot floppy,  Up: Installation
+
+3.2 Installing GRUB natively
+============================
+
+*Caution:* Installing GRUB's stage1 in this manner will erase the
+normal boot-sector used by an OS.
+
+   GRUB can currently boot GNU Mach, Linux, FreeBSD, NetBSD, and OpenBSD
+directly, so using it on a boot sector (the first sector of a
+partition) should be okay. But generally, it would be a good idea to
+back up the first sector of the partition on which you are installing
+GRUB's stage1. This isn't as important if you are installing GRUB on
+the first sector of a hard disk, since it's easy to reinitialize it
+(e.g. by running `FDISK /MBR' from DOS).
+
+   If you decide to install GRUB in the native environment, which is
+definitely desirable, you'll need to create a GRUB boot disk, and
+reboot your computer with it. Otherwise, see *Note Installing GRUB
+using grub-install::.
+
+   Once started, GRUB will show the command-line interface (*note
+Command-line interface::). First, set the GRUB's "root device"(1)
+(*note Installing GRUB natively-Footnote-1::) to the partition
+containing the boot directory, like this:
+
+     grub> root (hd0,0)
+
+   If you are not sure which partition actually holds this directory,
+use the command `find' (*note find::), like this:
+
+     grub> find /boot/grub/stage1
+
+   This will search for the file name `/boot/grub/stage1' and show the
+devices which contain the file.
+
+   Once you've set the root device correctly, run the command `setup'
+(*note setup::):
+
+     grub> setup (hd0)
+
+   This command will install the GRUB boot loader on the Master Boot
+Record (MBR) of the first drive. If you want to put GRUB into the boot
+sector of a partition instead of putting it in the MBR, specify the
+partition into which you want to install GRUB:
+
+     grub> setup (hd0,0)
+
+   If you install GRUB into a partition or a drive other than the first
+one, you must chain-load GRUB from another boot loader. Refer to the
+manual for the boot loader to know how to chain-load GRUB.
+
+   After using the setup command, you will boot into GRUB without the
+GRUB floppy. See the chapter *Note Booting:: to find out how to boot
+your operating systems from GRUB.
+
+
+File: grub.info,  Node: Installing GRUB natively-Footnotes,  Up: Installing GRUB natively
+
+   (1) Note that GRUB's root device doesn't necessarily mean your OS's
+root partition; if you need to specify a root partition for your OS,
+add the argument into the command `kernel'.
+
+
+File: grub.info,  Node: Installing GRUB using grub-install,  Next: Making a GRUB bootable CD-ROM,  Prev: Installing GRUB natively,  Up: Installation
+
+3.3 Installing GRUB using grub-install
+======================================
+
+*Caution:* This procedure is definitely less safe, because there are
+several ways in which your computer can become unbootable. For example,
+most operating systems don't tell GRUB how to map BIOS drives to OS
+devices correctly--GRUB merely "guesses" the mapping. This will succeed
+in most cases, but not always. Therefore, GRUB provides you with a map
+file called the "device map", which you must fix if it is wrong. *Note
+Device map::, for more details.
+
+   If you still do want to install GRUB under a UNIX-like OS (such as
+GNU), invoke the program `grub-install' (*note Invoking grub-install::)
+as the superuser ("root").
+
+   The usage is basically very simple. You only need to specify one
+argument to the program, namely, where to install the boot loader. The
+argument can be either a device file (like `/dev/hda') or a partition
+specified in GRUB's notation. For example, under Linux the following
+will install GRUB into the MBR of the first IDE disk:
+
+     # grub-install /dev/hda
+
+   Likewise, under GNU/Hurd, this has the same effect:
+
+     # grub-install /dev/hd0
+
+   If it is the first BIOS drive, this is the same as well:
+
+     # grub-install '(hd0)'
+
+   Or you can omit the parentheses:
+
+     # grub-install hd0
+
+   But all the above examples assume that GRUB should use images under
+the root directory. If you want GRUB to use images under a directory
+other than the root directory, you need to specify the option
+`--root-directory'. The typical usage is that you create a GRUB boot
+floppy with a filesystem. Here is an example:
+
+     # mke2fs /dev/fd0
+     # mount -t ext2 /dev/fd0 /mnt
+     # grub-install --root-directory=/mnt fd0
+     # umount /mnt
+
+   Another example is when you have a separate boot partition which is
+mounted at `/boot'. Since GRUB is a boot loader, it doesn't know
+anything about mountpoints at all. Thus, you need to run `grub-install'
+like this:
+
+     # grub-install --root-directory=/boot /dev/hda
+
+   By the way, as noted above, it is quite difficult to guess BIOS
+drives correctly under a UNIX-like OS. Thus, `grub-install' will prompt
+you to check if it could really guess the correct mappings, after the
+installation. The format is defined in *Note Device map::. Please be
+quite careful. If the output is wrong, it is unlikely that your
+computer will be able to boot with no problem.
+
+   Note that `grub-install' is actually just a shell script and the
+real task is done by the grub shell `grub' (*note Invoking the grub
+shell::). Therefore, you may run `grub' directly to install GRUB,
+without using `grub-install'. Don't do that, however, unless you are
+very familiar with the internals of GRUB. Installing a boot loader on a
+running OS may be extremely dangerous.
+
+
+File: grub.info,  Node: Making a GRUB bootable CD-ROM,  Prev: Installing GRUB using grub-install,  Up: Installation
+
+3.4 Making a GRUB bootable CD-ROM
+=================================
+
+GRUB supports the "no emulation mode" in the El Torito specification(1)
+(*note Making a GRUB bootable CD-ROM-Footnote-1::). This means that you
+can use the whole CD-ROM from GRUB and you don't have to make a floppy
+or hard disk image file, which can cause compatibility problems.
+
+   For booting from a CD-ROM, GRUB uses a special Stage 2 called
+`stage2_eltorito'. The only GRUB files you need to have in your
+bootable CD-ROM are this `stage2_eltorito' and optionally a config file
+`menu.lst'. You don't need to use `stage1' or `stage2', because El
+Torito is quite different from the standard boot process.
+
+   Here is an example of procedures to make a bootable CD-ROM image.
+First, make a top directory for the bootable image, say, `iso':
+
+     $ mkdir iso
+
+   Make a directory for GRUB:
+
+     $ mkdir -p iso/boot/grub
+
+   Copy the file `stage2_eltorito':
+
+     $ cp /usr/lib/grub/i386-pc/stage2_eltorito iso/boot/grub
+
+   If desired, make the config file `menu.lst' under `iso/boot/grub'
+(*note Configuration::), and copy any files and directories for the
+disc to the directory `iso/'.
+
+   Finally, make a ISO9660 image file like this:
+
+     $ mkisofs -R -b boot/grub/stage2_eltorito -no-emul-boot \
+         -boot-load-size 4 -boot-info-table -o grub.iso iso
+
+   This produces a file named `grub.iso', which then can be burned into
+a CD (or a DVD).  `mkisofs' has already set up the disc to boot from
+the `boot/grub/stage2_eltorito' file, so there is no need to setup GRUB
+on the disc.  (Note that the `-boot-load-size 4' bit is required for
+compatibility with the BIOS on many older machines.)
+
+   You can use the device `(cd)' to access a CD-ROM in your config
+file. This is not required; GRUB automatically sets the root device to
+`(cd)' when booted from a CD-ROM. It is only necessary to refer to
+`(cd)' if you want to access other drives as well.
+
+
+File: grub.info,  Node: Making a GRUB bootable CD-ROM-Footnotes,  Up: Making a GRUB bootable CD-ROM
+
+   (1) El Torito is a specification for bootable CD using BIOS
+functions.
+
+
+File: grub.info,  Node: Booting,  Next: Configuration,  Prev: Installation,  Up: Top
+
+4 Booting
+*********
+
+GRUB can load Multiboot-compliant kernels in a consistent way, but for
+some free operating systems you need to use some OS-specific magic.
+
+* Menu:
+
+* General boot methods::        How to boot OSes with GRUB generally
+* OS-specific notes::           Notes on some operating systems
+* Making your system robust::   How to make your system robust
+
+
+File: grub.info,  Node: General boot methods,  Next: OS-specific notes,  Up: Booting
+
+4.1 How to boot operating systems
+=================================
+
+GRUB has two distinct boot methods. One of the two is to load an
+operating system directly, and the other is to chain-load another boot
+loader which then will load an operating system actually. Generally
+speaking, the former is more desirable, because you don't need to
+install or maintain other boot loaders and GRUB is flexible enough to
+load an operating system from an arbitrary disk/partition. However, the
+latter is sometimes required, since GRUB doesn't support all the
+existing operating systems natively.
+
+* Menu:
+
+* Loading an operating system directly::
+* Chain-loading::
+
+
+File: grub.info,  Node: Loading an operating system directly,  Next: Chain-loading,  Up: General boot methods
+
+4.1.1 How to boot an OS directly with GRUB
+------------------------------------------
+
+Multiboot (*note Multiboot Specification: (multiboot)Top.) is the
+native format supported by GRUB.  For the sake of convenience, there is
+also support for Linux, FreeBSD, NetBSD and OpenBSD. If you want to
+boot other operating systems, you will have to chain-load them (*note
+Chain-loading::).
+
+   Generally, GRUB can boot any Multiboot-compliant OS in the following
+steps:
+
+  1. Set GRUB's root device to the drive where the OS images are stored
+     with the command `root' (*note root::).
+
+  2. Load the kernel image with the command `kernel' (*note kernel::).
+
+  3. If you need modules, load them with the command `module' (*note
+     module::) or `modulenounzip' (*note modulenounzip::).
+
+  4. Run the command `boot' (*note boot::).
+
+   Linux, FreeBSD, NetBSD and OpenBSD can be booted in a similar
+manner. You load a kernel image with the command `kernel' and then run
+the command `boot'. If the kernel requires some parameters, just append
+the parameters to `kernel', after the file name of the kernel. Also,
+please refer to *Note OS-specific notes::, for information on your
+OS-specific issues.
+
+
+File: grub.info,  Node: Chain-loading,  Prev: Loading an operating system directly,  Up: General boot methods
+
+4.1.2 Load another boot loader to boot unsupported operating systems
+--------------------------------------------------------------------
+
+If you want to boot an unsupported operating system (e.g. Windows 95),
+chain-load a boot loader for the operating system. Normally, the boot
+loader is embedded in the "boot sector" of the partition on which the
+operating system is installed.
+
+  1. Set GRUB's root device to the partition by the command
+     `rootnoverify' (*note rootnoverify::):
+
+          grub> rootnoverify (hd0,0)
+
+  2. Set the "active" flag in the partition using the command
+     `makeactive'(1) (*note Chain-loading-Footnote-1::) (*note
+     makeactive::):
+
+          grub> makeactive
+
+  3. Load the boot loader with the command `chainloader' (*note
+     chainloader::):
+
+          grub> chainloader +1
+
+     `+1' indicates that GRUB should read one sector from the start of
+     the partition. The complete description about this syntax can be
+     found in *Note Block list syntax::.
+
+  4. Run the command `boot' (*note boot::).
+
+   However, DOS and Windows have some deficiencies, so you might have to
+use more complicated instructions. *Note DOS/Windows::, for more
+information.
+
+
+File: grub.info,  Node: Chain-loading-Footnotes,  Up: Chain-loading
+
+   (1) This is not necessary for most of the modern operating systems.
+
+
+File: grub.info,  Node: OS-specific notes,  Next: Making your system robust,  Prev: General boot methods,  Up: Booting
+
+4.2 Some caveats on OS-specific issues
+======================================
+
+Here, we describe some caveats on several operating systems.
+
+* Menu:
+
+* GNU/Hurd::
+* GNU/Linux::
+* FreeBSD::
+* NetBSD::
+* OpenBSD::
+* DOS/Windows::
+* SCO UnixWare::
+* QNX::
+
+
+File: grub.info,  Node: GNU/Hurd,  Next: GNU/Linux,  Up: OS-specific notes
+
+4.2.1 GNU/Hurd
+--------------
+
+Since GNU/Hurd is Multiboot-compliant, it is easy to boot it; there is
+nothing special about it. But do not forget that you have to specify a
+root partition to the kernel.
+
+  1. Set GRUB's root device to the same drive as GNU/Hurd's. Probably
+     the command `find /boot/gnumach' or similar can help you (*note
+     find::).
+
+  2. Load the kernel and the module, like this:
+
+          grub> kernel /boot/gnumach root=hd0s1
+          grub> module /boot/serverboot
+
+  3. Run the command `boot' (*note boot::).
+
+
+File: grub.info,  Node: GNU/Linux,  Next: FreeBSD,  Prev: GNU/Hurd,  Up: OS-specific notes
+
+4.2.2 GNU/Linux
+---------------
+
+It is relatively easy to boot GNU/Linux from GRUB, because it somewhat
+resembles to boot a Multiboot-compliant OS.
+
+  1. Set GRUB's root device to the same drive as GNU/Linux's. Probably
+     the command `find /vmlinuz' or similar can help you (*note find::).
+
+  2. Load the kernel:
+
+          grub> kernel /vmlinuz root=/dev/hda1
+
+     If you need to specify some kernel parameters, just append them to
+     the command. For example, to set `vga' to `ext', do this:
+
+          grub> kernel /vmlinuz root=/dev/hda1 vga=ext
+
+     See the documentation in the Linux source tree for complete
+     information on the available options.
+
+  3. If you use an initrd, execute the command `initrd' (*note
+     initrd::) after `kernel':
+
+          grub> initrd /initrd
+
+  4. Finally, run the command `boot' (*note boot::).
+
+   *Caution:* If you use an initrd and specify the `mem=' option to the
+kernel to let it use less than actual memory size, you will also have
+to specify the same memory size to GRUB. To let GRUB know the size, run
+the command `uppermem' _before_ loading the kernel. *Note uppermem::,
+for more information.
+
+
+File: grub.info,  Node: FreeBSD,  Next: NetBSD,  Prev: GNU/Linux,  Up: OS-specific notes
+
+4.2.3 FreeBSD
+-------------
+
+GRUB can load the kernel directly, either in ELF or a.out format. But
+this is not recommended, since FreeBSD's bootstrap interface sometimes
+changes heavily, so GRUB can't guarantee to pass kernel parameters
+correctly.
+
+   Thus, we'd recommend loading the very flexible loader `/boot/loader'
+instead. See this example:
+
+     grub> root (hd0,a)
+     grub> kernel /boot/loader
+     grub> boot
+
+
+File: grub.info,  Node: NetBSD,  Next: OpenBSD,  Prev: FreeBSD,  Up: OS-specific notes
+
+4.2.4 NetBSD
+------------
+
+GRUB can load NetBSD a.out and ELF directly, follow these steps:
+
+  1. Set GRUB's root device with `root' (*note root::).
+
+  2. Load the kernel with `kernel' (*note kernel::). You should append
+     the ugly option `--type=netbsd', if you want to load an ELF
+     kernel, like this:
+
+          grub> kernel --type=netbsd /netbsd-elf
+
+  3. Run `boot' (*note boot::).
+
+   For now, however, GRUB doesn't allow you to pass kernel parameters,
+so it may be better to chain-load it instead. For more information,
+please see *Note Chain-loading::.
+
+
+File: grub.info,  Node: OpenBSD,  Next: DOS/Windows,  Prev: NetBSD,  Up: OS-specific notes
+
+4.2.5 OpenBSD
+-------------
+
+The booting instruction is exactly the same as for NetBSD (*note
+NetBSD::).
+
+
+File: grub.info,  Node: DOS/Windows,  Next: SCO UnixWare,  Prev: OpenBSD,  Up: OS-specific notes
+
+4.2.6 DOS/Windows
+-----------------
+
+GRUB cannot boot DOS or Windows directly, so you must chain-load them
+(*note Chain-loading::). However, their boot loaders have some critical
+deficiencies, so it may not work to just chain-load them. To overcome
+the problems, GRUB provides you with two helper functions.
+
+   If you have installed DOS (or Windows) on a non-first hard disk, you
+have to use the disk swapping technique, because that OS cannot boot
+from any disks but the first one. The workaround used in GRUB is the
+command `map' (*note map::), like this:
+
+     grub> map (hd0) (hd1)
+     grub> map (hd1) (hd0)
+
+   This performs a "virtual" swap between your first and second hard
+drive.
+
+   *Caution:* This is effective only if DOS (or Windows) uses BIOS to
+access the swapped disks. If that OS uses a special driver for the
+disks, this probably won't work.
+
+   Another problem arises if you installed more than one set of
+DOS/Windows onto one disk, because they could be confused if there are
+more than one primary partitions for DOS/Windows. Certainly you should
+avoid doing this, but there is a solution if you do want to do so. Use
+the partition hiding/unhiding technique.
+
+   If GRUB "hide"s a DOS (or Windows) partition (*note hide::), DOS (or
+Windows) will ignore the partition. If GRUB "unhide"s a DOS (or
+Windows) partition (*note unhide::), DOS (or Windows) will detect the
+partition. Thus, if you have installed DOS (or Windows) on the first
+and the second partition of the first hard disk, and you want to boot
+the copy on the first partition, do the following:
+
+     grub> unhide (hd0,0)
+     grub> hide (hd0,1)
+     grub> rootnoverify (hd0,0)
+     grub> chainloader +1
+     grub> makeactive
+     grub> boot
+
+
+File: grub.info,  Node: SCO UnixWare,  Next: QNX,  Prev: DOS/Windows,  Up: OS-specific notes
+
+4.2.7 SCO UnixWare
+------------------
+
+It is known that the signature in the boot loader for SCO UnixWare is
+wrong, so you will have to specify the option `--force' to
+`chainloader' (*note chainloader::), like this:
+
+     grub> rootnoverify (hd1,0)
+     grub> chainloader --force +1
+     grub> makeactive
+     grub> boot
+
+
+File: grub.info,  Node: QNX,  Prev: SCO UnixWare,  Up: OS-specific notes
+
+4.2.8 QNX
+---------
+
+QNX seems to use a bigger boot loader, so you need to boot it up, like
+this:
+
+     grub> rootnoverify (hd1,1)
+     grub> chainloader +4
+     grub> boot
+
+
+File: grub.info,  Node: Making your system robust,  Prev: OS-specific notes,  Up: Booting
+
+4.3 How to make your system robust
+==================================
+
+When you test a new kernel or a new OS, it is important to make sure
+that your computer can boot even if the new system is unbootable. This
+is crucial especially if you maintain servers or remote systems. To
+accomplish this goal, you need to set up two things:
+
+  1. You must maintain a system which is always bootable. For instance,
+     if you test a new kernel, you need to keep a working kernel in a
+     different place. And, it would sometimes be very nice to even have
+     a complete copy of a working system in a different partition or
+     disk.
+
+  2. You must direct GRUB to boot a working system when the new system
+     fails. This is possible with the "fallback" system in GRUB.
+
+   The former requirement is very specific to each OS, so this
+documentation does not cover that topic. It is better to consult some
+backup tools.
+
+   So let's see the GRUB part. There are two possibilities: one of them
+is quite simple but not very robust, and the other is a bit complex to
+set up but probably the best solution to make sure that your system can
+start as long as GRUB itself is bootable.
+
+* Menu:
+
+* Booting once-only::
+* Booting fallback systems::
+
+
+File: grub.info,  Node: Booting once-only,  Next: Booting fallback systems,  Up: Making your system robust
+
+4.3.1 Booting once-only
+-----------------------
+
+You can teach GRUB to boot an entry only at next boot time. Suppose
+that your have an old kernel `old_kernel' and a new kernel
+`new_kernel'. You know that `old_kernel' can boot your system
+correctly, and you want to test `new_kernel'.
+
+   To ensure that your system will go back to the old kernel even if the
+new kernel fails (e.g. it panics), you can specify that GRUB should try
+the new kernel only once and boot the old kernel after that.
+
+   First, modify your configuration file. Here is an example:
+
+     default saved        # This is important!!!
+     timeout 10
+
+     title the old kernel
+     root (hd0,0)
+     kernel /old_kernel
+     savedefault
+
+     title the new kernel
+     root (hd0,0)
+     kernel /new_kernel
+     savedefault 0         # This is important!!!
+
+   Note that this configuration file uses `default saved' (*note
+default::) at the head and `savedefault 0' (*note savedefault::) in the
+entry for the new kernel. This means that GRUB boots a saved entry by
+default, and booting the entry for the new kernel saves `0' as the
+saved entry.
+
+   With this configuration file, after all, GRUB always tries to boot
+the old kernel after it booted the new one, because `0' is the entry of
+`the old kernel'.
+
+   The next step is to tell GRUB to boot the new kernel at next boot
+time. For this, execute `grub-set-default' (*note Invoking
+grub-set-default::):
+
+     # grub-set-default 1
+
+   This command sets the saved entry to `1', that is, to the new kernel.
+
+   This method is useful, but still not very robust, because GRUB stops
+booting, if there is any error in the boot entry, such that the new
+kernel has an invalid executable format. Thus, it it even better to use
+the "fallback" mechanism of GRUB. Look at next subsection for this
+feature.
+
+
+File: grub.info,  Node: Booting fallback systems,  Prev: Booting once-only,  Up: Making your system robust
+
+4.3.2 Booting fallback systems
+------------------------------
+
+GRUB supports a fallback mechanism of booting one or more other entries
+if a default boot entry fails. You can specify multiple fallback
+entries if you wish.
+
+   Suppose that you have three systems, `A', `B' and `C'. `A' is a
+system which you want to boot by default. `B' is a backup system which
+is supposed to boot safely. `C' is another backup system which is used
+in case where `B' is broken.
+
+   Then you may want GRUB to boot the first system which is bootable
+among `A', `B' and `C'. A configuration file can be written in this way:
+
+     default saved        # This is important!!!
+     timeout 10
+     fallback 1 2         # This is important!!!
+
+     title A
+     root (hd0,0)
+     kernel /kernel
+     savedefault fallback # This is important!!!
+
+     title B
+     root (hd1,0)
+     kernel /kernel
+     savedefault fallback # This is important!!!
+
+     title C
+     root (hd2,0)
+     kernel /kernel
+     savedefault
+
+   Note that `default saved' (*note default::), `fallback 1 2' and
+`savedefault fallback' are used. GRUB will boot a saved entry by
+default and save a fallback entry as next boot entry with this
+configuration.
+
+   When GRUB tries to boot `A', GRUB saves `1' as next boot entry,
+because the command `fallback' specifies that `1' is the first fallback
+entry. The entry `1' is `B', so GRUB will try to boot `B' at next boot
+time.
+
+   Likewise, when GRUB tries to boot `B', GRUB saves `2' as next boot
+entry, because `fallback' specifies `2' as next fallback entry. This
+makes sure that GRUB will boot `C' after booting `B'.
+
+   It is noteworthy that GRUB uses fallback entries both when GRUB
+itself fails in booting an entry and when `A' or `B' fails in starting
+up your system. So this solution ensures that your system is started
+even if GRUB cannot find your kernel or if your kernel panics.
+
+   However, you need to run `grub-set-default' (*note Invoking
+grub-set-default::) when `A' starts correctly or you fix `A' after it
+crashes, since GRUB always sets next boot entry to a fallback entry.
+You should run this command in a startup script such as `rc.local' to
+boot `A' by default:
+
+     # grub-set-default 0
+
+   where `0' is the number of the boot entry for the system `A'.
+
+   If you want to see what is current default entry, you can look at the
+file `/boot/grub/default' (or `/grub/default' in some systems). Because
+this file is plain-text, you can just `cat' this file. But it is
+strongly recommended *not to modify this file directly*, because GRUB
+may fail in saving a default entry in this file, if you change this
+file in an unintended manner. Therefore, you should use
+`grub-set-default' when you need to change the default entry.
+
+
+File: grub.info,  Node: Configuration,  Next: Network,  Prev: Booting,  Up: Top
+
+5 Configuration
+***************
+
+You've probably noticed that you need to type several commands to boot
+your OS. There's a solution to that - GRUB provides a menu interface
+(*note Menu interface::) from which you can select an item (using arrow
+keys) that will do everything to boot an OS.
+
+   To enable the menu, you need a configuration file, `menu.lst' under
+the boot directory. We'll analyze an example file.
+
+   The file first contains some general settings, the menu interface
+related options. You can put these commands (*note Menu-specific
+commands::) before any of the items (starting with `title' (*note
+title::)).
+
+     #
+     # Sample boot menu configuration file
+     #
+
+   As you may have guessed, these lines are comments. Lines starting
+with a hash character (`#'), and blank lines, are ignored by GRUB.
+
+     # By default, boot the first entry.
+     default 0
+
+   The first entry (here, counting starts with number zero, not one!)
+will be the default choice.
+
+     # Boot automatically after 30 secs.
+     timeout 30
+
+   As the comment says, GRUB will boot automatically in 30 seconds,
+unless interrupted with a keypress.
+
+     # Fallback to the second entry.
+     fallback 1
+
+   If, for any reason, the default entry doesn't work, fall back to the
+second one (this is rarely used, for obvious reasons).
+
+   Note that the complete descriptions of these commands, which are menu
+interface specific, can be found in *Note Menu-specific commands::.
+Other descriptions can be found in *Note Commands::.
+
+   Now, on to the actual OS definitions. You will see that each entry
+begins with a special command, `title' (*note title::), and the action
+is described after it. Note that there is no command `boot' (*note
+boot::) at the  end of each item. That is because GRUB automatically
+executes `boot' if it loads other commands successfully.
+
+   The argument for the command `title' is used to display a short
+title/description of the entry in the menu. Since `title' displays the
+argument as is, you can write basically anything there.
+
+     # For booting GNU/Hurd
+     title  GNU/Hurd
+     root   (hd0,0)
+     kernel /boot/gnumach.gz root=hd0s1
+     module /boot/serverboot.gz
+
+   This boots GNU/Hurd from the first hard disk.
+
+     # For booting GNU/Linux
+     title  GNU/Linux
+     kernel (hd1,0)/vmlinuz root=/dev/hdb1
+
+   This boots GNU/Linux, but from the second hard disk.
+
+     # For booting Mach (getting kernel from floppy)
+     title  Utah Mach4 multiboot
+     root   (hd0,2)
+     pause  Insert the diskette now^G!!
+     kernel (fd0)/boot/kernel root=hd0s3
+     module (fd0)/boot/bootstrap
+
+   This boots Mach with a kernel on a floppy, but the root filesystem at
+hd0s3. It also contains a `pause' line (*note pause::), which will
+cause GRUB to display a prompt and delay, before actually executing the
+rest of the commands and booting.
+
+     # For booting FreeBSD
+     title  FreeBSD
+     root   (hd0,2,a)
+     kernel /boot/loader
+
+   This item will boot FreeBSD kernel loaded from the `a' partition of
+the third PC slice of the first hard disk.
+
+     # For booting OS/2
+     title OS/2
+     root  (hd0,1)
+     makeactive
+     # chainload OS/2 bootloader from the first sector
+     chainloader +1
+     # This is similar to "chainload", but loads a specific file
+     #chainloader /boot/chain.os2
+
+   This will boot OS/2, using a chain-loader (*note Chain-loading::).
+
+     # For booting Windows NT or Windows95
+     title Windows NT / Windows 95 boot menu
+     root        (hd0,0)
+     makeactive
+     chainloader +1
+     # For loading DOS if Windows NT is installed
+     # chainload /bootsect.dos
+
+   The same as the above, but for Windows.
+
+     # For installing GRUB into the hard disk
+     title Install GRUB into the hard disk
+     root    (hd0,0)
+     setup   (hd0)
+
+   This will just (re)install GRUB onto the hard disk.
+
+     # Change the colors.
+     title Change the colors
+     color light-green/brown blink-red/blue
+
+   In the last entry, the command `color' is used (*note color::), to
+change the menu colors (try it!). This command is somewhat special,
+because it can be used both in the command-line and in the menu. GRUB
+has several such commands, see *Note General commands::.
+
+   We hope that you now understand how to use the basic features of
+GRUB. To learn more about GRUB, see the following chapters.
+
+
+File: grub.info,  Node: Network,  Next: Serial terminal,  Prev: Configuration,  Up: Top
+
+6 Downloading OS images from a network
+**************************************
+
+Although GRUB is a disk-based boot loader, it does provide network
+support. To use the network support, you need to enable at least one
+network driver in the GRUB build process. For more information please
+see `netboot/README.netboot' in the source distribution.
+
+* Menu:
+
+* General usage of network support::
+* Diskless::
+
+
+File: grub.info,  Node: General usage of network support,  Next: Diskless,  Up: Network
+
+6.1 How to set up your network
+==============================
+
+GRUB requires a file server and optionally a server that will assign an
+IP address to the machine on which GRUB is running. For the former, only
+TFTP is supported at the moment. The latter is either BOOTP, DHCP or a
+RARP server(1) (*note General usage of network support-Footnote-1::).
+It is not necessary to run both the servers on one computer. How to
+configure these servers is beyond the scope of this document, so please
+refer to the manuals specific to those protocols/servers.
+
+   If you decided to use a server to assign an IP address, set up the
+server and run `bootp' (*note bootp::), `dhcp' (*note dhcp::) or `rarp'
+(*note rarp::) for BOOTP, DHCP or RARP, respectively. Each command will
+show an assigned IP address, a netmask, an IP address for your TFTP
+server and a gateway. If any of the addresses is wrong or it causes an
+error, probably the configuration of your servers isn't set up properly.
+
+   Otherwise, run `ifconfig', like this:
+
+     grub> ifconfig --address=192.168.110.23 --server=192.168.110.14
+
+   You can also use `ifconfig' in conjuction with `bootp', `dhcp' or
+`rarp' (e.g. to reassign the server address manually). *Note
+ifconfig::, for more details.
+
+   Finally, download your OS images from your network. The network can
+be accessed using the network drive `(nd)'. Everything else is very
+similar to the normal instructions (*note Booting::).
+
+   Here is an example:
+
+     grub> bootp
+     Probing... [NE*000]
+     NE2000 base ...
+     Address: 192.168.110.23    Netmask: 255.255.255.0
+     Server: 192.168.110.14     Gateway: 192.168.110.1
+
+     grub> root (nd)
+     grub> kernel /tftproot/gnumach.gz root=sd0s1
+     grub> module /tftproot/serverboot.gz
+     grub> boot
+
+
+File: grub.info,  Node: General usage of network support-Footnotes,  Up: General usage of network support
+
+   (1) RARP is not advised, since it cannot serve much information
+
+
+File: grub.info,  Node: Diskless,  Prev: General usage of network support,  Up: Network
+
+6.2 Booting from a network
+==========================
+
+It is sometimes very useful to boot from a network, especially when you
+use a machine which has no local disk. In this case, you need to obtain
+a kind of Net Boot ROM, such as a PXE ROM or a free software package
+like Etherboot. Such a Boot ROM first boots the machine, sets up the
+network card installed into the machine, and downloads a second stage
+boot image from the network. Then, the second image will try to boot an
+operating system actually from the network.
+
+   GRUB provides two second stage images, `nbgrub' and `pxegrub' (*note
+Images::). These images are the same as the normal Stage 2, except that
+they set up a network automatically, and try to load a configuration
+file from the network, if specified. The usage is very simple: If the
+machine has a PXE ROM, use `pxegrub'. If the machine has an NBI loader
+such as Etherboot, use `nbgrub'. There is no difference between them
+except their formats. Since the way to load a second stage image you
+want to use should be described in the manual on your Net Boot ROM,
+please refer to the manual, for more information.
+
+   However, there is one thing specific to GRUB. Namely, how to specify
+a configuration file in a BOOTP/DHCP server. For now, GRUB uses the tag
+`150', to get the name of a configuration file. The following is an
+example with a BOOTP configuration:
+
+     .allhost:hd=/tmp:bf=null:\
+             :ds=145.71.35.1 145.71.32.1:\
+             :sm=255.255.254.0:\
+             :gw=145.71.35.1:\
+             :sa=145.71.35.5:
+
+     foo:ht=1:ha=63655d0334a7:ip=145.71.35.127:\
+             :bf=/nbgrub:\
+             :tc=.allhost:\
+             :T150="(nd)/tftpboot/menu.lst.foo":
+
+   Note that you should specify the drive name `(nd)' in the name of
+the configuration file. This is because you might change the root drive
+before downloading the configuration from the TFTP server when the
+preset menu feature is used (*note Preset Menu::).
+
+   See the manual of your BOOTP/DHCP server for more information. The
+exact syntax should differ a little from the example.
+
+
+File: grub.info,  Node: Serial terminal,  Next: Preset Menu,  Prev: Network,  Up: Top
+
+7 Using GRUB via a serial line
+******************************
+
+This chapter describes how to use the serial terminal support in GRUB.
+
+   If you have many computers or computers with no display/keyboard, it
+could be very useful to control the computers through serial
+communications. To connect one computer with another via a serial line,
+you need to prepare a null-modem (cross) serial cable, and you may need
+to have multiport serial boards, if your computer doesn't have extra
+serial ports. In addition, a terminal emulator is also required, such as
+minicom. Refer to a manual of your operating system, for more
+information.
+
+   As for GRUB, the instruction to set up a serial terminal is quite
+simple. First of all, make sure that you haven't specified the option
+`--disable-serial' to the configure script when you built your GRUB
+images. If you get them in binary form, probably they have serial
+terminal support already.
+
+   Then, initialize your serial terminal after GRUB starts up. Here is
+an example:
+
+     grub> serial --unit=0 --speed=9600
+     grub> terminal serial
+
+   The command `serial' initializes the serial unit 0 with the speed
+9600bps. The serial unit 0 is usually called `COM1', so, if you want to
+use COM2, you must specify `--unit=1' instead. This command accepts
+many other options, so please refer to *Note serial::, for more details.
+
+   The command `terminal' (*note terminal::) chooses which type of
+terminal you want to use. In the case above, the terminal will be a
+serial terminal, but you can also pass `console' to the command, as
+`terminal serial console'. In this case, a terminal in which you press
+any key will be selected as a GRUB terminal.
+
+   However, note that GRUB assumes that your terminal emulator is
+compatible with VT100 by default. This is true for most terminal
+emulators nowadays, but you should pass the option `--dumb' to the
+command if your terminal emulator is not VT100-compatible or implements
+few VT100 escape sequences. If you specify this option then GRUB
+provides you with an alternative menu interface, because the normal
+menu requires several fancy features of your terminal.
+
+
+File: grub.info,  Node: Preset Menu,  Next: Security,  Prev: Serial terminal,  Up: Top
+
+8 Embedding a configuration file into GRUB
+******************************************
+
+GRUB supports a "preset menu" which is to be always loaded before
+starting. The preset menu feature is useful, for example, when your
+computer has no console but a serial cable. In this case, it is
+critical to set up the serial terminal as soon as possible, since you
+cannot see any message until the serial terminal begins to work. So it
+is good to run the commands `serial' (*note serial::) and `terminal'
+(*note terminal::) before anything else at the start-up time.
+
+   How the preset menu works is slightly complicated:
+
+  1. GRUB checks if the preset menu feature is used, and loads the
+     preset menu, if available. This includes running commands and
+     reading boot entries, like an ordinary configuration file.
+
+  2. GRUB checks if the configuration file is available. Note that this
+     check is performed *regardless of the existence of the preset
+     menu*. The configuration file is loaded even if the preset menu was
+     loaded.
+
+  3. If the preset menu includes any boot entries, they are cleared when
+     the configuration file is loaded. It doesn't matter whether the
+     configuration file has any entries or no entry. The boot entries
+     in the preset menu are used only when GRUB fails in loading the
+     configuration file.
+
+   To enable the preset menu feature, you must rebuild GRUB specifying a
+file to the configure script with the option `--enable-preset-menu'.
+The file has the same semantics as normal configuration files (*note
+Configuration::).
+
+   Another point you should take care is that the diskless support
+(*note Diskless::) diverts the preset menu. Diskless images embed a
+preset menu to execute the command `bootp' (*note bootp::)
+automatically, unless you specify your own preset menu to the configure
+script. This means that you must put commands to initialize a network in
+the preset menu yourself, because diskless images don't set it up
+implicitly, when you use the preset menu explicitly.
+
+   Therefore, a typical preset menu used with diskless support would be
+like this:
+
+     # Set up the serial terminal, first of all.
+     serial --unit=0 --speed=19200
+     terminal --timeout=0 serial
+
+     # Initialize the network.
+     dhcp
+
+
+File: grub.info,  Node: Security,  Next: Images,  Prev: Preset Menu,  Up: Top
+
+9 Protecting your computer from cracking
+****************************************
+
+You may be interested in how to prevent ordinary users from doing
+whatever they like, if you share your computer with other people. So
+this chapter describes how to improve the security of GRUB.
+
+   One thing which could be a security hole is that the user can do too
+many things with GRUB, because GRUB allows one to modify its
+configuration and run arbitrary commands at run-time. For example, the
+user can even read `/etc/passwd' in the command-line interface by the
+command `cat' (*note cat::). So it is necessary to disable all the
+interactive operations.
+
+   Thus, GRUB provides a "password" feature, so that only administrators
+can start the interactive operations (i.e. editing menu entries and
+entering the command-line interface). To use this feature, you need to
+run the command `password' in your configuration file (*note
+password::), like this:
+
+     password --md5 PASSWORD
+
+   If this is specified, GRUB disallows any interactive control, until
+you press the key <p> and enter a correct password.  The option `--md5'
+tells GRUB that `PASSWORD' is in MD5 format.  If it is omitted, GRUB
+assumes the `PASSWORD' is in clear text.
+
+   You can encrypt your password with the command `md5crypt' (*note
+md5crypt::). For example, run the grub shell (*note Invoking the grub
+shell::), and enter your password:
+
+     grub> md5crypt
+     Password: **********
+     Encrypted: $1$U$JK7xFegdxWH6VuppCUSIb.
+
+   Then, cut and paste the encrypted password to your configuration
+file.
+
+   Also, you can specify an optional argument to `password'. See this
+example:
+
+     password PASSWORD /boot/grub/menu-admin.lst
+
+   In this case, GRUB will load `/boot/grub/menu-admin.lst' as a
+configuration file when you enter the valid password.
+
+   Another thing which may be dangerous is that any user can choose any
+menu entry. Usually, this wouldn't be problematic, but you might want to
+permit only administrators to run some of your menu entries, such as an
+entry for booting an insecure OS like DOS.
+
+   GRUB provides the command `lock' (*note lock::). This command always
+fails until you enter the valid password, so you can use it, like this:
+
+     title Boot DOS
+     lock
+     rootnoverify (hd0,1)
+     makeactive
+     chainload +1
+
+   You should insert `lock' right after `title', because any user can
+execute commands in an entry until GRUB encounters `lock'.
+
+   You can also use the command `password' instead of `lock'. In this
+case the boot process will ask for the password and stop if it was
+entered incorrectly.  Since the `password' takes its own PASSWORD
+argument this is useful if you want different passwords for different
+entries.
+
+
+File: grub.info,  Node: Images,  Next: Filesystem,  Prev: Security,  Up: Top
+
+10 GRUB image files
+*******************
+
+GRUB consists of several images: two essential stages, optional stages
+called "Stage 1.5", one image for bootable CD-ROM, and two network boot
+images. Here is a short overview of them. *Note Internals::, for more
+details.
+
+`stage1'
+     This is an essential image used for booting up GRUB. Usually, this
+     is embedded in an MBR or the boot sector of a partition. Because a
+     PC boot sector is 512 bytes, the size of this image is exactly 512
+     bytes.
+
+     All `stage1' must do is to load Stage 2 or Stage 1.5 from a local
+     disk. Because of the size restriction, `stage1' encodes the
+     location of Stage 2 (or Stage 1.5) in a block list format, so it
+     never understand any filesystem structure.
+
+`stage2'
+     This is the core image of GRUB. It does everything but booting up
+     itself. Usually, this is put in a filesystem, but that is not
+     required.
+
+`e2fs_stage1_5'
+`fat_stage1_5'
+`ffs_stage1_5'
+`jfs_stage1_5'
+`minix_stage1_5'
+`reiserfs_stage1_5'
+`vstafs_stage1_5'
+`xfs_stage1_5'
+     These are called "Stage 1.5", because they serve as a bridge
+     between `stage1' and `stage2', that is to say, Stage 1.5 is loaded
+     by Stage 1 and Stage 1.5 loads Stage 2. The difference between
+     `stage1' and `*_stage1_5' is that the former doesn't understand
+     any filesystem while the latter understands one filesystem (e.g.
+     `e2fs_stage1_5' understands ext2fs). So you can move the Stage 2
+     image to another location safely, even after GRUB has been
+     installed.
+
+     While Stage 2 cannot generally be embedded in a fixed area as the
+     size is so large, Stage 1.5 can be installed into the area right
+     after an MBR, or the boot loader area of a ReiserFS or a FFS.
+
+`stage2_eltorito'
+     This is a boot image for CD-ROMs using the "no emulation mode" in
+     El Torito specification. This is identical to Stage 2, except that
+     this boots up without Stage 1 and sets up a special drive `(cd)'.
+
+`nbgrub'
+     This is a network boot image for the Network Image Proposal used
+     by some network boot loaders, such as Etherboot. This is mostly
+     the same as Stage 2, but it also sets up a network and loads a
+     configuration file from the network.
+
+`pxegrub'
+     This is another network boot image for the Preboot Execution
+     Environment used by several Netboot ROMs. This is identical to
+     `nbgrub', except for the format.
+
+
+File: grub.info,  Node: Filesystem,  Next: Interface,  Prev: Images,  Up: Top
+
+11 Filesystem syntax and semantics
+**********************************
+
+GRUB uses a special syntax for specifying disk drives which can be
+accessed by BIOS. Because of BIOS limitations, GRUB cannot distinguish
+between IDE, ESDI, SCSI, or others. You must know yourself which BIOS
+device is equivalent to which OS device. Normally, that will be clear if
+you see the files in a device or use the command `find' (*note find::).
+
+* Menu:
+
+* Device syntax::               How to specify devices
+* File name syntax::            How to specify files
+* Block list syntax::           How to specify block lists
+
+
+File: grub.info,  Node: Device syntax,  Next: File name syntax,  Up: Filesystem
+
+11.1 How to specify devices
+===========================
+
+The device syntax is like this:
+
+     `(DEVICE[,PART-NUM][,BSD-SUBPART-LETTER])'
+
+   `[]' means the parameter is optional. DEVICE should be either `fd'
+or `hd' followed by a digit, like `fd0'.  But you can also set DEVICE
+to a hexadecimal or a decimal number which is a BIOS drive number, so
+the following are equivalent:
+
+     (hd0)
+     (0x80)
+     (128)
+
+   PART-NUM represents the partition number of DEVICE, starting from
+zero for primary partitions and from four for extended partitions, and
+BSD-SUBPART-LETTER represents the BSD disklabel subpartition, such as
+`a' or `e'.
+
+   A shortcut for specifying BSD subpartitions is
+`(DEVICE,BSD-SUBPART-LETTER)', in this case, GRUB searches for the
+first PC partition containing a BSD disklabel, then finds the
+subpartition BSD-SUBPART-LETTER. Here is an example:
+
+     (hd0,a)
+
+   The syntax `(hd0)' represents using the entire disk (or the MBR when
+installing GRUB), while the syntax `(hd0,0)' represents using the first
+partition of the disk (or the boot sector of the partition when
+installing GRUB).
+
+   If you enabled the network support, the special drive, `(nd)', is
+also available. Before using the network drive, you must initialize the
+network. *Note Network::, for more information.
+
+   If you boot GRUB from a CD-ROM, `(cd)' is available. *Note Making a
+GRUB bootable CD-ROM::, for details.
+
+
+File: grub.info,  Node: File name syntax,  Next: Block list syntax,  Prev: Device syntax,  Up: Filesystem
+
+11.2 How to specify files
+=========================
+
+There are two ways to specify files, by "absolute file name" and by
+"block list".
+
+   An absolute file name resembles a Unix absolute file name, using `/'
+for the directory separator (not `\' as in DOS). One example is
+`(hd0,0)/boot/grub/menu.lst'. This means the file `/boot/grub/menu.lst'
+in the first partition of the first hard disk. If you omit the device
+name in an absolute file name, GRUB uses GRUB's "root device"
+implicitly. So if you set the root device to, say, `(hd1,0)' by the
+command `root' (*note root::), then `/boot/kernel' is the same as
+`(hd1,0)/boot/kernel'.
+
+
+File: grub.info,  Node: Block list syntax,  Prev: File name syntax,  Up: Filesystem
+
+11.3 How to specify block lists
+===============================
+
+A block list is used for specifying a file that doesn't appear in the
+filesystem, like a chainloader. The syntax is
+`[OFFSET]+LENGTH[,[OFFSET]+LENGTH]...'.  Here is an example:
+
+     `0+100,200+1,300+300'
+
+   This represents that GRUB should read blocks 0 through 99, block 200,
+and blocks 300 through 599. If you omit an offset, then GRUB assumes
+the offset is zero.
+
+   Like the file name syntax (*note File name syntax::), if a blocklist
+does not contain a device name, then GRUB uses GRUB's "root device". So
+`(hd0,1)+1' is the same as `+1' when the root device is `(hd0,1)'.
+
+
+File: grub.info,  Node: Interface,  Next: Commands,  Prev: Filesystem,  Up: Top
+
+12 GRUB's user interface
+************************
+
+GRUB has both a simple menu interface for choosing preset entries from a
+configuration file, and a highly flexible command-line for performing
+any desired combination of boot commands.
+
+   GRUB looks for its configuration file as soon as it is loaded. If one
+is found, then the full menu interface is activated using whatever
+entries were found in the file. If you choose the "command-line" menu
+option, or if the configuration file was not found, then GRUB drops to
+the command-line interface.
+
+* Menu:
+
+* Command-line interface::      The flexible command-line interface
+* Menu interface::              The simple menu interface
+* Menu entry editor::           Editing a menu entry
+* Hidden menu interface::       The hidden menu interface
+
+
+File: grub.info,  Node: Command-line interface,  Next: Menu interface,  Up: Interface
+
+12.1 The flexible command-line interface
+========================================
+
+The command-line interface provides a prompt and after it an editable
+text area much like a command-line in Unix or DOS. Each command is
+immediately executed after it is entered(1) (*note Command-line
+interface-Footnote-1::). The commands (*note Command-line and menu
+entry commands::) are a subset of those available in the configuration
+file, used with exactly the same syntax.
+
+   Cursor movement and editing of the text on the line can be done via a
+subset of the functions available in the Bash shell:
+
+<C-f>
+<PC right key>
+     Move forward one character.
+
+<C-b>
+<PC left key>
+     Move back one character.
+
+<C-a>
+<HOME>
+     Move to the start of the line.
+
+<C-e>
+<END>
+     Move the the end of the line.
+
+<C-d>
+<DEL>
+     Delete the character underneath the cursor.
+
+<C-h>
+<BS>
+     Delete the character to the left of the cursor.
+
+<C-k>
+     Kill the text from the current cursor position to the end of the
+     line.
+
+<C-u>
+     Kill backward from the cursor to the beginning of the line.
+
+<C-y>
+     Yank the killed text back into the buffer at the cursor.
+
+<C-p>
+<PC up key>
+     Move up through the history list.
+
+<C-n>
+<PC down key>
+     Move down through the history list.
+
+   When typing commands interactively, if the cursor is within or before
+the first word in the command-line, pressing the <TAB> key (or <C-i>)
+will display a listing of the available commands, and if the cursor is
+after the first word, the `<TAB>' will provide a completion listing of
+disks, partitions, and file names depending on the context. Note that
+to obtain a list of drives, one must open a parenthesis, as `root ('.
+
+   Note that you cannot use the completion functionality in the TFTP
+filesystem. This is because TFTP doesn't support file name listing for
+the security.
+
+
+File: grub.info,  Node: Command-line interface-Footnotes,  Up: Command-line interface
+
+   (1) However, this behavior will be changed in the future version, in
+a user-invisible way.
+
+
+File: grub.info,  Node: Menu interface,  Next: Menu entry editor,  Prev: Command-line interface,  Up: Interface
+
+12.2 The simple menu interface
+==============================
+
+The menu interface is quite easy to use. Its commands are both
+reasonably intuitive and described on screen.
+
+   Basically, the menu interface provides a list of "boot entries" to
+the user to choose from. Use the arrow keys to select the entry of
+choice, then press <RET> to run it.  An optional timeout is available
+to boot the default entry (the first one if not set), which is aborted
+by pressing any key.
+
+   Commands are available to enter a bare command-line by pressing <c>
+(which operates exactly like the non-config-file version of GRUB, but
+allows one to return to the menu if desired by pressing <ESC>) or to
+edit any of the "boot entries" by pressing <e>.
+
+   If you protect the menu interface with a password (*note Security::),
+all you can do is choose an entry by pressing <RET>, or press <p> to
+enter the password.
+
+
+File: grub.info,  Node: Menu entry editor,  Next: Hidden menu interface,  Prev: Menu interface,  Up: Interface
+
+12.3 Editing a menu entry
+=========================
+
+The menu entry editor looks much like the main menu interface, but the
+lines in the menu are individual commands in the selected entry instead
+of entry names.
+
+   If an <ESC> is pressed in the editor, it aborts all the changes made
+to the configuration entry and returns to the main menu interface.
+
+   When a particular line is selected, the editor places the user in a
+special version of the GRUB command-line to edit that line.  When the
+user hits <RET>, GRUB replaces the line in question in the boot entry
+with the changes (unless it was aborted via <ESC>, in which case the
+changes are thrown away).
+
+   If you want to add a new line to the menu entry, press <o> if adding
+a line after the current line or press <O> if before the current line.
+
+   To delete a line, hit the key <d>. Although GRUB unfortunately does
+not support "undo", you can do almost the same thing by just returning
+to the main menu.
+
+
+File: grub.info,  Node: Hidden menu interface,  Prev: Menu entry editor,  Up: Interface
+
+12.4 The hidden menu interface
+==============================
+
+When your terminal is dumb or you request GRUB to hide the menu
+interface explicitly with the command `hiddenmenu' (*note
+hiddenmenu::), GRUB doesn't show the menu interface (*note Menu
+interface::) and automatically boots the default entry, unless
+interrupted by pressing <ESC>.
+
+   When you interrupt the timeout and your terminal is dumb, GRUB falls
+back to the command-line interface (*note Command-line interface::).
+
+
+File: grub.info,  Node: Commands,  Next: Troubleshooting,  Prev: Interface,  Up: Top
+
+13 The list of available commands
+*********************************
+
+In this chapter, we list all commands that are available in GRUB.
+
+   Commands belong to different groups. A few can only be used in the
+global section of the configuration file (or "menu"); most of them can
+be entered on the command-line and can be used either anywhere in the
+menu or specifically in the menu entries.
+
+* Menu:
+
+* Menu-specific commands::
+* General commands::
+* Command-line and menu entry commands::
+
+
+File: grub.info,  Node: Menu-specific commands,  Next: General commands,  Up: Commands
+
+13.1 The list of commands for the menu only
+===========================================
+
+The semantics used in parsing the configuration file are the following:
+
+   * The menu-specific commands have to be used before any others.
+
+   * The files _must_ be in plain-text format.
+
+   * `#' at the beginning of a line in a configuration file means it is
+     only a comment.
+
+   * Options are separated by spaces.
+
+   * All numbers can be either decimal or hexadecimal. A hexadecimal
+     number must be preceded by `0x', and is case-insensitive.
+
+   * Extra options or text at the end of the line are ignored unless
+     otherwise specified.
+
+   * Unrecognized commands are added to the current entry, except
+     before entries start, where they are ignored.
+
+   These commands can only be used in the menu:
+
+* Menu:
+
+* default::                     Set the default entry
+* fallback::                    Set the fallback entry
+* hiddenmenu::                  Hide the menu interface
+* timeout::                     Set the timeout
+* title::                       Start a menu entry
+
+
+File: grub.info,  Node: default,  Next: fallback,  Up: Menu-specific commands
+
+13.1.1 default
+--------------
+
+ -- Command: default num
+     Set the default entry to the entry number NUM. Numbering starts
+     from 0, and the entry number 0 is the default if the command is not
+     used.
+
+     You can specify `saved' instead of a number. In this case, the
+     default entry is the entry saved with the command `savedefault'.
+     *Note savedefault::, for more information.
+
+
+File: grub.info,  Node: fallback,  Next: hiddenmenu,  Prev: default,  Up: Menu-specific commands
+
+13.1.2 fallback
+---------------
+
+ -- Command: fallback num...
+     Go into unattended boot mode: if the default boot entry has any
+     errors, instead of waiting for the user to do something,
+     immediately start over using the NUM entry (same numbering as the
+     `default' command (*note default::)). This obviously won't help if
+     the machine was rebooted by a kernel that GRUB loaded. You can
+     specify multiple fallback entry numbers.
+
+
+File: grub.info,  Node: hiddenmenu,  Next: timeout,  Prev: fallback,  Up: Menu-specific commands
+
+13.1.3 hiddenmenu
+-----------------
+
+ -- Command: hiddenmenu
+     Don't display the menu. If the command is used, no menu will be
+     displayed on the control terminal, and the default entry will be
+     booted after the timeout expired. The user can still request the
+     menu to be displayed by pressing <ESC> before the timeout expires.
+     See also *Note Hidden menu interface::.
+
+
+File: grub.info,  Node: timeout,  Next: title,  Prev: hiddenmenu,  Up: Menu-specific commands
+
+13.1.4 timeout
+--------------
+
+ -- Command: timeout sec
+     Set a timeout, in SEC seconds, before automatically booting the
+     default entry (normally the first entry defined).
+
+
+File: grub.info,  Node: title,  Prev: timeout,  Up: Menu-specific commands
+
+13.1.5 title
+------------
+
+ -- Command: title name ...
+     Start a new boot entry, and set its name to the contents of the
+     rest of the line, starting with the first non-space character.
+
+
+File: grub.info,  Node: General commands,  Next: Command-line and menu entry commands,  Prev: Menu-specific commands,  Up: Commands
+
+13.2 The list of general commands
+=================================
+
+Commands usable anywhere in the menu and in the command-line.
+
+* Menu:
+
+* bootp::                       Initialize a network device via BOOTP
+* color::                       Color the menu interface
+* device::                      Specify a file as a drive
+* dhcp::                        Initialize a network device via DHCP
+* hide::                        Hide a partition
+* ifconfig::                    Configure a network device manually
+* pager::                       Change the state of the internal pager
+* partnew::                     Make a primary partition
+* parttype::                    Change the type of a partition
+* password::                    Set a password for the menu interface
+* rarp::                        Initialize a network device via RARP
+* serial::                      Set up a serial device
+* setkey::                      Configure the key map
+* terminal::                    Choose a terminal
+* terminfo::                    Define escape sequences for a terminal
+* tftpserver::                  Specify a TFTP server
+* unhide::                      Unhide a partition
+
+
+File: grub.info,  Node: bootp,  Next: color,  Up: General commands
+
+13.2.1 bootp
+------------
+
+ -- Command: bootp [`--with-configfile']
+     Initialize a network device via the "BOOTP" protocol. This command
+     is only available if GRUB is compiled with netboot support. See
+     also *Note Network::.
+
+     If you specify `--with-configfile' to this command, GRUB will
+     fetch and load a configuration file specified by your BOOTP server
+     with the vendor tag `150'.
+
+
+File: grub.info,  Node: color,  Next: device,  Prev: bootp,  Up: General commands
+
+13.2.2 color
+------------
+
+ -- Command: color normal [highlight]
+     Change the menu colors. The color NORMAL is used for most lines in
+     the menu (*note Menu interface::), and the color HIGHLIGHT is used
+     to highlight the line where the cursor points. If you omit
+     HIGHLIGHT, then the inverted color of NORMAL is used for the
+     highlighted line. The format of a color is
+     `FOREGROUND/BACKGROUND'. FOREGROUND and BACKGROUND are symbolic
+     color names. A symbolic color name must be one of these:
+
+        * black
+
+        * blue
+
+        * green
+
+        * cyan
+
+        * red
+
+        * magenta
+
+        * brown
+
+        * light-gray
+
+          *These below can be specified only for the foreground.*
+
+        * dark-gray
+
+        * light-blue
+
+        * light-green
+
+        * light-cyan
+
+        * light-red
+
+        * light-magenta
+
+        * yellow
+
+        * white
+
+     But only the first eight names can be used for BACKGROUND. You can
+     prefix `blink-' to FOREGROUND if you want a blinking foreground
+     color.
+
+     This command can be used in the configuration file and on the
+     command line, so you may write something like this in your
+     configuration file:
+
+          # Set default colors.
+          color light-gray/blue black/light-gray
+
+          # Change the colors.
+          title OS-BS like
+          color magenta/blue black/magenta
+
+
+File: grub.info,  Node: device,  Next: dhcp,  Prev: color,  Up: General commands
+
+13.2.3 device
+-------------
+
+ -- Command: device drive file
+     In the grub shell, specify the file FILE as the actual drive for a
+     BIOS drive DRIVE. You can use this command to create a disk image,
+     and/or to fix the drives guessed by GRUB when GRUB fails to
+     determine them correctly, like this:
+
+          grub> device (fd0) /floppy-image
+          grub> device (hd0) /dev/sd0
+
+     This command can be used only in the grub shell (*note Invoking
+     the grub shell::).
+
+
+File: grub.info,  Node: dhcp,  Next: hide,  Prev: device,  Up: General commands
+
+13.2.4 dhcp
+-----------
+
+ -- Command: dhcp [-with-configfile]
+     Initialize a network device via the "DHCP" protocol. Currently,
+     this command is just an alias for `bootp', since the two protocols
+     are very similar. This command is only available if GRUB is
+     compiled with netboot support. See also *Note Network::.
+
+     If you specify `--with-configfile' to this command, GRUB will
+     fetch and load a configuration file specified by your DHCP server
+     with the vendor tag `150'.
+
+
+File: grub.info,  Node: hide,  Next: ifconfig,  Prev: dhcp,  Up: General commands
+
+13.2.5 hide
+-----------
+
+ -- Command: hide partition
+     Hide the partition PARTITION by setting the "hidden" bit in its
+     partition type code. This is useful only when booting DOS or
+     Windows and multiple primary FAT partitions exist in one disk. See
+     also *Note DOS/Windows::.
+
+
+File: grub.info,  Node: ifconfig,  Next: pager,  Prev: hide,  Up: General commands
+
+13.2.6 ifconfig
+---------------
+
+ -- Command: ifconfig [`--server=server'] [`--gateway=gateway']
+          [`--mask=mask'] [`--address=address']
+     Configure the IP address, the netmask, the gateway, and the server
+     address of a network device manually. The values must be in dotted
+     decimal format, like `192.168.11.178'. The order of the options is
+     not important. This command shows current network configuration,
+     if no option is specified. See also *Note Network::.
+
+
+File: grub.info,  Node: pager,  Next: partnew,  Prev: ifconfig,  Up: General commands
+
+13.2.7 pager
+------------
+
+ -- Command: pager [flag]
+     Toggle or set the state of the internal pager. If FLAG is `on',
+     the internal pager is enabled. If FLAG is `off', it is disabled.
+     If no argument is given, the state is toggled.
+
+
+File: grub.info,  Node: partnew,  Next: parttype,  Prev: pager,  Up: General commands
+
+13.2.8 partnew
+--------------
+
+ -- Command: partnew part type from len
+     Create a new primary partition. PART is a partition specification
+     in GRUB syntax (*note Naming convention::); TYPE is the partition
+     type and must be a number in the range `0-0xff'; FROM is the
+     starting address and LEN is the length, both in sector units.
+
+
+File: grub.info,  Node: parttype,  Next: password,  Prev: partnew,  Up: General commands
+
+13.2.9 parttype
+---------------
+
+ -- Command: parttype part type
+     Change the type of an existing partition.  PART is a partition
+     specification in GRUB syntax (*note Naming convention::); TYPE is
+     the new partition type and must be a number in the range 0-0xff.
+
+
+File: grub.info,  Node: password,  Next: rarp,  Prev: parttype,  Up: General commands
+
+13.2.10 password
+----------------
+
+ -- Command: password [`--md5'] passwd [new-config-file]
+     If used in the first section of a menu file, disable all
+     interactive editing control (menu entry editor and command-line)
+     and entries protected by the command `lock'. If the password
+     PASSWD is entered, it loads the NEW-CONFIG-FILE as a new config
+     file and restarts the GRUB Stage 2, if NEW-CONFIG-FILE is
+     specified. Otherwise, GRUB will just unlock the privileged
+     instructions.  You can also use this command in the script
+     section, in which case it will ask for the password, before
+     continuing.  The option `--md5' tells GRUB that PASSWD is
+     encrypted with `md5crypt' (*note md5crypt::).
+
+
+File: grub.info,  Node: rarp,  Next: serial,  Prev: password,  Up: General commands
+
+13.2.11 rarp
+------------
+
+ -- Command: rarp
+     Initialize a network device via the "RARP" protocol.  This command
+     is only available if GRUB is compiled with netboot support. See
+     also *Note Network::.
+
+
+File: grub.info,  Node: serial,  Next: setkey,  Prev: rarp,  Up: General commands
+
+13.2.12 serial
+--------------
+
+ -- Command: serial [`--unit=unit'] [`--port=port'] [`--speed=speed']
+          [`--word=word'] [`--parity=parity'] [`--stop=stop']
+          [`--device=dev']
+     Initialize a serial device. UNIT is a number in the range 0-3
+     specifying which serial port to use; default is 0, which
+     corresponds to the port often called COM1. PORT is the I/O port
+     where the UART is to be found; if specified it takes precedence
+     over UNIT.  SPEED is the transmission speed; default is 9600. WORD
+     and STOP are the number of data bits and stop bits. Data bits must
+     be in the range 5-8 and stop bits must be 1 or 2. Default is 8 data
+     bits and one stop bit. PARITY is one of `no', `odd', `even' and
+     defaults to `no'. The option `--device' can only be used in the
+     grub shell and is used to specify the tty device to be used in the
+     host operating system (*note Invoking the grub shell::).
+
+     The serial port is not used as a communication channel unless the
+     `terminal' command is used (*note terminal::).
+
+     This command is only available if GRUB is compiled with serial
+     support. See also *Note Serial terminal::.
+
+
+File: grub.info,  Node: setkey,  Next: terminal,  Prev: serial,  Up: General commands
+
+13.2.13 setkey
+--------------
+
+ -- Command: setkey [to_key from_key]
+     Change the keyboard map. The key FROM_KEY is mapped to the key
+     TO_KEY. If no argument is specified, reset key mappings. Note that
+     this command _does not_ exchange the keys. If you want to exchange
+     the keys, run this command again with the arguments exchanged,
+     like this:
+
+          grub> setkey capslock control
+          grub> setkey control capslock
+
+     A key must be an alphabet letter, a digit, or one of these symbols:
+     `escape', `exclam', `at', `numbersign', `dollar', `percent',
+     `caret', `ampersand', `asterisk', `parenleft', `parenright',
+     `minus', `underscore', `equal', `plus', `backspace', `tab',
+     `bracketleft', `braceleft', `bracketright', `braceright', `enter',
+     `control', `semicolon', `colon', `quote', `doublequote',
+     `backquote', `tilde', `shift', `backslash', `bar', `comma',
+     `less', `period', `greater', `slash', `question', `alt', `space',
+     `capslock', `FX' (`X' is a digit), and `delete'. This table
+     describes to which character each of the symbols corresponds:
+
+    `exclam'
+          `!'
+
+    `at'
+          `@'
+
+    `numbersign'
+          `#'
+
+    `dollar'
+          `$'
+
+    `percent'
+          `%'
+
+    `caret'
+          `^'
+
+    `ampersand'
+          `&'
+
+    `asterisk'
+          `*'
+
+    `parenleft'
+          `('
+
+    `parenright'
+          `)'
+
+    `minus'
+          `-'
+
+    `underscore'
+          `_'
+
+    `equal'
+          `='
+
+    `plus'
+          `+'
+
+    `bracketleft'
+          `['
+
+    `braceleft'
+          `{'
+
+    `bracketright'
+          `]'
+
+    `braceright'
+          `}'
+
+    `semicolon'
+          `;'
+
+    `colon'
+          `:'
+
+    `quote'
+          `''
+
+    `doublequote'
+          `"'
+
+    `backquote'
+          ``'
+
+    `tilde'
+          `~'
+
+    `backslash'
+          `\'
+
+    `bar'
+          `|'
+
+    `comma'
+          `,'
+
+    `less'
+          `<'
+
+    `period'
+          `.'
+
+    `greater'
+          `>'
+
+    `slash'
+          `/'
+
+    `question'
+          `?'
+
+    `space'
+          ` '
+
+
+File: grub.info,  Node: terminal,  Next: terminfo,  Prev: setkey,  Up: General commands
+
+13.2.14 terminal
+----------------
+
+ -- Command: terminal [`--dumb'] [`--no-echo'] [`--no-edit']
+          [`--timeout=secs'] [`--lines=lines'] [`--silent'] [`console']
+          [`serial'] [`hercules']
+     Select a terminal for user interaction. The terminal is assumed to
+     be VT100-compatible unless `--dumb' is specified. If both
+     `console' and `serial' are specified, then GRUB will use the one
+     where a key is entered first or the first when the timeout
+     expires. If neither are specified, the current setting is
+     reported. This command is only available if GRUB is compiled with
+     serial support. See also *Note Serial terminal::.
+
+     This may not make sense for most users, but GRUB supports Hercules
+     console as well. Hercules console is usable like the ordinary
+     console, and the usage is quite similar to that for serial
+     terminals: specify `hercules' as the argument.
+
+     The option `--lines' defines the number of lines in your terminal,
+     and it is used for the internal pager function. If you don't
+     specify this option, the number is assumed as 24.
+
+     The option `--silent' suppresses the message to prompt you to hit
+     any key. This might be useful if your system has no terminal
+     device.
+
+     The option `--no-echo' has GRUB not to echo back input characters.
+     This implies the option `--no-edit'.
+
+     The option `--no-edit' disables the BASH-like editing feature.
+
+
+File: grub.info,  Node: terminfo,  Next: tftpserver,  Prev: terminal,  Up: General commands
+
+13.2.15 terminfo
+----------------
+
+ -- Command: terminfo `--name=name' `--cursor-address=seq'
+          [`--clear-screen=seq'] [`--enter-standout-mode=seq']
+          [`--exit-standout-mode=seq']
+     Define the capabilities of your terminal. Use this command to
+     define escape sequences, if it is not vt100-compatible. You may
+     use `\e' for <ESC> and `^X' for a control character.
+
+     You can use the utility `grub-terminfo' to generate appropriate
+     arguments to this command. *Note Invoking grub-terminfo::.
+
+     If no option is specified, the current settings are printed.
+
+
+File: grub.info,  Node: tftpserver,  Next: unhide,  Prev: terminfo,  Up: General commands
+
+13.2.16 tftpserver
+------------------
+
+ -- Command: tftpserver ipaddr
+     *Caution:* This command exists only for backward compatibility.
+     Use `ifconfig' (*note ifconfig::) instead.
+
+     Override a TFTP server address returned by a BOOTP/DHCP/RARP
+     server. The argument IPADDR must be in dotted decimal format, like
+     `192.168.0.15'.  This command is only available if GRUB is compiled
+     with netboot support. See also *Note Network::.
+
+
+File: grub.info,  Node: unhide,  Prev: tftpserver,  Up: General commands
+
+13.2.17 unhide
+--------------
+
+ -- Command: unhide partition
+     Unhide the partition PARTITION by clearing the "hidden" bit in its
+     partition type code. This is useful only when booting DOS or
+     Windows and multiple primary partitions exist on one disk. See also
+     *Note DOS/Windows::.
+
+
+File: grub.info,  Node: Command-line and menu entry commands,  Prev: General commands,  Up: Commands
+
+13.3 The list of command-line and menu entry commands
+=====================================================
+
+These commands are usable in the command-line and in menu entries.  If
+you forget a command, you can run the command `help' (*note help::).
+
+* Menu:
+
+* blocklist::                   Get the block list notation of a file
+* boot::                        Start up your operating system
+* cat::                         Show the contents of a file
+* chainloader::                 Chain-load another boot loader
+* cmp::                         Compare two files
+* configfile::                  Load a configuration file
+* debug::                       Toggle the debug flag
+* displayapm::                  Display APM information
+* displaymem::                  Display memory configuration
+* embed::                       Embed Stage 1.5
+* find::                        Find a file
+* fstest::                      Test a filesystem
+* geometry::                    Manipulate the geometry of a drive
+* halt::                        Shut down your computer
+* help::                        Show help messages
+* impsprobe::                   Probe SMP
+* initrd::                      Load an initrd
+* install::                     Install GRUB
+* ioprobe::                     Probe I/O ports used for a drive
+* kernel::                      Load a kernel
+* lock::                        Lock a menu entry
+* makeactive::                  Make a partition active
+* map::                         Map a drive to another
+* md5crypt::                    Encrypt a password in MD5 format
+* module::                      Load a module
+* modulenounzip::               Load a module without decompression
+* pause::                       Wait for a key press
+* quit::                        Exit from the grub shell
+* reboot::                      Reboot your computer
+* read::                        Read data from memory
+* root::                        Set GRUB's root device
+* rootnoverify::                Set GRUB's root device without mounting
+* savedefault::                 Save current entry as the default entry
+* setup::                       Set up GRUB's installation automatically
+* testload::                    Load a file for testing a filesystem
+* testvbe::                     Test VESA BIOS EXTENSION
+* uppermem::                    Set the upper memory size
+* vbeprobe::                    Probe VESA BIOS EXTENSION
+
+
+File: grub.info,  Node: blocklist,  Next: boot,  Up: Command-line and menu entry commands
+
+13.3.1 blocklist
+----------------
+
+ -- Command: blocklist file
+     Print the block list notation of the file FILE. *Note Block list
+     syntax::.
+
+
+File: grub.info,  Node: boot,  Next: cat,  Prev: blocklist,  Up: Command-line and menu entry commands
+
+13.3.2 boot
+-----------
+
+ -- Command: boot
+     Boot the OS or chain-loader which has been loaded. Only necessary
+     if running the fully interactive command-line (it is implicit at
+     the end of a menu entry).
+
+
+File: grub.info,  Node: cat,  Next: chainloader,  Prev: boot,  Up: Command-line and menu entry commands
+
+13.3.3 cat
+----------
+
+ -- Command: cat file
+     Display the contents of the file FILE. This command may be useful
+     to remind you of your OS's root partition:
+
+          grub> cat /etc/fstab
+
+
+File: grub.info,  Node: chainloader,  Next: cmp,  Prev: cat,  Up: Command-line and menu entry commands
+
+13.3.4 chainloader
+------------------
+
+ -- Command: chainloader [`--force'] file
+     Load FILE as a chain-loader. Like any other file loaded by the
+     filesystem code, it can use the blocklist notation to grab the
+     first sector of the current partition with `+1'. If you specify the
+     option `--force', then load FILE forcibly, whether it has a
+     correct signature or not. This is required when you want to load a
+     defective boot loader, such as SCO UnixWare 7.1 (*note SCO
+     UnixWare::).
+
+
+File: grub.info,  Node: cmp,  Next: configfile,  Prev: chainloader,  Up: Command-line and menu entry commands
+
+13.3.5 cmp
+----------
+
+ -- Command: cmp file1 file2
+     Compare the file FILE1 with the file FILE2. If they differ in
+     size, print the sizes like this:
+
+          Differ in size: 0x1234 [foo], 0x4321 [bar]
+
+     If the sizes are equal but the bytes at an offset differ, then
+     print the bytes like this:
+
+          Differ at the offset 777: 0xbe [foo], 0xef [bar]
+
+     If they are completely identical, nothing will be printed.
+
+
+File: grub.info,  Node: configfile,  Next: debug,  Prev: cmp,  Up: Command-line and menu entry commands
+
+13.3.6 configfile
+-----------------
+
+ -- Command: configfile file
+     Load FILE as a configuration file.
+
+
+File: grub.info,  Node: debug,  Next: displayapm,  Prev: configfile,  Up: Command-line and menu entry commands
+
+13.3.7 debug
+------------
+
+ -- Command: debug
+     Toggle debug mode (by default it is off). When debug mode is on,
+     some extra messages are printed to show disk activity. This global
+     debug flag is mainly useful for GRUB developers when testing new
+     code.
+
+
+File: grub.info,  Node: displayapm,  Next: displaymem,  Prev: debug,  Up: Command-line and menu entry commands
+
+13.3.8 displayapm
+-----------------
+
+ -- Command: displayapm
+     Display APM BIOS information.
+
+
+File: grub.info,  Node: displaymem,  Next: embed,  Prev: displayapm,  Up: Command-line and menu entry commands
+
+13.3.9 displaymem
+-----------------
+
+ -- Command: displaymem
+     Display what GRUB thinks the system address space map of the
+     machine is, including all regions of physical RAM installed. GRUB's
+     "upper/lower memory" display uses the standard BIOS interface for
+     the available memory in the first megabyte, or "lower memory", and
+     a synthesized number from various BIOS interfaces of the memory
+     starting at 1MB and going up to the first chipset hole for "upper
+     memory" (the standard PC "upper memory" interface is limited to
+     reporting a maximum of 64MB).
+
+
+File: grub.info,  Node: embed,  Next: find,  Prev: displaymem,  Up: Command-line and menu entry commands
+
+13.3.10 embed
+-------------
+
+ -- Command: embed stage1_5 device
+     Embed the Stage 1.5 STAGE1_5 in the sectors after the MBR if
+     DEVICE is a drive, or in the "boot loader" area if DEVICE is a FFS
+     partition or a ReiserFS partition.(1) (*note embed-Footnote-1::)
+     Print the number of sectors which STAGE1_5 occupies, if successful.
+
+     Usually, you don't need to run this command directly. *Note
+     setup::.
+
+
+File: grub.info,  Node: embed-Footnotes,  Up: embed
+
+   (1) The latter feature has not been implemented yet.
+
+
+File: grub.info,  Node: find,  Next: fstest,  Prev: embed,  Up: Command-line and menu entry commands
+
+13.3.11 find
+------------
+
+ -- Command: find filename
+     Search for the file name FILENAME in all mountable partitions and
+     print the list of the devices which contain the file. The file
+     name FILENAME should be an absolute file name like
+     `/boot/grub/stage1'.
+
+
+File: grub.info,  Node: fstest,  Next: geometry,  Prev: find,  Up: Command-line and menu entry commands
+
+13.3.12 fstest
+--------------
+
+ -- Command: fstest
+     Toggle filesystem test mode.  Filesystem test mode, when turned
+     on, prints out data corresponding to all the device reads and what
+     values are being sent to the low-level routines. The format is
+     `<PARTITION-OFFSET-SECTOR, BYTE-OFFSET, BYTE-LENGTH>' for
+     high-level reads inside a partition, and `[DISK-OFFSET-SECTOR]'
+     for low-level sector requests from the disk.  Filesystem test mode
+     is turned off by any use of the `install' (*note install::) or
+     `testload' (*note testload::) commands.
+
+
+File: grub.info,  Node: geometry,  Next: halt,  Prev: fstest,  Up: Command-line and menu entry commands
+
+13.3.13 geometry
+----------------
+
+ -- Command: geometry drive [cylinder head sector [total_sector]]
+     Print the information for the drive DRIVE. In the grub shell, you
+     can set the geometry of the drive arbitrarily. The number of
+     cylinders, the number of heads, the number of sectors and the
+     number of total sectors are set to CYLINDER, HEAD, SECTOR and
+     TOTAL_SECTOR, respectively. If you omit TOTAL_SECTOR, then it will
+     be calculated based on the C/H/S values automatically.
+
+
+File: grub.info,  Node: halt,  Next: help,  Prev: geometry,  Up: Command-line and menu entry commands
+
+13.3.14 halt
+------------
+
+ -- Command: halt `--no-apm'
+     The command halts the computer. If the `--no-apm' option is
+     specified, no APM BIOS call is performed. Otherwise, the computer
+     is shut down using APM.
+
+
+File: grub.info,  Node: help,  Next: impsprobe,  Prev: halt,  Up: Command-line and menu entry commands
+
+13.3.15 help
+------------
+
+ -- Command: help `--all' [pattern ...]
+     Display helpful information about builtin commands. If you do not
+     specify PATTERN, this command shows short descriptions of most of
+     available commands. If you specify the option `--all' to this
+     command, short descriptions of rarely used commands (such as *Note
+     testload::) are displayed as well.
+
+     If you specify any PATTERNS, it displays longer information about
+     each of the commands which match those PATTERNS.
+
+
+File: grub.info,  Node: impsprobe,  Next: initrd,  Prev: help,  Up: Command-line and menu entry commands
+
+13.3.16 impsprobe
+-----------------
+
+ -- Command: impsprobe
+     Probe the Intel Multiprocessor Specification 1.1 or 1.4
+     configuration table and boot the various CPUs which are found into
+     a tight loop. This command can be used only in the Stage 2, but
+     not in the grub shell.
+
+
+File: grub.info,  Node: initrd,  Next: install,  Prev: impsprobe,  Up: Command-line and menu entry commands
+
+13.3.17 initrd
+--------------
+
+ -- Command: initrd file ...
+     Load an initial ramdisk for a Linux format boot image and set the
+     appropriate parameters in the Linux setup area in memory. See also
+     *Note GNU/Linux::.
+
+
+File: grub.info,  Node: install,  Next: ioprobe,  Prev: initrd,  Up: Command-line and menu entry commands
+
+13.3.18 install
+---------------
+
+ -- Command: install [`--force-lba'] [`--stage2=os_stage2_file']
+          stage1_file [`d'] dest_dev stage2_file [addr] [`p']
+          [config_file] [real_config_file]
+     This command is fairly complex, and you should not use this command
+     unless you are familiar with GRUB. Use `setup' (*note setup::)
+     instead.
+
+     In short, it will perform a full install presuming the Stage 2 or
+     Stage 1.5(1) (*note install-Footnote-1::) is in its final install
+     location.
+
+     In slightly more detail, it will load STAGE1_FILE, validate that
+     it is a GRUB Stage 1 of the right version number, install in it a
+     blocklist for loading STAGE2_FILE as a Stage 2. If the option `d'
+     is present, the Stage 1 will always look for the actual disk
+     STAGE2_FILE was installed on, rather than using the booting drive.
+     The Stage 2 will be loaded at address ADDR, which must be `0x8000'
+     for a true Stage 2, and `0x2000' for a Stage 1.5. If ADDR is not
+     present, GRUB will determine the address automatically. It then
+     writes the completed Stage 1 to the first block of the device
+     DEST_DEV. If the options `p' or CONFIG_FILE are present, then it
+     reads the first block of stage2, modifies it with the values of
+     the partition STAGE2_FILE was found on (for `p') or places the
+     string CONFIG_FILE into the area telling the stage2 where to look
+     for a configuration file at boot time. Likewise, if
+     REAL_CONFIG_FILE is present and STAGE2_FILE is a Stage 1.5, then
+     the Stage 2 CONFIG_FILE is patched with the configuration file
+     name REAL_CONFIG_FILE. This command preserves the DOS BPB (and for
+     hard disks, the partition table) of the sector the Stage 1 is to
+     be installed into.
+
+     *Caution:* Several buggy BIOSes don't pass a booting drive
+     properly when booting from a hard disk drive. Therefore, you will
+     unfortunately have to specify the option `d', whether your Stage2
+     resides at the booting drive or not, if you have such a BIOS. We
+     know these are defective in this way:
+
+
+          Fujitsu LifeBook 400 BIOS version 31J0103A
+
+
+          HP Vectra XU 6/200 BIOS version GG.06.11
+
+     *Caution2:* A number of BIOSes don't return a correct LBA support
+     bitmap even if they do have the support. So GRUB provides a
+     solution to ignore the wrong bitmap, that is, the option
+     `--force-lba'. Don't use this option if you know that your BIOS
+     doesn't have LBA support.
+
+     *Caution3:* You must specify the option `--stage2' in the grub
+     shell, if you cannot unmount the filesystem where your stage2 file
+     resides. The argument should be the file name in your operating
+     system.
+
+
+File: grub.info,  Node: install-Footnotes,  Up: install
+
+   (1) They're loaded the same way, so we will refer to the Stage 1.5
+as a Stage 2 from now on.
+
+
+File: grub.info,  Node: ioprobe,  Next: kernel,  Prev: install,  Up: Command-line and menu entry commands
+
+13.3.19 ioprobe
+---------------
+
+ -- Command: ioprobe drive
+     Probe I/O ports used for the drive DRIVE. This command will list
+     the I/O ports on the screen. For technical information, *Note
+     Internals::.
+
+
+File: grub.info,  Node: kernel,  Next: lock,  Prev: ioprobe,  Up: Command-line and menu entry commands
+
+13.3.20 kernel
+--------------
+
+ -- Command: kernel [`--type=type'] [`--no-mem-option'] file ...
+     Attempt to load the primary boot image (Multiboot a.out or ELF,
+     Linux zImage or bzImage, FreeBSD a.out, NetBSD a.out, etc.) from
+     FILE. The rest of the line is passed verbatim as the "kernel
+     command-line". Any modules must be reloaded after using this
+     command.
+
+     This command also accepts the option `--type' so that you can
+     specify the kernel type of FILE explicitly. The argument TYPE must
+     be one of these: `netbsd', `freebsd', `openbsd', `linux',
+     `biglinux', and `multiboot'. However, you need to specify it only
+     if you want to load a NetBSD ELF kernel, because GRUB can
+     automatically determine a kernel type in the other cases, quite
+     safely.
+
+     The option `--no-mem-option' is effective only for Linux. If the
+     option is specified, GRUB doesn't pass the option `mem=' to the
+     kernel.  This option is implied for Linux kernels 2.4.18 and newer.
+
+
+File: grub.info,  Node: lock,  Next: makeactive,  Prev: kernel,  Up: Command-line and menu entry commands
+
+13.3.21 lock
+------------
+
+ -- Command: lock
+     Prevent normal users from executing arbitrary menu entries. You
+     must use the command `password' if you really want this command to
+     be useful (*note password::).
+
+     This command is used in a menu, as shown in this example:
+
+          title This entry is too dangerous to be executed by normal users
+          lock
+          root (hd0,a)
+          kernel /no-security-os
+
+     See also *Note Security::.
+
+
+File: grub.info,  Node: makeactive,  Next: map,  Prev: lock,  Up: Command-line and menu entry commands
+
+13.3.22 makeactive
+------------------
+
+ -- Command: makeactive
+     Set the active partition on the root disk to GRUB's root device.
+     This command is limited to _primary_ PC partitions on a hard disk.
+
+
+File: grub.info,  Node: map,  Next: md5crypt,  Prev: makeactive,  Up: Command-line and menu entry commands
+
+13.3.23 map
+-----------
+
+ -- Command: map to_drive from_drive
+     Map the drive FROM_DRIVE to the drive TO_DRIVE. This is necessary
+     when you chain-load some operating systems, such as DOS, if such
+     an OS resides at a non-first drive. Here is an example:
+
+          grub> map (hd0) (hd1)
+          grub> map (hd1) (hd0)
+
+     The example exchanges the order between the first hard disk and the
+     second hard disk. See also *Note DOS/Windows::.
+
+
+File: grub.info,  Node: md5crypt,  Next: module,  Prev: map,  Up: Command-line and menu entry commands
+
+13.3.24 md5crypt
+----------------
+
+ -- Command: md5crypt
+     Prompt to enter a password, and encrypt it in MD5 format. The
+     encrypted password can be used with the command `password' (*note
+     password::). See also *Note Security::.
+
+
+File: grub.info,  Node: module,  Next: modulenounzip,  Prev: md5crypt,  Up: Command-line and menu entry commands
+
+13.3.25 module
+--------------
+
+ -- Command: module file ...
+     Load a boot module FILE for a Multiboot format boot image (no
+     interpretation of the file contents are made, so the user of this
+     command must know what the kernel in question expects). The rest
+     of the line is passed as the "module command-line", like the
+     `kernel' command. You must load a Multiboot kernel image before
+     loading any module. See also *Note modulenounzip::.
+
+
+File: grub.info,  Node: modulenounzip,  Next: pause,  Prev: module,  Up: Command-line and menu entry commands
+
+13.3.26 modulenounzip
+---------------------
+
+ -- Command: modulenounzip file ...
+     The same as `module' (*note module::), except that automatic
+     decompression is disabled.
+
+
+File: grub.info,  Node: pause,  Next: quit,  Prev: modulenounzip,  Up: Command-line and menu entry commands
+
+13.3.27 pause
+-------------
+
+ -- Command: pause message ...
+     Print the MESSAGE, then wait until a key is pressed. Note that
+     placing <^G> (ASCII code 7) in the message will cause the speaker
+     to emit the standard beep sound, which is useful when prompting
+     the user to change floppies.
+
+
+File: grub.info,  Node: quit,  Next: reboot,  Prev: pause,  Up: Command-line and menu entry commands
+
+13.3.28 quit
+------------
+
+ -- Command: quit
+     Exit from the grub shell `grub' (*note Invoking the grub shell::).
+     This command can be used only in the grub shell.
+
+
+File: grub.info,  Node: reboot,  Next: read,  Prev: quit,  Up: Command-line and menu entry commands
+
+13.3.29 reboot
+--------------
+
+ -- Command: reboot
+     Reboot the computer.
+
+
+File: grub.info,  Node: read,  Next: root,  Prev: reboot,  Up: Command-line and menu entry commands
+
+13.3.30 read
+------------
+
+ -- Command: read addr
+     Read a 32-bit value from memory at address ADDR and display it in
+     hex format.
+
+
+File: grub.info,  Node: root,  Next: rootnoverify,  Prev: read,  Up: Command-line and menu entry commands
+
+13.3.31 root
+------------
+
+ -- Command: root device [hdbias]
+     Set the current "root device" to the device DEVICE, then attempt
+     to mount it to get the partition size (for passing the partition
+     descriptor in `ES:ESI', used by some chain-loaded boot loaders),
+     the BSD drive-type (for booting BSD kernels using their native
+     boot format), and correctly determine the PC partition where a BSD
+     sub-partition is located. The optional HDBIAS parameter is a
+     number to tell a BSD kernel how many BIOS drive numbers are on
+     controllers before the current one. For example, if there is an
+     IDE disk and a SCSI disk, and your FreeBSD root partition is on
+     the SCSI disk, then use a `1' for HDBIAS.
+
+     See also *Note rootnoverify::.
+
+
+File: grub.info,  Node: rootnoverify,  Next: savedefault,  Prev: root,  Up: Command-line and menu entry commands
+
+13.3.32 rootnoverify
+--------------------
+
+ -- Command: rootnoverify device [hdbias]
+     Similar to `root' (*note root::), but don't attempt to mount the
+     partition. This is useful for when an OS is outside of the area of
+     the disk that GRUB can read, but setting the correct root device
+     is still desired. Note that the items mentioned in `root' above
+     which derived from attempting the mount will _not_ work correctly.
+
+
+File: grub.info,  Node: savedefault,  Next: setup,  Prev: rootnoverify,  Up: Command-line and menu entry commands
+
+13.3.33 savedefault
+-------------------
+
+ -- Command: savedefault num
+     Save the current menu entry or NUM if specified as a default
+     entry. Here is an example:
+
+          default saved
+          timeout 10
+
+          title GNU/Linux
+          root (hd0,0)
+          kernel /boot/vmlinuz root=/dev/sda1 vga=ext
+          initrd /boot/initrd
+          savedefault
+
+          title FreeBSD
+          root (hd0,a)
+          kernel /boot/loader
+          savedefault
+
+     With this configuration, GRUB will choose the entry booted
+     previously as the default entry.
+
+     You can specify `fallback' instead of a number. Then, next
+     fallback entry is saved. Next fallback entry is chosen from
+     fallback entries. Normally, this will be the first entry in
+     fallback ones.
+
+     See also *Note default:: and *Note Invoking grub-set-default::.
+
+
+File: grub.info,  Node: setup,  Next: testload,  Prev: savedefault,  Up: Command-line and menu entry commands
+
+13.3.34 setup
+-------------
+
+ -- Command: setup [`--force-lba'] [`--stage2=os_stage2_file']
+          [`--prefix=dir'] install_device [image_device]
+     Set up the installation of GRUB automatically. This command uses
+     the more flexible command `install' (*note install::) in the
+     backend and installs GRUB into the device INSTALL_DEVICE. If
+     IMAGE_DEVICE is specified, then find the GRUB images (*note
+     Images::) in the device IMAGE_DEVICE, otherwise use the current
+     "root device", which can be set by the command `root'. If
+     INSTALL_DEVICE is a hard disk, then embed a Stage 1.5 in the disk
+     if possible.
+
+     The option `--prefix' specifies the directory under which GRUB
+     images are put. If it is not specified, GRUB automatically
+     searches them in `/boot/grub' and `/grub'.
+
+     The options `--force-lba' and `--stage2' are just passed to
+     `install' if specified. *Note install::, for more information.
+
+
+File: grub.info,  Node: testload,  Next: testvbe,  Prev: setup,  Up: Command-line and menu entry commands
+
+13.3.35 testload
+----------------
+
+ -- Command: testload file
+     Read the entire contents of FILE in several different ways and
+     compare them, to test the filesystem code. The output is somewhat
+     cryptic, but if no errors are reported and the final `i=X,
+     filepos=Y' reading has X and Y equal, then it is definitely
+     consistent, and very likely works correctly subject to a
+     consistent offset error. If this test succeeds, then a good next
+     step is to try loading a kernel.
+
+
+File: grub.info,  Node: testvbe,  Next: uppermem,  Prev: testload,  Up: Command-line and menu entry commands
+
+13.3.36 testvbe
+---------------
+
+ -- Command: testvbe mode
+     Test the VESA BIOS EXTENSION mode MODE. This command will switch
+     your video card to the graphics mode, and show an endless
+     animation. Hit any key to return. See also *Note vbeprobe::.
+
+
+File: grub.info,  Node: uppermem,  Next: vbeprobe,  Prev: testvbe,  Up: Command-line and menu entry commands
+
+13.3.37 uppermem
+----------------
+
+ -- Command: uppermem kbytes
+     Force GRUB to assume that only KBYTES kilobytes of upper memory
+     are installed. Any system address range maps are discarded.
+
+     *Caution:* This should be used with great caution, and should only
+     be necessary on some old machines. GRUB's BIOS probe can pick up
+     all RAM on all new machines the author has ever heard of. It can
+     also be used for debugging purposes to lie to an OS.
+
+
+File: grub.info,  Node: vbeprobe,  Prev: uppermem,  Up: Command-line and menu entry commands
+
+13.3.38 vbeprobe
+----------------
+
+ -- Command: vbeprobe [mode]
+     Probe VESA BIOS EXTENSION information. If the mode MODE is
+     specified, show only the information about MODE. Otherwise, this
+     command lists up available VBE modes on the screen. See also *Note
+     testvbe::.
+
+
+File: grub.info,  Node: Troubleshooting,  Next: Invoking the grub shell,  Prev: Commands,  Up: Top
+
+14 Error messages reported by GRUB
+**********************************
+
+This chapter describes error messages reported by GRUB when you
+encounter trouble. *Note Invoking the grub shell::, if your problem is
+specific to the grub shell.
+
+* Menu:
+
+* Stage1 errors::               Errors reported by the Stage 1
+* Stage1.5 errors::             Errors reported by the Stage 1.5
+* Stage2 errors::               Errors reported by the Stage 2
+
+
+File: grub.info,  Node: Stage1 errors,  Next: Stage1.5 errors,  Up: Troubleshooting
+
+14.1 Errors reported by the Stage 1
+===================================
+
+The general way that the Stage 1 handles errors is to print an error
+string and then halt. Pressing `<CTRL>-<ALT>-<DEL>' will reboot.
+
+   The following is a comprehensive list of error messages for the
+Stage 1:
+
+Hard Disk Error
+     The stage2 or stage1.5 is being read from a hard disk, and the
+     attempt to determine the size and geometry of the hard disk failed.
+
+Floppy Error
+     The stage2 or stage1.5 is being read from a floppy disk, and the
+     attempt to determine the size and geometry of the floppy disk
+     failed. It's listed as a separate error since the probe sequence
+     is different than for hard disks.
+
+Read Error
+     A disk read error happened while trying to read the stage2 or
+     stage1.5.
+
+Geom Error
+     The location of the stage2 or stage1.5 is not in the portion of
+     the disk supported directly by the BIOS read calls.  This could
+     occur because the BIOS translated geometry has been changed by the
+     user or the disk is moved to another machine or controller after
+     installation, or GRUB was not installed using itself (if it was,
+     the Stage 2 version of this error would have been seen during that
+     process and it would not have completed the install).
+
+
+File: grub.info,  Node: Stage1.5 errors,  Next: Stage2 errors,  Prev: Stage1 errors,  Up: Troubleshooting
+
+14.2 Errors reported by the Stage 1.5
+=====================================
+
+The general way that the Stage 1.5 handles errors is to print an error
+number in the form `Error NUM' and then halt. Pressing
+`<CTRL>-<ALT>-<DEL>' will reboot.
+
+   The error numbers correspond to the errors reported by Stage 2.
+*Note Stage2 errors::.
+
+
+File: grub.info,  Node: Stage2 errors,  Prev: Stage1.5 errors,  Up: Troubleshooting
+
+14.3 Errors reported by the Stage 2
+===================================
+
+The general way that the Stage 2 handles errors is to abort the
+operation in question, print an error string, then (if possible) either
+continue based on the fact that an error occurred or wait for the user
+to deal with the error.
+
+   The following is a comprehensive list of error messages for the
+Stage 2 (error numbers for the Stage 1.5 are listed before the colon in
+each description):
+
+1 : Filename must be either an absolute filename or blocklist
+     This error is returned if a file name is requested which doesn't
+     fit the syntax/rules listed in the *Note Filesystem::.
+
+2 : Bad file or directory type
+     This error is returned if a file requested is not a regular file,
+     but something like a symbolic link, directory, or FIFO.
+
+3 : Bad or corrupt data while decompressing file
+     This error is returned if the run-length decompression code gets an
+     internal error. This is usually from a corrupt file.
+
+4 : Bad or incompatible header in compressed file
+     This error is returned if the file header for a supposedly
+     compressed file is bad.
+
+5 : Partition table invalid or corrupt
+     This error is returned if the sanity checks on the integrity of the
+     partition table fail. This is a bad sign.
+
+6 : Mismatched or corrupt version of stage1/stage2
+     This error is returned if the install command points to
+     incompatible or corrupt versions of the stage1 or stage2. It can't
+     detect corruption in general, but this is a sanity check on the
+     version numbers, which should be correct.
+
+7 : Loading below 1MB is not supported
+     This error is returned if the lowest address in a kernel is below
+     the 1MB boundary. The Linux zImage format is a special case and
+     can be handled since it has a fixed loading address and maximum
+     size.
+
+8 : Kernel must be loaded before booting
+     This error is returned if GRUB is told to execute the boot sequence
+     without having a kernel to start.
+
+9 : Unknown boot failure
+     This error is returned if the boot attempt did not succeed for
+     reasons which are unknown.
+
+10 : Unsupported Multiboot features requested
+     This error is returned when the Multiboot features word in the
+     Multiboot header requires a feature that is not recognized. The
+     point of this is that the kernel requires special handling which
+     GRUB is probably unable to provide.
+
+11 : Unrecognized device string
+     This error is returned if a device string was expected, and the
+     string encountered didn't fit the syntax/rules listed in the *Note
+     Filesystem::.
+
+12 : Invalid device requested
+     This error is returned if a device string is recognizable but does
+     not fall under the other device errors.
+
+13 : Invalid or unsupported executable format
+     This error is returned if the kernel image being loaded is not
+     recognized as Multiboot or one of the supported native formats
+     (Linux zImage or bzImage, FreeBSD, or NetBSD).
+
+14 : Filesystem compatibility error, cannot read whole file
+     Some of the filesystem reading code in GRUB has limits on the
+     length of the files it can read. This error is returned when the
+     user runs into such a limit.
+
+15 : File not found
+     This error is returned if the specified file name cannot be found,
+     but everything else (like the disk/partition info) is OK.
+
+16 : Inconsistent filesystem structure
+     This error is returned by the filesystem code to denote an internal
+     error caused by the sanity checks of the filesystem structure on
+     disk not matching what it expects. This is usually caused by a
+     corrupt filesystem or bugs in the code handling it in GRUB.
+
+17 : Cannot mount selected partition
+     This error is returned if the partition requested exists, but the
+     filesystem type cannot be recognized by GRUB.
+
+18 : Selected cylinder exceeds maximum supported by BIOS
+     This error is returned when a read is attempted at a linear block
+     address beyond the end of the BIOS translated area. This generally
+     happens if your disk is larger than the BIOS can handle (512MB for
+     (E)IDE disks on older machines or larger than 8GB in general).
+
+19 : Linux kernel must be loaded before initrd
+     This error is returned if the initrd command is used before
+     loading a Linux kernel.
+
+20 : Multiboot kernel must be loaded before modules
+     This error is returned if the module load command is used before
+     loading a Multiboot kernel. It only makes sense in this case
+     anyway, as GRUB has no idea how to communicate the presence of
+     such modules to a non-Multiboot-aware kernel.
+
+21 : Selected disk does not exist
+     This error is returned if the device part of a device- or full
+     file name refers to a disk or BIOS device that is not present or
+     not recognized by the BIOS in the system.
+
+22 : No such partition
+     This error is returned if a partition is requested in the device
+     part of a device- or full file name which isn't on the selected
+     disk.
+
+23 : Error while parsing number
+     This error is returned if GRUB was expecting to read a number and
+     encountered bad data.
+
+24 : Attempt to access block outside partition
+     This error is returned if a linear block address is outside of the
+     disk partition. This generally happens because of a corrupt
+     filesystem on the disk or a bug in the code handling it in GRUB
+     (it's a great debugging tool).
+
+25 : Disk read error
+     This error is returned if there is a disk read error when trying to
+     probe or read data from a particular disk.
+
+26 : Too many symbolic links
+     This error is returned if the link count is beyond the maximum
+     (currently 5), possibly the symbolic links are looped.
+
+27 : Unrecognized command
+     This error is returned if an unrecognized command is entered on the
+     command-line or in a boot sequence section of a configuration file
+     and that entry is selected.
+
+28 : Selected item cannot fit into memory
+     This error is returned if a kernel, module, or raw file load
+     command is either trying to load its data such that it won't fit
+     into memory or it is simply too big.
+
+29 : Disk write error
+     This error is returned if there is a disk write error when trying
+     to write to a particular disk. This would generally only occur
+     during an install of set active partition command.
+
+30 : Invalid argument
+     This error is returned if an argument specified to a command is
+     invalid.
+
+31 : File is not sector aligned
+     This error may occur only when you access a ReiserFS partition by
+     block-lists (e.g. the command `install'). In this case, you should
+     mount the partition with the `-o notail' option.
+
+32 : Must be authenticated
+     This error is returned if you try to run a locked entry. You should
+     enter a correct password before running such an entry.
+
+33 : Serial device not configured
+     This error is returned if you try to change your terminal to a
+     serial one before initializing any serial device.
+
+34 : No spare sectors on the disk
+     This error is returned if a disk doesn't have enough spare space.
+     This happens when you try to embed Stage 1.5 into the unused
+     sectors after the MBR, but the first partition starts right after
+     the MBR or they are used by EZ-BIOS.
+
+
+File: grub.info,  Node: Invoking the grub shell,  Next: Invoking grub-install,  Prev: Troubleshooting,  Up: Top
+
+15 Invoking the grub shell
+**************************
+
+This chapter documents the grub shell `grub'. Note that the grub shell
+is an emulator; it doesn't run under the native environment, so it
+sometimes does something wrong. Therefore, you shouldn't trust it too
+much. If there is anything wrong with it, don't hesitate to try the
+native GRUB environment, especially when it guesses a wrong map between
+BIOS drives and OS devices.
+
+* Menu:
+
+* Basic usage::                 How to use the grub shell
+* Installation under UNIX::     How to install GRUB via `grub'
+* Device map::                  The map between BIOS drives and OS devices
+
+
+File: grub.info,  Node: Basic usage,  Next: Installation under UNIX,  Up: Invoking the grub shell
+
+15.1 Introduction into the grub shell
+=====================================
+
+You can use the command `grub' for installing GRUB under your operating
+systems and for a testbed when you add a new feature into GRUB or when
+fixing a bug. `grub' is almost the same as the Stage 2, and, in fact,
+it shares the source code with the Stage 2 and you can use the same
+commands (*note Commands::) in `grub'. It is emulated by replacing BIOS
+calls with UNIX system calls and libc functions.
+
+   The command `grub' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--verbose'
+     Print some verbose messages for debugging purpose.
+
+`--device-map=FILE'
+     Use the device map file FILE. The format is described in *Note
+     Device map::.
+
+`--no-floppy'
+     Do not probe any floppy drive. This option has no effect if the
+     option `--device-map' is specified (*note Device map::).
+
+`--probe-second-floppy'
+     Probe the second floppy drive. If this option is not specified,
+     the grub shell does not probe it, as that sometimes takes a long
+     time. If you specify the device map file (*note Device map::), the
+     grub shell just ignores this option.
+
+`--config-file=FILE'
+     Read the configuration file FILE instead of `/boot/grub/menu.lst'.
+     The format is the same as the normal GRUB syntax. See *Note
+     Filesystem::, for more information.
+
+`--boot-drive=DRIVE'
+     Set the stage2 BOOT_DRIVE to DRIVE. This argument should be an
+     integer (decimal, octal or hexadecimal).
+
+`--install-partition=PAR'
+     Set the stage2 INSTALL_PARTITION to PAR. This argument should be
+     an integer (decimal, octal or hexadecimal).
+
+`--no-config-file'
+     Do not use the configuration file even if it can be read.
+
+`--no-curses'
+     Do not use the screen handling interface by the curses even if it
+     is available.
+
+`--batch'
+     This option has the same meaning as `--no-config-file --no-curses'.
+
+`--read-only'
+     Disable writing to any disk.
+
+`--hold'
+     Wait until a debugger will attach. This option is useful when you
+     want to debug the startup code.
+
+
+File: grub.info,  Node: Installation under UNIX,  Next: Device map,  Prev: Basic usage,  Up: Invoking the grub shell
+
+15.2 How to install GRUB via `grub'
+===================================
+
+The installation procedure is the same as under the "native" Stage 2.
+*Note Installation::, for more information. The command `grub'-specific
+information is described here.
+
+   What you should be careful about is "buffer cache". `grub' makes use
+of raw devices instead of filesystems that your operating systems
+serve, so there exists a potential problem that some cache
+inconsistency may corrupt your filesystems. What we recommend is:
+
+   * If you can unmount drives to which GRUB may write any amount of
+     data, unmount them before running `grub'.
+
+   * If a drive cannot be unmounted but can be mounted with the
+     read-only flag, mount it in read-only mode. That should be secure.
+
+   * If a drive must be mounted with the read-write flag, make sure
+     that no activity is being done on it while the command `grub' is
+     running.
+
+   * Reboot your operating system as soon as possible. This is probably
+     not required if you follow the rules above, but reboot is the most
+     secure way.
+
+   In addition, enter the command `quit' when you finish the
+installation. That is _very important_ because `quit' makes the buffer
+cache consistent. Do not push <C-c>.
+
+   If you want to install GRUB non-interactively, specify `--batch'
+option in the command-line. This is a simple example:
+
+     #!/bin/sh
+
+     # Use /usr/sbin/grub if you are on an older system.
+     /sbin/grub --batch <<EOT 1>/dev/null 2>/dev/null
+     root (hd0,0)
+     setup (hd0)
+     quit
+     EOT
+
+
+File: grub.info,  Node: Device map,  Prev: Installation under UNIX,  Up: Invoking the grub shell
+
+15.3 The map between BIOS drives and OS devices
+===============================================
+
+When you specify the option `--device-map' (*note Basic usage::), the
+grub shell creates the "device map file" automatically unless it
+already exists. The file name `/boot/grub/device.map' is preferred.
+
+   If the device map file exists, the grub shell reads it to map BIOS
+drives to OS devices. This file consists of lines like this:
+
+     DEVICE FILE
+
+   DEVICE is a drive specified in the GRUB syntax (*note Device
+syntax::), and FILE is an OS file, which is normally a device file.
+
+   The reason why the grub shell gives you the device map file is that
+it cannot guess the map between BIOS drives and OS devices correctly in
+some environments. For example, if you exchange the boot sequence
+between IDE and SCSI in your BIOS, it gets the order wrong.
+
+   Thus, edit the file if the grub shell makes a mistake. You can put
+any comments in the file if needed, as the grub shell assumes that a
+line is just a comment if the first character is `#'.
+
+
+File: grub.info,  Node: Invoking grub-install,  Next: Invoking grub-md5-crypt,  Prev: Invoking the grub shell,  Up: Top
+
+16 Invoking grub-install
+************************
+
+The program `grub-install' installs GRUB on your drive using the grub
+shell (*note Invoking the grub shell::). You must specify the device
+name on which you want to install GRUB, like this:
+
+     grub-install INSTALL_DEVICE
+
+   The device name INSTALL_DEVICE is an OS device name or a GRUB device
+name.
+
+   `grub-install' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--force-lba'
+     Force GRUB to use LBA mode even for a buggy BIOS. Use this option
+     only if your BIOS doesn't work properly in LBA mode even though it
+     supports LBA mode.
+
+`--root-directory=DIR'
+     Install GRUB images under the directory DIR instead of the root
+     directory. This option is useful when you want to install GRUB
+     into a separate partition or a removable disk. Here is an example
+     in which you have a separate "boot" partition which is mounted on
+     `/boot':
+
+          grub-install --root-directory=/boot hd0
+
+`--grub-shell=FILE'
+     Use FILE as the grub shell. You can append arbitrary options to
+     FILE after the file name, like this:
+
+          grub-install --grub-shell="grub --read-only" /dev/fd0
+
+`--recheck'
+     Recheck the device map, even if `/boot/grub/device.map' already
+     exists. You should use this option whenever you add/remove a disk
+     into/from your computer.
+
+
+File: grub.info,  Node: Invoking grub-md5-crypt,  Next: Invoking grub-terminfo,  Prev: Invoking grub-install,  Up: Top
+
+17 Invoking grub-md5-crypt
+**************************
+
+The program `grub-md5-crypt' encrypts a password in MD5 format.  This
+is just a frontend of the grub shell (*note Invoking the grub shell::).
+Passwords encrypted by this program can be used with the command
+`password' (*note password::).
+
+   `grub-md5-crypt' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+`--grub-shell=FILE'
+     Use FILE as the grub shell.
+
+
+File: grub.info,  Node: Invoking grub-terminfo,  Next: Invoking grub-set-default,  Prev: Invoking grub-md5-crypt,  Up: Top
+
+18 Invoking grub-terminfo
+*************************
+
+The program `grub-terminfo' generates a terminfo command from a
+terminfo name (*note terminfo::). The result can be used in the
+configuration file, to define escape sequences. Because GRUB assumes
+that your terminal is vt100-compatible by default, this would be useful
+only if your terminal is uncommon (such as vt52).
+
+   `grub-terminfo' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+   You must specify one argument to this command. For example:
+
+     grub-terminfo vt52
+
+
+File: grub.info,  Node: Invoking grub-set-default,  Next: Invoking mbchk,  Prev: Invoking grub-terminfo,  Up: Top
+
+19 Invoking grub-set-default
+****************************
+
+The program `grub-set-default' sets the default boot entry for GRUB.
+This automatically creates a file named `default' under your GRUB
+directory (i.e. `/boot/grub'), if it is not present. This file is used
+to determine the default boot entry when GRUB boots up your system when
+you use `default saved' in your configuration file (*note default::),
+and to save next default boot entry when you use `savedefault' in a
+boot entry (*note savedefault::).
+
+   `grub-set-default' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+`--root-directory=DIR'
+     Use the directory DIR instead of the root directory (i.e. `/') to
+     define the location of the default file. This is useful when you
+     mount a disk which is used for another system.
+
+   You must specify a single argument to `grub-set-default'. This
+argument is normally the number of a default boot entry. For example,
+if you have this configuration file:
+
+     default saved
+     timeout 10
+
+     title GNU/Hurd
+     root (hd0,0)
+     ...
+
+     title GNU/Linux
+     root (hd0,1)
+     ...
+
+   and if you want to set the next default boot entry to GNU/Linux, you
+may execute this command:
+
+     grub-set-default 1
+
+   Because the entry for GNU/Linux is `1'. Note that entries are
+counted from zero. So, if you want to specify GNU/Hurd here, then you
+should specify `0'.
+
+   This feature is very useful if you want to test a new kernel or to
+make your system quite robust. *Note Making your system robust::, for
+more hints about how to set up a robust system.
+
+
+File: grub.info,  Node: Invoking mbchk,  Next: Obtaining and Building GRUB,  Prev: Invoking grub-set-default,  Up: Top
+
+20 Invoking mbchk
+*****************
+
+The program `mbchk' checks for the format of a Multiboot kernel. We
+recommend using this program before booting your own kernel by GRUB.
+
+   `mbchk' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--quiet'
+     Suppress all normal output.
+
+
+File: grub.info,  Node: Obtaining and Building GRUB,  Next: Reporting bugs,  Prev: Invoking mbchk,  Up: Top
+
+Appendix A How to obtain and build GRUB
+***************************************
+
+     *Caution:* GRUB requires binutils-2.9.1.0.23 or later because the
+     GNU assembler has been changed so that it can produce real 16bits
+     machine code between 2.9.1 and 2.9.1.0.x. See
+     `http://sources.redhat.com/binutils/', to obtain information on
+     how to get the latest version.
+
+   GRUB is available from the GNU alpha archive site
+`ftp://alpha.gnu.org/gnu/grub' or any of its mirrors. The file will be
+named grub-version.tar.gz. The current version is 0.97, so the file you
+should grab is:
+
+   `ftp://alpha.gnu.org/gnu/grub/grub-0.97.tar.gz'
+
+   To unbundle GRUB use the instruction:
+
+     zcat grub-0.97.tar.gz | tar xvf -
+
+   which will create a directory called `grub-0.97' with all the
+sources. You can look at the file `INSTALL' for detailed instructions
+on how to build and install GRUB, but you should be able to just do:
+
+     cd grub-0.97
+     ./configure
+     make install
+
+   This will install the grub shell `grub' (*note Invoking the grub
+shell::), the Multiboot checker `mbchk' (*note Invoking mbchk::), and
+the GRUB images. This will also install the GRUB manual.
+
+   Also, the latest version is available from the CVS. See
+`http://savannah.gnu.org/cvs/?group=grub' for more information.
+
+
+File: grub.info,  Node: Reporting bugs,  Next: Future,  Prev: Obtaining and Building GRUB,  Up: Top
+
+Appendix B Reporting bugs
+*************************
+
+These are the guideline for how to report bugs. Take a look at this
+list below before you submit bugs:
+
+  1. Before getting unsettled, read this manual through and through.
+     Also, see the GNU GRUB FAQ
+     (http://www.gnu.org/software/grub/grub-faq.html).
+
+  2. Always mention the information on your GRUB. The version number
+     and the configuration are quite important. If you build it
+     yourself, write the options specified to the configure script and
+     your operating system, including the versions of gcc and binutils.
+
+  3. If you have trouble with the installation, inform us of how you
+     installed GRUB. Don't omit error messages, if any. Just `GRUB hangs
+     up when it boots' is not enough.
+
+     The information on your hardware is also essential. These are
+     especially important: the geometries and the partition tables of
+     your hard disk drives and your BIOS.
+
+  4. If GRUB cannot boot your operating system, write down _everything_
+     you see on the screen. Don't paraphrase them, like `The foo OS
+     crashes with GRUB, even though it can boot with the bar boot
+     loader just fine'. Mention the commands you executed, the messages
+     printed by them, and information on your operating system
+     including the version number.
+
+  5. Explain what you wanted to do. It is very useful to know your
+     purpose and your wish, and how GRUB didn't satisfy you.
+
+  6. If you can investigate the problem yourself, please do. That will
+     give you and us much more information on the problem. Attaching a
+     patch is even better.
+
+     When you attach a patch, make the patch in unified diff format, and
+     write ChangeLog entries. But, even when you make a patch, don't
+     forget to explain the problem, so that we can understand what your
+     patch is for.
+
+  7. Write down anything that you think might be related. Please
+     understand that we often need to reproduce the same problem you
+     encounterred in our environment. So your information should be
+     sufficient for us to do the same thing--Don't forget that we
+     cannot see your computer directly. If you are not sure whether to
+     state a fact or leave it out, state it!  Reporting too many things
+     is much better than omitting something important.
+
+   If you follow the guideline above, submit a report to the Bug
+Tracking System (http://savannah.gnu.org/bugs/?group=grub).
+Alternatively, you can submit a report via electronic mail to
+<bug-grub@gnu.org>, but we strongly recommend that you use the Bug
+Tracking System, because e-mail can be passed over easily.
+
+   Once we get your report, we will try to fix the bugs.
+
+
+File: grub.info,  Node: Future,  Next: Internals,  Prev: Reporting bugs,  Up: Top
+
+Appendix C Where GRUB will go
+*****************************
+
+We started the next generation of GRUB, GRUB 2. This will include
+internationalization, dynamic module loading, real memory management,
+multiple architecture support, a scripting language, and many other
+nice feature. If you are interested in the development of GRUB 2, take
+a look at the homepage (http://www.gnu.org/software/grub/grub.html).
+
+
+File: grub.info,  Node: Internals,  Next: Index,  Prev: Future,  Up: Top
+
+Appendix D Hacking GRUB
+***********************
+
+This chapter documents the user-invisible aspect of GRUB.
+
+   As a general rule of software development, it is impossible to keep
+the descriptions of the internals up-to-date, and it is quite hard to
+document everything. So refer to the source code, whenever you are not
+satisfied with this documentation.  Please assume that this gives just
+hints to you.
+
+* Menu:
+
+* Memory map::                  The memory map of various components
+* Embedded data::               Embedded variables in GRUB
+* Filesystem interface::        The generic interface for filesystems
+* Command interface::           The generic interface for built-ins
+* Bootstrap tricks::            The bootstrap mechanism used in GRUB
+* I/O ports detection::         How to probe I/O ports used by INT 13H
+* Memory detection::            How to detect all installed RAM
+* Low-level disk I/O::          INT 13H disk I/O interrupts
+* MBR::                         The structure of Master Boot Record
+* Partition table::             The format of partition tables
+* Submitting patches::          Where and how you should send patches
+
+
+File: grub.info,  Node: Memory map,  Next: Embedded data,  Up: Internals
+
+D.1 The memory map of various components
+========================================
+
+GRUB consists of two distinct components, called "stages", which are
+loaded at different times in the boot process. Because they run
+mutual-exclusively, sometimes a memory area overlaps with another
+memory area. And, even in one stage, a single memory area can be used
+for various purposes, because their usages are mutually exclusive.
+
+   Here is the memory map of the various components:
+
+0 to 4K-1
+     BIOS and real mode interrupts
+
+0x07BE to 0x07FF
+     Partition table passed to another boot loader
+
+down from 8K-1
+     Real mode stack
+
+0x2000 to ?
+     The optional Stage 1.5 is loaded here
+
+0x2000 to 0x7FFF
+     Command-line buffer for Multiboot kernels and modules
+
+0x7C00 to 0x7DFF
+     Stage 1 is loaded here by BIOS or another boot loader
+
+0x7F00 to 0x7F42
+     LBA drive parameters
+
+0x8000 to ?
+     Stage2 is loaded here
+
+The end of Stage 2 to 416K-1
+     Heap, in particular used for the menu
+
+down from 416K-1
+     Protected mode stack
+
+416K to 448K-1
+     Filesystem buffer
+
+448K to 479.5K-1
+     Raw device buffer
+
+479.5K to 480K-1
+     512-byte scratch area
+
+480K to 512K-1
+     Buffers for various functions, such as password, command-line, cut
+     and paste, and completion.
+
+The last 1K of lower memory
+     Disk swapping code and data
+
+   See the file `stage2/shared.h', for more information.
+
+
+File: grub.info,  Node: Embedded data,  Next: Filesystem interface,  Prev: Memory map,  Up: Internals
+
+D.2 Embedded variables in GRUB
+==============================
+
+Stage 1 and Stage 2 have embedded variables whose locations are
+well-defined, so that the installation can patch the binary file
+directly without recompilation of the stages.
+
+   In Stage 1, these are defined:
+
+`0x3E'
+     The version number (not GRUB's, but the installation mechanism's).
+
+`0x40'
+     The boot drive. If it is 0xFF, use a drive passed by BIOS.
+
+`0x41'
+     The flag for if forcing LBA.
+
+`0x42'
+     The starting address of Stage 2.
+
+`0x44'
+     The first sector of Stage 2.
+
+`0x48'
+     The starting segment of Stage 2.
+
+`0x1FE'
+     The signature (`0xAA55').
+
+   See the file `stage1/stage1.S', for more information.
+
+   In the first sector of Stage 1.5 and Stage 2, the block lists are
+recorded between `firstlist' and `lastlist'. The address of `lastlist'
+is determined when assembling the file `stage2/start.S'.
+
+   The trick here is that it is actually read backward, and the first
+8-byte block list is not read here, but after the pointer is decremented
+8 bytes, then after reading it, it decrements again, reads, and so on,
+until it is finished. The terminating condition is when the number of
+sectors to be read in the next block list is zero.
+
+   The format of a block list can be seen from the example in the code
+just before the `firstlist' label. Note that it is always from the
+beginning of the disk, but _not_ relative to the partition boundaries.
+
+   In the second sector of Stage 1.5 and Stage 2, these are defined:
+
+`0x6'
+     The version number (likewise, the installation mechanism's).
+
+`0x8'
+     The installed partition.
+
+`0xC'
+     The saved entry number.
+
+`0x10'
+     The identifier.
+
+`0x11'
+     The flag for if forcing LBA.
+
+`0x12'
+     The version string (GRUB's).
+
+`0x12' + "the length of the version string"
+     The name of a configuration file.
+
+   See the file `stage2/asm.S', for more information.
+
+
+File: grub.info,  Node: Filesystem interface,  Next: Command interface,  Prev: Embedded data,  Up: Internals
+
+D.3 The generic interface for filesystems
+=========================================
+
+For any particular partition, it is presumed that only one of the
+"normal" filesystems such as FAT, FFS, or ext2fs can be used, so there
+is a switch table managed by the functions in `disk_io.c'. The notation
+is that you can only "mount" one at a time.
+
+   The block list filesystem has a special place in the system. In
+addition to the "normal" filesystem (or even without one mounted), you
+can access disk blocks directly (in the indicated partition) via the
+block list notation. Using the block list filesystem doesn't effect any
+other filesystem mounts.
+
+   The variables which can be read by the filesystem backend are:
+
+`current_drive'
+     The current BIOS drive number (numbered from 0, if a floppy, and
+     numbered from 0x80, if a hard disk).
+
+`current_partition'
+     The current partition number.
+
+`current_slice'
+     The current partition type.
+
+`saved_drive'
+     The "drive" part of the root device.
+
+`saved_partition'
+     The "partition" part of the root device.
+
+`part_start'
+     The current partition starting address, in sectors.
+
+`part_length'
+     The current partition length, in sectors.
+
+`print_possibilities'
+     True when the `dir' function should print the possible completions
+     of a file, and false when it should try to actually open a file of
+     that name.
+
+`FSYS_BUF'
+     Filesystem buffer which is 32K in size, to use in any way which the
+     filesystem backend desires.
+
+   The variables which need to be written by a filesystem backend are:
+
+`filepos'
+     The current position in the file, in sectors.
+
+     *Caution:* the value of FILEPOS can be changed out from under the
+     filesystem code in the current implementation. Don't depend on it
+     being the same for later calls into the backend code!
+
+`filemax'
+     The length of the file.
+
+`disk_read_func'
+     The value of DISK_READ_HOOK _only_ during reading of data for the
+     file, not any other fs data, inodes, FAT tables, whatever, then
+     set to `NULL' at all other times (it will be `NULL' by default).
+     If this isn't done correctly, then the `testload' and `install'
+     commands won't work correctly.
+
+   The functions expected to be used by the filesystem backend are:
+
+`devread'
+     Only read sectors from within a partition. Sector 0 is the first
+     sector in the partition.
+
+`grub_read'
+     If the backend uses the block list code, then `grub_read' can be
+     used, after setting BLOCK_FILE to 1.
+
+`print_a_completion'
+     If PRINT_POSSIBILITIES is true, call `print_a_completion' for each
+     possible file name. Otherwise, the file name completion won't work.
+
+   The functions expected to be defined by the filesystem backend are
+described at least moderately in the file `filesys.h'. Their usage is
+fairly evident from their use in the functions in `disk_io.c', look for
+the use of the FSYS_TABLE array.
+
+   *Caution:* The semantics are such that then `mount'ing the
+filesystem, presume the filesystem buffer `FSYS_BUF' is corrupted, and
+(re-)load all important contents. When opening and reading a file,
+presume that the data from the `mount' is available, and doesn't get
+corrupted by the open/read (i.e. multiple opens and/or reads will be
+done with only one mount if in the same filesystem).
+
+
+File: grub.info,  Node: Command interface,  Next: Bootstrap tricks,  Prev: Filesystem interface,  Up: Internals
+
+D.4 The generic interface for built-ins
+=======================================
+
+GRUB built-in commands are defined in a uniformal interface, whether
+they are menu-specific or can be used anywhere. The definition of a
+builtin command consists of two parts: the code itself and the table of
+the information.
+
+   The code must be a function which takes two arguments, a command-line
+string and flags, and returns an `int' value. The "flags" argument
+specifies how the function is called, using a bit mask. The return
+value must be zero if successful, otherwise non-zero. So it is normally
+enough to return ERRNUM.
+
+   The table of the information is represented by the structure `struct
+builtin', which contains the name of the command, a pointer to the
+function, flags, a short description of the command and a long
+description of the command. Since the descriptions are used only for
+help messages interactively, you don't have to define them, if the
+command may not be called interactively (such as `title').
+
+   The table is finally registered in the table BUILTIN_TABLE, so that
+`run_script' and `enter_cmdline' can find the command. See the files
+`cmdline.c' and `builtins.c', for more details.
+
+
+File: grub.info,  Node: Bootstrap tricks,  Next: I/O ports detection,  Prev: Command interface,  Up: Internals
+
+D.5 The bootstrap mechanism used in GRUB
+========================================
+
+The disk space can be used in a boot loader is very restricted because
+a MBR (*note MBR::) is only 512 bytes but it also contains a partition
+table (*note Partition table::) and a BPB. So the question is how to
+make a boot loader code enough small to be fit in a MBR.
+
+   However, GRUB is a very large program, so we break GRUB into 2 (or 3)
+distinct components, "Stage 1" and "Stage 2" (and optionally "Stage
+1.5"). *Note Memory map::, for more information.
+
+   We embed Stage 1 in a MBR or in the boot sector of a partition, and
+place Stage 2 in a filesystem. The optional Stage 1.5 can be installed
+in a filesystem, in the "boot loader" area in a FFS or a ReiserFS, and
+in the sectors right after a MBR, because Stage 1.5 is enough small and
+the sectors right after a MBR is normally an unused region. The size of
+this region is the number of sectors per head minus 1.
+
+   Thus, all Stage1 must do is just load Stage2 or Stage1.5. But even if
+Stage 1 needs not to support the user interface or the filesystem
+interface, it is impossible to make Stage 1 less than 400 bytes, because
+GRUB should support both the CHS mode and the LBA mode (*note Low-level
+disk I/O::).
+
+   The solution used by GRUB is that Stage 1 loads only the first
+sector of Stage 2 (or Stage 1.5) and Stage 2 itself loads the rest. The
+flow of Stage 1 is:
+
+  1. Initialize the system briefly.
+
+  2. Detect the geometry and the accessing mode of the "loading drive".
+
+  3. Load the first sector of Stage 2.
+
+  4. Jump to the starting address of the Stage 2.
+
+   The flow of Stage 2 (and Stage 1.5) is:
+
+  1. Load the rest of itself to the real starting address, that is, the
+     starting address plus 512 bytes. The block lists are stored in the
+     last part of the first sector.
+
+  2. Long jump to the real starting address.
+
+   Note that Stage 2 (or Stage 1.5) does not probe the geometry or the
+accessing mode of the "loading drive", since Stage 1 has already probed
+them.
+
+
+File: grub.info,  Node: I/O ports detection,  Next: Memory detection,  Prev: Bootstrap tricks,  Up: Internals
+
+D.6 How to probe I/O ports used by INT 13H
+==========================================
+
+FIXME: I will write this chapter after implementing the new technique.
+
+
+File: grub.info,  Node: Memory detection,  Next: Low-level disk I/O,  Prev: I/O ports detection,  Up: Internals
+
+D.7 How to detect all installed RAM
+===================================
+
+FIXME: I doubt if Erich didn't write this chapter only himself wholly,
+so I will rewrite this chapter.
+
+
+File: grub.info,  Node: Low-level disk I/O,  Next: MBR,  Prev: Memory detection,  Up: Internals
+
+D.8 INT 13H disk I/O interrupts
+===============================
+
+FIXME: I'm not sure where some part of the original chapter is derived,
+so I will rewrite this chapter.
+
+
+File: grub.info,  Node: MBR,  Next: Partition table,  Prev: Low-level disk I/O,  Up: Internals
+
+D.9 The structure of Master Boot Record
+=======================================
+
+FIXME: Likewise.
+
+
+File: grub.info,  Node: Partition table,  Next: Submitting patches,  Prev: MBR,  Up: Internals
+
+D.10 The format of partition tables
+===================================
+
+FIXME: Probably the original chapter is derived from "How It Works", so
+I will rewrite this chapter.
+
+
+File: grub.info,  Node: Submitting patches,  Prev: Partition table,  Up: Internals
+
+D.11 Where and how you should send patches
+==========================================
+
+When you write patches for GRUB, please send them to the mailing list
+<bug-grub@gnu.org>. Here is the list of items of which you should take
+care:
+
+   * Please make your patch as small as possible. Generally, it is not
+     a good thing to make one big patch which changes many things.
+     Instead, segregate features and produce many patches.
+
+   * Use as late code as possible, for the original code. The CVS
+     repository always has the current version (*note Obtaining and
+     Building GRUB::).
+
+   * Write ChangeLog entries. *Note Change Logs: (standards)Change
+     Logs, if you don't know how to write ChangeLog.
+
+   * Make patches in unified diff format. `diff -urN' is appropriate in
+     most cases.
+
+   * Don't make patches reversely. Reverse patches are difficult to
+     read and use.
+
+   * Be careful enough of the license term and the copyright. Because
+     GRUB is under GNU General Public License, you may not steal code
+     from software whose license is incompatible against GPL. And, if
+     you copy code written by others, you must not ignore their
+     copyrights. Feel free to ask GRUB maintainers, whenever you are
+     not sure what you should do.
+
+   * If your patch is too large to send in e-mail, put it at somewhere
+     we can see. Usually, you shouldn't send e-mail over 20K.
+
+
+File: grub.info,  Node: Index,  Prev: Internals,  Up: Top
+
+Index
+*****
+
+[index]
+* Menu:
+
+* blocklist:                             blocklist.            (line  7)
+* boot:                                  boot.                 (line  7)
+* bootp:                                 bootp.                (line  7)
+* cat:                                   cat.                  (line  7)
+* chainloader:                           chainloader.          (line  7)
+* cmp:                                   cmp.                  (line  7)
+* color:                                 color.                (line  7)
+* configfile:                            configfile.           (line  7)
+* current_drive:                         Filesystem interface. (line 19)
+* current_partition:                     Filesystem interface. (line 23)
+* current_slice:                         Filesystem interface. (line 26)
+* debug:                                 debug.                (line  7)
+* default:                               default.              (line  7)
+* device:                                device.               (line  7)
+* devread:                               Filesystem interface. (line 71)
+* dhcp:                                  dhcp.                 (line  7)
+* disk_read_func:                        Filesystem interface. (line 62)
+* displayapm:                            displayapm.           (line  7)
+* displaymem:                            displaymem.           (line  7)
+* embed:                                 embed.                (line  7)
+* fallback:                              fallback.             (line  7)
+* filemax:                               Filesystem interface. (line 59)
+* filepos:                               Filesystem interface. (line 52)
+* find:                                  find.                 (line  7)
+* fstest:                                fstest.               (line  7)
+* FSYS_BUF:                              Filesystem interface. (line 46)
+* geometry:                              geometry.             (line  7)
+* grub_read:                             Filesystem interface. (line 75)
+* halt:                                  halt.                 (line  7)
+* help:                                  help.                 (line  7)
+* hiddenmenu:                            hiddenmenu.           (line  7)
+* hide:                                  hide.                 (line  7)
+* ifconfig:                              ifconfig.             (line  8)
+* impsprobe:                             impsprobe.            (line  7)
+* initrd:                                initrd.               (line  7)
+* install:                               install.              (line  9)
+* ioprobe:                               ioprobe.              (line  7)
+* kernel:                                kernel.               (line  7)
+* lock:                                  lock.                 (line  7)
+* makeactive:                            makeactive.           (line  7)
+* map:                                   map.                  (line  7)
+* md5crypt:                              md5crypt.             (line  7)
+* module:                                module.               (line  7)
+* modulenounzip:                         modulenounzip.        (line  7)
+* pager:                                 pager.                (line  7)
+* part_length:                           Filesystem interface. (line 38)
+* part_start:                            Filesystem interface. (line 35)
+* partnew:                               partnew.              (line  7)
+* parttype:                              parttype.             (line  7)
+* password:                              password.             (line  7)
+* pause:                                 pause.                (line  7)
+* print_a_completion:                    Filesystem interface. (line 79)
+* print_possibilities:                   Filesystem interface. (line 41)
+* quit:                                  quit.                 (line  7)
+* rarp:                                  rarp.                 (line  7)
+* read:                                  read.                 (line  7)
+* reboot:                                reboot.               (line  7)
+* root:                                  root.                 (line  7)
+* rootnoverify:                          rootnoverify.         (line  7)
+* saved_drive:                           Filesystem interface. (line 29)
+* saved_partition:                       Filesystem interface. (line 32)
+* savedefault:                           savedefault.          (line  7)
+* serial:                                serial.               (line  9)
+* setkey:                                setkey.               (line  7)
+* setup:                                 setup.                (line  8)
+* terminal:                              terminal.             (line  9)
+* terminfo:                              terminfo.             (line  9)
+* testload:                              testload.             (line  7)
+* testvbe:                               testvbe.              (line  7)
+* tftpserver:                            tftpserver.           (line  7)
+* timeout:                               timeout.              (line  7)
+* title:                                 title.                (line  7)
+* unhide:                                unhide.               (line  7)
+* uppermem:                              uppermem.             (line  7)
+* vbeprobe:                              vbeprobe.             (line  7)
+
+
+
+Tag Table:
+Node: Top1487
+Node: Introduction3266
+Node: Overview3643
+Node: Overview-Footnotes5865
+Ref: Overview-Footnote-15926
+Node: History6087
+Node: Features7208
+Node: Features-Footnotes12976
+Ref: Features-Footnote-113037
+Node: Role of a boot loader13182
+Node: Role of a boot loader-Footnotes14520
+Ref: Role of a boot loader-Footnote-114607
+Node: Naming convention14686
+Node: Installation17621
+Node: Creating a GRUB boot floppy19363
+Node: Installing GRUB natively20181
+Node: Installing GRUB natively-Footnotes22461
+Ref: Installing GRUB natively-Footnote-122554
+Node: Installing GRUB using grub-install22739
+Node: Making a GRUB bootable CD-ROM25685
+Node: Making a GRUB bootable CD-ROM-Footnotes27730
+Ref: Making a GRUB bootable CD-ROM-Footnote-127833
+Node: Booting27908
+Node: General boot methods28363
+Node: Loading an operating system directly29104
+Node: Chain-loading30408
+Node: Chain-loading-Footnotes31718
+Ref: Chain-loading-Footnote-131789
+Node: OS-specific notes31861
+Node: GNU/Hurd32237
+Node: GNU/Linux32856
+Node: FreeBSD34104
+Node: NetBSD34617
+Node: OpenBSD35275
+Node: DOS/Windows35475
+Node: SCO UnixWare37301
+Node: QNX37719
+Node: Making your system robust37969
+Node: Booting once-only39294
+Node: Booting fallback systems41219
+Node: Configuration44066
+Node: Network48495
+Node: General usage of network support48989
+Node: General usage of network support-Footnotes50850
+Ref: General usage of network support-Footnote-150959
+Node: Diskless51027
+Node: Serial terminal53211
+Node: Preset Menu55444
+Node: Security57812
+Node: Images60620
+Node: Filesystem63131
+Node: Device syntax63814
+Node: File name syntax65308
+Node: Block list syntax66051
+Node: Interface66784
+Node: Command-line interface67661
+Node: Command-line interface-Footnotes69602
+Ref: Command-line interface-Footnote-169691
+Node: Menu interface69786
+Node: Menu entry editor70796
+Node: Hidden menu interface71875
+Node: Commands72452
+Node: Menu-specific commands73029
+Node: default74200
+Node: fallback74678
+Node: hiddenmenu75229
+Node: timeout75717
+Node: title75995
+Node: General commands76266
+Node: bootp77579
+Node: color78058
+Node: device79532
+Node: dhcp80104
+Node: hide80689
+Node: ifconfig81066
+Node: pager81642
+Node: partnew81976
+Node: parttype82412
+Node: password82779
+Node: rarp83598
+Node: serial83899
+Node: setkey85172
+Node: terminal87341
+Node: terminfo88878
+Node: tftpserver89565
+Node: unhide90111
+Node: Command-line and menu entry commands90486
+Node: blocklist93017
+Node: boot93259
+Node: cat93580
+Node: chainloader93884
+Node: cmp94500
+Node: configfile95051
+Node: debug95265
+Node: displayapm95649
+Node: displaymem95860
+Node: embed96562
+Node: embed-Footnotes97096
+Ref: embed-Footnote-197151
+Node: find97208
+Node: fstest97588
+Node: geometry98273
+Node: halt98885
+Node: help99212
+Node: impsprobe99833
+Node: initrd100232
+Node: install100571
+Node: install-Footnotes103415
+Ref: install-Footnote-1103474
+Node: ioprobe103571
+Node: kernel103896
+Node: lock105016
+Node: makeactive105591
+Node: map105903
+Node: md5crypt106470
+Node: module106817
+Node: modulenounzip107394
+Node: pause107687
+Node: quit108101
+Node: reboot108377
+Node: read108558
+Node: root108800
+Node: rootnoverify109677
+Node: savedefault110232
+Node: setup111208
+Node: testload112274
+Node: testvbe112884
+Node: uppermem113255
+Node: vbeprobe113837
+Node: Troubleshooting114220
+Node: Stage1 errors114758
+Node: Stage1.5 errors116135
+Node: Stage2 errors116573
+Node: Invoking the grub shell124033
+Node: Basic usage124786
+Node: Installation under UNIX127073
+Node: Device map128748
+Node: Invoking grub-install129896
+Node: Invoking grub-md5-crypt131484
+Node: Invoking grub-terminfo132133
+Node: Invoking grub-set-default132899
+Node: Invoking mbchk134700
+Node: Obtaining and Building GRUB135214
+Node: Reporting bugs136631
+Node: Future139435
+Node: Internals139926
+Node: Memory map141149
+Node: Embedded data142627
+Node: Filesystem interface144644
+Node: Command interface148077
+Node: Bootstrap tricks149392
+Node: I/O ports detection151541
+Node: Memory detection151813
+Node: Low-level disk I/O152105
+Node: MBR152374
+Node: Partition table152571
+Node: Submitting patches152844
+Node: Index154332
+
+End Tag Table

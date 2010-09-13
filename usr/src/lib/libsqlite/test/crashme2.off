@@ -1,0 +1,52 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+
+db close
+set DB [sqlite db test.db]
+
+execsql {
+  CREATE TABLE t1(a);
+  INSERT INTO t1 VALUES(1);
+  INSERT INTO t1 VALUES(2);
+  INSERT INTO t1 VALUES(3);
+  INSERT INTO t1 VALUES(4);
+}
+
+do_test capi3-13.1 {
+  execsql {
+    CREATE TABLE t3(a unique on conflict rollback);
+    INSERT INTO t3 SELECT a FROM t1;
+    BEGIN;
+    INSERT INTO t1 SELECT * FROM t1;
+  }
+} {}
+do_test capi3-13.2 {
+  set STMT [sqlite_compile $DB "SELECT a FROM t1" TAIL]
+  sqlite_step $STMT
+  sqlite_step $STMT
+  sqlite_step $STMT
+  sqlite_step $STMT
+  sqlite_step $STMT
+} {SQLITE_ROW}
+do_test capi3-13.3 {
+# This causes a ROLLBACK, which deletes the table out from underneath the
+# SELECT statement. Causes a crash.
+  catchsql {
+    INSERT INTO t3 SELECT a FROM t1;
+  }
+} {1 {column a is not unique}}
+do_test capi3-13.4 {
+  sqlite_step $STMT
+  sqlite_step $STMT
+  sqlite_step $STMT
+  sqlite_step $STMT
+} {SQLITE_DONE}
+do_test capi3-13.5 {
+  sqlite_finalize $STMT
+} {SQLITE_OK}
+
+finish_test

@@ -1,0 +1,59 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#There are five fields separated by colon in this configuration file:
+#First Field: 	Name for the corresponding zone.
+#		It is used when zone is configured.
+#
+#Second Field: 	Label for the corresponding zone.
+#		It is used to label the zone when zone is booted.
+#		The label can be either hex label or  symbolic ones defined by
+#		label_encodings files.
+#
+#Third Field:	Policy match level for non-transport traffic.
+#		Currently unused.
+#
+#Fourth Field:	Multi-Level port configuration entry for private addresses.
+#		mlp info is list of semicolon separated mlp configuration entry.
+#		Each mlp configuration entry is specified by port/protocol.
+#
+#Fifth Field:	Multi-Level port configuration entry for shared address.
+#		It only applies to global zones.
+#
+# This is the default global zone configuration.  Note that although this
+# entry must have a label and match flag, neither is configurable by the user.
+#
+# Multilevel Port (MLP) specification:
+#
+#	MLP			PURPOSE
+#	---			-------
+#	111			Port Mapper
+#	500			IKE (IPsec key management)
+#	515			BSD Multilevel Printing
+#	631			IPP Multilevel Printing
+#	2049			NFSv4 server
+#	4500			IKE NAT-T (IPsec/IKE nat traversal)
+#	6000-6003		Multilevel Desktop
+#
+global:ADMIN_LOW:1:111/tcp;111/udp;500/udp;4500/udp;515/tcp;631/tcp;2049/tcp;6000-6003/tcp:6000-6003/tcp;500/udp;4500/udp

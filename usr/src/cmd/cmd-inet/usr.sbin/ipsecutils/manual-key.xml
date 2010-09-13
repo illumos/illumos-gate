@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+        ident	"%Z%%M%	%I%	%E% SMI"
+
+        NOTE:  This service manifest is not editable; its contents will
+        be overwritten by package or patch operations, including
+        operating system upgrade.  Make customizations in a different
+        file.
+-->
+<service_bundle type='manifest' name='SUNWcsr:manual-key'>
+
+<service
+        name='network/ipsec/manual-key'
+        type='service'
+        version='1'>
+
+        <!-- The 'manual-key' service is delivered disabled
+	because there is not a default configuration file.
+        See note below on changing the default configuration file. -->
+
+        <create_default_instance enabled='false' />
+
+        <single_instance />
+
+	<!-- Read/Write access to /var/run required for lock files -->
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri
+			value='svc:/system/filesystem/minimal'
+		/>
+	</dependency>
+	<!-- Kernel needs to know IPsec supported algorithms -->
+        <dependency
+                name='algorithms'
+                grouping='require_all'
+                restart_on='none'
+                type='service'>
+                <service_fmri
+                        value='svc:/network/ipsec/ipsecalgs'
+                />
+        </dependency>
+
+        <!-- If we are enabled, we should be running fairly early -->
+
+        <dependent
+                name='ipseckey-network'
+                grouping='optional_all'
+                restart_on='none'>
+                <service_fmri
+                        value='svc:/milestone/network'
+                />
+        </dependent>
+
+        <exec_method
+                type='method'
+                name='start'
+                exec='/usr/sbin/ipseckey -f  %{config/config_file}'
+                timeout_seconds='60'
+        />
+
+	<!-- To prevent ipseckey generating warnings about duplicate
+	SAs when the service is refreshed, ipseckey will flush the
+	existing SAs when its called from smf(5). -->
+
+        <exec_method
+                type='method'
+                name='refresh'
+                exec='/usr/sbin/ipseckey -f  %{config/config_file}'
+                timeout_seconds='60'
+        />
+
+        <exec_method
+                type='method'
+                name='stop'
+                exec='/usr/sbin/ipseckey flush'
+                timeout_seconds='60'
+        />
+
+	<property_group name='general' type='framework'>
+		<!-- A user with this authorization can:
+
+			svcadm restart manual-key
+			svcadm refresh manual-key
+			svcadm mark <state> manual-key
+			svcadm clear manual-key
+
+		see auths(1) and user_attr(4)-->
+
+		<propval
+			name='action_authorization'
+			type='astring'
+			value='solaris.smf.manage.ipsec'
+		/>
+		<!-- A user with this authorization can:
+
+			svcadm disable manual-key
+			svcadm enable manual-key
+
+		see auths(1) and user_attr(4)-->
+
+		<propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.manage.ipsec'
+		/>
+	</property_group>
+
+        <!-- The properties defined below can be changed by a user
+	with 'solaris.smf.value.ipsec' authorization using the 
+	svccfg(1M) command. 
+
+	EG:
+
+        svccfg -s manual-key setprop config/config_file = /new/config_file
+
+	The new configurations will be read on service refresh:
+
+	svcadm refresh ipsec/manual-key
+
+	Note: svcadm disable/enable does not use the new property
+	until after the service has been refreshed.
+
+        ***Do not edit this manifest to change these properties! -->
+
+        <property_group name='config' type='application'>
+                <propval
+                        name='config_file'
+                        type='astring'
+                        value='/etc/inet/secret/ipseckeys'
+                />
+		<propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.value.ipsec'
+		/>
+        </property_group>
+
+        <property_group name='startd' type='framework'>
+                <propval
+                        name='duration'
+                        type='astring'
+                        value='transient'
+                />
+        </property_group>
+
+        <stability value='Unstable' />
+
+        <template>
+                <common_name>
+                        <loctext xml:lang='C'>
+                                manually keyed IPsec startup
+                        </loctext>
+                </common_name>
+                <description>
+                        <loctext xml:lang='C'>
+                                Loads static security associations
+                        </loctext>
+                </description>
+                <documentation>
+                        <manpage title='ipseckey' section='1M'
+                                manpath='/usr/share/man' />
+                </documentation>
+        </template>
+</service>
+</service_bundle>
+

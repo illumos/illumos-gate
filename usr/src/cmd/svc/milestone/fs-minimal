@@ -1,0 +1,85 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
+# All rights reserved.
+#
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/fs_include.sh
+
+# Mount other file systems to be available in single user mode.
+# Currently, these are /var, /var/adm, /var/run and /tmp.  A change
+# here will require a modification to the following programs (and
+# documentation): /sbin/mountall, /sbin/umountall, and
+# /lib/svc/bin/svc.startd.
+
+rootiszfs=0
+readmnttab / < /etc/mnttab
+if [ "$fstype" = zfs ] ; then
+	rootiszfs=1
+	be=$special
+fi
+
+for fs in /var /var/adm /tmp; do
+	readvfstab $fs < $vfstab
+	if [ -n "$mountp" ]; then
+		mounted $mountp $mntopts $fstype < /etc/mnttab && continue
+		checkfs $fsckdev $fstype $mountp || exit $SMF_EXIT_ERR_FATAL
+		mountfs -O $mountp $fstype $mntopts - ||
+		    exit $SMF_EXIT_ERR_FATAL
+		continue
+	fi
+	if [ "$rootiszfs" = 1 ]; then
+		mountpt=`zfs get -H -o value mountpoint $be$fs 2>/dev/null`
+		if [ $? = 0 ] ; then
+			if [ "x$mountpt" = "x$fs" ] ; then
+				/sbin/zfs mount -O $be$fs
+			fi
+		fi
+	fi
+done
+
+mounted /var/run - tmpfs < /etc/mnttab
+if [ $? != 0 ] ; then
+	mountfs -O /var/run tmpfs - swap || exit $SMF_EXIT_ERR_FATAL
+fi
+
+if [ ! -f /var/run/tzsync ] ; then
+	/sbin/tzreload -I
+fi
+
+if [ "$rootiszfs" = 1 ] ; then
+	/sbin/zfs list -rH -o mountpoint -s mountpoint -t filesystem $be | \
+	    while read mountp ; do
+		if [ "x$mountp" != "x" -a "$mountp" != "legacy" ] ; then
+			mounted $mountp - zfs < /etc/mnttab  && continue
+			/sbin/zfs mount $be$mountp
+		fi
+	done
+fi
+
+exit $SMF_EXIT_OK

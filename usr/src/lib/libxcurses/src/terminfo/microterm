@@ -1,0 +1,73 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# microterm: MICROTERM
+#
+microterm|act4|microterm act iv,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, ed=^_, el=^^, clear=^L,
+	cup=^T%p1%c%p2%c, cols#80, lines#24, cuf1=^X, cuu1=^Z, home=^],
+# The padding on cuf1 for act5 and mime is a guess and not final.
+# The act5 has hardware tabs, but in cols 8, 16, 24, 32, 41 (!), 49, ...
+microterm5|act5|microterm act v,
+	uc=\EA, ri=\EH$<3>, kcuu1=^Z, kcud1=^K, kcub1=^H, kcuf1=^X, use=act4,
+# Act V in split screen mode.  act5s is not tested and said not to work.
+# Could have been because of the funny tabs - it might work now.
+act5s|skinny act5,
+	smcup=\EP, rmcup=\EQ, lines#48, cols#39, use=act5,
+# These mime1 entries refer to the Microterm Mime I or Mime II.
+# The default mime is assumed to be in enhanced act iv mode.
+# There is a ^Q in is2 to unwedge any lines that wedge on ^S.
+mime|mime1|mime2|mimei|mimeii|microterm mime1,
+	cup=^T%p1%{24}%+%c%p2%?%p2%{32}%>%t%{48}%+%;%{80}%+%c, cols#80,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<80>, am, cub1=^H,
+	ed=^_, el=^^, clear=\035^C, dl1=^W$<80>, ht=^I, lines#24,
+	cuf1=^X, uc=^U, cuu1=^z, home=\035, cud1=^K, is2=\E^S^Q,
+	kcuu1=^Z, kcud1=^K, kcub1=^H, kcuf1=^X, ri=^R$<3>, vt#9,
+mime-3a|mime-adm3a|mime1 emulating adm3a,
+	am@, kcuu1=^Z, kcud1=^K, kcub1=^H, kcuf1=^X, use=adm3a,
+mime-3ax|mime-adm3ax|mime1 emulating enhanced adm3a,
+	il1=^A$<80>, dl1=^W$<80>, ht=^I$<3>, el=^X, ed=^_, use=mime-3a,
+# Mimes using brightness for standout.  Half bright is very dim unless
+# you turn up the brightness so far that lines show up on the screen.
+mime-fb|full bright mime1,
+	smso=^Y, rmso=^S, is2=^S\E^Q, use=mime,
+mime-hb|half bright mime1,
+	smso=^S, rmso=^Y, is2=^Y\E, use=mime,
+# These entries (for mime 2a) put the terminal in low intensity mode
+# since high intensity mode is so obnoxious.
+# This is the preferred mode (but ^X can't be used as a kill character (?))
+mime2a|mime2a-v|microterm mime2a (emulating an enhanced vt52),
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<20*>, cub1=^H, ed=\EQ$<20*>,
+	cols#80, el=\EP, clear=\EL, cup=\EY%p1%' '%+%c%p2%' '%+%c, is2=^Y,
+	dch1=^N, dl1=^W$<20*>, ip=$<2>, rmir=^Z, home=\EH, smir=^O, cuu1=\EA,
+	ri=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, kcuu1=\EA, lines#24,
+	cuf1=\EC, ht=^I, rmso=\E9, smso=\E8, smul=\E4, rmul=\E5,
+mime2a-s|microterm mime2a (emulating an enhanced soroc iq120),
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<20*>, am, cub1=^H, ed=\EJ$<20*>,
+	el=\EK, clear=\EL, cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\ED,
+	dl1=^W$<20*>, kcub1=^H, kcuf1=^L, kcuu1=^K, kcud1=^J, home=^^, is2=\E),
+	ri=\EI, smir=\EE, rmir=^Z, ip=$<2>, lines#24, cuf1=^L, cuu1=\EI,
+	smso=\E:, rmso=\E;, smul=\E6, rmul=\E7,

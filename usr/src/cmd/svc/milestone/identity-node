@@ -1,0 +1,96 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
+# All rights reserved.
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+# Make sure that the libraries essential to this stage of booting can be found.
+LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
+
+#
+# If DHCP was used on a primary interface then set the hostname
+# that was returned. If no hostname was returned, set the name
+# to be "unknown". The hostname must be set to something, because
+# tooltalk will hang unless the name can be locally resolved.
+# Sendmail also requires the name to be resolvable locally.
+# Later, in inetsvc, we create a name "unknown" and create a entry
+# in the local /etc/inet/hosts file pairing "unknown" with the IP
+# address assigned by DHCP.  The use of bootparams as a fallback
+# for all non-DHCP cases provides compatibility with the
+# behavior of the system before netstrategy was introduced.
+#
+# For non-global zones, fall back to the `uname -n` value provided by the
+# kernel if /etc/nodename does not exist, as is expected on an initial boot.
+#
+
+smf_netstrategy
+
+case "$_INIT_NET_STRATEGY" in
+	"dhcp") hostname=`/sbin/dhcpinfo Hostname` ;;
+	"rarp") hostname=`/sbin/hostconfig -h -p bootparams`
+		trap 'intr=1' 2 3
+		while [ -z "$hostname" -a ! -f /etc/.UNCONFIGURED -a \
+		    -z "$intr" ]; do
+			echo "re-trying host configuration..."
+			# Restrict this to IPv4 interfaces.
+			/sbin/ifconfig -adD4 auto-revarp up
+			hostname=`/sbin/hostconfig -h -p bootparams`
+		done
+		trap 2 3 ;;
+	"none") hostname="`shcat /etc/nodename 2>/dev/null`"
+       		if [ -z "$hostname" ]; then
+			if smf_is_globalzone; then
+				hostname=`/sbin/hostconfig -h -p bootparams`
+			else
+				hostname=`/sbin/uname -n`
+			fi
+		fi ;;
+esac
+
+#
+# If the netstrategy was unsuccessful and we haven't got a locally configured
+# name, default to "unknown"
+#
+if [ -z "$hostname" ]; then
+	hostname="`shcat /etc/nodename 2>/dev/null`"
+	if [ -z "$hostname" ]; then
+		hostname="unknown"
+	fi
+fi
+
+/sbin/uname -S $hostname
+
+echo "Hostname: `/sbin/uname -n`" > /dev/msglog
+
+# Reset the library path now that we are past the critical stage
+unset LD_LIBRARY_PATH
+
+exit $SMF_EXIT_OK

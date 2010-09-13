@@ -1,0 +1,107 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifests for in.rexecd.
+-->
+
+<service_bundle type='manifest' name='SUNWrcmdr:rexec'>
+
+<service
+	name='network/rexec'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<restarter>
+		<service_fmri value='svc:/network/inetd:default' />
+	</restarter>
+
+	<exec_method
+	    type='method'
+	    name='inetd_start'
+	    exec='/usr/sbin/in.rexecd'
+	    timeout_seconds='0'>
+	    <method_context>
+		<method_credential user='root' group='root' />
+	    </method_context>
+	</exec_method>
+
+	<exec_method
+	    type='method'
+	    name='inetd_disable'
+	    exec=':kill'
+	    timeout_seconds='0'>
+	</exec_method>
+
+	<!--
+	    The proto setting here of both tcp and tcp6only is required in order
+	    to prevent breaking applications which assume that the socket they
+	    are handed by rexec is of the AF_INET family.
+	-->
+	<property_group name='inetd' type='framework'>
+		<stability value='Evolving' />
+		<propval name='name' type='astring' value='exec' />
+		<propval name='endpoint_type' type='astring' value='stream' />
+		<propval name='wait' type='boolean' value='false' />
+		<propval name='isrpc' type='boolean' value='false' />
+		<property name='proto' type='astring' override='true'>
+			<astring_list>
+				<value_node value='tcp'/>
+				<value_node value='tcp6only'/>
+			</astring_list>
+		</property>
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			rexec
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='in.rexecd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

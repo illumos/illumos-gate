@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWckr:notify-params'>
+
+<service
+	name='system/fm/notify-params'
+	type='service'
+	version='1'>
+
+	<!--
+	  Fault Manager notification parameters
+	-->
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec=':true'
+	    timeout_seconds='0' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':true'
+	    timeout_seconds='0' />
+
+	<!--
+	    SMF property groups match the regex
+	    ([A-Za-z][ A-Za-z0-9.-]*,)?[A-Za-z][ A-Za-z0-9-]*
+	    swfma was added at the end to allow the class dotted names
+	    The macro SCF_NOTIFY_PG_POSTFIX in libscf.h translates to "swfma"
+	-->
+
+	<instance name='default' enabled='false'>
+		<!--
+		This sets the default notification preferences for FMA events
+		which is to send an email to root and emit a console message via
+		syslog for list.suspect events and to send an SNMP trap for
+		list.suspect, list.repaired and list.resolved events.
+		-->
+
+		<notification_parameters>
+			<event value='problem-diagnosed' />
+			<type name='smtp' active='true'>
+				<paramval name='to' value='root@localhost' />
+				<paramval name='reply-to'
+				    value='root@localhost' />
+			</type>
+			<type name='snmp' active='true' />
+			<type name='syslog' active='true' />
+		</notification_parameters>
+		<notification_parameters>
+			<event value='problem-repaired,problem-resolved' />
+			<type name='snmp' active='true' />
+		</notification_parameters>
+	</instance>
+
+	<stability value='Evolving' />
+
+	<template>
+	    	<common_name>
+		    	<loctext xml:lang='C'>
+				Solaris Fault Manager notification parameters
+			</loctext>
+		</common_name>
+
+		<documentation>
+		    	<manpage
+			    title='smf'
+			    section='5'
+			    manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

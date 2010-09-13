@@ -1,0 +1,296 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
+
+/*
+ * Platform Power Management master pseudo driver platform support.
+ */
+
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/ppmvar.h>
+#include <sys/cpupm.h>
+
+#define	PPM_CPU_PSTATE_DOMAIN_FLG	0x100
+
+/*
+ * Used by ppm_redefine_topspeed() to set the highest power level of all CPUs
+ * in a domain.
+ */
+void
+ppm_set_topspeed(ppm_dev_t *cpup, int speed)
+{
+	for (cpup = cpup->domp->devlist; cpup != NULL; cpup = cpup->next)
+		(*cpupm_set_topspeed_callb)(cpup->dip, speed);
+}
+
+/*
+ * Redefine the highest power level for all CPUs in a domain. This
+ * functionality is necessary because ACPI uses the _PPC to define
+ * a CPU's highest power level *and* allows the _PPC to be redefined
+ * dynamically. _PPC changes are communicated through _PPC change
+ * notifications caught by the CPU device driver.
+ */
+void
+ppm_redefine_topspeed(void *ctx)
+{
+	char *str = "ppm_redefine_topspeed";
+	ppm_dev_t *cpup;
+	ppm_dev_t *ncpup;
+	int topspeed;
+	int newspeed = -1;
+
+	cpup = PPM_GET_PRIVATE((dev_info_t *)ctx);
+
+	if (cpupm_get_topspeed_callb == NULL ||
+	    cpupm_set_topspeed_callb == NULL) {
+		cmn_err(CE_WARN, "%s: Cannot process request for instance %d "
+		    "since cpupm interfaces are not initialized", str,
+		    ddi_get_instance(cpup->dip));
+		return;
+	}
+
+	if (!(cpup->domp->dflags & PPMD_CPU_READY)) {
+		PPMD(D_CPU, ("%s: instance %d received _PPC change "
+		    "notification before PPMD_CPU_READY", str,
+		    ddi_get_instance(cpup->dip)));
+		return;
+	}
+
+	/*
+	 * Process each CPU in the domain.
+	 */
+	for (ncpup = cpup->domp->devlist; ncpup != NULL; ncpup = ncpup->next) {
+		topspeed = (*cpupm_get_topspeed_callb)(ncpup->dip);
+		if (newspeed == -1 || topspeed < newspeed)
+			newspeed = topspeed;
+	}
+
+	ppm_set_topspeed(cpup, newspeed);
+}
+
+/*
+ * For x86 platforms CPU domains must be built dynamically at bootime.
+ * Until the domains have been built, refuse all power transition
+ * requests.
+ */
+/* ARGSUSED */
+boolean_t
+ppm_manage_early_cpus(dev_info_t *dip, int new, int *result)
+{
+	ppm_dev_t *ppmd = PPM_GET_PRIVATE(dip);
+
+	if (!(ppmd->domp->dflags & PPMD_CPU_READY)) {
+		PPMD(D_CPU, ("ppm_manage_early_cpus: attempt to manage CPU "
+		    "before it was ready dip(0x%p)", (void *)dip));
+		return (B_TRUE);
+	}
+	*result = DDI_FAILURE;
+	return (B_FALSE);
+}
+
+int
+ppm_change_cpu_power(ppm_dev_t *ppmd, int newlevel)
+{
+#ifdef DEBUG
+	char *str = "ppm_change_cpu_power";
+#endif
+	ppm_unit_t *unitp;
+	ppm_domain_t *domp;
+	ppm_dev_t *cpup;
+	dev_info_t *dip;
+	int oldlevel;
+	int ret;
+
+	unitp = ddi_get_soft_state(ppm_statep, ppm_inst);
+	ASSERT(unitp);
+	domp = ppmd->domp;
+	cpup = domp->devlist;
+
+	dip = cpup->dip;
+	ASSERT(dip);
+
+	oldlevel = cpup->level;
+
+	PPMD(D_CPU, ("%s: old %d, new %d\n", str, oldlevel, newlevel))
+
+	if (newlevel == oldlevel)
+		return (DDI_SUCCESS);
+
+	/* bring each cpu to next level */
+	for (; cpup; cpup = cpup->next) {
+		ret = pm_power(cpup->dip, 0, newlevel);
+		PPMD(D_CPU, ("%s: \"%s\", changed to level %d, ret %d\n",
+		    str, cpup->path, newlevel, ret))
+		if (ret == DDI_SUCCESS) {
+			cpup->level = newlevel;
+			cpup->rplvl = PM_LEVEL_UNKNOWN;
+			continue;
+		}
+
+		/*
+		 * If the driver was unable to lower cpu speed,
+		 * the cpu probably got busy; set the previous
+		 * cpus back to the original level
+		 */
+		if (newlevel < oldlevel)
+			ret = ppm_revert_cpu_power(cpup, oldlevel);
+
+		return (ret);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * allocate ppm CPU pstate domain if non-existence,
+ * otherwise, add the CPU to the corresponding ppm
+ * CPU pstate domain.
+ */
+void
+ppm_alloc_pstate_domains(cpu_t *cp)
+{
+	cpupm_mach_state_t	*mach_state;
+	uint32_t		pm_domain;
+	int			sub_domain;
+	ppm_domain_t		*domp;
+	dev_info_t		*cpu_dip;
+	ppm_db_t		*dbp;
+	char			path[MAXNAMELEN];
+
+	mach_state = (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	ASSERT(mach_state);
+	pm_domain = mach_state->ms_pstate.cma_domain->pm_domain;
+
+	/*
+	 * There are two purposes of sub_domain:
+	 * 1. skip the orignal ppm CPU domain generated by ppm.conf
+	 * 2. A CPU ppm domain could have several pstate domains indeed.
+	 */
+	sub_domain = pm_domain | PPM_CPU_PSTATE_DOMAIN_FLG;
+
+	/*
+	 * Find ppm CPU pstate domain
+	 */
+	for (domp = ppm_domain_p; domp; domp = domp->next) {
+		if ((domp->model == PPMD_CPU) &&
+		    (domp->sub_domain == sub_domain)) {
+			break;
+		}
+	}
+
+	/*
+	 * Create one ppm CPU pstate domain if no found
+	 */
+	if (domp == NULL) {
+		domp = kmem_zalloc(sizeof (*domp), KM_SLEEP);
+		mutex_init(&domp->lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_enter(&domp->lock);
+		domp->name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+		(void) snprintf(domp->name, MAXNAMELEN, "cpu_pstate_domain_%d",
+		    pm_domain);
+		domp->sub_domain = sub_domain;
+		domp->dflags = PPMD_LOCK_ALL | PPMD_CPU_READY;
+		domp->pwr_cnt = 0;
+		domp->pwr_cnt++;
+		domp->propname = NULL;
+		domp->model = PPMD_CPU;
+		domp->status = PPMD_ON;
+		cpu_dip = mach_state->ms_dip;
+		(void) ddi_pathname(cpu_dip, path);
+		dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
+		dbp->name = kmem_zalloc((strlen(path) + 1),
+		    KM_SLEEP);
+		(void) strcpy(dbp->name, path);
+		dbp->next = domp->conflist;
+		domp->conflist = dbp;
+		domp->next = ppm_domain_p;
+		ppm_domain_p = domp;
+		mutex_exit(&domp->lock);
+	}
+	/*
+	 * We found one matched ppm CPU pstate domain,
+	 * add cpu to this domain
+	 */
+	else {
+		mutex_enter(&domp->lock);
+		cpu_dip = mach_state->ms_dip;
+		(void) ddi_pathname(cpu_dip, path);
+		dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
+		dbp->name = kmem_zalloc((strlen(path) + 1),
+		    KM_SLEEP);
+		(void) strcpy(dbp->name, path);
+		dbp->next = domp->conflist;
+		domp->conflist = dbp;
+		domp->pwr_cnt++;
+		mutex_exit(&domp->lock);
+	}
+}
+
+/*
+ * remove CPU from the corresponding ppm CPU pstate
+ * domain. We only remove CPU from conflist here.
+ */
+void
+ppm_free_pstate_domains(cpu_t *cp)
+{
+	cpupm_mach_state_t	*mach_state;
+	ppm_domain_t		*domp;
+	ppm_dev_t		*devp;
+	dev_info_t		*cpu_dip;
+	ppm_db_t		**dbpp, *pconf;
+	char			path[MAXNAMELEN];
+
+	mach_state = (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	ASSERT(mach_state);
+	cpu_dip = mach_state->ms_dip;
+	(void) ddi_pathname(cpu_dip, path);
+
+	/*
+	 * get ppm CPU pstate domain
+	 */
+	devp = PPM_GET_PRIVATE(cpu_dip);
+	ASSERT(devp);
+	domp = devp->domp;
+	ASSERT(domp);
+
+	/*
+	 * remove CPU from conflist
+	 */
+	mutex_enter(&domp->lock);
+	for (dbpp = &domp->conflist; (pconf = *dbpp) != NULL; ) {
+		if (strcmp(pconf->name, path) != 0) {
+			dbpp = &pconf->next;
+			continue;
+		}
+		*dbpp = pconf->next;
+		kmem_free(pconf->name, strlen(pconf->name) + 1);
+		kmem_free(pconf, sizeof (*pconf));
+	}
+	mutex_exit(&domp->lock);
+}

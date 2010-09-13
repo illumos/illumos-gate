@@ -1,0 +1,391 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH PATH 3
+.SH NAME
+path \- file path routines
+.SH SYNOPSIS
+.EX
+#include <ast.h>
+
+char*     pathaccess(char* \fIpath\fP, const char* \fIdirs\fP, const char* \fIa\fP, const char* \fIb\fP, int \fImode\fP);
+char*     pathbin(void);
+char*     pathcanon(char* \fIpath\fP, int \fIflags\fP);
+char*     pathcat(char* \fIpath\fP, const char* \fIdirs\fP, int \fIsep\fP, const char* \fIa\fP, const char* \fIb\fP);
+char*     pathcd(char* \fIpath\fP, const char* \fIhome\fP);
+int       pathcheck(const char* \fIpackage\fP, const char* \fItool\fP, Pathcheck_t* \fIpc\fP);
+int       pathgetlink(const char* \fIname\fP, char* \fIbuf\fP, int \fIsiz\fP);
+char*     pathkey(char* \fIkey\fP, char* \fIattr\fP, const char* \fIlang\fP, const char* \fIpath\fP);
+char*     pathnext(char* \fIpath\fP, char* \fIextra\fP, long* \fIvisits\fP);
+char*     pathpath(char* \fIpath\fP, const char* \fIp\fP, const char* \fIa\fP, int \fImode\fP);
+char*     pathprobe(char* \fIpath\fP, char* \fIattr\fP, const char* \fIlang\fP, const char* \fItool\fP, const char* \fIproc\fP, int \fIop\fP);
+char*     pathrepl(char* \fIpath\fP, const char* \fImatch\fP, const char* \fIreplace\fP);
+int       pathsetlink(const char* \fItext\fP, char* \fIname\fP);
+char*     pathshell(void);
+int       pathstat(const char* \fIpath\fP, struct stat* \fIst\fP);
+char*     pathtemp(char* \fIpath\fP, const char* \fIdir\fP, const char* \fIpfx\fP);
+.EE
+.SH DESCRIPTION
+These routines operate on file path names.
+Path buffers are assumed to be of size
+.LR PATH_MAX .
+.L <ast.h>
+always defines
+.LR PATH_MAX ,
+even if it indeterminant on the local system.
+Yes, this was probably a bad choice, but it was made about 10 years ago.
+We will probably move to a <stk.h> based implementation.
+.PP
+.L pathaccess
+constructs a path in
+.L path
+to the file
+.L a/b
+with access
+.L mode
+using the
+.L :
+separated directories in 
+.IR dirs .
+Both
+.I a
+and
+.I b
+may be
+.LR 0 .
+.L mode
+is the inclusive-or of:
+.TP
+.L F_OK
+File exists.
+.TP
+.L R_OK
+Read permission on file.
+.TP
+.L W_OK
+Write permission on file.
+.TP
+.L X_OK
+Execute permission on file.
+.TP
+.L PATH_REGULAR
+A regular file.
+.TP
+.L PATH_ABSOLUTE
+Generated path name is rooted at
+.LR / .
+.I path 
+is returned, 0 on error.
+.PP
+.L pathbin
+returns a pointer to the 
+.L :
+separated list of directories to search for executable commands.
+The
+.L PATH
+environment variable is first consulted.
+If not defined then
+.L confstr(_CS_PATH,...)
+is used.
+A valid string is always returned.
+.PP
+.L pathcanon
+canonicalizes the path
+.I path
+in place.
+A pointer to the trailing 0 in the canonicalized path is returned.
+A canonical path has:
+redundant 
+.L .
+and
+.L /
+removed;
+.L ..
+moved to the front;
+.L /..
+preserved for super root hacks;
+.L ...
+resolved if
+.IR fs3d (3)
+is enabled.
+.I flags is the inclusive-or of:
+.TP
+.L PATH_DOTDOT
+Each
+.L ..
+is checked for access.
+.TP
+.L PATH_EXISTS
+Path must exist at each component.
+.TP
+.L PATH_PHYSICAL
+Symbolic links are resolved at each component.
+.PP
+0 is returned on error.
+If an error occurs and either of
+.L PATH_DOTDOT
+or
+.L PATH_EXISTS 
+is set then
+.I path
+will contain the components following the failure point.
+.PP
+.L pathcat
+concatenates the first
+.I sep
+separated path component in
+.I dirs
+with the path components
+.I a
+and
+.I b
+into
+.LR path .
+The path is constructed in
+.I path
+by separating each path component with
+.IR / .
+Both
+.I a
+and
+.I b
+may be
+.LR 0 .
+A pointer to the next
+.I sep
+separated component in
+.I dirs
+is returned,
+.L 0
+when there are no more components.
+.L pathcat
+is used by
+.LR pathaccess .
+.PP
+.L pathcd
+sets the current working directory to
+.I path
+via
+.IR chdir (2).
+If
+.I path
+is longer than
+.L PATH_MAX
+then it is split up into a sequence of relative paths and
+.I chdir
+is called on each of these.
+For any given system, if you got to a directory, then 
+.L pathcd
+can get you back, modulo permission and link changes.
+.PP
+.L pathcheck
+is a stub for license libraries.
+See
+.IR license (3).
+.PP
+.L pathgetlink
+returns the 0-terminated symbolic link text for
+.I path
+in the buffer
+.I bu
+of size
+.IR siz .
+The link text length is returned on success, \-1 on error.
+Weird
+.I universe (1)
+interactions with dynamic symbolic links are handled
+by converting non-standard dynamic link text to
+.LI .../$( UNIVERSE )/...
+.L pathsetsymlink
+converts in the other direction.
+.PP
+.L pathkey
+generates in 
+.I key
+a 14 character lookup key (plus terminating 0) for the language
+.I lang
+processor in
+.IR path .
+A poihter to the key is returned, 0 on error.
+If
+.I "key == 0"
+then space is allocated via
+.IR malloc (3).
+Key specific attribute
+.I name=value
+pairs are copied into
+.I attr
+if
+.IR "attr != 0" .
+.PP
+.L pathpath
+constructs in
+.I path
+a path to
+.I p
+with
+.IR access (2)
+mode
+.I mode
+using the directories from
+.LR pathbin() .
+If \fIa != 0\fP then
+.IR a ,
+.IR argv [0]
+(if available via
+.IR optget (3)),
+and the
+.L _
+environment variable (set by
+.IR ksh (1) )
+are used for related root searching.
+If 
+.I p
+also contains a 
+.L /
+then
+.I ../p
+is searched for.
+.PP
+.L pathprobe
+generates in
+.I path
+the full path name of the
+.I tool
+specific
+.IR probe (1)
+information file for the
+.I lang
+langauge processor
+.IR proc .
+If
+.I "path == 0"
+then space is allocated via
+.IR malloc (3).
+Probe attribute
+.I name=value
+pairs are copied into
+.I attr
+if
+.IR "attr != 0" .
+.I op
+may be one of:
+.TP
+.B \-1
+return the path name with no access checks or generation
+.TP
+.B 0
+message emitted information must be generated via
+.IR probe (1)
+.TP
+.B 1
+no message emitted information must be probed via
+.IR probe (1)
+.PP
+0 is returned if the information does not exist and cannot be generated.
+.PP
+.L pathrepl
+does an in-place replacement of the first occurrence of
+.I /match/
+with
+.I /replace/
+in
+.IR path .
+.PP
+.L pathsetlink
+creates a symbolic link
+.I text
+in the path
+.IR name .
+See
+.L pathgetlink
+above for weird
+.IR universe (1)
+interactions hidden by this routine.
+.PP
+.L pathshell
+returns a pointer to the pathname for the shell for the current process.
+The
+.L SHELL
+environment variable is first consulted, but is rejected under suspicious
+ownership/setuid conditions of if it seems to point to
+.IR csh (1) ;
+otherwise
+.L confstr(_CS_SHELL,...)
+is used.
+A valid string is always returned.
+.PP
+.L pathstat
+first tries
+.LI stat( path,st )
+and if that fails it tries
+.LI lstat( path,st ).
+The
+.L stat
+or
+.L lstat
+return value is returned.
+.PP
+.L pathtemp
+generates in
+.I path
+a temporary file path name of the form
+.I dir/pfx<pid>.<suf>
+where the length of
+.IR pfx ,
+if !=0, is limited to 5, the length of
+.I <pid>
+(the base 64 representation of the current process id)
+is limited to 3, and 
+.I <suf>
+(an internally generated suffix that avoid file confilicts)
+is limited to 3.
+The generated path name conforms to the classic UNIX 14 char and the DOS
+.LR 8.3
+limitations.
+Both 
+.I dir
+and
+.I pfx
+may be
+.LR 0 .
+.IR access (2)
+is used to avoid file conflicts but the generated path name is not created,
+so you could lose in a race.
+.SH "SEE ALSO"
+3d(1), access(2), confstr(3), fs3d(3), lstat(2), stat(2)

@@ -1,0 +1,93 @@
+#
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# BSD 3 Clause License
+#
+# Copyright (c) 2007, The Storage Networking Industry Association.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 	- Redistributions of source code must retain the above copyright
+#	  notice, this list of conditions and the following disclaimer.
+#
+# 	- Redistributions in binary form must reproduce the above copyright
+#	  notice, this list of conditions and the following disclaimer in
+#	  the documentation and/or other materials provided with the
+#	  distribution.
+#
+#	- Neither the name of The Storage Networking Industry Association (SNIA)
+#	  nor the names of its contributors may be used to endorse or promote
+#	  products derived from this software without specific prior written
+#	  permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	ndmp_get_devinfo;
+	ndmp_get_devinfo_free;
+	ndmp_terminate_session;
+	ndmp_get_session_info;
+	ndmp_get_session_info_free;
+	ndmp_get_stats;
+	ndmp_get_prop;
+	ndmp_set_prop;	
+	ndmp_service_refresh;
+	ndmp_door_status;
+	ndmp_base64_encode;
+	ndmp_base64_decode;
+	ndmp_strerror;
+	ndmp_errno;
+	ndmp_door_decode_start;
+	ndmp_door_decode_finish;
+	ndmp_door_encode_start;
+	ndmp_door_encode_finish;
+	ndmp_door_get_int32;
+	ndmp_door_get_uint32;
+	ndmp_door_get_string;
+	ndmp_door_put_int32;
+	ndmp_door_put_uint32;
+	ndmp_door_put_string;
+	ndmp_door_free_string;
+	ndmp_door_get_int64;
+	ndmp_door_get_uint64;
+	ndmp_door_put_uint64;
+	ndmp_door_put_short;
+	ndmp_door_get_short;
+	ndmp_door_put_ushort;
+	ndmp_door_get_ushort;
+	ndmp_door_put_buf;
+	ndmp_door_get_buf;
+    local:
+	*;
+};

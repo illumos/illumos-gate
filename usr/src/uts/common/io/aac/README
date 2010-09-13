@@ -1,0 +1,91 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+aac driver 2.0
+================
+The Solaris aac driver enhancement updates the Solaris aac 1.6 driver
+to a full-fledged one. The old Solaris aac driver is simple and stable,
+but with limited functions.
+
+The new Solaris aac driver adds support of the following features:
+1. New firmware support:
+	New Communication interface, RawIO command, Large FIB, 64-bit LBA
+2. New hardware support:
+	Rocket chip based cards, such as 2820SA
+3. Other features:
+	64-bit DMA, Fast IO, firmware version checking, tagged-queuing
+4. IOCTL
+5. AIF
+6. IOP reset
+
+The new Solaris aac 2.0 driver is mainly based on FreeBSD 6.0 aac driver.
+IOP reset, AIF handling, 64-bit LBA, and some other minor features are
+implemented from scratch by Adaptec engineers. They are not supported in
+current FreeBSD aac driver.
+
+Adaptec approves Sun's intention to open source the aac RAID driver for
+commercial Solaris and the Open Solaris community.
+
+aac driver 2.1.14
+===================
+UART trace support is added in this release:
+        The driver can now make output through the firmware UART trace. You
+        have to set AAC_DEBUG and the appropriate flags in aac_debug_flags, at
+        least AACDB_FLAGS_FW_PRINT to enable the UART trace and any other flags
+	to enable the output class you want to see.
+	To use the tip utility to connect to the UART daughter card, a configu-
+	ration line as below should be added to /etc/remote:
+	aac:\
+		:dv=/dev/term/a:br#115200:el=^C^S^Q^U^D:ie=%$:oe=^D:
+
+aac driver 2.2.0
+==================
+SPARC platform support is added in this release:
+	To support SPARC, the driver is modified for DDI compliance. The driver
+	now uses DDI compliant functions to access the device's IO and memory
+	spaces for DMA transfers.
+
+aac driver 2.2.3
+==================
+MSI interrupts supporting is added in this release:
+	Instead of supporting fixed interrupt only, the driver added the MSI
+	interrupt whenever the HBA card has this feature. In the same time, the
+	driver has replaced all legacy interrupt ddi interfaces callings by 
+	the according ddi_intr_* ones.
+
+aac driver 2.2.5
+==================
+Two new features are included in this release:
+One is Non-DASD support:
+	The driver now supports non-DASD(Non Direct Access Storage Device).
+	This means you can use cdroms and other non-DASD devices with
+	your aac card. Before trying it, make sure your card's firmware support
+	non-DASD access. For some cards, you may need to explicitly enable it
+	through aac BIOS. Make sure nondasd-enable property in aac.conf is
+	switched on.
+The other is FIB dump:
+	The driver now supports FIB contents dumping for driver debugging. To
+	enable it, you need to set AAC_DEBUG and the appropriate flags in
+	aac_debug_fib_flags.

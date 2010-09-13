@@ -1,0 +1,168 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+LIBDRIVERS = libdrivers.a
+
+LIBDRIVERS_OBJS	= $(LIB_OBJS) $(DRIVER_OBJS)
+
+LIB_OBJS	= libdrivers_a-basemem.o	\
+		  libdrivers_a-config.o		\
+		  libdrivers_a-fsys_tftp.o	\
+		  libdrivers_a-i386_timer.o	\
+		  libdrivers_a-misc.o		\
+		  libdrivers_a-nic.o		\
+		  libdrivers_a-pci.o		\
+		  libdrivers_a-pci_io.o		\
+		  libdrivers_a-pic8259.o	\
+		  libdrivers_a-timer.o
+$(LIB_OBJS)	:= CFLAGS = $(BASE_CFLAGS) -Os -fno-builtin -nostdinc \
+			-DFSYS_TFTP=1 $(NET_CFLAGS) $(NET_EXTRAFLAGS)
+
+#
+# The following netboot drivers are available.
+# NOTE: Compiling too many netboot drivers into stage2 could cause GRUB to
+#	crash or misbehave.
+# NOTE: NET_CFLAGS has to be adjusted to correspond to the drivers
+#	selected in $(DRIVER_OBJS).
+#
+#	3c595.o		- 3Com595 driver
+#	3c90x.o		- 3Com90x driver
+#	davicom.o	- Davicom driver
+#	e1000.o		- Etherexpress Pro/1000 driver
+#	eepro100.o	- Etherexpress Pro/100 driver
+#	epic100.o	- SMC 83c170 EPIC/100 driver
+#	forcedeth.o	- Nvidia Geforce driver
+#	natsemi.o	- NatSemi DP8381x driver
+#	ns83820.o	- NS83820 driver
+#	ns8390.o	- NE2000 PCI driver
+#	pcnet32.o	- AMD Lance/PCI PCNet/32 driver
+#	pnic.o		- Bochs Pseudo Nic driver
+#	r8169.o		- Realtek 8169 driver
+#	rtl8139.o	- Realtek 8139 driver
+#	sis900.o	- SIS 900 and SIS 7016 driver
+#	sundance.o	- Sundance ST201 driver
+#	tg3.o		- Broadcom Tigon3 driver
+#	tlan.o		- TI ThunderLAN driver
+#	tulip.o		- Tulip driver
+#	undi.o		- PXE UNDI driver
+#	via-rhine.o	- Rhine-I/II driver
+#	w89c840.o	- Winbond W89c840 driver
+#
+DRIVER_OBJS	= undi.o
+
+NET_CFLAGS	= -DINCLUDE_UNDI=1
+
+$(DRIVER_OBJS)	:= CFLAGS = $(BASE_CFLAGS) -Os -fno-builtin -nostdinc \
+			$(NET_EXTRAFLAGS) $(DRIVER_DEFS)
+
+3c595.o		:= DRIVER_DEFS = -DINCLUDE_3C595=1
+3c90x.o		:= DRIVER_DEFS = -DINCLUDE_3C90X=1
+davicom.o	:= DRIVER_DEFS = -DINCLUDE_DAVICOM=1
+e1000.o		:= DRIVER_DEFS = -DINCLUDE_E1000=1
+eepro100.o	:= DRIVER_DEFS = -DINCLUDE_EEPRO100=1
+epic100.o	:= DRIVER_DEFS = -DINCLUDE_EPIC100=1
+forcedeth.o	:= DRIVER_DEFS = -DINCLUDE_FORCEDETH=1
+natsemi.o	:= DRIVER_DEFS = -DINCLUDE_NATSEMI=1
+ns83820.o	:= DRIVER_DEFS = -DINCLUDE_NS83820=1
+ns8390.o	:= DRIVER_DEFS = -DINCLUDE_NS8390=1
+pcnet32.o	:= DRIVER_DEFS = -DINCLUDE_PCNET32=1
+pnic.o		:= DRIVER_DEFS = -DINCLUDE_PNIC=1
+r8169.o		:= DRIVER_DEFS = -DINCLUDE_R8169=1
+rtl8139.o	:= DRIVER_DEFS = -DINCLUDE_RTL8139=1
+sis900.o	:= DRIVER_DEFS = -DINCLUDE_SIS900=1
+sundance.o	:= DRIVER_DEFS = -DINCLUDE_SUNDANCE=1
+tg3.o		:= DRIVER_DEFS = -DINCLUDE_TG3=1
+tlan.o		:= DRIVER_DEFS = -DINCLUDE_TLAN=1
+tulip.o		:= DRIVER_DEFS = -DINCLUDE_TULIP=1
+undi.o		:= DRIVER_DEFS = -DINCLUDE_UNDI=1
+via-rhine.o	:= DRIVER_DEFS = -DINCLUDE_VIA_RHINE=1
+w89c840.o	:= DRIVER_DEFS = -DINCLUDE_W89C840=1
+
+3c595.o		:= DRIVER_SRC = 3c595.c
+3c90x.o		:= DRIVER_SRC = 3c90x.c
+davicom.o	:= DRIVER_SRC = davicom.c
+e1000.o		:= DRIVER_SRC = e1000.c
+eepro100.o	:= DRIVER_SRC = eepro100.c
+epic100.o	:= DRIVER_SRC = epic100.c
+forcedeth.o	:= DRIVER_SRC = forcedeth.c
+natsemi.o	:= DRIVER_SRC = natsemi.c
+ns83820.o	:= DRIVER_SRC = ns83820.c
+ns8390.o	:= DRIVER_SRC = ns8390.c
+pcnet32.o	:= DRIVER_SRC = pcnet32.c
+pnic.o		:= DRIVER_SRC = pnic.c
+r8169.o		:= DRIVER_SRC = r8169.c
+rtl8139.o	:= DRIVER_SRC = rtl8139.c
+sis900.o	:= DRIVER_SRC = sis900.c
+sundance.o	:= DRIVER_SRC = sundance.c
+tg3.o		:= DRIVER_SRC = tg3.c
+tlan.o		:= DRIVER_SRC = tlan.c
+tulip.o		:= DRIVER_SRC = tulip.c
+undi.o		:= DRIVER_SRC = undi.c
+via-rhine.o	:= DRIVER_SRC = via-rhine.c
+w89c840.o	:= DRIVER_SRC = w89c840.c
+
+
+INCLUDES	= -I. -I.. -I../stage2 -I../stage1
+
+NET_EXTRAFLAGS	= -DCONFIG_PCI				\
+		  -DCONFIG_PCI_DIRECT=1			\
+		  -DCONGESTED=1				\
+		  -DNE_SCAN=0x280,0x300,0x320,0x340	\
+		  -DWD_DEFAULT_MEM=0xCC000
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/netboot
+SRC_FILES	= Makefile.am Makefile.in README.netboot \
+		  3c595.c 3c595.h 3c90x.c basemem.c big_bswap.h bootp.h \
+		  byteswap.h config.c cpu.h davicom.c dev.h e1000.c \
+		  e1000_hw.h eepro100.c elf.h endian.h epic100.c epic100.h \
+		  etherboot.h forcedeth.c fsys_tftp.c grub.h i386_byteswap.h \
+		  i386_elf.h i386_endian.h i386_timer.c if_arp.h if_ether.h \
+		  igmp.h in.h io.h ip.h isa.h latch.h little_bswap.h mii.h \
+		  misc.c natsemi.c nfs.h nic.c nic.h ns83820.c ns8390.c \
+		  ns8390.h osdep.h pci.c pci.h pci_ids.h pci_io.c pcnet32.c \
+		  pic8259.c pic8259.h pnic.c pnic_api.h pxe.h r8169.c \
+		  rtl8139.c segoff.h sis900.c sis900.h stdint.h sundance.c \
+		  tftp.h tg3.c tg3.h timer.c timer.h tlan.c tlan.h tulip.c \
+		  types.h udp.h undi.c undi.h via-rhine.c w89c840.c
+
+INSTALL_TARGETS	= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all: $(LIBDRIVERS)
+
+$(LIBDRIVERS): $(LIBDRIVERS_OBJS)
+	$(RM) $@
+	$(AR) cru $@ $(LIBDRIVERS_OBJS)
+	$(RANLIB) $@
+
+$(LIB_OBJS): $$(@:libdrivers_a-%.o=%.c)
+	$(CC) $(CFLAGS) -c -o $@ $(@:libdrivers_a-%.o=%.c)
+
+$(DRIVER_OBJS): $$(DRIVER_SRC)
+	$(CC) $(CFLAGS) -c -o $@ $(DRIVER_SRC)
+
+
+install: all $(INSTALL_TARGETS)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(SRC_DIR):
+	$(INS.dir)
+
+
+clean: _FORCE
+	$(RM) *.o $(LIBDRIVERS)
+
+clobber: clean
+
+_FORCE:

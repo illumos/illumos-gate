@@ -1,0 +1,206 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
+ * routine gss_canonicalize_name
+ *
+ * This routine is used to produce a mechanism specific
+ * representation of name that has been previously
+ * imported with gss_import_name.  The routine uses the mechanism
+ * specific implementation of gss_import_name to implement this
+ * function.
+ *
+ * We allow a NULL output_name, in which case we modify the
+ * input_name to include the mechanism specific name.
+ */
+
+#include <mechglueP.h>
+#include "gssapiP_generic.h"
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#include <string.h>
+#include <errno.h>
+#include <syslog.h>
+
+static OM_uint32 val_canon_name_args(
+	OM_uint32 *minor_status,
+	const gss_name_t input_name,
+	const gss_OID mech_type,
+	gss_name_t *output_name)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (output_name != NULL)
+		*output_name = GSS_C_NO_NAME;
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (input_name == GSS_C_NO_NAME || mech_type == GSS_C_NULL_OID)
+		return (GSS_S_CALL_INACCESSIBLE_READ);
+
+	return (GSS_S_COMPLETE);
+}
+
+OM_uint32
+gss_canonicalize_name(minor_status,
+				input_name,
+				mech_type,
+				output_name)
+OM_uint32 *minor_status;
+const gss_name_t input_name;
+const gss_OID mech_type;
+gss_name_t *output_name;
+{
+	gss_union_name_t in_union, out_union = NULL, dest_union = NULL;
+	OM_uint32 major_status = GSS_S_FAILURE;
+	/* Solaris Kerberos - need to preserve more important minor_status */
+	OM_uint32 tmp_status = 0;
+
+	major_status = val_canon_name_args(minor_status,
+					input_name,
+					mech_type,
+					output_name);
+	if (major_status != GSS_S_COMPLETE)
+		return (major_status);
+
+	/* Initial value needed below. */
+	major_status = GSS_S_FAILURE;
+
+	in_union = (gss_union_name_t)input_name;
+	/*
+	 * If the caller wants to reuse the name, and the name has already
+	 * been converted, then there is nothing for us to do.
+	 */
+	if (!output_name && in_union->mech_type &&
+		g_OID_equal(in_union->mech_type, mech_type))
+		return (GSS_S_COMPLETE);
+
+	/* ok, then we need to do something - start by creating data struct */
+	if (output_name) {
+		out_union =
+			(gss_union_name_t)malloc(sizeof (gss_union_name_desc));
+		if (!out_union)
+			goto allocation_failure;
+
+		out_union->mech_type = 0;
+		out_union->mech_name = 0;
+		out_union->name_type = 0;
+		out_union->external_name = 0;
+
+		/* Allocate the buffer for the user specified representation */
+		if (gssint_create_copy_buffer(in_union->external_name,
+				&out_union->external_name, 1))
+			goto allocation_failure;
+
+		if (in_union->name_type != GSS_C_NULL_OID) {
+			major_status = generic_gss_copy_oid(minor_status,
+							in_union->name_type,
+							&out_union->name_type);
+			if (major_status) {
+				map_errcode(minor_status);
+				goto allocation_failure;
+			}
+		}
+	}
+
+	/*
+	 * might need to delete any old mechanism names if we are
+	 * reusing the buffer.
+	 */
+	if (!output_name) {
+		if (in_union->mech_type) {
+			(void) __gss_release_internal_name(minor_status,
+							in_union->mech_type,
+							&in_union->mech_name);
+			(void) gss_release_oid(minor_status,
+					    &in_union->mech_type);
+			in_union->mech_type = 0;
+		}
+		dest_union = in_union;
+	} else
+		dest_union = out_union;
+
+	/* now let's create the new mech name */
+	if (major_status = generic_gss_copy_oid(minor_status, mech_type,
+						&dest_union->mech_type)) {
+		map_errcode(minor_status);
+		goto allocation_failure;
+	}
+
+	if (major_status =
+		__gss_import_internal_name(minor_status, mech_type,
+						dest_union,
+					&dest_union->mech_name))
+		goto allocation_failure;
+
+	if (output_name)
+		*output_name = (gss_name_t)dest_union;
+
+	return (GSS_S_COMPLETE);
+
+/* Solaris Kerberos - note some fails are not "allocation fails".  Sigh. */
+allocation_failure:
+	/* do not delete the src name external name format */
+	if (output_name) {
+		if (out_union->external_name) {
+			if (out_union->external_name->value)
+				free(out_union->external_name->value);
+			free(out_union->external_name);
+		}
+		if (out_union->name_type)
+			(void) gss_release_oid(&tmp_status,
+					    &out_union->name_type);
+
+		dest_union = out_union;
+	} else
+		dest_union = in_union;
+
+	/*
+	 * delete the partially created mech specific name
+	 * applies for both src and dest which ever is being used for output
+	 */
+
+	if (dest_union->mech_name) {
+		(void) __gss_release_internal_name(&tmp_status,
+						dest_union->mech_type,
+						&dest_union->mech_name);
+	}
+
+	if (dest_union->mech_type)
+		(void) gss_release_oid(&tmp_status, &dest_union->mech_type);
+
+
+	if (output_name)
+		free(out_union);
+
+	return (major_status);
+} /**********  gss_canonicalize_name ********/

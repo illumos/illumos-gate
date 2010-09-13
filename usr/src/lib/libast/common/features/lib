@@ -1,0 +1,663 @@
+ref	-D_def_map_ast=1
+
+cmd	universe
+
+hdr	dirent,direntry,filio,fmtmsg,fnmatch,jioctl,libgen,limits
+hdr	locale,ndir,nl_types,process,spawn,syslog,utime,vfork,wctype
+hdr	wchar note{ <wchar.h> and isw*() really work }end execute{
+	#include <wchar.h>
+	int
+	main()
+	{
+		wchar_t	w = 'a';
+		return iswalnum(w) == 0;
+	}
+}end
+
+dat	_tzname,tzname
+
+lib	BSDsetpgrp
+lib	_cleanup
+lib	atexit,bcopy,bzero,catclose,catgets,catopen,confstr,dirread,dup2
+lib	execlp,execve,execvp,execvpe
+lib	fchmod,fcntl,fmtmsg,fnmatch,fork,fsync
+lib	getconf,getdents,getdirentries,getdtablesize,getdate
+lib	getgroups,gethostname,getlogin,getpagesize,getrlimit,getuniverse
+lib	getopt,getsubopt,getopt_long,getopt_long_only
+lib	glob,index,iswblank,iswctype,killpg,link,localeconv,madvise
+lib	mbtowc,mbrtowc,memalign,memchr,memcpy,memdup,memmove,memset
+lib	mkdir,mkfifo,mktemp,mktime
+lib	mount,on_exit,onexit,opendir,pathconf
+lib	readlink,remove,rename,rewinddir,rindex,rmdir,setlocale
+lib	setpgid,setpgrp,setpgrp2,setreuid,setsid,setuid,sigaction
+lib	sigprocmask,sigsetmask,sigunblock,sigvec,socketpair
+lib	spawn,spawnve,spawnveg
+lib	strchr,strcoll,strdup,strerror,strcasecmp,strncasecmp,strrchr,strstr
+lib	strmode,strxfrm,strftime,swab,symlink,sysconf,sysinfo,syslog
+lib	telldir,tmpnam,tzset,universe,unlink,utime,wctype
+lib	ftruncate,truncate
+lib	creat64,fstat64,fstatvfs64,ftruncate64 -D_LARGEFILE64_SOURCE
+lib	lseek64,lstat64 -D_LARGEFILE64_SOURCE
+lib	open64,readdir64,stat64,statvfs64,truncate64 -D_LARGEFILE64_SOURCE
+
+lib,npt	strtod,strtold,strtol,strtoll,strtoul,strtoull stdlib.h
+lib,npt	sigflag signal.h
+
+mem	direct.d_reclen sys/types.h sys/dir.h
+mem	dirent.d_fileno,dirent.d_ino,dirent.d_namlen,dirent.d_off,dirent.d_reclen,dirent.d_type sys/types.h dirent.h
+mem	DIR sys/types.h - dirent.h - sys/dir.h
+mem	DIR.dd_fd sys/types.h - dirent.h - sys/dir.h
+mem	inheritance.pgroup spawn.h
+
+sys	dir,filio,jioctl,localedef,ptem,resource
+sys	socket,stream,systeminfo,universe,vfork
+
+typ	off64_t -D_LARGEFILE64_SOURCE
+typ	struct.dirent64 -D_LARGEFILE64_SOURCE dirent.h
+
+tst	tst_errno note{ errno can be assigned }end link{
+	_BEGIN_EXTERNS_
+	#define error		______error
+	#define strerror	______strerror
+	#include <errno.h>
+	#undef	error
+	#undef	strerror
+	#ifndef errno
+	extern int errno;
+	#endif
+	error() { }
+	strerror() { }
+	_END_EXTERNS_
+	int main() { errno = 0; error(); strerror(); return 0; }
+}end
+
+tst	lib_poll_fd_1 note{ fd is first arg to poll() }end execute{
+	#include <poll.h>
+	_BEGIN_EXTERNS_
+	extern int	pipe _ARG_((int*));
+	_END_EXTERNS_
+	int
+	main()
+	{	int		rw[2];
+		struct pollfd	fd;
+		if (pipe(rw) < 0) return 1;
+		fd.fd = rw[0];
+		fd.events = POLLIN;
+		fd.revents = 0;
+		if (poll(&fd, 1, 0) < 0 || fd.revents != 0) return 1;
+		if (write(rw[1], "x", 1) != 1) return 1;
+		if (poll(&fd, 1, 0) < 0 || fd.revents == 0) return 1;
+		return 0;
+	}
+}end
+
+tst	lib_poll_fd_2 note{ fd is second arg to poll() }end execute{
+	#include <poll.h>
+	_BEGIN_EXTERNS_
+	extern int	pipe _ARG_((int*));
+	_END_EXTERNS_
+	int
+	main()
+	{	int		rw[2];
+		struct pollfd	fd;
+		if (pipe(rw) < 0) return 1;
+		fd.fd = rw[0];
+		fd.events = POLLIN;
+		fd.revents = 0;
+		return poll(1, &fd, 0) < 0;
+		if (poll(1, &fd, 0) < 0 || fd.revents != 0) return 1;
+		if (write(rw[1], "x", 1) != 1) return 1;
+		if (poll(1, &fd, 0) < 0 || fd.revents == 0) return 1;
+		return 0;
+	}
+}end
+
+exp	_lib_poll	_lib_poll_fd_1||_lib_poll_fd_2
+
+tst	lib_poll_notimer note{ poll with no fds ignores timeout }end execute{
+	#include <sys/types.h>
+	#include <poll.h>
+	_BEGIN_EXTERNS_
+	extern time_t	time _ARG_((time_t*));
+	_END_EXTERNS_
+	#define TIMEOUT		4
+	int
+	main()
+	{
+		unsigned long	start;
+		unsigned long	finish;
+		struct pollfd	fd;
+		start = time((time_t*)0);
+		if (poll(&fd, 0, TIMEOUT * 1000) < 0)
+			return 0;
+		finish = time((time_t*)0);
+		return (finish - start) > (TIMEOUT / 2);
+	}
+}end
+
+tst	lib_select note{ select() has standard 5 arg interface }end link{
+	#include <sys/types.h>
+	#include <sys/time.h>
+	#include <sys/socket.h>
+	int
+	main()
+	{	struct timeval	tmb;
+		fd_set		rd;
+		FD_ZERO(&rd);
+		FD_SET(0,&rd);
+		tmb.tv_sec = 0;
+		tmb.tv_usec = 0;
+		select(1,&rd,(fd_set*)0,(fd_set*)0,&tmb);
+		return 0;
+	}
+}end
+
+tst	pipe_rw note{ full duplex pipes }end execute{
+	_BEGIN_EXTERNS_
+	extern int	pipe _ARG_((int*));
+	extern int	read _ARG_((int, void*, int));
+	extern int	strcmp _ARG_((const char*, const char*));
+	extern int	write _ARG_((int, void*, int));
+	_END_EXTERNS_
+	int
+	main()
+	{
+	#if defined(__sgi) || defined(_sgi) || defined(sgi)
+		/* boot tuneable pipes force one way for bin compatibility */
+		return 1;
+	#else
+		static char	test[] = "test\n";
+		int		io[2];
+		char		buf[sizeof(test)];
+		if (pipe(io)) return 1;
+		if (write(io[1], test, sizeof(test)) != sizeof(test)) return 1;
+		if (read(io[0], buf, sizeof(test)) != sizeof(test)) return 1;
+		if (strcmp(test, buf)) return 1;
+		if (write(io[0], test, sizeof(test)) != sizeof(test)) return 1;
+		if (read(io[1], buf, sizeof(test)) != sizeof(test)) return 1;
+		if (strcmp(test, buf)) return 1;
+		return 0;
+	#endif
+	}
+}end
+
+tst	lib_vfork unistd.h stdlib.h vfork.h note{ vfork exists and it works }end execute{
+	#include <signal.h>
+	int
+	main(argc, argv)
+	int	argc;
+	char**	argv;
+	{
+		int	status;
+		char*	cmd[3];
+		if (argv[1])
+			_exit(signal(SIGHUP, SIG_DFL) != SIG_IGN);
+		signal(SIGHUP, SIG_IGN);
+		switch (vfork())
+		{
+		case -1:
+			_exit(1);
+		case 0:
+			cmd[0] = argv[0];
+			cmd[1] = "test";
+			cmd[2] = 0;
+			execv(cmd[0], cmd);
+			_exit(2);
+		}
+		status = 1;
+		_exit(wait(&status) < 0 || status != 0);
+ 	}
+}end
+ 
+tst	real_vfork note{ vfork child shares data with parent }end execute{
+	_BEGIN_EXTERNS_
+	extern int	_exit _ARG_((int));
+	extern int	vfork _ARG_((void));
+	_END_EXTERNS_
+	int		code;
+	int
+	main()
+	{
+		code = 1;
+		if (!vfork())
+			code = 0;
+		_exit(code);
+	}
+}end
+
+tst	lib_posix_spawn unistd.h stdlib.h spawn.h -Dfork=______fork note{ posix_spawn exists and it works and its worth using }end status{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <sys/wait.h>
+	#include <spawn.h>
+	#include <signal.h>
+	#include <fcntl.h>
+	#include <string.h>
+	#undef fork
+	/* if it uses fork() why bother? */
+	pid_t fork _ARG_((void)) { return -1; }
+	pid_t _fork _ARG_((void)) { return -1; }
+	pid_t __fork _ARG_((void)) { return -1; }
+	int
+	main(argc, argv)
+	int	argc;
+	char**	argv;
+	{
+		char*			s;
+		pid_t			pid;
+		posix_spawnattr_t	attr;
+		int			n;
+		int			status;
+		char*			cmd[3];
+		char			tmp[1024];
+		if (argv[1])
+			_exit(signal(SIGHUP, SIG_DFL) != SIG_IGN);
+		signal(SIGHUP, SIG_IGN);
+		if (posix_spawnattr_init(&attr))
+			_exit(0);
+		if (posix_spawnattr_setpgroup(&attr, 0))
+			_exit(0);
+		if (posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP))
+			_exit(0);
+		/* first try an a.out and verify that SIGHUP is ignored */
+		cmd[0] = argv[0];
+		cmd[1] = "test";
+		cmd[2] = 0;
+		if (posix_spawn(&pid, cmd[0], 0, &attr, cmd, 0))
+			_exit(0);
+		status = 1;
+		if (wait(&status) < 0 || status != 0)
+			_exit(0);
+		/* passing ENOEXEC to the shell is bogus */
+		n = strlen(cmd[0]);
+		if (n >= (sizeof(tmp) - 3))
+			_exit(0);
+		strcpy(tmp, cmd[0]);
+		tmp[n] = '.';
+		tmp[n+1] = 's';
+		tmp[n+2] = 'h';
+		tmp[n+3] = 0;
+		if (close(open(tmp, O_CREAT, S_IRWXU|S_IRWXG|S_IRWXO)) < 0 || chmod(tmp, S_IRWXU|S_IRWXG|S_IRWXO) < 0)
+			_exit(0);
+		cmd[0] = tmp;
+		n = 0;
+		pid = -1;
+		if (posix_spawn(&pid, cmd[0], 0, &attr, cmd, 0))
+			n = 2;
+		else
+		{
+			n = pid != -1 && waitpid(pid, &status, WNOHANG|WNOWAIT) == pid && ((status>>8)&0x7f) == 127;
+			wait(&status);
+		}
+		_exit(n);
+ 	}
+}end
+
+tst	lib_spawn_mode unistd.h stdlib.h note{ first spawn arg is mode and it works }end execute{
+	#include <signal.h>
+	#include <process.h>
+	#ifndef P_NOWAIT
+	#define P_NOWAIT _P_NOWAIT
+	#endif
+	int
+	main(argc, argv)
+	int	argc;
+	char**	argv;
+	{
+		int	status;
+		char*	cmd[3];
+		if (argv[1])
+			_exit(signal(SIGHUP, SIG_DFL) != SIG_IGN);
+		signal(SIGHUP, SIG_IGN);
+		cmd[0] = argv[0];
+		cmd[1] = "test";
+		cmd[2] = 0;
+		if (spawnv(P_NOWAIT, cmd[0], cmd) < 0)
+			_exit(1);
+		status = 1;
+		_exit(wait(&status) < 0 || status != 0);
+	}
+}end
+
+tst	stream_peek note{ ioctl(I_PEEK) works }end execute{
+	#include <sys/types.h>
+	#include <unistd.h>
+	#include <stropts.h>
+	int
+	main()
+	{	struct strpeek	peek;
+		int		fds[2];
+		char		ctlbuf[32];
+		char		databuf[32];
+		peek.flags = 0;
+		peek.ctlbuf.maxlen = peek.ctlbuf.len = sizeof(ctlbuf);
+		peek.ctlbuf.buf = ctlbuf;
+		peek.databuf.maxlen = peek.databuf.len = sizeof(databuf);
+		peek.databuf.buf = databuf;
+		pipe(fds);
+		return ioctl(fds[0],I_PEEK,&peek) < 0;
+	}
+}end
+
+tst	socket_peek note{ recv(MSG_PEEK) works }end execute{
+	#include <unistd.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	int
+	main()
+	{	
+		int		i;
+		int		fds[2];
+		char		buf[128];
+
+		static char	msg[] = "abcd";
+
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds))
+			return 1;
+		if (write(fds[1], msg, sizeof(msg)) != sizeof(msg))
+				return 1;
+		if (recv(fds[0], buf, sizeof(buf), MSG_PEEK) != sizeof(msg))
+			return 1;
+		for (i = 0; i < sizeof(msg); i++)
+			if (buf[i] != msg[i])
+				return 1;
+		if (read(fds[0], buf, sizeof(msg)) != sizeof(msg))
+			return 1;
+		for (i = 0; i < sizeof(msg); i++)
+			if (buf[i] != msg[i])
+				return 1;
+		return 0;
+	}
+}end
+
+tst	lib_memcmp string.h note{ standard memcmp interface that works }end execute{
+	/* sgi again -- we're sick of being their regression test */
+	#define L	8
+	char		a[L] = { '0' };
+	char		b[L] = { '1' };
+	int
+	main()
+	{
+		return memcmp(a, b, L) >= 0;
+	}
+}end
+
+tst	lib_memccpy string.h unistd.h stdlib.h fcntl.h signal.h sys/types.h sys/stat.h sys/mman.h fcntl.h note{ standard memccpy interface that works }end execute{
+	#if _STD_
+	static void gotcha(int sig)
+	#else
+	static int gotcha(sig) int sig;
+	#endif
+	{
+		exit(1);
+	}
+	#ifdef MAP_PRIVATE
+	static const char x[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxN";
+	#if _STD_
+	static int indict_sgi_ia64_4Q_2004(int n)
+	#else
+	static int indict_sgi_ia64_4Q_2004(n) int n;
+	#endif
+	{
+		char*		b;
+		char*		s;
+		char*		e;
+		char*		t;
+		long		m;
+		int		d;
+		char		u[1024];
+
+		static char	p[32] = {'/','t','m','p','/','m','m'};
+
+		for (d = 7; d < 13; d++)
+			p[d] = 'X';
+		p[d] = 0;
+		if ((d = mkstemp(p)) < 0)
+			return 1;
+		remove(p);
+		for (m = 0; m < n; m++)
+			if (write(d, x, sizeof(x)-1) != sizeof(x)-1)
+			{
+				close(d);
+				return 1;
+			}
+		if (lseek(d, (off_t)0, SEEK_SET))
+		{
+			close(d);
+			return 1;
+		}
+		m = n * (sizeof(x)-1);
+		if (!(b = mmap((void*)0, m, PROT_READ|PROT_WRITE, MAP_PRIVATE, d, (off_t)0)))
+		{
+			close(d);
+			return 1;
+		}
+		for (e = (s = b) + m; s < e && (t = memccpy(u, s, 'N', (e-s) > sizeof(u) ? sizeof(u) : (e-s))); s += (t-u))
+			if ((t-u) != (sizeof(x)-1) || memcmp(u, s, t-u))
+			{
+				close(d);
+				return 1;
+			}
+		if (s < e)
+		{
+			close(d);
+			return 1;
+		}
+		close(d);
+		return 0;
+	}
+	#endif
+
+	int
+	main ()
+	{
+		char	buf[1024];
+	#ifdef MAP_PRIVATE
+		char*	srcbuf;
+		char*	dstbuf;
+		int	fd;
+		size_t	siz;
+		int	i;
+	#endif
+
+	#if defined(__ia64) || defined(__ia64__) || defined(__itanium__)
+		/*
+		 * 0 faith that the itanium coders will ever get this right
+		 * prove me wrong
+		 */
+
+		return 1;
+	#endif
+	
+		/*
+		 * early mac osx failed here -- fixed 3Q 2001
+		 */
+
+		if (memccpy(buf, "abc", 0, sizeof(buf)) != (buf + 4))
+			return 1;
+	#ifdef MAP_PRIVATE
+		siz = 64 * 1024;
+		if (!(dstbuf = malloc(2 * siz)))
+			return 0;
+		if ((fd = open("/dev/zero", O_RDWR)) < 0)
+			return 0;
+		if (!(srcbuf = (char*)mmap(NULL, siz, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0)))
+			return 0;
+		if (!mmap(srcbuf + siz, siz, PROT_NONE, MAP_PRIVATE, fd, 0))
+			return 0;
+		for (i = 0; i < siz; i++)
+			srcbuf[i] = 'x';
+		srcbuf[siz - 1] = 0;
+		alarm(10);
+		signal(SIGSEGV, gotcha);
+		signal(SIGBUS, gotcha);
+		signal(SIGALRM, gotcha);
+		/*
+		 * sgi ia64 dumps here as of 3Q 2001
+		 * bug acknowleged 1Q 2003
+		 */
+		memccpy(dstbuf, srcbuf, 0, siz + 10);
+		alarm(0);
+		if (strcmp(srcbuf, dstbuf))
+			return 1;
+		if (indict_sgi_ia64_4Q_2004(1))
+			return 1;
+		if (indict_sgi_ia64_4Q_2004(257))
+			return 1;
+	#endif
+		return 0;
+	}
+}end
+
+tst	lib_utime_now note{ utime works with 0 time vector }end execute{
+	#include <sys/types.h>
+	_BEGIN_EXTERNS_
+	extern int	utime _ARG_((const char*, void*));
+	_END_EXTERNS_
+	int
+	main()
+	{
+		return utime(".", (void*)0) == -1;
+	}
+}end
+
+tst	cross{
+	u=att
+	case `/bin/cat -s /dev/null/foo 2>&1` in
+	'')	;;
+	*)	case `/bin/echo '\\t'` in
+		'\t')	u=ucb ;;
+		esac
+		;;
+	esac
+	echo "#define _UNIV_DEFAULT	\"$u\"	/* default universe name */"
+}end
+
+std	cleanup note{ stuck with standard _cleanup }end noexecute{
+	_BEGIN_EXTERNS_
+	extern void exit _ARG_((int));
+	extern void _exit _ARG_((int));
+	extern void _cleanup();
+	void _cleanup() { _exit(0); }
+	_END_EXTERNS_
+	int main() { printf("cleanup\n"); exit(1); }
+}end
+
+std	remove note{ stuck with standard remove() }end nostatic{
+	_BEGIN_EXTERNS_
+	extern int unlink _ARG_((const char*));
+	_END_EXTERNS_
+	#if _STD_
+	int remove(const char* path) { return 0; }
+	#else
+	int remove(path) char* path; { return 0; }
+	#endif
+	int main() { return unlink("foo"); }
+}end
+
+std	signal note{ stuck with standard signal }end nolink{
+	_BEGIN_EXTERNS_
+	extern int abort();
+	int signal() { return 0; }
+	_END_EXTERNS_
+	int main() { signal(); abort(); return 0; }
+}end
+
+std	strcoll note{ standard strcoll works }end execute{
+	#include <string.h>
+	#define S	"hello world"
+	int
+	main()
+	{
+		char	s[] = S;
+		char	t[] = S;
+		return strcoll(s, t) || strcmp(s, t);
+	}
+}end
+
+std	strtod stdlib.h note{ stuck with standard strtod }end nostatic{
+	_BEGIN_EXTERNS_
+	#if _STD_
+	double strtod(const char* s, char** e) { return 0.0; }
+	#else
+	double strtod(s, e) char* s; char** e; { return 0.0; }
+	#endif
+	_END_EXTERNS_
+	int main() { printf(""); return strtod("1",0) != 0; }
+}end
+
+std	strtold stdlib.h note{ stuck with standard strtold }end nostatic{
+	_BEGIN_EXTERNS_
+	#if _STD_
+	long double strtold(const char* s, char** e) { return 0.0; }
+	#else
+	long double strtold(s, e) char* s; char** e; { return 0.0; }
+	#endif
+	_END_EXTERNS_
+	int main() { printf(""); return strtold("1",0) != 0; }
+}end
+
+std	strtol note{ stuck with standard strtol }end nostatic{
+	_BEGIN_EXTERNS_
+	#if _STD_
+	extern long atol(const char*);
+	long strtol(const char* s, char** e, int b) { return 0; }
+	#else
+	extern long atol();
+	long strtol(s, e, b) char* s; char** e; int b; { return 0; }
+	#endif
+	_END_EXTERNS_
+	int main() { printf(""); return (atol("1") + strtol("1",(char**)0,0)) != 0; }
+}end
+
+tst	- output{
+	int
+	main()
+	{
+	#if _UWIN
+		printf("\n");
+		printf("/* override some uwin feature tests */\n");
+		printf("#undef	_lib_execlp\n");
+		printf("#undef	_lib_execvp\n");
+		printf("#undef	_lib_execvpe\n");
+		printf("#undef	_lib_fork\n");
+		printf("#undef	_std_string\n");
+		printf("#define _std_string	1\n");
+		printf("#undef	_stream_peek\n");
+		printf("\n");
+	#endif
+
+	#if _lib_spawnveg || _lib_posix_spawn || _lib_spawn_mode || _lib_spawn && _hdr_spawn && _mem_pgroup_inheritance || _lib_vfork && _real_vfork
+		printf("#if !_AST_no_spawnveg\n");
+		printf("#define _use_spawnveg	1\n");
+		printf("#endif\n");
+		printf("\n");
+	#endif
+
+		return 0;
+	}
+
+}end
+
+tst	no64 -D_LARGEFILE64_SOURCE note{ largefile 64 broken }end execute{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	int
+	main()
+	{
+		struct stat64	st;
+		return !stat64(".", &st) && st.st_mode && st.st_mtime;
+	}
+}end pass{
+	echo "/* can we at least agree that a successful return means success? */"
+	echo "#undef	_lib_creat64"
+	echo "#undef	_lib_fstat64"
+	echo "#undef	_lib_fstatvfs64"
+	echo "#undef	_lib_ftruncate64"
+	echo "#undef	_lib_lseek64"
+	echo "#undef	_lib_lstat64"
+	echo "#undef	_lib_mmap64"
+	echo "#undef	_lib_stat64"
+	echo "#undef	_lib_statvfs64"
+	echo "#undef	_lib_truncate64"
+}end

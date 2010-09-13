@@ -1,0 +1,68 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+
+# Install these only if the OPTION_DOCS option is on (blank).
+$(OPTION_DOCS)MAN1_FILES	= mbchk.1
+
+$(OPTION_DOCS)MAN8_FILES	= grub-install.8	\
+				  grub-md5-crypt.8	\
+				  grub-terminfo.8	\
+				  grub.8
+
+$(OPTION_DOCS)INFO_FILES	= grub.info		\
+				  grub.info-1		\
+				  grub.info-2		\
+				  grub.info-3		\
+				  grub.info-4		\
+				  multiboot.info
+
+
+INSTALL_MAN1_DIR = $(ROOT_PLAT_GRUB)/man/man1
+INSTALL_MAN8_DIR = $(ROOT_PLAT_GRUB)/man/man8
+INSTALL_INFO_DIR = $(ROOT_PLAT_GRUB)/info
+
+INSTALL_TARGETS	= $(MAN1_FILES:%=$(INSTALL_MAN1_DIR)/%) \
+		  $(MAN8_FILES:%=$(INSTALL_MAN8_DIR)/%) \
+		  $(INFO_FILES:%=$(INSTALL_INFO_DIR)/%)
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/docs
+SRC_FILES	= Makefile.am Makefile.in boot.S boot.S.texi \
+		  grub-install.8 grub-md5-crypt.8 grub-terminfo.8 grub.8 \
+		  grub.info grub.info-1 grub.info-2 grub.info-3 grub.info-4 \
+		  grub.texi help2man internals.texi kernel.c kernel.c.texi \
+		  mbchk.1 mdate-sh menu.lst multiboot.h multiboot.h.texi \
+		  multiboot.info multiboot.texi src2texi stamp-vti \
+		  texinfo.tex version.texi
+
+INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all clean clobber:
+
+
+install: all $(INSTALL_TARGETS)
+
+$(INSTALL_MAN1_DIR)/%: $(INSTALL_MAN1_DIR) %
+	$(INS.file)
+
+$(INSTALL_MAN8_DIR)/%: $(INSTALL_MAN8_DIR) %
+	$(INS.file)
+
+$(INSTALL_INFO_DIR)/%: $(INSTALL_INFO_DIR) %
+	$(INS.file)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(INSTALL_MAN1_DIR) $(INSTALL_MAN8_DIR) $(INSTALL_INFO_DIR) $(SRC_DIR):
+	$(INS.dir)

@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. /lib/svc/share/smf_include.sh
+
+SVCNAME='Logical Domains agents'
+LDMAD='/usr/lib/ldoms/ldmad'
+VLDS='/devices/virtual-devices@100/channel-devices@200/virtual-domain-service@0:vlds'
+mach=`/sbin/uname -m`
+
+if [ "$mach" != "sun4v" ]; then
+	echo "The $SVCNAME service is not supported on this platform."
+	exit "$SMF_EXIT_ERR_FATAL"
+fi
+
+if smf_is_nonglobalzone; then
+	echo "The $SVCNAME service has been disabled because " \
+	    "it is not supported in a local zone."
+	/usr/sbin/svcadm disable "$SMF_FMRI"
+	sleep 5 &
+	exit "$SMF_EXIT_OK"
+fi
+
+#
+# The Logical Domains agents service is enabled by default on sun4v platforms.
+# However it can fail to start if the domain has a machine description in which
+# the vlds node is not defined (because it has an old MD or firmware). So we
+# check if a vlds device is effectively defined. If not then we disable the
+# service for this session. We don't return an error so that the service does
+# not go into the maintenance state and generate spurious error (especially if
+# the system is not configured with LDoms). The service is not permanently
+# disabled so that the service can come up if the domain is restarted with a
+# compatible MD.
+#
+if [ ! -c "$VLDS" ]; then
+	echo "The $SVCNAME service has been disabled because the system" \
+	    "has no virtual domain service (vlds) device."
+	/usr/sbin/svcadm disable -t "$SMF_FMRI"
+	sleep 5 &
+	exit "$SMF_EXIT_OK"
+fi
+
+if [ ! -x "$LDMAD" ]; then
+	echo "The $SVCNAME service requires the $LDMAD executable." 
+	exit "$SMF_EXIT_ERR_CONFIG"
+fi
+
+$LDMAD
+
+EXIT=$?
+
+if [ "$EXIT" != 0 ]; then
+	exit "$EXIT"
+fi
+
+exit "$SMF_EXIT_OK"

@@ -1,0 +1,220 @@
+libpp change history
+
+	 ----- minor sync release -----
+09/11/89 add extra sun style 1,2 arg to line syncs in ppline with pp:linetype
+	 add pp:oldc to convert __STDC__ void* and prototypes to old C
+08/11/89 fix <...> include dir bug
+08/08/89 add SYM_INIT for #define during INIT
+07/28/89 delete STRIPTOP, STRIP only T_STRING & T_CHARCONST at pp.level==1
+	 add ppcargs() compatibility command line argument parse
+07/17/89 dialect: ANSI (default) or (Reiser) compatibility
+	 style: extended (default) or strict
+	 use pathprobe(3) for dynamic ppdefault.h
+	 add PP_PROBE to specify pathprobe() processor
+	 add -[DI]+ to invert options in ppargs()
+	 delete PP_ANSI, PP_DIALECT, PP_INITDIR, PP_LANGUAGE
+	 delete PP_NONHOSTED, PP_NOPASSTHROUGH, PP_PHASEOUT
+	 add #pragma's for most ppargs() options
+	 add #option(pragma-option) predicate test
+	 PP_MACREF now called during initialization
+07/11/89 add PP_BUILTIN for external #(...) handler
+	 add line number to missing endif message
+	 ignore errors in skipped ppexpr() &&, || and ?: subexpressions
+	 add space before macro actual in replacement text
+07/04/89 fix PP_TRUNCATE interaction with PP_COMPILE
+06/30/89 #define x #; x was recognized as directive #
+06/27/89 don't pass comments during #if skip
+05/01/89 add L"..." and L'...' wide quoted constants
+	 mixed "..." and L"..." ok -- L"..." for COMPILE, first otherwise
+	 fix PASSCOMMENTS in directives
+	 allow #define f(a,) for COMPATIBILITY
+	 fix literal string concatenation bugs
+	 fix header parsing in non-active if-blocks
+	 #endmac now takes no arg
+04/11/89 tone down unknown directive diagnostic in conditional
+04/07/89 move macref call before arg processing
+03/27/89 fix pplex bug that bombed line sync for last line == #include
+03/15/89 fix PP_TRUNCATE macro id bit table checks
+	 remove compatibility option s from ppargs() -- belongs in cmds
+03/08/89 remove ``empty character constant'' warning for PASSTHROUGH
+02/28/89 fix variable n usage conflict for DEFINE: in ppcontrol
+02/22/89 fix -T conflict with __GNUC__ in ppargs
+02/01/89 add -T (PP_TRUNCATE) for old non-flexname compiler compatibility
+01/31/89 -I-M-<char><suffix> finds map file by mapping input file name
+	 -I-H[directory] allowed for fine hosted control
+01/24/89 fix #undef of SYM_READONLY macro message
+	 add PPCOMPATIBLE for compatibility installation in /lib/cpp
+	 add PP_MAP & -I-M to map include files for minimal including
+01/18/89 fix pp.token setting by noting with pp.state|=TOKENSET
+01/11/89 fix #if skip bug where quoted token set begin line state
+12/11/88 add error checking wrappers to *alloc()
+12/05/88 add PP_FILEDEPS (-M) and FILEDEPS mode for BSD compatibility
+12/01/88 add #macdef-#endmac and change actualsync() char to SYNC ('\r')
+11/30/88 TOKOUTBUF controls 11/28/88 STANDALONE speedup
+11/28/88 speed up STANDALONE by avoiding pp.token copy
+11/22/88 add comment removal to string_special
+11/11/88 LIBEXPR enables expr(3) in ppexpr() (12K extra text)
+10/11/88 move VARQUOTE to pp.mode
+10/01/88 allow checkpoint files for !STANDALONE
+08/31/88 add pp.undefsym for pp.macref's on undefined symbols
+08/23/88 0xe+N -> `0xe' `+' `N'
+08/16/88 fix ppckeys.c: T_DOUBLE->T_DOUBLE_T, T_FLOAT->T_FLOAT_T
+07/17/88 add \newline to string_special
+	 add line number arg to pp.comment call
+	 move private stuff from pp.h to pplib.h
+	 add ignored -v to ppargs() (GNU uses this)
+06/22/88 move pp.macref check; stack pp.state in ppcontrol()
+	 add PP_INCREF and (*pp.incref)(old-file, new-file, push|return)
+06/11/88 add pp.macref
+	 add ppckeys.h and C, C++ and pcc-based C keyword tables
+06/01/88 convert to new hash library interface
+05/31/88 pp:readonly in PP_INIT only for STRICT
+05/11/88 T_MOREARGS -> T_VARIADIC; add SYM_VARIADIC for ... last macro arg
+05/03/88 fix empty include file bug by omitting empty check
+04/27/88 ignore space in pragma % maps to accomodate SCCS %.% expansion
+04/19/88 change pp.h to check for old nmake cpp clash with ppsymbol
+04/11/88 fix flag check bug in ppload()
+02/29/88 add MAP_ECHO and %E for MAP_RESCAN + echo
+	 PP_INITDIR inserted before PP_STANDARD during initialization
+02/18/88 ignore malformed #'s in COMPATIBILITY macro definitions
+	 add pp.prefix, PP_PREFIX and -I-P for prefix dir "..." includes
+02/10/88 add NOQUOTE to disable ' and " and decouple from VARQUOTE
+	 add keyword and quote pragmas
+02/02/88 add strcmp builtin predicate for token string value comparison
+01/24/88 fix <backslash><newline> handling in #define on bsd
+01/20/88 add %T and fix %[...] pragma mapping formats
+01/11/88 complete 12/11/87 COMPATIBILITY macro arg /**/ pasting bug fix
+	 complete KEYWORD support
+01/08/88 add PP_KEYWORD, (pp.state & KEYWORD), -D-K and #if KEYARGS
+01/06/88 hex char constants are now variable length
+01/04/88 do not add terminator for COMPATIBILITY " and ' constants
+12/11/87 remove #multiple in lieu of #pragma multiple
+	 add %R MAP_RESCAN option to rescan pragma/directive mapping
+	 fix COMPATIBILITY macro arg /**/ pasting bug
+12/08/87 recode for updated hash library interface
+	 add T_PTRMEMREF ->* and T_DOTREF .* C++ operator tokens
+12/01/87 reorganize pp token numbers to span 0401..0477
+11/22/87 add operand error checks to ppexpr()
+	 add PP_DEFAULT and -I-Dfile for fine PPDEFAULT control
+11/11/87 pppragma() now omits space after # for primitive passes (uts)
+10/30/87 fix line count on `newline' in ['"] constant warning
+10/29/87 add MAP_PLUSCOMMENT and %P to pragma|directive mapping
+10/28/87 add head & tail args to ppcomment; pass // comments as is
+10/23/87 add warning for multiple ppop(PP_LOCAL) calls
+10/16/87 change PP_HOSTED to PP_HOSTDIR, add PP_HOSTED and PP_NONHOSTED
+	 add #(BASE) that expands to base name of #(FILE)
+10/15/87 for PASSTHROUGH each line of multi-line "..." or '...' is a token
+10/14/87 add ppmultiple() for multiple include test ops
+10/11/87 delete CONVERTASSIGN -> `=<op>' no longer recognized
+	 delete C++ := -> = conversion
+	 fix COMPATIBILITY macro recursion bug
+	 add `#pragma multiple' equivalent to `#multiple'
+10/06/87 split pplex.c adding ppdirective.c and ppbuiltin.c
+	 don't recognize obsolete assignments for PLUSPLUS
+10/05/87 fix PLUSPLUS PASSCOMMENTS bug `// */' -> `/* ***/'
+10/01/87 allow newlines in ' and " constants for PASSTHROUGH
+09/28/87 fix CONVERTCC STRICT bug that omitted octal character constants
+	 add CATLITERAL compile switch for adjacent string literal concatenation
+	 fix "\07" "3" -> "\073" string literal concatenation bug -> "\0073"
+09/18/87 complete ppdump() and ppload() checkpoint support
+09/17/87 fix macro formal bug that didn't update pointers after realloc()
+	 add PP_DONE complement op to PP_INIT
+	 add SYM_BUILTIN and #pragma pp:builtin to note builtin macros
+	 add PP_DUMP, -D-D and #pragma pp:load checkpoint support
+08/20/87 fix bug that omitted some actualsync() calls for '\n' in pp.in->actual
+08/19/87 fix pp.linesync==0 && PASSTHROUGH bug that omitted '\n' after "token"
+08/11/87 fix #($var) null pointer bug
+07/31/87 fix linesync bug for comment after #include in PASSCOMMENTS
+07/24/87 add PP_NOPASSTHROUGH
+07/16/87 fix predicate missing # ambiguity warning
+07/09/87 fix `macro("@*")' bug in expand_special()
+06/17/87 fix comment error message check that was off by one line
+06/16/87 remove #pragma pp:multiple; add #multiple; retain PP_MULTIPLE
+06/08/87 add # operator to disambiguate predicate tests
+	 inhibit more warnings on hosted files
+	 make diagnostics more consistent -- a little more work
+	 PP_READ files and their included files always marked hosted
+06/05/87 fix macro actual arg collection with imbedded #include, #line
+05/28/87 add `#pragma pp:multiple *' to mark all files multiple
+	 add -D-M for command line equivalent to `#pragma pp:multiple *'
+05/01/87 clarify HOSTED and SYM_PREDEFINED
+04/24/87 split pplex.c into smaller files -- too big for some compilers
+	 move common wrapper routines into the library
+	 fix ppargs() to cooperate with other option parsers
+04/22/87 remove getenv("PPSTANDARD") override of PP_STANDARD
+04/21/87 replace yacc parser with recursive expr() from library streval()
+04/20/87 add #((<expr>)) expression evaluation on (x)
+	 add #(<sym>=<expr>) to dynamically evaluate macro values
+04/11/87 home brew output buffering for PP_STANDALONE -- up to 10%
+	 cleanup
+04/10/87 change T_STRING concatenation in preparation for new output buffering
+04/09/87 fix character constant conversion warnings
+04/07/87 fix \\n and ??/\n bugs in comment scan
+04/06/87 add DIGIT, HEX, OCTAL and NONOCTAL case classes to ppdefs.h
+	 use GETCHR() and ISSPECIAL() in outer pplex() loop -- up to 10%
+	 fix macro actual arg count test
+04/03/87 add PP_TEST and TEST1, TEST2 to mode for internal tests
+04/02/87 delete PPDEFAULT and generalize with PP_READ
+	 note `# <line> "<file>"' as non-standard
+	 add check for malloc() out of space
+04/01/87 C specific error messages only if language="C"
+	 C++ specific error messages only if language="C++"
+03/31/87 delete command() predicate -- gateway for trojan horse
+03/30/87 add dialect() and language() builtin predicates
+	 change in->standard to in->hosted and STANDARD to HOSTED
+	 add PP_HOSTED and change PP_NOSTANDARD to PP_NOHOSTED
+	 ignore #pragma for non-hosted files in STRICT dialect
+03/27/87 add predop(); delete pp:plusplus
+	 pp:dialect and pp:language for verification only
+03/24/87 ----- first release -----
+03/24/87 ----- first release -----
+03/23/87 allow WARN to apply to all dialects
+	 fix pp:directive `...multiple...' warning
+	 add MAP_NEWLINE to separate multiple pragmas
+03/22/87 warn about null macro args for STRICT
+	 add PP_LANGUAGE, `#pragma language [language]'
+	 warn about newline in macro call arguments in directives
+	 warn about directives in macro call arguments for STRICT
+	 validate character constants in #if expressions
+03/20/87 add PP_DIRECTIVE and PP_LOCAL
+	 add %I (ignore) map format and allow %X for pragma args
+03/19/87 change PP_DEFAULT to PP_STANDARD, add PP_DIALECT
+	 add dialect arg to PP_COMPATIBILITY, PP_DIALECT and PP_STRICT
+	 add `#pragma pp:pragma pass:option format' mapping
+03/18/87 delete pp:obsolete; fix `#pragma version'
+	 fixed macro stack frame bug during recursive macro arg expansion
+	 change CONFORMING, PP_CONFORMING to STRICT, PP_STRICT
+	 add `#pragma dialect [dialect]' verification
+03/17/87 add PP_NOSTANDARD to disable any special handling of std files
+	 refine mkdefault.sh for sun workstations
+	 remove comma operator from pp.yacc since it implies side effects
+	 add argument type checking for pp:directive and pp:obsolete
+03/16/87 refine CONFORMING messages
+	 disambiguate most #assert/#define clashes
+	 add PASSCOMMENT and (*ppcomment)() for old lint fans
+03/14/87 #undef in pp:readonly marks id as readonly macro
+03/11/87 warn about macros that are predicates in #if expressions
+	 add mode to handle uncoupled flag bit overflow from state
+03/04/87 fix COMPATIBILITY to expand a macro in its definition
+02/24/87 add gentab.sh and mkdefault.sh to Makefile
+02/20/87 add IN_RECURSIVE for proper handling of #(...)
+02/16/87 add #unassert; PP_WARN & WARN to note obsolete usage
+	 only recognize directive if # is first char for (state&COMPATIBILITY)
+	 generalize gentab.sh and retrofit pp.tab
+	 change in->name.file to be the name of including file
+02/13/87 add pp.tab; PP_PRAGMA "x=y" -> "#pragma x y"
+	 add #(x y...) -> "#x y..." for recursive directive evaluation
+02/12/87 #pragma [pass:] [no]option [arg ...]
+	 #pragma pp:[no]directive [pass:]<new-directive>
+	 #pragma pp:id <identifier-character>
+02/11/87 distribute post-token switch in pplex() to individual cases (~5%)
+02/09/87 clarify invalid numeric token gobble
+	 add VARQUOTE & PP_VARQUOTE for `X...X vs. '...' & "..." constants
+02/06/87 change STRICT to CONFORMING; add PP_CONFORMING
+02/06/87 change PPBUILTIN to #(<id>)
+02/05/87 clarify /*...*/ concatenation for (state&COMPATIBILITY)
+	 add convertcc() to convert new char const to old style
+	 rework # op to work with convertcc()
+02/04/87 add =<op> obsolete operators for (state&COMPATIBILITY)
+02/02/87 fix expand() to save and restore (state&DISABLE)
+12/17/86 first code

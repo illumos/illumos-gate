@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+# External declarations - used to suppress -zdefs errors.
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	script_setenv	{ TYPE = FUNCTION; FLAGS = extern };	# From pppd
+	script_getenv	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	slprintf	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	option_error	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	warn		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fatal		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	dbglog		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	absmax_mtu	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	absmax_mru	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	updown_script_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	devnam_info	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	check_options_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	device_pipe_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	already_ppp	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	devnam		{ TYPE = DATA; FLAGS = extern };	#    "     "
+	sys_read_packet_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	ifname		{ TYPE = DATA; FLAGS = extern };	#    "     "
+	fclose		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ioctl		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fdopen		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	close		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	open		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strcmp		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fgets		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strlen		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	seteuid		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ether_ntoa	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	___errno	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strdup		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	run_program	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	malloc		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strrchr		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strchr		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	error		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	free		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strcpy		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	memcpy		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	script_unsetenv	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ntohs		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+};

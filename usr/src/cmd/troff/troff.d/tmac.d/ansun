@@ -1,0 +1,764 @@
+.\"		Copyright Notice 
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\"Notice of copyright on this source code product does not indicate 
+.\"publication.
+.\"
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.ds || /usr/share/lib/tmac
+.pl 9i
+.if t .po .75i
+.if n .po 0n
+.\" set fonts to Palatino
+.if '\*(.T'psc' .nr PA 1
+.if '\*(.T'post' .nr PA 1
+.if \n(PA \{\
+.	fp 1 PA
+.	fp 2 PI
+.	fp 3 PB
+.	fp 4 PB
+.	fp 5 PA
+.	fp 6 PB
+.\}
+.\" set fonts to Roman if psc2 or -rf1 on cmdline
+.if '\*(.T'psc2' .nr f 1
+.if \nf \{\
+.	fp 1 R
+.	fp 2 I
+.	fp 3 B
+.	fp 4 B
+.	fp 5 R
+.	fp 6 B
+.\}
+.if n .ds lq ""
+.if n .ds rq ""
+.if t .ds rq \(rq
+.if t .ds lq \(lq
+.if t .if '\*(.T'post' \{\
+.	ds rq \(''
+.	ds lq \(``
+.\}
+.if t .tr *\(**
+.	# reset environment
+.de }E
+.}f
+.in \\n()Ru+\\n(INu
+.ll \\n(LLu
+.hy 14
+..
+.	# reset font
+.de }f
+.ps 10
+.ft 1
+..
+.	# default tabs
+.de DT
+.ta .5i 1i 1.5i 2i 2.5i 3i 3.5i 4i 4.5i 5i 5.5i 6i 6.5i
+..
+.	# draw vertical rule
+.de }R
+.if t .tl \h'|1.38i'\s-9\D'l 0 7.5i'\s+9
+..
+.	# page header
+.de }H
+.ev 1
+'sp .333i
+.ft 1
+.ps 10
+.lt 7i
+.if t .if !\\nD .tl \\*(]D\\*(]H
+.if t .if  \\nD .if o .tl \\*(]D\\*(]H
+.if t .if  \\nD .if e .tl \\*(]H\\*(]D
+'sp .083i
+.if !\\n(pb .}R
+.ev
+.nr TQ \\n(.i
+.nr TK \\n(.u
+.if \\n(IT \{\
+.	in 0
+.	nf
+.	if \\n(T1 .TC
+.	TT
+.	in \\n(TQu
+.	if \\n(TK .fi
+.\}
+.ns
+.mk #T
+.if \\n(U# \{\
+.	mk U#
+.	in \\n(DIu
+.\}
+..
+.	# page footer
+.de }F
+.rn }F FZ
+.if \\nF .tm .SE PAGINATE NEW-PAGE \\n%
+.if \\n(U# \{\
+.rr U#
+.\}
+.if \\n(IT .nr T. 1
+.if \\n(IT .if !\\n(FC .T# 1
+.if \\n(IT .br
+.ev 1
+.ft 1
+.ps 10
+'sp |8.5i
+.\" sequential pagination if register O is set
+.ie \\nO \{\
+.if t .if !\\nD .tl \\*(]L\\*(]W\\*(PN%
+.if t .if  \\nD .if o .tl \\*(]L\\*(]W\\*(PN%
+.if t .if  \\nD .if e .tl \\*(PN%\\*(]W\\*(]L
+.\}
+.el \{\
+.if t .if !\\nD .tl \\*(]L\\*(]W\\*(]C\\*(PN%
+.if t .if  \\nD .if o .tl \\*(]L\\*(]W\\*(]C\\*(PN%
+.if t .if  \\nD .if e .tl \\*(]C\\*(PN%\\*(]W\\*(]L
+.\}
+.if !\\nA 'bp
+.if \\nA .if \\n%>=\\nA \{\
+.	ds PN \\n%
+.	pn 1
+.	af % a
+.	nr A 0
+'	bp 1
+.\}
+.if \\nA .if \\n%<\\nA 'bp
+.ev
+.rn FZ }F
+..
+.	# end macro (pass pagenum)
+.de }M
+.}N
+.ll \\n(LLu
+.if \\nF \{\
+.	nr P \\n%
+.	if o .nr P +2
+.	if e .nr P +1
+.	tm \\nP
+.\}
+.if n .sp
+.ev 1
+.if n .tl \\*(]L\\*(]H
+.ev
+..
+.	# end macro (until .TH)
+.de }K
+.}N
+.pl 1
+.ll \\n(LLu
+..
+.em }K
+.de TS
+.rn TS @T
+.so \\*(||/ansun.tbl
+.TS \\$1 \\$2
+.rm @T
+..
+.de TC
+.if !\\n(rC \{\
+.as tH \(em Continued
+.nr tC 1
+.\}
+.TF "\\*(tH"
+.sp \\n()Pu
+..
+.	# title heading
+.de TH
+.PD
+.DT
+.rs
+.if \\*(]W .ds ]W SunOS 5.10
+.if n .nr IN .5i
+.if t .nr IN .5i
+.ll 7i
+.nr LL \\n(.l
+.if '\\$1'intro' \{\
+.       if \\n(nl \{\
+.               if o \{\
+.               nr pb 1
+.                       ds ]H
+.                       ds ]L
+.                       ds T1 \\*(]W
+.                       ds ]W
+.                       bp 
+.               \}
+.       \}
+.\}
+.ds ]D Misc. Reference Manual Pages
+.if '\\$2'1' .ds ]D User Commands
+.if '\\$2'1B' .ds ]D SunOS/BSD Compatibility Package Commands
+.if '\\$2'1b' .ds ]D SunOS/BSD Compatibility Package Commands
+.if '\\$2'1C' .ds ]D Communication Commands 
+.if '\\$2'1c' .ds ]D Communication Commands
+.if '\\$2'1F' .ds ]D FMLI Commands 
+.if '\\$2'1f' .ds ]D FMLI Commands
+.if '\\$2'1G' .ds ]D Graphics and CAD Commands 
+.if '\\$2'1g' .ds ]D Graphics and CAD Commands 
+.if '\\$2'1M' .ds ]D Maintenance Commands
+.if '\\$2'1m' .ds ]D Maintenance Commands
+.if '\\$2'1S' .ds ]D SunOS Specific Commands
+.if '\\$2'1s' .ds ]D SunOS Specific Commands
+.if '\\$2'2' .ds ]D System Calls
+.if '\\$2'3' .ds ]D Introduction to Library Functions
+.if '\\$2'3AIO' .ds ]D Asynchronous I/O Library Functions
+.if '\\$2'3aio' .ds ]D Asynchronous I/O Library Functions
+.if '\\$2'3BSM' .ds ]D Security and Auditing Library Functions
+.if '\\$2'3bsm' .ds ]D Security and Auditing Library Functions
+.if '\\$2'3C' .ds ]D Standard C Library Functions
+.if '\\$2'3c' .ds ]D Standard C Library Functions
+.if '\\$2'3CFGADM' .ds ]D Configuration Administration Library Functions
+.if '\\$2'3cfgadm' .ds ]D Configuration Administration Library Functions
+.if '\\$2'3CURSES' .ds ]D Curses Library Functions
+.if '\\$2'3curses' .ds ]D Curses Library Functions
+.if '\\$2'3DEVID' .ds ]D Device ID Library Functions
+.if '\\$2'3devid' .ds ]D Device ID Library Functions
+.if '\\$2'3DEVINFO' .ds ]D Device Information Library Functions
+.if '\\$2'3devinfo' .ds ]D Device Information Library Functions
+.if '\\$2'3DL' .ds ]D Dynamic Linking Library Functions
+.if '\\$2'3dl' .ds ]D Dynamic Linking Library Functions
+.if '\\$2'3DMI' .ds ]D DMI Library Functions
+.if '\\$2'3dmi' .ds ]D DMI Library Functions
+.if '\\$2'3DOOR' .ds ]D Door Library Functions
+.if '\\$2'3door' .ds ]D Door Library Functions
+.if '\\$2'3ELF' .ds ]D ELF Library Functions
+.if '\\$2'3elf' .ds ]D ELF Library Functions
+.if '\\$2'3EXT' .ds ]D Extended Library Functions
+.if '\\$2'3ext' .ds ]D Extended Library Functions
+.if '\\$2'3GEN' .ds ]D String Pattern-Matching Library Functions
+.if '\\$2'3gen' .ds ]D String Pattern-Matching Library Functions
+.if '\\$2'3HEAD' .ds ]D Headers
+.if '\\$2'3head' .ds ]D Headers
+.if '\\$2'3KRB' .ds ]D Kerberos Library Functions
+.if '\\$2'3krb' .ds ]D Kerberos Library Functions
+.if '\\$2'3KSTAT' .ds ]D Kernel Statistics Library Functions
+.if '\\$2'3kstat' .ds ]D Kernel Statistics Library Functions
+.if '\\$2'3KVM' .ds ]D Kernel VM Library Functions
+.if '\\$2'3kvm' .ds ]D Kernel VM Library Functions
+.if '\\$2'3LDAP' .ds ]D LDAP Library Functions
+.if '\\$2'3ldap' .ds ]D LDAP Library Functions
+.if '\\$2'3LIB' .ds ]D Interface Libraries
+.if '\\$2'3lib' .ds ]D Interface Libraries
+.if '\\$2'3LIBUCB' .ds ]D SunOS/BSD Compatibility Interface Libraries
+.if '\\$2'3libucb' .ds ]D SunOS/BSD Compatibility Interface Libraries
+.if '\\$2'3M' .ds ]D Mathematical Library Functions
+.if '\\$2'3m' .ds ]D Mathematical Library Functions
+.if '\\$2'3MAIL' .ds ]D User Mailbox Library Functions
+.if '\\$2'3mail' .ds ]D User Mailbox Library Functions
+.if '\\$2'3MALLOC' .ds ]D Memory Allocation Library Functions
+.if '\\$2'3malloc' .ds ]D Memory Allocation Library Functions
+.if '\\$2'3MP' .ds ]D Multiple Precision Library Functions
+.if '\\$2'3mp' .ds ]D Multiple Precision Library Functions
+.if '\\$2'3NSL' .ds ]D Networking Services Library Functions
+.if '\\$2'3nsl' .ds ]D Networking Services Library Functions
+.if '\\$2'3PAM' .ds ]D PAM Library Functions
+.if '\\$2'3pam' .ds ]D PAM Library Functions
+.if '\\$2'3PLOT' .ds ]D Graphics Interface Library Functions
+.if '\\$2'3plot' .ds ]D Graphics Interface Library Functions
+.if '\\$2'3PROC' .ds ]D Process Control Library Functions
+.if '\\$2'3proc' .ds ]D Process Control Library Functions
+.if '\\$2'3RAC' .ds ]D Remote Asynchronous Calls Library Functions
+.if '\\$2'3rac' .ds ]D Remote Asynchronous Calls Library Functions
+.if '\\$2'3RESOLV' .ds ]D Resolver Library Functions
+.if '\\$2'3resolv' .ds ]D Resolver Library Functions
+.if '\\$2'3RPC' .ds ]D RPC Library Functions
+.if '\\$2'3rpc' .ds ]D RPC Library Functions
+.if '\\$2'3RT' .ds ]D Realtime Library Functions
+.if '\\$2'3rt' .ds ]D Realtime Library Functions
+.if '\\$2'3SCHED' .ds ]D LWP Scheduling Library Functions
+.if '\\$2'3sched' .ds ]D LWP Scheduling Library Functions
+.if '\\$2'3SEC' .ds ]D File Access Control Library Functions
+.if '\\$2'3sec' .ds ]D File Access Control Library Functions
+.if '\\$2'3SNMP' .ds ]D SNMP Library Functions
+.if '\\$2'3snmp' .ds ]D SNMP Library Functions
+.if '\\$2'3SOCKET' .ds ]D Sockets Library Functions
+.if '\\$2'3socket' .ds ]D Sockets Library Functions
+.if '\\$2'3THR' .ds ]D Threads Library Functions
+.if '\\$2'3thr' .ds ]D Threads Library Functions
+.if '\\$2'3TNF' .ds ]D TNF Library Functions
+.if '\\$2'3tnf' .ds ]D TNF Library Functions
+.if '\\$2'3UCB' .ds ]D SunOS/BSD Compatibility Library Functions
+.if '\\$2'3ucb' .ds ]D SunOS/BSD Compatibility Library Functions
+.if '\\$2'3VOLMGT' .ds ]D Volume Management Library Functions
+.if '\\$2'3volmgt' .ds ]D Volume Management Library Functions
+.if '\\$2'3XCURSES' .ds ]D X/Open Curses Library Functions
+.if '\\$2'3xcurses' .ds ]D X/Open Curses Library Functions
+.if '\\$2'3XFN' .ds ]D XFN Interface Library Functions
+.if '\\$2'3xfn' .ds ]D XFN Interface Library Functions
+.if '\\$2'3XNET' .ds ]D X/Open Networking Services Library Functions
+.if '\\$2'3xnet' .ds ]D X/Open Networking Services Library Functions
+.if '\\$2'3B' .ds ]D SunOS/BSD Compatibility Library Functions
+.if '\\$2'3b' .ds ]D SunOS/BSD Compatibility Library Functions
+.if '\\$2'3E' .ds ]D C Library Functions
+.if '\\$2'3e' .ds ]D C Library Functions
+.if '\\$2'3F' .ds ]D Fortran Library Routines
+.if '\\$2'3f' .ds ]D Fortran Library Routines
+.if '\\$2'3G' .ds ]D C Library Functions
+.if '\\$2'3g' .ds ]D C Library Functions
+.if '\\$2'3K' .ds ]D Kernel VM Library Functions
+.if '\\$2'3k' .ds ]D Kernel VM Library Functions
+.if '\\$2'3L' .ds ]D Lightweight Processes Library
+.if '\\$2'3l' .ds ]D Lightweight Processes Library
+.if '\\$2'3N' .ds ]D Network Functions
+.if '\\$2'3n' .ds ]D Network Functions
+.if '\\$2'3R' .ds ]D Realtime Library
+.if '\\$2'3r' .ds ]D Realtime Library
+.if '\\$2'3S' .ds ]D Standard I/O Functions
+.if '\\$2'3s' .ds ]D Standard I/O Functions
+.if '\\$2'3T' .ds ]D Threads Library
+.if '\\$2'3t' .ds ]D Threads Library
+.if '\\$2'3W' .ds ]D C Library Functions
+.if '\\$2'3w' .ds ]D C Library Functions
+.if '\\$2'3X' .ds ]D Miscellaneous Library Functions
+.if '\\$2'3x' .ds ]D Miscellaneous Library Functions
+.if '\\$2'3XC' .ds ]D X/Open Curses Library Functions
+.if '\\$2'3xc' .ds ]D X/Open Curses Library Functions
+.if '\\$2'3XN' .ds ]D X/Open Networking Services Library Functions 
+.if '\\$2'3xn' .ds ]D X/Open Networking Services Library Functions
+.if '\\$2'4' .ds ]D File Formats
+.if '\\$2'4B' .ds ]D SunOS/BSD Compatibility Package File Formats
+.if '\\$2'4b' .ds ]D SunOS/BSD Compatibility Package File Formats
+.if '\\$2'5' .ds ]D Standards, Environments, and Macros
+.if '\\$2'6' .ds ]D Games and Demos
+.if '\\$2'7' .ds ]D Device and Network Interfaces
+.if '\\$2'7B' .ds ]D SunOS/BSD Compatibility Special Files
+.if '\\$2'7b' .ds ]D SunOS/BSD Compatibility Special Files
+.if '\\$2'7D' .ds ]D Devices
+.if '\\$2'7d' .ds ]D Devices
+.if '\\$2'7FS' .ds ]D File Systems
+.if '\\$2'7fs' .ds ]D File Systems
+.if '\\$2'7I' .ds ]D Ioctl Requests
+.if '\\$2'7i' .ds ]D Ioctl Requests
+.if '\\$2'7M' .ds ]D STREAMS Modules
+.if '\\$2'7m' .ds ]D STREAMS Modules
+.if '\\$2'7P' .ds ]D Protocols
+.if '\\$2'7p' .ds ]D Protocols
+.if '\\$2'8' .ds ]D Maintenance Procedures
+.if '\\$2'8C' .ds ]D Maintenance Procedures
+.if '\\$2'8c' .ds ]D Maintenance Procedures
+.if '\\$2'8S' .ds ]D Maintenance Procedures
+.if '\\$2'8s' .ds ]D Maintenance Procedures
+.if '\\$2'9' .ds ]D Device Driver Interfaces
+.if '\\$2'9E' .ds ]D Driver Entry Points
+.if '\\$2'9e' .ds ]D Driver Entry Points
+.if '\\$2'9F' .ds ]D Kernel Functions for Drivers
+.if '\\$2'9f' .ds ]D Kernel Functions for Drivers
+.if '\\$2'9S' .ds ]D Data Structures for Drivers
+.if '\\$2'9s' .ds ]D Data Structures for Drivers
+.if '\\$2'L' .ds ]D Local Commands
+.if !'\\$4''  .ds ]W \\$4
+.if !'\\$5''  .ds ]D \\$5
+.if t .wh 0 }H
+.if t .wh -.8i }F
+.em }M
+.ds ]H \\$1\|(\|\\$2\|)
+.if '\\$1'intro' \{\
+.       if \\n%>1 .if e \{\
+.               rs
+.               nr pb 0
+.                       ds ]W \\*(T1
+.               bp
+.               nr % 1
+.       \}
+.       ds ]C \\$2
+.       as ]C \\(hy
+.       if !\\n(nl .if !\\nP .nr P 1
+.       if !\\n(nl .if \\nP .pn \\nP
+.       if \\nA .if \\nP>=\\nA \{\
+.       ds PN \\nP
+.       pn 1
+.       af % a
+.       nr A 0
+.\}
+.if !\\n(nl .if \\nP .nr P 0
+.\".if  \\nC .if \\n(nl .bp 1
+.\".if  !\\nC .if \\n(nl .bp 1
+.\}
+.af S A
+.if \nC .ds ]C \\nC
+.if \nS .as ]C \\nS\\(hy
+.if \nC .if !\nS .as ]C\\(hy
+.if !'\\$1'intro' \{\
+.if \\n(nlu .bp
+.if !'\\*(]C'' \{\
+.	if \\n%<=1 .if \\nP .nr % \\nP
+.	if \\n%<=1 .if !\\nP .nr % 1
+.       if \\nA .if \\nP>=\\nA \{\
+.       ds PN \\nP
+.       pn 1
+.       af % a
+.       nr A 0
+.\}
+.\}
+.if '\\*(]C'' \{\
+.       if \\n%>1 .if e \{\
+.               rs
+.               bp
+.               nr % 1
+.       \}
+.       ds ]C \\$2
+.       as ]C \\(hy
+.       if !\\n(nl .if !\\nP .nr P 1
+.       if !\\n(nl .if \\nP .pn \\nP
+.       if \\nA .if \\nP>=\\nA \{\
+.       ds PN \\nP
+.       pn 1
+.       af % a
+.       nr A 0
+.\}
+.\}
+.\}
+.ds ]L modified \\$3
+.nr ]L \\$3
+.if \\n(]L=0 .rm ]L
+.if \\nC .nr '' \\n%
+.}E
+.if \\nC .nr % \\n(''
+.DT
+.nr )I .5i
+.if t .nr )R 1i
+.if n .nr )R 0n
+.if \\nF .if !\\nO .tm .CE MAN-PAGE 1 \\$1(\\$2) \\*(]C\\n%
+.if \\nF .if \\nO .tm .CE MAN-PAGE 1 \\$1(\\$2) \\n%
+.ev 1
+.if n .tl \\*(]W\\*(]D\\*(]H
+.ev
+..
+.	# index entry
+.de IX
+.if \\nF .tm .IE\tENTRY\t\\$1\t\\$2\t\\$3\t\\$4\t\\$5\t\\$6\t\\*(]C\\*(PN\\n%
+..
+.de TZ
+.rn TZ @T
+.so \\*(||/tz.map
+.TZ \\$1 \\$2
+.rm @T
+..
+.de HC
+.rn HC @T
+.so \\*(||/tz.map
+.HC \\$1 \\$2
+.rm @T
+..
+.	# section head
+.de SH
+.\" jah needed RETURN VALUES to appear on one line.  line length
+.\" is a little to short for this.
+.ie \\$1RETURN \{
+.       if \\$2VALUES \{
+.       ds s1 \\$1\\ \\$2
+.       ds      s2 
+.       \}
+.\}
+.el \{\
+.ds s1 \\$1
+.ds s2 \\$2
+.\}
+.}X 0
+.nr )E 2
+\&\\*(s1 \\*(s2 \\$3 \\$4 \\$5 \\$6
+..
+.	# sub section
+.de SS
+.\" jah needed RETURN VALUES to appear on one line.  line length
+.\" is a little to short for this.
+.ie \\$1RETURN \{
+.       if \\$2VALUES \{
+.       ds s1 \\$1\\ \\$2
+.       ds      s2
+.\}
+.\}
+.el \{\
+.ds s1 \\$1
+.ds s2 \\$2
+.\}
+.}X 0
+.nr )E 2
+.SM
+\&\\*(s1 \\*(s2 \\$3 \\$4 \\$5 \\$6
+..
+.	# section head subroutine
+.de }X
+.if t .rs
+.}E
+.if t .in \\$1 
+.if n .ti \\$1
+.sp \\n()Pu
+.sp \\n()Pu
+.sp \\n()Pu
+.ne 2
+.if t .mk #H
+.if t .nr )R 1i
+.if n .nr )R 0n 
+.fi
+.it 1 }N
+.if t .ll 1.25i
+.if t .ad r
+.if n .ad l
+.if t .nh
+.B
+..
+.	# end of SH (see }X above and }N below)
+.de }2
+.nr )E 0
+.}E
+.nr )I .5i
+.if t .sp |\\n(#Hu
+.ad l
+.ns
+..
+.	# italic
+.de I
+.ft 2
+.it 1 }N
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.	# bold
+.de B
+.ft 3
+.it 1 }N
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.	# small
+.de SM
+.ps 9
+.it 1 }N
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.	# combinations of Roman, italic, bold
+.de RI
+.}S 1 2 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de RB
+.}S 1 3 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de IR
+.}S 2 1 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de IB
+.}S 2 3 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de BR
+.}S 3 1 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de BI
+.}S 3 2 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.	# change bar start and end
+.de VS
+.if '\\$1'4' .mc \s12\(br\s0
+..
+.de VE
+.mc
+..
+.	# make special case of shift out of italic
+.de }S
+.ds ]F
+.if "\\$1"2" .if !"\\$5"" .ds ]F\^
+.ie !"\\$4"" .}S \\$2 \\$1 "\\$3\f\\$1\\$4\\*(]F" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+.el \\$3
+.}f
+..
+.	# small and boldface
+.de SB
+.ps -1 
+.it 1 }N
+.if !"\\$1"" \&\f3\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.	# paragraph
+.de P
+.PP
+..
+.de LP
+.PP
+..
+.de PP
+.sp \\n()Pu
+.ne 2
+.}E
+.nr )I .5i
+.ns 
+..
+.	# paragraph distance
+.de PD
+.if t .nr )P .3v
+.if n .nr )P 1v
+.if !"\\$1"" .nr )P \\$1v
+..
+.	# hanging indent
+.de HP
+.sp \\n()Pu
+.ne 2
+.if !"\\$1"" .nr )I \\$1n
+.ll \\n(LLu
+.in \\n()Ru+\\n(INu+\\n()Iu
+.ti \\n()Ru+\\n(INu
+.}f
+..
+.	# indented paragraph
+.de IP
+.TP \\$2
+\&\\$1
+..
+.	# hanging label
+.de TP
+.if !"\\$1"" .nr )I \\$1n
+.sp \\n()Pu
+.in \\n()Ru
+.nr )E 1
+.ns
+.it 1 }N
+.di ]B
+..
+.	# end of TP (cf }N below)
+.de }1
+.ds ]X \&\\*(]B\\
+.nr )E 0
+.if !"\\$1"" .nr )I \\$1n
+.}f
+.ll \\n(LLu
+.in \\n()Ru+\\n(INu+\\n()Iu
+.ti \\n(INu
+.ie !\\n()Iu+\\n()Ru-\w\\*(]Xu-3p \{\\*(]X
+.br\}
+.el \\*(]X\h|\\n()Iu+\\n()Ru\c
+.}f
+..
+.	# handle end of 1-line features
+.de }N
+.if \\n()E .br
+.di
+.if "\\n()E"0" .}f
+.if "\\n()E"1" .}1
+.if "\\n()E"2" .}2
+.nr )E 0
+..
+.	# right shift
+.de RS
+.nr ]\\n+()p \\n()I
+.nr )\\n()p \\n()R
+.ie !"\\$1"" .nr )R +\\$1n
+.el .nr )R +\\n()I
+.nr )I .5i
+.}E
+..
+.	# retreat
+.de RE
+.if !"\\$1"" \{\
+.	ie "\\$1"0" .nr )p 1 1
+.	el .nr )p \\$1 1
+.\}
+.ds ]i \\*(]I\\n()p
+.ds ]r \\*(]R\\n()p
+.nr )I \\*(]i
+.nr )R \\*(]r
+.if \\n()p .nr )p -1
+.}E
+..
+.de CP    \" postscript inclusion macro
+.br
+.ie !\\$2 .nr tY \\$2
+.el .nr tY 1.0i
+.\".ie !\\$8 .nr tS \\$8
+.\".el .nr tS 0.0i
+.nr tS 0.0i
+.ie !\\$3 .nr tX \\$3
+.el .nr tX 0.0i
+.ie !\\$4 .nr z 6v
+.el .nr z 0v
+.if (\\n(tYu+\\n(tSu+1v)>(\\n(.tu-\\nz) \{\
+.       bp
+.       br
+.       rs
+.\}
+.rs
+.br
+.ie t \{\
+.ie !\\n(.z \{\
+\!.mk P#
+\!.nr t \\\\n(P#u
+.\}
+.el \{\
+\\kx
+.nr t \\n(nlu
+.\}
+.sp \\n(tYu
+.ie !\\$5 .ds sX \\$5
+.el .ds sX 1.0
+.ie !\\$6 .ds sY \\$6
+.el .ds sY 1.0
+.ie !\\$7 .ds sR \\$7
+.el .ds sR 0
+.ie !\\n(.z \{\
+\!\\kx
+\!.nr x \\\\n(.o+\\\\n(.i+\\\\nx+\\n(tXu
+\!.mk P#
+\!.nr y \\\\n(P#u
+\!\!x P /DOCHEIGHT \\\\nt \\\\ny sub 1.0 \\\\*(sY div mul def
+\!\!x P /DOCSTATE save def
+\!\!x P \\\\nx \\\\ny translate
+\!\!x P \\*(sX 8 mul \\*(sY -8 mul scale
+\!\!x P \\*(sR rotate
+\!\!x P /showpage {} def
+\!\!x I \\$1
+\!\!x P DOCSTATE restore
+.\}
+.el \{\
+\\kx
+.nr x \\n(.o+\\n(.i+\\nx+\\n(tXu
+.mk P#
+.nr y \\n(P#u
+\!x P /DOCHEIGHT \\nt \\ny sub 1.0 \\*(sY div mul def
+\!x P /DOCSTATE save def
+\!x P \\nx \\ny translate
+\!x P \\*(sX 8 mul \\*(sY -8 mul scale
+\!x P \\*(sR rotate
+\!x P /showpage {} def
+\!x I \\$1
+\!x P DOCSTATE restore
+.\}
+.\".if !\\$8 \{\
+.\".rs
+.\".sp \\$8
+.\".\}
+.\}
+.\}
+.el \{\
+.sp (\\n(tYu/2u)u
+.ce 1
+See hardcopy of \\*(]H
+.sp (\\n(tYu/2u)u
+.\}
+.rr PA P# sR t x y z sX sY tX tY
+.if !\\$4 .FN "\\$4"
+..
+.nr )p 0 1
+.ds ]I \\\\n(]
+.ds ]R \\\\n()
+.bd S 3 3
+.bd S 4 3
+.bd S1 3 3
+.bd S1 4 3
+.if t .ds R \(rg
+.if n .ds R (Reg.)
+.ds S \s10

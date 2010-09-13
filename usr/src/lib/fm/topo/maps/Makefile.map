@@ -1,0 +1,89 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+.KEEP_STATE:
+.SUFFIXES:
+.SUFFIXES: .xml .xmlgen $(SUFFIXES)
+
+MODCLASS = maps
+
+include ../../../Makefile.lib
+include ../../../../Makefile.lib
+
+DTDSRC = $(DTDFILE:%=../common/%)
+DTDTARG = $(DTDFILE:%=%)
+ROOTDTDTARG = $(DTDTARG:%=$(ROOT)/usr/share/lib/xml/dtd/%)
+
+common_ROOTTOPOROOT = $(ROOT)/usr/lib/fm/topo/$(MODCLASS)
+arch_ROOTTOPOROOT = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/$(MODCLASS)
+platform_ROOTTOPOROOT = \
+	$(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/$(MODCLASS))
+ROOTTOPOROOT = $($(CLASS)_ROOTTOPOROOT)
+ROOTTOPOMAPS = $(TOPOFILE:%=$(ROOTTOPOROOT)/%)
+
+install:= FILEMODE =	0444
+
+# The .xmlgen perl file automatically generates a new xml file.  This is done
+# to avoid having to deal with things like 48 platform specific internal
+# storage bays by hand.
+.xmlgen.xml:
+	$(RM) $@ 
+	$(CAT) ../common/xmlgen-header.xml > $@
+	$(PERL) $< >> $@
+	
+%.xml: ../common/%.xml
+	$(RM) $@
+	$(CAT) $< > $@
+
+include ../../Makefile.rootdirs
+
+all: $(TOPOFILE)
+
+clean:
+	$(RM) $(ROOTTOPOMAPS)
+	$(RM) $(TEMPTOPOFILE)
+
+clobber: clean
+
+check: $(CHECKHDRS)
+
+install_h _msg:
+
+lint: $(TOPOFILE:%=%.chk)
+
+%.xml.chk: %.xml
+	@echo xmllint $<
+	@xmllint --dropdtd $< | \
+	xmllint --noout --dtdvalid  $(DTDSRC) -
+
+$($(CLASS)_ROOTTOPOROOT)/%: %
+	$(INS.file)
+
+$(ROOTDTDTARG): $$(@D)
+	$(RM) $@; $(INS) -s -m 0444 -f $(@D) $(DTDSRC)
+
+install: all $(ROOTDTDTARG) $(ROOTTOPOROOT) $(ROOTTOPOMAPS)

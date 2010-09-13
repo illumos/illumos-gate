@@ -1,0 +1,75 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
+# All rights reserved.
+#
+
+# Initiate the device reconfiguration process in case we need some
+# device links established so that we can successfully perform our
+# remaining standard mounts.
+
+. /lib/svc/share/smf_include.sh
+
+smf_is_globalzone || exit $SMF_EXIT_OK
+
+svcprop -q -p system/reconfigure system/svc/restarter:default
+if [ $? -eq 0 ]; then
+	echo 'Configuring devices.' > /dev/msglog 2>&1
+	/usr/sbin/devfsadm >/dev/msglog 2>&1
+
+	#
+	# Rerun soconfig to configure any sockets that use /dev
+	# entries that were just created by devfsadm.
+	#
+	/sbin/soconfig -d /etc/sock2path.d >/dev/null 2>&1
+
+	#
+	# Update kernel driver.conf cache.
+	#
+	/usr/sbin/devfsadm -I
+fi
+
+# Establish the default framebuffer name.
+
+fbdev=`/usr/sbin/prtconf -F 2>/dev/null`
+
+if [ $? -eq 0 ]; then
+	set -- /devices$fbdev*
+	if [ -c $1 ]; then
+		if [ -h /dev/fb ]; then
+			fblink=`ls -l /dev/fb | /usr/bin/awk '{ print $11 }'`
+
+			if [ "$1" != "$fblink" ]; then
+				rm -f /dev/fb
+				ln -s $1 /dev/fb
+			fi
+		else
+			rm -f /dev/fb
+			ln -s $1 /dev/fb
+		fi
+        fi
+fi
+
+exit $SMF_EXIT_OK

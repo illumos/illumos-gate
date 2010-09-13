@@ -1,0 +1,28 @@
+# ident	"%Z%%M%	%I%	%E% SMI"
+-------------------- ~ ESCAPES ----------------------------
+~~		Quote a single tilde
+~a,~A		Autograph (insert 'sign','Sign' variable)
+~b users	Add users to Bcc list
+~c users	Add users to Cc list
+~d		Read in dead.letter file
+~e		Edit the message buffer
+~f messages	Read in messages, do not right-shift
+~h		Prompt for Subject and To, Cc and Bcc lists
+~i variable	Insert variable into message (~a := ~i sign)
+~m messages	Read in messages, right-shifted by a tab
+~p		Print the message buffer
+~q,~Q		Quit, save letter in $HOME/dead.letter
+~r,~< file	Read a file into the message buffer
+~r,~< !command	Read output from command into message
+~R		Mark message for return receipt
+~s subject	Set subject
+~t users	Add users to To list
+~v		Invoke display editor on message
+~w file		Write message onto file (no header)
+~x		Quit, do not save letter
+~!command	Run a shell command
+~|,~^ command	Pipe the message through the command
+~:,~_ command	Execute regular mailx command
+~.		end of input
+~?		print this help message
+-----------------------------------------------------------

@@ -1,0 +1,127 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	dtrace_addr2str;
+	dtrace_aggregate_clear;
+	dtrace_aggregate_print;
+	dtrace_aggregate_snap;
+	dtrace_aggregate_walk;
+	dtrace_aggregate_walk_joined;
+	dtrace_aggregate_walk_keyrevsorted;
+	dtrace_aggregate_walk_keysorted;
+	dtrace_aggregate_walk_keyvarrevsorted;
+	dtrace_aggregate_walk_keyvarsorted;
+	dtrace_aggregate_walk_valrevsorted;
+	dtrace_aggregate_walk_valsorted;
+	dtrace_aggregate_walk_valvarrevsorted;
+	dtrace_aggregate_walk_valvarsorted;
+	dtrace_attr2str;
+	dtrace_class_name;
+	dtrace_close;
+	dtrace_consume;
+	dtrace_ctlfd;
+	_dtrace_debug;
+	dtrace_desc2str;
+	dtrace_dof_create;
+	dtrace_dof_destroy;
+	dtrace_errmsg;
+	dtrace_errno;
+	dtrace_faultstr;
+	dtrace_fprinta;
+	dtrace_fprintf;
+	dtrace_geterr_dof;
+	dtrace_getopt;
+	dtrace_getopt_dof;
+	dtrace_go;
+	dtrace_handle_buffered;
+	dtrace_handle_drop;
+	dtrace_handle_err;
+	dtrace_handle_proc;
+	dtrace_handle_setopt;
+	dtrace_id2desc;
+	dtrace_lookup_by_addr;
+	dtrace_lookup_by_name;
+	dtrace_lookup_by_type;
+	dtrace_object_info;
+	dtrace_object_iter;
+	dtrace_open;
+	dtrace_printa_create;
+	dtrace_printf_create;
+	dtrace_printf_format;
+	dtrace_probe_info;
+	dtrace_probe_iter;
+	dtrace_proc_continue;
+	dtrace_proc_create;
+	dtrace_proc_grab;
+	dtrace_proc_release;
+	dtrace_program_exec;
+	dtrace_program_fcompile;
+	dtrace_program_header;
+	dtrace_program_info;
+	dtrace_program_link;
+	dtrace_program_strcompile;
+	dtrace_provider_modules;
+	dtrace_setopt;
+	dtrace_sleep;
+	dtrace_stability_name;
+	dtrace_status;
+	dtrace_stmt_action;
+	dtrace_stmt_add;
+	dtrace_stmt_create;
+	dtrace_stmt_destroy;
+	dtrace_stmt_iter;
+	dtrace_stop;
+	dtrace_str2attr;
+	dtrace_str2desc;
+	dtrace_subrstr;
+	dtrace_symbol_type;
+	dtrace_type_fcompile;
+	dtrace_type_strcompile;
+	dtrace_uaddr2str;
+	dtrace_update;
+	_dtrace_version;
+	dtrace_vopen;
+	dtrace_work;
+	dtrace_xstr2desc;
+    local:
+	*;
+};

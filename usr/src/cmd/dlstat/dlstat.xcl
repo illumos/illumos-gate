@@ -1,0 +1,110 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+msgid  "  %s \n"
+msgid  " %.2f"
+msgid  " %6.2lf%c"
+msgid  " %7.0lf%c"
+msgid  " %s"
+msgid  "---------------------------------------------------\n"
+msgid  "--"
+msgid  ": %s\n"
+msgid  ":hrtFapi:o:u:"
+msgid  ":rtaApi:o:u:"
+msgid  ":rtapi:o:u:"
+msgid  ":rtpi:o:u:"
+msgid  ""
+msgid  "\n"
+msgid  "\t\t%15llu\n"
+msgid  "\t%15s"
+msgid  "# Time"
+msgid  "%.0lf"
+msgid  "%llu"
+msgid  "%m/%d/%Y"
+msgid  "%s \n"
+msgid  "%s Mbps"
+msgid  "%s: "
+msgid  "%s: warning: "
+msgid  "%s"
+msgid  "%s\n"
+msgid  "%T"
+msgid  "all"
+msgid  "B"
+msgid  "BANDWIDTH"
+msgid  "bcast"
+msgid  "BLKCNT"
+msgid  "BYTES"
+msgid  "CH<10"
+msgid  "CH>50"
+msgid  "CH10-50"
+msgid  "das:e:o:f:F:"
+msgid  "DURATION"
+msgid  "END"
+msgid  "FOUT"
+msgid  "G"
+msgid  "gnuplot"
+msgid  "hw"
+msgid  "ID"
+msgid  "INDEX"
+msgid  "INTRS"
+msgid  "IPKTS"
+msgid  "K"
+msgid  "lcl/sw"
+msgid  "link,id,index,fout,ipkts,rbytes"
+msgid  "link,ipkts,rbytes,intrs,polls,ch<10,ch10-50,ch>50"
+msgid  "link,ipkts,rbytes,opkts,obytes"
+msgid  "link,opkts,obytes,blkcnt,ublkcnt"
+msgid  "link,port,ipkts,rbytes,opkts,obytes"
+msgid  "link,port,ipkts,rbytes"
+msgid  "link,port,opkts,obytes"
+msgid  "link,start,end,rbytes,obytes,bandwidth"
+msgid  "link,type,id,index,ipkts,rbytes,intrs,polls,ch<10,ch10-50,ch>50"
+msgid  "link,type,id,index,opkts,obytes,blkcnt,ublkcnt"
+msgid  "link,type,id,index,pkts,bytes"
+msgid  "link,type,index,ipkts,rbytes"
+msgid  "link,type,index,opkts,obytes"
+msgid  "link,type,index,pkts,bytes"
+msgid  "LINK"
+msgid  "local"
+msgid  "M"
+msgid  "OBYTES"
+msgid  "OPKTS"
+msgid  "P"
+msgid  "PKTS"
+msgid  "POLLS"
+msgid  "PORT"
+msgid  "RBYTES"
+msgid  "rx"
+msgid  "SDROPS"
+msgid  "show-aggr"
+msgid  "show-link -h"
+msgid  "show-link"
+msgid  "show-phys"
+msgid  "START"
+msgid  "sw"
+msgid  "T"
+msgid  "tx"
+msgid  "TYPE"
+msgid  "UBLKCNT"

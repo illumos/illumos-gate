@@ -1,0 +1,112 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.2 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	sysevent_bind_handle;
+	sysevent_free;
+	sysevent_get_attr_list;
+	sysevent_get_class_name;
+	sysevent_get_pid;
+	sysevent_get_pub_name;
+	sysevent_get_seq;
+	sysevent_get_size;
+	sysevent_get_subclass_name;
+	sysevent_get_time;
+	sysevent_get_vendor_name;
+	sysevent_post_event;
+	sysevent_subscribe_event;
+	sysevent_unbind_handle;
+	sysevent_unsubscribe_event;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	se_print;
+	sysevent_alloc_event;
+	sysevent_attr_name;
+	sysevent_attr_next;
+	sysevent_attr_value;
+	sysevent_bind_publisher;
+	sysevent_bind_subscriber;
+	sysevent_bind_xhandle;
+	sysevent_bind_xsubscriber;
+	sysevent_cleanup_publishers;
+	sysevent_cleanup_subscribers;
+	sysevent_close_channel;
+	sysevent_dup;
+	sysevent_evc_bind;
+	sysevent_evc_control;
+	sysevent_evc_getpropnvl;
+	sysevent_evc_publish;
+	sysevent_evc_setpropnvl;
+	sysevent_evc_subscribe;
+	sysevent_evc_unbind;
+	sysevent_evc_unsubscribe;
+	sysevent_evc_xsubscribe;
+	sysevent_get_class;
+	sysevent_get_pub;
+	sysevent_get_subclass;
+	sysevent_lookup_attr;
+	sysevent_open_channel;
+	sysevent_open_channel_alt;
+	sysevent_register_event;
+	sysevent_send_event;
+	sysevent_unbind_publisher;
+	sysevent_unbind_subscriber;
+	sysevent_unregister_event;
+	sysevent_subattr_alloc;
+	sysevent_subattr_free;
+	sysevent_subattr_sigmask;
+	sysevent_subattr_thrattr;
+	sysevent_subattr_thrcreate;
+	sysevent_subattr_thrsetup;
+    local:
+	*;
+};

@@ -1,0 +1,134 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * # ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This file creates the system board structure
+ */
+
+NODE SUNW,Netra-CP3010 fru
+
+NODE CPU location
+	PROP Label string r 0 "CPU 0"
+	PROP GeoAddr uint r 1 1
+	PROP SlotType string r 0 "cpu"
+ENDNODE
+
+NODE CPU location
+	PROP Label string r 0 "CPU 1"
+	PROP GeoAddr uint r 1 2
+	PROP SlotType string r 0 "cpu"
+ENDNODE
+
+NODE mem-slot location
+	PROP GeoAddr uint r 1 1
+	PROP Label string r 0 "DIMM0"
+	PROP SlotType string r 0 "memory-module"
+ENDNODE
+
+NODE mem-slot location
+	PROP GeoAddr uint r 1 2
+	PROP Label string r 0 "DIMM1"
+	PROP SlotType string r 0 "memory-module"
+ENDNODE
+
+NODE mem-slot location
+	PROP GeoAddr uint r 1 3
+	PROP Label string r 0 "DIMM2"
+	PROP SlotType string r 0 "memory-module"
+ENDNODE
+
+NODE mem-slot location
+	PROP GeoAddr uint r 1 4
+	PROP Label string r 0 "DIMM3"
+	PROP SlotType string r 0 "memory-module"
+ENDNODE
+
+ENDNODE
+
+/*
+ * create the fru modules for CPU 
+ */
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/CPU?GeoAddr=1
+REFNODE cpu-module fru WITH _class:/PLATFORM_CLASS/cpu?ID=0
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/CPU?GeoAddr=2
+REFNODE cpu-module fru WITH _class:/PLATFORM_CLASS/cpu?ID=1
+
+/*
+ * _fru_parent CPU devices
+ */
+_class:/PLATFORM_CLASS/cpu?ID=0
+REFPROP _fru_parent /frutree/chassis/MB/SUNW,Netra-CP3010/CPU?GeoAddr=1/cpu-module
+
+_class:/PLATFORM_CLASS/cpu?ID=1
+REFPROP _fru_parent /frutree/chassis/MB/SUNW,Netra-CP3010/CPU?GeoAddr=2/cpu-module
+
+/*
+ * _fru_parent motherboard
+ */
+_class:/PLATFORM_CLASS
+REFPROP _fru_parent /frutree/chassis/MB/SUNW,Netra-CP3010
+
+/*
+ * Set up memory module fru
+ */
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM0
+REFNODE mem-module fru WITH /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a0
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM1
+REFNODE mem-module fru WITH /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a2
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM2
+REFNODE mem-module fru WITH /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a4
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM3
+REFNODE mem-module fru WITH /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a6
+
+/*
+ * seeprom source for motherboard
+ */
+name:/frutree/chassis/MB/SUNW,Netra-CP3010
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/motherboard-fru-prom@81,a8
+
+/*
+ * seeprom source for dimms
+ */
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM0/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a0
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM1/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a2
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM2/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a4
+
+name:/frutree/chassis/MB/SUNW,Netra-CP3010/mem-slot?Label=DIMM3/mem-module
+PROP FRUDataAvailable void r
+REFPROP _seeprom_source /platform/pci@1e,600000/isa@7/ipmc@0,2e8/i2c@81/dimm-spd@81,a6

@@ -1,0 +1,53 @@
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# With zfs root the active menu.lst file is /<pool>/boot/grub/menu.lst
+# This reference copy of the file is not used.
+
+# default menu entry to boot
+default 0
+#
+# menu timeout in second before default OS is booted
+# set to -1 to wait for user input
+timeout 10
+#
+# To enable grub serial console to ttya uncomment the following lines
+# and comment out the splashimage line below
+# WARNING: do not enable grub serial console when BIOS console serial
+#	redirection is active.
+#   serial --unit=0 --speed=9600
+#   terminal serial
+#
+# Uncomment the following line to enable GRUB splashimage on console
+#   splashimage /boot/grub/splash.xpm.gz
+#
+# To chainload another OS
+#
+# title Another OS
+#	root (hd<disk no>,<partition no>)
+#	chainloader +1
+#
+# To chainload a Solaris release not based on grub
+#
+# title Solaris 9
+#	root (hd<disk no>,<partition no>)
+#	chainloader +1
+#	makeactive
+#
+# To load a Solaris instance based on grub
+# If GRUB determines if the booting system is 64-bit capable,
+# the kernel$ and module$ commands expand $ISADIR to "amd64"
+#
+# title Solaris <version>
+#	root (hd<disk no>,<partition no>,x)	--x = Solaris root slice
+#	kernel$ /platform/i86pc/kernel/$ISADIR/unix
+#	module$ /platform/i86pc/$ISADIR/boot_archive
+
+#
+# To override Solaris boot args (see kernel(1M)), console device and
+# properties set via eeprom(1M) edit the "kernel" line to:
+#
+#   kernel /platform/i86pc/kernel/unix <boot-args> -B prop1=val1,prop2=val2,...
+#

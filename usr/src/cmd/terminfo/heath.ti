@@ -1,0 +1,126 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+# # --------------------------------
+#
+# heath: HEATHKIT and ZENITH
+#
+# Manufacturer:	HEATHKIT and ZENITH
+# Class:	I
+h19-a|heath-ansi|heathkit-a|heathkit h19 ansi mode,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\E[1L$<1*>, am, cub1=^H, ed=\E[J,
+	el=\E[K, clear=\E[2J, cup=\E[%i%p1%d;%p2%dH, cols#80,
+	dch1=\E[1P, dl1=\E[1M$<1*>, cud1=\E[1B,
+	rmir=\E[4l, home=\E[H, smir=\E[4h, lines#24, mir,
+	cuf1=\E[1C, smacs=\E[10m, rmacs=\E[11m, msgr, ht=^I, it#8,
+	rmso=\E[0m, smso=\E[7m, cuu1=\E[1A, cvvis=\E[>4h, cnorm=\E[>4l,
+	kbs=^h, kcuu1=\E[1A, kcud1=\E[1B, kcub1=\E[1D, kcuf1=\E[1C,
+	khome=\E[H,
+	kf1=\EOS, kf2=\EOT, kf3=\EOU, kf4=\EOV, kf5=\EOW, lf6=blue,
+	lf7=red, lf8=white, kf6=\EOP, kf7=\EOQ, kf8=\EOR,
+	ri=\EM, is2=\E<\E[>1;2;3;4;5;6;7;8;9l\E[0m\E[11m\E[?7h,
+h19-bs|heathkit w/keypad shifted,
+	smkx=\Et, rmkx=\Eu, use=h19-b,
+h19-smul|heathkit w/keypad shifted/underscore cursor,
+	smkx=\Et, rmkx=\Eu, use=h19-u,
+h19|heath|h19-b|heathkit|heath-19|z19|zenith|heathkit h19,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL$<1*>, am, cub1=^H,
+	ed=\EJ, el=\EK, clear=\EE, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80,
+	dch1=\EN, dl1=\EM$<1*>, cud1=\EB, rmir=\EO, home=\EH, smir=\E@,
+	lines#24, mir, cuf1=\EC, smacs=\EF, rmacs=\EG, msgr, ht=^I, it#8,
+	ri=\EI, rmso=\Eq, smso=\Ep, cuu1=\EA, cvvis=\Ex4, cnorm=\Ey4,
+	kbs=^h, kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\EH,
+	kf1=\ES, kf2=\ET, kf3=\EU, kf4=\EV, kf5=\EW,
+	lf6=blue, lf7=red, lf8=white, kf6=\EP, kf7=\EQ, kf8=\ER,
+	hs, eslok, tsl=\Ej\Ex5\EY8%p1%' '%+%c\Eo\Eo, fsl=\Ek\Ey5,
+h19-u|heathkit with underscore cursor,
+	cvvis@, cnorm@, use=h19-b,
+# Info:
+#	This still doesn't work right - something funny is going on 
+#	with return # and linefeed in the reach program. Apparently 
+#	cr acts like crlf and lf is ignored. There is a "literal end 
+#	of line mode" which works right, but this will cause cr's to 
+#	appear in files that are spooled. This description assumes 
+#	"normal end of line mode".
+#
+reach|h89|h89 running reach,
+	cr@, cud1=\EB, ind=\r\l, is2=\Ey3\Ev, use=h19-b,
+alto-h19|altoh19|altoheath|alto-heath|alto emulating heathkit h19,
+	lines#60, il1=\EL, dl1=\EM, use=h19,
+# Info:
+#	The major problem with the Z29 is that it requires more 
+#	padding than the Z19. Once again, here's a little termcap 
+#	entry for it that will do the trick. 
+#	
+#	The problem declaring an H19 to be synonomous with a Z29 is that
+#	it needs more padding. It especially loses if a program attempts
+#	to put the Z29 into insert mode and insert text at 9600 baud. It
+#	even loses worse if the program attempts to insert tabs at 9600
+#	baud. Adding padding to text that is inserted loses because in 
+#	order to make the Z29 not die, one must add so much padding that
+#	whenever the program tries to use insert mode, the effective 
+#	rate is about 110 baud.
+#	
+#	What program would want to put the terminal into insert mode 
+#	and shove stuff at it at 9600 baud you ask?  
+#	
+#	Emacs. Emacs seems to want to do the mathematically optimal 
+#	thing in doing a redisplay rather than the practical thing.
+#	When it is about to output a line on top of a line that is 
+#	already on the screen, instead of just killing to the end of 
+#	the line and outputing the new line, it compares the old line 
+#	and the new line and if there are any similarities, it 
+#	constructs the new line by deleting the text on the old line 
+#	on the terminal that is already there and then inserting new
+#	text into the line to transform it into the new line that is 
+#	to be displayed. The Z29 does not act kindly to this.
+#	
+#	But don't cry for too long.... There is a solution. You can make
+#	a termcap entry for the Z29 that says the Z29 has no insert mode.
+#	Then Emacs cannot use it. "Oh, no, but now inserting into a 
+#	line will be really slow", you say. Well there is a sort of a
+#	solution to that too. There is an insert character option on 
+#	the Z29 that will insert one character. Unfortunately, it 
+#	involves putting the terminal into ansi mode, inserting the 
+#	character, and changing it back to H19 mode. All this takes 12 
+#	characters. Pretty expensive to insert one character, but it 
+#	works. Either Emacs doesn't try to use its inserting hack when 
+#	it's only given an insert character ability or the Z29 doesn't 
+#	require padding with this (the former is probably more likely, 
+#	but I haven't checked it out).
+#
+z29|zenith29|z29b|,
+	cr=^M, cud1=^J, ind=^J, bel=^G, is2=\E<\E[?2h\Ev, il1=\EL$<1>, am,
+	cub1=^H, ed=\EJ$<14>, el=\EK$<1>, clear=\EE$<14>,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c,
+	cols#80, dch1=\EN$<0.1*>, dl1=\EM$<1>, cud1=\EB, home=\EH,
+	ich1=\E<\E[1@\E[?2h$<1>, lines#24, cuf1=\EC,
+	rmacs=\EF, smacs=\EG, ind=\n$<2>, msgr, ht=^I, ri=\EI$<2>, rmso=\Eq,
+	smso=\Ep, cuu1=\E$<1>A, cvvis=\Ex4, cnorm=\Ey4, kbs=^h, kcuu1=\EA,
+	kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\EH, kf1=\ES,
+	kf2=\ET, kf3=\EU, kf4=\EV, kf5=\EW, kf6=\EP, kf7=\EQ, kf8=\ER,
+	kf9=\E0I, kf0=\E~, lf0=home,
+	cbt=\E-, smul=\Es8, rmul=\Es0,

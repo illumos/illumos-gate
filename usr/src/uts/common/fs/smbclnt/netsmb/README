@@ -1,0 +1,49 @@
+
+
+    SMB/CIFS protocol and SMB/CIFS file system implementation
+		for FreeBSD, version 1.4.
+    
+    This is native SMB/CIFS filesystem (smbfs for short) for FreeBSD.
+It is a complete, kernel side implementation of SMB requester and filesystem.
+
+    Supportted platforms:
+	FreeBSD 4.X
+
+	FreeBSD-current		kernel module is included in the base source
+				tree.
+
+    I'm would be very grateful for any feedback, bug reports etc.
+
+    Supported SMB servers:
+	Samba
+	Windows 95/98/ME/2000/NT4.0 (SPs 4, 5, 6)
+	IBM LanManager
+	NetApp
+
+    An updated versions of this package can be retrieved from ftp server:
+
+    ftp://ftp.butya.kz/pub/smbfs/smbfs.tar.gz
+
+Author: Boris Popov <bp@freebsd.org>
+
+================================================================
+
+Additional notes from Sun Microsystems:
+
+This code (the OpenSolaris CIFS client) is derived from the
+Apple Darwin project, smb-217.2 code drop.  See the file
+COPYRIGHT for copyright and redistribution terms.
+
+The Darwin code was reorganized as follows for Solaris:
+
+Darwin location:	Solaris location: (usr/src/...)
+kernel/netsmb		uts/common/netsmb (exported headers)
+kernel/netsmb		uts/common/fs/smbclnt/netsmb
+kernel/fs/smbfs		uts/common/fs/smbclnt/smbfs
+include/netsmb		lib/libsmb/netsmb
+lib/smb			lib/libsmb/smb
+mount_smbfs		cmd/fs.d/smbclnt/mount
+smbutil			cmd/fs.d/smbclnt/smbutil
+idl_compiler		cmd/idlgen
+
+[ ident	"%Z%%M%	%I%	%E% SMI" ]

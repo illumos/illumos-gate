@@ -1,0 +1,62 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Definitions common for HAL code and consumers
+#
+
+HAL_VERSION =		0.5.8
+
+ROOTLIB_HAL =		$(ROOTLIB)/hal
+ROOTLIB_HAL_SCRIPTS =	$(ROOTLIB)/hal
+
+ROOT_HAL_FDI =		$(ROOT)/etc/hal/fdi
+
+HAL_USER =		daemon
+HAL_GROUP =		daemon
+
+# derived from the generated config.h
+HAL_CONFIG_CPPFLAGS =	-DPACKAGE_DATA_DIR=\"/usr/lib\" \
+			-DPACKAGE_BIN_DIR=\"/usr/bin\" \
+			-DPACKAGE_LIBEXEC_DIR=\"/usr/lib/hal\" \
+			-DPACKAGE_SCRIPT_DIR=\"/usr/lib/hal\" \
+			-DPACKAGE_LOCALSTATEDIR=\"/var\" \
+			-DPACKAGE_SYSCONF_DIR=\"/etc\" \
+			-DPACKAGE_LOCALE_DIR=\"/usr/lib/locale\" \
+			-DPACKAGE_VERSION=\"$(HAL_VERSION)\" \
+			-DPACKAGE_STRING=\""hal $(HAL_VERSION)"\" \
+			-DHALD_PID_FILE=\"/var/run/hald/pid\" \
+			-DHALD_SOCKET_DIR=\"/var/run/hald\" \
+			-DHAVE_ASPRINTF \
+			-DHAVE_POLKIT \
+			-DHWDATA_DIR=\"/usr/share/hwdata\" \
+			-DHAL_USER=\"$(HAL_USER)\" \
+			-DHAL_GROUP=\"$(HAL_GROUP)\"
+
+HAL_DBUS_CPPFLAGS =	-DDBUS_API_SUBJECT_TO_CHANGE -DDBUS_SYSTEMD_DIR=\"/etc/dbus-1/system.d\" \
+			 -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include
+
+HAL_GLIB_CPPFLAGS = 	-I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+
+HAL_GETTEXT_PACKAGE =	$(TEXT_DOMAIN)
+

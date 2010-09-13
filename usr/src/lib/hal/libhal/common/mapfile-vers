@@ -1,0 +1,139 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	libhal_ctx_new;
+	libhal_ctx_set_cache;
+	libhal_ctx_set_dbus_connection;
+	libhal_ctx_get_dbus_connection;
+	libhal_ctx_set_user_data;
+	libhal_ctx_get_user_data;
+	libhal_ctx_set_device_added;
+	libhal_ctx_set_device_removed;
+	libhal_ctx_set_device_new_capability;
+	libhal_ctx_set_device_lost_capability;
+	libhal_ctx_set_device_property_modified;
+	libhal_ctx_set_device_condition;
+	libhal_ctx_init;
+	libhal_ctx_shutdown;
+	libhal_ctx_free;
+	libhal_ctx_init_direct;
+	libhal_get_all_devices;
+	libhal_device_exists;
+	libhal_device_print;
+	libhal_device_property_exists;
+	libhal_device_get_property_string;
+	libhal_device_get_property_int;
+	libhal_device_get_property_uint64;
+	libhal_device_get_property_double;
+	libhal_device_get_property_bool;
+	libhal_device_get_property_strlist;
+	libhal_device_set_property_string;
+	libhal_device_set_property_int;
+	libhal_device_set_property_uint64;
+	libhal_device_set_property_double;
+	libhal_device_set_property_bool;
+	libhal_device_property_strlist_append;
+	libhal_device_property_strlist_prepend;
+	libhal_device_property_strlist_remove_index;
+	libhal_device_property_strlist_remove;
+	libhal_device_remove_property;
+	libhal_device_get_property_type;
+	libhal_device_new_changeset;
+	libhal_changeset_set_property_string;
+	libhal_changeset_set_property_int;
+	libhal_changeset_set_property_uint64;
+	libhal_changeset_set_property_double;
+	libhal_changeset_set_property_bool;
+	libhal_changeset_set_property_strlist;
+	libhal_device_commit_changeset;
+	libhal_device_free_changeset;
+	libhal_device_get_all_properties;
+	libhal_free_property_set;
+	libhal_property_set_get_num_elems;
+	libhal_ps_get_type;
+	libhal_ps_get_string;
+	libhal_ps_get_int32;
+	libhal_ps_get_uint64;
+	libhal_ps_get_double;
+	libhal_ps_get_bool;
+	libhal_ps_get_strlist;
+	libhal_psi_init;
+	libhal_psi_has_more;
+	libhal_psi_next;
+	libhal_psi_get_type;
+	libhal_psi_get_key;
+	libhal_psi_get_string;
+	libhal_psi_get_int;
+	libhal_psi_get_uint64;
+	libhal_psi_get_double;
+	libhal_psi_get_bool;
+	libhal_psi_get_strlist;
+	libhal_string_array_length;
+	libhal_free_string_array;
+	libhal_free_string;
+	libhal_new_device;
+	libhal_device_commit_to_gdl;
+	libhal_remove_device;
+	libhal_merge_properties;
+	libhal_device_matches;
+	libhal_manager_find_device_string_match;
+	libhal_device_add_capability;
+	libhal_device_query_capability;
+	libhal_find_device_by_capability;
+	libhal_device_property_watch_all;
+	libhal_device_add_property_watch;
+	libhal_device_remove_property_watch;
+	libhal_device_lock;
+	libhal_device_unlock;
+	libhal_device_rescan;
+	libhal_device_reprobe;
+	libhal_device_emit_condition;
+	libhal_device_claim_interface;
+	libhal_device_addon_is_ready;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	SUNWprivate_1.1;
+    local:
+	*;
+};

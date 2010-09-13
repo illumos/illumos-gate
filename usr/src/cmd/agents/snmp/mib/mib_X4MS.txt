@@ -1,0 +1,625 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+   X4MS-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+       OBJECT-TYPE, Counter32, Gauge32
+         FROM SNMPv2-SMI
+       DisplayString,
+         FROM SNMPv2-TC
+       DistinguishedName
+         FROM APPLICATION-MIB;
+
+   x4ms MODULE-IDENTITY
+       LAST-UPDATED "9508170000Z"
+       ORGANIZATION "SunSoft"
+       CONTACT-INFO
+         ""
+       DESCRIPTION
+         "This MIB module is used to monitor the Solstice X.400
+          Message Store.
+
+          Implementation choice:
+            I decided to add a single entry in the applTable to
+            monitor the whole X.400 MS process even through it may
+            serves several users. That is why I introduced the an
+            x4msUserTable that contains an entry for every MS User.
+            This is in line with the X.400 concepts of one
+            MS entity per user."
+       ::= { private-mibs 1 }
+
+
+--
+--	x4msMtaTable
+--
+
+   x4msMtaTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF X4msMtaEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The Solstice X.400 Message Store can have associations
+          with a limited set of MTAs. All these MTAs are
+          registered in this table."
+       ::= {x4ms 1}
+
+   x4msMtaEntry OBJECT-TYPE
+       SYNTAX X4msMtaEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MTA."
+       INDEX {x4msMtaIndex}
+       ::= {x4msMtaTable 1}
+
+   X4msMtaEntry ::= SEQUENCE {
+       x4msMtaIndex
+         INTEGER,
+       x4msMtaName
+         DisplayString
+   }
+
+   x4msMtaIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "A integer that uniquely identifies the MTA."
+       ::= {x4msMtaEntry 1}
+
+   x4msMtaName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The name of the MTA:
+         example: Local/Remote $MTANAME on IP = $HOSTNAME"
+       ::= {x4msMtaEntry 2}
+
+
+--
+--	x4msUserTablePart1
+--
+
+   x4msUserTablePart1 OBJECT-TYPE
+       SYNTAX SEQUENCE OF X4msUserEntryPart1
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information about all MS Users."
+       ::= {x4ms 2}
+
+   x4msUserEntryPart1 OBJECT-TYPE
+       SYNTAX X4msUserEntryPart1
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MS User."
+       INDEX {x4msUserIndex}
+       ::= {x4msUserTablePart1 1}
+
+   X4msUserEntryPart1 ::= SEQUENCE {
+       x4msUserIndex
+         INTEGER,
+       x4msUserMessages
+         Gauge32,
+       x4msUserVolume
+         Gauge32,
+       x4msUserP3Associations
+         Gauge32,
+       x4msUserP7Associations
+         Gauge32,
+       x4msUserLastP7Association
+         TimeInterval,
+       x4msUserAuthentificationsFailures
+         Counter32,
+       x4msUserAuthentificationFailureReason
+         DisplayString,
+       x4msUserName
+         DisplayString
+   }
+
+   x4msUserIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "An integer that uniquely identifies a MS User."
+       ::= {x4msUserEntryPart1 1}
+
+   x4msUserTotalMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages stored in the MS User's mailbox."
+       ::= {x4msUserEntryPart1 2}
+
+   x4msUserTotalVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages stored in the MS User's mailbox."
+       ::= {x4msUserEntryPart1 3}
+
+   x4msUserP3Associations OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current P3 associations with the MTA."
+       ::= {x4msUserEntryPart1 4}
+
+   x4msUserP7Associations OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current P7 associations."
+       ::= {x4msUserEntryPart1 5}
+
+   x4msUserLastP7Association OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that this MS had a P7 association."
+       ::= {x4msUserEntryPart1 6}
+
+   x4msUserAuthentificationFailures OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of authentifictaion failures that occurred
+         since the MS initialization (Security Violation)."
+       ::= {x4msUserEntryPart1 7}
+
+   x4msUserAuthentificationFailureReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "A string describing the last authentification reason.
+         If no authentification failure occurred since the MS was
+         initialized the value should be 'never'."
+       ::= {x4msUserEntryPart1 8}
+
+   x4msUserName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The Name of the MS User."
+       ::= {x4msUserEntryPart1 9}
+
+
+--
+--	x4msUserTablePart2
+--
+
+   x4msUserTablePart2 OBJECT-TYPE
+       SYNTAX SEQUENCE OF X4msUserEntryPart2
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding detailed statistics about the messages
+          stored in an MS User mailbox.
+          To access the information stored in this table, the manager
+          will have to do an SNMP GET request and specify a valid x4msUserIndex.
+          A manager will not be able to do an SNMP GET-NEXT request
+          on this table (an empty table is returned)."
+       ::= {x4ms 3}
+
+   x4msUserEntryPart2 OBJECT-TYPE
+       SYNTAX X4msUserEntryPart2
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MS User."
+       INDEX {x4msUserIndex}
+       ::= {x4msUserTablePart2 1}
+
+   X4msUserEntryPart2 ::= SEQUENCE {
+       x4msUserNewMessages
+         Gauge32,
+       x4msUserNewVolume
+         Gauge32,
+       x4msUserListedMessages
+         Gauge32,
+       x4msUserListedVolume
+         Gauge32,
+       x4msUserProcessedMessages
+         Gauge32,
+       x4msUserProcessedVolume
+         Gauge32,
+       x4msUserMessagesOlderThanWeek
+         Gauge32,
+       x4msUserVolumeOlderThanWeek
+         Gauge32,
+       x4msUserMessagesOlderThanMonth
+         Gauge32,
+       x4msUserVolumeOlderThanMonth
+         Gauge32,
+       x4msUserMessagesOlderThanYear
+         Gauge32,
+       x4msUserVolumeOlderThanYear
+         Gauge32,
+       x4msUserP3InboundAssociations
+         Gauge32,
+       x4msUserP7InboundAssociations
+         Gauge32,
+       x4msUserP3OutboundAssociations
+         Gauge32,
+       x4msUserAccumulatedP3InboundAssociations
+         Counter32,
+       x4msUserAccumulatedP7InboundAssociations
+         Counter32,
+       x4msUserAccumulatedP3OutboundAssociations
+         Counter32,
+       x4msUserLastP3InboundActivity
+         TimeInterval,
+       x4msUserLastP7InboundActivity
+         TimeInterval,
+       x4msUserLastP3OutboundActivity
+         TimeInterval,
+       x4msUserRejectedP3InboundAssociations
+         Counter32,
+       x4msUserRejectedP7InboundAssociations
+         Counter32,
+       x4msUserFailedP3OutboundAssociations
+         Counter32,
+       x4msUserP3InboundRejectionReason
+         DisplayString,
+       x4msUserP7InboundRejectionReason
+         DisplayString,
+       x4msUserP3OutboundConnectFailureReason
+         DisplayString,
+       x4msUserMtaIndex
+         INTEGER,
+       x4msUserORName
+         DistinguishedName
+   }
+
+   x4msUserNewMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages whose Entry-Status is new(0)
+         and currently stored in the MS User's mailbox.
+         (see Entry-Status of a Message, CCITT X.413 page 463)"
+       ::= {x4msUserEntryPart2 1}
+
+   x4msUserNewVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of messages whose Entry-Status is new(0)
+         and currently stored in the MS User's mailbox.
+         (see Content-Length of a Message, CCITT X.413 page 461)"
+       ::= {x4msUserEntryPart2 2}
+
+   x4msUserListedMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages whose Entry-Status is listed(1)
+         and currently stored in the MS User's mailbox.
+         (see Entry-Status of a Message, CCITT X.413 page 463)"
+       ::= {x4msUserEntryPart2 3}
+
+   x4msUserListedVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of messages whose Entry-Status is listed(1)
+         and currently stored in the MS User's mailbox.
+         (see Content-Length of a Message, CCITT X.413 page 461)"
+       ::= {x4msUserEntryPart2 4}
+
+   x4msUserProcessedMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages whose Entry-Status is processed(2)
+         and currently stored in the MS User's mailbox.
+         (see Entry-Status of a Message, CCITT X.413 page 463)"
+       ::= {x4msUserEntryPart2 5}
+
+   x4msUserProcessedVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of messages whose Entry-Status is processed(2)
+         and currently stored in the MS User's mailbox.
+         (see Content-Length of a Message, CCITT X.413 page 461)"
+       ::= {x4msUserEntryPart2 6}
+
+   x4msUserMessagesOlderThanWeek OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages older than a week in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 7}
+
+   x4msUserVolumeOlderThanWeek OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of the messages older than a week in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 8}
+
+   x4msUserMessagesOlderThanMonth OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages older than a month (30 days) in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 9}
+
+   x4msUserVolumeOlderThanMonth OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of the messages older than a month (30 days) in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 10}
+
+   x4msUserMessagesOlderThanYear OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages older than a year (365 days) in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 11}
+
+   x4msUserVolumeOlderThanYear OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume of the messages older than a year (365 days) in the
+         MS User's mailbox.
+         (see Creation-Time of a Message, CCITT X.413 page 462)"
+       ::= {x4msUserEntryPart2 12}
+
+   x4msUserP3InboundAssociations OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current P3 associations with the MTA, where the
+         MS is the responder."
+       ::= {x4msUserEntryPart2 13}
+
+   x4msUserP7InboundAssociations OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current P7 associations with the MS, where the
+         MS is the responder."
+       ::= {x4msUserEntryPart2 14}
+
+   x4msUserP3OutboundAssociations OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current P3 associations with the MS, where the
+         MS is the initiator."
+       ::= {x4msUserEntryPart2 15}
+
+   x4msUserAccumulatedP3InboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of P3 associations with the MTA, where the
+         MS is the responder."
+       ::= {x4msUserEntryPart2 16}
+
+   x4msUserAccumulatedP7InboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of P7 associations with the MS, where the
+         MS the responder."
+       ::= {x4msUserEntryPart2 17}
+
+   x4msUserAccumulatedP3OutboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of associations with the MS, where the
+         MS is the initiator."
+       ::= {x4msUserEntryPart2 18}
+
+   x4msUserLastP3InboundActivity OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that this MS had a P3 inbound
+         association."
+       ::= {x4msUserEntryPart2 19}
+
+   x4msUserLastP7InboundActivity OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that this MS had a P7 inbound
+         association."
+       ::= {x4msUserEntryPart2 20}
+
+   x4msUserLastP3OutboundActivity OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that this MS had a P3 outbound
+         association."
+       ::= {x4msUserEntryPart2 21}
+
+   x4msUserRejectedP3InboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of P3 inbound associations this MS has rejected."
+       ::= {x4msUserEntryPart2 22}
+
+   x4msUserRejectedP7InboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of P7 inbound associations this MS has rejected."
+       ::= {x4msUserEntryPart2 23}
+
+   x4msUserFailedP3OutboundAssociations OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of P3 outbound associations that failed."
+       ::= {x4msUserEntryPart2 24}
+
+   x4msUserP3InboundRejectionReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The reason of the rejection of the last P3 inbound
+         association."
+       ::= {x4msUserEntryPart2 25}
+
+   x4msUserP7InboundRejetionReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The reason of the rejection of the last P7 inbound
+         association."
+       ::= {x4msUserEntryPart2 26}
+
+   x4msUserP3OutboundConnectFailureReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The reason of the failure of the last P3 outbound
+         association."
+       ::= {x4msUserEntryPart2 27}
+
+   x4msUserMtaIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "A pointer to the MS MTA table."
+       ::= {x4msUserEntryPart2 28}
+
+   x4msUserORName OBJECT-TYPE
+       SYNTAX DistinguishedName
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The O/R Name of the MS User."
+       ::= {x4msUserEntryPart2 29}
+
+
+--
+--	x4msUserAssociationTable
+--
+
+   x4msUserAssociationTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsUserAssociationEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information regarding the associations
+          for each MS User."
+       ::= {x4ms 4}
+
+   x4msUserAssociationEntry OBJECT-TYPE
+       SYNTAX MsUserAssociationEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry holding information regarding the associations
+          for each MS User."
+       INDEX {x4msUserIndex, x4msUserAssociationIndex}
+       ::= {x4msUserAssociationTable 1}
+
+   MsUserAssociationEntry ::= SEQUENCE {
+       x4msUserAssociationIndex
+           INTEGER
+   }
+
+   x4msUserAssociationIndex OBJECT-TYPE
+       SYNTAX INTEGER (1..2147483647)
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Reference into association table to allow correlation of
+          this MS User's active associations with the association table."
+       ::= {x4msUserAssociationEntry 1}
+
+
+   END
+

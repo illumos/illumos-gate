@@ -1,0 +1,51 @@
+# ident	"%Z%%M%	%I%	%E% SMI"
+                mailx commands
+
+alias,group user ...            declare alias for user names
+alternates user                 declare alternate names for your login
+cd,chdir [directory]            chdir to directory or home if none given
+!command                        shell escape
+copy [msglist] file             save messages to file without marking as saved
+delete [msglist]                delete messages
+discard,ignore header           discard header field when printing message
+dp,dt [msglist]                 delete messages and type next message
+echo string                     print the string
+edit [msglist]                  edit messages
+folder,file filename            change mailboxes to filename
+folders                         list files in directory of current folder
+followup [msglist]              reply to authors of messages and save copy
+Followup [message]              reply to all recipients of message and save copy
+from [msglist]                  give header lines of messages
+header [message]                print page of active message headers
+help,?                          print this help message
+hold,preserve [msglist]         hold messages in mailbox
+inc				incorporate new messages into current session
+list                            list all commands (no explanations)
+mail user                       mail to specific user
+Mail                            mail to specific user, saving copy
+mbox [msglist]                  messages will go to mbox when quitting
+next [message]                  goto and type next message
+pipe,| [msglist] shell-cmd      pipe the messages to the shell command
+print,type [msglist]            print messages
+Print,Type [msglist]            print messages with all headers
+quit                            quit, preserving unread messages
+reply,respond [msglist]         reply to authors (only) of the messages
+Reply,Respond [message]         reply to the author and recipients of the msg
+save [msglist] file             save (appending) messages to file
+Save [msglist]                  save messages to file named after author
+set variable[=value]            set variable to value
+size [msglist]                  print size of messages
+source file                     read commands from file
+top [msglist]                   print top 5 lines of messages
+touch [msglist]                 force the messages to be saved when quitting
+undelete [msglist]              restore deleted messages
+undiscard,unignore header       add header field back to list printed
+unread,new [msglist]		mark messages unread
+version                         print version
+visual [msglist]                edit list with $VISUAL editor
+write [msglist] file            write messages without headers
+xit,exit                        quit, preserving all messages
+z [+/-]                         display next [last] page of 10 headers
+
+[msglist] is optional and specifies messages by number, author, subject or
+type.  The default is the current message.

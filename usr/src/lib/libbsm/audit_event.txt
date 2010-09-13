@@ -1,0 +1,675 @@
+#
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Audit Event Database
+#
+# File Format:
+#
+# event number:event name:event description:event classes (comma separated)
+#
+# Used to map audit events to audit classes for preselection and post-selection.
+# Used by TCB programs that write audit records to preselect audit events
+#     based on event to class mappings.
+#
+# NOTE: several events are obsolete but must continue to be defined here for
+# compatibility reasons. Obsolete events are defined in the "no" (invalid)
+# class to indicate they will not be generated.  Other events in the "no"
+# class which are not obsolete (but are in this class for other reasons),
+# are individually noted with a comment for explanation.
+#
+# System Adminstrators: Do NOT modify or add events with an event number less
+#   than 32768. These are reserved by the system.
+#
+#     0		Reserved as an invalid event number.
+#     1 - 2047	Reserved for the Solaris Kernel events.
+#  2048 - 32767	Reserved for the Solaris TCB programs.
+# 32768 - 65535	Available for third party TCB applications.
+#
+#
+# Allocation of reserved kernel events:
+# (NOTE: the kernel event table, and possibly MAX_KEVENTS, must be updated
+# in audit_kevents.h when changes are made to kernel events.)
+#	    1 -   511	allocated for Solaris
+#	  512 -  2047	(reserved but not allocated)
+#
+# Allocation of user level audit events:
+#	 2048 -  5999	(reserved but not allocated)
+#	 6000 -  9999	allocated for Solaris
+#	10000 - 32767	(reserved but not allocated)
+#	32768 - 65535	(Available for third party TCB applications)
+#
+#
+# kernel audit events
+#	    1 -   511	allocated for Solaris
+#
+0:AUE_NULL:indir system call:no
+1:AUE_EXIT:exit(2):ps
+2:AUE_FORKALL:forkall(2):ps
+# AUE_OPEN is a placeholder and will not be generated
+3:AUE_OPEN:open(2) - place holder:no
+4:AUE_CREAT:creat(2):no
+5:AUE_LINK:link(2):fc
+6:AUE_UNLINK:unlink(2):fd
+7:AUE_EXEC:exec(2):no
+8:AUE_CHDIR:chdir(2):pm
+9:AUE_MKNOD:mknod(2):fc
+10:AUE_CHMOD:chmod(2):fm
+11:AUE_CHOWN:chown(2):fm
+12:AUE_UMOUNT:umount(2) - old version:as
+13:AUE_JUNK:junk:no
+14:AUE_ACCESS:access(2):fa
+15:AUE_KILL:kill(2):pm
+16:AUE_STAT:stat(2):fa
+17:AUE_LSTAT:lstat(2):fa
+18:AUE_ACCT:acct(2):as
+19:AUE_MCTL:mctl(2):no
+20:AUE_REBOOT:reboot(2):no
+21:AUE_SYMLINK:symlink(2):fc
+22:AUE_READLINK:readlink(2):fr
+23:AUE_EXECVE:execve(2):ps,ex
+24:AUE_CHROOT:chroot(2):pm
+25:AUE_VFORK:vfork(2):ps
+26:AUE_SETGROUPS:setgroups(2):pm
+27:AUE_SETPGRP:setpgrp(2):pm
+28:AUE_SWAPON:swapon(2):no
+29:AUE_SETHOSTNAME:sethostname(2):no
+30:AUE_FCNTL:fcntl(2):fm
+31:AUE_SETPRIORITY:setpriority(2):no
+32:AUE_CONNECT:connect(2):nt
+33:AUE_ACCEPT:accept(2):nt
+34:AUE_BIND:bind(2):nt
+35:AUE_SETSOCKOPT:setsockopt(2):nt
+36:AUE_VTRACE:vtrace(2):no
+37:AUE_SETTIMEOFDAY:settimeofday(2):no
+38:AUE_FCHOWN:fchown(2):fm
+39:AUE_FCHMOD:fchmod(2):fm
+40:AUE_SETREUID:setreuid(2):pm
+41:AUE_SETREGID:setregid(2):pm
+42:AUE_RENAME:rename(2):fc,fd
+43:AUE_TRUNCATE:truncate(2):no
+44:AUE_FTRUNCATE:ftruncate(2):no
+45:AUE_FLOCK:flock(2):no
+46:AUE_SHUTDOWN:shutdown(2):nt
+47:AUE_MKDIR:mkdir(2):fc
+48:AUE_RMDIR:rmdir(2):fd
+49:AUE_UTIMES:utimes(2):fm
+50:AUE_ADJTIME:adjtime(2):as
+51:AUE_SETRLIMIT:setrlimit(2):ua
+52:AUE_KILLPG:killpg(2):no
+53:AUE_NFS_SVC:nfs_svc(2):no
+54:AUE_STATFS:statfs(2):fa
+55:AUE_FSTATFS:fstatfs(2):fa
+56:AUE_UNMOUNT:unmount(2):no
+57:AUE_ASYNC_DAEMON:async_daemon(2):no
+58:AUE_NFS_GETFH:nfs_getfh(2):no
+59:AUE_SETDOMAINNAME:setdomainname(2):no
+60:AUE_QUOTACTL:quotactl(2):no
+61:AUE_EXPORTFS:exportfs(2):no
+62:AUE_MOUNT:mount(2):as
+# AUE_SEMSYS is a placeholder and will not be generated
+63:AUE_SEMSYS:semsys(2) - place holder:no
+# AUE_MSGSYS is a placeholder and will not be generated
+64:AUE_MSGSYS:msgsys(2) - place holder:no
+# AUE_SHMSYS is a placeholder and will not be generated
+65:AUE_SHMSYS:shmsys(2) - place holder:no
+66:AUE_BSMSYS:bsmsys(2) - place holder:no
+67:AUE_RFSSYS:rfssys(2) - place holder:no
+68:AUE_FCHDIR:fchdir(2):pm
+69:AUE_FCHROOT:fchroot(2):pm
+70:AUE_VPIXSYS:vpixsys(2) - place holder:no
+71:AUE_PATHCONF:pathconf(2):fa
+72:AUE_OPEN_R:open(2) - read:fr
+73:AUE_OPEN_RC:open(2) - read,creat:fc,fr
+74:AUE_OPEN_RT:open(2) - read,trunc:fd,fr
+75:AUE_OPEN_RTC:open(2) - read,creat,trunc:fc,fd,fr
+76:AUE_OPEN_W:open(2) - write:fw
+77:AUE_OPEN_WC:open(2) - write,creat:fc,fw
+78:AUE_OPEN_WT:open(2) - write,trunc:fd,fw
+79:AUE_OPEN_WTC:open(2) - write,creat,trunc:fc,fd,fw
+80:AUE_OPEN_RW:open(2) - read,write:fr,fw
+81:AUE_OPEN_RWC:open(2) - read,write,creat:fc,fw,fr
+82:AUE_OPEN_RWT:open(2) - read,write,trunc:fd,fr,fw
+83:AUE_OPEN_RWTC:open(2) - read,write,creat,trunc:fc,fd,fw,fr
+84:AUE_MSGCTL:msgctl(2) - illegal command:ip
+85:AUE_MSGCTL_RMID:msgctl(2) - IPC_RMID command:ip
+86:AUE_MSGCTL_SET:msgctl(2) - IPC_SET command:ip
+87:AUE_MSGCTL_STAT:msgctl(2) - IPC_STAT command:ip
+88:AUE_MSGGET:msgget(2):ip
+89:AUE_MSGRCV:msgrcv(2):ip
+90:AUE_MSGSND:msgsnd(2):ip
+91:AUE_SHMCTL:shmctl(2) - illegal command:ip
+92:AUE_SHMCTL_RMID:shmctl(2) - IPC_RMID command:ip
+93:AUE_SHMCTL_SET:shmctl(2) - IPC_SET command:ip
+94:AUE_SHMCTL_STAT:shmctl(2) - IPC_STAT command:ip
+95:AUE_SHMGET:shmget(2):ip
+96:AUE_SHMAT:shmat(2):ip
+97:AUE_SHMDT:shmdt(2):ip
+98:AUE_SEMCTL:semctl(2) - illegal command:ip
+99:AUE_SEMCTL_RMID:semctl(2) - IPC_RMID command:ip
+100:AUE_SEMCTL_SET:semctl(2) - IPC_SET command:ip
+101:AUE_SEMCTL_STAT:semctl(2) - IPC_STAT command:ip
+102:AUE_SEMCTL_GETNCNT:semctl(2) - GETNCNT command:ip
+103:AUE_SEMCTL_GETPID:semctl(2) - GETPID command:ip
+104:AUE_SEMCTL_GETVAL:semctl(2) - GETVAL command:ip
+105:AUE_SEMCTL_GETALL:semctl(2) - GETALL command:ip
+106:AUE_SEMCTL_GETZCNT:semctl(2) - GETZCNT command:ip
+107:AUE_SEMCTL_SETVAL:semctl(2) - SETVAL command:ip
+108:AUE_SEMCTL_SETALL:semctl(2) - SETALL command:ip
+109:AUE_SEMGET:semget(2):ip
+110:AUE_SEMOP:semop(2):ip
+111:AUE_CORE:process dumped core:fc
+112:AUE_CLOSE:close(2):cl
+113:AUE_SYSTEMBOOT:system booted:na
+114:AUE_ASYNC_DAEMON_EXIT:async_daemon(2) exited:no
+115:AUE_NFSSVC_EXIT:nfssvc(2) exited:no
+116:AUE_PFEXEC:execve(2) with pfexec enabled:ps,ex,ua,as
+117:AUE_OPEN_S:open(2) - search:fr
+118:AUE_OPEN_E:open(2) - exec:fr
+
+130:AUE_GETAUID:getauid(2):aa
+131:AUE_SETAUID:setauid(2):aa
+132:AUE_GETAUDIT:getaudit(2):aa
+133:AUE_SETAUDIT:setaudit(2):aa
+134:AUE_GETUSERAUDIT:getuseraudit(2):no
+135:AUE_SETUSERAUDIT:setuseraudit(2):no
+# AUE_AUDITSVC is a placeholder and will not be generated
+136:AUE_AUDITSVC:auditsvc(2) - place holder:no
+# AUE_AUDITON is a placeholder and will not be generated
+138:AUE_AUDITON:auditon(2) - place holder:no
+139:AUE_AUDITON_GTERMID:auditon(2) - GETTERMID command:no
+140:AUE_AUDITON_STERMID:auditon(2) - SETTERMID command:no
+141:AUE_AUDITON_GPOLICY:auditon(2) - get audit policy flags:aa
+142:AUE_AUDITON_SPOLICY:auditon(2) - set audit policy flags:as
+143:AUE_AUDITON_GESTATE:auditon(2) - GESTATE command:no
+144:AUE_AUDITON_SESTATE:auditon(2) - SESTATE command:no
+145:AUE_AUDITON_GQCTRL:auditon(2) - get queue control parameters:as
+146:AUE_AUDITON_SQCTRL:auditon(2) - set queue control parameters:as
+147:AUE_GETKERNSTATE:getkernstate(2):no
+148:AUE_SETKERNSTATE:setkernstate(2):no
+149:AUE_GETPORTAUDIT:getportaudit(2):no
+150:AUE_AUDITSTAT:auditstat(2):no
+153:AUE_ENTERPROM:enter prom:na
+154:AUE_EXITPROM:exit prom:na
+158:AUE_IOCTL:ioctl(2):io
+173:AUE_ONESIDE:one-sided session record:no
+174:AUE_MSGGETL:msggetl(2):no
+175:AUE_MSGRCVL:msgrcvl(2):no
+176:AUE_MSGSNDL:msgsndl(2):no
+177:AUE_SEMGETL:semgetl(2):no
+178:AUE_SHMGETL:shmgetl(2):no
+183:AUE_SOCKET:socket(2):nt
+184:AUE_SENDTO:sendto(2):nt
+# AUE_PIPE is a potentially very high-volume event, use with caution
+185:AUE_PIPE:pipe(2):no
+186:AUE_SOCKETPAIR:socketpair(2):no
+187:AUE_SEND:send(2):no
+188:AUE_SENDMSG:sendmsg(2):nt
+189:AUE_RECV:recv(2):no
+190:AUE_RECVMSG:recvmsg(2):nt
+191:AUE_RECVFROM:recvfrom(2):nt
+# AUE_READ is a potentially very high-volume event, use with caution
+192:AUE_READ:read(2):no
+193:AUE_GETDENTS:getdents(2):no
+194:AUE_LSEEK:lseek(2):no
+# AUE_WRITE is a potentially very high-volume event, use with caution
+195:AUE_WRITE:write(2):no
+196:AUE_WRITEV:writev(2):no
+197:AUE_NFS:nfs server:no
+198:AUE_READV:readv(2):no
+199:AUE_OSTAT:old stat(2):no
+200:AUE_SETUID:setuid(2):pm
+201:AUE_STIME:old stime(2):as
+202:AUE_UTIME:old utime(2):no
+203:AUE_NICE:old nice(2):pm
+204:AUE_OSETPGRP:old setpgrp(2):no
+205:AUE_SETGID:old setgid(2):pm
+206:AUE_READL:readl(2):no
+207:AUE_READVL:readvl(2):no
+208:AUE_FSTAT:fstat(2):no
+209:AUE_DUP2:dup2(2):no
+# AUE_MMAP is a potentially very high-volume event, use with caution
+210:AUE_MMAP:mmap(2):no
+# AUE_AUDIT is a potentially very high-volume event, use with caution
+211:AUE_AUDIT:audit(2):no
+212:AUE_PRIOCNTLSYS:priocntlsys(2):pm
+213:AUE_MUNMAP:munmap(2):cl
+214:AUE_SETEGID:setegid(2):pm
+215:AUE_SETEUID:seteuid(2):pm
+216:AUE_PUTMSG:putmsg(2):nt
+217:AUE_GETMSG:getmsg(2):nt
+218:AUE_PUTPMSG:putpmsg(2):nt
+219:AUE_GETPMSG:getpmsg(2):nt
+# AUE_AUDITSYS is a placeholder and will not be generated
+220:AUE_AUDITSYS:audit system calls place holder:no
+221:AUE_AUDITON_GETKMASK:auditon(2) - get kernel mask:aa
+222:AUE_AUDITON_SETKMASK:auditon(2) - set kernel mask:as
+223:AUE_AUDITON_GETCWD:auditon(2) - get current working directory:aa,as
+224:AUE_AUDITON_GETCAR:auditon(2) - get current active root:aa,as
+225:AUE_AUDITON_GETSTAT:auditon(2) - get audit statistics:as
+226:AUE_AUDITON_SETSTAT:auditon(2) - reset audit statistics:as
+227:AUE_AUDITON_SETUMASK:auditon(2) - set mask per audit uid:as
+228:AUE_AUDITON_SETSMASK:auditon(2) - set mask per session ID:as
+229:AUE_AUDITON_GETCOND:auditon(2) - get audit state:aa
+230:AUE_AUDITON_SETCOND:auditon(2) - set audit state:as
+231:AUE_AUDITON_GETCLASS:auditon(2) - get event class:aa,as
+232:AUE_AUDITON_SETCLASS:auditon(2) - set event class:as
+233:AUE_FUSERS:utssys(2) - fusers:fa
+234:AUE_STATVFS:statvfs(2):fa
+235:AUE_XSTAT:xstat(2):no
+236:AUE_LXSTAT:lxstat(2):no
+237:AUE_LCHOWN:lchown(2):fm
+238:AUE_MEMCNTL:memcntl(2):ot
+239:AUE_SYSINFO:sysinfo(2):as
+240:AUE_XMKNOD:xmknod(2):no
+241:AUE_FORK1:fork1(2):ps
+# AUE_MODCTL is a placeholder and will not be generated
+242:AUE_MODCTL:modctl(2) system call place holder:no
+243:AUE_MODLOAD:modctl(2) - load module:as
+244:AUE_MODUNLOAD:modctl(2) - unload module:as
+# AUE_MODCONFIG is a place holder and will not be generated
+245:AUE_MODCONFIG:modctl(2) - no longer generated:no
+246:AUE_MODADDMAJ:modctl(2) - bind module:as
+247:AUE_SOCKACCEPT:getmsg-accept:nt
+248:AUE_SOCKCONNECT:putmsg-connect:nt
+249:AUE_SOCKSEND:putmsg-send:nt
+250:AUE_SOCKRECEIVE:getmsg-receive:nt
+251:AUE_ACLSET:acl(2) - SETACL command:fm
+252:AUE_FACLSET:facl(2) - SETACL command:fm
+# AUE_DOORFS is a placeholder and will not be generated
+253:AUE_DOORFS:doorfs(2) - system call place holder:no
+254:AUE_DOORFS_DOOR_CALL:doorfs(2) - DOOR_CALL:ip
+255:AUE_DOORFS_DOOR_RETURN:doorfs(2) - DOOR_RETURN:ip
+256:AUE_DOORFS_DOOR_CREATE:doorfs(2) - DOOR_CREATE:ip
+257:AUE_DOORFS_DOOR_REVOKE:doorfs(2) - DOOR_REVOKE:ip
+258:AUE_DOORFS_DOOR_INFO:doorfs(2) - DOOR_INFO:ip
+259:AUE_DOORFS_DOOR_CRED:doorfs(2) - DOOR_CRED:ip
+260:AUE_DOORFS_DOOR_BIND:doorfs(2) - DOOR_BIND:ip
+261:AUE_DOORFS_DOOR_UNBIND:doorfs(2) - DOOR_UNBIND:ip
+262:AUE_P_ONLINE:p_online(2):as
+263:AUE_PROCESSOR_BIND:processor_bind(2):as
+264:AUE_INST_SYNC:inst_sync(2):as
+265:AUE_SOCKCONFIG:configure socket:nt
+266:AUE_SETAUDIT_ADDR:setaudit_addr(2):aa
+267:AUE_GETAUDIT_ADDR:getaudit_addr(2):aa
+268:AUE_UMOUNT2:umount2(2):as
+# AUE_FSAT and all AUE_OPENAT_* codes are obsolete and will not be generated
+269:AUE_FSAT:fsat(2) - place holder:no
+270:AUE_OPENAT_R:openat(2) - read:no
+271:AUE_OPENAT_RC:openat(2) - read,creat:no
+272:AUE_OPENAT_RT:openat(2) - read,trunc:no
+273:AUE_OPENAT_RTC:openat(2) - read,creat,trunc:no
+274:AUE_OPENAT_W:openat(2) - write:no
+275:AUE_OPENAT_WC:openat(2) - write,creat:no
+276:AUE_OPENAT_WT:openat(2) - write,trunc:no
+277:AUE_OPENAT_WTC:openat(2) - write,creat,trunc:no
+278:AUE_OPENAT_RW:openat(2) - read,write:no
+279:AUE_OPENAT_RWC:openat(2) - read,write,creat:no
+280:AUE_OPENAT_RWT:openat(2) - read,write,trunc:no
+281:AUE_OPENAT_RWTC:openat(2) - read,write,creat,trunc:no
+282:AUE_RENAMEAT:renameat(2):no
+283:AUE_FSTATAT:fstatat(2):no
+284:AUE_FCHOWNAT:fchownat(2):no
+285:AUE_FUTIMESAT:futimesat(2):no
+286:AUE_UNLINKAT:unlinkat(2):no
+287:AUE_CLOCK_SETTIME:clock_settime(3RT):as
+288:AUE_NTP_ADJTIME:ntp_adjtime(2):as
+289:AUE_SETPPRIV:setppriv(2):pm
+290:AUE_MODDEVPLCY:modctl(2) - configure device policy:as
+291:AUE_MODADDPRIV:modctl(2) - configure additional privilege:as
+292:AUE_CRYPTOADM:kernel cryptographic framework:as
+293:AUE_CONFIGKSSL:configure kernel SSL:as
+294:AUE_BRANDSYS:brandsys(2):ot
+295:AUE_PF_POLICY_ADDRULE:Add IPsec policy rule:as
+296:AUE_PF_POLICY_DELRULE:Delete IPsec policy rule:as
+297:AUE_PF_POLICY_CLONE:Clone IPsec policy:as
+298:AUE_PF_POLICY_FLIP:Flip IPsec policy:as
+299:AUE_PF_POLICY_FLUSH:Flush IPsec policy rules:as
+300:AUE_PF_POLICY_ALGS:Update IPsec algorithms:as
+# AUE_PORTFS is a placeholder and won't be generated.
+301:AUE_PORTFS:portfs(2) - file events source - place holder:no
+#
+302:AUE_LABELSYS_TNRH:tnrh(2) - config TN remote host cache:as
+303:AUE_LABELSYS_TNRHTP:tnrhtp(2) - config TN remote host template cache:as
+304:AUE_LABELSYS_TNMLP:tnmlp(2) - config TN multi-level port entry:as
+#
+305:AUE_PORTFS_ASSOCIATE:portfs(2) - file events source - PORT_ASSOCIATE:fa
+306:AUE_PORTFS_DISSOCIATE:portfs(2) - file events source - PORT_DISSOCIATE:fa
+#
+307:AUE_SETSID:setsid(2):pm
+308:AUE_SETPGID:setpgid(2):pm
+309:AUE_FACCESSAT:faccessat(2):no
+310:AUE_AUDITON_GETAMASK:auditon(2) - get default user preselection mask:aa
+311:AUE_AUDITON_SETAMASK:auditon(2) - set default user preselection mask:as
+#
+# user level audit events
+#	2048 -  6143	Reserved
+#
+#	6000 -  7999	allocated for Solaris
+#
+6144:AUE_at_create:at-create atjob:ua
+6145:AUE_at_delete:at-delete atjob (at or atrm):ua
+6146:AUE_at_perm:at-permission:no
+6147:AUE_cron_invoke:cron-invoke:ua
+6148:AUE_crontab_create:crontab-crontab created:ua
+6149:AUE_crontab_delete:crontab-crontab deleted:ua
+6150:AUE_crontab_perm:crontab-persmisson:no
+6151:AUE_inetd_connect:inetd connect:na
+6152:AUE_login:login - local:lo
+6153:AUE_logout:logout:lo
+6154:AUE_telnet:login - telnet:lo
+6155:AUE_rlogin:login - rlogin:lo
+6156:AUE_mountd_mount:mount:na
+6157:AUE_mountd_umount:unmount:na
+6158:AUE_rshd:rsh access:lo
+6159:AUE_su:su:lo
+6160:AUE_halt_solaris:halt(1m):ss
+6161:AUE_reboot_solaris:reboot(1m):ss
+6162:AUE_rexecd:rexecd:lo
+6163:AUE_passwd:passwd:lo
+6164:AUE_rexd:rexd:lo
+6165:AUE_ftpd:ftp access:lo
+6166:AUE_init_solaris:init(1m):ss
+6167:AUE_uadmin_solaris:uadmin(1m):no
+6168:AUE_shutdown_solaris:shutdown(1b):ss
+6169:AUE_poweroff_solaris:poweroff(1m):ss
+6170:AUE_crontab_mod:crontab-modify:ua
+6171:AUE_ftpd_logout:ftp logout:lo
+6172:AUE_ssh:login - ssh:lo
+6173:AUE_role_login:role login:lo
+6180:AUE_prof_cmd:profile command:ua,as
+6181:AUE_filesystem_add:add filesystem:as
+6182:AUE_filesystem_delete:delete filesystem:as
+6183:AUE_filesystem_modify:modify filesystem:as
+6184:AUE_network_add:add network attributes:as
+6185:AUE_network_delete:delete network attributes:as
+6186:AUE_network_modify:modify network attributes:as
+6187:AUE_printer_add:add printer:as
+6188:AUE_printer_delete:delete printer:as
+6189:AUE_printer_modify:modify printer:as
+6190:AUE_scheduledjob_add:add scheduled job:ua
+6191:AUE_scheduledjob_delete:delete scheduled job:ua
+6192:AUE_scheduledjob_modify:modify scheduled job:ua
+6193:AUE_serialport_add:add serial port:as
+6194:AUE_serialport_delete:delete serial port:as
+6195:AUE_serialport_modify:modify serial port:as
+6196:AUE_usermgr_add:add user/user attributes:ua
+6197:AUE_usermgr_delete:delete user/user attributes:ua
+6198:AUE_usermgr_modify:modify user/user attributes:ua
+6199:AUE_uauth:authorization used:ua,as
+6200:AUE_allocate_succ:allocate-device success:ot
+6201:AUE_allocate_fail:allocate-device failure:ot
+6202:AUE_deallocate_succ:deallocate-device success:ot
+6203:AUE_deallocate_fail:deallocate-device failure:ot
+6205:AUE_listdevice_succ:allocate-list devices success:ot
+6206:AUE_listdevice_fail:allocate-list devices failure:ot
+6207:AUE_create_user:create user:no
+6208:AUE_modify_user:modify user:no
+6209:AUE_delete_user:delete user:no
+6210:AUE_disable_user:disable user:no
+6211:AUE_enable_user:enable user:no
+6212:AUE_newgrp_login:newgrp login:lo
+6213:AUE_admin_authenticate:admin login:lo
+6214:AUE_kadmind_auth:authenticated kadmind request:ua
+6215:AUE_kadmind_unauth:unauthenticated kadmind req:ua
+6216:AUE_krb5kdc_as_req:kdc authentication svc request:ap
+6217:AUE_krb5kdc_tgs_req:kdc tkt-grant svc request:ap
+6218:AUE_krb5kdc_tgs_req_2ndtktmm:kdc tgs 2ndtkt mismtch:ap
+6219:AUE_krb5kdc_tgs_req_alt_tgt:kdc tgs issue alt tgt:ap
+6220:AUE_smserverd:smserverd:ot
+6221:AUE_screenlock:screenlock - lock:lo
+6222:AUE_screenunlock:screenlock - unlock:lo
+6223:AUE_zone_state:zoneadmd:ss
+6224:AUE_inetd_copylimit:inetd copylimit:na
+6225:AUE_inetd_failrate:inetd failrate:na
+6226:AUE_inetd_ratelimit:inetd ratelimit:na
+6227:AUE_zlogin:login - zlogin:lo
+6228:AUE_su_logout:su logout:lo
+6229:AUE_role_logout:role logout:lo
+6230:AUE_attach:attach device:ot
+6231:AUE_detach:detach device:ot
+6232:AUE_remove:remove/eject device:ot
+6233:AUE_pool_import:import device into pool:ot
+6234:AUE_pool_export:export device from pool:ot
+6235:AUE_dladm_create_secobj:create network security object:as,cy
+6236:AUE_dladm_delete_secobj:delete network security object:as,cy
+6237:AUE_uadmin_shutdown:uadmin(1m) - shutdown:ss
+6238:AUE_uadmin_reboot:uadmin(1m) - reboot:ss
+6239:AUE_uadmin_dump:uadmin(1m) - dump:ss
+6240:AUE_uadmin_freeze:uadmin(1m) - freeze:ss
+6241:AUE_uadmin_remount:uadmin(1m) - remount:ss
+6242:AUE_uadmin_ftrace:uadmin(1m) - ftrace:ss
+6243:AUE_uadmin_swapctl:uadmin(1m) - swapctl:ss
+6244:AUE_smbd_session:smbd(1m) session setup:lo
+6245:AUE_smbd_logoff:smbd(1m) session logoff:lo
+6246:AUE_vscan_quarantine:vscand(1m) quarantine infected file:na
+6247:AUE_ndmp_connect:ndmp connect:na
+6248:AUE_ndmp_disconnect:ndmp disconnect:na
+6249:AUE_ndmp_backup:ndmp backup:na
+6250:AUE_ndmp_restore:ndmp restore:na
+6251:AUE_cpu_ondemand:set ondemand CPU freq governor:ss
+6252:AUE_cpu_performance:set max CPU freq governor:ss
+6253:AUE_cpu_threshold:set CPU freq threshold:ss
+6254:AUE_uadmin_thaw:uadmin(1m) - thaw after freeze:ss,na
+6255:AUE_uadmin_config:uadmin(1m) - config:ss
+
+#
+# SMF(5) svc.configd events (svcadm(1M) related)
+#
+6260:AUE_smf_enable:persistently enable service instance:ss
+6261:AUE_smf_tmp_enable:temporarily enable service instance:ss
+6262:AUE_smf_disable:persistently disable service instance:ss
+6263:AUE_smf_tmp_disable:temporarily disable service instance:ss
+6264:AUE_smf_restart:restart service instance:ss
+6265:AUE_smf_refresh:refresh service instance:ss
+6266:AUE_smf_clear:clear service instance state:ss
+6267:AUE_smf_degrade:set service instance degraded state:ss
+6268:AUE_smf_immediate_degrade:immediately set service instance degraded state:ss
+6269:AUE_smf_maintenance:set service instance persistent maintenance state:ss
+6270:AUE_smf_immediate_maintenance:immediately set service instance persistent maintenance state:ss
+6271:AUE_smf_immtmp_maintenance:immediately set service instance temporary maintenance state:ss
+6272:AUE_smf_tmp_maintenance:set service instance maintenance temporary state:ss
+6273:AUE_smf_milestone:set service management facility milestone:ss
+#
+# SMF(5) svc.configd miscellaneous events
+#
+6275:AUE_smf_read_prop:read restricted access property value:as
+#
+# SMF(5) svc.configd events (svccfg(1M) related)
+#
+6280:AUE_smf_create:create service instance object:as
+6281:AUE_smf_delete:delete service instance object:as
+6282:AUE_smf_create_pg:create persistent service property group:as
+6283:AUE_smf_create_npg:create non-persistent service property group:as
+6284:AUE_smf_delete_pg:delete persistent service property group:as
+6285:AUE_smf_delete_npg:delete non-persistent service property group:as
+6286:AUE_smf_create_snap:create repository snapshot:as
+6287:AUE_smf_delete_snap:delete repository snapshot:as
+6288:AUE_smf_attach_snap:attach repository snapshot:as
+6289:AUE_smf_annotation:annotate transaction:as,ss
+6290:AUE_smf_create_prop:create service instance property:as
+6291:AUE_smf_change_prop:change service instance property:as
+6292:AUE_smf_delete_prop:delete service instance property:as
+#
+# nwamd(1M) events
+#
+6300:AUE_nwam_enable:enable nwam profile object:ss
+6301:AUE_nwam_disable:disable nwam profile object:ss
+#
+# ilbd(1M) events
+#
+6310:AUE_ilb_create_healthcheck:create ILB health check:as
+6311:AUE_ilb_delete_healthcheck:delete ILB health check:as
+6312:AUE_ilb_create_rule:create ILB rule:as
+6313:AUE_ilb_delete_rule:delete ILB rule:as
+6314:AUE_ilb_disable_rule:disable ILB rule:as
+6315:AUE_ilb_enable_rule:enable ILB rule:as
+6316:AUE_ilb_add_server:add ILB server:as
+6317:AUE_ilb_disable_server:disable ILB server:as
+6318:AUE_ilb_enable_server:enable ILB server:as
+6319:AUE_ilb_remove_server:remove ILB server:as
+6320:AUE_ilb_create_servergroup:create ILB server group:as
+6321:AUE_ilb_delete_servergroup:delete ILB server group:as
+#
+# netcfgd(1M) events
+#
+6330:AUE_netcfg_update:create or modify configuration object:ss
+6331:AUE_netcfg_remove:remove configuration object from repository:ss
+#
+# TCSD(8) events
+#
+6400:AUE_tpm_takeownership:take ownership of TPM:as
+6401:AUE_tpm_clearowner:clear ownership of TPM:as
+6402:AUE_tpm_setoperatorauth:set TPM operator authorization:as
+6403:AUE_tpm_setownerinstall:set TPM ownership flag:as
+6404:AUE_tpm_selftestfull:test all TPM protected capabilities:as
+6405:AUE_tpm_certifyselftest:perform full TPM self-test:as
+6406:AUE_tpm_continueselftest:complete TPM self-test:as
+6407:AUE_tpm_ownersetdisable:change the status of TPM disable flag:as
+6408:AUE_tpm_ownerclear:perform the clear operation under TPM owner auth:as
+6409:AUE_tpm_disableownerclear:disable TPM_OwnerClear command permanently:as
+6410:AUE_tpm_forceclear:perform TPM clear operation under physical access:as
+6411:AUE_tpm_disableforceclear:disable ForceClear execution until next startup:as
+6412:AUE_tpm_physicaldisable:disable TPM physical presence:as
+6413:AUE_tpm_physicalenable:enable TPM physical presence:as
+6414:AUE_tpm_physicaldeactivate:set TPM deactivated flag:as
+6415:AUE_tpm_settempdeactivated:set volatile TPM deactivated flag to TRUE:as
+6416:AUE_tpm_settempdeactivated2:set volatile TPM deactivated flag TRUE with auth:as
+6417:AUE_tpm_physicalpresence:set the TPM physical presence flag:as
+6418:AUE_tpm_fieldupgrade:update TPM protected capabilities:as
+6419:AUE_tpm_resetlockvalue:reset TPM failed authorization attempt lock:as
+#
+# hotplugd(1m) events
+#
+6500:AUE_hotplug_state:change hotplug connection state:ss
+6501:AUE_hotplug_set:set hotplug bus private options:ss
+
+#
+# Trusted Extensions events:
+#
+9035:AUE_sl_change:Workspace label change:ap
+9036:AUE_file_relabel:relabel file:fm
+9037:AUE_file_copy:file copy:fm
+9038:AUE_file_move:file move:no
+9039:AUE_sel_mgr_xfer:selection manager transfer:fm
+9101:AUE_ClientConnect:client connection to x server:lo
+9102:AUE_ClientDisconnect:client disconn. from x server:lo
+9120:AUE_ChangeProperty:XChangeProperty(3X11):xc
+9121:AUE_DeleteProperty:XDeleteProperty(3X11):xc
+9137:AUE_GrabServer:XGrabServer(3X11):ot
+9138:AUE_UngrabServer:XUngrabServer(3X11):ot
+9146:AUE_SetFontPath:XSetFontPath(3X11):ot
+9173:AUE_InstallColormap:XInstallColormap(3X11):ot
+9174:AUE_UninstallColormap:XUninstallColormap(3X11):xp
+9193:AUE_SetScreenSaver:XSetScreenSaver(3X11):xp
+9194:AUE_ChangeHosts:XChangeHosts(3X11):ot
+9195:AUE_SetAccessControl:XSetAccessControl(3X11):xp
+9196:AUE_SetCloseDownMode:XSetCloseDownMode(3X11):xs
+9197:AUE_KillClient:XKillClient(3X11):xc
+9202:AUE_XExtensions:X server extensions:xp
+9103:AUE_CreateWindow:XCreateWindow(3X11):xc
+9104:AUE_ChangeWindowAttributes:XChangeWindowAttributes(3X11):xp
+9105:AUE_GetWindowAttributes:XGetWindowAttributes(3X11):xp
+9106:AUE_DestroyWindow:XDestroyWindow(3X11):xc
+9107:AUE_DestroySubwindows:XDestroySubwindows(3X11):xc
+9108:AUE_ChangeSaveSet:XChangeSaveSet(3X11):xp
+9109:AUE_ReparentWindow:XReparentWindow(3X11):xp
+9110:AUE_MapWindow:XMapWindow(3X11):xp
+9111:AUE_MapSubwindows:XMapSubwindows(3X11):xp
+9112:AUE_UnmapWindow:XUnmapWindow(3X11):xp
+9113:AUE_UnmapSubwindows:XUnmapSubwindows(3X11):xp
+9114:AUE_ConfigureWindow:XConfigureWindow(3X11):xp
+9115:AUE_CirculateWindow:XCirculateWindow(3X11):xp
+9116:AUE_GetGeometry:XGetGeometry(3X11):xp
+9117:AUE_QueryTree:XQueryTree(3X11):xp
+9118:AUE_InternAtom:XInternAtom(3X11):xs
+9119:AUE_GetAtomName:XGetAtomName(3X11):xs
+9122:AUE_GetProperty:XGetProperty(3X11):xp
+9123:AUE_ListProperties:XListProperties(3X11):xp
+9124:AUE_SetSelectionOwner:XSetSelectionOwner(3X11):xp
+9125:AUE_GetSelectionOwner:XGetSelectionOwner(3X11):xs
+9126:AUE_ConvertSelection:XConvertSelection(3X11):xs
+9127:AUE_SendEvent:XSendEvent(3X11):xs
+9128:AUE_GrabPointer:XGrabPointer(3X11):xs
+9129:AUE_UngrabPointer:XUngrabPointer(3X11):xs
+9130:AUE_GrabButton:XGrabButton(3X11):xp
+9131:AUE_UngrabButton:XUngrabButton(3X11):xs
+9132:AUE_ChangeActivePointerGrab:XChangeActivePointerGrab(3X11):xs
+9133:AUE_GrabKeyboard:XGrabKeyboard(3X11):xp
+9134:AUE_UngrabKeyboard:XUngrabKeyboard(3X11):xs
+9135:AUE_GrabKey:XGrabKey(3X11):xp
+9136:AUE_UngrabKey:XUngrabKey(3X11):xp
+9139:AUE_QueryPointer:XQueryPointer(3X11):xp
+9140:AUE_GetMotionEvents:XGetMotionEvents(3X11):xp
+9141:AUE_TranslateCoords:XTranslateCoords(3X11):xp
+9142:AUE_WarpPointer:XWarpPointer(3X11):xs
+9143:AUE_SetInputFocus:XSetInputFocus(3X11):xs
+9144:AUE_GetInputFocus:XGetInputFocus(3X11):xs
+9145:AUE_QueryKeymap:XQueryKeymap(3X11):xp
+9147:AUE_FreePixmap:XFreePixmap(3X11):xc
+9148:AUE_ChangeGC:XChangeGC(3X11):xp
+9149:AUE_CopyGC:XCopyGC(3X11):xp
+9150:AUE_SetDashes:XSetDashes(3X11):xp
+9151:AUE_SetClipRectangles:XSetClipRectangles(3X11):xp
+9152:AUE_FreeGC:XFreeGC(3X11):xc
+9153:AUE_ClearArea:XClearArea(3X11):xp
+9154:AUE_CopyArea:XCopyArea(3X11):xs
+9155:AUE_CopyPlane:XCopyPlane(3X11):xs
+9156:AUE_PolyPoint:XPolyPoint(3X11):xp
+9157:AUE_PolyLine:XPolyLine(3X11):xp
+9158:AUE_PolySegment:XPolySegment(3X11):xp
+9159:AUE_PolyRectangle:XPolyRectangle(3X11):xs
+9160:AUE_PolyArc:XPolyArc(3X11):xp
+9161:AUE_FillPolygon:XFillPolygon(3X11):xp
+9162:AUE_PolyFillRectangle:XPolyFillRectangle(3X11):xp
+9163:AUE_PolyFillArc:XPolyFillArc(3X11):xp
+9164:AUE_PutImage:XPutImage(3X11):xp
+9165:AUE_GetImage:XGetImage(3X11):xs
+9166:AUE_PolyText8:XPolyText8(3X11):xp
+9167:AUE_PolyText16:XPolyText16(3X11):xp
+9168:AUE_ImageText8:XImageText8(3X11):xp
+9169:AUE_ImageText16:XImageText16(3X11):xp
+9170:AUE_CreateColormap:XCreateColormap(3X11):xc
+9171:AUE_FreeColormap:XFreeColormap(3X11):xc
+9172:AUE_CopyColormapAndFree:XCopyColormapAndFree(3X11):xp
+9175:AUE_ListInstalledColormaps:XListInstalledColormaps(3X11):xs
+9176:AUE_AllocColor:XAllocColor(3X11):xc
+9177:AUE_AllocNamedColor:XAllocNamedColor(3X11):xc
+9178:AUE_AllocColorCells:XAllocColorCells(3X11):xc
+9179:AUE_AllocColorPlanes:XAllocColorPlanes(3X11):xc
+9180:AUE_FreeColors:XFreeColors(3X11):xc
+9181:AUE_StoreColors:XStoreColors(3X11):xp
+9182:AUE_StoreNamedColor:XStoreNamedColor(3X11):xp
+9183:AUE_QueryColors:XQueryColors(3X11):xp
+9184:AUE_LookupColor:XLookupColor(3X11):xp
+9185:AUE_CreateCursor:XCreateCursor(3X11):xc
+9186:AUE_CreateGlyphCursor:XCreateGlyphCursor(3X11):xc
+9187:AUE_FreeCursor:XFreeCursor(3X11):xc
+9188:AUE_RecolorCursor:XRecolorCursor(3X11):xp
+9189:AUE_ChangeKeyboardMapping:XChangeKeyboardMapping(3X11):xs
+9190:AUE_ChangeKeyboardControl:XChangeKeyboardControl(3X11):xs
+9191:AUE_Bell:XBell(3X11):xs
+9192:AUE_ChangePointerControl:XChangePointerControl(3X11):xs
+9198:AUE_RotateProperties:XRotateProperties(3X11):xp
+9199:AUE_ForceScreenSaver:XForceScreenSaver(3X11):xp
+9200:AUE_SetPointerMapping:XSetPointerMapping(3X11):xs
+9201:AUE_SetModifierMapping:XSetModifierMapping(3X11):xs

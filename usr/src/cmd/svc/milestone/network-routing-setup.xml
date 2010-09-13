@@ -1,0 +1,148 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+        ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:routing-setup'>
+
+<service
+	name='network/routing-setup'
+	type='service'
+	version='1'>
+
+	<!-- loopback/physical network configuration is required -->
+	<dependency
+		name='network'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<!-- usr filesystem required to run routing-related commands -->
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/usr' />
+	</dependency>
+
+	<!--
+		This dependency was added to make sure soconfig runs in
+		devices-local method, before routeadm invocation in
+		network/routing-setup.  This is because routeadm commands
+		depend on sockets.
+	-->
+	<dependency
+		name='devices'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/devices' />
+	</dependency>
+
+	<!--
+		This dependency is required to ensure that all routing-related
+		manifests have been imported prior to running routeadm.
+	-->
+	<dependency
+		name='manifest_import'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/manifest-import:default' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/net-routing-setup'
+		timeout_seconds='600'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='3'>
+	</exec_method>
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<instance name='default' enabled='true' >
+
+	<!-- Properties in this group are used by routeadm (1M) -->
+	<property_group name='routeadm' type='framework'>
+		<stability value='Evolving' />
+		<!-- set if routeadm -e/d ipv4-routing is explicitly invoked -->
+		<propval name='ipv4-routing-set' type='boolean'
+			value='false' />
+		<!-- set if routeadm -e/d ipv6-routing is explicitly invoked -->
+		<propval name='ipv6-routing-set' type='boolean'
+			value='false' />
+		<!-- set if legacy routing.conf configuration has been read -->
+		<propval name='routing-conf-read' type='boolean'
+			value='false' />
+		<!-- default for ipv4-routing to revert to via routeadm -r -->
+		<propval name='default-ipv4-routing' type='boolean'
+		    value='false' />
+		<propval name='default-ipv6-routing' type='boolean'
+			value='false' />
+		<!-- routing-svcs values, current and default -->
+		<propval name='routing-svcs' type='astring'
+		    value='route:default ripng:default' />
+		<propval name='default-routing-svcs' type='astring'
+		    value='route:default ripng:default' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.routing' />
+	</property_group>
+
+	</instance>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				Initial routing-related configuration.
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='routeadm' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

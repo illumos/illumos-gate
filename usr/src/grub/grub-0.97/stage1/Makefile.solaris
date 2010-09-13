@@ -1,0 +1,74 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+.SUFFIXES:
+.SUFFIXES: .exec $(SUFFIXES)
+
+.exec:
+	$(OBJCOPY) -O binary $< $@
+
+
+INCLUDES	= -I. -I..
+CCASFLAGS	+= -O2 -fno-builtin -nostdinc
+LDFLAGS		+= -nostdlib -N -Ttext 7C00
+LIBS		=
+
+
+DATA		= $(STAGE1_DATA)
+PROGRAMS	= $(STAGE1_EXEC)
+
+STAGE1_DATA	= stage1
+STAGE1_EXEC	= stage1.exec
+STAGE1_ASMOBJS	= stage1.o
+STAGE1_OBJS	=
+
+INSTALL_TARGETS	= $(DATA:%=$(ROOT_BOOT_GRUB)/%)
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/stage1
+SRC_FILES	= Makefile.am Makefile.in stage1.S stage1.h
+
+INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all: $(PROGRAMS) $(DATA)
+
+
+$(STAGE1_EXEC): $(STAGE1_ASMOBJS) $(STAGE1_OBJS)
+	$(RM) $@
+	$(LINK) -o $@ $(STAGE1_ASMOBJS) $(STAGE1_OBJS) $(LIBS)
+
+$(STAGE1_ASMOBJS): $$(@:.o=.S)
+	$(CCAS) $(CCASFLAGS) -c -o $@ $(@:.o=.S)
+
+$(STAGE1_OBJS): $$(@:.o=.c)
+	$(CC) $(CFLAGS) -c -o $@ $(@:.o=.c)
+
+
+install: all $(INSTALL_TARGETS)
+
+$(ROOT_BOOT_GRUB)/%: $(ROOT_BOOT_GRUB) %
+	$(INS.file)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(ROOT_BOOT_GRUB) $(SRC_DIR):
+	$(INS.dir)
+
+
+clean: _FORCE
+	$(RM) *.o $(PROGRAMS)
+
+clobber: clean
+	$(RM) $(DATA)
+
+_FORCE:

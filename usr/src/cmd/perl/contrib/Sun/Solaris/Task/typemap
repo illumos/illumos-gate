@@ -1,0 +1,12 @@
+#
+# Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved.
+#
+
+TYPEMAP
+	taskid_t	T_IV
+	projid_t	T_IV
+
+INPUT
+
+OUTPUT
+

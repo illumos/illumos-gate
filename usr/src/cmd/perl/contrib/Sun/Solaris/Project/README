@@ -1,0 +1,44 @@
+#
+# Copyright (c) 2003, Oracle and/or its affiliates. All rights reserved.
+#
+
+Licensing
+---------
+This module is released under the Perl Artistic License.
+
+Availability
+------------
+This module is only available for Solaris 9 onwards.
+
+Description
+-----------
+This module provided access to the Solaris Project subsystem, which is part of
+the Solaris resource management infrastructure.
+
+For more information on Solaris Projects, see the project(4) manpage and the
+following on-line documentation:
+
+System Administration Guide: Resource Management and Network Services
+Chapter 6 - Projects and Tasks
+http://docs.sun.com/db/doc/816-7125
+
+An example of how this module might be used is to put the Apache httpd under
+resource management control, so that the total resources used by Apache can be
+limited using Solaris resource management.  Assuming mod_perl is installed for
+Apache, and a project with the appropriate limits has been established
+(see documentation references above), the following code in the Apache Perl
+startup file will place Apache under RM control:
+
+use Sun::Solaris::Project qw(:ALL);
+my $user = getpwuid(Apache->server->uid());
+setproject(getdefaultproj($user), $user, 0) == 0 || die($!);
+
+Installation
+------------
+
+1. Uncompress and untar the archive
+2. cd to the module directory
+3. perl Makefile.PL; make install
+
+If you are using gcc and wish to build this module against the perl shipped as
+part of Solaris, see the Solaris-PerlGcc module, also available from CPAN.

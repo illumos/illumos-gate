@@ -1,0 +1,252 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+.KEEP_STATE:
+.SUFFIXES:
+
+include $(SRC)/cmd/mdb/Makefile.tools
+
+$(KMOD_SOURCES_DIFFERENT)KMODSRCS = $(MODSRCS)
+
+MODOBJS = $(MODSRCS:%.c=dmod/%.o)
+KMODOBJS = $(KMODSRCS:%.c=kmod/%.o)
+
+MODNAME = $(MODULE:%.so=%)
+KMODULE = $(MODNAME)
+
+MODFILE = dmod/$(MODULE)
+KMODFILE = kmod/$(KMODULE)
+
+#
+# The mess below is designed to pick the right set of objects to build and/or
+# lint.  We have three flavors:
+#
+#  1. proc and raw modules.  Only $(MODOBJS) are built.
+#  2. kvm modules for systems without kmdb.  Only $(MODOBJS) are built.
+#  3. kvm modules for systems with kmdb.  $(MODOBJS) and $(KMODOBJS) are built.
+#
+# Complicating matters, we'd like to make the distinction between 2 and 3 before
+# this Makefile is loaded.  By default, we'll assume that all kvm modules should
+# be built for kmdb.  If, however, the user sets $(MODULE_BUILD_TYPE) to `mdb',
+# the kmdb variant of the module won't be built.
+#
+
+# Which flavors are to be built?
+TARGETS_kvm_type_	= both	# Build both if $(MODULE_BUILD_TYPE) is unset
+TARGETS_kvm_type_kmdb	= both
+TARGETS_kvm_type_mdb	= mdb
+TARGETS_kvm_type	= $(TARGETS_kvm_type_$(MODULE_BUILD_TYPE))
+
+# What should we build?
+TARGETS_kvm_kmdb	= $(KMODFILE)
+TARGETS_kvm_mdb		= $(MODFILE)
+TARGETS_kvm_both	= $(TARGETS_kvm_mdb) $(TARGETS_kvm_kmdb)
+TARGETS_kvm		= $(TARGETS_kvm_$(TARGETS_kvm_type))
+TARGETS_proc		= $(MODFILE)
+TARGETS_raw		= $(MODFILE)
+TARGETS			= $(TARGETS_$(MDBTGT))
+
+# Where should we install that which we've built?
+ROOTTGTS_kvm_type	= $(TARGETS_kvm_type)	# overridden by mdb_ks
+ROOTTGTS_kvm_kmdb	= $(ROOTKMOD)/$(KMODULE)
+ROOTTGTS_kvm_mdb	= $(ROOTMOD)/$(MODULE)
+ROOTTGTS_kvm_both	= $(ROOTTGTS_kvm_mdb) $(ROOTTGTS_kvm_kmdb)
+ROOTTGTS_kvm		= $(ROOTTGTS_kvm_$(ROOTTGTS_kvm_type))
+ROOTTGTS_proc		= $(ROOTMOD)/$(MODULE)
+ROOTTGTS_raw		= $(ROOTMOD)/$(MODULE)
+ROOTTGTS		= $(ROOTTGTS_$(MDBTGT))
+
+# What should we lint?
+KLINTOBJS		= $(KMODOBJS:%.o=%.ln)
+LINTOBJS		= $(MODOBJS:%.o=%.ln)
+
+LINTFILES_kvm_type	= $(TARGETS_kvm_type)
+LINTFILES_kvm_both	= $(KLINTOBJS) $(LINTOBJS)
+LINTFILES_kvm_mdb	= $(LINTOBJS)
+LINTFILES_kvm		= $(LINTFILES_kvm_$(LINTFILES_kvm_type))
+LINTFILES_proc		= $(LINTOBJS)
+LINTFILES_raw		= $(LINTOBJS)
+LINTFILES		= $(LINTFILES_$(MDBTGT))
+
+kvm_TGTFLAGS		= -D_KERNEL
+proc_TGTFLAGS		= -D_USER
+
+CFLAGS			+= $(CCVERBOSE)
+CFLAGS64		+= $(CCVERBOSE)
+CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common
+LDFLAGS			+= $(ZTEXT)
+LDFLAGS64		+= $(ZTEXT)
+
+# Module type-specific compiler flags
+$(MODOBJS) :=			CFLAGS += $(C_BIGPICFLAGS) $(XREGSFLAG)
+$(MODOBJS) :=			CFLAGS64 += $(C_BIGPICFLAGS) $(XREGSFLAG)
+$(KMODOBJS) $(KLINTOBJS) :=	CPPFLAGS += -D_KMDB
+$(KMODOBJS) :=			V9CODESIZE = $(CCABS32)
+$(KMODOBJS) :=			DTS_ERRNO =
+
+# Modules aren't allowed to export symbols
+MAPFILE		= $(SRC)/cmd/mdb/common/modules/conf/mapfile
+
+# Modules typically make external references.  To provide for -zdefs use
+# and clean ldd(1) processing, explicitly define all external references.
+MAPFILE-EXT	= $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
+
+#
+# kmdb is a kernel module, so we'll use the kernel's build flags.
+$(KMODOBJS) := CFLAGS += $(STAND_FLAGS_32)
+$(KMODOBJS) := CFLAGS64 += $(STAND_FLAGS_64)
+
+#
+# Override this to pull source files from another directory
+#
+MODSRCS_DIR = ../../../common/modules/genunix
+
+all: $$(TARGETS)
+
+install: all $$(ROOTTGTS)
+
+dmods: install
+
+clean.lint:
+	$(RM) $(LINTFILES)
+
+clean:
+	$(RM) $(MODOBJS) $(KMODOBJS) $(CLEANFILES)
+
+clobber: clean clean.lint
+	$(RM) $(MODFILE) $(KMODFILE) $(CLOBBERFILES)
+
+lint: $$(LINTFILES)
+
+.NO_PARALLEL:
+.PARALLEL: $(MODOBJS) $(KMODOBJS) mdb_tgt kmdb_tgt dmod kmod \
+	$(TARGETS) $(LINTFILES)
+
+$(MODFILE): dmod .WAIT $(MODOBJS) $$(MAPFILE-EXT)
+	$(LINK.c) $(ZDEFS) $(ZIGNORE) $(MAPFILE-EXT:%=-M%) $(GSHARED) \
+	    $(MODOBJS) -o $@ $(LDLIBS) -lc
+	$(CTFMERGE) -L VERSION -o $@ $(MODOBJS)
+	$(POST_PROCESS_SO)
+
+#
+# kmdb dmods must *not* stray from the module API.  To ensure that they don't,
+# we try to link them, at build time, against an object that exports the symbols
+# that they can legally use.  The link test object is, however, only built when
+# kmdb itself is built.  Requiring module developers to build kmdb first would
+# be painful, so by default, module-level builds don't do the link test (the
+# $(POUND_SIGN) assignment below takes care of that).  Builds of the entire
+# tree can, however, guarantee the construction of kmdb first, and as such can
+# override the setting of $(KMDB_LINKTEST_ENABLE).  This override causes the
+# link test to be run.
+#
+# Developers wanting to force a link test for a single module can use the
+# `linktest' target from within a module directory.
+#
+LINKTESTOBJ = $(KMDBDIR)/kmdb_modlinktest.o
+
+KMDB_LINKTEST = \
+	$(LD) $(ZDEFS) -dy -r -o $@.linktest $(KMODOBJS) \
+	$(STANDOBJS) $(LINKTESTOBJ) && \
+	$(RM) $@.linktest
+
+KMDB_LINKTEST_ENABLE=$(POUND_SIGN)
+$(KMDB_LINKTEST_ENABLE)KMDB_LINKTEST_CMD = $(KMDB_LINKTEST)
+
+#
+# Ensure that dmods don't use floating point
+#
+KMDB_FPTEST_CMD = $(KMDB_FPTEST)
+
+$(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
+	$(LD) -dy -r $(MAPFILE:%=-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS) \
+	$(STANDOBJS)
+	$(KMDB_LINKTEST_CMD)
+	$(KMDB_FPTEST_CMD)
+	$(CTFMERGE) -f -L VERSION -o $@ $(KMODOBJS)
+	$(SETDYNFLAG) -f DF_1_NOKSYMS $@
+
+linktest: linktest_check .WAIT kmod .WAIT $(KMODOBJS)
+	$(KMDB_LINKTEST)
+
+linktest_check:
+	@if [ "$(MDBTGT)" != "kvm" ] ; then \
+		echo "ERROR: linktest is not supported non-kvm/disasm dmods" \
+		    >&2 ; \
+		exit 1 ; \
+	fi
+
+#
+# Dynamic rules for object construction
+#
+dmod/%.o kmod/%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.o kmod/%.o: ../%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.o kmod/%.o: ../../../common/modules/$(MODNAME)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.o kmod/%.o: $$(MODSRCS_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+#
+# Lint
+#
+dmod/%.ln kmod/%.ln: %.c
+	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: ../%.c
+	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: ../../../common/modules/$(MODNAME)/%.c
+	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: $$(MODSRCS_DIR)/%.c
+	$(LINT.c) -dirout=$(@D) -c $<
+
+#
+# Installation targets
+#
+
+$(ROOT)/usr/lib/mdb/$(MDBTGT): $(ROOT)/usr/lib/mdb
+	$(INS.dir)
+
+$(ROOT)/usr/lib/mdb:
+	$(INS.dir)
+
+$(ROOT)/kernel/kmdb:
+	$(INS.dir)
+
+$(ROOTMOD)/$(MODULE): $(ROOTMOD)
+
+$(ROOTKMOD)/$(KMODULE): $(ROOTKMOD)
+
+kmod dmod:
+	-@mkdir -p $@

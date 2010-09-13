@@ -1,0 +1,56 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+INCLUDES	= -I. -I.. -I../stage1 -I../stage2
+CFLAGS		+= -O2
+
+
+LIBCOMMON	= libcommon.a
+LIBCOMMON_OBJS	= device.o \
+		  getopt.o \
+		  getopt1.o
+
+LIBRARIES	= $(LIBCOMMON)
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/lib
+SRC_FILES	= Makefile.am Makefile.in device.c device.h \
+		  getopt.c getopt.h getopt1.c
+
+INSTALL_TARGETS	= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all: $(LIBRARIES)
+
+$(LIBCOMMON): $(LIBCOMMON_OBJS)
+	$(RM) $@
+	$(AR) cru $@ $(LIBCOMMON_OBJS)
+	$(RANLIB) $@
+
+$(LIBCOMMON_OBJS): $$(@:.o=.c)
+	$(CC) $(CFLAGS) -c -o $@ $(@:.o=.c)
+
+
+install: all $(INSTALL_TARGETS)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(SRC_DIR):
+	$(INS.dir)
+
+
+clean: _FORCE
+	$(RM) *.o $(LIBRARIES)
+
+clobber: clean
+
+_FORCE:

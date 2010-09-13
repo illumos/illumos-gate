@@ -1,0 +1,453 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1995 Sun Microsystems, Inc.  All Rights Reserved
+#
+#ident	"%W%	%E% SMI"
+#
+#	design notes that are likely to be of general (rather than
+#	merely historical) interest.
+
+Table of Contents
+
+	Overview			what filesync does
+
+	Primary Data Structures
+		general principles	why they exist
+		key concepts		what they represent
+		data structures		major structures and their contents
+
+	Overview of Passes		main phases of program execution
+
+	Modules				list and descriptions of files
+
+	Studying the Code
+		active ingredients	a reading list of high points
+		the whole thing		a suggested order for everything
+
+	Gross calling structure		who calls whom
+
+	Helpful hints			good things to know
+
+Overview
+
+	The purpose of this program is to compare pairs of directory
+	trees with a baseline snapshot, to determine which files have
+	changed, and to propagate the changes in order to bring the
+	trees back into congruency.  The baseline snapshot describes
+	size, ownership, ... for all files that filesync is managing
+	WHEN THEY WERE LAST IN SYNC.
+
+	The files and directory trees to be compared are determined 
+	by a relatively flexible (user editable) rules file, whose
+	format (packingrules.4) permits files and or trees to be
+	specified, explicitly, implicitly, or with wild cards.
+	There are also provisions for filtering out unwanted files
+	and for running programs to generate lists of files and
+	directories to be included or excluded.
+
+	The comparisons begin by comparing the structured name
+	spaces.  For names that appear in both trees, the files
+	are then compared on the basis of type, size, contents,
+	ownership and protections.  For files that are already
+	in the baseline snapshot, if the sizes and modification
+	times have not changed, we do not bother to recheck the
+	contents.
+
+	The reconciliation process (resolving the differences)
+	will only propagate a change if it is obvious what should
+	be done (one side has changed relative to the snapshot,
+	while the other has not).  If there are conflicting changes,
+	the file is flagged and the user is asked to reconcile the
+	differences manually.  There are, however a few switches
+	that can be used to constrain the analysis or reconciliation,
+	or to force one particular side to win in case of a conflict.
+
+
+Primary Data Structures
+
+	general principles:
+		we will build up an in-memory tree that represents 
+		the union of the name spaces found in the baseline 
+		and on the source and destination sides. 
+	
+		keep in mind that the baseline recalls the state of
+		files THE LAST TIME THEY WERE IN AGREEMENT.  If files
+		have disagreed for a long time, the baseline still
+		remembers what they were like when they agreed.  If
+		files have never agreed, the baseline has no notions
+		of how they "used to be".  
+
+	key concepts:
+		a "base pair" is a pair of directories whose
+		contents (or a subset of whose contents) are to
+		be syncrhonized.  The "base pairs" to be managed
+		are specified in the packing rules file.
+
+		associated with each "base pair" is a set of rules
+		that describe which files (under those directories)
+		are to be kept in sync.  Each rule is a list of:
+			files and or directories to be included
+			wild cards for files or directories to be included
+			programs to generate lists of names for inclusion
+			file names to be ignored
+			wild cards for file names to be ignored
+			programs to generate lists of names for ignoring
+
+		as a result of the "evaluation" process we build up
+		(under each base pair) a tree that represents all of 
+		the files that we are supposed to keep in sync, and
+		contains everything we need to know about each one
+		of those files.  The structure of the tree mirrors
+		the directory hierarchy ... actually the union of the
+		three hiearchies (baseline, source and destination).
+
+		for each file, we record interesting information (type,
+		size, owner, protection, mod time) and keep separate
+		note of what these values were:
+			in the baseline last time two sides agreed
+			on the source side, as we just examined it
+			on the destination side, as we just examined it
+		
+	data structures:
+
+		there is an ordered list of "base" structures
+		for each base, we maintain
+			three lists of associated "rule" descriptions:
+				inclusion rules
+				exclusion rules
+				restriction rules (from the command line)
+			a "file" tree, representing all files below the bases
+			a list of statistics to be printed as a summary
+
+		for each "rule", we maintain
+			some flags describing the type of rule
+			the character string that is the rule
+
+		for each "file", we maintain
+			sibling and child pointers to give them tree structure
+			flags to describe what we have done/should do
+			"fileinfo" information from the src, dest, and baseline
+			
+			in addition there are some fields that are used
+			to add the file to a list of files requiring
+			reconciliation and record what happened to it.
+
+		a "fileinfo" structure contains a subset of the information
+		that we obtain from a stat call:
+			major/minor/inum
+			type
+			link count
+			ownership, protection, and acls
+			size
+			modification time
+
+		there is also, built up during analysis, a reconciliation
+		list.  This is an ordered list of "file" structures which
+		are believed to descibe files that have changed and require
+		reconciliation.  The ordering is important both for correctness
+		and to preserve relative modification times.
+
+Overview of passes:
+
+	pass I (evaluate)
+		
+		stat every file that we might be interested in
+		(on both src/dest sides).  This includes walking
+		the trees under all directories in order to
+		find out what files exist and stating all of
+		them.
+
+		the main trick in this pass is that there may be
+		files we don't want to evaluate (because we are
+		limiting our attention to specific files and trees).
+		There is a LISTED flag kept in the database that
+		tells me whether or not I need to stat/descend any
+		given node.
+
+		all restrictions and ignores take effect during this pass.
+
+	pass II (analyze)
+
+		given the baseline and all of the current stat information
+		gained during pass I, figure out what might conceivably
+		have changed and queue it for pass III.  This pass doesn't
+		try to figure out what happened or who should win ... it
+		merely identifies candidates for pass III.  This pass
+		ignores any nodes that were not evaluated during pass I.
+
+		the queueing process, however, determines the order in
+		which the files will be processed in pass III, and the
+		order is very important.
+
+	pass III (reconcile)
+
+		process the list of candidates, figuring out what has
+		actually changed and which versions deserve to win.  If
+		is clear what needs doing, we actually do it in this
+		pass.
+
+Modules
+
+	filesync.h
+		defines for limits, sizes and return codes
+		declarations for global variables (mostly cmd-line parms)
+		defines for default file names
+		declarations for routines of general interest
+
+	database.h
+		data-structures for recording rules
+		data-structures for recording information about files
+		declarations for routines that operate on/with those structures
+
+	messages.h
+		the text of all localizable messages
+
+	debug.h
+		definitions and declarations for routines for error
+		simulation and bit-map display.
+
+	acls.c
+		routines to get, set, compare, and display Access Control Lists
+	action.c
+		routines to do the real work of copying, deleting, or
+		changing ownership in order to make one side agree
+		with the other.
+	anal.c
+		routines to examine the in-core list of files and
+		determine what has changed (and therefore what is
+		files are candidates for reconciliation).  This
+		analysis includes figuring out which files should
+		be links rather than copies.
+	base.c
+		routines to read and write the baseline file
+		routines to search and manipulate the in-core base list
+	debug.c
+		data structures and routines, used to sumulate errors
+		and produce debug output, that map between bits (as found 
+		in various flag words) character string names for their 
+		meanings.
+
+	eval.c
+		routines to build up the internal tree that describes
+		the status of all of the files that are described
+		by the current rules.
+	files.c
+		routines to manipulate file name arguments, including
+		wild cards and embedded environment variables.
+	ignore.c
+		routines to maintain a list of names or patterns for
+		files to be ignored, and to check file names against
+		that list.
+	main.c
+		global variables, cmd-line parameter processing,
+		parameter validation, error reporting, and the
+		main loop.
+	recon.c
+		routines to examine a list of files that appear to
+		have changed, and figure out what the appropriate
+		reconciliation course of action is.
+	rename.c
+		routines to search the tree to determine whether
+		or not any creates/deletes are actually renames.
+	rules.c
+		routines to read and write the rules file
+		routines to add rules and enumerate in-core rules
+
+	filecheck.c
+		not really a part of filesync, but rather a utility
+		program that is used in the test suite.  It extracts
+		information about files that is not readily available
+		from other unix commands.
+
+Comments on studying the code
+
+	if you are only interested in the "active ingredients":
+
+		read the above notes on data structures and then
+
+		read the structure declarations in database.h
+
+		read the above notes overviewing the passes
+
+		in recon.c: read reconcile
+
+			this routine almost makes sense on its own,
+			and it is unquestionably the most important
+			routine in the entire program.  Everything
+			else just gathers data for reconcile to use,
+			or updates the books to reflect the changes.
+
+		in eval.c: read evaluate, eval_file, walker, and note_info
+
+			this is the main guts of pass I
+
+		in anal.c: read analyze, check_file, check_changes & queue_file
+
+			this is the main guts of pass II
+
+	if you want to read the whole thing:
+
+		the following routines do fundamentally simple things
+		in simple ways, and can (for the most part) be understood
+		in vaccuuo.  The things they do are probably sufficiently
+		obvious that you can probably understand the more interesting
+		code without having read them at all.
+
+			base.c
+			rules.c
+			files.c
+			debug.c
+			ignore.c
+			acls.c
+
+		the following routines constitute the real meat of the
+		program, and while they are broken into specialized
+		modules, they probably need to be understood as an
+		organic whole:
+
+			main.c		setup and control
+			eval.c		pass I
+			anal.c		pass II
+			recon.c		pass III
+			action.c	execution and book-keeping
+			rename.c	a special case for a common situation
+
+
+Gross calling structure / flow of control
+
+	main.c:main
+		findfiles
+		read_baseline
+		read_rules	
+		if new rules
+			add_base	
+			add_include
+		evaluate
+		analyze
+		write_baseline
+		write_summary
+
+	eval.c:evaluate
+		add_file_to_base
+		add_glob
+		add_run
+		ignore_pgm
+		ignore_file
+		ignore_expr
+		eval_file
+
+	eval.c:eval_file
+		note_info
+		nftw
+			walker	
+				note_info
+
+	anal.c:analyze
+		check_file
+		reconcile
+
+	anal.c:check_file
+		check_changes
+		queue_file
+		
+
+	recon.c:reconcile
+		samedata
+		samestuff
+		do_copy
+			copy
+			do_like
+			update_info
+		do_like
+		do_remove
+
+Helpful Hints
+
+	the "file" structure contains a bunch of flags.  Many of them
+	just summarize what we know about the file (e.g. where it was
+	found).  Others are more subtle and control the evaluation
+	process or the writing out of the baseline file.  You can't
+	really understand the processing unless you understand what
+	these flags mean.
+
+		F_NEW		added by a new rule
+
+		F_LISTED	this name was generated by a rule
+
+		F_SPARSE	this directory is an intermediate on
+				the way to a name generated by a rule
+				and should not be recursively walked.
+
+		F_EVALUATE	this node was found in evaluation and
+				has up-to-date stat information
+
+		F_CONFLICT	there is a conflict on this node so
+				baseline should remain unchanged
+
+		F_REMOVE	this node should be purged from the baseline
+
+		F_STAT_ERROR	it was impossible to stat this file
+				(and anything below it) 
+
+	the implications of these flags on processing are
+
+		F_NEW, F_LISTED, F_SPARSE
+
+			affect whether or not a particular node should
+			be included in the evaluation pass.
+
+			in some situations, only new rules are interpreted.
+
+			listed files and directories should be evaluated
+			and analyzed.  sparse directories should not be
+			recursively enumerated.
+
+		F_EVALUATE
+
+			determines whether or not a node is included
+			in the analysis pass.  Only nodes that have
+			been evaluated will be analyzed.
+
+		F_CONFLICT, F_REMOVE, F_EVALUATE
+
+			affect how a node should be written back into					the baseline file.
+
+			if there is a conflict or we haven't evaluated 
+			a node, we won't update the baseline.
+
+			if a node is marked for removal, it will be
+			excluded from the baseline when it is written out.
+
+		F_STAT_ERROR
+
+			if we could not get proper status information
+			about a file (or the tree under it) we cannot,
+			with any confidence, determine what its state
+			is or do anything about it.  Such files are 
+			flagged as "in conflict".
+
+			it is somewhat kinky that we put error flagged
+			files on the reconciliation list.  We do this
+			because this is the easiest way to pull them
+			out for reporting as conflicts.
+			
+

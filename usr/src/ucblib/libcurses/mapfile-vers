@@ -1,0 +1,194 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	AL;
+	AL_PARM;
+	AM;
+	BC;
+	box;
+	BS;
+	BT;
+	CA;
+	CD;
+	CE;
+	CL;
+	CM;
+	COLS;
+	CR;
+	CS;
+	curscr;
+	DA;
+	DB;
+	DC;
+	Def_term;
+	delwin;
+	DL;
+	DL_PARM;
+	DM;
+	DO;
+	DOWN_PARM;
+	_echoit;
+	ED;
+	EI;
+	endwin;
+	_endwin;
+	EO;
+	getcap;
+	gettmode;
+	GT;
+	HC;
+	HO;
+	HZ;
+	IC;
+	idlok;
+	IM;
+	IN;
+	initscr;
+	IP;
+	K0;
+	K1;
+	K2;
+	K3;
+	K4;
+	K5;
+	K6;
+	K7;
+	K8;
+	K9;
+	KD;
+	KE;
+	KH;
+	KL;
+	KR;
+	KS;
+	KU;
+	LEFT_PARM;
+	LINES;
+	LL;
+	longname;
+	MA;
+	MI;
+	MS;
+	mvcur;
+	mvprintw;
+	mvscanw;
+	mvwin;
+	mvwprintw;
+	mvwscanw;
+	My_term;
+	NC;
+	ND;
+	newwin;
+	NL;
+	NONL;
+	normtty;
+	NS;
+	OS;
+	overlay;
+	overwrite;
+	PC;
+	_pfast;
+	printw;
+	_rawmode;
+	RC;
+	_res_flg;
+	RIGHT_PARM;
+	SC;
+	scanw;
+	scroll;
+	SE;
+	setterm;
+	SF;
+	SO;
+	SR;
+	stdscr;
+	subwin;
+	TA;
+	TE;
+	TI;
+	touchline;
+	touchwin;
+	_tty;
+	_tty_ch;
+	ttytype;
+	UC;
+	UE;
+	UL;
+	_unctrl;
+	UP;
+	UP_PARM;
+	UPPERCASE;
+	US;
+	VB;
+	VE;
+	VS;
+	waddch;
+	waddstr;
+	wclear;
+	wclrtobot;
+	wclrtoeol;
+	wdelch;
+	wdeleteln;
+	werase;
+	wgetch;
+	wgetstr;
+	winsch;
+	winsertln;
+	wmove;
+	wprintw;
+	wrefresh;
+	wscanw;
+	wstandend;
+	wstandout;
+	XB;
+	XN;
+	XS;
+	XT;
+	XX;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_putchar;
+    local:
+	*;
+};

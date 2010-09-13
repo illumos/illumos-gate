@@ -1,0 +1,169 @@
+.fp 5 CW
+.TH STAK 3
+.SH NAME
+\fBstak\fR \- data stack storage library (obsolete: use \fBstk\fR instead)
+.SH SYNOPSIS
+.ta .75i 1.5i 2.25i 3i 3.75i 4.5i 5.25i 6i
+.PP
+.nf
+\f5
+#include <stak.h>
+
+Stak_t *stakcreate(int \fIflags\fP);
+Stak_t *stakinstall(Stak_t *\fIstack\fP, char *(\fIoverflow\fP)(int));
+int stakdelete(Stak_t *\fIstack\fP);
+void staklink(Stak_t *\fIstack\fP)
+
+char *stakalloc(unsigned \fIsize\fP);
+char *stakcopy(const char *\fIstring\fP);
+char *stakset(char *\fIaddress\fP, unsigned \fIoffset\fP);
+
+char *stakseek(unsigned \fIoffset\fP);
+int stakputc(int \fIc\fP);
+int stakputs(const char *\fIstring\fP);
+int stakwrite(const char *\fIaddress\fP, unsigned \fIsize\fP);
+int staktell(void);
+char *stakptr(unsigned \fIoffset\fP);
+char *stakfreeze(unsigned \fIextra\fP);
+\fR
+.fi
+.SH DESCRIPTION
+.PP
+\f5stak\fP is a package of routines designed to provide efficient
+stack oriented dynamic storage.
+A stack abstraction consists of an ordered list of contiguous
+memory regions, called stack frames, that can hold objects of
+arbitrary size.
+A stack is represented by the type \f5Stak_t\fP
+defined in header \f5<stak.h>\fP.
+At any instant there is one active stack.
+Variable size objects can be
+added to the active stack
+and programs can reference these objects directly with pointers.
+In addition, the last object on the stack
+(referred to here as the current object)
+can be built incrementally.
+The current object has an associated offset that determines its
+current size.
+While the current object is being built incrementally,
+its location might
+change so that it is necessary to reference the object with
+relative offsets ranging from zero to the current offset of the object.
+.PP
+There is a preset initial active stack.
+To use an additional stack, it is necessary to create it and to
+install it as the active stack.
+A stack is created with the \f5stakcreate\fP() function.
+A \fIflags\fP argument of \f5STAK_SMALL\fP indicates that unused
+space on the stack should be freed whenever this stack ceases
+to be the active stack. 
+If successful,
+\f5stakcreate\fP() returns a pointer to a stack whose reference
+count is 1.
+Otherwise, \f5stakcreate\fP() returns a null pointer.
+The \f5staklink\fP() function increases the reference count for the
+given \fIstack\fP.
+The \f5stakinstall\fP() function 
+makes the specified \fIstack\fP the active stack and returns a pointer
+to the previous active stack.
+When the \fIoverflow\fP argument is not null,
+it specifies a function that will
+be called whenever \f5malloc\fP(3) fails while trying to grow the
+stack.
+The \fIoverflow\fP function will be called with the size that was passed
+to \f5malloc\fP(3).
+The \fIoverflow\fP function can call \f5exit\fP(3), call \f5longjmp\fP(3)
+or return.
+If the \f5overflow\fP function returns,
+it must return a pointer to a memory region of the given size.
+The default action is to write an error to standard error and to
+call \f5exit\fP(2) with a non-zero exit value.
+When \fIstack\fP is a null pointer,
+the active stack is not changed
+but the \fIoverflow\fP function for the active stack can be changed
+and a pointer to the active stack is returned.
+The \f5stakdelete\fP() function decrements the reference count and
+frees the memory associated with
+the specified stack
+when the reference count is zero.
+The effect of subsequent references to objects
+on the stack are undefined.
+.PP
+The
+\f5stakalloc\fP() function returns an aligned pointer to space on the
+active stack that can be used to hold any object of the given \fIsize\fP.
+\f5stakalloc\fP() is similar to \f5malloc\fP(3) except that individual
+items returned by \f5stakalloc\fP() can not be freed.
+\f5stakalloc\fP() causes the offset of the current object to be set to
+zero.
+.PP
+The
+\f5stakcopy\fP() function copies the given string onto the stack
+and returns a pointer to the \fIstring\fP on the stack.
+\f5stakcopy\fP() causes the offset of the current object to be set to
+zero.
+.PP
+The \f5stakset\fP() function finds the frame containing the given
+\fIaddress\fP, frees all frames that were created after the one containing
+the given \fIaddress\fP, and sets the current object to the given
+\fIaddress\fP.
+The top of the current object is set to \fIoffset\fP bytes from
+current object.
+If \fIaddress\fP is not the address of an object on the
+stack the result is undefined.
+.PP
+The remaining functions are used to build the current object incrementally.
+An object that is built incrementally on the stack will  
+always occupy contiguous memory within a stack frame but
+until \f5stakfreeze\fP() is called,
+the location in memory for the object can change.
+There is a current offset associated with the current object that
+determines where subsequent operations apply.
+Initially, this offset is zero, and the offset changes as a result
+of the operations you specify.
+The \f5stakseek\fP() function is used set the offset for the
+current object.
+The \fIoffset\fP argument to \f5stakseek\fP() specifies the new 
+offset for the current object.
+The frame will be extended or moved
+if \f5offset\fP causes the new current offset to extend beyond the
+current frame.
+\f5stakseek\fP() returns a pointer to the beginning of the current object.
+The \f5staktell\fP() function gives the offset of the current object.
+.PP
+The \f5stakputc\fP() function adds a given character to the current object
+on the stack.
+The current offset is advanced by 1.
+The \f5stakputs\fP() function appends the given \fIstring\fP onto the current
+object in the stack and returns the length of the string.
+The current offset is advanced by the length of the string.
+The \f5stakwrite\fP() function appends the given \fIsize\fP byte memory
+region starting at \fIaddress\fP onto the current
+object in the stack and advances the current offset by \fIsize\fP.
+The current offset is returned.
+.PP
+The \f5stakptr\fP() function converts the given \f5offset\fP
+for the current object into a memory address on the stack.
+This address is only valid until another stack operation is given.
+The result is not defined if \fIoffset\fP exceeds the size of the current
+object.
+The \f5stakfreeze\fP()
+function terminates the current object on the
+stack and returns a pointer to the beginning of this object.
+If \fIextra\fP is non-zero, \fIextra\fP bytes are added to the stack
+before the current object is terminated.  The first added byte will
+contain zero and the contents of the remaining bytes are undefined.
+.PP
+.SH HISTORY
+The
+\f5stak\fP
+interface was derived from similar routines in the KornShell code
+that is used for building parse trees and carrying out expansions.
+It provides an efficient mechanism for grouping dynamically allocated
+objects so that they can be freed all at once rather than individually.
+.SH AUTHOR
+ David Korn
+.SH SEE ALSO
+\f5exit(2)\fP
+\f5longjmp(3)\fP
+\f5malloc(3)\fP

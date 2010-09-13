@@ -1,0 +1,16 @@
+#! /bin/sh
+#
+# Convert a source file to a TeXinfo file. Stolen from glibc.
+#
+# Usage: src2texi SRCDIR SRC TEXI
+
+dir=$1
+src=`basename $2`
+texi=`basename $3`
+
+sed -e 's,[{}],@&,g'					\
+    -e 's,/\*\(@.*\)\*/,\1,g'				\
+    -e 's,/\*  *,/* @r{,g' -e 's,  *\*/,} */,'		\
+    -e 's/\(@[a-z][a-z]*\)@{\([^}]*\)@}/\1{\2}/g'	\
+    ${dir}/${src} | expand > ${texi}.new
+mv -f ${texi}.new ${dir}/${texi}

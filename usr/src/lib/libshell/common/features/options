@@ -1,0 +1,47 @@
+# SHOPT_* option probe
+
+tst	cross{
+	: check for shell magic #!
+	cat > /tmp/file$$ <<!
+	#! /bin/echo
+	exit 1
+	!
+	chmod 755 /tmp/file$$
+	if	/tmp/file$$ > /dev/null
+	then	echo "#define SHELLMAGIC	1"
+	fi
+	rm -f /tmp/file$$
+	
+	option() # name value
+	{
+		case $2 in
+		0)	echo "#ifndef SHOPT_$1"
+			echo "#   define SHOPT_$1	1"
+			echo "#endif"
+			;;
+		*)	echo "#undef  SHOPT_$1"
+			;;
+		esac
+	}
+	
+	ls /dev/fd/9 9<&0 >/dev/null 2>&1
+	option DEVFD $?
+	exec 9<&-
+	case  `echo a | tr a '\012' | wc -l` in
+	*1*)	option MULTIBYTE 0 ;;
+	esac
+	test -x /bin/pfexec -o -x /usr/bin/pfexec
+	option PFSH $?
+	/bin/test ! -l . 2> /dev/null
+	option TEST_L $?
+	test -f /etc/ksh.kshrc -o -f /etc/bash.bashrc &&
+	option SYSRC 0
+	test -f /bin/universe && univ=`/bin/universe` > /dev/null 2>&1 -a ucb = "$univ"
+	option UCB $?
+}end
+
+cat{
+	#if !_PACKAGE_ast && ( (MB_LEN_MAX-1)<=0 || !defined(_lib_mbtowc) )
+	#   undef SHOPT_MULTIBYTE
+	#endif
+}end

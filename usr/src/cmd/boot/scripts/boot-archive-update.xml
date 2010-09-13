@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:boot-archive-update'>
+
+<service
+	name='system/boot-archive-update'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance/>
+
+
+	<!--
+	  This needs to depend on filesystem/local because the boot-archive
+	  or the GRUB menu may live in /stubboot.
+	-->
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<!--
+	  Since updating the boot-archive can take a while on slow machines or
+	  when there are many glommed kernels to wad up, a longer timeout is
+	  needed. However if it doesn't finish eventually something up, and
+	  an error message to trigger further investigation is appropriate.
+
+	  Please note that a similar timeout exists in startd, which again
+	  runs bootadm at the end of shutdown.  These timeouts should be
+	  adjusted in sync with each other.
+	-->
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/boot-archive-update'
+		timeout_seconds='3600' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='3' />
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				update boot archive if necessary
+			</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+				This service updates the boot archive if
+				a non fatal file was out of sync or if this
+				is a reconfiguration boot.
+			</loctext>
+		</description>
+	</template>
+</service>
+
+</service_bundle>

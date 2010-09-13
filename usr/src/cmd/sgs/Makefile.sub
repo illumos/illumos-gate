@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Standard subdirs makefile for the sgs area.
+#
+
+include		$(SRC)/Makefile.master
+
+# This is how the SUBDIRS stuff should look by the time the SGS
+# directory is fully converted:
+#
+# SUBDIRS=	$(MACH) $(BUILD64) $(MACH64)
+#
+# $(SUBDIRS):	FRC
+#	@cd $@; pwd; $(MAKE) $(TARGET)
+#
+# In the meantime, we use an sneaky trick on the $(SUBDIRS) target
+# to build whatever 64-bit directories we actually find as a side-effect
+# of descending into the 32-bit directories.  Ick.
+
+SUBDIRS =	$(MACH) $(EXTRASUBDIRS)
+
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+delete :=	TARGET= delete
+install :=	TARGET= install
+lint :=		TARGET= lint
+catalog :=	TARGET= catalog
+package :=	TARGET= package
+chkmsg :=	TARGET= chkmsg
+
+.KEEP_STATE:
+.KEEP_STATE_FILE: .make.state.$(MACH)
+
+all clean clobber delete install lint catalog package chkmsg: \
+		$(SUBDIRS)
+
+$(SUBDIRS):	FRC
+		@ cd $@; pwd; $(MAKE) $(TARGET)
+		@ $(BUILD64)if [ -f $(MACH64)/Makefile ]; then		\
+		  $(BUILD64)     cd $(MACH64); pwd; $(MAKE) $(TARGET);	\
+		  $(BUILD64)else /bin/true; fi
+
+FRC:

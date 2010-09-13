@@ -1,0 +1,47 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+$mapfile_version 2
+
+LOAD_SEGMENT dboot {
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0xC00000;
+	PADDR = 0xC00000;
+	ALIGN = 0x1000;
+
+	#
+	# Make sure that dboot_grub.s`_start is the first thing in the dboot
+	# .text segment, since when we boot that's where the boot loader will
+	# start execution
+	#
+	ASSIGN_SECTION is_text {
+		IS_NAME = .text;
+		FILE_BASENAME = dboot_grub.o;
+	};
+	ASSIGN_SECTION is_alloc {
+		FLAGS = ALLOC;
+	};
+	IS_ORDER = is_text is_alloc;
+};

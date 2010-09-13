@@ -1,0 +1,57 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This is a fragment of a config file, used by FMD as a temporary measure for
+ * serial number retrieval.  PICL frutree generation for littleneck is handled
+ * by the littleneck-specific libpiclfrutree.so.
+ */
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0100
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,a0
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0101
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,a2
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0202
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,a4
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0203
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,a6
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0304
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,a8
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0305
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,aa
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0406
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,ac
+
+name:/frutree/chassis/system-board/mem-slot?Label=J0407
+REFNODE mem-module fru WITH /platform/pci/ebus/i2c?UnitAddress=1,2e/dimm-fru?UnitAddress=1,ae

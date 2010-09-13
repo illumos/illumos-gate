@@ -1,0 +1,88 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include $(SRC)/Makefile.master
+
+.KEEP_STATE:
+
+VERSION		= 0.95
+
+# $(POUND_SIGN) is just a #.  Used to turn a feature off.
+# The $(POUND_SIGN)POUND_SIGN:sh construct is just so make doesn't have to
+# spawn a shell and redefine POUND_SIGN if it is already defined (e.g.
+# $(SRC)/Makefile.master was already included).
+$(POUND_SIGN)POUND_SIGN:sh = echo '\043'
+
+
+#
+# Optional features (set to $(POUND_SIGN) to turn off):
+#
+# OPTION_UTILS:
+#	Build the userland utilities.
+#	NOTE: these utilities will be installed in
+#	      /platform/$(PLATFORM)/boot/grub, not /boot/grub.
+#
+# OPTION_DOCS:
+#	Build and install some GRUB documentations, e.g. man and info files.
+#	NOTE: these docs will be installed in
+#	      /platform/$(PLATFORM)/boot/grub, not /boot/grub.
+#
+# OPTION_FS:
+#	Build additional filesystem support into GRUB. This will increase
+#	the sizes of stage2 and pxegrub and may cause malfunction.
+#
+# STAGE2_NETBOOT:
+#	Include netboot support in stage2 (on by default).
+#	This only affects stage2, not pxegrub (diskless support).
+#
+# STAGE2_NETBOOT	= $(POUND_SIGN)
+OPTION_UTILS	= $(POUND_SIGN)
+OPTION_DOCS	= $(POUND_SIGN)
+OPTION_FS	= $(POUND_SIGN)
+
+
+BASE_CFLAGS	= -B$(GNU_ROOT)/bin/ -g $(CPPFLAGS) $(OPTFLAGS)
+BASE_CCASFLAGS	= -B$(GNU_ROOT)/bin/ -g $(CPPFLAGS) $(OPTFLAGS)
+BASE_LDFLAGS	=
+
+CC		= $(GNU_ROOT)/bin/gcc
+CFLAGS		= $(BASE_CFLAGS)
+CCDEPMODE	= depmode=none
+
+CCAS		= $(CC)
+CCASFLAGS	= $(BASE_CCASFLAGS)
+
+CPP		= $(CC) -E
+
+# $(ENVCPPFLAGS4), if defined, should be something like "-Y I,somepath".
+# We want to get rid of the "-Y I," part but make's pattern replacement
+# macro reference doesn't allow spaces in it, e.g. $(ENVCPPFLAGS4:-Y I,%=%).
+# So we'll get rid of the "-Y" now and then the "I," later.  By the way, this
+# should also work in case $(ENVCPPFLAGS4) is "-YI,somepath" (no space).
+t.ENVCPPFLAGS4	= $(ENVCPPFLAGS4:-Y%=%)
+
+CPPFLAGS	= $(DEFS) $(INCLUDES) $(WARNFLAGS) \
+		  $(ENVCPPFLAGS1:-I%=-isystem %) \
+		  $(ENVCPPFLAGS2:-I%=-isystem %) \
+		  $(ENVCPPFLAGS3:-I%=-isystem %) \
+		  $(t.ENVCPPFLAGS4:I,%=-nostdinc -isystem %)
+
+CCLD		= $(GNU_ROOT)/bin/gld
+LDFLAGS		= $(BASE_LDFLAGS)
+LINKFLAGS	= -g
+LINK		= $(CCLD) $(LINKFLAGS) $(LDFLAGS)
+
+DEFS		= -DHAVE_CONFIG_H -DSOLARIS_NETBOOT
+OPTFLAGS	= -falign-jumps=1 -falign-loops=1 -falign-functions=1
+#WARNFLAGS	= -Wall -Wmissing-prototypes -Wunused -Wshadow \
+#		  -Wpointer-arith -Wundef
+
+OBJCOPY		= $(GNU_ROOT)/bin/gobjcopy
+
+AR		= /usr/ccs/bin/ar
+RANLIB		= :
+
+MKDIR		= mkdir -p

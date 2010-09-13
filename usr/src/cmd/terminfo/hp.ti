@@ -1,0 +1,515 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.21	*/
+# # --------------------------------
+#
+# hp: HEWLETT PACKARD
+#
+# Manufacturer:	HEWLETT PACKARD
+# Class:	I
+# 
+# Info:
+#	Generic HP terminal - this should (hopefully) work on any HP 
+#	terminal.
+#
+hp|hewlett-packar|hewlettpackard,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL, am,
+	cub1=^H, ed=\EJ, el=\EK, hpa=\E&a%p1%dC, clear=\EH\EJ,
+	cup=\E&a%p2%dc%p1%dY$<6>, cols#80, vpa=\E&a%p1%dY, lm#0, da, db,
+	dch1=\EP, dl1=\EM, rmir=\ER, smir=\EQ, kbs=^H, lines#24, mir,
+	cuf1=\EC, ht=^I, rmso=\E&d@, smso=\E&dJ,
+	smul=\E&dD, rmul=\E&d@, cuu1=\EA, xhp, vt#6, kcbt=\Ei,
+
+hp110|hewlett-packard model 110 portable,
+	lines#16,use=hp,
+
+hp+pfk+cr|hp function keys with CR,
+	kf1=\Ep\r, kf2=\Eq\r, kf3=\Er\r, kf4=\Es\r,
+	kf5=\Et\r, kf6=\Eu\r, kf7=\Ev\r, kf8=\Ew\r,
+
+hp+pfk-cr|hp function keys w/o CR,
+	kf1=\Ep, kf2=\Eq, kf3=\Er, kf4=\Es,
+	kf5=\Et, kf6=\Eu, kf7=\Ev, kf8=\Ew,
+
+# Info:
+#	The 2621's use the same keys for the arrows and function keys, 
+#	but not separate escape sequences. These definitions allow the 
+#	user to use those keys as arrow keys rather than as function 
+#	keys.
+#
+hp+pfk+arrows|hp alternate arrow definitions,
+	khome=\Ep\r, kll=\Eq\r, kind=\Er\r, kri=\Es\r,
+	kcuu1=\Et\r, kcub1=\Eu\r, kcuf1=\Ev\r, kcud1=\Ew\r,
+	kf1@, kf2@, kf3@, kf4@, kf5@, kf6@, kf7@, kf8@,
+
+hp+arrows|hp arrow definitions,
+	kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC,
+	khome=\Eh, kll=\EF, kind=\ES, kri=\ET,
+
+# Info:
+#	Generic stuff from the HP 262x series
+#
+hp262x,
+	dch1=\EP$<2>, ip=$<2>, rmso=\E&d@, smso=\E&dB, ed=\ED\EJ$<500>\EC,
+	rev=\E&dB, smul=\E&dD, blink=\E&dA, invis=\E&dS, sgr0=\E&d@, rmul=\E&d@,
+	sgr=\E&d%'@'%?%p1%t%'B'%|%;%?%p2%t%'D'%|%;%?%p3%t%'B'%|%;%?%p4%t%'A'%|%;%c,
+	khome=\Eh, kcuu1=\EA, kcub1=\ED, kcuf1=\EC, kcud1=\EB,
+	smkx=\E&s1A, rmkx=\E&s0A, knp=\EU, kpp=\EV, kri=\ET,
+	kind=\ES, kil1=\EL, kdl1=\EM, kich1=\EQ, kdch1=\EP,
+	kel=\EK, ked=\EJ, krmir=\ER,
+	ind=\ES, ht=^I$<2>, xhp,
+	ed=\EJ,
+# Info:
+#	Note: no "home" on HP's since that homes to top of memory, not 
+#	screen.
+#	
+#	The only way to get the arrow keys to transmit anything at all 
+#	is to turn on the function key labels (f1-f8) with smkx, and 
+#	even then the user has to hold down shift!
+#	
+#	The default 2621 turns off the labels except when it has to to 
+#	enable the function keys. If your installation prefers labels 
+#	on all the time, or off all the time (at the "expense" of the 
+#	function keys) move the # 2621-nl or 2621-wl labels to the 
+#	front using reorder.
+#	
+#	Note: there are newer ROM's for 2621's that allow you to set 
+#	strap A so the regular arrow keys xmit \EA, etc, as with the 
+#	2645. However, even with this strap set, the terminal stops 
+#	xmitting if you reset it, until you unset and reset the strap!
+#	Since there is no way to set/unset the strap with an escape 
+#	sequence, we don't use it in the default.
+#	
+#	If you like, you can use 2621-ba (bad arrow keys).
+#
+hp2621-ba|2621-ba|2621 w/new rom and strap A set,
+	smkx@, rmkx@,
+	use=hp+arrows,
+	use=hp2621,
+
+# Info:
+#	2621 with function labels. Most of the time they are off,
+#	but inside vi, the function key labels appear. You have to
+#	hold down shift to get them to xmit.
+#
+hp2621|hp2621a|hp2621A|2621|2621a|2621A|hp2621-wl|2621-wl|hp 2621 w/labels,
+	is2=\E&jA\r, rmkx=\E&jA, use=hp2621-fl,
+
+# Info:
+#	2621 with function labels.  Most of the time they are off,
+#	but inside vi, the function key labels appear.  You have to
+#	hold down shift to get them to xmit.
+#
+hp2621-fl|2621-fl|hp 2621,
+	is2=\E&j@\r, cbt=\Ei, cup=\E&a%p2%dc%p1%dY,
+	dch1=\EP$<2>, ip=$<2>, pb#19200,
+	smso=\E&dD, rmso=\E&d@, smul=\E&dD, rmul=\E&d@, sgr0=\E&d@, xhp@,
+	use=hp+pfk+cr, smkx=\E&jB, rmkx=\E&j@, ht=^I$<2>, xon, use=hp,
+
+# Info:
+#	To use 2621p printer, setenv TERM=2621p, PRINTER=2612p
+#
+hp2621p|2621p|2621P|hp 2621 with printer,
+	mc5=\E&p11C, mc4=\E&p13C, use=hp2621,
+
+hp2621p-a|2621p-a|hp2621p with fn as arrows,
+	use=hp+pfk+arrows, use=hp2621p,
+
+# Info:
+#	hp2621 with k45 keyboard
+#
+hp2621-k45|hp2621k45|2621k45|k45|hp 2621 with 45 keyboard,
+	kbs=^H, kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\Eh,
+	smkx=\E&s1A, rmkx=\E&s0A, use=hp2621,
+
+# Info:
+#	This terminal should be used at 4800 baud or less. It needs 
+#	padding for plain characters at 9600, I guessed at an 
+#	appropriate cr delay.
+#	
+#	It really wants ^E/^F handshaking, but that doesn't work well 
+#	even if you write software to support it.
+#
+2645|hp2645|hp45|hp 264x series,
+	dim=\E&dH, rev=\E&dB, smul=\E&dD, blink=\E&dA, sgr0=\E&d@,
+	sgr=\E&d%'@'%?%p1%t%'B'%|%;%?%p2%t%'D'%|%;%?%p3%t%'B'%|%;%?%p4%t%'A'%|%;%?%p5%t%'H'%|%;%?%p6%t%'B'%|%;%c,
+	kcuu1=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, khome=\Eh,
+	kctab=\E2, khts=\E1,
+	smkx=\E&s1A, rmkx=\E&s0A, knp=\EU, kpp=\EV, kri=\ET, kind=\ES,
+	kil1=\EL, kdl1=\EM, kich1=\EQ, kdch1=\EP,
+	kel=\EK, ked=\EJ, krmir=\ER, pb#9600, cr=^M$<20>, use=hp,
+
+# Info:
+#	Hp 2624 B with 4 or 10 pages of memory.
+#	
+#	Some assumptions are made with this entry. These settings are 
+#	NOT set up by the initialization strings.
+#	
+#	Port Configuration
+#		RecvPace=Xon/Xoff
+#		XmitPace=Xon/Xoff
+#		StripNulDel=Yes
+#	
+#	Terminal Configuration
+#		InhHndShk=Yes
+#		InhDC2=Yes
+#		XmitFnctn(A)=No
+#		InhEolWrp=No
+#	
+#	Note: the 2624 DOES have a true "home," believe it or not!
+#	
+#	The 2624 has an "error line" to which messages can be sent. 
+#	This is CLOSE to what is expected for a "status line". However,
+#	after a message is sent to the "error line", the next carriage 
+#	return is EATEN and the "error line" is turned back off again! 
+#	So I guess we can't define hs, eslok, wsl, dsl, fsl, tsl
+#	
+#	This entry supports emacs (and any other program that uses raw 
+#	mode) at 4800 baud and less. I couldn't get the padding right 
+#	for 9.6.
+#
+
+hp2624|hp2624a|hp2624b|hp2624b-4p|2624-4p|2624|2624a|2624b|Hewlett Packard 2624 B,
+	da, db, lm#96,
+	flash=\E&w13F\200\200\200\200\E&w12F\200\200\200\200\E&w13F\200\200\200\200\E&w12F,
+	use=hp+labels,
+	use=scrhp,
+
+# Info:
+#	These attributes are not set above:
+#	
+#	civis, cmdch, cnorm, csr, cub, cud, cuf, cuu, cvvis, dch, dl, 
+#	ech, eo, eslok, fsl, gn, hc, hd, hu, hz, ich, ich1, if, il, in,
+#	indn, iprog, is2, is3, it, ka1, ka3, kb2, kc1, kc3, kclr, kf0, 
+#	kf10, khts, km, ktbc, lf0, lf1, lf10, lf2, lf3, lf4, lf5, lf6, 
+#	lf7, lf8, lf9, mc5p, os, pad, pfkey*, pfloc*, pfx*, prot, rc, 
+#	rep, rin, rmcup, rmdc, rmm, rs2, rs3, sc, smcup, smdc, smm, tsl,
+#	uc, ul, vt, wind, wsl, xenl, xmc, xsb, xt
+#	
+#	not needed if tset is used:
+#		if=/usr/share/lib/tabset/std,
+#	
+#	This 2626 entry does not use any of the fancy windowing stuff 
+#	of the 2626.
+#	
+#	Indeed, terminfo does not yet handle such stuff. Since changing 
+#	any window clears memory, it is probably not possible to use 
+#	this for screen opt.
+#	
+#	ed is incredibly slow most of the time - I am guessing at the 
+#	exact padding. Since the terminal uses xoff/xon this is intended 
+#	only for cost computation, so that the terminal will prefer el 
+#	or even dl1 which is probably faster!
+#	
+#	\ED\EJ\EC hack for ed from Ed Bradford - apparently ed is only 
+#	extra slow # on the last line of the window. 
+#	
+#	The padding probably should be changed.
+#
+hp2626|hp2626a|hp2626p|2626|2626a|2626p|2626A|2626P|hp 2626,
+	ed=\ED\EJ$<500>\EC,
+	ip=$<4>,
+	is2=\E&j@\r,
+	pb#19200,
+	da, db, lm#0,
+	indn=\E&r%p1%dD,
+	rin=\E&r%p1%dU,
+	use=hp+pfk+cr,
+	use=hp+labels,
+	use=scrhp,
+
+# Info:
+#	This entry is for sysline. It allocates a 23 line window with 
+#	a 115 line workspace for regular use, and a 1 line window for 
+#	the status line.
+#	
+#	This assumes port 2 is being used.
+#	Turn off horizontal line, Create ws #1 with 115 lines,
+#	Create ws #2 with 1 line, Create window #1 lines 1-23,
+#	Create window #2 lines 24-24, Attach cursor to workspace #1.
+#	Note that this clears the tabs so it must be done by tset before
+#	it sets the tabs.
+#
+hp2626-s|2626-s|hp 2626 using only 23 lines,
+	tsl=\E&w7f2p2I\E&w4f2I\r\EK\E&a%p1%dC,
+	fsl=\E&d@\E&w7f2p1I\E&w4f1I, eslok, hs,
+	is1=\E&q3t0{0H \E&w0f115n1I \E&w0f1n2I
+	\E&w2f1i0d0u22l0S \E&w2f2i0d23u23l0S \E&w7f2p1I \r,
+	lines#23, use=2626,
+# Info:
+#	Force terminal back to 24 lines after being 23.
+#
+hp2626-ns|2626-ns|hp 2626 using all 24 lines,
+	is1=\E&q3t0{0H \E&w0f118n1I \E&w0f1n2I
+	\E&w2f1i0d0u23l0S \E&w3f2I \E&w7f2p1I \r,
+	use=2626,
+# Info:
+#	Various entries useful for small windows on 2626.
+#
+hp2626-12|2626-12,
+	lines#12, use=2626,
+hp2626-12x40|2626-12x40,
+	cols#40, lines#12, use=2626,
+hp2626-x40|2626-x40,
+	cols#40, use=2626,
+hp2626-12-s|2626-12-s,
+	lines#11, use=2626-s,
+# Info:
+#	You should use this terminal at 4800 baud or less.
+#
+hp2648|hp2648a|2648a|2648A|2648|HP 2648a graphics terminal,
+	clear=\EH\EJ$<50>, cup=\E&a%p2%dc%p1%dY$<20>,
+	dch1=\EP$<7>, ip=$<5>, use=2645,
+
+# Info:
+#	2640a doesn't have the Y cursor addressing feature, and C is 
+#	memory relative instead of screen relative, as we need.
+#
+2640|hp2640a|2640a|hp 2640a,
+	cup@, smkx@, rmkx@, use=2645,
+
+2640b|hp2640b|2644a|hp2644a|hp 264x series,
+	smkx@, rmkx@, use=2645,
+
+# Info:
+#	2621 using all 48 lines of memory, only 24 visible at any time.  
+#
+hp2621-48|2621-48|48 line 2621,
+	vpa=\E&a%p1%dR, lines#48, home=\EH, cup=\E&a%p2%dc%p1%dR, use=hp2621,
+
+# Info:
+#	2621 with no labels ever. Also prevents vi delays on escape.
+#
+hp2621-nl|2621-nl|hp 2621 with no labels,
+	smkx@, rmkx@, khome@, kcuu1@, kcub1@, kcuf1@, kcud1@, use=hp2621-fl,
+
+# Info:
+#	Needed for UCB ARPAVAX console, since lsi-11 expands tabs 
+#	(wrong).
+#
+hp2621-nt|2621-nt|hp 2621 w/no tabs,
+	ht@, use=hp2621,
+
+# Info:
+#	The HP 150 terminal is a fairly vanilla HP terminal, with the 
+#	clreol standout problem. It also has graphics capabilities and 
+#	a touch screen, which we don't describe here.
+#
+hp150|Hewlett Packard Model 150,
+	use=2622,
+
+# Info:
+#	Hp 2382a terminals, "the little ones." They don't have any 
+#	alternate character set support and sending out ^N/^O will 
+#	leave the screen blank.
+#
+hp2382a|hp2382|Hewlett Packard 2382a,
+	da, db, lm#48,
+	pln=\E&f0a%p1%dk%p2%l%Pa%?%ga%t%ga%d%e1%;d0L%?%ga%!%t %;%p2%s,
+	lh#1, use=hp+labels,
+	rmacs@, smacs@, acsc@,
+	sgr0=\E&d@,
+	sgr=\E&d%{0}%Pa%?%p4%t%{1}%ga%+%Pa%;%?%p1%p3%|%p6%|%t%{2}%ga%+%Pa%;%?%p2%p6%|%t%{4}%ga%+%Pa%;%?%p1%p5%|%t%{8}%ga%+%Pa%;%?%p7%t%?%ga%ts%ga%'@'%+%e%'S'%;%e%?%ga%t%ga%'@'%+%e%'@'%;%;%c,
+	use=scrhp,
+
+hp2621-a|hp2621a-a|2621-a|hp2621 with fn as arrows,
+	use=hp+pfk+arrows, use=hp2621-fl,
+
+# Info:
+#	new Hewlett Packard terminals
+#	
+#	This entry supports emacs (and any other program that uses raw 
+#	mode) at 4800 baud and less. I couldn't get the padding right 
+#	for >=9.6.
+#
+
+newhpkeyboard|generic entry for HP extended keyboard,
+	kbs=^H, kcbt=\Ei, kclr=\EJ,
+	kcub1=\ED, kcud1=\EB, kcuf1=\EC, kcuu1=\EA,
+	kdch1=\EP, kdl1=\EM, ked=\EJ, kel=\EK,
+	use=hp+pfk-cr,
+	khome=\Eh, kich1=\EQ, kil1=\EL, kind=\ET, kll=\EF,
+	knp=\EU, kpp=\EV, kri=\ES, krmir=\ER,
+	rmkx=\E&s0A, smkx=\E&s1A,
+
+newhp|generic entry for new Hewlett Packard terminals,
+	am, bw, mir, xhp, xon,
+	cols#80, lines#24, pb#4800,
+	acsc=T1R!U2S"W3O#V4P$t5u6w7v8:'9(LQKWlRkT5I3@2[MAJSmFjGdHQ;Y+Z*X:4>q\,x.n/,
+	bel=^G, blink=\E&dA, bold=\E&dF, cbt=\Ei, cr=^M,
+	cub1=^H, cud1=^J, cuf1=\EC, cuu1=\EA,
+#	cub1=\ED, cud1=\EB,
+	dch1=\EP$<2>, dim=\E&dH, dl1=\EM,
+	ed=\EJ, el=\EK, ht=^I$<2>,
+	hts=\E1, il1=\EL, ind=^J, invis=\E&dS, ip=$<2>, is1=\E&jB$<8>,
+#	ind=\ES,
+	nel=^M^J,
+	pfkey=\E&f0a%p1%dk0d%p2%l%dL%p2%s,
+	pfloc=\E&f1a%p1%dk0d%p2%l%dL%p2%s,
+	pfx=\E&f2a%p1%dk0d%p2%l%dL%p2%s,
+	rev=\E&dB, ri=\ET, rmacs=^O, rmir=\ER, rmso=\E&d@, rmul=\E&d@,
+	rs1=\Eg,
+	sgr0=\E&d@^O,
+# Info:
+#	sgr is figured out as follows:
+#	    tparm parameters
+#		1=standout, 2=underlining, 3=reverse video, 4=blinking, 5=dim,
+#		6=bold, 7=blank, 8=protection, 9=alternate character set
+#		The protection parameter is ignored.
+#	    combination parameters
+#		standout = reverse + half-intensity = 3 | 5.
+#		bold = reverse + underline = 2 | 3.
+#
+	sgr=\E&d%{0}%Pa%?%p4%t%{1}%ga%+%Pa%;%?%p1%p3%|%p6%|%t%{2}%ga%+%Pa%;%?%p2%p6%|%t%{4}%ga%+%Pa%;%?%p1%p5%|%t%{8}%ga%+%Pa%;%?%p7%t%?%ga%ts%ga%'@'%+%e%'S'%;%e%?%ga%t%ga%'@'%+%e%'@'%;%;%c%?%p9%t^N%e^O%;,
+	smacs=^N, smir=\EQ, smso=\E&dJ, smul=\E&dD,
+	tbc=\E3,
+	use=newhpkeyboard,
+
+memhp|memory relative addressing for new HP ttys,
+	vt#6,
+	clear=\EH\EJ$<40>,
+	cub=\E&a-%p1%dC, cud=\E&a+%p1%dR, cuf=\E&a+%p1%dC, cuu=\E&a-%p1%dR,
+	cup=\E&a%p1%dr%p2%dC, mrcup=\E&a%p1%dr%p2%dC,
+	home=\EH, hpa=\E&a%p1%dC, ll=\E&a23R^M, vpa=\E&a%p1%dR,
+	use=newhp,
+
+scrhp|screen relative addressing for new HP ttys,
+	clear=\E&a0x0Y\EJ$<40>,
+	cub=\E&a-%p1%dC, cud=\E&a+%p1%dR, cuf=\E&a+%p1%dC, cuu=\E&a-%p1%dR,
+	cup=\E&a%p1%dy%p2%dX$<10>, mrcup=\E&a%p1%dr%p2%dC,
+	home=\E&a0y0X, hpa=\E&a%p1%dC, ll=\E&a0y0X\EA, vpa=\E&a%p1%dY,
+	use=newhp,
+
+hp+labels|"standard" label info for new HP ttys,
+	lh#2, lw#8, nlab#8,
+	pln=\E&f0a%p1%dk%p2%l%Pa%?%ga%t%ga%d%e1%;d0L%?%ga%!%t %;%p2%s,
+	smln=\E&jB,
+
+hp+printer| "standard" printer info for HP ttys,
+	ff=\E&p4u0C, mc0=\EH\E&p4dF, mc4=\E&p13C, mc5=\E&p11C,
+
+
+# Info:
+#	The new hp2621b is kind of a cross between the old 2621 and the
+#	new 262x series of machines. It has dip-switched options. 
+#	The firmware has a bug in it such that if you give it a null 
+#	length label, the following character is eaten!
+#
+
+hp2621b|2621b|hp 2621b with old style keyboard,
+	lm#48, lh#1, lw#8, nlab#8,
+	pln=\E&f0a%p1%dk%p2%l%Pa%?%ga%t%ga%d%e1%;d3L%?%ga%!%t%' '%c%;%p2%s\E%'o'%p1%+%c\r,
+	smln=\E&jB,
+	khome=\Eh, kll=\EF, kri=\ES, kind=\ET,
+	kcuu1=\EA, kcub1=\ED, kcuf1=\EC, kcud1=\EB,
+	use=hp2621,
+
+hp2621b-p|2621b-p|hp 2621b with printer,
+	use=hp+printer,
+	use=hp2621b,
+
+# Info:
+#	hp2621b - new 2621b's with new extended keyboard
+#	these are closer to the new 26xx series than the other 2621b
+#
+hp2621b-kx|2621b-kx|hp 2621b with extended keyboard,
+	use=newhpkeyboard,
+	use=hp2621b,
+
+hp2621b-kx-p|2621b-kx-p|hp 2621b with new keyboard & printer,
+	use=hp+printer,
+	use=hp2621b-kx,
+
+# Info:
+#	Some assumptions are made in the following entries.
+#	These settings are NOT set up by the initialization strings.
+#	
+#    Port Configuration
+#	RecvPace=Xon/Xoff	XmitPace=Xon/Xoff	StripNulDel=Yes
+#	
+#    Terminal Configuration
+#	InhHndShk(G)=Yes	InhDC2(H)=Yes
+#	XmitFnctn(A)=No		InhEolWrp=No
+#
+#	
+# Hp 2622a & hp2623a display and graphics terminals
+#
+hp2622|hp2622a|2622|2622a|hp 2622,
+	use=hp+pfk+cr,
+	is2=\E&dj@\r,
+	pb#19200,
+	da, db, lm#0,
+	use=hp+labels,
+	use=scrhp,
+
+# Info:
+#	The 2623 is a 2622 with extra graphics hardware.
+#
+hp2623|hp2623a|2623|2623a|hp 2623,
+	use=hp2622,
+
+
+hp2624b-p|hp2624b-4p-p|Hewlett Packard 2624 B with printer,
+	use=hp+printer,
+	use=hp2624b,
+
+# Info:
+#	The Hewlett Packard B can have an optional extra 6 pages of 
+#	memory.
+#
+
+hp2624-10p|hp2624a-10p|hp2624b-10p|2624-10p|2624a-10p|2624b-10p|Hewlett Packard 2624 B w/ 10 pages of memory,
+	lm#240, use=hp2624b,
+
+hp2624b-10p-p|Hewlett Packard 2624 B w/ extra memory & printer,
+	lm#240, use=hp2624b-p,
+
+# Info:
+#	Color manipulations for HP terminals
+
+hp+color|hp with colors,
+	ccc,
+	pairs#8, colors#16, ncv#17,
+	scp=\E&v%p1%dS,
+	initp=\E&v%?%p2%{1000}%=%t1%e.%p2%d%;a
+		  %?%p3%{1000}%=%t1%e.%p3%d%;b
+		  %?%p4%{1000}%=%t1%e.%p4%d%;c
+		  %?%p5%{1000}%=%t1%e.%p5%d%;x
+		  %?%p6%{1000}%=%t1%e.%p6%d%;y
+		  %?%p7%{1000}%=%t1%e.%p7%d%;z
+		  %p1%dI,
+	oc=\E&v0m1a1b1c0I\E&v1a1I\E&v1b2I\E&v1a1b3I\E&v1c4I\E&v1a1c5I\E&v1b1c6I\E&v1x1y7I,
+	op=\E&v0S,
+
+# Info:
+#	is2 disables the dispay, set screen to be 80 columns wide, 
+#       set all function keys to transmit default strings, clears
+#       the screen and then enables the display.
+#
+
+hp2397|2397|2397a|hp2397a|HP 2397A,
+	is2=\E*dF\E&w6f80X\E&f0a1k2d2Lf1\Ep\E&f0a2k2d2Lf2\Eq\E&f0a3k2d2Lf3\Er\E&f0a4k2d2Lf4\Es\E&f0a5k2d2Lf5\Et\E&f0a6k2d2Lf6\Eu\E&f0a7k2d2Lf7\Ev\E&f0a8k2d2Lf8\Ew\EH\EJ$<40>\E*dE,
+	use=scrhp, use=hp+labels, use=hp+color,

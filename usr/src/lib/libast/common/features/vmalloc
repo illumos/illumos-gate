@@ -1,0 +1,167 @@
+#
+# This file defines probes for local features that vmalloc requires.
+# Such probes are interpreted by the "iffe" language interpreter.
+# Results are stored in the FEATURE directory. Some of the
+# {lib,hdr,sys,typ} tests may also be done in the AST features/lib;
+# repeating them here allows for single standalone and AST sources.
+#
+
+ref	-D_def_map_ast=1
+
+lib	atexit,getpagesize,mallinfo,mallopt,memalign,mstats
+lib	onexit,pvalloc,strdup,valloc,vmalloc
+lib	_malloc,__malloc,__libc_malloc
+hdr	alloca,malloc,stat,stdlib,unistd
+mem	mallinfo.arena,mstats.bytes_total malloc.h
+sys	stat
+typ	ssize_t
+
+tst	mem_sbrk note{ brk()/sbrk() work as expected }end execute{
+	#include        <sys/types.h>
+	#include        <unistd.h>
+	#undef	uchar
+	#define	uchar	unsigned char
+	int main()
+	{	uchar	*brk0, *brk1;
+
+		/* allocate a big chunk */
+		if(!(brk0 = (uchar*)sbrk(0)) || brk0 == (uchar*)(-1))
+			return 1;
+		brk0 += 256*1024;
+		if(brk(brk0) != 0)
+			return 1;
+		if((brk1 = (uchar*)sbrk(0)) != brk0)
+			return 1;
+
+		/* now return half of it */
+		brk1 -= 128*1024;
+		if(brk(brk1) != 0 )
+			return 1;
+		if((brk0 = (uchar*)sbrk(0)) != brk1)
+			return 1;
+
+		return 0;
+	}
+}end
+
+tst	map_malloc note{ map malloc to _ast_malloc }end noexecute{
+	#if __CYGWIN__
+	int main() { return 1; }
+	#else
+	static int user = 0;
+	_BEGIN_EXTERNS_
+	#if _lib_strdup
+	extern char* strdup _ARG_((const char*));
+	#define LOCAL()	strdup("s")
+	#else
+	extern void* calloc _ARG_((unsigned int, unsigned int));
+	#define LOCAL()	calloc(1,1)
+	#endif
+	#if __CYGWIN__
+	#define extern __declspec(dllexport)
+	#endif
+	#define HT double
+	static HT heap[1024 * 4];
+	static HT* hp = &heap[1];
+	static HT* op;
+	#define MALLOC(n) if(user)return&heap[0];op=hp;hp+=(n+sizeof(HT)-1)/sizeof(HT);return(void*)op;
+	#define INTERCEPTED(p) (((char*)(p))==((char*)&heap[0]))
+	#if _STD_
+	extern void free(void* p) { }
+	extern void _free(void* p) { }
+	extern void __free(void* p) { }
+	extern void __libc_free(void* p) { }
+	extern void* malloc(unsigned int n) { MALLOC(n); }
+	extern void* _malloc(unsigned int n) { MALLOC(n); }
+	extern void* __malloc(unsigned int n) { MALLOC(n); }
+	extern void* __libc_malloc(unsigned int n) { MALLOC(n); }
+	#else
+	extern void free(p) char* p; { }
+	extern void _free(p) char* p; { }
+	extern void __free(p) char* p; { }
+	extern void __libc_free(p) char* p; { }
+	extern void* malloc(n) unsigned int n; { MALLOC(n); }
+	extern void* _malloc(n) unsigned int n; { MALLOC(n); }
+	extern void* __malloc(n) unsigned int n; { MALLOC(n); }
+	extern void* __libc_malloc(n) unsigned int n; { MALLOC(n); }
+	#endif
+	_END_EXTERNS_
+	int main() { user = 1; return !INTERCEPTED(LOCAL()); }
+	#endif
+}end
+
+tst	map_malloc note{ map malloc to _ast_malloc -- wimp-o mach? }end noexecute{
+	#if _map_malloc
+	int main() { return 0; }
+	#else
+	_BEGIN_EXTERNS_
+	#if _STD_
+	void* calloc(unsigned n, unsigned m) { exit(1); }
+	#else
+	void* calloc(n, m) unsigned n, m; { exit(1); }
+	#endif
+	_END_EXTERNS_
+	int main() { return 0; }
+	#endif
+}end
+
+lib	alloca note{ alloca exists }end link{
+	#if _hdr_alloca
+	#include	<alloca.h>
+	#endif
+	int
+	main()
+	{	alloca(10);
+	}
+}end
+
+tst	mal_alloca note{ alloca is based on malloc() }end execute{
+	#if __CYGWIN__
+	int main() { return 1; }
+	#else
+	#if _hdr_alloca
+	#include	<alloca.h>
+	#endif
+	#if _STD_
+	void* malloc(unsigned int size)
+	#else
+	void* malloc(size) unsigned int size;
+	#endif
+	{	exit(0);
+		return 0;
+	}
+	int main()
+	{	alloca(10);
+		return 1;
+	}
+	#endif
+}end
+
+tst	stk_down note{ stack grows downward }end execute{
+	static growdown()
+	{	static char*	addr = 0;
+		char		array[4];
+		if(!addr)
+		{	addr = &array[0];
+			return growdown();
+		}
+		else if(addr < &array[0])
+			return 0;
+		else	return 1;	
+	}
+	int main() { return growdown() ? 0 : 1; }
+}end
+
+cat{
+	#include "FEATURE/mmap"
+	#if _BLD_INSTRUMENT || cray || _UWIN && _BLD_ast
+	#undef	_map_malloc
+	#define _std_malloc	1	/* defer to standard malloc */
+	#endif
+	#if _mmap_anon
+	#define _mem_mmap_anon	1
+	#endif
+	#if _mmap_devzero
+	#define _mem_mmap_zero	1
+	#endif
+}end

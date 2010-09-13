@@ -1,0 +1,133 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+# # --------------------------------
+#
+# microterm: MICROTERM
+#
+# Manufacturer:	MICROTERM
+# Class:	III
+microterm|act4|microterm act iv,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, ed=^_, el=^^, clear=^L,
+	cup=^T%p1%c%p2%c, cols#80, lines#24, cuf1=^X, cuu1=^Z, home=^],
+# Info:
+#	The padding on cuf1 for act5 and mime is a guess and not final.
+#	The act5 has hardware tabs, but in cols 8, 16, 24, 32, 41 (!), 49, ...
+#
+microterm5|act5|microterm act v,
+	uc=\EA, ri=\EH$<3>, kcuu1=^Z, kcud1=^K, kcub1=^H, kcuf1=^X, use=act4,
+# Info:
+#	Act V in split screen mode. act5-s is not tested and said not 
+#	to work.
+#	Could have been because of the funny tabs - it might work now.
+#
+act5-s|act5s|act 5 in split screen mode,
+	smcup=\EP, rmcup=\EQ, lines#48, cols#39, use=act5,
+# Info:
+#	These mime1 entries refer to the Microterm Mime I or Mime II.
+#	The default mime is assumed to be in enhanced act iv mode.
+#	There is a ^Q in is2 to unwedge any lines that wedge on ^S.
+#
+mime|mime1|mime2|mimei|mimeii|microterm mime1,
+	cup=^T%p1%{24}%+%c%p2%?%p2%{32}%>%t%{48}%+%;%{80}%+%c, cols#80,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<80>, am, cub1=^H,
+	ed=^_, el=^^, clear=\035^C, dl1=^W$<80>, ht=^I, lines#24,
+	cuf1=^X, it#8, uc=^U, cuu1=^z, home=\035, cud1=^K, is2=\E^S^Q,
+	kcuu1=^Z, kcud1=^K, kcub1=^H, kcuf1=^X, ri=^R$<3>, vt#9,
+mime-na|mime with no arrow keys,
+	kcuu1@, kcud1@, kcuf1@, use=mime,
+mime-3a|mime-adm3a|mime1 emulating adm3a,
+	cols#80, lines#24,
+	bel=^G, clear=^Z$<1>, cr=\r, cub1=\b, cud1=\n,
+	cuf1=\f, cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	home=^^, ind=\n, kcub1=\b, kcud1=^K, kcuf1=^X,
+	kcuu1=^Z,
+mime-3ax|mime-adm3ax|mime1 emulating enhanced adm3a,
+	il1=^A$<80>, dl1=^W$<80>, ht=^I$<3>, it#8, el=^X, ed=^_, use=mime-3a,
+# Info:
+#	Mimes using brightness for standout. Half bright is very dim 
+#	unless you turn up the brightness so far that lines show up on 
+#	the screen.
+#
+mime-fb|full bright mime1,
+	smso=^Y, rmso=^S, is2=^S\E^Q, use=mime,
+mime-hb|half bright mime1,
+	smso=^S, rmso=^Y, is2=^Y\E, use=mime,
+# Info:
+#	These entries (for mime 2a) put the terminal in low intensity 
+#	mode since high intensity mode is so obnoxious.
+#	This is the preferred mode (but ^X can't be used as a kill 
+#	character (?))
+#
+mime2a|mime2a-v|microterm mime2a (emulating an enhanced vt52),
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<20*>, cub1=^H, ed=\EQ$<20*>,
+	cols#80, el=\EP, clear=\EL, cup=\EY%p1%' '%+%c%p2%' '%+%c, is2=^Y,
+	dch1=^N, dl1=^W$<20*>, ip=$<2>, rmir=^Z, home=\EH, smir=^O, cuu1=\EA,
+	ri=\EA, kcud1=\EB, kcub1=\ED, kcuf1=\EC, kcuu1=\EA, lines#24,
+	cuf1=\EC, ht=^I, it#8, rmso=\E9, smso=\E8, smul=\E4, rmul=\E5,
+mime2a-s|microterm mime2a (emulating an enhanced soroc iq120),
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^A$<20*>, am, cub1=^H, ed=\EJ$<20*>,
+	el=\EK, clear=\EL, cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\ED,
+	dl1=^W$<20*>, kcub1=^H, kcuf1=^L, kcuu1=^K, kcud1=^J, home=^^, is2=\E),
+	ri=\EI, smir=\EE, rmir=^Z, ip=$<2>, lines#24, cuf1=^L, cuu1=\EI,
+	smso=\E:, rmso=\E;, smul=\E6, rmul=\E7,
+# Info:
+#	Wed Mar  9 18:53:21 1983
+#	We run our terminals at 2400 Baud, so there might be some timing
+#	problems at higher speeds.
+#	The major improvements in this mod are the terminal now 
+#	scrolls down and insert mode works without redrawing the rest 
+#	of the line to the right of the cursor. This is done with a 
+#	bit of a kludge using the exit graphics mode to get out of 
+#	insert, but it does not appear to hurt anything when using 
+#	vi at least. If you have some users using act4's with programs 
+#	that use curses and graphics mode this could be a problem.
+#
+mm3|mime314|mm314|mime 314,
+	am, cub1=^H, ht=^I, ed=^_, el=^^, clear=^L, cup=^T%p1%c%p2%c,
+	cols#80, lines#24, cuf1=^X, cuu1=^Z,
+	home=^], kcud1=^K, kcub1=^H, kcuf1=^X, kcuu1=^Z,
+	il1=^A, dch1=^D, dl1=^W, smir=^S, rmir=^V, 
+# Info:
+#	Fri Aug  5 08:11:57 1983
+#	this entry works for ergo 4000's with the following setups:
+#	ansi,wraparound,newline disabled, xon/xoff disabled in both
+#	setup a & c    
+#	
+#	WARNING!!! There are multiple versions of ERGO 4000 microcode
+#	Be advised that very early versions DO NOT WORK RIGHT !!  
+#	Microterm does have a ROM exchange program- use it or lose big
+#
+m8|ergo4000|microterm ergo 4000,
+	cr=^M, cud1=^J, ind=^J, bel=^G, ed=\E[0J$<15>, el=\E[0K$<13>,
+	clear=\E[H\E[2J$<80>, cub1=^H, cuf1=\E[C, cuu1=\E[A, cud1=\E[B,
+	cup=\E[%i%p1%d;%p2%dH, cols#80, lines#66, da, db, dch1=\E[1P$<80>,
+	il=\E[1L$<5*>, dl1=\E[1M$<5*>, smir=\E[4h$<6>, rmir=\E[4l,
+	is2=\E<\E=\E[?1l\E[?4l\E[?5l\E[?7h\E[?8h$<300>, kf1=\EOP,
+	kf2=\EOQ, kf3=\EOR, kf4=\EOS, kcud1=\E[B, rmkx=\E=$<4>,
+	kcub1=\E[D, kcuf1=\E[C, smkx=\E=$<4>, kcuu1=\E[A, lf1=pf1,
+	lf2=pf2, lf3=pf3, lf4=pf4, msgr, ht=^I, rmso=\E[0m$<20>,
+	smso=\E[7m$<20>, ri=\EM$<20*>, ind=\ED$<20*>,

@@ -1,0 +1,155 @@
+hdr,sys	poll,socket,netinet/in
+lib	select,poll,socket
+lib	htons,htonl sys/types.h sys/socket.h netinet/in.h
+lib	getaddrinfo sys/types.h sys/socket.h netdb.h
+typ	fd_set sys/socket.h sys/select.h
+tst	pipe_socketpair note{ use socketpair() for peekable pipe() }end execute{
+	#include <ast.h>
+	#include <signal.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	#ifndef SHUT_RD
+	#define SHUT_RD		0
+	#endif
+	#ifndef SHUT_WR
+	#define SHUT_WR		1
+	#endif
+	static void handler(sig)
+	int	sig;
+	{
+		_exit(0);
+	}
+	int main()
+	{
+		int		n;
+		int		pfd[2];
+		int		sfd[2];
+		char		buf[256];
+		pid_t		pid;
+		static char	msg[] = "hello world\n";
+		close(0);
+		if (pipe(pfd) < 0 ||
+		    socketpair(AF_UNIX, SOCK_STREAM, 0, sfd) < 0 ||
+		    shutdown(sfd[1], SHUT_RD) < 0 ||
+		    shutdown(sfd[0], SHUT_WR) < 0)
+			return(1);
+		if ((pid = fork()) < 0)
+			return(1);
+		if (pid)
+		{
+			close(pfd[1]);
+			close(sfd[1]);
+			wait(&n);
+			if (sfpkrd(pfd[0], buf, sizeof(buf), '\n', -1, 1) >= 0 ||
+			    sfpkrd(sfd[0], buf, sizeof(buf), '\n', -1, 1) < 0)
+				return(1);
+		}
+		else
+		{
+			close(pfd[0]);
+			close(sfd[0]);
+			write(pfd[1], msg, sizeof(msg) - 1);
+			write(sfd[1], msg, sizeof(msg) - 1);
+			return(0);
+		}
+		close(pfd[0]);
+		close(sfd[0]);
+		signal(SIGPIPE, handler);
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, sfd) < 0 ||
+		    shutdown(sfd[1], SHUT_RD) < 0 ||
+		    shutdown(sfd[0], SHUT_WR) < 0)
+			return(1);
+		close(sfd[0]);
+		write(sfd[1], msg, sizeof(msg) - 1);
+		return(1);
+	}
+}end
+tst	socketpair_devfd note{ /dev/fd/N handles socketpair() }end execute{
+	#include <ast.h>
+	#include <fs3d.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	int main()
+	{
+		int		devfd;
+		int		n;
+		int		sfd[2];
+		fs3d(FS3D_OFF);
+		close(0);
+		open("/dev/null", O_RDONLY);
+		if ((n = open("/dev/fd/0", O_RDONLY)) < 0)
+			return(1);
+		close(n);
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, sfd) < 0 ||
+		    shutdown(sfd[0], 1) < 0 ||
+		    shutdown(sfd[1], 0) < 0)
+			return(1);
+		close(0);
+		dup(sfd[0]);
+		close(sfd[0]);
+		if ((n = open("/dev/fd/0", O_RDONLY)) < 0)
+			return(1);
+		return(0);
+	}
+}end
+tst	socketpair_shutdown_mode note{ fchmod() after socketpair() shutdown() }end execute{
+	#include <ast.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <sys/socket.h>
+	int main()
+	{
+		int		sfd[2];
+		struct stat	st0;
+		struct stat	st1;
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, sfd) < 0 ||
+		    shutdown(sfd[0], 1) < 0 ||
+		    shutdown(sfd[1], 0) < 0)
+			return(1);
+		if (fstat(sfd[0], &st0) < 0 || fstat(sfd[1], &st1) < 0)
+			return(1);
+		if ((st0.st_mode & (S_IRUSR|S_IWUSR)) == S_IRUSR &&
+		    (st1.st_mode & (S_IRUSR|S_IWUSR)) == S_IWUSR)
+			return(1);
+		if (fchmod(sfd[0], S_IRUSR) < 0 ||
+		    fstat(sfd[0], &st0) < 0 ||
+		    (st0.st_mode & (S_IRUSR|S_IWUSR)) != S_IRUSR)
+			return(1);
+		if (fchmod(sfd[1], S_IWUSR) < 0 ||
+		    fstat(sfd[1], &st1) < 0 ||
+		    (st1.st_mode & (S_IRUSR|S_IWUSR)) != S_IWUSR)
+			return(1);
+		return(0);
+	}
+}end
+cat{
+	#pragma prototyped
+	#ifdef _lib_poll
+	#   define poll _SYS_poll
+	#else
+	#   undef _hdr_poll
+	#   undef _sys_poll
+	#endif /* _lib_poll */
+	#ifdef _hdr_poll
+	#    include    <poll.h>
+	#else
+	#   ifdef _sys_poll
+	#	include    <sys/poll.h>
+	#   endif /* _sys_poll */
+	#endif /* _hdr_poll */
+	#ifdef _lib_poll
+	#   undef poll
+	    extern int poll(struct pollfd*,unsigned long,int);
+	#endif /* _lib_poll */
+	#ifdef _lib_select
+	#   ifndef FD_ZERO
+	#	define FD_ZERO(x)	(*(x)=0)
+	#   endif /* FD_ZERO */
+	#   ifndef FD_SET
+	#	define FD_SET(n,x)	(*(x)|=(1L<<(n)))
+	#   endif /* FD_SET */
+	#   ifndef _typ_fd_set
+		typedef long fd_set;
+	#   endif /*_typ_fd_set */
+	#endif /* _lib_select */
+}end

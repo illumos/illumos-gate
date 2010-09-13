@@ -1,0 +1,88 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# University Copyright- Copyright (c) 1982, 1986, 1988
+# The Regents of the University of California
+# All Rights Reserved
+#
+# University Acknowledgment- Portions of this document are derived from
+# software developed by the University of California, Berkeley, and its
+# contributors.
+#
+
+
+# For use in one of the dev* font-table directories
+#
+#    If you're not really comfortable with the 'makedev' program, you can
+# use this shell script to make the binary font and device tables for the
+# device independent troff. You can be sure that all the necessary
+# binary files will be properly updated. The command 'maketables *'
+# will make a complete new set of binary '.out' files.
+#
+#    If the makedev program isn't located in the parent of this directory,
+# just change the initialization of the shell variable MAKEDEV.
+#
+#
+# USAGE:  maketables files
+#         files - one or more files from this directory.
+#
+#
+
+
+MAKEDEV=../makedev                        # this program does the real work
+MAKEDESC=no                            # need to remake the DESC.out file
+
+FONTS=`grep "^fonts" DESC | sed s/"fonts[ \t][0-9][0-9]*"//gp`
+
+FONTS=`echo "$FONTS" | sed "s/	/ /gp"`     # get rid of any tabs
+FONTS="$FONTS "								# and add a blank to the end
+
+for i do
+    if echo "$FONTS" | grep " $i " > /dev/null; then
+        MAKEDESC=yes
+        continue
+    fi
+
+    case $i in
+             [A-Z]) $MAKEDEV $i;;
+
+        [A-Z][0-9]) $MAKEDEV $i;;
+
+        [A-Z][A-Z]) $MAKEDEV $i;;
+
+              DESC) MAKEDESC=yes;;
+    esac
+done
+
+if [ $MAKEDESC = yes ]; then
+    $MAKEDEV DESC
+fi
+
+if [ -r LINKFILE ]; then
+	. LINKFILE
+fi

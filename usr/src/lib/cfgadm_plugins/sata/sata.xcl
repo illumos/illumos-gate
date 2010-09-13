@@ -1,0 +1,107 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/cfgadm_plugins/sata/sata.xcl
+#
+msgid	"/devices/"
+msgstr
+msgid	"/devices"
+msgstr
+msgid	"/"
+msgstr
+msgid	"/n"
+msgstr
+msgid	"ap_id: "
+msgstr
+msgid	" %s%s\n%s"
+msgstr
+msgid	"cfga_change_state: get device path failed\n"
+msgstr
+msgid	"cfga_change_state: get path failed\n"
+msgstr
+msgid	"devctl_ap_unconfigure failed\n"
+msgstr
+msgid	"No valid option specified\n"
+msgstr
+msgid	"cfga_list_ext: cannot locate target device\n"
+msgstr
+msgid	"/dsk/"
+msgstr
+msgid	"/rdsk/"
+msgstr
+msgid	"/dev/"
+msgstr
+msgid	"SATA_CFGA_GET_MODULE_INFO ioctl failed\n"
+msgstr
+msgid	"Mod: "
+msgstr
+msgid	"SATA_CFGA_GET_REVFIRMWARE_INFO ioctl failed\n"
+msgstr
+msgid	" FRev: "
+msgstr
+msgid	"SATA_CFGA_GET_SERIALNUMBER_INFO ioctl failed\n"
+msgstr
+msgid	" SN: "
+msgstr
+msgid	"SATA_CFGA_GET_AP_TYPE ioctl failed\n"
+msgstr
+msgid	"::"
+msgstr
+msgid	"sata-port"
+msgstr
+msgid	"cfga_msg: NULL msgp\n"
+msgstr
+msgid	"cfga_msg: null str\n"
+msgstr
+msgid	"cfga_msg"
+msgstr
+msgid	"0123456789."
+msgstr
+msgid	".."
+msgstr
+msgid	"devctl_ap_acquire failed\n"
+msgstr
+msgid	"nvlist_alloc failed\n"
+msgstr
+msgid	"setup_for_devctl_cmd: get_port_num, errno: %d\n"
+msgstr
+msgid	"nvlist_add_int32 failed\n"
+msgstr
+msgid	"devctl_ap_getstate failed, errno: %d\n"
+msgstr
+msgid	"do_control_ioctl: open failed: errno:%d\n"
+msgstr
+msgid	"ioctl failed (size)"
+msgstr
+msgid	"zero length data\n"
+msgstr
+msgid	"do_control_ioctl: malloc failed\n"
+msgstr
+msgid	" "
+msgstr
+msgid	"%%-%ds  %%-%ds"
+msgstr

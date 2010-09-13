@@ -1,0 +1,269 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright (c) 2010, Intel Corporation.
+#
+#	This Makefile defines file modules in the directory uts/i86pc
+#	and its children. These are the source files which are i86pc
+#	"implementation architecture" dependent.
+#
+
+#
+#	object lists
+#
+CORE_OBJS +=			\
+	acpi_stubs.o		\
+	biosdisk.o		\
+	bios_call.o		\
+	cbe.o			\
+	cmi.o			\
+	cmi_hw.o		\
+	cms.o			\
+	confunix.o		\
+	cpu_idle.o		\
+	cpuid.o			\
+	cpuid_subr.o		\
+	cpupm.o			\
+	cpupm_mach.o		\
+	cpupm_amd.o		\
+	cpupm_intel.o		\
+	cpupm_throttle.o	\
+	cpu_acpi.o		\
+	dis_tables.o		\
+	ddi_impl.o		\
+	dtrace_subr.o		\
+	dvma.o			\
+	fpu_subr.o		\
+	fakebop.o		\
+	fastboot.o		\
+	fb_swtch.o		\
+	graphics.o		\
+	hardclk.o		\
+	hat_i86.o		\
+	hat_kdi.o		\
+	hment.o			\
+	hold_page.o		\
+	hrtimers.o		\
+	htable.o		\
+	hypercall.o		\
+	hypersubr.o		\
+	i86_mmu.o		\
+	ibft.o			\
+	instr_size.o		\
+	intr.o			\
+	kboot_mmu.o		\
+	kdi_subr.o		\
+	kdi_idt.o		\
+	kdi_idthdl.o		\
+	kdi_asm.o		\
+	lgrpplat.o		\
+	mach_kdi.o		\
+	mach_sysconfig.o	\
+	machdep.o		\
+	mem_config.o		\
+	mem_config_stubs.o	\
+	mem_config_arch.o	\
+	memlist_new.o		\
+	memnode.o		\
+	microcode.o		\
+	microfind.o		\
+	mlsetup.o		\
+	mp_call.o		\
+	mp_implfuncs.o		\
+	mp_machdep.o		\
+	mp_pc.o			\
+	mp_startup.o		\
+	memscrub.o		\
+	mpcore.o		\
+	notes.o			\
+	pci_bios.o		\
+	pci_cfgacc.o		\
+	pci_cfgacc_x86.o	\
+	pci_cfgspace.o		\
+	pci_mech1.o		\
+	pci_mech1_amd.o		\
+	pci_mech2.o		\
+	pci_neptune.o		\
+	pci_orion.o		\
+	pmem.o			\
+	ppage.o			\
+	pwrnow.o		\
+	speedstep.o		\
+	startup.o		\
+	timestamp.o		\
+	todpc_subr.o		\
+	trap.o			\
+	vm_machdep.o		\
+	xpv_platform.o		\
+	x_call.o
+
+#
+#	Add the SMBIOS subsystem object files directly to the list of objects
+#	built into unix itself; this is all common code except for smb_dev.c.
+#
+CORE_OBJS += $(SMBIOS_OBJS)
+
+#
+# These get compiled twice:
+# - once in the dboot (direct boot) identity mapped code
+# - once for use during early startup in unix
+#
+BOOT_DRIVER_OBJS =		\
+	boot_console.o		\
+	boot_keyboard.o		\
+	boot_keyboard_table.o	\
+	boot_vga.o		\
+	boot_mmu.o
+
+CORE_OBJS += $(BOOT_DRIVER_OBJS)
+
+#
+#	locore.o is special. It must be the first file relocated so that it
+#	it is relocated just where its name implies.
+#
+SPECIAL_OBJS_32 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm.o
+
+SPECIAL_OBJS_64 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm_amd64.o
+
+SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
+
+#
+# Objects that get compiled into the identity mapped PT_LOAD section of unix
+# to handle the earliest part of booting.
+#
+DBOOT_OBJS_32 =
+
+DBOOT_OBJS_64 += dboot_elfload.o
+
+DBOOT_OBJS +=			\
+	dboot_asm.o		\
+	dboot_grub.o		\
+	dboot_printf.o		\
+	dboot_startkern.o	\
+	memcpy.o		\
+	memset.o		\
+	muldiv.o		\
+	string.o		\
+	$(BOOT_DRIVER_OBJS)	\
+	$(DBOOT_OBJS_$(CLASS))
+
+#
+#			driver and misc modules
+#
+GFX_PRIVATE_OBJS	+= gfx_private.o gfxp_pci.o gfxp_segmap.o \
+			   gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
+FIPE_OBJS += fipe_drv.o fipe_pm.o
+IOAT_OBJS += ioat.o ioat_rs.o ioat_ioctl.o ioat_chan.o
+ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
+PCIE_MISC_OBJS += pcie_acpi.o pciehpc_acpi.o pcie_x86.o
+PCI_E_NEXUS_OBJS += npe.o npe_misc.o
+PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
+PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
+PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
+			mp_platform_common.o mp_platform_misc.o		\
+			hpet_acpi.o apic_common.o apic_timer.o
+APIX_OBJS += apix.o apic_regops.o psm_common.o apix_intr.o apix_utils.o \
+		apix_irm.o mp_platform_common.o hpet_acpi.o apic_common.o \
+		apic_timer.o
+
+
+ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o
+ACPINEX_OBJS	+= acpinex_drv.o acpinex_event.o
+
+CPUDRV_OBJS	+= \
+	cpudrv.o \
+	cpudrv_mach.o
+
+PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
+
+ACPIPPM_OBJS	+= acpippm.o acpisleep.o
+ACPIDEV_OBJS += acpidev_drv.o \
+	acpidev_scope.o acpidev_device.o \
+	acpidev_container.o \
+	acpidev_cpu.o \
+	acpidev_dr.o \
+	acpidev_memory.o \
+	acpidev_pci.o \
+	acpidev_resource.o \
+	acpidev_util.o
+
+DRMACH_ACPI_OBJS += drmach_acpi.o dr_util.o drmach_err.o
+
+DR_OBJS	+= dr.o dr_cpu.o dr_err.o dr_io.o dr_mem_acpi.o dr_quiesce.o dr_util.o
+
+ROOTNEX_OBJS += rootnex.o immu.o immu_dmar.o immu_dvma.o \
+		immu_intrmap.o immu_qinv.o immu_regs.o
+
+TZMON_OBJS	+= tzmon.o
+UPPC_OBJS += uppc.o psm_common.o
+XSVC_OBJS += xsvc.o
+AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
+			amd_iommu_cmd.o amd_iommu_log.o amd_iommu_page_tables.o
+
+#
+#	Build up defines and paths.
+#
+ALL_DEFS	+= -Di86pc
+INC_PATH	+= -I$(UTSBASE)/i86pc -I$(SRC)/common
+INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
+
+#
+# Since the assym files are derived, the dependencies must be explicit for
+# all files including this file. (This is only actually required in the
+# instance when the .nse_depinfo file does not exist.) It may seem that
+# the lint targets should also have a similar dependency, but they don't
+# since only C headers are included when #defined(__lint) is true.
+#
+
+ASSYM_DEPS      += 		\
+	copy.o			\
+	desctbls_asm.o		\
+	ddi_i86_asm.o		\
+	exception.o		\
+	fast_trap_asm.o		\
+	float.o			\
+	i86_subr.o		\
+	interrupt.o		\
+	lock_prim.o		\
+	locore.o		\
+	mpcore.o		\
+	sseblk.o		\
+	swtch.o			\
+	syscall_asm.o		\
+	syscall_asm_amd64.o	\
+	cpr_wakecode.o
+
+CPR_IMPL_OBJS	= cpr_impl.o	cpr_wakecode.o
+
+$(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
+
+ASSYM_DEPS += kdi_asm.o

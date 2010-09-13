@@ -1,0 +1,241 @@
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Data file for the 'format' program.  This file defines the known
+# disks, disk types, and partition maps.
+#
+
+#
+# Following is a list of sample embedded SCSI disk configurations.
+#
+disk_type = "Quantum ProDrive 80S" \
+	: ctlr = SCSI : fmt_time = 1 \
+	: cache = 0x07 : trks_zone = 6 : atrks = 0 : asect = 1 \
+	: ncyl = 832 : acyl = 2 : pcyl = 834 : nhead = 6 : nsect = 34 \
+	: rpm = 3662 : bpt = 16896
+
+#disk_type = "CDC Wren VII 94601-12G" \
+#	: ctlr = SCSI : fmt_time = 4 \
+#	: cache = 0x11 : trks_zone = 15 : asect = 5 : atrks = 30 \
+#	: ncyl =  1703 : acyl = 2 : pcyl = 1931 : nhead = 15 : nsect = 80 \
+#	: rpm = 3597 : bpt = 41301
+
+#
+# An early CDC Wren IV, shipped with the 386i
+#
+#disk_type = "CDC Wren IV 94171-327" \
+#	: ctlr = SCSI : fmt_time = 4 \
+#	: cache = 0x11 : trks_zone = 9 : asect = 3 \
+#	: ncyl = 1520 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+#	: rpm = 3600 : bpt = 20833
+
+#
+# This is the list of Sun supported disks for embedded SCSI.
+#
+disk_type = "Quantum ProDrive 105S" \
+	: ctlr = SCSI : fmt_time = 1 \
+	: cache = 0x07 : trks_zone = 6 : atrks = 0 : asect = 1 \
+	: ncyl = 974 : acyl = 2 : pcyl = 1019 : nhead = 6 : nsect = 35 \
+	: rpm = 3662 : bpt = 16896
+
+disk_type = "CDC Wren IV 94171-344" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: cache = 0x11 : trks_zone = 9 : asect = 3 \
+	: ncyl = 1545 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+	: rpm = 3600 : bpt = 20833
+
+disk_type = "SUN0104" \
+	: ctlr = SCSI : fmt_time = 1 \
+	: trks_zone = 6 : atrks = 0 : asect = 1 \
+	: ncyl = 974 : acyl = 2 : pcyl = 1019 : nhead = 6 : nsect = 35 \
+	: rpm = 3662 : bpt = 16896
+
+disk_type = "SUN0207" \
+	: ctlr = SCSI \
+	: trks_zone = 9 : atrks = 2: asect = 4 \
+	: ncyl = 1254 : acyl = 2 : pcyl = 1272 : nhead = 9 : nsect = 36 \
+	: rpm = 3600 : bpt = 18432
+
+disk_type = "SUN0327" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: cache = 0x11 : trks_zone = 9 : asect = 3 \
+	: ncyl = 1545 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+	: rpm = 3600 : bpt = 20833
+
+disk_type = "SUN0340" \
+	: ctlr = SCSI : fmt_time = 2 \
+	: trks_zone = 6  \
+	: ncyl = 1538 : acyl = 2 : pcyl = 1544 : nhead = 6 : nsect = 72 \
+	: rpm = 4200
+
+disk_type = "SUN0424" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: trks_zone = 9 : asect = 2 \
+	: ncyl = 1151 : acyl = 2 : pcyl = 2500 : nhead = 9 : nsect = 80 \
+	: rpm = 4400 : bpt = 26000
+
+disk_type = "SUN0535" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: ncyl = 1866 : acyl = 2 : pcyl = 2500 : nhead = 7 : nsect = 80 \
+	: rpm = 5400
+
+disk_type = "SUN0669" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: trks_zone = 15 : asect = 5 : atrks = 30 \
+	: ncyl =  1614 : acyl = 2 : pcyl = 1632 : nhead = 15 : nsect = 54 \
+	: rpm = 3600 : bpt = 31410
+
+disk_type = "SUN1.0G" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: trks_zone = 15 : asect = 5 : atrks = 30 \
+	: ncyl =  1703 : acyl = 2 : pcyl = 1931 : nhead = 15 : nsect = 80 \
+	: rpm = 3597 : bpt = 41301
+
+disk_type = "SUN1.05" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: ncyl = 2036 : acyl = 2 : pcyl = 2038 : nhead = 14 : nsect = 72 \
+	: rpm = 5400
+
+disk_type = "SUN1.3G" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: trks_zone = 17 : asect = 6 : atrks = 17 \
+	: ncyl = 1965 : acyl = 2 : pcyl = 3500 : nhead = 17 : nsect = 80 \
+	: rpm = 5400 : bpt = 44823
+
+disk_type = "SUN2.1G" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: ncyl = 2733 : acyl = 2 : pcyl = 3500 : nhead = 19 : nsect = 80 \
+	: rpm = 5400 : bpt = 44823
+
+disk_type = "SUN2.9G" \
+	: ctlr = SCSI : fmt_time = 4 \
+	: ncyl = 2734 : acyl = 2 : pcyl = 3500 : nhead = 21 : nsect = 99 \
+	: rpm = 5400
+
+disk_type = "Zip 100" \
+	: ctlr = SCSI \
+	: ncyl = 95 : acyl = 0 : pcyl = 95 : nhead = 64 : nsect = 32 \
+	: rpm = 2941 : bpt = 16384
+
+disk_type = "Zip 250" \
+	: ctlr = SCSI : ncyl = 6117 : acyl = 2 : pcyl = 6119 \
+	: nhead = 2 : nsect = 40 : rpm = 3600
+
+disk_type = "Peerless 10GB" \
+	: ctlr = SCSI : ncyl = 9583 : acyl = 2 : pcyl = 9585 \
+	: nhead = 64 : nsect = 32 : rpm = 3600
+
+
+#
+# Following is a list of sample partition tables for embedded SCSI disks.
+#
+partition = "Quantum ProDrive 80S" \
+	: disk = "Quantum ProDrive 80S" : ctlr = SCSI \
+	: 0 = 0, 16384 : 1 = 64, 32512 : 2 = 0, 198144 : 6 = 191, 149248
+
+#partition = "CDC Wren VII 94601-12G" \
+#	: disk = "CDC Wren VII 94601-12G" : ctlr = SCSI \
+#	: 0 = 0, 32400 : 1 = 27, 64800 : 2 = 0, 2043600 : 6 = 81, 1946400
+
+#partition = "CDC Wren IV 94171-327" \
+#	: disk = "CDC Wren IV 94171-327" : ctlr = SCSI \
+#	: 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 629280 : 6 = 221, 527786
+
+#
+# This is the list of partition tables for embedded SCSI controllers.
+#
+partition = "Quantum ProDrive 105S" \
+	: disk = "Quantum ProDrive 105S" : ctlr = SCSI \
+	: 0 = 0, 16170 : 1 = 77, 28140 : 2 = 0, 204540 : 6 = 211, 160230
+
+partition = "CDC Wren IV 94171-344, small root" \
+	: disk = "CDC Wren IV 94171-344" : ctlr = SCSI \
+	: 0 = 0, 16974 : 1 = 41, 33948 : 2 = 0, 639630 : 6 = 123, 588708
+
+partition = "CDC Wren IV 94171-344" \
+	: disk = "CDC Wren IV 94171-344" : ctlr = SCSI \
+	: 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 639630 : 6 = 221, 548136
+
+partition = "SUN0104" \
+	: disk = "SUN0104" : ctlr = SCSI \
+	: 0 = 0, 16170 : 1 = 77, 28140 : 2 = 0, 204540 : 6 = 211, 160230
+
+partition = "SUN0207" \
+	: disk = "SUN0207" : ctlr = SCSI \
+	: 0 = 0, 33048 : 1 = 102, 65448 : 2 = 0, 406296 : 6 = 304, 307800
+
+partition = "SUN0327" \
+	: disk = "SUN0327" : ctlr = SCSI \
+	: 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 639630 : 6 = 221, 548136
+
+partition = "SUN0340" \
+	: disk = "SUN0340" : ctlr = SCSI \
+	: 0 = 0, 86400 : 1 = 200, 66960 : 2 = 0, 664416 : 6 = 355, 446256 \
+	: 7 = 1388, 64800
+
+partition = "SUN0424" \
+	: disk = "SUN0424" : ctlr = SCSI \
+	: 0 = 0, 33120 : 1 = 46, 65520 : 2 = 0, 828720 : 6 = 137, 730080
+
+partition = "SUN0535" \
+	: disk = "SUN0535" : ctlr = SCSI \
+	: 0 = 0, 64400 : 1 = 115, 103600 : 2 = 0, 1044960 : 6 = 300, 876960
+
+partition = "SUN0669" \
+	: disk = "SUN0669" : ctlr = SCSI \
+	: 0 = 0, 32400 : 1 = 40, 64800 : 2 = 0, 1307340 : 6 = 120, 1210140
+
+partition = "SUN1.0G" \
+	: disk = "SUN1.0G" : ctlr = SCSI \
+	: 0 = 0, 32400 : 1 = 27, 64800 : 2 = 0, 2043600 : 6 = 81, 1946400
+
+partition = "SUN1.05" \
+	: disk = "SUN1.05" : ctlr = SCSI \
+	: 0 = 0, 66528 : 1 = 66, 133056 : 2 = 0, 2052288 : 6 = 198, 1852704
+
+partition = "SUN1.3G" \
+	: disk = "SUN1.3G" : ctlr = SCSI \
+	: 0 = 0, 34000 : 1 = 25, 133280 : 2 = 0, 2672400 : 6 = 123, 2505120
+
+partition = "SUN2.1G" \
+	: disk = "SUN2.1G" : ctlr = SCSI \
+	: 0 = 0, 62320 : 1 = 41, 197600 : 2 = 0, 4154160 : 6 = 171, 3894240
+
+partition = "SUN2.9G" \
+	: disk = "SUN2.9G" : ctlr = SCSI \
+	: 0 = 0, 195426 : 1 = 94, 390852 : 2 = 0, 5683986 : 6 = 282, 5097708
+
+partition = "Zip 100" \
+	: disk = "Zip 100" : ctlr = SCSI \
+	: 0 = 0, 194560 : 2 = 0, 194560
+
+partition = "Zip 250" \
+	: disk = "Zip 250" : ctlr = SCSI \
+	: 0 =  0, 489360 : 2 =  0, 489360
+
+partition = "Peerless 10GB" \
+	: disk = "Peerless 10GB" : ctlr = SCSI \
+	: 0 = 0, 19625984 : 2 = 0, 19625984

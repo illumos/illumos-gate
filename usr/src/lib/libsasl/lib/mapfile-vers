@@ -1,0 +1,108 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	prop_clear;
+	prop_dispose;
+	prop_dup;
+	prop_erase;
+	prop_format;
+	prop_get;
+	prop_getnames;
+	prop_new;
+	prop_request;
+	prop_set;
+	prop_setvals;
+	sasl_auxprop_add_plugin;
+	sasl_auxprop_getctx;
+	sasl_auxprop_request;
+	sasl_canonuser_add_plugin;
+	sasl_checkapop;
+	sasl_checkpass;
+	sasl_client_add_plugin;
+	sasl_client_init;
+	sasl_client_new;
+	sasl_client_start;
+	sasl_client_step;
+	sasl_decode;
+	sasl_decode64;
+	sasl_dispose;
+	sasl_done;
+	sasl_encode;
+	sasl_encode64;
+	sasl_encodev;
+	sasl_erasebuffer;
+	sasl_errdetail;
+	sasl_errstring;
+	sasl_getprop;
+	sasl_global_listmech;
+	sasl_idle;
+	sasl_listmech;
+	sasl_server_add_plugin;
+	sasl_server_init;
+	sasl_server_new;
+	sasl_server_start;
+	sasl_server_step;
+	sasl_set_alloc;
+	sasl_seterror;
+	sasl_set_mutex;
+	sasl_setpass;
+	sasl_setprop;
+	sasl_user_exists;
+	sasl_utf8verify;
+	sasl_version;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_sasl_auxprop_add_plugin;
+	_sasl_canonuser_add_plugin;
+	_sasl_client_add_plugin;
+	_sasl_client_init;
+	_sasl_client_new;
+	sasl_create_context;
+	sasl_free_context;
+	_sasl_server_add_plugin;
+	_sasl_server_init;
+	_sasl_server_new;
+    local:
+	*;
+};

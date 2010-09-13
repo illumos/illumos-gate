@@ -1,0 +1,367 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/cfgadm_plugins/ib/ib.xcl
+#
+msgid  "/devices/"
+msgstr
+msgid  "/devices"
+msgstr
+msgid  "get_error_msg: bad error msg index: %d\n"
+msgstr
+msgid  "ib_set_msg: realloc failed.\n"
+msgstr
+msgid  "ap_id: "
+msgstr
+# msgid  ""
+# msgstr
+# msgid  ""
+# msgstr
+msgid  "\n"
+msgstr
+# msgid  ""
+# msgstr
+# msgid  ""
+# msgstr
+# msgid  "ap_id: "
+# msgstr
+# msgid  "\n"
+# msgstr
+# msgid  "\n"
+# msgstr
+# msgid  ""
+# msgstr
+msgid  "ib_err_msg: Unrecognized message index: %d\n"
+msgstr
+msgid  "ib_valid_apid: l_apid = %s\n"
+msgstr
+msgid  "..."
+msgstr
+msgid  ".."
+msgstr
+msgid  "ib_verify_params: h/w-specific options not "
+       "supported.\n"
+msgstr
+msgid  "ib_verify_params: not an IB ap_id.\n"
+msgstr
+msgid  "ib_setup_for_devctl_cmd: devctl_ap_acquire "
+       "errno: %d\n"
+msgstr
+msgid  "ib_setup_for_devctl: nvlist_alloc errno: %d\n"
+msgstr
+msgid  "ib_setup_for_devctl_cmd: nvlist_add_string failed. "
+       "errno: %d\n"
+msgstr
+msgid  "ib_device_configured failed, errno: %d\n"
+msgstr
+msgid  "ib_device_connected failed, errno: %d\n"
+msgstr
+msgid  "ib_do_control_ioctl: open failed: "
+       "errno = %d\n"
+msgstr
+msgid  "ib_do_control_ioctl: size ioctl ERR, errno: %d\n"
+msgstr
+msgid  "ib_do_control_ioctl: malloc failed\n"
+msgstr
+msgid  "ib_do_control_ioctl: ioctl failed: errno:%d\n"
+msgstr
+msgid  "cfga_change_state: devctl_ap_configure "
+       "failed. errno: %d\n"
+msgstr
+msgid  "cfga_change_state: get device "
+       "path failed i = %d\n"
+msgstr
+msgid  "cfga_change_state: get device path failed\n"
+msgstr
+msgid  "cfga_change_state: devctl_ap_unconfigure "
+       "failed with errno: %d\n"
+msgstr
+msgid  "cfga_private_func: ib_verify_params "
+       "failed with rv: %d\n"
+msgstr
+msgid  "cfga_private_func: func is NULL\n"
+msgstr
+msgid  "cfga_private_func: func is %s\n"
+msgstr
+msgid  "cfga_private_func: fabric apid supplied\n"
+msgstr
+msgid  "cfga_private_func: malloc for msg failed. "
+       "errno: %d\n"
+msgstr
+msgid  "cfga_private_func: "
+       "ib_do_control_ioctl list failed :%d\n"
+msgstr
+msgid  "cfga_private_func: "
+       "nvlist_unpack 2 failed %p\n"
+msgstr
+# msgid  "cfga_private_func: fabric apid supplied\n"
+# msgstr
+msgid  "cfga_private_func: ib_do_control_ioctl "
+       "failed :%d\n"
+msgstr
+msgid  "cfga_private_func: nvlist_unpack failed %p\n"
+msgstr
+msgid  "cfga_private_func: client apid = %s, "
+       "DevPath = %s\n"
+msgstr
+msgid  "cfga_private_func: client rcm "
+       "offline failed for %s, with %d\n"
+msgstr
+msgid  "cfga_private_func: client "
+       "unconfigure failed: errno %d\n"
+msgstr
+msgid  "cfga_private_func: unconfig_clients of %s "
+       "failed with %d\n"
+msgstr
+msgid  "cfga_private_func: fabric apid needed\n"
+msgstr
+# msgid  "cfga_private_func: ib_do_control_ioctl "
+#        "failed :%d\n"
+# msgstr
+# msgid  "cfga_private_func: fabric apid needed\n"
+# msgstr
+msgid  "cfga_private_func: no sub-options\n"
+msgstr
+msgid  "comm sub-opt invalid "
+       "arg\n"
+msgstr
+msgid  "comm sub-opt invalid "
+       "service passed\n"
+msgstr
+msgid  "comm sub-opt "
+       "internal error\n"
+msgstr
+msgid  "Service = %s, Comm = %s, Operation = %s\n"
+msgstr
+msgid  "cfga_private_func: add failed\n"
+msgstr
+msgid  "cfga_private_func: delete failed\n"
+msgstr
+# msgid  "cfga_private_func: fabric apid needed\n"
+# msgstr
+msgid  "cfga_private_func: ib_list_services failed\n"
+msgstr
+msgid  "cfga_private_func: unrecognized command.\n"
+msgstr
+msgid  "ib_fill_static_apids: "
+       "ib_physpath_to_devlink failed\n"
+msgstr
+msgid  "ib_fill_static_apids: devlink doesn't contain "
+       "/dev/cfg\n"
+msgstr
+msgid  "ib_fill_static_apids: ib_do_control_ioctl "
+       "failed :%d\n"
+msgstr
+msgid  "cfga_list_ext: list = NULL or nlistp = NULL\n"
+msgstr
+msgid  "cfga_list_ext: ap_id = %s\n"
+msgstr
+msgid  "cfga_list_ext: ib_do_control_ioctl "
+       "IBNEX_NUM_DEVICE_NODES failed :%d\n"
+msgstr
+msgid  "cfga_list_ext: num_devices = %d\n"
+msgstr
+msgid  "cfga_list_ext: ib_do_control_ioctl "
+       "IBNEX_NUM_HCA_NODES failed :%d\n"
+msgstr
+msgid  "cfga_list_ext: num_hcas = %d\n"
+msgstr
+msgid  "cfga_list_ext: no IB devices found\n"
+msgstr
+msgid  "cfga_list_ext: malloc for cfga_list_data_t failed. "
+       "errno: %d\n"
+msgstr
+msgid  "cfga_list_ext: ib_do_control_ioctl "
+       "failed :%d\n"
+msgstr
+msgid  "cfga_list_ext: nvlist_unpack 1 failed %p\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, apid = %s\n"
+msgstr
+msgid  "cfga_list_ext: NO MATCH\n"
+msgstr
+msgid  "cfga_list_ext: "
+       "not a valid IB ap_id\n"
+msgstr
+msgid  "cfga_list_ext: ap_pi = %s, ap_li = %s,"
+       "\nap_info = %s\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, info = %s\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, type = %x\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, "
+       "rstate = %x\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, "
+       "ostate = %x\n"
+msgstr
+msgid  "cfga_list_ext: Name = %s, "
+       "condition = %x\n"
+msgstr
+msgid  "cfga_msg: msg\n"
+msgstr
+msgid  "cfga_msg: null str\n"
+msgstr
+msgid  "cfga_msg: null q\n"
+msgstr
+msgid  "cfga_help:\n"
+msgstr
+msgid  "ib_confirm: %d\n"
+msgstr
+msgid  "ib_get_devicepath: get device path ioctl ok\n"
+msgstr
+msgid  "ib_get_devicepath: get device path ioctl failed\n"
+msgstr
+msgid  "ib_rcm_offline:\n"
+msgstr
+msgid  "ib_rcm_offline: rsrc_fixed: %s\n"
+msgstr
+msgid  "ib_rcm_offline: rcm_request_offline failed\n"
+msgstr
+msgid  "ib_rcm_offline: table = %s\n"
+msgstr
+msgid  "ib_rcm_online:\n"
+msgstr
+msgid  "ib_rcm_online: rcm_notify_online failed\n"
+msgstr
+msgid  "ib_rcm_remove:\n"
+msgstr
+msgid  "ib_rcm_remove: rcm_notify_remove failed\n"
+msgstr
+msgid  "ib_rcm_init:\n"
+msgstr
+msgid  "ib_rcm_init: rsrc is NULL\n"
+msgstr
+msgid  "ib_rcm_init: alloc_handle failed\n"
+msgstr
+msgid  "ib_rcm_info_table:\n"
+msgstr
+msgid  "ib_rcm_info_table: no tuples\n"
+msgstr
+msgid  "ib_rcm_info_table: no table\n"
+msgstr
+msgid  "ib_service_record_add: (%x, %s) "
+       "(#port = %d #vppa = %d #hca = %d)\n"
+msgstr
+msgid  "ib_get_services: ERROR\n"
+msgstr
+msgid  "ib_cmp_service: (%x, %s) "
+       "(#port = %d #vppa = %d #hca = %d)\n"
+msgstr
+msgid  "ib_cmp_service:P usvc = %s, usvc_name = %s\n"
+msgstr
+msgid  "NONE"
+msgstr
+msgid  "ib_cmp_service:V utype = %x, usvc_name = %s\n"
+msgstr
+# msgid  "NONE"
+# msgstr
+msgid  "ib_free_service_recs: "
+       "#port_services = %d, #vppa_services = %d #hca_services = %d\n"
+msgstr
+msgid  "ib_cleanup_file: unlock file %s failed\n"
+msgstr
+msgid  "ib_cleanup_file: tmpfile %s being renamed to %s\n"
+msgstr
+msgid  "ib_init_file: calloc errmsg failed\n"
+msgstr
+msgid  "ib_init_file: failed to fstat %s file\n"
+msgstr
+# msgid  "ib_init_file: failed to fstat %s file\n"
+# msgstr
+msgid  "ib_init_file: failed to read %s file\n"
+msgstr
+msgid  "ib_add_service: type = %x, service_name=%s\n"
+msgstr
+msgid  "ib_add_service: initializing file failed\n"
+msgstr
+msgid  "ib_add_service: token=%x, found=%x\n"
+msgstr
+msgid  "ib_add_service: invalid add operation\n"
+msgstr
+msgid  "!FOUND and adding\n"
+msgstr
+msgid  "ib_add_service: failed to calloc sbuf %s file\n"
+msgstr
+msgid  "ib_add_service: lseek %s file failed\n"
+msgstr
+msgid  "ib_add_service: ioctl add failed %d\n"
+msgstr
+msgid  "ib_add_service: write %s file failed\n"
+msgstr
+msgid  "ib_add_service: write %s file failed 2\n"
+msgstr
+msgid  "ib_delete_service: type = %x, service_name=%s\n"
+msgstr
+msgid  "ib_delete_service: initializing file failed\n"
+msgstr
+msgid  "ib_delete_service: token=%x, found=%x\n"
+msgstr
+msgid  "ib_delete_service: invalid delete operation\n"
+msgstr
+msgid  "FOUND and deleting \n"
+msgstr
+msgid  "ib_delete_service: sbuf alloc failed %s\n"
+msgstr
+msgid  "ib_delete_service: tmpnamef = %s\n"
+msgstr
+msgid  "ib_delete_service: failed to creat tmpnamef\n"
+msgstr
+msgid  "ib_delete_service: ioctl delete failed %d\n"
+msgstr
+msgid  "ib_delete_service: write %s file failed 1\n"
+msgstr
+msgid  "ib_delete_service: write %s file failed 2\n"
+msgstr
+msgid  "ib_delete_service: write %s file failed 3\n"
+msgstr
+msgid  "ib_list_services:\n"
+msgstr
+msgid  "ib_list_services: initializing file failed\n"
+msgstr
+msgid  "ib_list_services: #port_services = %d, #vppa_services = %d, "
+       "#hca_services = %d\n"
+msgstr
+msgid  "ib_list_services: svc_name = %s\n"
+msgstr
+# msgid  "NONE"
+# msgstr
+# msgid  "ib_list_services: svc_name = %s\n"
+# msgstr
+# msgid  "NONE"
+# msgstr
+msgid  "Service = %s len = %x, type = %x\n"
+msgstr
+msgid  "ib_conf_control_ioctl: open failed: errno = %d\n"
+msgstr
+msgid  "ib_conf_control_ioctl: size ioctl ERR, errno: %d\n"
+msgstr
+msgid  "cfga_private_func: fabric/IOC apid needed\n"
+msgstr
+msgid  ","
+msgstr

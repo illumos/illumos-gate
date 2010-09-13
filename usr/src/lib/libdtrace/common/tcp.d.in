@@ -1,0 +1,269 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+#pragma D depends_on module unix
+#pragma D depends_on provider tcp
+
+inline int TH_FIN = @TH_FIN@;
+#pragma D binding "1.6.3" TH_FIN
+inline int TH_SYN = @TH_SYN@;
+#pragma D binding "1.6.3" TH_SYN
+inline int TH_RST = @TH_RST@;
+#pragma D binding "1.6.3" TH_RST
+inline int TH_PUSH = @TH_PUSH@;
+#pragma D binding "1.6.3" TH_PUSH
+inline int TH_ACK = @TH_ACK@;
+#pragma D binding "1.6.3" TH_ACK
+inline int TH_URG = @TH_URG@;
+#pragma D binding "1.6.3" TH_URG
+inline int TH_ECE = @TH_ECE@;
+#pragma D binding "1.6.3" TH_ECE
+inline int TH_CWR = @TH_CWR@;
+#pragma D binding "1.6.3" TH_CWR
+
+inline int32_t TCP_STATE_CLOSED = @TCPS_CLOSED@;
+#pragma D binding "1.6.3" TCP_STATE_CLOSED
+inline int32_t TCP_STATE_IDLE = @TCPS_IDLE@;
+#pragma D binding "1.6.3" TCP_STATE_IDLE
+inline int32_t TCP_STATE_BOUND = @TCPS_BOUND@;
+#pragma D binding "1.6.3" TCP_STATE_BOUND
+inline int32_t TCP_STATE_LISTEN = @TCPS_LISTEN@;
+#pragma D binding "1.6.3" TCP_STATE_LISTEN
+inline int32_t TCP_STATE_SYN_SENT = @TCPS_SYN_SENT@;
+#pragma D binding "1.6.3" TCP_STATE_SYN_SENT
+inline int32_t TCP_STATE_SYN_RECEIVED = @TCPS_SYN_RCVD@;
+#pragma D binding "1.6.3" TCP_STATE_SYN_RECEIVED
+inline int32_t TCP_STATE_ESTABLISHED = @TCPS_ESTABLISHED@;
+#pragma D binding "1.6.3" TCP_STATE_ESTABLISHED
+inline int32_t TCP_STATE_CLOSE_WAIT = @TCPS_CLOSE_WAIT@;
+#pragma D binding "1.6.3" TCP_STATE_CLOSE_WAIT
+inline int32_t TCP_STATE_FIN_WAIT_1 = @TCPS_FIN_WAIT_1@;
+#pragma D binding "1.6.3" TCP_STATE_FIN_WAIT_1
+inline int32_t TCP_STATE_CLOSING = @TCPS_CLOSING@;
+#pragma D binding "1.6.3" TCP_STATE_CLOSING
+inline int32_t TCP_STATE_LAST_ACK = @TCPS_LAST_ACK@;
+#pragma D binding "1.6.3" TCP_STATE_LAST_ACK
+inline int32_t TCP_STATE_FIN_WAIT_2 = @TCPS_FIN_WAIT_2@;
+#pragma D binding "1.6.3" TCP_STATE_FIN_WAIT_2
+inline int32_t TCP_STATE_TIME_WAIT = @TCPS_TIME_WAIT@;
+#pragma D binding "1.6.3" TCP_STATE_TIME_WAIT
+
+/*
+ * Convert a TCP state value to a string.
+ */
+inline string tcp_state_string[int32_t state] =
+	state == TCP_STATE_CLOSED ? "state-closed" :
+	state == TCP_STATE_IDLE ? "state-idle" :
+	state == TCP_STATE_BOUND ? "state-bound" :
+	state == TCP_STATE_LISTEN ? "state-listen" :
+	state == TCP_STATE_SYN_SENT ? "state-syn-sent" :
+	state == TCP_STATE_SYN_RECEIVED ? "state-syn-received" :
+	state == TCP_STATE_ESTABLISHED ? "state-established" :
+	state == TCP_STATE_CLOSE_WAIT ? "state-close-wait" :
+	state == TCP_STATE_FIN_WAIT_1 ? "state-fin-wait-1" :
+	state == TCP_STATE_CLOSING ? "state-closing" :
+	state == TCP_STATE_LAST_ACK ? "state-last-ack" :
+	state == TCP_STATE_FIN_WAIT_2 ? "state-fin-wait-2" :
+	state == TCP_STATE_TIME_WAIT ? "state-time-wait" :
+	"<unknown>";
+#pragma D binding "1.6.3" tcp_state_string
+
+/*
+ * tcpinfo is the TCP header fields.
+ */
+typedef struct tcpinfo {
+	uint16_t tcp_sport;		/* source port */
+	uint16_t tcp_dport;		/* destination port */
+	uint32_t tcp_seq;		/* sequence number */
+	uint32_t tcp_ack;		/* acknowledgment number */
+	uint8_t tcp_offset;		/* data offset, in bytes */
+	uint8_t tcp_flags;		/* flags */
+	uint16_t tcp_window;		/* window size */
+	uint16_t tcp_checksum;		/* checksum */
+	uint16_t tcp_urgent;		/* urgent data pointer */
+	tcph_t *tcp_hdr;		/* raw TCP header */
+} tcpinfo_t;
+
+/*
+ * tcpsinfo contains stable TCP details from tcp_t.
+ */
+typedef struct tcpsinfo {
+	uintptr_t tcps_addr;
+	int tcps_local;			/* is delivered locally, boolean */
+	int tcps_active;		/* active open (from here), boolean */
+	uint16_t tcps_lport;		/* local port */
+	uint16_t tcps_rport;		/* remote port */
+	string tcps_laddr;		/* local address, as a string */
+	string tcps_raddr;		/* remote address, as a string */
+	int32_t tcps_state;		/* TCP state */
+	uint32_t tcps_iss;		/* Initial sequence # sent */
+	uint32_t tcps_suna;		/* sequence # sent but unacked */
+	uint32_t tcps_snxt;		/* next sequence # to send */
+	uint32_t tcps_rack;		/* sequence # we have acked */
+	uint32_t tcps_rnxt;		/* next sequence # expected */
+	uint32_t tcps_swnd;		/* send window size */
+	int32_t tcps_snd_ws;		/* send window scaling */
+	uint32_t tcps_rwnd;		/* receive window size */
+	int32_t tcps_rcv_ws;		/* receive window scaling */
+	uint32_t tcps_cwnd;		/* congestion window */
+	uint32_t tcps_cwnd_ssthresh;	/* threshold for congestion avoidance */
+	uint32_t tcps_sack_fack;	/* SACK sequence # we have acked */
+	uint32_t tcps_sack_snxt;	/* next SACK seq # for retransmission */
+	uint32_t tcps_rto;		/* round-trip timeout, msec */
+	uint32_t tcps_mss;		/* max segment size */
+	int tcps_retransmit;		/* retransmit send event, boolean */
+} tcpsinfo_t;
+
+/*
+ * tcplsinfo provides the old tcp state for state changes.
+ */
+typedef struct tcplsinfo {
+	int32_t tcps_state;		/* previous TCP state */
+} tcplsinfo_t;
+
+/*
+ * __dtrace_tcp_tcph_t is used by the tcpinfo_t * translator to take either
+ * the non-NULL tcph_t * passed in or, if it is NULL, uses arg3 (tcp_t *)
+ * from the tcp:::send and tcp:::recieve probes and translates the tcp_t *
+ * into the tcpinfo_t.  When no headers are available - as is the case for
+ * TCP fusion tcp:::send and tcp:::receive - this allows us to present the
+ * consumer with header data based on tcp_t * content and hide TCP fusion
+ * implementation details.
+ */
+typedef tcph_t * __dtrace_tcp_tcph_t;
+
+#pragma D binding "1.6.3" translator
+translator tcpinfo_t < tcph_t *T > {
+	tcp_sport = ntohs(*(uint16_t *)T->th_lport);
+	tcp_dport = ntohs(*(uint16_t *)T->th_fport);
+	tcp_seq = ntohl(*(uint32_t *)T->th_seq);
+	tcp_ack = ntohl(*(uint32_t *)T->th_ack);
+	tcp_offset = (*(uint8_t *)T->th_offset_and_rsrvd & 0xf0) >> 2;
+	tcp_flags = *(uint8_t *)T->th_flags;
+	tcp_window = ntohs(*(uint16_t *)T->th_win);
+	tcp_checksum = ntohs(*(uint16_t *)T->th_sum);
+	tcp_urgent = ntohs(*(uint16_t *)T->th_urp);
+	tcp_hdr = T;
+};
+
+#pragma D binding "1.6.3" translator
+translator tcpinfo_t < __dtrace_tcp_tcph_t *T > {
+	tcp_sport =
+	    T != NULL ? ntohs(*(uint16_t *)((tcph_t *)T)->th_lport) :
+	    arg3 != NULL && probename == "send" ?
+	    ntohs(((tcp_t *)arg3)->tcp_connp->u_port.connu_ports.connu_lport) :
+	    arg3 != NULL && probename == "receive" ?
+	    ntohs(((tcp_t *)arg3)->tcp_connp->u_port.connu_ports.connu_fport) :
+	    0;
+	tcp_dport =
+	    T != NULL ? ntohs(*(uint16_t *)((tcph_t *)T)->th_fport) :
+	    arg3 != NULL && probename == "send" ?
+	    ntohs(((tcp_t *)arg3)->tcp_connp->u_port.connu_ports.connu_fport) :
+	    arg3 != NULL && probename == "receive" ?
+	    ntohs(((tcp_t *)arg3)->tcp_connp->u_port.connu_ports.connu_lport) :
+	    0;
+	tcp_seq =
+	    T != NULL ? ntohl(*(uint32_t *)((tcph_t *)T)->th_seq) :
+	    arg3 != NULL && probename == "send" ?
+	    ((tcp_t *)arg3)->tcp_snxt - ((tcp_t *)arg3)->tcp_last_sent_len :
+	    arg3 != NULL && probename == "receive" ?
+	    ((tcp_t *)arg3)->tcp_rnxt - ((tcp_t *)arg3)->tcp_last_recv_len :
+	    0;
+	tcp_ack =
+	    T != NULL ? ntohl(*(uint32_t *)((tcph_t *)T)->th_ack) :
+	    arg3 != NULL && probename == "send" ?
+	    ((tcp_t *)arg3)->tcp_rnxt :
+	    arg3 != NULL && probename == "receive" ?
+	    ((tcp_t *)arg3)->tcp_snxt :
+	    0;
+	tcp_offset = T != NULL ? 
+	    (*(uint8_t *)((tcph_t *)T)->th_offset_and_rsrvd & 0xf0) >> 2 :
+	    @TCP_MIN_HEADER_LENGTH@;
+	tcp_flags = T != NULL ? *(uint8_t *)((tcph_t *)T)->th_flags : TH_ACK;
+	tcp_window = T != NULL ? ntohs(*(uint16_t *)((tcph_t *)T)->th_win) :
+	    arg3 != NULL ? ((tcp_t *)arg3)->tcp_swnd : 0;
+	tcp_checksum = T != NULL ? ntohs(*(uint16_t *)((tcph_t *)T)->th_sum) :
+	    0;
+	tcp_urgent = T != NULL ? ntohs(*(uint16_t *)((tcph_t *)T)->th_urp) : 0;
+	tcp_hdr = NULL;
+};
+
+#pragma D binding "1.6.3" translator
+translator tcpsinfo_t < tcp_t *T > {
+	tcps_addr = (uintptr_t)T;
+	/*
+	 * The following two members should just use tcp_t->tcp_loopback
+	 * and tcp_t->tcp_active_open, however these are bit fields and
+	 * can't be used until CR 6876830 is fixed.  Meanwhile we source
+	 * them a different way.
+	 */
+	tcps_local = T ? T->tcp_ipha ?
+	    T->tcp_ipha->ipha_src == T->tcp_ipha->ipha_dst : 1 : 0;
+	tcps_active = T ? !T->tcp_saved_listener : 0;
+	tcps_lport = T ?
+	    ntohs(T->tcp_connp->u_port.connu_ports.connu_lport) : 0;
+	tcps_rport = T ?
+	    ntohs(T->tcp_connp->u_port.connu_ports.connu_fport) : 0;
+	tcps_laddr = T ?
+	    inet_ntoa6(&T->tcp_connp->connua_v6addr.connua_laddr) : "<unknown>";
+	tcps_raddr = T ?
+	    inet_ntoa6(&T->tcp_connp->connua_v6addr.connua_faddr) : "<unknown>";
+	tcps_state = T ? T->tcp_state : TCP_STATE_CLOSED;
+	tcps_iss = T ? T->tcp_iss : 0;
+	tcps_suna = T ? T->tcp_suna : 0;
+	tcps_snxt = T ? T->tcp_snxt : 0;
+	tcps_rack = T ? T->tcp_rack : 0;
+	tcps_rnxt = T ? T->tcp_rnxt : 0;
+	tcps_swnd = T ? T->tcp_swnd : 0;
+	tcps_snd_ws = T ? T->tcp_snd_ws : 0;
+	tcps_rwnd = T ? T->tcp_rwnd : 0;
+	tcps_rcv_ws = T ? T->tcp_rcv_ws : 0;
+	tcps_cwnd = T ? T->tcp_cwnd : 0;
+	tcps_cwnd_ssthresh = T ? T->tcp_cwnd_ssthresh : 0;
+	tcps_sack_fack = T ? T->tcp_sack_info.tcp_fack : 0;
+	tcps_sack_snxt = T ? T->tcp_sack_info.tcp_sack_snxt : 0;
+	tcps_rto = T ? T->tcp_rto : 0;
+	tcps_mss = T ? T->tcp_mss : 0;
+	/*
+	 * Determine if send is a retransmission by comparing the seq # to
+	 * tcp_rexmit_nxt/tcp_rexmit_max - if the value is >= rexmit_nxt and
+	 * < rexmit_max, this is a retransmission.  Cannot use tcp_rexmit
+	 * bitfield value due to CR 6876830.
+	 */
+	tcps_retransmit = T && probename == "send" && arg4 != NULL &&
+	    ntohl(*(uint32_t *)((tcph_t *)arg4)->th_seq) >= T->tcp_rexmit_nxt &&
+	    ntohl(*(uint32_t *)((tcph_t *)arg4)->th_seq) <  T->tcp_rexmit_max ?
+	    1 : 0;
+};
+
+/*
+ * Note: although we specify that the old state argument used as the
+ * input to the tcplsinfo_t translator is an int32_t, it reaches us as an
+ * int64_t (since it is a probe argument) so explicitly cast it back to
+ * interpret the negatively-valued states correctly.
+ */
+#pragma D binding "1.6.3" translator
+translator tcplsinfo_t < int64_t I > {
+	tcps_state = (int32_t) I;
+};

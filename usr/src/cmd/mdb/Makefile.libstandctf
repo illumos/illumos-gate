@@ -1,0 +1,96 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+.KEEP_STATE:
+
+CTF_COMMON_SRCS = \
+	ctf_create.c \
+	ctf_decl.c \
+	ctf_error.c \
+	ctf_hash.c \
+	ctf_labels.c \
+	ctf_lookup.c \
+	ctf_open.c \
+	ctf_types.c \
+	ctf_util.c
+
+CTF_STUB_SRCS = \
+	ctf_subr.c
+
+MAPFILE = ../../../common/libstandctf/mapfile
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS += -I$(SRC)/common/ctf -I../../../common -DCTF_OLD_VERSIONS -D_MDB \
+    -Dvsnprintf=ctf_vsnprintf
+
+#
+# kmdb is a kernel module, so we'll use the kernel's build flags.
+CFLAGS += $(STAND_FLAGS_32)
+CFLAGS64 += $(STAND_FLAGS_64)
+
+LDFLAGS = $(ZNOVERSION) $(BREDUCE) -M $(MAPFILE) -dy -r
+
+LIB = libstandctf.so
+OBJS = $(CTF_COMMON_SRCS:%.c=%.o) $(CTF_STUB_SRCS:%.c=%.o)
+LINTFILES = $(OBJS:%.o=%.ln)
+
+LINTFLAGS += -n -errtags=yes
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJS)
+
+install all: $(LIB)
+
+$(LIB): $(OBJS) $(MAPFILE)
+	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+
+clobber clean:
+	$(RM) $(LIB) $(OBJS) $(LINTFILES)
+
+lint: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES)
+
+#
+# Dynamic rules for object construction
+#
+
+%.o: ../../../common/libstandctf/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/ctf/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+#
+# Lint
+#
+
+%.ln: ../../../common/libstandctf/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/ctf/%.c
+	$(LINT.c) -c $<

@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# libsoftcrypto provides two families of optimized functions for SPARC
+# platforms, one for sun4u, and one for sun4v.  Previous implementations
+# provided these families as libsoftcrypto_psr.so.1 libraries, triggered
+# by tagging libsoftcrypto.so.1 as an auxiliary filter.  These psr filtees
+# were installed under /usr/platform/sun4u/lib, and numerous symlinks were
+# established to provide the necessary $PLATFORM names, ie:
+#
+#  /usr/platform/SUNW,Ultra-2/lib/libsoftcrypto_psr.so.1 -> ../../../sun4u
+#  /usr/platform/SUNW,Ultra-4/lib/libsoftcrypto_psr.so.1 -> ../../../sun4u
+#  ....
+#
+# and:
+#
+#  /usr/platform/SUNW,Netra-CP3060/lib/libsoftcrypto_psr.so.1 -> ../../sun4v
+#  /usr/platform/SUNW,Netra-CP3260/lib/libsoftcrypto_psr.so.1 -> ../../sun4v/
+#  ....
+#
+# The objects that made up these filtees are now combined into one relocatable
+# object, pics/objcap.o, using ../common/mapfile-cap.  This mapfile identifies
+# the machine hardware name, together with establishing the global symbols that
+# should be exported to define each family.
+#
+# This object capabilities relocatable object is then translated into a symbol
+# capabilities relocatable object, pics/symcap.o.
+#
+# The sun4u and sun4v families of symbol capabilities object are eventually
+# included in the final build of libsoftcrypto.so.1.
+
+$(SYMCAP):	$(OBJCAP)
+$(OBJCAP):	$(PICS)
+$(PICS):	pics
+
+# Combine all pic objects into one relocatable object.  Assign any capabilities
+# to this object, and define the interface.
+
+pics/objcap.o:	$(PICS) $(MAPFILE-CAP)
+		$(LD) -r -o $@ $(MAPOPT-CAP) -Breduce $(PICS)
+
+# Convert the combined object capabilities object into a symbol capabilities
+# object.
+
+pics/symcap.o:	$(OBJCAP)
+		$(LD) -r -o $@ -z symbolcap $(OBJCAP)
+
+include		../../../Makefile.targ

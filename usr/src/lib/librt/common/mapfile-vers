@@ -1,0 +1,145 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# DO NOT TOUCH THIS FILE.
+# This file declares interfaces that are cast in stone.
+# They offer interfaces that will never change.
+# DO NOT TOUCH THIS FILE.
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.4 {
+    global:
+	clock_nanosleep		{ TYPE = FUNCTION };
+	mq_reltimedreceive_np	{ TYPE = FUNCTION };
+	mq_reltimedsend_np	{ TYPE = FUNCTION };
+	mq_timedreceive		{ TYPE = FUNCTION };
+	mq_timedsend		{ TYPE = FUNCTION };
+	sem_reltimedwait_np	{ TYPE = FUNCTION };
+	sem_timedwait		{ TYPE = FUNCTION };
+    local:
+	*;
+} SUNW_1.3;
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	aio_waitn		{ TYPE = FUNCTION };
+$if _ELF32
+	aio_waitn64		{ TYPE = FUNCTION };
+$endif
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	close			{ TYPE = FUNCTION; FLAGS = NODIRECT };
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	fork			{ TYPE = FUNCTION; FLAGS = NODIRECT };
+
+$if _ELF32
+	aio_cancel64		{ TYPE = FUNCTION };
+	aio_error64		{ TYPE = FUNCTION };
+	aio_fsync64		{ TYPE = FUNCTION };
+	aio_read64		{ TYPE = FUNCTION };
+	aio_return64		{ TYPE = FUNCTION };
+	aio_suspend64		{ TYPE = FUNCTION };
+	aio_write64		{ TYPE = FUNCTION };
+	lio_listio64		{ TYPE = FUNCTION };
+$endif
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	aio_cancel		{ TYPE = FUNCTION };
+	aio_error		{ TYPE = FUNCTION };
+	aio_fsync		{ TYPE = FUNCTION };
+	aio_read		{ TYPE = FUNCTION };
+	aio_return		{ TYPE = FUNCTION };
+	aio_suspend		{ TYPE = FUNCTION };
+	aio_write		{ TYPE = FUNCTION };
+	clock_getres		{ TYPE = FUNCTION };
+	clock_gettime		{ TYPE = FUNCTION };
+	clock_settime		{ TYPE = FUNCTION };
+	fdatasync		{ TYPE = FUNCTION };
+	lio_listio		{ TYPE = FUNCTION };
+	mq_close		{ TYPE = FUNCTION };
+	mq_getattr		{ TYPE = FUNCTION };
+	mq_notify		{ TYPE = FUNCTION };
+	mq_open			{ TYPE = FUNCTION };
+	mq_receive		{ TYPE = FUNCTION };
+	mq_send			{ TYPE = FUNCTION };
+	mq_setattr		{ TYPE = FUNCTION };
+	mq_unlink		{ TYPE = FUNCTION };
+	nanosleep		{ TYPE = FUNCTION };
+	sched_getparam		{ TYPE = FUNCTION };
+	sched_get_priority_max	{ TYPE = FUNCTION };
+	sched_get_priority_min	{ TYPE = FUNCTION };
+	sched_getscheduler	{ TYPE = FUNCTION };
+	sched_rr_get_interval	{ TYPE = FUNCTION };
+	sched_setparam		{ TYPE = FUNCTION };
+	sched_setscheduler	{ TYPE = FUNCTION };
+	sched_yield		{ TYPE = FUNCTION };
+	sem_close		{ TYPE = FUNCTION };
+	sem_destroy		{ TYPE = FUNCTION };
+	sem_getvalue		{ TYPE = FUNCTION };
+	sem_init		{ TYPE = FUNCTION };
+	sem_open		{ TYPE = FUNCTION };
+	sem_post		{ TYPE = FUNCTION };
+	sem_trywait		{ TYPE = FUNCTION };
+	sem_unlink		{ TYPE = FUNCTION };
+	sem_wait		{ TYPE = FUNCTION };
+	shm_open		{ TYPE = FUNCTION };
+	shm_unlink		{ TYPE = FUNCTION };
+	sigqueue		{ TYPE = FUNCTION };
+	sigtimedwait		{ TYPE = FUNCTION };
+	sigwaitinfo		{ TYPE = FUNCTION };
+	timer_create		{ TYPE = FUNCTION };
+	timer_delete		{ TYPE = FUNCTION };
+	timer_getoverrun	{ TYPE = FUNCTION };
+	timer_gettime		{ TYPE = FUNCTION };
+	timer_settime		{ TYPE = FUNCTION };
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	SUNWprivate_1.1;
+};

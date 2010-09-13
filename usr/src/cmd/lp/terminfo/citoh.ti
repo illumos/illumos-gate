@@ -1,0 +1,127 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+
+######################################################################
+#
+# Generic entry for the C.Itoh 8510 printer and emulations:
+#
+
+Gcitoh+basic,
+
+#   The 8510 I use only allows 79 columns!
+	cols#79,
+
+	lines#66,
+	it#8,
+
+	orc#1,
+	orhi#10,
+	orl#24,
+	orvi#144,
+
+	cr=\r,
+	cud1=\n,
+	cuf1=\s,
+	ff=\f,
+	ht=\t,
+
+	cpi=%?%p1%{10}%=%t\EN%e%p1%{12}%=%t\EE%e%p1%{16}%=%p1%{17}%=%O%t\EQ%;,
+	cvr=%?%p1%{0}%>%p1%{100}%<%&%t\ET%p1%02d%;,
+
+	is1=^Q^X,
+	is2=\Ec1\Ev66.,
+
+	smso=\E!,
+	rmso=\E",
+	smul=\EX,
+	rmul=\EY,
+	bold=\E!,
+	ssubm=\Es2,
+	rsubm=\Es0,
+	ssupm=\Es1,
+	rsupm=\Es0,
+	swidm=^N,
+	rwidm=^O,
+	sgr0=\E"\EY\Es0^O,
+	sgr=%?%p1%p6%|%t\E!%e\E"%;%?%p2%t\EX%e\EY%;,
+
+	rep=\ER%p2%03d%p1%c,
+
+	snlq=\Em2,
+	snrmq=\Em1,
+	sdrfq=\Em0,
+
+	smglp=\EL%p1%03d,
+	smgrp=\E/%{1}%p1%+%03d,
+
+#   slines=
+	u9=\Ev%p1%02d.,
+	slines=\Ev%p1%02d.,
+
+Gcitoh+low,
+
+	npins#8,
+	spinv#68,
+	spinh#136,
+
+	porder=8\,7\,6\,5\,4\,3\,2\,1;0,
+
+	sbim=\ES%p1%04d,
+
+#   birep=
+	u4=\EV%p2%04d%p3%c,
+	birep=\EV%p2%04d%p3%c,
+
+        bitwin#1,
+	u1=1,
+        bitype#1,
+	u2=1,
+
+#   defbi=
+#	Set the line spacing to 17/144 inch to get (almost) 68 dots
+#	per inch vertically (8 * 144/17).
+#	Set the character spacing to compressed (1/17 inch or 17
+#	characters per inch); at 136 dots per inch horizontally this
+#	means 8 dots per character.
+#	Set the left margin at the left edge of the image.
+#	The C.Itoh doesn't have parameterized vertical motion,
+#	so we simulate it with linefeeds. Assume we never need
+#	to move more than 63 lines (at 17/144 LPI).
+#	Set uni-directional motion; bi-directional causes a wavy
+#	image.
+#   defbi=
+	u6=%?%p5%{1}%=%t\ET17\EQ\EL%p1%{8}%/%03d%p2%{8}%/%Py%?%gy%{31}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{32}%-%Py%;%?%gy%{15}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{16}%-%Py%;%?%gy%{7}%>%t\n\n\n\n\n\n\n\n%gy%{8}%-%Py%;%?%gy%{3}%>%t\n\n\n\n%gy%{4}%-%Py%;%?%gy%{1}%>%t\n\n%gy%{2}%-%Py%;%?%gy%{0}%>%t\n%;\E>%;,
+	defbi=%?%p5%{1}%=%t\ET17\EQ\EL%p1%{8}%/%03d%p2%{8}%/%Py%?%gy%{31}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{32}%-%Py%;%?%gy%{15}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{16}%-%Py%;%?%gy%{7}%>%t\n\n\n\n\n\n\n\n%gy%{8}%-%Py%;%?%gy%{3}%>%t\n\n\n\n%gy%{4}%-%Py%;%?%gy%{1}%>%t\n\n%gy%{2}%-%Py%;%?%gy%{0}%>%t\n%;\E>%;,
+
+#   endbi=
+	u7=\EA\EP\EL001\E<,
+	endbi=\EA\EP\EL001\E<,
+
+#   binel=
+	u5=\n\r\EL%p1%{8}%/%03d,
+	binel=\n\r\EL%p1%{8}%/%03d,
+

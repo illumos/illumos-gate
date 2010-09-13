@@ -1,0 +1,42 @@
+cuab:dv=/dev/cua/b:br#2400
+dialup1|Dial-up system:\
+	:pn=2015551212:tc=UNIX-2400:
+hardwire:\
+	:dv=/dev/term/b:br#9600:el=^C^S^Q^U^D:ie=%$:oe=^D:
+tip300:tc=UNIX-300:
+tip1200:tc=UNIX-1200:
+tip0|tip2400:tc=UNIX-2400:
+tip9600:tc=UNIX-9600:
+tip19200:tc=UNIX-19200:
+UNIX-300:\
+	:el=^D^U^C^S^Q^O@:du:at=hayes:ie=#$%:oe=^D:br#300:tc=dialers:
+UNIX-1200:\
+	:el=^D^U^C^S^Q^O@:du:at=hayes:ie=#$%:oe=^D:br#1200:tc=dialers:
+UNIX-2400:\
+	:el=^D^U^C^S^Q^O@:du:at=hayes:ie=#$%:oe=^D:br#2400:tc=dialers:
+UNIX-9600:\
+	:el=^D^U^C^S^Q^O@:du:at=hayes:ie=#$%:oe=^D:br#9600:tc=dialers:
+UNIX-19200:\
+	:el=^D^U^C^S^Q^O@:du:at=hayes:ie=#$%:oe=^D:br#19200:tc=dialers:
+VMS-300|TOPS20-300:\
+	:el=^Z^U^C^S^Q^O:du:at=hayes:ie=$@:oe=^Z:br#300:tc=dialers:
+VMS-1200|TOPS20-1200:\
+	:el=^Z^U^C^S^Q^O:du:at=hayes:ie=$@:oe=^Z:br#1200:tc=dialers:
+dialers:\
+	:dv=/dev/cua/b:
+--------------------------------------------------------------------
+The attributes are:
+
+dv	device to use for the tty
+el	EOL marks (default is NULL)
+du	make a call flag (dial up)
+pn	phone numbers (@ =>'s search phones file; possibly taken from
+			      PHONES environment variable)
+at	ACU type
+ie	input EOF marks	(default is NULL)
+oe	output EOF string (default is NULL)
+cu	call unit (default is dv)
+br	baud rate (defaults to 300)
+fs	frame size (default is BUFSIZ) -- used in buffering writes
+	  on receive operations
+tc	to continue a capability

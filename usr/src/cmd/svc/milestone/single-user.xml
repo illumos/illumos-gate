@@ -1,0 +1,164 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:single-user'>
+
+<service
+	name='milestone/single-user'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance />
+
+	<!--
+	  Single-user's dependency on sysidtool is obsolete, but instead of
+	  removing it from this manifest, retain it here with its delete
+	  attribute set to true. This is to try and prevent a dependency
+	  cycle with the new sysidtool which declares a dependency on
+	  single-user. This will force the deletion of single-user's
+	  sysidtool dependency as soon as this manifest is imported
+	  (instead of waiting for upgrade to delete it).
+
+	  Note that this does not guarantee the prevention of a dependency
+	  cycle (if the new sysidtool manifest is imported before
+	  single-user's) - if this does occur, the code in upgrade will
+	  catch it - it deletes single-user's dependency and "svcadm
+	  clear"s sysidtool.
+	-->
+
+	<dependency
+		name='sysidtool'
+		grouping='require_all'
+		restart_on='none'
+		type='service'
+		delete='true'>
+		<service_fmri value='svc:/system/sysidtool:net' />
+		<service_fmri value='svc:/system/sysidtool:system' />
+	</dependency>
+
+	<dependency
+		name='nodename'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/identity:node' />
+	</dependency>
+
+	<dependency
+		name='filesystem-minimal'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<dependency
+		name='milestone-devices'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/devices' />
+	</dependency>
+
+	<dependency
+		name='manifests'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/manifest-import' />
+	</dependency>
+
+	<dependency
+		name='loopback-network'
+		grouping='require_any'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependency
+		name='network'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<!--
+	  We can't know how long legacy init scripts will take to run.  Set
+	  the timeout value high enough to allow them to take their time
+	  to start.
+	-->
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/sbin/rcS start'
+		timeout_seconds='1800' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='0' />
+
+	<!--
+	    The init scripts should never automatically be run twice.
+	    duration=transient tells svc.startd not to restart if no
+	    processes are left running, and timeout_retry=false tells
+	    svc.startd not to retry the start method if it times out.
+	-->
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+		<propval name='timeout_retry' type='boolean' value='false' />
+	</property_group>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				single-user milestone
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='init' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

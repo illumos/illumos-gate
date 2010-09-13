@@ -1,0 +1,62 @@
+#! /usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms. 
+#
+
+# get the valid layout name from the eeprom and set it into kernel.
+# check space and tab to make sure that the kbd -s interaction mode
+# doesn't run here.
+KBD_LAYOUT_NVRAM_EXIST="`/usr/sbin/eeprom | grep keyboard-layout`"
+
+if test -n "$KBD_LAYOUT_NVRAM_EXIST"
+then
+	KBD_LAYOUT_NAME="`/usr/sbin/eeprom keyboard-layout |\
+			/usr/bin/sed -n 's/keyboard-layout=//g; s/[ |	]*//p'`"
+else
+	exit 0
+fi
+
+# The firmware on the keyboard may report "Taiwanese" and so 
+# translate it to the new "Traditional-Chinese" name as this is
+# the preferred name to use.
+if [ "$KBD_LAYOUT_NAME" = "Taiwanese" ]
+then
+       KBD_LAYOUT_NAME="Traditional-Chinese"
+fi
+
+if test -n "$KBD_LAYOUT_NAME"
+then
+	KBD_LAYOUT_NAME_STRING="^$KBD_LAYOUT_NAME="
+	LAYOUT_NAME_VALID="`cat /usr/share/lib/keytables/type_6/kbd_layouts | \
+                   	grep "$KBD_LAYOUT_NAME_STRING"`"
+else
+	exit 0
+fi
+
+if test -n "$LAYOUT_NAME_VALID"
+then
+	# Set the keyboard layout
+	/usr/bin/kbd -s $KBD_LAYOUT_NAME
+fi

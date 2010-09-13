@@ -1,0 +1,121 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+KMDBSRCS += \
+	ffs.c \
+	kaif_start.c \
+	mdb.c \
+	mdb_addrvec.c \
+	mdb_argvec.c \
+	mdb_callb.c \
+	mdb_cmdbuf.c \
+	mdb_cmds.c \
+	kvm_cpu.c \
+	kmdb_conf.c \
+	kmdb_context.c \
+	kmdb_create.c \
+	mdb_ctf.c \
+	kmdb_ctf_open.c \
+	mdb_debug.c \
+	kmdb_demangle.c \
+	mdb_disasm.c \
+	kmdb_dl.c \
+	kmdb_dpi.c \
+	mdb_dump.c \
+	mdb_err.c \
+	mdb_evset.c \
+	kmdb_fault.c \
+	kmdb_fdio.c \
+	mdb_fmt.c \
+	mdb_frame.c \
+	mdb_gelf.c \
+	mdb_help.c \
+	mdb_io.c \
+	kmdb_kdi.c \
+	kmdb_kvm.c \
+	mdb_logio.c \
+	mdb_list.c \
+	mdb_macalias.c \
+	kmdb_main.c \
+	mdb_modapi.c \
+	mdb_module.c \
+	kmdb_module.c \
+	kmdb_module_load.c \
+	mdb_nm.c \
+	mdb_nv.c \
+	mdb_pipeio.c \
+	mdb_print.c \
+	kmdb_promio.c \
+	kmdb_promif.c \
+	mdb_set.c \
+	kmdb_shell.c \
+	mdb_signal.c \
+	mdb_string.c \
+	mdb_strio.c \
+	kmdb_stubs.c \
+	mdb_target.c \
+	kmdb_terminfo.c \
+	mdb_termio.c \
+	mdb_umem.c \
+	kmdb_umemglue.c \
+	mdb_value.c \
+	mdb_vcb.c \
+	mdb_wcb.c \
+	mdb_whatis.c \
+	kmdb_wr.c
+
+KMDBML +=
+
+KMDBOBJS = $(KMDBSRCS:%.c=%.o) $(KMDBML:%.s=%.o)
+
+PROMSRCS += 
+
+PROMOBJS = $(PROMSRCS:%.c=%.o)
+
+KCTLSRCS += \
+	kctl_auxv.c \
+	kctl_dmod.c \
+	kctl_err.c \
+	kctl_main.c \
+	kctl_mod.c \
+	kctl_string.c \
+	kctl_wr.c
+
+KCTLML += 
+
+KCTLOBJS = $(KCTLSRCS:%.c=%.o) $(KCTLML:%.s=%.o)
+
+SRCS += $(KMDBSRCS) $(PROMSRCS)
+MLSRCS += $(KMDBML)
+OBJS = $(SRCS:%.c=%.o) $(KMDBML:%.s=%.o)
+
+ALLOBJS = $(OBJS) $(KCTLOBJS)
+ALLLINTFILES = $(ALLOBJS:%.o=%.ln)
+
+# files that need KMDB_VERSION defined
+VERSFILES = \
+	kmdb_conf.c \
+	kctl_main.c
+VERSOBJS = $(VERSFILES:%.c=%.o)

@@ -1,0 +1,12 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+PLATFORM	= i86pc
+
+ROOT_BOOT_GRUB	= $(ROOT)/boot/grub
+ROOT_PLAT_GRUB	= $(ROOT)/platform/$(PLATFORM)/boot/grub
+ROOT_SRC	= $(ROOT)/usr/share/src/grub

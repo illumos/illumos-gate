@@ -1,0 +1,171 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+-- **jerry** using command v2mib2schema
+
+   DEMO-MIB DEFINITIONS ::= BEGIN
+
+
+   IMPORTS
+       OBJECT-TYPE, Counter32, Gauge32
+         FROM SNMPv2-SMI
+
+-- **jerry** not recognized mib-2 ???
+--       mib-2
+--	 FROM RFC1213-MIB
+       DisplayString, TimeStamp
+         FROM SNMPv2-TC;
+
+   mib-2	OBJECT IDENTIFIER ::= { mgmt 1 }
+   sun	OBJECT IDENTIFIER ::= { enterprises 42 }
+   demo	OBJECT IDENTIFIER ::= { sun 1000 }
+
+-- **jerry** using MODULE-IDENTITY, no group table generated
+--   demo MODULE-IDENTITY
+--       LAST-UPDATED "9503310000Z"
+--       ORGANIZATION "SunSoft"
+--       CONTACT-INFO
+--         ""
+--       DESCRIPTION
+--         "An demo MIB module"
+--       ::= { sun 1000 }
+
+
+--
+-- Some objects
+--
+
+   demoString OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write object of type String."
+       ::= {demo 1}
+
+   demoInteger OBJECT-TYPE
+       SYNTAX INTEGER {
+         up(1),
+         down(2)
+       }
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write object of type Integer."
+       ::= {demo 2}
+
+   demoOid OBJECT-TYPE
+       SYNTAX OBJECT IDENTIFIER
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write object of type Oid."
+       ::= {demo 3}
+
+
+--
+-- A table composed of some columns
+--
+
+   demoTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF DemoEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "A table."
+       ::= {demo 10}
+
+   demoEntry OBJECT-TYPE
+       SYNTAX DemoEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "An entry in the table demoTable."
+       INDEX {demoEntryIndex}
+
+       ::= {demoTable 1}
+
+   DemoEntry ::= SEQUENCE {
+       demoEntryIndex
+           INTEGER,
+       demoEntryString
+           DisplayString,
+       demoEntryInteger
+           INTEGER,
+       demoEntryOid
+	   OBJECT IDENTIFIER
+   }
+
+   demoEntryIndex OBJECT-TYPE
+       SYNTAX INTEGER (1..2147483647)
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "An index to uniquely identify the entry."
+       ::= {demoEntry 1}
+
+   demoEntryString OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write column of type String."
+       ::= {demoEntry 2}
+
+   demoEntryInteger OBJECT-TYPE
+       SYNTAX INTEGER {
+         up(1),
+         down(2)
+       }
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write column of type Integer."
+       ::= {demoEntry 3}
+
+   demoEntryOid OBJECT-TYPE
+       SYNTAX OBJECT IDENTIFIER
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         "A read-write column of type Oid."
+       ::= {demoEntry 4}
+
+   demoTrap TRAP-TYPE
+	ENTERPRISE sun
+	VARIABLES { demoInteger , demoString, demoOid}
+	DESCRIPTION
+	" Trap for testing."
+	::= 2
+
+   demoColdLinkTrap TRAP-TYPE
+	ENTERPRISE snmp
+	DESCRIPTION
+	" Trap for testing."
+	::= 0
+   END
+

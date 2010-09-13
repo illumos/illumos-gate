@@ -1,0 +1,46 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# The following are the boot-time defaults.  These establish all IPv4 and
+# IPv6 addresses as unlabeled.  Both are removed if this file contains any
+# non-blank entries.
+#
+#0.0.0.0/0:_unlab
+#\:\:0/0:_unlab
+#
+# The following is a sample 32-bit match for the literal address 0.0.0.0,
+# not a wildcard.  Uncomment this if the global zone should respond
+# to 0.0.0.0 (literal), such as for dhcp or some third-party network
+# applications.
+#
+#0.0.0.0/32:admin_low
+#
+# Default wildcard value shipped with system. This allows the global zone
+# of the system to obtain various services during initial boot. Administrators
+# should remove this wildcard entry after the system is fully configured.
+#
+0.0.0.0:admin_low
+#\:\:0:admin_low
+127.0.0.1:cipso
+#\:\:1:cipso

@@ -1,0 +1,94 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Generic interface definition for usr/src/cmd/sgs/libld.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_4.6 {
+	global:
+		dbg_print {	# interposed - ld(1) and ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
+
+		ld_getopt;
+
+		ld32_main;
+		ld64_main;
+
+		ld32_create_outfile;
+		ld64_create_outfile;
+		ld32_ent_setup;
+		ld64_ent_setup;
+		ld32_init_strings;
+		ld64_init_strings;
+		ld32_init_target;
+		ld64_init_target;
+		ld32_make_sections;
+		ld64_make_sections;
+		ld32_ofl_cleanup;
+		ld64_ofl_cleanup;
+		ld32_process_mem;
+		ld64_process_mem;
+		ld32_reloc_init;
+		ld64_reloc_init;
+		ld32_reloc_process;
+		ld64_reloc_process;
+		ld32_sym_validate;
+		ld64_sym_validate;
+		ld32_update_outfile;
+		ld64_update_outfile;
+	local:
+		*;
+};
+
+# The following functions must be provided by our caller, or one of the
+# callers dependencies.
+
+SYMBOL_SCOPE {
+	global:
+		eprintf {
+			TYPE = FUNCTION;
+			FLAGS = extern;
+		};
+		veprintf {
+			TYPE = FUNCTION;
+			FLAGS = extern;
+		};
+};

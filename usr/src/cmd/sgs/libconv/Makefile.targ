@@ -1,0 +1,106 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+pics/%.o:	../common/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o:	%.s
+		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%32.o:	../common/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%64.o:	../common/%.c
+		$(COMPILE.c) -D_ELF64 -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+		$(POST_PROCESS_O)
+
+# This rule generates the report_bufsize.h include file used by libconv
+# code to ensure that their private buffer size calculations agree with
+# the public values exposed in sgs/include/conv.h. The limit value
+# supplied must be larger than the largest buffer used in libconv. There
+# is little penalty for making it very large, because the header file is
+# only included in error situations where the compilation will fail.
+#
+# We make this depend on Makefile.targ, because a change to Makefile.targ
+# can change the limit, in which case we want to force everything to rebuild.
+report_bufsize.h:	../Makefile.targ
+		perl ../../tools/libconv_mk_report_bufsize.pl 8000
+
+../common/%.c ../common/%_machelf.c:	%_msg.h
+
+%_msg.h %_msg.c: $(SGSMSG) ../common/%.msg report_bufsize.h
+		$(SGSMSG) $(SGSMSGFLAGS) -h $*_msg.h -d $*_msg.c \
+			-n sgs_msg_libconv_$* $<
+
+$(SGSMSG):	FRC
+		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
+		@ pwd
+
+vernote.s:	bld_vernote $(README_REVISION) $(ONLDREADME)
+		./bld_vernote \
+			-R `perl $(README_REVISION) $(VERNOTE_DEBUG) \
+				$(ONLDREADME)` \
+			-r "$(RELEASE)" -o $@
+
+bld_vernote:	../common/bld_vernote.ksh
+		$(RM) -f $@
+		cp ../common/bld_vernote.ksh $@
+		chmod a+x $@
+
+$(LIBRARY):	pics $$(PICS)
+		@ $(RM) $(LIBRARY)
+		$(AR) $(ARFLAGS) $@ $(PICS)
+		$(POST_PROCESS_A)
+
+chkmsg:		$(LINTSRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
+
+.PARALLEL:	$(LINTOUT32) $(LINTOUT64) $(LINTLIB32) $(LINTLIB64)
+
+lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
+		    .WAIT $(SGSLINTOUT)
+
+catalog:
+
+pics:
+		-@mkdir -p $@
+
+clobber:	clean
+		-$(RM) $(LIBRARY) $(CLOBBERFILES)
+
+clean:
+		-$(RM) $(PICS) $(CLEANFILES)
+
+delete:
+
+include		$(SRC)/cmd/sgs/Makefile.targ

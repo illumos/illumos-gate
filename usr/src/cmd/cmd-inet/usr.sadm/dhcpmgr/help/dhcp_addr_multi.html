@@ -1,0 +1,205 @@
+<!--
+  -- ident	"%W%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: Modify Multiple Addresses</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=615>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+	
+	<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><P>
+	<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relay Agents</STRONG></A><P>
+	
+	<A HREF="dhcp_addr_ref.html"><STRONG>IP Addresses</STRONG></A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_create.html">Create</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_wiz.html">Address Wizard</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_dup.html">Duplicate</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_mod.html">Modify</A><BR>
+	<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">Modify Multi<BR>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#server"><EM>Server</EM></a><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#comment"><EM>Comment</EM></a><BR>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#macro"><EM>Macro</EM></a><BR>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#bootp"><EM>BOOTP</EM></a><BR>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#unusable"><EM>Unusable</EM></A><BR>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#lease"><EM>Lease</EM></a><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_rel.html">Release</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_addr_del.html">Delete</A><P>
+		
+<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>		
+<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><P>
+<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+	
+	
+		</td>
+
+
+
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+
+	<td colspan=1 valign="top" bgcolor="#ffffff">
+	<P>&nbsp;</P>
+
+
+<h1>Modify Multiple Addresses</h1>
+
+The Modify Multiple Addresses dialog box lets you modify multiple client 
+records in the current DHCP network table. <p>
+
+<center>
+
+	<table border=1 cellspacing=3 cellpadding=3 width=400>
+
+	<tr>
+	<td width=400 valign="top" align="left" BGCOLOR="#EBEBEB">To modify one 
+	address at a time, select the address in the list of addresses
+	for the selected network, and then choose Properties from the Edit menu 
+	to display the <a href="dhcp_addr_mod.html">Address Properties</a> 
+	dialog box.</td>
+	</tr>
+
+	</table>
+
+</center>
+
+<p>The settings in the Modify Multiple Addresses dialog box are described below.<p>
+Note that fields labelled Keep Current Settings are not modified in the selected records.
+
+<P><HR NOSHADE><P>
+
+	<table border=0 cellspacing=4 cellpadding=3>
+	
+		<tr>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="server"><STRONG>Managing Server</STRONG></a></td> 
+	<td valign="top">Specify the host name or IP address of the DHCP server 
+	that owns the IP address. This server is responsible for initially responding to the DHCP client's request for IP address allocation.<P>
+
+Click the arrow to view a list of servers to which you are connected.
+You can enter a the name or address of a server that is not on this list.</td>
+	</tr>
+	
+			<tr>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="comment"><STRONG>Comment</STRONG> (optional)</a></td>
+	<td valign="top">Enter an optional text comment.</td>
+	</tr>
+	
+	<tr>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="macro"><STRONG>Configuration Macro</STRONG></a></td>
+	<td valign="top">The configuration macro is used by the server to
+	obtain client configuration parameters from the <tt>dhcptab</tt>. Click the arrow to see a list of macros available on the 
+	server. If the macro you want to specify does not already exist on the server, you can create it, using the <a href="dhcp_macro_create.html">Create Macro</A> dialog box.</td>
+	</tr>
+	
+	<tr>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="bootp"><STRONG>BootP</STRONG></a></td>
+	<td valign="top">You can choose whether or not to assign all the addresses to BOOTP clients.</td>
+	</tr>
+	
+		<tr>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="unusable"><STRONG>Unusable</STRONG></a></td>
+	<td valign="top">You can choose whether or not to mark these addresses as Unusable.</td>
+	</tr>
+
+	<TR>
+	<TD WIDTH="100" ALIGN="LEFT" VALIGN="TOP"><a name="lease"><STRONG>Lease Type</STRONG></a></td>
+	<td valign="top">
+	<U>Dynamic:</U> The DHCP server is responsible for the allocation 
+	and re-allocation of this range of IP addresses. <P>
+	Enter the expiration time of the lease. You can specify an
+	expiration date for the lease in mm/dd/yyyy format.<P>
+	<U>Permanent:</U> The lease does not expire.
+
+	</td>
+		</tr>
+
+
+	</table>
+
+<p>&nbsp;</p>
+
+&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

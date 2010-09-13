@@ -1,0 +1,232 @@
+This directory, and its subdirectories contain the source code
+for ksh-93; the language described in the second addition of
+the book, "The KornShell Command and Programming Language," by
+Morris Bolsky and David Korn which is published by Prentice Hall.
+ksh-93 has been compiled and run on several machines with several
+operating systems.  The end of this file contains a partial list of
+operating systems and machines that ksh-93 has been known to run on.
+
+The layout of files for ksh-93 has changed somewhat since ksh-88,
+the last major release.  Most of the source code for ksh remains in
+the sh directory.  However, the shell editing and history routines
+are in the edit sub-directory.  The code for shell built-ins is
+in the bltins directory.  The data directory contains read-only
+data tables and messages that are used by the shell.  The include
+files remain in the include directory and the shlib directory
+is gone.  The features directory replaces the older install
+directory. The method for generating systems specific feature
+information has changed substantially.
+
+The Makefile file contains several compilation options that can be set
+before compiling ksh.  Options are of the form SHOPT_option and become
+#define inside the code.  These options are set to their recommended
+value and some of these may disappear as options in future releases.
+A value of 0, or no value  represents off, 1 represents on.
+Note that == is needed, not =, because these are nmake state variables
+and changing their value will cause all modules that could be affected
+by this change to be recompiled.
+The options have the following defaults and meanings:
+    ACCT         off Shell accounting.
+    ACCTFILE     off Enable per user accounting info.
+    AUDIT	 off For auditing specific users
+    AUDITFILE	 "/etc/ksh_audit"
+    APPEND       on  Allows var+=val string and array append.
+    BASH         off Bash compatibility mode.  It is not fully implemented
+                     and is experimental.
+    BRACEPAT     on  C-shell type abc{d,e}f style file generation
+    CMDLIB_BLTIN off Makes all commands in libcmd.a builtins.  The
+                     SH_CMDLIB_DIR nmake state variable can be used to
+		     specify a directory. 
+    CMDLIB_DIR   off Sets CMDLIB_BLTIN=1 and provides a default value
+                     of "/opt/ast/bin" for SH_CMDLIB_DIR.
+    COMPOUND_ARRAY
+                 on  Allows all components of compound variables except the
+                     first to be any string by enclosing in [...].  It also
+                     allows components other than the last to be arrays.
+                     This is experimental and only partially complete.
+    CRNL         off <cr><nl> treated as <nl> in shell grammar.
+    DYNAMIC      on  Dynamic loading of builtins. (Requires dlopen() interface.)
+    ECHOPRINT    off Make echo equivalent to print.
+    ESH          on  Compile with emacs command line editing.  The original
+                     emacs line editor code was provided by Mike Veach at IH.
+    FILESCAN     on  Experimental option that allows fast reading of files
+                     using while < file;do ...; done and allowing fields in
+                     each line to be accessed as positional parameters.
+    FS_3D        off For use with 3-D file system.  Enabled automatically for
+                     sytems with dynamic linking.
+    KIA          off Allow generation of shell cross reference database with -I.
+    MULTIBYTE    on  Multibyte character handling.  Requires mblen() and
+                     mbctowc().
+    NAMESPACE    on  Allows namespaces.  This is experimental, incomplete
+                     and undocumented.
+    OLDTERMIO    off Use either termios or termio at runtime.
+    OO           on  Experimental object oriented extension.  This option
+                     should disappear soon.
+    OPTIMIZE     on  Optimize loop invariants for with for and while loops.
+    P_SUID       off If set, all real uids, greater than or equal to this
+                     value will require the -p flag to run suid/sgid scripts.
+    PFSH         off Compile with support for profile shell.
+    RAWONLY      off Turn on if the vi line mode doesn't work right unless
+                     you do a set -o viraw.
+    SEVENBIT     off Strip the eigth bit from characters.
+    SPAWN        off Use spawn as combined fork/exec.  May improve speed on
+                     some systems.
+    STATS	 on  Add .sh.stats compound variable.
+    SUID_EXEC    on  Execute /etc/suid_exec for setuid, setgid script.
+    TIMEOUT      off Set this to the number of seconds for timing out and
+                     exiting the shell when you don't enter a command.  If
+                     non-zero, TMOUT can not be set larger than this value.
+    TYPEDEF	 on  Enable typeset type definitions.
+    VSH          on  Compile with vi command line editing.  The original vi
+                     line editor code was provided by Pat Sullivan at CB.
+
+The following compile options are set automatically by the feature testing:
+    DEVFD   Set when /dev/fd is a directory that names open files.
+    SHELLMAGIC
+            Set on systems that recognize script beginning with #! specially.
+    VPIX    Set on systems the have /usr/bin/vpix program for running MS-DOS.
+
+
+In most instances, you will generate ksh from a higher level directory
+which also generates libcmd and libast libraries on which ksh depends.
+However, it is possible to generate ksh, with by running make -f ksh.mk
+in this directory.  The ksh.mk file was generated from the nmake Makefile.
+If you do not have make or nmake, but do have a Version 7 UNIX compatible
+shell, then you can run the script mamexec < Mamfile to build ksh.
+If you have nmake, version 2.3 or later, you can use it without the -f ksh.mk.
+In either case, ksh relies on libraries libast and libcmd which must be
+built first.  The binary for ksh becomes the file named ./ksh which can
+be copied to where ever you install it.
+
+If you use old make or the Mamfile, and you system has dynamic shared
+libraries, then you should define the variables mam_cc_static and
+mam_cc_dynanamic as the compiler options that request static linking
+and dynamic linking respectively.  This will decrease the number of
+shared libraries that ksh need and cut startup time substantially.
+
+The makefile should also generate shcomp, a program that will precompile
+a script.  ksh93 is able to recognize files in this format and process
+them as scripts.  You can use shcomp to send out scripts when you
+don't want to give away the original script source.
+
+It is advisable that you put the line PWD=$HOME;export PWD into the
+/etc/profile file to reduce initialization time for ksh.
+
+To be able to run setuid/setgid shell scripts, or scripts without read
+permission, the SUID_EXEC compile option must be on, and ksh must be installed
+in the /bin directory, the /usr/bin directory, the /usr/lbin directory,
+or the /usr/local/bin directory and the name must end in sh. The program
+suid_exec must be installed in the /etc directory, must be owned by root,
+and must be a suid program.  If you must install ksh in some other directory
+and want to be able to run setuid/setgid and execute only scripts, then
+you will have to change the source code file sh/suid_exec.c explicitly.
+If you do not have ksh in one of these secure locations, /bin/sh will
+be invoked with the -p options and will fail when you execute a setuid/setgid
+and/or execute only script.  Note, that ksh does not read the .profile
+or $ENV file when it the real and effective user/group id's are not
+equal.
+
+The tests sub-directory contains a number of regression tests for ksh.
+To run all these tests with the shell you just built, go to the tests
+directory and run the command
+        SHELL=$dir/ksh $dir/ksh shtests
+where dir is the directory of the ksh you want to test.
+
+The file PROMO.mm is an advertisement that extolls the virtues of ksh.
+The file sh.1 contains the troff (man) description of this Shell.
+The file nval.3 contains the troff (man) description of the name-value
+pair library that is needed for writing built-ins that need to
+access shell variables.
+
+The file sh.memo contains a draft troff (mm) memo describing ksh.  The
+file RELEASE88 contains the changes made for ksh88.  The file RELEASE93
+contains the changes made in this release since ksh-88.  The file
+RELEASE contains bug fixes made in this release since ksh-88.  The file
+COMPATIBILITY contains a list of incompatibilities with ksh-88.  The
+file bltins.mm is a draft troff (mm) memo describing how to write
+built-in commands that can be loaded at run time.
+
+Most of the work for internationalization has been done with ksh93.
+The file ksh.msg is a generated file that contains error messages
+that need to be translated.  In addition, the function translate()
+in sh/init.c has to be completed to interface with the dictionary
+lookup.  The translate function takes two argument, the string
+that is to be translated and a type which is
+    0 when a library string needs translation.
+    1 when one of the error messages in ksh.msg needs translation.
+    2 when a string in a script needs translation.  You use a $ in front
+      of a double quoted string in a script to indicate that it
+      needs translation.  The -D option for ksh builds the dictionary.
+The translate routine needs to return the translated message.
+For dictionaries that need to use a numeric key, it should be
+possible to use the strhash() function to generate numbers to
+go along with each of the messages and to use this number both
+when generating the dictionary and when converting strings.
+If you encounter error messages of type 1 that are not be translated via
+this translate() function send mail to the address below.
+
+Please report any problems or suggestions to:
+
+dgk@research.att.com
+
+
+ksh93 has been compiled and alpha tested on the following.  An asterisk
+signifies that ksh has been installed as /bin/sh on this machine.
+
+*    Sun OS 4.1.[123] on sparc.
+     Sun OS 4.1.1 on sun.
+     Solaris 2.[1-9] on sparc.
+     Solaris 2.[4-8] on X86.
+     HP/UX 8 on HP-9000/730.
+     HP/UX 9 on HP-9000/730.
+     HP/UX 10 on HP-9000/857.
+     HP/UX 11 on pa-risc.
+     System V Release 3 on Counterpoint C19
+     System V Release  4 on AT&T Intel 486.
+     System V Release  4 on NCR 4850 Intel 486.
+     IRIX Release 4.0.? System V on SGI-MIPS.
+     IRIX Release 5.1 System V on SGI-MIPS.
+     IRIX Release 6.[1-5] System V on SGI-MIPS.
+     System V Release 3.2 on 3B2. 
+     UTS 5.2.6 on Amdahl 3090,5990,580.
+     System V Release 3.2 on i386.
+     SMP_DC.OSx olivetti dcosx MIServer-S 2/128.
+     SMP_DC.OSx Pyramid dcosx MIServer-S 2/160 r3000.
+     4.3BSD on Vax 8650.
+     AIX release 2 on RS6000.
+     AIX 3.2 on RS6000.
+     Linux 1.X on Intel
+     Linux 2.X on Intel
+     Linux 2.X on Alpha
+     Linux 2.X on Alpha
+     Linux 2.X on OS/390
+     Linux 2.X on sparc
+     Linux 2.4 on intel itanium 64
+     Linux Slackware on sparc64
+*    Linux ARM on i-PAQ 
+     OSF1 on DEC alpha.
+     OSF4 on DEC alpha.
+     UMIPS 4.52 on mips.
+     BSD-i [2-4] on X86.
+     OpenBSD on X86
+     NetBSD on X86
+     FreeBSD on X86
+     NeXT on Intel X86.
+     NeXT on HP.
+*    Windows NT using UWIN on X86
+*    Windows NT using UWIN on alpha
+     Windows NT using Cygwin on X86
+     Windows NT with NutCracker libraries.
+     Windows NT with Portage libraries.
+     Windows 3.1 using custom C library.
+     OpenEdition on MVS
+     Darwin OS X on PPC
+     MVS on OS 390
+     SCO Openserver 3.2 on X86
+     Unixware 7 on X86
+
+Good luck!!
+
+David Korn
+dgk@research.att.com
+

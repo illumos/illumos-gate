@@ -1,0 +1,12 @@
+cat{
+	#if SHOPT_DYNAMIC
+	#include	<dlldefs.h>
+	#endif
+	#if !defined(SHOPT_FS_3D) && SHOPT_DYNAMIC
+	#   define SHOPT_FS_3D	1
+	#endif /* !SHOPT_FS_3D */
+	#if SHOPT_FS_3D
+	#   undef mount
+	#   include	<fs3d.h>
+	#endif /* SHOPT_FS_3D */
+}end

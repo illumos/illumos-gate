@@ -1,0 +1,315 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+#pragma dictionary "STORAGE"
+
+/*
+ * Fault event definitions.
+ */
+
+event fault.config.fan-fail@ses-enclosure;
+event fault.config.fantray-fail@ses-enclosure;
+event fault.config.psu-fail@ses-enclosure;
+event fault.device.controller.fail@controller;
+event fault.device.ethernet.fail@controller;
+event fault.device.ethernet.fail@sas-expander;
+event fault.device.fan.fail@fan;
+event fault.device.fan.fail@fanmodule;
+event fault.device.psu.fail@psu;
+event fault.device.psu.fail@psu;
+event fault.device.sas-expander.fail@sas-expander;
+event fault.device.unusable-chassis-id@fanboard;
+event fault.io.i2c.fail@controller;
+event fault.io.i2c.fail@fanboard;
+event fault.io.i2c.fail@fanmodule;
+event fault.io.i2c.fail@powerboard;
+event fault.io.i2c.fail@psu;
+event fault.io.sas.log.fatal@sas-expander;
+event fault.io.sas.log.non-fatal@sas-expander;
+event fault.power.ext-fail@ses-enclosure;
+event fault.power.fail@controller;
+event fault.power.fail@controller;
+event fault.power.fail@controller;
+event fault.power.fail@fanmodule;
+event fault.power.fail@fanmodule;
+event fault.power.fail@psu;
+event fault.power.fail@psu;
+event fault.sensor.read-fail@controller;
+event fault.sensor.read-fail@fanmodule;
+event fault.sensor.read-fail@fan;
+event fault.sensor.read-fail@psu;
+event fault.sp.fail@controller;
+event fault.sp.svc-fail@controller;
+event fault.sp.unavailable@controller;
+event fault.temp.fail@controller;
+event fault.temp.fail@fanmodule;
+event fault.temp.fail@psu;
+
+/*
+ * Error event definitions.
+ */
+
+event ereport.chassis.config.missing-fan@ses-enclosure;
+event ereport.chassis.config.missing-fantray@ses-enclosure;
+event ereport.chassis.config.missing-psu@ses-enclosure;
+event ereport.chassis.device.ecb.shutoff@controller;
+event ereport.chassis.device.ethernet.link-down@controller;
+event ereport.chassis.device.ethernet.link-down@sas-expander;
+event ereport.chassis.device.psu.dc-fail@psu;
+event ereport.chassis.device.psu.dc-oc@psu;
+event ereport.chassis.device.psu.dc-ov@psu;
+event ereport.chassis.device.psu.dc-uv@psu;
+event ereport.chassis.device.psu.ext-ac-fail@psu;
+event ereport.chassis.device.psu.ot@psu;
+event ereport.chassis.device.sas-expander.fail@sas-expander;
+event ereport.chassis.device.unusable-chassis-id@fanboard;
+event ereport.chassis.io.i2c.fail@controller;
+event ereport.chassis.io.i2c.fail@fanboard;
+event ereport.chassis.io.i2c.fail@fanmodule;
+event ereport.chassis.io.i2c.fail@powerboard;
+event ereport.chassis.io.i2c.fail@psu;
+event ereport.chassis.post.device.fail@controller;
+event ereport.chassis.post.device.fail@fan;
+event ereport.chassis.post.device.fail@fanmodule;
+event ereport.chassis.post.device.fail@psu;
+event ereport.chassis.post.sp.fail@controller;
+event ereport.chassis.sensor.current.oc@controller;
+event ereport.chassis.sensor.current.oc@fanmodule;
+event ereport.chassis.sensor.current.oc@psu;
+event ereport.chassis.sensor.current.uc@controller;
+event ereport.chassis.sensor.current.uc@fanmodule;
+event ereport.chassis.sensor.current.uc@psu;
+event ereport.chassis.sensor.fanspeed.us@fan;
+event ereport.chassis.sensor.read-fail@controller;
+event ereport.chassis.sensor.read-fail@fanmodule;
+event ereport.chassis.sensor.read-fail@fan;
+event ereport.chassis.sensor.read-fail@psu;
+event ereport.chassis.sensor.temp.ot@controller;
+event ereport.chassis.sensor.temp.ot@fanmodule;
+event ereport.chassis.sensor.temp.ot@psu;
+event ereport.chassis.sensor.temp.ut@controller;
+event ereport.chassis.sensor.temp.ut@fanmodule;
+event ereport.chassis.sensor.temp.ut@psu;
+event ereport.chassis.sensor.voltage.ov@controller;
+event ereport.chassis.sensor.voltage.ov@fanmodule;
+event ereport.chassis.sensor.voltage.ov@psu;
+event ereport.chassis.sensor.voltage.uv@controller;
+event ereport.chassis.sensor.voltage.uv@fanmodule;
+event ereport.chassis.sensor.voltage.uv@psu;
+event ereport.chassis.sp.svc-restart@controller;
+event ereport.chassis.sp.unavailable@controller;
+event ereport.io.sas.log.fatal@sas-expander;
+event ereport.io.sas.log.non-fatal@sas-expander;
+
+/*
+ * Service Processor failure
+ */
+
+prop fault.sp.fail@controller ->
+    ereport.chassis.post.sp.fail@controller;
+
+/*
+ * Controller failure
+ */
+
+prop fault.device.controller.fail@controller ->
+    ereport.chassis.post.device.fail@controller;
+
+/*
+ * Fan module failure
+ */
+
+prop fault.device.fan.fail@fanmodule ->
+    ereport.chassis.post.device.fail@fanmodule;
+
+/*
+ * I2C transaction failure
+ */
+
+prop fault.io.i2c.fail@controller ->
+    ereport.chassis.io.i2c.fail@controller;
+  
+prop fault.io.i2c.fail@fanboard ->
+    ereport.chassis.io.i2c.fail@fanboard;
+
+prop fault.io.i2c.fail@fanmodule ->
+    ereport.chassis.io.i2c.fail@fanmodule;
+
+prop fault.io.i2c.fail@powerboard ->
+    ereport.chassis.io.i2c.fail@powerboard;
+
+prop fault.io.i2c.fail@psu ->
+    ereport.chassis.io.i2c.fail@psu;
+
+/*
+ * Chassis ID unusable failure
+ */
+
+prop fault.device.unusable-chassis-id@fanboard ->
+    ereport.chassis.device.unusable-chassis-id@fanboard;
+
+/*
+ * Configuration failure
+ */
+
+prop fault.config.psu-fail@ses-enclosure ->
+    ereport.chassis.config.missing-psu@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
+
+prop fault.config.fan-fail@ses-enclosure ->
+    ereport.chassis.config.missing-fan@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
+
+prop fault.config.fantray-fail@ses-enclosure ->
+    ereport.chassis.config.missing-fantray@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
+
+/*
+ * Fan failure
+ */
+
+prop fault.device.fan.fail@fan ->
+    ereport.chassis.sensor.fanspeed.us@fan,
+    ereport.chassis.post.device.fail@fan;
+
+/*
+ * Sensor reading failure
+ */
+
+prop fault.sensor.read-fail@controller ->
+    ereport.chassis.sensor.read-fail@controller;
+
+prop fault.sensor.read-fail@fanmodule ->
+    ereport.chassis.sensor.read-fail@fanmodule;
+
+prop fault.sensor.read-fail@fan ->
+    ereport.chassis.sensor.read-fail@fan;
+
+prop fault.sensor.read-fail@psu ->
+    ereport.chassis.sensor.read-fail@psu;
+
+/*
+ * Temperature failure
+ */
+
+prop fault.temp.fail@controller ->
+    ereport.chassis.sensor.temp.ot@controller,
+    ereport.chassis.sensor.temp.ut@controller;
+
+prop fault.temp.fail@fanmodule ->
+    ereport.chassis.sensor.temp.ot@fanmodule,
+    ereport.chassis.sensor.temp.ut@fanmodule;
+
+prop fault.temp.fail@psu ->
+    ereport.chassis.sensor.temp.ot@psu,
+    ereport.chassis.sensor.temp.ut@psu;
+
+/*
+ * Power failure
+ */
+
+prop fault.power.fail@controller ->
+    ereport.chassis.device.ecb.shutoff@controller,
+    ereport.chassis.sensor.current.oc@controller,
+    ereport.chassis.sensor.current.uc@controller,
+    ereport.chassis.sensor.voltage.ov@controller,
+    ereport.chassis.sensor.voltage.uv@controller;
+
+prop fault.power.fail@fanmodule ->
+    ereport.chassis.sensor.current.oc@fanmodule,
+    ereport.chassis.sensor.current.uc@fanmodule,
+    ereport.chassis.sensor.voltage.ov@fanmodule,
+    ereport.chassis.sensor.voltage.uv@fanmodule;
+
+prop fault.power.fail@psu ->
+    ereport.chassis.sensor.current.oc@psu,
+    ereport.chassis.sensor.current.uc@psu,
+    ereport.chassis.sensor.voltage.ov@psu,
+    ereport.chassis.sensor.voltage.uv@psu;
+
+/*
+ * Power supply unit failure
+ */
+
+prop fault.device.psu.fail@psu ->
+    ereport.chassis.device.psu.dc-fail@psu,
+    ereport.chassis.device.psu.dc-ov@psu,
+    ereport.chassis.device.psu.dc-uv@psu,
+    ereport.chassis.device.psu.dc-oc@psu,
+    ereport.chassis.device.psu.ot@psu,
+    ereport.chassis.post.device.fail@psu;
+
+/*
+ * External power failure
+ */
+
+prop fault.power.ext-fail@ses-enclosure ->
+    ereport.chassis.device.psu.ext-ac-fail@psu<>;
+
+/*
+ * SAS Expander failure
+ */
+
+prop fault.device.sas-expander.fail@sas-expander ->
+    ereport.chassis.device.sas-expander.fail@sas-expander;
+
+/*
+ * Ethernet failure
+ */
+
+prop fault.device.ethernet.fail@controller ->
+    ereport.chassis.device.ethernet.link-down@controller;
+
+prop fault.device.ethernet.fail@sas-expander ->
+    ereport.chassis.device.ethernet.link-down@sas-expander;
+
+/*
+ * Service Processor unavailable failure
+ */
+
+prop fault.sp.unavailable@controller ->
+    ereport.chassis.sp.unavailable@controller;
+
+/*
+ * Service Processor service failure
+ */
+
+prop fault.sp.svc-fail@controller ->
+    ereport.chassis.sp.svc-restart@controller{
+    setpayloadprop("service", payloadprop("service"))};
+
+/*
+ * SAS Expander Log failure
+ */
+
+prop fault.io.sas.log.non-fatal@sas-expander ->
+    ereport.io.sas.log.non-fatal@sas-expander;
+
+prop fault.io.sas.log.fatal@sas-expander ->
+    ereport.io.sas.log.fatal@sas-expander;
+

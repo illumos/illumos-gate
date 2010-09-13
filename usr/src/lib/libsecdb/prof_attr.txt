@@ -1,0 +1,122 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+
+#
+# /etc/security/prof_attr
+#
+# profiles attributes. see prof_attr(4)
+#
+All:::Execute any command as the user or role:help=RtAll.html
+Audit Configuration:::Configure Solaris Audit:auths=solaris.smf.value.audit;help=RtAuditCfg.html
+Audit Control:::Control Solaris Audit:auths=solaris.smf.manage.audit;help=RtAuditCtrl.html
+Audit Review:::Review Solaris Auditing logs:help=RtAuditReview.html
+Console User:::Manage System as the Console User:profiles=Suspend To RAM,Suspend To Disk,Brightness,CPU Power Management,Network Autoconf User;auths=solaris.system.shutdown;help=RtConsUser.html
+Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
+Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html
+Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.*,solaris.label.print,solaris.smf.manage.discovery.printers.*,solaris.smf.value.discovery.printers.*;help=RtPrntAdmin.html
+Cron Management:::Manage at and cron jobs:auths=solaris.jobs.*,solaris.smf.manage.cron;help=RtCronMngmnt.html
+Log Management:::Manage log files:help=RtLogMngmnt.html
+Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.mail.mailq,solaris.device.mount.removable,solaris.admin.wusb.read;profiles=All;help=RtDefault.html
+Device Security:::Manage devices and Volume Manager:auths=solaris.device.*,solaris.smf.manage.vt,solaris.smf.manage.allocate;help=RtDeviceSecurity.html
+DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
+Extended Accounting Flow Management:::Manage the Flow Extended Accounting service:auths=solaris.smf.manage.extended-accounting.flow,solaris.smf.value.extended-accounting.flow;profiles=acctadm;help=RtExActtFlow.html
+Extended Accounting Process Management:::Manage the Process Extended Accounting service:auths=solaris.smf.manage.extended-accounting.process,solaris.smf.value.extended-accounting.process;profiles=acctadm;hep=RtExAcctProcess.html
+Extended Accounting Task Management:::Manage the Task Extended Accounting service:auths=solaris.smf.manage.extended-accounting.task,solaris.smf.value.extended-accounting.task;profiles=acctadm;help=RtExAcctTask.html
+Extended Accounting Net Management:::Manage the Net Extended Accounting service:auths=solaris.smf.manage.extended-accounting.net,solaris.smf.value.extended-accounting.net;profiles=acctadm;help=RtExActtNet.html
+File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management,SMBFS Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
+File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
+Forced Privilege:::Commands with forced privileges associated with them:help=RtReservedProfile.html
+HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
+Hotplug Management:::Manage Hotplug Connections:auths=solaris.smf.manage.hotplug,solaris.hotplug.*;help=RtHotplugMgmt.html
+Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
+Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.manage.idmap,solaris.smf.value.idmap;help=RtIdmapMngmnt.html
+Inetd Management:::Manage inetd configuration parameters:auths=solaris.smf.manage.inetd,solaris.smf.value.inetd;help=RtInetdMngmnt.html
+Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
+Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range,solaris.smf.manage.coreadm,solaris.smf.value.coreadm;profiles=Hotplug Management;help=RtMaintAndRepair.html
+Media Backup:::Backup files and file systems:profiles=NDMP Management;help=RtMediaBkup.html
+Media Catalog:::Catalog files and file systems:help=RtMediaCtlg.html
+Media Restore:::Restore files and file systems from backups:profiles=NDMP Management;help=RtMediaRestore.html
+NDMP Management:::Manage the NDMP service:auths=solaris.smf.manage.ndmp,solaris.smf.value.ndmp,solaris.smf.read.ndmp;help=RtNdmpMngmnt.html
+Network Autoconf Admin:::Manage Network Auto-Magic configuration via nwamd:profiles=Network Autoconf User;auths=solaris.network.autoconf.write,solaris.smf.manage.location,solaris.smf.modify.application;help=RtNetAutoconfAdmin.html
+Network Autoconf User:::Network Auto-Magic User:auths=solaris.network.autoconf.read,solaris.network.autoconf.select,solaris.network.autoconf.wlan;help=RtNetAutoconfUser.html
+Network ILB:::Manage ILB configuration via ilbadm:auths=solaris.network.ilb.config,solaris.network.ilb.enable;help=RtNetILB.html
+Network VRRP:::Manage VRRP instances:auths=solaris.network.vrrp,solaris.smf.manage.vrrp;help=RtNetVRRP.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns,solaris.smf.manage.ilb,solaris.network.interface.config;profiles=Network Wifi Management,Inetd Management,Network VRRP,Network Observability;help=RtNetMngmnt.html
+Network Observability:::Allow access to observability devices:privs=net_observability;help=RtNetObservability.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd,solaris.network.*;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
+Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
+Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
+Network Link Security:::Manage network link security:auths=solaris.network.link.security;help=RtNetLinkSecure.html
+Network IPsec Management:::Manage IPsec and IKE:auths=solaris.smf.manage.ipsec,solaris.smf.value.ipsec;help=RtNetIPsec.html
+Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
+Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
+Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
+Operator:::Can perform simple administrative tasks:profiles=Printer Management,Media Backup,All;help=RtOperator.html
+Primary Administrator:::Can perform all administrative tasks:auths=solaris.*,solaris.grant;help=RtPriAdmin.html
+Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
+Reparse Management:::Manage the reparse service:auths=solaris.smf.manage.reparse:help=RtReparseMngmnt.html
+Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html
+Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.smf.manage.rmvolmgr;help=RtRmvolmgrMngmnt.html
+Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
+Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
+Software Installation:::Add application software to the system:profiles=ZFS File System Management;help=RtSoftwareInstall.html
+Stop:::Last Profile evaluated, default profiles are not considered:help=RtReservedProfile.html
+System Administrator:::Can perform most non-security administrative tasks:profiles=Audit Review,Printer Management,Cron Management,Device Management,File System Management,Mail Management,Maintenance and Repair,Media Backup,Media Restore,Name Service Management,Network Management,Object Access Management,Process Management,Software Installation,User Management,Project Management,All;help=RtSysAdmin.html
+System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html
+User Management:::Manage users, groups, home directory:auths=solaris.profmgr.read;help=RtUserMngmnt.html
+User Security:::Manage passwords, clearances:auths=solaris.role.*,solaris.profmgr.*,solaris.label.range;help=RtUserSecurity.html
+FTP Management:::Manage the FTP server:help=RtFTPMngmnt.html
+Crypto Management:::Cryptographic Framework Administration:help=RtCryptoMngmnt.html
+Kerberos Client Management:::Maintain and Administer Kerberos excluding the servers:help=RtKerberosClntMngmnt.html
+Kerberos Server Management:::Maintain and Administer Kerberos Servers:profiles=Kerberos Client Management;help=RtKerberosSrvrMngmnt.html
+DAT Administration:::Manage the DAT configuration:help=RtDatAdmin.html
+SMB Management:::Manage the SMB service:auths=solaris.smf.manage.smb,solaris.smf.value.smb,solaris.smf.read.smb;help=RtSMBMngmnt.html
+SMBFS Management:::Manage the SMB client:auths=solaris.smf.manage.smbfs,solaris.smf.value,solaris.smf.modify.application;help=RtSMBFSMngmnt.html
+STMF Administration:::Configure STMF service:auths=solaris.smf.modify.application
+STMF Management:::Start/Stop STMF service:auths=solaris.smf.manage.stmf
+ZFS File System Management:::Create and Manage ZFS File Systems:help=RtZFSFileSysMngmnt.html
+ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMngmnt.html
+Zone Security:::Zones Virtual Application Environment Security:auths=solaris.zone.*,solaris.zone.grant;help=RtZoneSecurity.html
+Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
+IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
+Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html
+VSCAN Management:::Manage the VSCAN service:auths=solaris.smf.manage.vscan,solaris.smf.value.vscan,solaris.smf.modify.application;help=RtVscanMngmnt.html
+WUSB Management:::Manage Wireless USB:auths=solaris.admin.wusb.*,solaris.smf.manage.wusb;help=WUSBmgmt.html
+Event Notification Agent Management:::Manage Event Notification Agents:auths=solaris.smf.manage.smtp-notify,solaris.smf.manage.snmp-notify,solaris.smf.value.smtp-notify,solaris.smf.value.snmp-notify
+#
+# Trusted Extensions profiles:
+#
+Information Security:::Maintains MAC and DAC security policies:profiles=Device Security,File System Security,Name Service Security,Network Security,Object Access Management,Object Label Management;help=RtInfoSec.html
+Object Label Management:::Change labels on files.:auths=solaris.device.allocate,solaris.label.file.downgrade,solaris.label.win.downgrade,solaris.label.win.upgrade,solaris.label.file.upgrade,solaris.label.range,solaris.smf.manage.labels;help=RtObjectLabelMngmnt.html
+Outside Accred:::Allow a user to operate outside the user accreditation range.:auths=solaris.label.range;help=RtOutsideAccred.html
+#
+# Power Management profiles:
+#
+System Power:::For authorized users to manage system power:auths=solaris.system.power.*;help=RtSysPowerMgmt.html
+Suspend:::For authorized users to Suspend system:auths=solaris.system.power.suspend.*;help=RtSysPowerMgmtSuspend.html
+Suspend To Disk:::For authorized users to Suspend to Disk:auths=solaris.system.power.suspend.disk;help=RtSysPowerMgmtSuspendToDisk.html
+Suspend To RAM:::For authorized users to Suspend to RAM:auths=solaris.system.power.suspend.ram;help=RtSysPowerMgmtSuspendToRAM.html
+Brightness:::For authorized users to Control LCD Brightness:auths=solaris.system.power.brightness;help=RtSysPowerMgmtBrightness.html
+CPU Power Management:::For authorized users to manage CPU Power:auths=solaris.system.power.cpu;help=RtCPUPowerManagement.html
+acctadm:::Do not assign to users. Commands required for Extended Accounting Management profiles:help=RtAcctadm.help
+ISNS Server Management:::Manage ISNS server:auths=solaris.smf.manage.isns,solaris.smf.value.isns,solaris.isnsmgr.write:help=RtISNSMngmnt.html

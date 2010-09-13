@@ -1,0 +1,316 @@
+<!--
+  -- ident	"%W%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: Modify Option</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=615>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+
+	<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><P>
+		<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relays</STRONG></A><P>
+	<A HREF="dhcp_addr_ref.html"><STRONG>IP Addresses</STRONG></A><P>
+	<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+	<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_option_create.html">Create</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_option_dup.html">Duplicate</A><BR>
+	
+	<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">Modify<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#name"><EM>Name</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#cat"><EM>Category</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#code"><EM>Code</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#type"><EM>Data Type</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#gran"><EM>Granularity</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#max"><EM>Maximum</EM></A><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#class"><EM>Class</EM></A><BR>
+
+	&nbsp;&nbsp;<A HREF="dhcp_option_del.html">Delete</A><P>
+		
+<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><P>
+<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+	
+		</td>
+
+
+
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+
+	<td colspan=1 valign="top" bgcolor="#ffffff">
+	<P>&nbsp;</P>
+
+
+
+<h1>Modify Option</h1>
+
+The Option Properties dialog box lets you modify existing settings for an option in the
+DHCP server's network database. <p>
+
+See <a href="dhcp_macros_about.html">
+About Macros and Options</a>, for more information about defining DHCP options.<p>
+The settings in the Modify Option dialog box are described in the following table.<P>
+<P><HR NOSHADE><P>
+
+
+<table border=0 cellspacing=4 cellpadding=3>
+
+	<tr>
+	<td width=100 valign="top"><a name="name"><STRONG>Name</STRONG></a></td>
+	<td valign="top">The name of the option.
+	Option names can be a maximum of 128 alphanumeric characters including spaces.</td>
+	</tr>
+
+	<tr>
+	<td width=100 valign="top"><a name="cat"><STRONG>Category</STRONG></a></td>
+	<td valign="top">The category of the option: 
+	The category can be one of Site, Extend, or Vendor.<P>
+	<table border=0 cellspacing=3 cellpadding=3>
+
+		
+		<tr>
+		<td width=100 valign="top"><U>Site</U></td>
+		<td valign="top">User-defined option definitions, used for 
+		unique or custom purposes; accepts <a href="#code">Option 
+		Codes</a> <tt>128-254</tt>.</td>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><U>Extend</U></td>
+		<td valign="top">Option definitions beyond the standard set, 
+		which may already be present in versions of the DHCP protocol 
+		being used on your server. Rather than upgrading your DHCP 
+		implementation, you can add extended options; accepts Option 
+		Codes <tt>77-127</tt>.</td>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><U>Vendor</U></td>
+		<td valign="top">Hardware-, vendor-, or platform-specific option 
+		definitions; accepts Option Codes <tt>1-254</tt>. Selecting this 
+		context enables the <a href="#class">Client Class</a> 
+		parameter.</td>
+		</tr>
+
+		</table>
+		</td>
+		</tr>
+
+	
+	<tr>
+	<td width=115 valign="top"><a name="code"><STRONG>Code</STRONG></a></td>
+	<td valign="top">A unique numeric code to 
+	identify the option. Valid values depend on the option <a 
+	href="#cat">category</a>:<P>
+
+	<table border=0 cellspacing=3 cellpadding=3>
+
+		<tr>
+		<td width=100 valign="top"><U>Extend</U></td>
+		<td valign="top">Accepts code values of <tt>77-127</tt><P></TD>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><U>Site</U></td>
+		<td valign="top">Accepts code values of <tt>128-254</tt><P></TD>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><U>Vendor</U></td>
+		<td valign="top">Accepts code values of <tt>1-254</tt></td>
+		</tr>
+
+</table>
+
+<P>
+</td>
+
+	</tr>
+
+	<tr>
+	<td width=100 valign="top"><A NAME="type"><STRONG>Data Type</STRONG></A></td>
+	<td valign="top">The type of data that is acceptable 
+	for options values:<P>
+
+		<table border=0 cellspacing=3 cellpadding=3>
+
+		<tr>
+		<td width=100 valign="top"><u>Ascii</u></td>
+		<td valign="top">ASCII text.</td>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><u>Boolean</u></td>
+		<td valign="top">No value is associated with this data type. 
+		Presence of options of this type denote Boolean TRUE; absence 
+		denotes FALSE.</td>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><u>IP</u></td>
+		<td valign="top">One or more Internet addresses in dotted decimal format.</td>
+		</tr>
+        <tr>
+		<td width=100 valign="top"><u>Octet</u></td>
+		<td valign="top">Uninterpreted ASCII representation of binary 
+		data; for example, a client ID.</td>
+		</tr>
+		<tr>
+		<td width=100 valign="top"><u>Unumber8</u><BR><u>Unumber16</u><BR>
+<u>Unumber32</u><BR><u>Unumber64</u><BR>
+
+</td>
+		<td valign="top">Unsigned number, where the trailing number indicates the number of bits in the number.</td>
+		</tr>
+		<tr>
+		<td width=100 valign="top"><u>Snumber8</u><BR><u>Snumber16</u><BR>
+<u>Snumber32</u><BR><u>Snumber64</u><BR>
+</td>
+		<td valign="top">Signed number, where the trailing number indicates the number of bits in the number.</td>
+		</tr>
+
+	</table>
+	</td>
+	</tr>
+	
+
+	<tr>
+	<td width=100 valign="top"><a name="gran"><STRONG>Granularity</STRONG></a></td>
+	<td valign="top">Specifies how many values of the given <a 
+	href="#type">data type</a> are required to make a complete option value. 
+	For example, a data type of <tt>IP</tt> and a granularity of <tt>2</tt> would 
+	mean that the option value would need to contain two IP addresses.</td>
+	</tr>
+
+	<tr>
+	<td width=100 valign="top"><a name="max"><STRONG>Maximum</STRONG></a></td>
+	<td valign="top">The maximum number of values of a 
+	given granularity that can be specified for the option. Building on the 
+	previous example, a maximum of <tt>2</tt>, with a granularity of 
+	<tt>2</tt> and a data type of <tt>IP</tt> would mean that the option 
+	value could contain a maximum of two pairs of IP addresses.<P>
+
+		<table border=0>
+
+		<tr>
+		<td width=100 valign="top"><U>Unlimited</U></td>
+		<td valign="top">No limit to the number of values; implies a 
+		maximum setting of <tt>0</tt>.</td>
+		</tr>
+
+		<tr>
+		<td width=100 valign="top"><U>Specify</U></td>
+		<td valign="top">A specific number indicating the maximum.</td>
+		</tr>
+		
+		</table>
+	</td>
+	</tr>
+	
+		
+	<tr>
+	<td width=100 valign="top"><A NAME="class"><STRONG>Vendor Client Classes</STRONG></A></td>
+	<td valign="top">This option is enabled only when the option 
+	<a href="#cat">category</a> is Vendor. It identifies the client class(es) with which the Vendor option is
+	associated.<P>
+	The Class is an ASCII string representing the client machine type and/or operating system, for example, <TT>SUNW.Ultra5_10</TT>. This type of option makes it possible to define configuration parameters that are passed to all clients of the same class. <P>
+	Enter the client class and then press Enter. You can
+	specify multiple client classes. Only those DHCP clients with a client 
+	class value matching one listed here will use the option.</td>
+	</tr>
+
+
+	</table>
+	<P>
+	
+<strong>Notify DHCP Server of Change:</STRONG> Check the box if 
+you want the DHCP server to reload the <tt>dhcptab</tt> immediately after
+the data is written. Normally, you will want this to
+happen. However, if you are making multiple changes, you may choose
+to wait so that the server reloads only after all the
+changes are written. <P>
+&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+
+<p>&nbsp;</p>
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

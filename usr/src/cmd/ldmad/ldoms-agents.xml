@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different file.
+-->
+
+<service_bundle type='manifest' name='SUNWldomu:ldmad'>
+
+<service
+    name='ldoms/agents'
+    type='service'
+    version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+	    name='filesystem-minimal'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<dependency
+	    name='syslog'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/system-log' />
+	</dependency>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/lib/svc/method/ldoms-agents'
+	    timeout_seconds='60' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':kill'
+	    timeout_seconds='30' />
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Logical Domains agents service
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='ldmad' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

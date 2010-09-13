@@ -1,0 +1,121 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	uu_alt_exit;
+	uu_avl_create;
+	uu_avl_destroy;
+	uu_avl_find;
+	uu_avl_first;
+	uu_avl_insert;
+	uu_avl_last;
+	uu_avl_nearest_next;
+	uu_avl_nearest_prev;
+	uu_avl_next;
+	uu_avl_node_fini;
+	uu_avl_node_init;
+	uu_avl_numnodes;
+	uu_avl_pool_create;
+	uu_avl_pool_destroy;
+	uu_avl_prev;
+	uu_avl_remove;
+	uu_avl_teardown;
+	uu_avl_walk;
+	uu_avl_walk_end;
+	uu_avl_walk_next;
+	uu_avl_walk_start;
+	uu_check_name;
+	uu_die;
+	uu_dprintf;
+	uu_dprintf_create;
+	uu_dprintf_destroy;
+	uu_dprintf_getname;
+	uu_dump;
+	uu_error;
+	uu_exit_fatal;
+	uu_exit_ok;
+	uu_exit_usage;
+	uu_free;
+	uu_getpname;
+	uu_list_create;
+	uu_list_destroy;
+	uu_list_find;
+	uu_list_first;
+	uu_list_insert;
+	uu_list_insert_after;
+	uu_list_insert_before;
+	uu_list_last;
+	uu_list_nearest_next;
+	uu_list_nearest_prev;
+	uu_list_next;
+	uu_list_node_fini;
+	uu_list_node_init;
+	uu_list_numnodes;
+	uu_list_pool_create;
+	uu_list_pool_destroy;
+	uu_list_prev;
+	uu_list_remove;
+	uu_list_teardown;
+	uu_list_walk;
+	uu_list_walk_end;
+	uu_list_walk_next;
+	uu_list_walk_start;
+	uu_memdup;
+	uu_msprintf;
+	uu_open_tmp;
+	uu_setpname;
+	uu_strbw;
+	uu_strcaseeq;
+	uu_strdup;
+	uu_streq;
+	uu_strerror;
+	uu_strndup;
+	uu_strtoint;
+	uu_strtouint;
+	uu_vdie;
+	uu_vwarn;
+	uu_vxdie;
+	uu_warn;
+	uu_xdie;
+	uu_zalloc;
+    local:
+	*;
+};

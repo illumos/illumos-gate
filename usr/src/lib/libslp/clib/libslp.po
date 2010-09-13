@@ -1,0 +1,170 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+domain "libslp"
+msgid  "out of memory"
+msgstr
+msgid  "URL was never registered by this process: %s"
+msgstr
+msgid  "could not start thread: %s"
+msgstr
+msgid  "cannot open config file"
+msgstr
+msgid  "error reading file: %d"
+msgstr
+msgid  "could not parse property: ``%s'' = ``%s''"
+msgstr
+msgid  "could not create socket: %s"
+msgstr
+msgid  "could not connect to slpd: %s"
+msgstr
+msgid  "is slpd running?"
+msgstr
+msgid  "could not talk to slpd: %s"
+msgstr
+msgid  "sendmsg failed: %s"
+msgstr
+msgid  "recvfrom failed: %s"
+msgstr
+msgid  "DA %s returned error code %d; dropping reply"
+msgstr
+msgid  "could not connect, error = %s"
+msgstr
+msgid  "could not send, error = %s"
+msgstr
+msgid  "could not set broadcast interface: %s"
+msgstr
+msgid  "could not enable broadcast: %s"
+msgstr
+msgid  "could not set multicast TTL: %s"
+msgstr
+msgid  "could not set multicast interface: %s"
+msgstr
+msgid  "could not convert address; aborting TCP handoff"
+msgstr
+msgid  "poll error: %s"
+msgstr
+msgid  "drop PR ignored by host: %s"
+msgstr
+msgid  "couldn't initialize semaphore"
+msgstr
+msgid  "OK"
+msgstr
+msgid  "Language not supported"
+msgstr
+msgid  "Parse error"
+msgstr
+msgid  "Invalid registration"
+msgstr
+msgid  "Scope not supported"
+msgstr
+msgid  "Invalid error number"
+msgstr
+msgid  "Authentication absent"
+msgstr
+msgid  "Authentication failed"
+msgstr
+msgid  "Invalid update"
+msgstr
+msgid  "Not implemented"
+msgstr
+msgid  "Buffer overflow"
+msgstr
+msgid  "Network timed out"
+msgstr
+msgid  "Network init failed"
+msgstr
+msgid  "Memory alloc failed"
+msgstr
+msgid  "Parameter bad"
+msgstr
+msgid  "Network error"
+msgstr
+msgid  "Internal system error"
+msgstr
+msgid  "Handle in use"
+msgstr
+msgid  "Type error"
+msgstr
+msgid  "Last call"
+msgstr
+msgid  "Security Implementation Unavailable"
+msgstr
+msgid  "No signing identity given"
+msgstr
+msgid  "corrupt auth block"
+msgstr
+msgid  "Could not dlopen AMI library: %s"
+msgstr
+msgid  "Is AMI installed?"
+msgstr
+msgid  "Could not relocate AMI_MD5WithRSAEncryption_AID: %s"
+msgstr
+msgid  "Could not relocate AMI_SHA1WithDSASignature_AID: %s"
+msgstr
+msgid  "Could not load ami_init"
+msgstr
+msgid  "Could not load ami_sign"
+msgstr
+msgid  "Could not load ami_verify"
+msgstr
+msgid  "Could not load ami_get_cert"
+msgstr
+msgid  "Could not load ami_get_cert_chain"
+msgstr
+msgid  "Could not load ami_str2dn"
+msgstr
+msgid  "Could not load ami_dn2str"
+msgstr
+msgid  "Could not load ami_free_cert_list"
+msgstr
+msgid  "Could not load ami_free_dn"
+msgstr
+msgid  "Could not load ami_strerror"
+msgstr
+msgid  "Could not load ami_end"
+msgstr
+msgid  "ami_init failed: %s"
+msgstr
+msgid  "ami_sign failed: %s"
+msgstr
+msgid  "Unsupported BSD %d for given SPI %s"
+msgstr
+msgid  "Can not get certificate for %s: %s"
+msgstr
+msgid  "ami_verify failed: %s"
+msgstr
+msgid  "Can not get my DN: %s"
+msgstr
+msgid  "No cert found for myself"
+msgstr
+msgid  "Can not convert DN to string: %s"
+msgstr
+msgid  "no SPI configured"
+msgstr
+msgid  "can not get cert chain: %s"
+msgstr
+msgid  "can not create DN structure for %s: %s"
+msgstr
+msgid  "can not convert DN to string: %s"
+msgstr
+msgid  "Could not get SLPHandle: %s"
+msgstr

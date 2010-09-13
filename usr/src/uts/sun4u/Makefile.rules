@@ -1,0 +1,286 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#	This Makefile defines the build rules for the directory uts/sun4u
+#	and its children. These are the source files which sun4u
+#	"implementation architecture" dependent.
+#
+#	The following two-level ordering must be maintained in this file.
+#	  Lines are sorted first in order of decreasing specificity based on
+#	  the first directory component.  That is, sun4u rules come before
+#	  sparc rules come before common rules.
+#
+#	  Lines whose initial directory components are equal are sorted
+#	  alphabetically by the remaining components.
+
+#
+#	Section 1a: C object build rules
+#
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.s
+	$(COMPILE.s) -o $@ $<
+
+#
+# This rule for io/ppm/%.c needs to come before the io/%.c rule so that
+# the sun4u/ppm driver pulls in io/ppm/ppm.c instead of io/ppm.c.
+# Making an explicit rule to build ppm.o doesn't work because it breaks
+# the build of excalibur/xcalppm
+#
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/ppm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/i2c/clients/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/i2c/misc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/i2c/nexus/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pciex/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pciex/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/ml/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/pcbe/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/brand/sn1/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4/brand/solaris10/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sfmmu/ml/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sfmmu/vm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/bignum/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
+	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
+	    $(UNIQ) | $(NAWK) '{ \
+	    printf("\t.global %s\n\t.type %s, #function\n%s:\n", \
+	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
+
+$(DTRACESTUBS):	$(DTRACESTUBS_O)
+	$(BUILD.SO) $(DTRACESTUBS_O)
+
+#
+#	Section 1b: Lint `object' build rules
+#
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/cpu/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/cpu/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/ppm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/clients/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/misc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/nexus/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pci/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pci/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/px/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/px/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pciex/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pciex/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/ml/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/pcbe/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/brand/sn1/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/sun4/brand/solaris10/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/vm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/vm/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sfmmu/ml/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sfmmu/vm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/bignum/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/aes/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/arcfour/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/des/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/aes/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/arcfour/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/des/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))

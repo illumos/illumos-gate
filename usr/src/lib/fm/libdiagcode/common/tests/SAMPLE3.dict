@@ -1,0 +1,113 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# SAMPLE3 diagcode dictionary -- used by "make test" target only
+#
+# this sample dictionary tests code type 3.
+#
+FMDICT: name=SAMPLE3 version=1 maxkey=10
+#
+fault.one=36029071898968063
+fault.two=36029071898968064
+fault.three=36029071898968065
+# random values throughout the full range of diagcodes...
+fault.a00=1
+fault.a01=2
+fault.a02=6029071898968
+fault.a03=11111
+fault.a04=2222222
+fault.a05=333333333
+fault.a06=1234567890
+fault.a07=9223372036854775806
+fault.a08=10
+fault.a09=92233720368547758
+fault.a10=2779096485
+fault.a11=24699
+fault.a12=3032727735
+fault.a13=198766
+fault.a14=196954181200000000
+fault.a15=521136074
+fault.a16=5141963
+fault.a17=9999999999999
+fault.a18=1892739288974
+fault.a19=314159
+fault.a20=0
+#
+#TEST:open:0
+#TEST:codelen:0:32
+#TEST:maxkey:0:11
+#TEST:key2code:0:fault.one:SAMPLE3-EYYY-YYYY-YYYY-6T
+#TEST:key2code:0:fault.two:SAMPLE3-F000-0000-0000-000G-VD
+#TEST:key2code:0:fault.three:SAMPLE3-F000-0000-0000-000W-YV
+#TEST:key2code:ENOMSG:a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z
+#TEST:code2key:0:SAMPLE3-EYYY-YYYY-YYYY-6T:fault.one
+#TEST:code2key:0:SAMPLE3-F000-0000-0000-000G-VD:fault.two
+#TEST:code2key:0:SAMPLE3-F000-0000-0000-000W-YV:fault.three
+
+#TEST:key2code:0:fault.a00:SAMPLE3-8000-16
+#TEST:key2code:0:fault.a01:SAMPLE3-8000-2N
+#TEST:key2code:0:fault.a02:SAMPLE3-D00A-FX0K-1DNJ-QN
+#TEST:key2code:0:fault.a03:SAMPLE3-80AU-7K
+#TEST:key2code:0:fault.a04:SAMPLE3-A000-0XJ3-QN
+#TEST:key2code:0:fault.a05:SAMPLE3-A02F-Y46N-9K
+#TEST:key2code:0:fault.a06:SAMPLE3-A095-U05M-KD
+#TEST:key2code:0:fault.a07:SAMPLE3-F03Y-GYYU-YYXY-YYYC-LU
+#TEST:key2code:0:fault.a08:SAMPLE3-8000-A7
+#TEST:key2code:0:fault.a09:SAMPLE3-F000-RXPW-8XP1-8XQ8-DF
+#TEST:key2code:0:fault.a10:SAMPLE3-A0MP-2TC9-F8
+#TEST:key2code:0:fault.a11:SAMPLE3-80R3-U8
+#TEST:key2code:0:fault.a12:SAMPLE3-A0PK-JV1E-TN
+#TEST:key2code:0:fault.a13 fault.a13 fault.a13 fault.a13:SAMPLE3-8623-F7
+#TEST:key2code:0:fault.a14:SAMPLE3-F002-7FV8-JJTM-6H08-RS
+#TEST:key2code:0:fault.a15:SAMPLE3-A03U-QXGK-LG
+#TEST:key2code:0:fault.a16:SAMPLE3-A000-Q7CK-YR
+#TEST:key2code:0:fault.a17:SAMPLE3-D00J-P2FA-AGYX-Y4
+#TEST:key2code:0:fault.a18:SAMPLE3-D002-X5GW-P7RW-JP
+#TEST:key2code:0:fault.a19:SAMPLE3-89KS-GD
+#TEST:key2code:0:fault.a20:SAMPLE3-8000-0T
+#TEST:code2key:0:SAMPLE3-8000-16:fault.a00
+#TEST:code2key:0:SAMPLE3-8000-2N:fault.a01
+#TEST:code2key:0:SAMPLE3-D00A-FX0K-1DNJ-QN:fault.a02
+#TEST:code2key:0:SAMPLE3-80AU-7K:fault.a03
+#TEST:code2key:0:SAMPLE3-A000-0XJ3-QN:fault.a04
+#TEST:code2key:0:SAMPLE3-A02F-Y46N-9K:fault.a05
+#TEST:code2key:0:SAMPLE3-A095-U05M-KD:fault.a06
+#TEST:code2key:0:SAMPLE3-F03Y-GYYU-YYXY-YYYC-LU:fault.a07
+#TEST:code2key:0:SAMPLE3-8000-A7:fault.a08
+#TEST:code2key:0:SAMPLE3-F000-RXPW-8XP1-8XQ8-DF:fault.a09
+#TEST:code2key:0:SAMPLE3-A0MP-2TC9-F8:fault.a10
+#TEST:code2key:0:SAMPLE3-80R3-U8:fault.a11
+#TEST:code2key:0:SAMPLE3-A0PK-JV1E-TN:fault.a12
+#TEST:code2key:0:SAMPLE3-8623-F7:fault.a13
+#TEST:code2key:0:SAMPLE3-F002-7FV8-JJTM-6H08-RS:fault.a14
+#TEST:code2key:0:SAMPLE3-A03U-QXGK-LG:fault.a15
+#TEST:code2key:0:SAMPLE3-A000-Q7CK-YR:fault.a16
+#TEST:code2key:0:SAMPLE3-D00J-P2FA-AGYX-Y4:fault.a17
+#TEST:code2key:0:SAMPLE3-D002-X5GW-P7RW-JP:fault.a18
+#TEST:code2key:0:SAMPLE3-89KS-GD:fault.a19
+#TEST:code2key:0:SAMPLE3-8000-0T:fault.a20
+#

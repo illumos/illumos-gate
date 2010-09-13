@@ -1,0 +1,67 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+$mapfile_version 2
+
+CAPABILITY sun4u {
+	MACHINE = sun4u;
+};
+
+SYMBOL_SCOPE {
+	global:
+		aes_alloc_keysched;
+		aes_decrypt_contiguous_blocks;
+		aes_decrypt_block;
+		aes_encrypt_contiguous_blocks;
+		aes_encrypt_block;
+		aes_init_keysched;
+		arcfour_crypt;
+		arcfour_key_init;
+		big_add;
+		big_bitlength;
+		big_cmp_abs;
+		big_copy;
+		big_div_pos;
+		big_ext_gcd_pos;
+		big_extend;
+		big_finish;
+		big_init1;
+		big_init;
+		big_modexp;
+		big_modexp_crt;
+		big_mul;
+		big_nextprime_pos;
+		big_random;
+		big_sub;
+		big_sub_pos;
+		bignum2bytestring;
+		des3_crunch_block;
+		des_alloc_keysched;
+		des_crunch_block;
+		des_init_keysched;
+		des_keycheck;
+	local:
+		*;
+};

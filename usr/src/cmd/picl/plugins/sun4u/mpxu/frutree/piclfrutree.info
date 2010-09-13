@@ -1,0 +1,414 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * #ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * There are a lot of nodes below the rmclomv node, define a shortname
+ */
+#define	RMCLOMV	/platform/pci@1e,600000/isa@7/rmc-comm@0,3e8/SUNW,rmclomv
+
+VERSION 1.1
+VERBOSE 1
+NODE frutree picl
+    NODE chassis fru
+    /*
+     * SunMC physical view view_points for this platform
+     * This will get moved to a separate SunMC physical view plugin later.
+     */
+    PROP ViewPoints string r 0 "front rear side"
+	NODE MB location
+	    PROP SlotType string r 0 "system-board"
+    	    PROP Label string r 0 "MB"
+	ENDNODE
+	NODE F0 location
+	    PROP SlotType string r 0 "fan-unit"
+    	    PROP Label string r 0 "F0"
+	ENDNODE
+	NODE F1 location
+	    PROP SlotType string r 0 "fan-unit"
+    	    PROP Label string r 0 "F1"
+	ENDNODE
+	NODE F2 location
+	    PROP SlotType string r 0 "fan-unit"
+    	    PROP Label string r 0 "F2"
+	ENDNODE
+	NODE PS0 location
+	    PROP SlotType string r 0 "power-supply"
+	    PROP Label string r 0 "PS0"
+	ENDNODE
+	NODE HDD0 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD0"
+	ENDNODE
+	NODE HDD1 location
+	    PROP SlotType string r 0 "disk-slot"
+	    PROP Label string r 0 "HDD1"
+	ENDNODE
+	NODE RMD0 location
+	    PROP SlotType string r 0 "cdrom-slot"
+	    PROP Label string r 0 "RMD0"
+	ENDNODE
+	NODE IFB location
+    	    PROP Label string r 0 "IFB"
+	    NODE ifb fru
+	    ENDNODE
+	ENDNODE
+	NODE BB location
+    	    PROP Label string r 0 "BB"
+	    NODE bb fru
+	    ENDNODE
+	ENDNODE
+	NODE HCM location
+    	    PROP Label string r 0 "HCM"
+	ENDNODE
+	NODE SCC location
+    	    PROP Label string r 0 "SCC"
+	    NODE scc fru
+	    ENDNODE
+	ENDNODE
+    	NODE PCI0 location
+	    PROP SlotType string r 0 "pci"
+    	    PROP Label string r 0 "PCI0"
+    	ENDNODE
+	NODE USB0 location
+            PROP Label string r 0 "USB0"
+        ENDNODE
+        NODE USB1 location
+            PROP Label string r 0 "USB1"
+        ENDNODE
+
+	/*
+	 * nodes for extra hardware present in 1u version on ENxS
+	 */
+	REFNODE F3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V210
+	REFNODE F3 location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE F3 location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE F3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V125
+	REFNODE F4 location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE F5 location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE ALARM location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE DVDIF location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE SASPCI location WITH /platform?PlatformName=SUNW,Netra-210
+	REFNODE SYSCTRL location WITH /platform?PlatformName=SUNW,Netra-210
+
+	/*
+	 * nodes for extra hardware present in 2u version on ENxS
+	 */
+	REFNODE HDD2 location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE HDD3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PS1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PS1 location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE PRB location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PRB location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE PDB location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PDB location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE PCI2 location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE PCI2 location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE SYSCTRL location WITH /platform?PlatformName=SUNW,Sun-Fire-V240
+	REFNODE SYSCTRL location WITH /platform?PlatformName=SUNW,Netra-240
+	REFNODE ALARM location WITH /platform?PlatformName=SUNW,Netra-240
+    ENDNODE
+ENDNODE
+
+/*
+ * add power-supply nodes if their fru-proms are visible
+ */
+name:/frutree/chassis/PS0
+	REFNODE power-supply fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/power-supply-fru-prom@0,b0
+name:/frutree/chassis/PS1
+	REFNODE power-supply fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/power-supply-fru-prom@0,a4
+
+/*
+ * add properties to 2u locations
+ */
+
+/* extra disks */
+name:/frutree/chassis/HDD2
+	PROP SlotType string r 0 "disk-slot"
+	PROP Label string r 0 "HDD2"
+name:/frutree/chassis/HDD3
+	PROP SlotType string r 0 "disk-slot"
+	PROP Label string r 0 "HDD3"
+
+/* add disk fru nodes for disks which are present */
+name:/frutree/chassis/HDD0
+	REFNODE disk fru WITH name:/platform/pci@1c,600000/scsi@2/sd@0,0
+name:/frutree/chassis/HDD1
+	REFNODE disk fru WITH name:/platform/pci@1c,600000/scsi@2/sd@1,0
+name:/frutree/chassis/HDD2
+	REFNODE disk fru WITH name:/platform/pci@1c,600000/scsi@2/sd@2,0
+name:/frutree/chassis/HDD3
+	REFNODE disk fru WITH name:/platform/pci@1c,600000/scsi@2/sd@3,0
+
+/* add disk fru nodes for SAS disks which are present */
+name:/frutree/chassis/HDD0
+        REFNODE disk fru WITH name:/platform/pci@1c,600000/LSILogic,sas@1/sd@0,0
+name:/frutree/chassis/HDD1
+        REFNODE disk fru WITH name:/platform/pci@1c,600000/LSILogic,sas@1/sd@1,0
+
+/* add cdrom fru nodes for disks which are present */
+name:/frutree/chassis/RMD0
+	REFNODE cdrom fru WITH name:/platform/pci@1e,600000/ide@d/sd@0,0
+
+/* populate fan locations with fans which are present */
+name:/frutree/chassis/F0
+	REFNODE fan-unit fru WITH name:RMCLOMV/f0_rs
+name:/frutree/chassis/F1
+	REFNODE fan-unit fru WITH name:RMCLOMV/f1_rs
+name:/frutree/chassis/F2
+	REFNODE fan-unit fru WITH name:RMCLOMV/f2_rs
+
+/* extra chassis fan */
+name:/frutree/chassis/F3
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F3"
+	REFNODE fan-unit fru WITH name:RMCLOMV/f3_rs
+
+name:/frutree/chassis/F4
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F4"
+	REFNODE fan-unit fru WITH name:RMCLOMV/f4_rs
+
+name:/frutree/chassis/F5
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F5"
+	REFNODE fan-unit fru WITH name:RMCLOMV/f5_rs
+
+/* extra power supply */
+name:/frutree/chassis/PS1
+	PROP SlotType string r 0 "power-supply"
+	PROP Label string r 0 "PS1"
+
+/* PCI riser board */
+name:/frutree/chassis/PRB
+	PROP Label string r 0 "PRB"
+	NODE prb fru
+	ENDNODE
+
+/* Power distribution board */
+name:/frutree/chassis/PDB
+	PROP Label string r 0 "PDB"
+	NODE pdb fru
+	ENDNODE
+
+/* Extra PCI slots */
+name:/frutree/chassis/PCI1
+	PROP SlotType string r 0 "pci"
+	PROP Label string r 0 "PCI1"
+
+name:/frutree/chassis/PCI2
+	PROP SlotType string r 0 "pci"
+	PROP Label string r 0 "PCI2"
+
+/* keyswitch */
+name:/frutree/chassis/SYSCTRL
+	PROP Label string r 0 "SYSCTRL"
+
+/* an anomoly, the chassis fruid prom */
+name:/frutree/chassis/IFB/ifb
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/chassis-fru-prom@0,a8
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/chassis-fru-prom@0,a8
+	REFPROP _fru_parent /frutree/chassis/IFB/ifb
+
+/*
+ * high speed cryptographic module
+ */
+name:/frutree/chassis/HCM
+	REFNODE hcm fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/hcm-card-fru-prom@0,d6
+
+name:/frutree/chassis/HCM/hcm
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/hcm-card-fru-prom@0,d6
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hcm-card-fru-prom@0,d6
+	REFPROP _fru_parent /frutree/chassis/HCM/hcm
+
+name:/platform/pci@1c,600000/cpu?DeviceID=1
+	REFPROP _fru_parent /frutree/chassis/HCM/hcm
+
+name:/frutree/chassis/ALARM
+	PROP Label string r 0 "ALARM"
+	REFNODE alarm fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/alarm-fru-prom@0,ac
+
+name:/frutree/chassis/ALARM/alarm
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/alarm-fru-prom@0,ac
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/alarm-fru-prom@0,ac
+	REFPROP _fru_parent /frutree/chassis/ALARM/alarm
+
+/*
+ * dvd if 
+ */
+name:/frutree/chassis/DVDIF
+	PROP Label string r 0 "DVDIF"
+	REFNODE dvdif fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/dvd-if-fru-prom@0,aa
+
+name:/frutree/chassis/DVDIF/dvdif
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/dvd-if-fru-prom@0,aa
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/dvd-if-fru-prom@0,aa
+	REFPROP _fru_parent /frutree/chassis/DVDIF/dvdif
+
+/*
+ * sas if 
+ */
+name:/frutree/chassis/SASIF
+	PROP Label string r 0 "SASIF"
+	REFNODE sasif fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-if-fru-prom@0,a8
+
+name:/frutree/chassis/SASIF/sasif
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-if-fru-prom@0,a8
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-if-fru-prom@0,a8
+	REFPROP _fru_parent /frutree/chassis/SASIF/sasif
+
+/*
+ * sas pci 
+ */
+name:/frutree/chassis/SASPCI
+	PROP Label string r 0 "SASPCI"
+	REFNODE saspci fru WITH name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-pci-fru-prom@0,d8
+
+name:/frutree/chassis/SASPCI/saspci
+	PROP FRUDataAvailable void r
+	REFPROP _seeprom_source name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-pci-fru-prom@0,d8
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/sas-pci-fru-prom@0,d8
+	REFPROP _fru_parent /frutree/chassis/SASPCI/saspci
+
+
+name:/frutree/chassis/PCI0
+	REFNODE pci-card fru WITH _class:/jbus/pci@1d,700000/picl?DeviceID=1
+name:/frutree/chassis/PCI1
+	REFNODE pci-card fru WITH _class:/jbus/pci@1e,600000/picl?DeviceID=3
+name:/frutree/chassis/PCI2
+	REFNODE pci-card fru WITH _class:/jbus/pci@1e,600000/picl?DeviceID=2
+
+#include <fru_SC_data.info>
+#include "system-board.info"
+#include <SB-tables.info>
+
+_class:/jbus/pci@1d,700000/picl@1
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,0
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,1
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,2
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,3
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,4
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,5
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,6
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1d,700000/picl@1,7
+	REFPROP _fru_parent name:/frutree/chassis/PCI0/pci-card
+_class:/jbus/pci@1e,600000/picl@3
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,0
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,1
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,2
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,3
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,4
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,5
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,6
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@3,7
+	REFPROP _fru_parent name:/frutree/chassis/PCI1/pci-card
+_class:/jbus/pci@1e,600000/picl@2
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,0
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,1
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,2
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,3
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,4
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,5
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,6
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card
+_class:/jbus/pci@1e,600000/picl@2,7
+	REFPROP _fru_parent name:/frutree/chassis/PCI2/pci-card

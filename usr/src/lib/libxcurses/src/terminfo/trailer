@@ -1,0 +1,94 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# The following have been included for upward compatibility with previous
+# names.  They are considered obsolete and the new name (which typically
+# contains an extra dash) should be used instead.  These names will go
+# away eventually (read: "soon") so you should start converting!
+#
+aaa20, use=aaa-20,
+aaa20rev, use=aaa-20-rv,
+aaa30, use=aaa-30,
+aaa30rev, use=aaa-30-rv,
+aaa40, use=aaa-40,
+aaa40rev, use=aaa-40-rv,
+aaa48, use=aaa-48,
+aaa48rev, use=aaa-48-rv,
+aaarev, use=aaa-48-rv,
+aaa60, use=aaa-60,
+aaa60rev, use=aaa-60-rv,
+vt100-np, use=vt100,
+aaa-29-np, use=aaa-29,
+hp2621nl|2621nl, use=2621-nl,
+hp2621nt|2621nt, use=2621-nt,
+hp2621wl|2621wl, use=2621-wl,
+9122p, use=912-2p,
+9202p, use=920-2p,
+9502p, use=950-2p,
+9504p, use=950-4p,
+950rv, use=950-rv,
+950rv2p, use=950-rv2p,
+950rv4p, use=950-rv4p,
+aaadb, use=aaa-db,
+c1004p, use=c100-4p,
+c100rv, use=c100-rv,
+c100rv4p, use=c100-rv4p,
+c100rv4pna, use=c100-rv4pna,
+c100rv4ppp, use=c100-rv4ppp,
+c100rvna, use=c100-rvna,
+c100rvpp, use=c100-rvpp,
+c100rvs, use=c100-rvs,
+c100s, use=c100-s,
+c108-4, use=c108-4p,
+c108-8, use=c108-8p,
+c100-s|concept-s|concept100-s, use=c100,
+c100-rvs|concept-rvs|concept100-rvs, use=c100-rv,
+h19a|h19A, use=h19-a,
+h19b, use=h19-b,
+h19bs, use=h19-bs,
+h19u, use=h19-u,
+mime2as, use=mime2a-s,
+mime2av, use=mime2a-v,
+mimefb, use=mime-fb,
+mimehb, use=mime-hb,
+tvi2p, use=tvi-2p,
+tvi9122p, use=tvi912-2p,
+tvi9202p, use=tvi920-2p,
+tvi9502p, use=tvi950-2p,
+tvi9504p, use=tvi950-4p,
+tvi950b, use=tvi950-b,
+tvi950ns, use=tvi950-ns,
+tvi950rv, use=tvi950-rv,
+tvi950rv2p, use=tvi950-rv2p,
+tvi950rv4p, use=tvi950-rv4p,
+vt100am, use=vt100-am,
+vt100nam, use=vt100-nam,
+vt100s, use=vt100-s,
+vt100w, use=vt100-w,
+#
+# END OF TERMINFO
+#  ------------------------

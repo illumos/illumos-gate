@@ -1,0 +1,229 @@
+#!/usr/bin/ksh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+
+#
+# Source the utilities.
+#
+DIRNAME=`dirname $0`
+. ${DIRNAME}/utilities.san
+
+#
+# Process the input arguments.
+#
+VALIDOPTS=dr:p:
+process_args $@
+
+#
+# In case the tester wants to see script output, allow them
+# to run in debug mode.
+#
+TESTNAME=`basename $0`
+if [ ! -z "${DEBUG}" ]
+then
+    OUTFILE=/tmp/${TESTNAME}.$$
+    echo "Output from test: ${TESTNAME}" >${OUTFILE}
+    echo >>${OUTFILE}
+    echo "debug output can be found at ${OUTFILE}"
+else
+    OUTFILE=/dev/null
+fi
+
+#
+# Set NISSERV and NISDMAIN if NIS or NIS+ in YP compat mode.
+# Returns 0 if these variables are set, nonzero otherwise.
+#
+get_nis_parms()
+{
+    unset NISSERV
+    unset NISDMAIN
+    NSSHOSTS=`grep '^hosts:' /etc/nsswitch.conf`
+    for TMP in ${NSSHOSTS}
+    do
+	case "${TMP}" in
+	"nis")
+	ypwhich >/dev/null 2>&1
+	if [ ${?} -eq 0 ]
+	then
+		X=`ypwhich -m hosts`
+		NISSERV=""
+		for NSERV in `ypmatch ${X} hosts.byname | awk '{ print $1 }'`
+		do
+		if [ -z "${NISSERV}" ]
+		then
+			NISSERV=${NSERV}
+		else
+			NISSERV="${NISSERV} ${NSERV}"
+		fi
+		done
+		unset NSERV
+		NISDMAIN=`domainname`
+	fi
+	;;
+	esac
+	unset TMP
+    done
+}
+
+#
+# Set variables.
+#
+SRVNAME=`uname -n`
+SRVADDR=`get_server_ip`
+
+#
+# Determine subnet, netmask, and broadcast address.
+#
+get_default_class ${SRVADDR} | read DEFNET DEFMASK
+SUBNET=`get_netmask ${SRVADDR}`
+if [ -z "${SUBNET}" ]
+then
+    if [ "${DEFNET}" != "${SRVADDR}" ]
+    then
+	# likely subnetted/supernetted.
+	print - "\n\n###\tWarning\t###\n"
+	print - "Network ${SRVADDR} is netmasked, but no entry was found in the 'netmasks'\ntable; please update the 'netmasks' table in the appropriate\nnameservice before continuing (see /etc/nsswitch.conf).\n" >&2
+	return 1
+    else
+	# use the default.
+	SUBNET="${DEFMASK}"
+    fi
+fi
+
+BCAST=`get_bcast_addr ${SRVADDR} ${SUBNET}`
+SUBNETADDR=`get_subnet_addr ${SRVADDR} ${SUBNET}`
+
+#
+# Make sure to clean up before we configure.
+#
+/usr/sbin/pntadm -r ${DHCPRSRC} -p ${DHCPPATH} -R ${SUBNETADDR} >>${OUTFILE} 2>&1
+/usr/sbin/dhtadm -r ${DHCPRSRC} -p ${DHCPPATH} -D -m ${SUBNETADDR} >>${OUTFILE} 2>&1
+
+#
+# Configure.
+#
+/usr/sbin/dhcpconfig -N ${SUBNETADDR} >>${OUTFILE} 2>&1
+RET=$?
+if [ "${RET}" != "0" ]
+then
+    echo "Error configuring ${SUBNETADDR} table = ${RET}"
+    echo "${TESTNAME} - Test failed!"
+    exit 1
+fi
+
+#
+# Verify that the network table was created.
+#
+NETTABS=`/usr/sbin/pntadm -r ${DHCPRSRC} -p ${DHCPPATH} -L 2>>${OUTFILE}`
+NETTAB=`echo ${NETTABS} | fgrep ${SUBNETADDR}`
+if [ -z ${NETTAB} ]
+then
+    echo "Network table for ${SUBNETADDR} not created."
+    echo "${TESTNAME} - Test failed!"
+    exit 1
+fi
+
+#
+# Verify that the network macro was created.
+#
+DATAFILE=/tmp/${TESTNAME}.data.$$
+/usr/sbin/dhtadm -r ${DHCPRSRC} -p ${DHCPPATH} -P >${DATAFILE} 2>>${OUTFILE}
+RET=$?
+if [ "${RET}" != "0" ]
+then
+    rm ${DATAFILE}
+    echo "Error displaying dhcptab = ${RET}"
+    echo "${TESTNAME} - Test failed!"
+    exit 1
+fi
+
+NETWORK_MACRO=`grep "^${SUBNETADDR}" ${DATAFILE}`
+if [ -z "${NETWORK_MACRO}" ]
+then
+    rm ${DATAFILE}
+    echo "Server macro does not exist in dhcptab"
+    echo "${TESTNAME} - Test failed!"
+    exit 1
+fi
+rm ${DATAFILE}
+
+#
+# Grab the server macro definition
+#
+MACRO_DEFINITION=$(get_value ${NETWORK_MACRO})
+
+#
+# Verify that the Subnet symbol is defined as part of the macro definition
+#
+SRCH=":Subnet=${SUBNET}:"
+macro_find_and_replace
+
+#
+# Verify that the RDiscvyF symbol is defined as part of the macro definition
+#
+SRCH=":RDiscvyF=1:"
+macro_find_and_replace
+
+#
+# Verify that the Broadcst symbol is defined as part of the macro definition
+#
+SRCH=":Broadcst=${BCAST}:"
+macro_find_and_replace
+
+#
+# Get the NIS info
+#
+get_nis_parms
+
+#
+# Verify that the DNSdmain symbol is defined as part of the macro definition
+#
+if [ ! -z "${NISDMAIN}" ]
+then
+    SRCH=":NISdmain=\"${NISDMAIN}\":"
+    macro_find_and_replace
+fi
+
+if [ ! -z "${NISSERV}" ]
+then
+    SRCH=":NISservs=${NISSERV}:"
+    macro_find_and_replace
+fi
+
+#
+# Verify that all symbols have been accounted for
+#
+if [ "${MACRO_DEFINITION}" != ":" ]
+then
+    echo "Network macro definition has invalid extra symbols: ${MACRO_DEFINITION}"
+    echo "${TESTNAME} - Test failed!"
+    exit 1
+fi
+
+echo "${TESTNAME} - Test passed."
+exit 0

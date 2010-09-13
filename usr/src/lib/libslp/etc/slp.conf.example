@@ -1,0 +1,208 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Example configuration file for SLP. This file lists and explains
+# each property you can set for SLP. No properties are acutally set,
+# so uncomment and edit any properties you wish to change. The
+# file /etc/inet/slp.conf must exist in order for slpd(1m) to start,
+# so copy this file to /etc/inet/slp.conf to enable SLP. See
+# slp.conf(4), slpd(1m), or RFC 2614 for more information.
+#
+
+# Specifies if slpd should act as a DA. Default is false.
+#
+# net.slp.isDA=true
+#
+
+# Static scope configuration
+#
+# Determines the set of scopes which this SA or DA supports. These scopes
+# will also be included in the list returned from a find scopes query.
+# This example simply sets the property to the default:
+# net.slp.useScopes=default
+#
+# This example sets the property to a site-specific list:
+# net.slp.useScopes=building17,building18,admin
+#
+
+# Static DA Configuration
+#
+# Forces UAs and SAs to use a set of DAs.
+#
+# This example specifies two DAs:
+# net.slp.DAAddresses=192.168.1.20,192.168.2.20
+#
+
+# Serialized Proxy Registrations
+#
+# Specifies a file containing a set of registrations to be processed
+# when slpd starts up, written as an URL.
+# To load a proxy-registration file at /etc/inet/slpd.reg:
+# net.slp.serializedRegURL=file:/etc/inet/slpd.reg
+#
+
+# Tracing and Logging
+#
+# By default, all tracing and logging is disabled.
+#
+# Display messages about traffic with DAs:
+# net.slp.traceDATraffic=true
+#
+# Display details about SLP messages:
+# net.slp.traceMsg=true
+#
+# Display details whenever a message is dropped:
+# net.slp.traceDrop=true
+#
+# Dump service table upon registration or deregistration:
+# net.slp.traceReg=true
+#
+
+#
+# Set this property to change the default DA Heartbeat (10800 seconds).
+# This example sets it to 7200 seconds (two hours):
+# net.slp.DAHeartBeat=7200
+#
+
+#
+# Use this property to configure special attributes for DAs; these
+# will be included in the attrs field in a DAAdvert. Currently
+# the only useful property is min-refresh-interval, which allows
+# you to set the minimum interval for which a DA will accept
+# registration refreshes. This example sets the minimum interval
+# to 3 hours (10800 seconds):
+# net.slp.DAAttributes=(min-refresh-interval=10800)
+#
+
+#
+# Use this property to configure special attributes for SAs; these
+# will be included in the attrs field in a SAAdvert. This example
+# sets the attribute "special-features" to "none":
+# net.slp.SAAttributes=(special-features=none)
+#
+
+#
+# Force SLP agents to use broadcast only (instead of the default multicast):
+# net.slp.isBroadcastOnly=true
+#
+
+#
+# Disable passive DA detection. Default is enabled.
+# net.slp.passiveDADetection=false
+#
+
+#
+# Change the multicast time-to-live (TTL). Default is 255. This example
+# limits SLP multicast to the local subnet only:
+# net.slp.multicastTTL=1
+#
+
+#
+# Set this property to change the default interval between DA discoveries.
+# Default is 900 seconds (15 minutes). This example changes it to 2 minutes
+# (at the risk of increasing network congestion):
+# net.slp.DAActiveDiscoveryInterval=120
+#
+
+#
+# Set this property to change the maximum amount of time to wait until
+# multicast convergance completes. Default is 15000 ms (15 seconds). This
+# example changes it to 20000 ms (20 seconds), which may be desirable on
+# congested networks with many SAs:
+# net.slp.multicastMaximumWait=20000
+#
+
+#
+# Set this property to control the intervals used in multicast convergance.
+# The default is 3000,3000,3000,3000,3000 (all 3 seconds). The following
+# example reduces the initial intervals, which may be increase responsiveness
+# on fast networks:
+# net.slp.multicastTimeouts=1000,1250,1500,2000,4000
+#
+# This example sets it to an aggressively short value; this may be useful
+# for increased responsiveness on fast, reliable networks:
+# net.slp.multicastTimeouts=1000
+
+#
+# This property works in a manner similar to net.slp.multicastTimeouts,
+# but acts on DA discovery multicast convergance instead. Default is
+# 2000,2000,2000,2000,3000,4000. This example increases the intervals,
+# which may help to discovery DAs which are slow, heavily loaded, or on
+# congested networks:
+# net.slp.DADiscoveryTimeouts=3000,3000,4000,4000,4000,4000
+#
+
+#
+# This property controls the retransmission intervals used for datagram
+# unicast. Default is 3000,3000,3000. This example decreases the
+# intervals for more aggressive retransmission, to 2 seconds:
+# net.slp.datagramTimeouts=2000,2000,2000
+#
+
+#
+# Set this property to change the maximum random wait bound (used with
+# initial DA discovery, for instance). Default is 1000 ms (1 second).
+# This example changes it to 2 seconds:
+# net.slp.randomWaitBound=2000
+#
+
+#
+# Change this property to change the maximum size of any datagram to
+# send (MTU), in bytes. Default is 1400. This example changes it to
+# 1500 bytes:
+# net.slp.MTU=1500
+#
+
+#
+# Set this property to restrict SLP to specific interfaces. Default is
+# empty, which causes SLP to use the the default interface.
+#
+# net.slp.interfaces=192.168.1.5,192.168.3.5
+#
+
+#
+# This property specifies the language tag to use for all messages.
+# Default is "en". This example changes it to "de":
+# net.slp.locale=de
+#
+
+#
+# Set this property to limit the total number of results for any
+# SLP query. Default is all results (-1). This example limits it
+# to 100:
+# net.slp.maxResults=100
+#
+
+#
+# A type hint will be used if an agent needs to discover scopes with
+# service agent solicitations. If the type hint is set, only service
+# agents which support those types will respond. In effect, this poses
+# the query: "find me all scopes which contain these service types."
+#
+# This sets the type hint to service:foo and service:bar:
+# net.slp.typeHint=service:foo,service:bar
+#

@@ -1,0 +1,107 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# If the /etc/power.conf file does not have a "statefile" entry
+# to specify the pathname of the cpr statefile, build one and
+# add the line.  We choose the largest of the standard Sun partitions.
+
+init_statefile_entry() {
+	[ ! -f /etc/power.conf -o ! -w /etc/power.conf ] && return
+
+	# Whitespace regular expression below is [<TAB><SPACE>]
+
+	pattern="^[ 	]*statefile[	 ][	 ]*/"
+	[ `/usr/bin/grep -c "$pattern" /etc/power.conf` -ge 1 ] && return
+
+	avail=0			# Free blocks in current filesystem
+	max_avail=0		# Most available free blocks encountered so far
+ 	statefile=.CPR		# Default cpr statefile name
+
+	# Remove old statefile (if any) from root
+	[ -f /$statefile ] && /usr/bin/rm -f /$statefile
+
+	/usr/bin/df -k -F ufs |
+	(
+		read line	# Skip past the header line of the df output
+
+		while read device kbytes used avail capacity filesys; do
+			case $filesys in
+			/|/usr|/var|/export/home)
+				if [ $avail -gt $max_avail ]; then
+					max_avail=$avail
+					winner=$filesys
+				fi
+				;;
+			esac
+		done
+
+		if [ $max_avail -gt 0 ]; then
+			echo "statefile		${winner}/${statefile}" \
+			    >>/etc/power.conf
+		fi
+
+		return
+	)
+	if [ $max_avail -eq 0 ]; then
+		if [ X`df -n / | awk '{print $3}'` != "Xzfs" ] ; then
+			return
+		fi
+		rootpool=`zfs mount | grep ' \/$' | awk '{print $1 }' |\
+		    sed 's/\/.*$//'`
+		if [ X$rootpool = "X" ] || \
+		    [ ! -L /dev/zvol/dsk/$rootpool/dump ]; then
+			return
+		fi
+		echo "statefile /dev/zvol/dsk/$rootpool/dump" \
+			>> /etc/power.conf
+	fi
+}
+
+case "$1" in
+'start')
+	/usr/sbin/uadmin 3 2 2>/dev/null
+	if [ $? -eq 0 ]; then
+		init_statefile_entry
+	fi
+
+	if [ -x /usr/sbin/pmconfig -a -r /etc/power.conf ]; then
+		/usr/sbin/pmconfig >/dev/console 2>&1
+	fi
+	;;
+
+'stop')
+	if [ -x /usr/sbin/pmconfig ]; then 
+		/usr/sbin/pmconfig -r >/dev/null 2>/dev/null
+	fi
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit 0

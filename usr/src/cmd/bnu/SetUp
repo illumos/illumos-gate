@@ -1,0 +1,117 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:SetUp 2.3.1.9 */
+
+#	a function to do the dirty work
+#	SYNTAX:
+#		needit OWNER GROUP MODE name oldname
+
+needit() {
+if [ ! -f $ETC/$4 ]; then
+    if [ -f $LIB/$4 ]; then
+	cp $LIB/$4 $ETC/$4
+    else
+	if [ -n "$5" -a -f $LIB/$5 ]; then
+    	    cp $LIB/$5 $ETC/$4
+	else
+    	    cp $4 $ETC/$4
+	fi
+    fi
+fi
+chown $1 $ETC/$4
+chgrp $2 $ETC/$4
+chmod $3 $ETC/$4
+rm -rf $LIB/$4
+$SYMLINK $ETC/$4 $LIB/$4
+}
+
+export IFS PATH
+IFS=" 	
+"
+PATH="/usr/bin"
+
+# This shell tries to set up all needed uucp database files.
+# Since the names changed from previous versions, it copies those.
+# For the Permissions, it will generate one if none exists
+
+LIB=$ROOT/usr/lib/uucp
+ETC=$ROOT/etc/uucp
+
+OWNER=uucp
+GROUP=uucp
+
+DBFILES="Config Devconfig Devices Dialcodes Dialers Grades Limits Permissions Poll Sysfiles Systems"
+
+SYMLINK=${1:-":"};
+
+# For cross environment, just take default files, and exit.
+
+if [ -n "$CH" ]; then
+    PATH="/bin:/usr/bin"
+    for i in $DBFILES
+    do
+	cp $i $ETC
+	rm -rf $LIB/$i
+	$SYMLINK $ETC/$i $LIB/$i
+    done
+    exit
+fi
+
+# For real environment, try to preserve user's database files
+
+needit $OWNER $GROUP 644 Config
+needit $OWNER $GROUP 644 Devconfig
+needit $OWNER $GROUP 644 Devices L-devices
+needit $OWNER $GROUP 644 Dialcodes L-dialcodes
+needit $OWNER $GROUP 644 Dialers L-dialers
+needit $OWNER $GROUP 644 Grades
+needit $OWNER $GROUP 644 Limits
+needit $OWNER $GROUP 644 Poll
+needit $OWNER $GROUP 644 Sysfiles
+needit $OWNER $GROUP 600 Systems L.sys
+
+# Permissions is handles differently
+if [ ! -f $ETC/Permissions ]; then
+    if [ -f $LIB/Permissions ]; then
+	cp $LIB/Permissions $ETC/Permissions
+    else
+	if [ -f $ETC/PERMISSIONS ]; then
+    	    cp $ETC/PERMISSIONS $ETC/Permissions
+	else
+	    # Try to generate a Permissions file
+	    # using uucp entries in /etc/passwd
+	    > $ETC/Permissions
+	    set - `sed -n "/uucico/s/:.*//p" /etc/passwd`
+	    for i
+	    do
+		echo "\tLOGNAME=$i\n"
+	    done > $ETC/Permissions
+	fi
+    fi
+fi
+chown $OWNER $ETC/Permissions
+chgrp $GROUP $ETC/Permissions
+chmod 600 $ETC/Permissions
+rm -rf $LIB/Permissions
+$SYMLINK $ETC/Permissions $LIB/Permissions
+

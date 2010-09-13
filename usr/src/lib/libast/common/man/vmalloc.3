@@ -1,0 +1,607 @@
+.fp 5 CW
+.de MW
+\f5\\$1\fP
+..
+.TH VMALLOC 3 "1 May 1998"
+.SH NAME
+vmalloc \- virtual memory allocation
+.SH SYNOPSIS
+.MW "#include <vmalloc.h>"
+.SS Regions
+.nf
+.MW "Vmalloc_t* vmopen(Vmdisc_t* disc, Vmethod_t* meth, int flags);"
+.MW "int vmclose(Vmalloc_t*);"
+.MW "int vmclear(Vmalloc_t*);"
+.MW "int vmcompact(Vmalloc_t* region);"
+.MW "int vmset(Vmalloc_t* region, int flags, int type);"
+.MW "Vmalloc_t* Vmheap;"
+.MW "Vmdisc_t* vmdisc(Vmalloc_t* region, Vmdisc_t* disc);"
+.MW "Vmalloc_t* vmmopen(char* file, Void_t* base, size_t round);"
+.MW "Void_t* vmmset(Vmalloc_t* vm, int key, Void_t* data, int set);"
+.fi
+.SS "Allocation functions"
+.nf
+.MW "Void_t* vmalloc(Vmalloc_t* region, size_t size);"
+.MW "Void_t* vmalign(Vmalloc_t* region, size_t size, size_t align);"
+.MW "Void_t* vmresize(Vmalloc_t* region, Void_t* addr, size_t size, int type);"
+.MW "int vmfree(Vmalloc_t* region, Void_t* addr);"
+.MW "Void_t* vmnewof(Vmalloc_t* region, Void_t* addr, type, size_t n, size_t x);"
+.MW "Void_t* vmoldof(Vmalloc_t* region, Void_t* addr, type, size_t n, size_t x);"
+.MW "Void_t* vmgetmem(Vmalloc_t* region, Void_t* addr, size_t size);"
+.fi
+.SS "Debugging"
+.nf
+.MW "int vmdebug(int);"
+.MW "int vmdbcheck(Vmalloc_t* vm);"
+.MW "int vmdbwatch(Void_t* addr);"
+.MW "static void vmdbwarn(Vmalloc_t*, char* mesg, int n);"
+.fi
+.SS "Profiling"
+.nf
+.MW "void vmprofile(Vmalloc_t* vm, int fd);"
+.fi
+.SS "Information and statistics"
+.nf
+.MW "Vmalloc_t* vmregion(Void_t* addr);"
+.MW "Void_t* vmsegment(Vmalloc_t* region, Void_t* addr);"
+.MW "int vmwalk(Vmalloc_t* region, int(*walkf)(Vmalloc_t*, Void_t*, size_t, size_t, Vmdisc_t*, Void_t*), Void_t* handle);"
+.MW "long vmaddr(Vmalloc_t* region, Void_t* addr);"
+.MW "long vmsize(Vmalloc_t* region, Void_t* addr);"
+.MW "int vmstat(Vmalloc_t* vm, Vmstat_t* statb);"
+.MW "int vmtrace(int fd);"
+.MW "int vmtrbusy(Vmalloc_t* vm);"
+.fi
+.SS "Malloc-compatible functions"
+.nf
+.MW "Void_t* malloc(size_t size);"
+.MW "Void_t* realloc(Void_t* addr, size_t size);"
+.MW "Void_t* calloc(size_t n_obj, size_t s_obj);"
+.MW "int cfree(Void_t* addr);"
+.MW "void free(Void_t* addr);"
+.MW "Void_t* memalign(size_t align, size_t size);"
+.MW "Void_t* valloc(size_t size);"
+.fi
+.SH DESCRIPTION
+These functions for dynamic storage allocation work in
+\fIregions\fP of memory.
+Each region has an \fIallocation method\fP
+for parceling out blocks of storage and a
+\fImemory discipline\fP for obtaining raw space.
+Automatic locking prevents interference by reentrant
+access to a region.
+.PP
+Pointers to space have type \f5Void_t*\fP
+where \f5Void_t\fP is \f5#define\fPd as \f5void\fP if possible, otherwise \f5char\fP.
+Space is counted in type \f5size_t\fP.
+
+.ne 4
+.SS Regions
+Regions have type \f5Vmalloc_t\fP.
+Two predefined regions are pointed to by:
+.TP
+.MW Vmheap
+A general-purpose region, with best-fit
+allocation, and Unix memory discipline \f5Vmdcsbrk\fP.
+.PP
+These functions manipulate regions:
+.PP
+.I vmopen
+creates a region with memory discipline \fIdisc\fP,
+allocation method \fImeth\fP,
+and a setting for control \fIflags\fP.
+It returns a pointer to the region on success and \f5NULL\fP on failure.
+The flags, represented by bit values or-ed together, are:
+.TP
+.MW VM_TRUST
+Disable locking and consistency checks, except under method \f5Vmdebug\fP.
+.TP
+.MW VM_TRACE
+Place tracing messages for each allocation event
+on the tracing file established by \fIvmtrace\fP.
+This turns off \f5VM_TRUST\fP.
+.TP
+\f5VM_DBCHECK\fP, \f5VM_DBABORT\fP
+.br
+See \fBDebugging\fP below.
+.PP
+.I vmclose
+closes a \fIregion\fP and releases all associated memory
+according to the region's discipline.
+The first segment obtained from the discipline's
+\f5memoryf\fP function (see `Disciplines' below) will be the last released.
+\fIvmclose\fP returns \-1 on failure and a non-negative value otherwise.
+.PP
+.I vmclear
+frees all allocated blocks in \fIregion\fP regardless of methods.
+It returns \-1 on failure and a non-negative value otherwise.
+.PP
+.I vmcompact
+releases as much of a \fIregion\fP's
+free space to its discipline's \f5memoryf\fP
+function as possible.
+It returns a nonnegative value on success and \-1 on failure.
+.PP
+.I vmset
+adjusts and queries a \fIregion\fP's \fIflags\fP.
+The indicated flags are turned on if \fItype\fP is nonzero, off if zero.
+\fIvmset\fP returns the previous value of all flags.
+Thus, \f5vmset(region,0,0)\fP queries the flags without changing them.
+In addition to the settable flags, one of
+\f5VM_MTBEST\fP, \f5VM_MTDEBUG\fP, \f5VM_MTPROFILE\fP,
+\f5VM_MTPOOL\fP, or \f5VM_MTLAST\fP
+is returned to indicate the method used in creating the \fIregion\fP.
+.PP
+.I vmdisc
+changes the discipline of \fIregion\fP to the given new discipline
+\fIdisc\fP if \fIdisc\fP is not \f5NULL\fP and its \f5memoryf\fP function
+is the same as the current discipline. If the current discipline
+has an \f5exceptf\fP function, it will be called with event \f5VM_DISC\fP.
+This function always returns the current discipline.
+.PP
+.I vmmopen
+creates a region to allocate memory given by the system call \fImmap(2)\fP.
+The given \fIfile\fP is the backing store for the map.
+If \fIbase\fP is not \f5NULL\fP, it is the address to map the data to.
+The \fIround\fP argument asserts that the size of the region is always
+a multiple of this value. However, note that \fIvmmopen\fP has
+an internally defined minimum round value (typically 64K) which may be
+used if the given value is too small.
+.PP
+.I vmmset
+sets a \fIdata\fP value associated with a \fIkey\fP if \f5set\fP is non-zero.
+In this case, it returns the current data (before setting)
+if \fIkey\fP is previously set; otherwise, it returns the new \fIdata\fP value.
+If the argument \fIset\fP is zero,
+the call returns the current data value associated with \fIkey\fP, if any.
+
+.SS "Allocation functions"
+.I vmalloc
+returns a pointer to a block of the requested \fIsize\fP
+in a \fIregion\fP, aligned to the \fIstrictest alignment\fP
+that is suitable for the needs of any basic data type.
+It returns \f5NULL\fP on failure.
+.PP
+.I vmalign
+works like \fIvmalloc\fP, but returns a block aligned to a common
+multiple of \fIalign\fP and the \fIstrictest alignment\fP.
+.PP
+.I vmresize
+attempts to change the length of the block pointed to by
+\fIaddr\fP to the specified \fIsize\fP.
+If that is impossible and \fItype\fP has
+at least one of \f5VM_RSMOVE\fP and \f5VM_RSCOPY\fP,
+a new block is allocated and the old block is freed.
+The bit \f5VM_RSCOPY\fP also causes
+the new block to be initialized with
+as much of the old contents as will fit.
+When a resized block gets larger, the new space will be cleared
+if \fItype\fP has the bit \f5VM_RSZERO\fP.
+\fIvmresize\fP
+returns a pointer to the final block, or \f5NULL\fP on failure.
+If \fIaddr\fP is \f5NULL\fP, \fIvmresize\fP behaves like \fIvmalloc\fP;
+otherwise, if \fIsize\fP is 0, it behaves like \fIvmfree\fP.
+.PP
+.I vmfree
+makes the currently allocated block pointed to by
+\fIaddr\fP available for future allocations in its \fIregion\fP.
+If \fIaddr\fP is \f5NULL\fP, \fIvmfree\fP does nothing.
+It returns \-1 on error, and nonnegative otherwise.
+.PP
+.I vmnewof
+is a macro function that attempts to change the length of
+the block pointed to by \fIaddr\fP to the size \f5n*sizeof(type)+x\fP.
+If the block is moved, new space will be initialized with as much of the
+old content as will fit.
+Additional space will be set to zero.
+.PP
+.I vmoldof
+is similar to \fIvmnewof\fP but it neither copies data nor clears space.
+.PP
+.I vmgetmem
+provides a handy function to creat/close regions and allocate/free memory
+based on chunks of memory obtained from the heap region \fIVmheap\fP.
+.TP
+.MW "vmgetmem(0,0,0)"
+This call opens a new region.
+.TP
+.MW "vmgetmem(region, 0, 0)"
+This call closes the given \f5region\fP.
+.TP
+.MW "vmgetmem(region,0,n)"
+This call allocates a block of length \f5n\fP and clears it to zeros.
+.TP
+.MW "vmgetmem(region,p,0)"
+This call frees the block \f5p\fP.
+.TP
+.MW "vmgetmem(region,p,n)"
+This call resizes the block \f5p\fP to length \f5n\fP
+and clears the new memory to zeros if the block grows.
+The block may be moved as deemed necessary by the allocator.
+.PP
+.SS "Memory disciplines"
+Memory disciplines have type \f5Vmdisc_t\fP,
+a structure with these members:
+.in +.5i
+.nf
+.MW "Void_t* (*memoryf)(Vmalloc_t *region, Void_t* obj,"
+.ti +.5i
+.MW "size_t csz, size_t nsz, Vmdisc_t *disc);"
+.MW "int (*exceptf)(Vmalloc_t *region, int type, Void_t* obj, Vmdisc_t *disc);"
+.MW "int round;"
+.fi
+.in -.5i
+.TP
+.MW round 
+If this value is positive, all size arguments to the
+\f5memoryf\fP function will be multiples of it.
+.TP
+.MW memoryf
+Points to a function to get or release segments of space for the
+\fIregion\fP.
+.TP
+.MW exceptf
+If this pointer is not \f5NULL\fP,
+the function it points to is called to announce
+events in a \fIregion\fP.
+.PP
+There are two standard disciplines.
+In both,
+\f5round\fP is 0, and \f5exceptf\fP is \f5NULL\fP.
+.TP
+.MW Vmdcsbrk
+A discipline whose \f5memoryf\fP function gets space from \fIsbrk\fP(2).
+.br
+.ns
+.TP
+.MW Vmdcheap
+A discipline whose \f5memoryf\fP function gets space from the region \f5Vmheap\fP.
+A region with \f5Vmdcheap\fP discipline and \f5Vmlast\fP
+allocation is good for building throwaway data structures.
+.PP
+A \fImemoryf\fP
+function returns a pointer to a memory segment on success, and \f5NULL\fP on failure.
+If \fIcsz\fP is 0, the function returns a new segment of size \fInsz\fP.
+Otherwise, the function attempts to change the length of the segment
+pointed to by \fIaddr\fP from \fIcsz\fP to \fInsz\fP.
+If this is successful, \f5memoryf\fP should return \fIaddr\fP (even if \fInsz\fP is 0).
+.PP
+An \fIexceptf\fP
+function is called for events identified by \fItype\fP, which is coded thus:
+.TP
+.MW VM_OPEN
+A new region is being opened.
+If \fIexceptf\fP returns a zero value, the region opening proceeds normally.
+A negative return value causes \fIvmopen\fP to terminate with failure.
+A positive return value indicates that the new region is to manipulate memory
+already initialized by a previous \fIvmopen\fP call
+(perhaps by a different process on persistent or shared memory).
+In this case, the argument \f5(Void_t**)\fP\fIobj\fP should
+return the initial segment (which is of type \f5(Void_t*)\fP).
+\fIvmopen\fP will return failure if this segment is not returned or if it
+has not been properly initialized.
+.TP
+.MW VM_CLOSE
+The region is being closed.
+The return value of \f5exceptf\fP is significant as follows.
+If negative, \fIvmclose\fP immediately returns with failure.
+If zero, \fIvmclose\fP proceeds normally by calling \f5memoryf\fP to free
+all allocated memory segments and also freeing the region itself.
+Finally, if positive, \fIvmclose\fP will only free the region
+without deallocating the allocated segments.
+.TP
+.MW VM_NOMEM
+An attempt to extend the region by the amount
+\f5(size_t)\fP\fIobj\fP failed. The region is unlocked, so the
+\fIexceptf\fP function may free blocks.
+If the function returns a positive value the memory
+request will be repeated.
+If zero, the allocation method
+will again invoke \fImemoryf\fP to get space.
+If negative, the allocation request will fail.
+.TP
+.MW VM_BADADDR
+Address \fIobj\fP, given to \fIvmfree\fP or \fIvmresize\fP,
+does not point to an allocated block from the region.
+The respective call will fail.
+.TP
+.MW VM_ALLOC
+Announce that a memory allocation request is finished and returning.
+.TP
+.MW VM_FREE
+Announce that a memory freeing request is finished and returning.
+.TP
+.MW VM_RESIZE
+Announce that a memory resizing request is finished and returning.
+
+.SS "Allocation methods"
+There are five methods, of type \f5Vmethod_t*\fP:
+.TP
+.MW Vmbest
+An approximately best-fit allocation strategy.
+.TP
+.MW Vmlast
+A strategy for building structures that are only deleted in whole.
+Only the latest allocated block can be freed.
+This means that as soon as a block \f5a\fP is allocated,
+\fIvmfree\fP calls on blocks other than \c5a\fP are ignored.
+.TP
+.MW Vmpool
+A strategy for blocks of one size,
+set by the first \fIvmalloc\fP call after \fIvmopen\fP or \fIvmclear\fP.
+.TP
+.MW Vmdebug
+An allocation strategy with extra-stringent checking and locking
+regardless of the \f5VM_TRUST\fP flag.
+It is useful for finding misuses of dynamically allocated
+memory, such as writing beyond the boundary of a block, or
+freeing a block twice.
+.ne 3
+.TP
+.MW Vmprofile
+An allocation method that records and prints summaries of memory usage.
+
+.SS Debugging
+The method \f5Vmdebug\fP is used to debug common memory violation problems.
+When a problem is found,
+a warning message is written to file descriptor 2 (standard error).
+In addition, if flag \f5VM_DBABORT\fP is on,
+the program is terminated by calling \fIabort\fP(2).
+Each message is a line of self-explanatory fields separated by colons.
+The optional flag \f5-DVMFL\fP, if used during compilation,
+enables recording of file names and line numbers.
+The following functions work with method \f5Vmdebug\fP.
+.PP
+.I vmdebug
+resets the file descriptor to write out warnings to the given argument.
+By default, this file descriptor is 2, the standard error.
+\fIvmdebug\fP returns the previous file descriptor.
+.PP
+.I vmdbcheck
+checks a region using \f5Vmdebug\fP or \f5Vmbest\fP for integrity.
+If \f5Vmdebug\fP, this also checks for block overwriting errors.
+On errors, \fIvmdbwarn\fP is called.
+If flag \f5VM_DBCHECK\fP is on, 
+\fIvmdbcheck\fP is called at each invocation of
+\fIvmalloc\fP, \fIvmfree\fP, or \fIvmresize\fP.
+.PP
+.I vmdbwatch
+causes address \fIaddr\fP
+to be watched, and reported whenever met in
+\fIvmalloc\fP, \fIvmresize\fP or \fIvmfree\fP.
+The watch list has finite size and if it becomes full,
+watches will be removed in a first-in-first-out fashion.
+If \fIaddr\fP is \f5NULL\fP,
+all current watches are canceled.
+\fIvmdbwatch\fP returns the watch bumped out due to an insertion
+into a full list or \f5NULL\fP otherwise.
+.PP
+.I vmdbwarn
+is an internal function that processes
+warning messages for discovered errors.
+It can't be called from outside the \fIvmalloc\fP package,
+but is a good place to plant debugger traps because
+control goes there at every trouble.
+
+.SS "Profiling"
+The method \f5Vmprofile\fP is used to profile memory usage.
+Profiling data are maintained in private memory of a process so
+\f5Vmprofile\fP should be avoided from regions manipulating
+persistent or shared memory.
+The optional flag \f5-DVMFL\fP, if used during compilation,
+enables recording of file names and line numbers.
+.PP
+.I vmprofile
+prints memory usage summary.
+The summary is restricted to region \fIvm\fP if \fIvm\fP is not \f5NULL\fP;
+otherwise, it is for all regions created with \f5Vmprofile\fP.
+Summary records are written to file descriptor \fIfd\fP as lines with
+colon-separated fields. Here are some of the fields:
+.TP
+.I n_alloc,n_free:
+Number of allocation and free calls respectively. Note that a resize
+operation is coded as a free and an allocation.
+.TP
+.I s_alloc,s_free:
+Total amounts allocated and freed. The difference between these numbers
+is the amount of space not yet freed.
+.TP
+.I max_busy, extent:
+These fields are only with the summary record for region.
+They show the maximum busy space at any time and the extent of the region.
+
+.SS "Information and statistics"
+.I vmregion
+returns the region to which the block pointed to by
+\fIaddr\fP belongs.
+This works only in regions that allocate with
+\f5Vmbest\fP, \f5Vmdebug\fP or \f5Vmprofile\fP.
+If multiple regions manipulate the same segment of memory,
+\fIvmregion\fP returns the region that causes the creation that memory segment.
+.PP
+.I vmsegment
+finds if some segment of memory in \fIregion\fP
+contains the address \fIaddr\fP.
+It returns the address of a found segment or \f5NULL\fP if none found.
+.PP
+.I vmwalk
+walks all segments in \fIregion\fP or if \fIregion\fP is \f5NULL\fP,
+all segments in all regions.
+At each segment, \fI(*walkf)(vm,addr,size,segno,disc,handle)\fP
+is called where \fIvm\fP is the region, \fIaddr\fP is the segment,
+\fIsize\fP is the size of the segment, \fIsegno\fP is the segment ordinal counting from 0,
+\fIdisc\fP is the region's discipline, and \fIhandle\fP is the user supplied \fIvmwalk\fP handle.
+If \fIwalkf\fP returns a negative value, the walk stops and returns the same value.
+On success, \fIvmwalk\fP returns 0; otherwise, it returns \-1.
+.PP
+.I vmaddr
+checks whether \fIaddr\fP
+points to an address within some allocated block of the given region.
+If not, it returns \-1.
+If so, it returns the offset from the beginning of the block.
+The function does not work for a \f5Vmlast\fP region except
+on the latest allocated block.
+.PP
+.I vmsize
+returns the size of the allocated block pointed to by \fIaddr\fP.
+It returns \-1 if \fIaddr\fP
+does not point to a valid block in the region.
+Sizes may be padded beyond that requested; in
+particular no block has size 0.
+The function does not work for a \f5Vmlast\fP region except
+on the latest allocated block.
+.PP
+.I vmstat
+gathers statistics on the given \fIregion\fP and returns that
+information in the \f5Vmstat_t\fP structure pointed to by \fIstatb\fP.
+A \f5Vmstat_t\fP structure has at least these members:
+.in +.5i
+.nf
+.ta \w'\f5size_t  \fP'u +\w'\f5extent    \fP'u
+.MW "int	n_busy;	/* number of busy blocks */
+.MW "int	n_free;	/* number of free blocks */
+.MW "size_t	s_busy;	/* total busy space */
+.MW "size_t	s_free;	/* total free space */
+.MW "size_t	m_busy;	/* maximum size of busy block */
+.MW "size_t	m_free;	/* maximum size of free block */
+.MW "int	n_seg;	/* number of segments in region */
+.MW "size_t	extent;	/* total size of the region */
+.fi
+.in -.5i
+.PP
+Bookeeping overhead is counted in \f5extent\fP,
+but not in \f5s_busy\fP or \f5s_free\fP.
+.PP
+.I vmtrace
+establishes file descriptor \fIfd\fP
+as the trace file and returns
+the previous value of the trace file descriptor.
+The trace descriptor is initially invalid.
+Output is sent to the trace file by successful allocation
+events when flag \f5VM_TRACE\fP is on.
+.PP
+Tools for analyzing traces are described in \fImtreplay\fP(1).
+The trace record for an allocation event
+is a line with colon-separated fields, four numbers and one string.
+.TP
+.I old
+Zero for a fresh allocation;
+the address argument for freeing and resizing.
+.TP
+.I new
+Zero for freeing;
+the address returned by allocation or resizing.
+.TP
+.I size
+The size argument for allocation or resizing;
+the size freed by freeing.
+Sizes may differ due to padding for alignment.
+.TP
+.I region
+The address of the affected region.
+.TP
+.I method
+A string that tells the region's method:
+\f5best\fP, \f5last\fP, \f5pool\fP, \f5profile\fP, or \f5debug\fP.
+.PP
+.I vmtrbusy
+outputs a trace of all currently busy blocks in region \f5vm\fP.
+This only works with the \f5Vmbest\fP, \f5Vmdebug\fP and \f5Vmprofile\fP methods.
+
+.SS "Malloc-compatible functions"
+Functions in this set provide the behaviors of \fImalloc\fP(3).
+The functions
+\fImemalign\fP and \fIvalloc\fP allocate aligned blocks;
+\fIvalloc\fP further restricts alignment to page boundaries.
+.PP
+The \fImalloc\fP functions are instrumented for run-time debugging,
+profiling and tracing.
+When these modes are enabled, time and space performance will be affected.
+For accurate reporting of files and line numbers,
+code should include \f5vmalloc.h\fP and compile with either \f5-DVMFL\fP
+or \f5-D_BLD_debug\fP (defined by \fBnmake\fP(1) for \f5-g\fP compilations).
+The
+.I VMALLOC_OPTIONS
+environment variable should be set before any memory allocation
+(e.g., before a process starts). Its value is a space-separated list of
+[\fBno\fP]\fIname\fP[=\fIvalue\fP] options that control runtime
+debugging/profiling and other modes:
+.TP
+.B abort
+If Vmregion==Vmdebug then VM_DBABORT is set, otherwise _BLD_debug
+enabled assertions abort() on failure.
+.TP
+.B check
+If Vmregion==Vmbest then the region is checked after every operation.
+.TP
+.BI method =method
+Sets Vmregion=\fImethod\fP if not already set.
+.I method
+(\fBVm\fP prefix optional) may be one of:
+.RS
+.TP
+.B best
+.TP
+.B debug
+.TP
+.B last
+.TP
+.B profile
+.RE
+.TP
+.B mmap
+Prefer mmap() over brk() for region allocation.
+.TP
+.BI period =n
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+the region is checked every \fIn\fP operations.
+.TP
+.BI profile =file
+Sets Vmregion=Vmprofile if not already set. If Vmregion==Vmprofile then
+profile info is printed to \fIfile\fP.
+.TP
+.B region
+If Vmregion==Vmbest then region block frees verify
+that the block belongs to the region.
+.BI start =n
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+region checking starts after \fIn\fP operations.
+.TP
+.BI trace =file
+Operation trace info is printed to \fIfile\fP.
+.TP
+.BI warn =file
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+warnings are printed to \fIfile\fP.
+.TP
+.BI watch =address
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+operations on \fIaddress\fP are traced.
+.PP
+Output files are created if they don't exist.
+.BI & n
+and
+.BI /dev/fd/ n
+name the file descriptor
+.I n
+which must be open for writing. The pattern
+.B %p
+in a file name is replaced by the current process ID.
+.I VMALLOC_OPTIONS
+combines the features of these previously used env vars {
+.I "VMDEBUG VMETHOD VMPROFILE VMTRACE"
+}.
+For compatibility, if
+.I VMALLOC_OPTIONS
+is not defined, then {
+.I "VMDEBUG VMETHOD VMPROFILE VMTRACE"
+} will be checked -- this will be dropped in a future release.
+
+.SH RECENT CHANGES
+\f5Vmlast\fP: allocated blocks are now allowed to be resized (1998-09).
+\fIVMALLOC_OPTIONS\fP now controls all runtime settings (2010-01).
+
+.SH SEE ALSO
+\fImtreplay\fP(1), \fImalloc\fP(3).
+
+.SH AUTHOR
+Kiem-Phong Vo, kpv@research.att.com

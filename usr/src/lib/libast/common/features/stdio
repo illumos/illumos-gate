@@ -1,0 +1,568 @@
+set	prototyped
+ref	-D_def_map_ast=1
+iff	SFSTDIO
+cat{
+	#define __FILE_typedef	1
+	#define _FILE_DEFINED	1
+	#define _FILE_defined	1
+	#define _FILEDEFED	1
+
+	#ifndef __FILE_TAG
+	#define __FILE_TAG	_sfio_s
+	#endif
+
+	#undef	FILE
+	#undef	_FILE
+	#undef	fpos_t
+	#undef	fpos64_t
+
+	typedef struct _sfio_s _sfio_FILE;
+
+	#define FILE		_sfio_FILE
+	#define _FILE		FILE
+
+	#if !defined(__FILE) && !__CYGWIN__
+	#undef	__FILE
+	#define __FILE		FILE
+	#endif
+
+	#if defined(_AST_H) || defined(_SFIO_H)
+
+	#define BUFSIZ		SF_BUFSIZE
+
+	#else
+
+	#ifndef BUFSIZ
+	#define BUFSIZ		8192
+	#endif
+
+	#ifndef EOF
+	#define EOF		(-1)
+	#endif
+
+	#ifndef NULL
+	#define NULL		0
+	#endif
+
+	#ifndef SEEK_SET
+	#define SEEK_SET	0
+	#define SEEK_CUR	1
+	#define SEEK_END	2
+	#endif
+
+	#include <ast_std.h>
+
+	#include <sfio_s.h>
+
+	#if __cplusplus
+	#define _sf_(f)		(f)
+	#else
+	#define _sf_(f)		((struct _sfio_s*)(f))
+	#endif
+
+	#define _SF_EOF		0000200
+	#define _SF_ERROR	0000400
+
+	#endif
+
+	#ifdef _NO_LARGEFILE64_SOURCE
+	#undef _LARGEFILE64_SOURCE
+	#endif
+
+	#ifdef _LARGEFILE64_SOURCE
+	#undef	off_t
+	#endif
+
+	#define fpos_t		_ast_fpos_t
+	#if _typ_int64_t
+	#define fpos64_t	_ast_fpos_t
+	#endif
+
+	typedef struct _ast_fpos_s
+	{
+		intmax_t	_sf_offset;
+		unsigned char	_sf_state[64 - sizeof(intmax_t)];
+	} _ast_fpos_t;
+
+	#define _base		_data
+	#define _ptr		_next
+	#define _IOFBF		0
+	#define _IONBF		1
+	#define _IOLBF		2
+
+	#if defined(__cplusplus) && defined(__THROW) && !defined(_UWIN)
+
+	#undef	FILE
+	#define FILE            FILE
+	typedef struct _sfio_s FILE;
+
+	#undef	strerror
+	extern char*	strerror(int) __THROW;
+
+	extern int	_doprnt(const char*, va_list, FILE*);
+	extern int	_doscan(FILE*, const char*, va_list);
+	extern int	asprintf(char**, const char*, ...);
+	extern int	clearerr(FILE*);
+	extern int	fclose(FILE*);
+	extern FILE*	fdopen(int, const char*);
+	extern int	feof(FILE*);
+	extern int	ferror(FILE*);
+	extern int	fflush(FILE*);
+	extern int	fgetc(FILE*);
+	extern int	fgetpos(FILE*, fpos_t*);
+	extern char*	fgets(char*, int, FILE*);
+	extern int	fileno(FILE*);
+	extern FILE*	fopen(const char*, const char*);
+	extern int	fprintf(FILE*, const char*, ...);
+	extern int	fpurge(FILE*);
+	extern int	fputc(int, FILE*);
+	extern int	fputs(const char*, FILE*);
+	extern size_t	fread(void*, size_t, size_t, FILE*);
+	extern FILE*	freopen(const char*, const char*, FILE*);
+	extern int	fscanf(FILE*, const char*, ...);
+	extern int	fseek(FILE*, long, int);
+	extern int	fseeko(FILE*, off_t, int);
+	extern int	fsetpos(FILE*, const fpos_t*);
+	extern long	ftell(FILE*);
+	extern off_t	ftello(FILE*);
+	extern size_t	fwrite(const void*, size_t, size_t, FILE*);
+	extern int	getc(FILE*);
+	extern int	getchar(void);
+	extern char*	gets(char*);
+	extern int	getw(FILE*);
+	extern int	pclose(FILE*);
+	extern FILE*	popen(const char*, const char*);
+	extern int	printf(const char*, ...);
+	extern int	putc(int, FILE*);
+	extern int	putchar(int);
+	extern int	puts(const char*);
+	extern int	putw(int, FILE*);
+	extern void	rewind(FILE*);
+	extern int	scanf(const char*, ...);
+	extern void	setbuf(FILE*, char*);
+	extern int	setbuffer(FILE*, char*, int);
+	extern int	setlinebuf(FILE*);
+	extern int	setvbuf(FILE*, char*, int, size_t);
+	extern int	snprintf(char*, int, const char*, ...);
+	extern int	sprintf(char*, const char*, ...);
+	extern int	sscanf(const char*, const char*, ...);
+	extern FILE*	tmpfile(void);
+	extern int	ungetc(int, FILE*);
+	extern int	vasprintf(char**, const char*, va_list);
+	extern int	vfprintf(FILE*, const char*, va_list);
+	extern int	vfscanf(FILE*, const char*, va_list);
+	extern int	vprintf(const char*, va_list);
+	extern int	vscanf(const char*, va_list);
+	extern int	vsnprintf(char*, int, const char*, va_list);
+	extern int	vsprintf(char*, const char*, va_list);
+	extern int	vsscanf(const char*, const char*, va_list);
+
+	#if _typ_int64_t
+
+	extern int		fgetpos64(FILE*, fpos64_t*);
+	extern int		fsetpos64(FILE*, const fpos64_t*);
+	extern int		fseek64(FILE*, int64_t, int);
+	extern int		fseeko64(FILE*, int64_t, int);
+	extern int64_t		ftell64(FILE*);
+	extern int64_t		ftello64(FILE*);
+
+	#endif
+
+	extern void	clearerr_unlocked(FILE*);
+	extern int	feof_unlocked(FILE*);
+	extern int	ferror_unlocked(FILE*);
+	extern int	fflush_unlocked(FILE*);
+	extern int	fgetc_unlocked(FILE*);
+	extern char*	fgets_unlocked(char*, int, FILE*);
+	extern int	fileno_unlocked(FILE*);
+	extern int	fputc_unlocked(int, FILE*);
+	extern int	fputs_unlocked(char*, FILE*);
+	extern size_t	fread_unlocked(void*, size_t, size_t, FILE*);
+	extern size_t	fwrite_unlocked(void*, size_t, size_t, FILE*);
+	extern int	getc_unlocked(FILE*);
+	extern int	getchar_unlocked(void);
+	extern int	putc_unlocked(int, FILE*);
+	extern int	putchar_unlocked(int);
+
+	extern void	flockfile(FILE*);
+	extern int	ftrylockfile(FILE*);
+	extern void	funlockfile(FILE*);
+
+	#ifdef _USE_GNU
+
+	extern int	fcloseall(void);
+	extern FILE*	fmemopen(void*, size_t, const char*);
+	extern ssize_t	__getdelim(char**, size_t*, int, FILE*);
+	extern ssize_t	getdelim(char**, size_t*, int, FILE*);
+	extern ssize_t	getline(char**, size_t*, FILE*);
+
+	#endif
+
+	#endif
+}end
+output{
+	#include <stdio.h>
+	#ifndef FILENAME_MAX
+	#ifndef NAME_MAX
+	#ifndef _POSIX_NAME_MAX
+	#define _POSIX_NAME_MAX	14
+	#endif
+	#define NAME_MAX	_POSIX_NAME_MAX
+	#endif
+	#define FILENAME_MAX	NAME_MAX
+	#endif
+	#ifndef FOPEN_MAX
+	#ifdef STREAM_MAX
+	#define FOPEN_MAX	STREAM_MAX
+	#else
+	#ifndef OPEN_MAX
+	#ifndef _POSIX_OPEN_MAX
+	#define _POSIX_OPEN_MAX	20
+	#endif
+	#define OPEN_MAX	_POSIX_OPEN_MAX
+	#endif
+	#define FOPEN_MAX	OPEN_MAX
+	#endif
+	#endif
+	#ifndef TMP_MAX
+	#define TMP_MAX		33520641
+	#endif
+	int
+	main()
+	{
+		printf("#ifndef FILENAME_MAX\n");
+		printf("#define FILENAME_MAX	%d\n", FILENAME_MAX);
+		printf("#endif\n");
+		printf("#ifndef FOPEN_MAX\n");
+		printf("#define FOPEN_MAX	%d\n", FOPEN_MAX);
+		printf("#endif\n");
+		printf("#ifndef TMP_MAX\n");
+		printf("#define TMP_MAX		%d\n", TMP_MAX);
+		printf("#endif\n");
+	#if !_UWIN
+		printf("\n");
+		printf("#define _doprnt		_ast_doprnt\n");
+		printf("#define _doscan		_ast_doscan\n");
+		printf("#define asprintf	_ast_asprintf\n");
+		printf("#define clearerr	_ast_clearerr\n");
+		printf("#define fclose		_ast_fclose\n");
+		printf("#define fdopen		_ast_fdopen\n");
+		printf("#define fflush		_ast_fflush\n");
+		printf("#define fgetc		_ast_fgetc\n");
+		printf("#define fgetpos		_ast_fgetpos\n");
+		printf("#define fgetpos64	_ast_fgetpos64\n");
+		printf("#define fgets		_ast_fgets\n");
+		printf("#define fopen		_ast_fopen\n");
+		printf("#define fprintf		_ast_fprintf\n");
+		printf("#define fpurge		_ast_fpurge\n");
+		printf("#define fputs		_ast_fputs\n");
+		printf("#define fread		_ast_fread\n");
+		printf("#define freopen		_ast_freopen\n");
+		printf("#define fscanf		_ast_fscanf\n");
+		printf("#define fseek		_ast_fseek\n");
+		printf("#define fseek64		_ast_fseek64\n");
+		printf("#define fseeko		_ast_fseeko\n");
+		printf("#define fseeko64	_ast_fseeko64\n");
+		printf("#define fsetpos		_ast_fsetpos\n");
+		printf("#define fsetpos64	_ast_fsetpos64\n");
+		printf("#define ftell		_ast_ftell\n");
+		printf("#define ftell64		_ast_ftell64\n");
+		printf("#define ftello		_ast_ftello\n");
+		printf("#define ftello64	_ast_ftello64\n");
+		printf("#define fwrite		_ast_fwrite\n");
+		printf("#define gets		_ast_gets\n");
+		printf("#define getw		_ast_getw\n");
+		printf("#define pclose		_ast_pclose\n");
+		printf("#define popen		_ast_popen\n");
+		printf("#define printf		_ast_printf\n");
+		printf("#define puts		_ast_puts\n");
+		printf("#define putw		_ast_putw\n");
+		printf("#define rewind		_ast_rewind\n");
+		printf("#define scanf		_ast_scanf\n");
+		printf("#define setbuf		_ast_setbuf\n");
+		printf("#undef	setbuffer\n");
+		printf("#define setbuffer	_ast_setbuffer\n");
+		printf("#define setlinebuf	_ast_setlinebuf\n");
+		printf("#define setvbuf		_ast_setvbuf\n");
+		printf("#define snprintf	_ast_snprintf\n");
+		printf("#define sprintf		_ast_sprintf\n");
+		printf("#define sscanf		_ast_sscanf\n");
+		printf("#define tmpfile		_ast_tmpfile\n");
+		printf("#define ungetc		_ast_ungetc\n");
+		printf("#define vasprintf	_ast_vasprintf\n");
+		printf("#define vfprintf	_ast_vfprintf\n");
+		printf("#define vfscanf		_ast_vfscanf\n");
+		printf("#define vprintf		_ast_vprintf\n");
+		printf("#define vscanf		_ast_vscanf\n");
+		printf("#define vsnprintf	_ast_vsnprintf\n");
+		printf("#define vsprintf	_ast_vsprintf\n");
+		printf("#define vsscanf		_ast_vsscanf\n");
+
+		printf("#define fcloseall	_ast_fcloseall\n");
+		printf("#define _filbuf		_ast__filbuf\n");
+		printf("#define fmemopen	_ast_fmemopen\n");
+		printf("#define __getdelim	_ast___getdelim\n");
+		printf("#define getdelim	_ast_getdelim\n");
+		printf("#define getline		_ast_getline\n");
+
+		printf("#define clearerr_unlocked _ast_clearerr_unlocked\n");
+		printf("#define feof_unlocked	_ast_feof_unlocked\n");
+		printf("#define ferror_unlocked	_ast_ferror_unlocked\n");
+		printf("#define fflush_unlocked	_ast_fflush_unlocked\n");
+		printf("#define fgetc_unlocked	_ast_fgetc_unlocked\n");
+		printf("#define fgets_unlocked	_ast_fgets_unlocked\n");
+		printf("#define fileno_unlocked	_ast_fileno_unlocked\n");
+		printf("#define fputc_unlocked	_ast_fputc_unlocked\n");
+		printf("#define fputs_unlocked	_ast_fputs_unlocked\n");
+		printf("#define fread_unlocked	_ast_fread_unlocked\n");
+		printf("#define fwrite_unlocked	_ast_fwrite_unlocked\n");
+		printf("#define getc_unlocked	_ast_getc_unlocked\n");
+		printf("#define getchar_unlocked _ast_getchar_unlocked\n");
+		printf("#define putc_unlocked	_ast_putc_unlocked\n");
+		printf("#define putchar_unlocked _ast_putchar_unlocked\n");
+
+		printf("#define flockfile	_ast_flockfile\n");
+		printf("#define ftrylockfile	_ast_ftrylockfile\n");
+		printf("#define funlockfile	_ast_funlockfile\n");
+
+		printf("\n");
+	#endif
+		return 0;
+	}
+}end
+macro{
+	<<"#if defined(__STDPP__directive) && defined(__STDPP__initial)">>
+	<<"__STDPP__directive pragma pp:initial">>
+	<<"#endif">>
+	<<"#ifndef P_tmpdir">>
+	#ifndef P_tmpdir
+	#define P_tmpdir "/usr/tmp/"
+	#endif
+	<<"#define P_tmpdir">> P_tmpdir <<"/*NOCATLITERAL*/">>
+	<<"#endif">>
+	<<"#ifndef L_ctermid">>
+	#ifndef L_ctermid
+	#define L_ctermid 9
+	#endif
+	<<"#define L_ctermid">> L_ctermid
+	<<"#endif">>
+	<<"#ifndef L_tmpnam">>
+	#ifndef L_tmpnam
+	#define L_tmpnam (sizeof(P_tmpdir)+15)
+	#endif
+	<<"#define L_tmpnam">> L_tmpnam
+	<<"#endif">>
+	<<"#if defined(__STDPP__directive) && defined(__STDPP__initial)">>
+	<<"__STDPP__directive pragma pp:noinitial">>
+	<<"#endif">>
+}end
+cat{
+	#if defined(__cplusplus) && defined(__THROW)
+	extern char*	ctermid(char*) __THROW;
+	#else
+	extern char*	ctermid(char*);
+	#endif
+	extern char*	tmpnam(char*);
+	extern char*	tempnam(const char*, const char*);
+	extern void	perror(const char*);
+	#ifndef _AST_STD_H
+	#ifndef remove
+	extern int	remove(const char*);
+	#endif
+	#ifndef rename
+	extern int	rename(const char*, const char*);
+	#endif
+	#endif
+
+	#undef	extern
+
+	#if _BLD_ast && defined(__EXPORT__)
+	#define extern		__EXPORT__
+	#endif
+
+	extern int	_doprnt(const char*, va_list, FILE*);
+	extern int	_doscan(FILE*, const char*, va_list);
+	extern int	asprintf(char**, const char*, ...);
+	extern int	clearerr(FILE*);
+	extern int	fclose(FILE*);
+	extern FILE*	fdopen(int, const char*);
+	extern int	feof(FILE*);
+	extern int	ferror(FILE*);
+	extern int	fflush(FILE*);
+	extern int	fgetc(FILE*);
+	extern int	fgetpos(FILE*, fpos_t*);
+	extern char*	fgets(char*, int, FILE*);
+	extern int	fileno(FILE*);
+	extern FILE*	fopen(const char*, const char*);
+	extern int	fprintf(FILE*, const char*, ...);
+	extern int	fpurge(FILE*);
+	extern int	fputc(int, FILE*);
+	extern int	fputs(const char*, FILE*);
+	extern size_t	fread(void*, size_t, size_t, FILE*);
+	extern FILE*	freopen(const char*, const char*, FILE*);
+	extern int	fscanf(FILE*, const char*, ...);
+	extern int	fseek(FILE*, long, int);
+	extern int	fseeko(FILE*, off_t, int);
+	extern int	fsetpos(FILE*, const fpos_t*);
+	extern long	ftell(FILE*);
+	extern off_t	ftello(FILE*);
+	extern size_t	fwrite(const void*, size_t, size_t, FILE*);
+	extern int	getc(FILE*);
+	extern int	getchar(void);
+	extern char*	gets(char*);
+	extern int	getw(FILE*);
+	extern int	pclose(FILE*);
+	extern FILE*	popen(const char*, const char*);
+	extern int	printf(const char*, ...);
+	extern int	putc(int, FILE*);
+	extern int	putchar(int);
+	extern int	puts(const char*);
+	extern int	putw(int, FILE*);
+	extern void	rewind(FILE*);
+	extern int	scanf(const char*, ...);
+	extern void	setbuf(FILE*, char*);
+	extern int	setbuffer(FILE*, char*, int);
+	extern int	setlinebuf(FILE*);
+	extern int	setvbuf(FILE*, char*, int, size_t);
+	extern int	snprintf(char*, int, const char*, ...);
+	extern int	sprintf(char*, const char*, ...);
+	extern int	sscanf(const char*, const char*, ...);
+	extern FILE*	tmpfile(void);
+	extern int	ungetc(int, FILE*);
+	extern int	vasprintf(char**, const char*, va_list);
+	extern int	vfprintf(FILE*, const char*, va_list);
+	extern int	vfscanf(FILE*, const char*, va_list);
+	extern int	vprintf(const char*, va_list);
+	extern int	vscanf(const char*, va_list);
+	extern int	vsnprintf(char*, int, const char*, va_list);
+	extern int	vsprintf(char*, const char*, va_list);
+	extern int	vsscanf(const char*, const char*, va_list);
+
+	#if _typ_int64_t
+
+	extern int		fgetpos64(FILE*, fpos64_t*);
+	extern int		fsetpos64(FILE*, const fpos64_t*);
+	extern int		fseek64(FILE*, int64_t, int);
+	extern int		fseeko64(FILE*, int64_t, int);
+	extern int64_t		ftell64(FILE*);
+	extern int64_t		ftello64(FILE*);
+
+	#ifdef _LARGEFILE64_SOURCE
+
+	#undef	fpos_t
+	#undef	off_t
+	#undef	fgetpos
+	#undef	fsetpos
+	#undef	fseek
+	#undef	fseeko
+	#undef	ftell
+	#undef	ftello
+
+	#define	fpos_t		fpos64_t
+	#if _typ_off64_t
+	#define	off_t		off64_t
+	#else
+	#define	off_t		int64_t
+	#endif
+
+	#define fgetpos		fgetpos64
+	#define fsetpos		fsetpos64
+	#define	fseek		fseek64
+	#define	fseeko		fseeko64
+	#define ftell		ftell64
+	#define ftello		ftello64
+
+	#endif
+
+	#endif
+
+	extern void	clearerr_unlocked(FILE*);
+	extern int	feof_unlocked(FILE*);
+	extern int	ferror_unlocked(FILE*);
+	extern int	fflush_unlocked(FILE*);
+	extern int	fgetc_unlocked(FILE*);
+	extern char*	fgets_unlocked(char*, int, FILE*);
+	extern int	fileno_unlocked(FILE*);
+	extern int	fputc_unlocked(int, FILE*);
+	extern int	fputs_unlocked(char*, FILE*);
+	extern size_t	fread_unlocked(void*, size_t, size_t, FILE*);
+	extern size_t	fwrite_unlocked(void*, size_t, size_t, FILE*);
+	extern int	getc_unlocked(FILE*);
+	extern int	getchar_unlocked(void);
+	extern int	putc_unlocked(int, FILE*);
+	extern int	putchar_unlocked(int);
+
+	#ifdef _USE_GNU
+
+	extern int	fcloseall(void);
+	extern FILE*	fmemopen(void*, size_t, const char*);
+	extern ssize_t	__getdelim(char**, size_t*, int, FILE*);
+	extern ssize_t	getdelim(char**, size_t*, int, FILE*);
+	extern ssize_t	getline(char**, size_t*, FILE*);
+
+	#endif
+
+	#undef	extern
+
+	#if _BLD_DLL && _DLL_INDIRECT_DATA
+
+	#define stdin		((FILE*)_ast_dll->_ast_stdin)
+	#define stdout		((FILE*)_ast_dll->_ast_stdout)
+	#define stderr		((FILE*)_ast_dll->_ast_stderr)
+
+	#else
+
+	#define	stdin		(&_Sfstdin)
+	#define	stdout		(&_Sfstdout)
+	#define	stderr		(&_Sfstderr)
+
+	#endif
+
+	#if defined(_AST_H) || defined(_SFIO_H)
+
+	#define feof(f)		sfeof(f)
+	#define ferror(f)	sferror(f)
+	#define fileno(f)	sffileno(f)
+	#define fputc(c,f)	sfputc(f,c)
+	#define getc(f)		sfgetc(f)
+	#define getchar()	sfgetc(sfstdin)
+	#define putc(c,f)	sfputc(f,c)
+	#define putchar(c)	sfputc(sfstdout,c)
+
+	#else
+
+	#if !_UWIN
+	#if _BLD_ast && defined(__EXPORT__)
+	#define extern		extern __EXPORT__
+	#endif
+	#if !_BLD_ast && defined(__IMPORT__)
+	#define extern		extern __IMPORT__
+	#endif
+	#endif
+
+	extern FILE	_Sfstdin;
+	extern FILE	_Sfstdout;
+	extern FILE	_Sfstderr;
+
+	#undef	extern
+
+	#define feof(f)		(_sf_(f)->_flags&_SF_EOF)
+	#define ferror(f)	(_sf_(f)->_flags&_SF_ERROR)
+	#define fileno(f)	(_sf_(f)->_file)
+	#define fputc(c,f)	(_sf_(f)->_next>=_sf_(f)->_endw?_sfflsbuf(_sf_(f),(int)((unsigned char)(c))):(int)(*_sf_(f)->_next++=(unsigned char)(c)))
+	#define getc(f)		(_sf_(f)->_next>=_sf_(f)->_endr?_sffilbuf(_sf_(f),0):(int)(*_sf_(f)->_next++))
+	#define getchar()	getc(stdin)
+	#define putc(c,f)	fputc(c,f)
+	#define putchar(c)	fputc(c,stdout)
+
+	#if _BLD_ast && defined(__EXPORT__)
+	#define extern		__EXPORT__
+	#endif
+
+	extern int		_sffilbuf(FILE*, int);
+	extern int		_sfflsbuf(FILE*, int);
+
+	#undef	extern
+
+	#endif
+}end

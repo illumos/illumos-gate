@@ -1,0 +1,126 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	cpc_walk_generic_events_pic;
+	cpc_walk_generic_events_all;
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	cpc_bind_cpu;
+	cpc_bind_curlwp;
+	cpc_bind_pctx;
+	cpc_buf_add;
+	cpc_buf_copy;
+	cpc_buf_create;
+	cpc_buf_destroy;
+	cpc_buf_get;
+	cpc_buf_hrtime;
+	cpc_buf_set;
+	cpc_buf_sub;
+	cpc_buf_tick;
+	cpc_buf_zero;
+	cpc_caps;
+	cpc_cciname;
+	cpc_close;
+	cpc_cpuref;
+	cpc_disable;
+	cpc_enable;
+	cpc_npic;
+	cpc_open;
+	cpc_request_preset;
+	cpc_set_add_request;
+	cpc_set_create;
+	cpc_set_destroy;
+	cpc_seterrhndlr;
+	cpc_set_restart;
+	cpc_set_sample;
+	cpc_unbind;
+	cpc_walk_attrs;
+	cpc_walk_events_all;
+	cpc_walk_events_pic;
+	cpc_walk_requests;
+
+	# On all platforms other than amd64, SUNW_1.2 inherts SUNW_1.1,
+	# which supplies additional functions. On amd64, there is no SUNW_1.1.
+$if !(_x86 && _ELF64)
+} SUNW_1.1 ;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	cpc_access;
+	cpc_bind_event;
+	cpc_count_sys_events;
+	cpc_count_usr_events;
+	cpc_event_accum;
+	cpc_event_diff;
+	cpc_eventtostr;
+	cpc_getcciname;
+	cpc_getcpuref;
+	cpc_getcpuver;
+	cpc_getnpic;
+	cpc_getusage;
+	cpc_pctx_bind_event;
+	cpc_pctx_invalidate;
+	cpc_pctx_rele;
+	cpc_pctx_take_sample;
+	cpc_rele;
+	cpc_seterrfn;
+	cpc_shared_bind_event;
+	cpc_shared_close;
+	cpc_shared_open;
+	cpc_shared_rele;
+	cpc_shared_take_sample;
+	cpc_strtoevent;
+	cpc_take_sample;
+	cpc_version;
+	cpc_walk_names;
+$endif
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	SUNWprivate_1.1;
+	cpc_terminate;
+    local:
+	*;
+};

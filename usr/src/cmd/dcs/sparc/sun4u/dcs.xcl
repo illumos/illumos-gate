@@ -1,0 +1,99 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2000 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+
+#
+# The list of error strings below are the ones that are
+# _only_ logged to syslog, and thus, should not be
+# localized. In the future, if a particular error string
+# is returned to the client, it should be removed from
+# this file.
+#
+
+msgid  "%s operation issued before session established"
+msgid  "%s service not found, using reserved port 665"
+msgid  "abort attempt of session, %d, unsuccessful"
+msgid  "client disconnected"
+msgid  "confirm callback failed, aborting operation"
+msgid  "connection attempt failed"
+msgid  "failed to acquire reserved port"
+msgid  "failed to start a new session handler"
+msgid  "illegal argument to -%c flag (%s), exiting"
+msgid  "illegal option (-%c), exiting"
+msgid  "internal error: %s: %s"
+msgid  "invalid session establishment sequence"
+msgid  "message callback failed, continuing"
+msgid  "network initialization failed"
+msgid  "operation failed"
+msgid  "permission denied"
+msgid  "received an invalid message"
+msgid  "retry value invalid (%d)"
+msgid  "retrying operation, attempt %d"
+msgid  "session aborted"
+msgid  "timeout value invalid (%d)"
+msgid  "unable to receive message"
+msgid  "unable to send message for %s operation"
+msgid  "unknown operation requested"
+msgid  "unrecognized error reported"
+msgid  "unsupported message protocol version %d.%d"
+
+
+#
+# Miscellaneous strings
+#
+
+msgid  ""
+msgid  "%s\n"
+msgid  "%s: %s"
+msgid  "%s: %s\n"
+msgid  ", RDR_FAILED"
+msgid  ", RDR_SUCCESS"
+msgid  "<%d> %s"
+msgid  "INVALID TYPE"
+msgid  "RDR_CONF_ABORT_CMD"
+msgid  "RDR_CONF_AP_ID_CMP"
+msgid  "RDR_CONF_CHANGE_STATE"
+msgid  "RDR_CONF_CONFIRM_CALLBACK"
+msgid  "RDR_CONF_HELP"
+msgid  "RDR_CONF_LIST_EXT"
+msgid  "RDR_CONF_MSG_CALLBACK"
+msgid  "RDR_CONF_PRIVATE_FUNC"
+msgid  "RDR_CONF_TEST"
+msgid  "RDR_INVALID_OP"
+msgid  "RDR_REPLY"
+msgid  "RDR_REQUEST"
+msgid  "RDR_RSRC_INFO"
+msgid  "RDR_SES_CHALLENGE"
+msgid  "RDR_SES_END"
+msgid  "RDR_SES_ESTBL"
+msgid  "RDR_SES_REQ"
+msgid  "dcs_msg.c"
+msgid  "hdr"
+msgid  "malloc"
+msgid  "message %s: <%s, %s%s>\n"
+msgid  "received"
+msgid  "sent"

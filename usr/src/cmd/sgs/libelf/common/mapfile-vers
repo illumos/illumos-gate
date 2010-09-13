@@ -1,0 +1,177 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.7 {
+    global:
+	elf_getphdrnum;
+	elf_getshdrnum;
+	elf_getshdrstrndx;
+} SUNW_1.6;
+
+SYMBOL_VERSION SUNW_1.6 {
+    global:
+	elf_getphnum;
+} SUNW_1.5;
+
+SYMBOL_VERSION SUNW_1.5 {
+    global:
+	gelf_getcap;
+	gelf_update_cap;
+} SUNW_1.4;
+
+SYMBOL_VERSION SUNW_1.4 {
+    global:
+	elf_getshnum;
+	elf_getshstrndx;
+	gelf_getsymshndx;
+	gelf_update_symshndx;
+} SUNW_1.3;
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	elf32_checksum;
+	elf64_checksum;
+	gelf_checksum;
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	elf64_fsize;
+	elf64_getehdr;
+	elf64_getphdr;
+	elf64_getshdr;
+	elf64_newehdr;
+	elf64_newphdr;
+	elf64_xlatetof;
+	elf64_xlatetom;
+	gelf_getclass;
+	gelf_fsize;
+	gelf_getehdr;
+	gelf_update_ehdr;
+	gelf_newehdr;
+	gelf_getphdr;
+	gelf_update_phdr;
+	gelf_newphdr;
+	gelf_getshdr;
+	gelf_update_shdr;
+	gelf_xlatetof;
+	gelf_xlatetom;
+	gelf_getsym;
+	gelf_update_sym;
+	gelf_getsyminfo;
+	gelf_getmove;
+	gelf_update_move;
+	gelf_update_syminfo;
+	gelf_getdyn;
+	gelf_update_dyn;
+	gelf_getrela;
+	gelf_update_rela;
+	gelf_getrel;
+	gelf_update_rel;
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	elf_begin;
+	elf_end;
+	elf_memory;
+	elf_next;
+	elf_rand;
+	elf_cntl;
+	elf_errmsg;
+	elf_errno;
+	elf_fill;
+	elf_flagdata;
+	elf_flagehdr;
+	elf_flagelf;
+	elf_flagphdr;
+	elf_flagscn;
+	elf_flagshdr;
+	elf_getarhdr;
+	elf_getarsym;
+	elf_getbase;
+	elf_getdata;
+	elf_newdata;
+	elf_rawdata;
+	elf_getident;
+	elf_getscn;
+	elf_ndxscn;
+	elf_newscn;
+	elf_nextscn;
+	elf_hash;
+	elf_kind;
+	elf_rawfile;
+	elf_strptr;
+	elf_update;
+	elf_version;
+	nlist;
+	elf32_fsize;
+	elf32_getphdr;
+	elf32_newphdr;
+	elf32_getshdr;
+	elf32_getehdr;
+	elf32_newehdr;
+	elf32_xlatetof;
+	elf32_xlatetom;
+    local:
+	*;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_elf_execfill;
+	_elf_getarhdrbase;
+	_elf_getarsymwordsize;
+	_elf_getnextoff;
+	_elf_getxoff;
+	_elf_outsync;
+	_elf_sys_encoding;
+	_elf_swap_wrimage;
+	_gelf_getdyndtflags_1;
+
+$if _ELF32
+	elf_demangle;
+$endif
+};

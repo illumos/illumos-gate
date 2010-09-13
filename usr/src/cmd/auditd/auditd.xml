@@ -1,0 +1,343 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:auditd'>
+
+<service
+	name='system/auditd'
+	type='service'
+	version='1'>
+
+	<single_instance />
+
+	<dependency
+		name='usr'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependency
+		name='ns'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+	<dependency
+		name='syslog'
+		type='service'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/system-log' />
+	</dependency>
+
+
+	<dependent
+		name='multi-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user'/>
+	</dependent>
+
+	<dependent
+		name='console-login'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/console-login'/>
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-auditd'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec='/lib/svc/method/svc-auditd'
+		timeout_seconds='30'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<!--
+	  auditd waits for c2audit to quiet down after catching a -TERM
+	  before exiting; auditd's timeout is 20 seconds
+	-->
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill -TERM'
+		timeout_seconds='30'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<!-- SIGs HUP, TERM, and USR1 are all expected by auditd -->
+	<property_group name='startd' type='framework'>
+		<propval name='ignore_error' type='astring'
+			value='core,signal' />
+	</property_group>
+
+	<property_group name='general' type='framework'>
+		<!-- to start/stop auditd -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.audit' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.audit' />
+	</property_group>
+
+	<instance name='default' enabled='false'>
+
+	<!--
+	  System-wide audit preselection flags - see auditconfig(1M)
+	  and audit_flags(5).
+
+	  The 'flags' property is the system-wide default set of
+	  audit classes that is combined with the per-user audit
+	  flags to configure the process audit at login and role
+	  assumption time.
+
+	  The 'naflags' property is the set of audit classes for
+	  audit event selection when an event cannot be attributed
+	  to an authenticated user.
+	-->
+	<property_group name='preselection' type='application'>
+		<propval name='flags' type='astring'
+			value='lo' />
+		<propval name='naflags' type='astring'
+			value='lo' />
+		<propval name='read_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	<!--
+	  Audit Queue Control Properties - see auditconfig(1M)
+	    
+	    Note, that the default value for all the queue control
+	    configuration parameters is 0, which makes auditd(1M) to
+	    use current active system parameters.
+	-->
+	<property_group name='queuectrl' type='application' >
+		<propval name='qbufsz' type='count'
+			value='0' />
+		<propval name='qdelay' type='count'
+			value='0' />
+		<propval name='qhiwater' type='count'
+			value='0' />
+		<propval name='qlowater' type='count'
+			value='0' />
+		<propval name='read_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	<!--
+	  Audit Policies - see auditconfig(1M)
+
+	    Note, that "all" and "none" policies available as a
+	    auditconfig(1M) policy flags actually means a full/empty set
+	    of other policy flags. Thus they are not configurable in the
+	    auditd service manifest, but set all the policies to true
+	    (all) or false (none).
+	-->
+	<property_group name='policy' type='application' >
+		<propval name='ahlt' type='boolean'
+			value='false' />
+		<propval name='arge' type='boolean'
+			value='false' />
+		<propval name='argv' type='boolean'
+			value='false' />
+		<propval name='cnt' type='boolean'
+			value='true' />
+		<propval name='group' type='boolean'
+			value='false' />
+		<propval name='path' type='boolean'
+			value='false' />
+		<propval name='perzone' type='boolean'
+			value='false' />
+		<propval name='public' type='boolean'
+			value='false' />
+		<propval name='seq' type='boolean'
+			value='false' />
+		<propval name='trail' type='boolean'
+			value='false' />
+		<propval name='windata_down' type='boolean'
+			value='false' />
+		<propval name='windata_up' type='boolean'
+			value='false' />
+		<propval name='zonename' type='boolean'
+			value='false' />
+		<propval name='read_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	<!--
+	  Plugins to configure where to send the audit trail - see
+	  auditconfig(1M), audit_binfile(5), audit_remote(5),
+	  audit_syslog(5) 
+
+	  Each plugin type property group has properties:
+
+	  'active' is a boolean which defines whether or not
+	    to load the plugin.
+
+	  'path' is a string which defines name of the
+	    plugin's shared object in the file system.
+	    Relative paths assume a prefix of
+	    "/usr/lib/security/$ISA"
+
+	  'qsize' is an integer which defines a plugin specific
+	    maximum number of records that auditd will queue
+	    for it. A zero (0) value indicates not defined.
+	    This overrides the system's active queue control
+	    hiwater mark.
+
+	    and various attributes as defined on the plugin's man page
+	-->
+	<property_group name='audit_binfile' type='plugin' >
+		<propval name='active' type='boolean'
+			value='true' />
+		<propval name='path' type='astring'
+			value='audit_binfile.so' />
+		<propval name='qsize' type='count'
+			value='0' />
+		<propval name='p_dir' type='astring'
+			value='/var/audit' />
+		<propval name='p_minfree' type='count'
+			value='0' />
+		<propval name='p_fsize' type='count'
+			value='0' />
+		<property name='read_authorization' type='astring'>
+			<astring_list>
+				<value_node value='solaris.smf.manage.audit' />
+				<value_node value='solaris.smf.value.audit' />
+			</astring_list>
+		</property>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	<property_group name='audit_syslog' type='plugin' >
+		<propval name='active' type='boolean'
+			value='false' />
+		<propval name='path' type='astring'
+			value='audit_syslog.so' />
+		<propval name='qsize' type='count'
+			value='0' />
+		<propval name='p_flags' type='astring'
+			value='' />
+		<property name='read_authorization' type='astring'>
+			<astring_list>
+				<value_node value='solaris.smf.manage.audit' />
+				<value_node value='solaris.smf.value.audit' />
+			</astring_list>
+		</property>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	<property_group name='audit_remote' type='plugin' >
+		<propval name='active' type='boolean'
+			value='false' />
+		<propval name='path' type='astring'
+			value='audit_remote.so' />
+		<propval name='qsize' type='count'
+			value='0' />
+		<propval name='p_hosts' type='astring'
+			value='' />
+		<propval name='p_retries' type='count'
+			value='3' />
+		<propval name='p_timeout' type='count'
+			value='5' />
+		<property name='read_authorization' type='astring'>
+			<astring_list>
+				<value_node value='solaris.smf.manage.audit' />
+				<value_node value='solaris.smf.value.audit' />
+			</astring_list>
+		</property>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.audit' />
+	</property_group>
+
+	</instance>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				Solaris audit daemon
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='auditd'
+				section='1M'
+				manpath='/usr/share/man'/>
+			<manpage title='audit'
+				section='1M'
+				manpath='/usr/share/man'/>
+			<manpage title='auditconfig'
+				section='1M'
+				manpath='/usr/share/man'/>
+			<manpage title='audit_flags'
+				section='5'
+				manpath='/usr/share/man'/>
+			<manpage title='audit_binfile'
+				section='5'
+				manpath='/usr/share/man'/>
+			<manpage title='audit_syslog'
+				section='5'
+				manpath='/usr/share/man'/>
+			<manpage title='audit_remote'
+				section='5'
+				manpath='/usr/share/man'/>
+	         </documentation>
+	</template>
+
+</service>
+
+</service_bundle>

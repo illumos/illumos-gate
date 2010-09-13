@@ -1,0 +1,106 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* Define if an absolute indirect call/jump must NOT be prefixed with `*' */
+#undef ABSOLUTE_WITHOUT_ASTERISK
+
+/* Define it to \"addr32\" or \"addr32;\" to make GAS happy */
+#undef ADDR32
+
+/* Define if you don't want to pass the mem= option to Linux */
+#undef AUTO_LINUX_MEM_OPT
+
+/* Define it to \"data32\" or \"data32;\" to make GAS happy */
+#undef DATA32
+
+/* Define if C symbols get an underscore after compilation */
+#undef HAVE_ASM_USCORE
+
+/* Define to 1 if you have the <curses.h> header file. */
+#undef HAVE_CURSES_H
+
+/* Define if edata is defined */
+#undef HAVE_EDATA_SYMBOL
+
+/* Define if end is defined */
+#undef HAVE_END_SYMBOL
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define if you have a curses library */
+#undef HAVE_LIBCURSES
+
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the <ncurses/curses.h> header file. */
+#undef HAVE_NCURSES_CURSES_H
+
+/* Define to 1 if you have the <ncurses.h> header file. */
+#undef HAVE_NCURSES_H
+
+/* Define if opendisk() in -lutil can be used */
+#undef HAVE_OPENDISK
+
+/* Define if start is defined */
+#undef HAVE_START_SYMBOL
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define if _edata is defined */
+#undef HAVE_USCORE_EDATA_SYMBOL
+
+/* Define if end is defined */
+#undef HAVE_USCORE_END_SYMBOL
+
+/* Define if _start is defined */
+#undef HAVE_USCORE_START_SYMBOL
+
+/* Define if __bss_start is defined */
+#undef HAVE_USCORE_USCORE_BSS_START_SYMBOL
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Define if there is user specified preset menu string */
+#undef PRESET_MENU_STRING
+
+/* Define to 1 if you have the ANSI C header files. */
+#undef STDC_HEADERS
+
+/* Version number of package */
+#undef VERSION

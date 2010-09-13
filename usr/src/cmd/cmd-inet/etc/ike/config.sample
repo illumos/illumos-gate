@@ -1,0 +1,133 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+##
+## This file should be copied into /etc/inet/ike/config to enable the
+## launch of the IKE daemon, in.iked(1m), at boot time.  You can also
+## launch the IKE daemon after creating this file without rebooting by
+## invoking /usr/lib/inet/in.iked with a root shell.
+##
+
+# Consult the ike.config(4) man page for further details.  Here is a small
+# example from the man page.
+
+### BEGINNING OF FILE
+
+### First some global parameters...
+
+## Optional hardware acceleration parameters...
+## Use the pathname of a library that supports PKCS#11 in quotes.
+## The example path is for the Sun Crypto Accelerator 1000.
+# pkcs11_path "/opt/SUNWconn/lib/libpkcs11.so"
+
+## certificate parameters...
+
+# Root certificates.  I SHOULD use a full Distinguished Name.
+# I MUST have this certificate in my local filesystem, see ikecert(1m).
+cert_root    "C=US, O=Sun Microsystems\\, Inc., CN=Sun CA"
+
+# Explicitly trusted certs that need no signatures, or perhaps self-signed
+# ones.  Like root certificates, use full DNs for them for now.
+cert_trust    "EMAIL=root@domain.org"
+
+# Where do I send LDAP requests?
+ldap_server   "ldap1.domain.org,ldap2.domain.org:389"
+
+# Some PKI-specific tweaks...
+# If you wish to ignore CRLs, uncomment this:
+#ignore_crls
+# If you wish to use HTTP (with name resolution) for URLs inside certs,
+# uncomment this:
+#use_http
+# HTTP proxy and socks URLs should also be indicated if needed...
+socks "socks://socks-relay.domain.org"
+#proxy "http://http-proxy.domain.org:8080"
+
+## Phase 1 transform defaults...
+
+p1_lifetime_secs 14400
+p1_nonce_len 20
+
+## Parameters that may also show up in rules.
+
+p1_xform { auth_method preshared oakley_group 5 auth_alg sha encr_alg 3des }
+p2_pfs 2
+
+### Now some rules...
+
+{
+   label "simple inheritor"
+   local_id_type ip
+   local_addr 10.1.1.1
+   remote_addr 10.1.1.2
+}
+
+{
+   # an index-only rule.  If I'm a receiver, and all I 
+   # have are index-only rules, what do I do about inbound IKE requests?
+   # Answer:  Take them all!
+
+   label "default rule"
+   # Use whatever "host" (e.g. IP address) identity is appropriate
+   local_id_type ipv4
+
+   local_addr 0.0.0.0/0
+   remote_addr 0.0.0.0/0
+
+   p2_pfs 5
+
+   # Now I'm going to have the p1_xforms
+   p1_xform
+   {auth_method preshared  oakley_group 5  auth_alg md5  encr_alg blowfish }
+   p1_xform
+   {auth_method preshared  oakley_group 5  auth_alg md5  encr_alg 3des }
+
+   # After said list, another keyword (or a '}') will stop xform parsing.
+}
+
+{
+   # Let's try something a little more conventional.
+
+   label "host to .80 subnet"
+   local_id_type ip
+   local_id "10.1.86.51"
+
+   remote_id ""    # Take any, use remote_addr for access control.
+
+   local_addr 10.1.86.51
+   remote_addr 10.1.80.0/24
+
+   p1_xform 
+   { auth_method rsa_sig  oakley_group 5  auth_alg md5  encr_alg 3des }
+   p1_xform
+   { auth_method rsa_sig  oakley_group 5  auth_alg md5  encr_alg blowfish }
+   p1_xform 
+   { auth_method rsa_sig  oakley_group 5  auth_alg sha1  encr_alg 3des }
+   p1_xform
+   { auth_method rsa_sig  oakley_group 5  auth_alg sha1  encr_alg blowfish }
+}
+

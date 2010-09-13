@@ -1,0 +1,127 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This configuration file is parsed by PICL plugin envmon in response
+ * to a PICL_FRU_ADDED event for FT6
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+#ifndef RMCLOMV
+#define	RMCLOMV	/platform/ebus@1f,464000/rmc-comm@2,0/SUNW,rmclomv
+#endif
+#ifndef PDB_1U
+#define PDB_1U /frutree/chassis/PDB/power-distribution-board
+#endif
+#ifndef PDB_2U
+#define PDB_2U /frutree/chassis/PDB/power-distribution-board/HDDFB/fan-connector-board
+#endif
+
+
+/*
+ * Create device table and location parents for Seattle 1U fans
+ */
+name:PDB_1U/FT6/fan-tray/F0
+    TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/pdb_ft6_f0
+	ENDROW
+    ENDTABLE
+name:PDB_1U/FT6/fan-tray/F1
+    TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/pdb_ft6_f1
+	ENDROW
+    ENDTABLE
+name:RMCLOMV/pdb_ft6_f0
+    REFPROP _location_parent name:PDB_1U/FT6/fan-tray/F0
+name:RMCLOMV/pdb_ft6_f1
+    REFPROP _location_parent name:PDB_1U/FT6/fan-tray/F1
+
+
+/*
+ * Create device table and location parents for Seattle 2U fans
+ */
+name:PDB_2U/FT6/fan-tray/F0
+    TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/pdb_hddfb_ft6_f0
+	ENDROW
+    ENDTABLE
+name:PDB_2U/FT6/fan-tray/F1
+    TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/pdb_hddfb_ft6_f1
+	ENDROW
+    ENDTABLE
+name:RMCLOMV/pdb_hddfb_ft6_f0
+    REFPROP _location_parent name:PDB_2U/FT6/fan-tray/F0
+name:RMCLOMV/pdb_hddfb_ft6_f1
+    REFPROP _location_parent name:PDB_2U/FT6/fan-tray/F1

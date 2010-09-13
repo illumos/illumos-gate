@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/routing_include.sh
+. /lib/svc/share/ipf_include.sh
+
+smf_configure_ip || exit $SMF_EXIT_OK
+
+create_ipf_rules()
+{
+	FMRI=$1
+	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+
+	#
+	# Allow incoming icmp from routers for successful discovery.
+	echo "# $FMRI" >$file
+	gen_IRDP_rules $file
+}
+
+if [ -n "$1" -a "$1" = "ipfilter" ]; then
+	create_ipf_rules $2
+	exit "$SMF_EXIT_OK"
+fi
+
+daemon_args=`get_daemon_args $SMF_FMRI`
+options="afsp:T:r"
+
+#
+# Handle upgrade - routing/daemon-args property must be mapped to properties
+# in routeadm property group.  The -s option is not supported as it is
+# not compatible with SMF.
+#
+if [ -n "$daemon_args" ]; then
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "a" accept_all true false
+	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "p" preference 0
+	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "T" transmit_interval 600
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "r" act_as_router true false
+	set_daemon_nonoption_properties "$SMF_FMRI" "$daemon_args" \
+	    "$options" "send_address receive_address"
+	clear_daemon_args $SMF_FMRI
+fi
+
+#
+# Assemble arguments to daemon from properties
+#
+args="`get_daemon_option_from_boolean_property $SMF_FMRI accept_all -a true`"
+args="$args `get_daemon_option_from_property $SMF_FMRI preference -p 0`"
+args="$args `get_daemon_option_from_property $SMF_FMRI transmit_interval \
+	T 600`"
+args="$args `get_daemon_option_from_boolean_property $SMF_FMRI act_as_router \
+	-r true`"
+args="$args `get_daemon_nonoption_property $SMF_FMRI send_address`"
+args="$args `get_daemon_nonoption_property $SMF_FMRI receive_address`"
+
+/usr/sbin/in.rdisc $args -f
+
+[ "$?" = 0 ] || exit $SMF_EXIT_ERR_FATAL
+
+exit "$SMF_EXIT_OK"

@@ -1,0 +1,135 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+.KEEP_STATE:
+.SUFFIXES:
+
+PROG = kmdbmod
+
+include ../Makefile.kmdb
+include ../../Makefile.kmdb
+include ../../../Makefile.versions
+include ../../../Makefile.tools
+include ../../../Makefile.kmdb.files
+
+OBJS += mdb_lex.o mdb_grammar.o
+
+.NO_PARALLEL:
+.PARALLEL: kmdb_modlinktest.o kmdb_terminfo.c $(ALLOBJS) $(ALLOBJS:%.o=%.ln)
+
+SRCINCDIRS	+= . .. ../.. ../../../common ../../../common/libstand
+OSINCDIRS	+= $(SRC)/uts/$(MMU) $(SRC)/uts/$(ISADIR)
+
+INCDIRS	= $(SRCINCDIRS) $(OSINCDIRS)
+
+# We don't want thread-specific errno's in kmdb, as we're single-threaded.
+DTS_ERRNO=
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS += -D_MDB -D_KMDB $(INCDIRS:%=-I%) $(ARCHOPTS)
+
+#
+# kmdb is a kernel module, so we'll use the kernel's build flags.
+CFLAGS += $(STAND_FLAGS_32)
+CFLAGS64 += $(STAND_FLAGS_64)
+
+ASFLAGS += -P -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
+
+SUBDIR64_sparc		= sparcv9
+SUBDIR64_i386		= amd64
+SUBDIR64		= $(SUBDIR64_$(MACH))
+
+#
+# Terminal types supported by kmdb
+#
+SUPPORTED_TERMS	= \
+	ansi \
+	at386 \
+	AT386 \
+	dtterm \
+	h19 \
+	sun \
+	sun-cmd \
+	sun-color \
+	vt100 \
+	vt52 \
+	wyse30 \
+	wyse50 \
+	wyse60 \
+	xterm \
+	xterms
+
+LINTFLAGS += -n -errtags=yes
+
+# The prom interfaces (the prom_* files) are compiled with -D_KERNEL, which
+# teaches them about the kernel version of the synchronization functions, while
+# the core of kmdb, which is compiled without -D_KERNEL, knows about the
+# userland versions.  Even though nobody actually uses either one, lint
+# complains that both know about different versions.  The same thing applies
+# to the driver, parts of which are executed directly by the kernel, and other
+# parts which are called by kmdb via the auxv.
+ALLLINTFLAGS = $(LINTFLAGS) \
+	-xerroff=E_FUNC_DECL_VAR_ARG2 \
+	-xerroff=E_INCONS_ARG_DECL \
+	-xerroff=E_INCONS_ARG_DECL2 \
+	-xerroff=E_INCONS_ARG_USED2 \
+	-xerroff=E_INCONS_VAL_TYPE_DECL2 \
+	-xerroff=E_INCONS_VAL_TYPE_USED2
+
+MAPFILE = mapfile
+MAPFILE_INTERMEDIATE = $(MAPFILE).i
+MAPFILE_TEMPLATE = ../../../common/kmdb/mapfile_skel
+MAPFILE_SOURCES_COMMON = \
+	../../../common/kmdb/kmdb_dpi.h \
+	../../../common/kmdb/kmdb_kctl.h \
+	../../../common/kmdb/kmdb_kdi.h \
+	../../../common/kmdb/kmdb_wr.h \
+	../../../common/mdb/mdb_ctf.h \
+	../../../common/mdb/mdb_ks.h \
+	../../../common/mdb/mdb_modapi.h \
+	../../../common/mdb/mdb_param.h \
+	../../../common/mdb/mdb_whatis.h
+
+mdb_lex.o mdb_grammar.o := CCVERBOSE =
+
+kmdb_ctf_open.o kmdb_ctf_open.ln	:= CPPFLAGS += -I$(SRC)/common/ctf
+
+PROMTGTS	= $(PROMOBJS) $(PROMOBJS:%.o=%.ln)
+VERSTGTS	= $(VERSOBJS) $(VERSOBJS:%.o=%.ln)
+KCTLTGTS	= $(KCTLOBJS) $(KCTLOBJS:%.o=%.ln)
+
+$(PROMTGTS) := CPPFLAGS += -D_BOOT -D_KERNEL -D_MACHDEP $(PROMINCDIRS:%=-I%) \
+	-Dassfail=kmdb_prom_assfail
+
+$(VERSTGTS) := CPPFLAGS += -DKMDB_VERSION='$(KMDB_VERSION)'
+
+$(KCTLTGTS) := CPPFLAGS += -D_KERNEL
+$(KCTLTGTS) := ASFLAGS += -D_KERNEL
+
+ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
+
+$(ROOTMISC) $(ROOTMISC64) := FILEMODE = 0755
+
+include ../../../Makefile.kmdb.targ

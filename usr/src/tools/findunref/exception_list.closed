@@ -1,0 +1,77 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# closed-tree exception list
+#
+# See README.exception_lists for details
+#
+
+#
+# Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
+#
+./usr/closed/uts/sun4v/io/n2cp/Makefile
+./usr/closed/uts/sun4v/io/ncp/Makefile
+
+#
+# Ignore files that are only used for warlock
+#
+./usr/closed/uts/sparc/marvell88sx/Makefile
+
+#
+# An unfortunate artifact of the bridged, split gate is that closed-source
+# deleted files go where findunref can accidentally find them...
+#
+# And an unfortunate artifact of using these tools with both full Teamware
+# and split, non-Teamware workspaces is that sometimes closed/deleted_files
+# won't exist, so we need the ISUSED directive here.
+#
+# ISUSED - let checkpaths know that the next entry is good.
+./usr/closed/deleted_files
+
+#
+# Ignore some files originally shared by Broadcom as part of bnxe driver
+#
+./usr/closed/uts/common/io/bnxe/577xx
+./usr/closed/uts/common/io/bnxe/src/bnxe_debug.h
+
+#
+# Ignore some files originally shared by Broadcom as part of bnx driver
+#
+./usr/closed/uts/common/io/bnx/hsi.h
+./usr/closed/uts/common/io/bnx/invm_cfg.h
+./usr/closed/uts/common/io/bnx/iparms.h
+./usr/closed/uts/common/io/bnx/itypes.h
+./usr/closed/uts/common/io/bnx/status_code.h
+./usr/closed/uts/common/io/bnx/tcp_ctx.h
+./usr/closed/uts/common/io/bnx/toe_ctx.h
+./usr/closed/uts/common/io/bnx/bnxdbg.c
+
+#
+# Ignore Makefile.tonic - not used unless we're running an
+# OpenSolaris closedbins delivery build
+#
+./usr/closed/Makefile.tonic
+

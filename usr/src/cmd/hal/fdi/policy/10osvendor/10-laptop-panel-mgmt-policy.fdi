@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <device>
+    <match key="info.category" string="laptop_panel">
+      <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.LaptopPanel</append>
+
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_names" type="strlist">SetBrightness</append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_signatures" type="strlist">i</append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_argnames" type="strlist">brightness_value</append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_execpaths" type="strlist">hal-system-lcd-set-brightness</append>
+
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_names" type="strlist">GetBrightness</append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.LaptopPanel.method_execpaths" type="strlist">hal-system-lcd-get-brightness</append>
+    </match>
+  </device>
+
+  <!-- On some borken laptops, the brightness control is all done in hardware
+       but the hardware also synthesizes keypresses when the brightness is
+       changed. This gives power manager software problems as the brightness
+       can get into a feedback state so the panel flashes uncontrollably.
+       This is a hardware "feature" seen on IBM x31 laptops. -->
+  <device>
+    <match key="info.category" string="laptop_panel">
+      <match key="/org/freedesktop/Hal/devices/computer:smbios.system.manufacturer" string="IBM">
+        <match key="/org/freedesktop/Hal/devices/computer:smbios.system.version" string="ThinkPad X31">
+          <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+        </match>
+      </match>
+    </match>
+  </device>
+
+  <!-- this is for Macbook Pro (LCD panel, light sensor, keyboard backlight) -->
+  <device>
+    <match key="system.kernel.name" string="Linux">
+      <match key="smbios.system.manufacturer" string="Apple Computer, Inc.">
+        <match key="smbios.system.product" string="MacBookPro1,1">
+          <spawn udi="/org/freedesktop/Hal/devices/macbook_pro_light_sensor"/>
+          <spawn udi="/org/freedesktop/Hal/devices/macbook_pro_keyboard_backlight"/>
+          <spawn udi="/org/freedesktop/Hal/devices/macbook_pro_lcd_panel"/>
+        </match>
+      </match>
+    </match>
+  </device>
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/macbook_pro_lcd_panel">
+      <append key="info.capabilities" type="strlist">laptop_panel</append>
+      <merge key="info.product" type="string">MacBook Pro Laptop Panel</merge>
+      <merge key="laptop_panel.access_method" type="string">custom</merge>
+      <merge key="laptop_panel.num_levels" type="int">229</merge>
+      <append key="info.addons" type="strlist">hald-addon-macbookpro-backlight</append>
+    </match>
+  </device>
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/macbook_pro_light_sensor">
+      <append key="info.capabilities" type="strlist">light_sensor</append>
+      <merge key="info.product" type="string">MacBook Pro Light Sensor</merge>
+      <merge key="light_sensor.num_sensors" type="int">2</merge>
+      <merge key="light_sensor.num_levels" type="int">256</merge>
+      <append key="light_sensor.sensor_locations" type="strlist">right</append>
+      <append key="light_sensor.sensor_locations" type="strlist">left</append>
+    </match>
+  </device>
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/macbook_pro_keyboard_backlight">
+      <append key="info.capabilities" type="strlist">keyboard_backlight</append>
+      <merge key="info.product" type="string">MacBook Pro Keyboard Backlight</merge>
+      <merge key="keyboard_backlight.num_levels" type="int">256</merge>
+    </match>
+  </device>
+
+</deviceinfo>

@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+  ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+<xs:element name="specification">
+	<xs:complexType>
+		<xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element name="debug" type="debug_t" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="event" type="event_t" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="token" type="token_t" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="msg_list" type="msg_list_t" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+</xs:element>
+
+<xs:complexType name="debug_t">
+	<xs:attribute name="set" use="required">
+		<xs:simpleType>
+			<xs:restriction base="xs:string">
+				<xs:enumeration value="on"/>
+				<xs:enumeration value="off"/>
+			</xs:restriction>
+		</xs:simpleType>
+	</xs:attribute>
+</xs:complexType>
+
+<xs:complexType name="event_t">
+	<xs:sequence minOccurs="0">
+		<xs:element name="debug" type="debug_t" minOccurs="0"/>
+		<xs:element name="altname" type="xs:string" minOccurs="0"/>
+		<xs:element name="title" type="xs:string" minOccurs="0" maxOccurs="1"/>
+		<xs:element name="program" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="see" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="entry" type="entry_t" minOccurs="0" maxOccurs="unbounded"/>
+	</xs:sequence>
+	<xs:attribute name="id" type="xs:string" use="required"/>
+	<xs:attribute name="reorder">
+		<xs:simpleType>
+			<xs:restriction base="xs:string">
+				<xs:enumeration value="yes"/>
+				<xs:enumeration value="no"/>
+			</xs:restriction>
+		</xs:simpleType>
+	</xs:attribute>
+	<xs:attribute name="header" type="xs:unsignedShort"/>
+	<xs:attribute name="idNo" type="xs:unsignedShort"/>
+	<xs:attribute name="type" type="xs:string"/>
+	<xs:attribute name="omit">
+		<xs:simpleType>
+			<xs:restriction base="xs:string">
+				<xs:enumeration value="no"/>
+				<xs:enumeration value="always"/>
+				<xs:enumeration value="JNI"/>
+			</xs:restriction>
+		</xs:simpleType>
+	</xs:attribute>
+	<xs:attribute name="instance_of" type="xs:string"/>
+</xs:complexType>
+
+<xs:complexType name="entry_t">
+	<xs:sequence>
+		<xs:element name="debug" type="debug_t" minOccurs="0"/>
+		<xs:element name="internal">
+			<xs:complexType>
+				<xs:attribute name="token" type="xs:string" use="required"/>
+				<xs:attribute name="order" type="xs:unsignedShort"/>
+				<xs:attribute name="format" type="xs:string"/>
+			</xs:complexType>
+		</xs:element>
+		<xs:element name="external">
+			<xs:complexType>
+				<xs:attribute name="opt" use="required">
+					<xs:simpleType>
+						<xs:restriction base="xs:string">
+							<xs:enumeration value="required"/>
+							<xs:enumeration value="optional"/>
+							<xs:enumeration value="obsolete"/>
+							<xs:enumeration value="none"/>
+						</xs:restriction>
+					</xs:simpleType>
+				</xs:attribute>
+				<xs:attribute name="type" type="xs:string"/>
+			</xs:complexType>
+		</xs:element>
+		<xs:element name="comment" type="xs:string" minOccurs="0" maxOccurs="1"/>
+	</xs:sequence>
+	<xs:attribute name="id" type="xs:string" use="required"/>
+</xs:complexType>
+
+<xs:simpleType name="bool_t">
+	<xs:restriction base="xs:string">
+		<xs:enumeration value="true"/>
+		<xs:enumeration value="false"/>
+	</xs:restriction>
+</xs:simpleType>
+
+<xs:complexType name="token_t">
+	<xs:simpleContent>
+		<xs:extension base="xs:string">
+			<xs:attribute name="id" type="xs:string" use="required"/>
+			<xs:attribute name="usage" type="xs:string"/>
+		</xs:extension>
+	</xs:simpleContent>
+</xs:complexType>
+
+<xs:complexType name="msg_list_t">
+	<xs:sequence>
+		<xs:element name="msg" minOccurs="0" maxOccurs="unbounded">
+			<xs:complexType>
+				<xs:simpleContent>
+					<xs:extension base="xs:string">
+						<xs:attribute name="id" type="xs:string"/>
+					</xs:extension>
+				</xs:simpleContent>
+			</xs:complexType>
+		</xs:element>
+	</xs:sequence>
+	<xs:attribute name="id" type="xs:string" use="required"/>
+	<xs:attribute name="header" type="xs:unsignedShort" use="required"/>
+	<xs:attribute name="start" type="xs:unsignedShort"/>
+	<xs:attribute name="public" type="bool_t"/>
+	<xs:attribute name="deprecated" type="bool_t"/>
+</xs:complexType>
+
+</xs:schema>

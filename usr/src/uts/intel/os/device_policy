@@ -1,0 +1,11 @@
+#
+# Device policy configuration file.   When devices are opened the
+# additional access controls in this file are enforced.
+#
+# The format of this file is subject to change without notice.
+#
+# Default open privileges, must be first entry in the file.
+#
+
+*		read_priv_set=none		write_priv_set=none
+md:admin					write_priv_set=sys_config

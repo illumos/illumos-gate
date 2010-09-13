@@ -1,0 +1,542 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
+# All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+#
+# In a shared-IP zone we need this service to be up, but all of the work
+# it tries to do is irrelevant (and will actually lead to the service 
+# failing if we try to do it), so just bail out. 
+# In the global zone and exclusive-IP zones we proceed.
+#
+smf_configure_ip || exit $SMF_EXIT_OK
+
+
+# Make sure that the libraries essential to this stage of booting can be found.
+LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
+
+smf_netstrategy
+
+if smf_is_globalzone; then
+	net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
+
+	# Update PVID on interfaces configured with VLAN 1
+	update_pvid
+
+	# 
+	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
+	# commands. Note that after we are done, we cannot rename the upgrade
+	# script file as the file system is still read-only at this point.
+	# Defer this to the manifest-import service.
+	#
+	upgrade_script=/var/svc/profile/upgrade_datalink
+	if [ -f "${upgrade_script}" ]; then 
+		. "${upgrade_script}"
+	fi
+
+	#
+	# Upgrade handling for ibd:
+	# After we are done with the upgrade handling, we can not set the
+	# ibd/ibd_upgraded property to "true" as the file system is
+	# read-only at this point. It will be done later by ibd-post-upgrade
+	# service.
+	#
+	ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
+	    $SMF_FMRI 2> /dev/null`
+	if [ "$ibd_upgraded" != "true" ]; then
+		/sbin/ibd_upgrade -v
+	fi
+
+	#
+	# Bring up simnets, link aggregations and initialize security objects.
+	# Note that link property initialization is deferred until after
+	# IP interfaces are plumbed to ensure that the links will not
+	# be unloaded (and the property settings lost). We should bring
+	# up simnets prior to VLANs/Aggrs to enable creation of VLANs/Aggrs
+	# over simnets.
+	#
+	/sbin/dladm up-simnet
+	/sbin/dladm up-aggr
+	/sbin/dladm up-vlan
+	/sbin/dladm up-part
+	/sbin/dladm init-secobj
+	#
+	# Bring up VNICs
+	#
+	/sbin/dladm up-vnic
+	#
+	# Create flows via flowadm.
+	#
+	/sbin/flowadm init-flow
+fi
+
+#
+# If the system was net booted by DHCP, hand DHCP management off to the
+# DHCP agent (ifconfig communicates to the DHCP agent through the
+# loopback interface).
+#
+if [ -n "$_INIT_NET_IF" -a "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+	/sbin/dhcpagent -a
+fi
+
+#
+# The network initialization is done early to support diskless and
+# dataless configurations.  For IPv4 interfaces that were configured by
+# the kernel (e.g.  those on diskless machines) and not configured by
+# DHCP, reset the netmask using the local "/etc/netmasks" file if one
+# exists, and then reset the broadcast address based on the netmask.
+#
+/sbin/ifconfig -auD4 netmask + broadcast +
+
+is_iptun ()
+{
+	intf=$1
+	# Is this a persistent IP tunnel link?
+	/sbin/dladm show-iptun -P $intf > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return 0
+	fi
+	# Is this an implicit IP tunnel (i.e., ip.tun0)
+	ORIGIFS="$IFS"
+	IFS="$IFS."
+	set -- $intf
+	IFS="$ORIGIFS"
+	if [ $# -eq 2 -a \( "$1" = "ip" -o "$1" = "ip6" \) ]; then
+		#
+		# It looks like one, but another type of link might be
+		# using a name that looks like an implicit IP tunnel.
+		# If dladm show-link -P finds it, then it's not an IP
+		# tunnel.
+		#
+		/sbin/dladm show-link -Pp $intf > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			return 1
+		else
+			return 0
+		fi
+	fi
+	return 1
+}
+
+#
+# All the IPv4 and IPv6 interfaces are plumbed before doing any
+# interface configuration.  This prevents errors from plumb failures
+# getting mixed in with the configured interface lists that the script
+# outputs.
+#
+
+#
+# First deal with /etc/hostname
+#
+# Get the list of IPv4 interfaces to configure by breaking
+# /etc/hostname.* into separate args by using "." as a shell separator
+# character.
+#
+interface_names="`echo /etc/hostname.*[0-9] 2>/dev/null`"
+if [ "$interface_names" != "/etc/hostname.*[0-9]" ]; then
+	ORIGIFS="$IFS"
+	IFS="$IFS."
+	set -- $interface_names
+	IFS="$ORIGIFS"
+	while [ $# -ge 2 ]; do
+		shift
+		intf_name=$1
+		while [ $# -gt 1 -a "$2" != "/etc/hostname" ]; do
+			intf_name="$intf_name.$2"
+			shift
+		done
+		shift
+
+		# skip IP tunnel interfaces plumbed by net-iptun.
+		if is_iptun $intf_name; then
+			continue
+		fi
+
+	        read one rest < /etc/hostname.$intf_name
+		if [ "$one" = ipmp ]; then
+			ipmp_list="$ipmp_list $intf_name"
+		else
+			inet_list="$inet_list $intf_name"
+		fi
+	done
+fi
+
+#
+# Get the list of IPv6 interfaces to configure by breaking
+# /etc/hostname6.* into separate args by using "." as a shell separator
+# character.
+#
+interface_names="`echo /etc/hostname6.*[0-9] 2>/dev/null`"
+if [ "$interface_names" != "/etc/hostname6.*[0-9]" ]; then
+	ORIGIFS="$IFS"
+	IFS="$IFS."
+	set -- $interface_names
+	IFS="$ORIGIFS"
+	while [ $# -ge 2 ]; do
+		shift
+		intf_name=$1
+		while [ $# -gt 1 -a "$2" != "/etc/hostname6" ]; do
+			intf_name="$intf_name.$2"
+			shift
+		done
+		shift
+
+		# skip IP tunnel interfaces plumbed by net-iptun.
+		if is_iptun $intf_name; then
+			continue
+		fi
+
+	        read one rest < /etc/hostname6.$intf_name
+		if [ "$one" = ipmp ]; then
+			ipmp6_list="$ipmp6_list $intf_name"
+		else
+			inet6_list="$inet6_list $intf_name"
+		fi
+	done
+fi
+
+#
+# Create all of the IPv4 IPMP interfaces.
+#
+if [ -n "$ipmp_list" ]; then
+	set -- $ipmp_list
+	while [ $# -gt 0 ]; do
+	    	if /sbin/ifconfig $1 ipmp; then
+			ipmp_created="$ipmp_created $1"
+		else
+			ipmp_failed="$ipmp_failed $1"
+		fi	
+		shift
+	done
+	[ -n "$ipmp_failed" ] && warn_failed_ifs "create IPv4 IPMP" \
+	    "$ipmp_failed"
+fi
+
+#
+# Step through the IPv4 interface list and try to plumb every interface.
+# Generate list of plumbed and failed IPv4 interfaces.
+#
+if [ -n "$inet_list" ]; then
+	set -- $inet_list
+	while [ $# -gt 0 ]; do
+		/sbin/ifconfig $1 plumb
+		if /sbin/ifconfig $1 inet >/dev/null 2>&1; then
+			inet_plumbed="$inet_plumbed $1"
+		else
+			inet_failed="$inet_failed $1"
+		fi
+		shift
+	done
+	[ -n "$inet_failed" ] && warn_failed_ifs "plumb IPv4" "$inet_failed"
+fi
+
+# Run autoconf to connect to a WLAN if the interface is a wireless one
+if [ -x /sbin/wificonfig -a -n "$inet_plumbed" ]; then
+	set -- $inet_plumbed
+	while [ $# -gt 0 ]; do
+			if [ -r /dev/wifi/$1 ]; then
+				/sbin/wificonfig -i $1 startconf >/dev/null
+			fi
+		shift
+	done
+fi
+
+#
+# Step through the IPv6 interface list and plumb every interface.
+# Generate list of plumbed and failed IPv6 interfaces.  Each plumbed
+# interface will be brought up later, after processing any contents of
+# the /etc/hostname6.* file.
+#
+if [ -n "$inet6_list" ]; then
+	set -- $inet6_list
+	while [ $# -gt 0 ]; do
+		/sbin/ifconfig $1 inet6 plumb
+		if /sbin/ifconfig $1 inet6 >/dev/null 2>&1; then
+			inet6_plumbed="$inet6_plumbed $1"
+		else
+			inet6_failed="$inet6_failed $1"
+		fi
+		shift
+	done
+	[ -n "$inet6_failed" ] && warn_failed_ifs "plumb IPv6" "$inet6_failed"
+fi
+
+#
+# Create all of the IPv6 IPMP interfaces.
+#
+if [ -n "$ipmp6_list" ]; then
+	set -- $ipmp6_list
+	while [ $# -gt 0 ]; do
+	    	if /sbin/ifconfig $1 inet6 ipmp; then
+			ipmp6_created="$ipmp6_created $1"
+		else
+			ipmp6_failed="$ipmp6_failed $1"
+ 		fi
+		shift
+	done
+	[ -n "$ipmp6_failed" ] && warn_failed_ifs "create IPv6 IPMP" \
+	    "$ipmp6_failed"
+fi
+
+#
+# Finally configure interfaces set up with ipadm. Any /etc/hostname*.intf
+# files take precedence over ipadm defined configurations except when
+# we are in a non-global zone and Layer-3 protection of IP addresses is
+# enforced on the interface by the global zone.
+#
+for showif_output in `/sbin/ipadm show-if -p -o ifname,state,current`; do
+	intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
+	state=`echo $showif_output | /usr/bin/cut -f2 -d:`
+	current=`echo $showif_output | /usr/bin/cut -f3 -d:`
+	if  [[ "$state" != "disabled" && $current != *Z* ]]; then
+		#
+		# skip if not a persistent interface, or if it should get IP
+		# configuration from the global zone ('Z' flag is set)
+		#
+		continue;
+	elif is_iptun $intf; then
+		# skip IP tunnel interfaces plumbed by net-iptun
+		continue;
+	elif [ -f /etc/hostname.$intf ] || [ -f /etc/hostname6.$intf ]; then
+		if [[ $current != *Z* ]]; then
+			echo "found /etc/hostname.$intf "\
+			    "or /etc/hostname6.$intf, "\
+			    "ignoring ipadm configuration" > /dev/msglog
+			continue;
+		else
+			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog 
+			/sbin/ifconfig $intf unplumb > /dev/null 2>&1
+			/sbin/ifconfig $intf inet6 unplumb > /dev/null 2>&1
+		fi
+	fi
+
+	# Enable the interface managed by ipadm
+	/sbin/ipadm enable-if -t $intf
+done
+
+#
+# Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these
+# before non-IPMP interfaces avoids accidental implicit IPMP group creation.
+#
+[ -n "$ipmp_created" ] && if_configure inet "IPMP" $ipmp_created
+[ -n "$ipmp6_created" ] && if_configure inet6 "IPMP" $ipmp6_created
+
+#
+# Process the /etc/hostname[6].* files for non-IPMP interfaces.
+#
+[ -n "$inet_plumbed" ] && if_configure inet "" $inet_plumbed
+[ -n "$inet6_plumbed" ] && if_configure inet6 "" $inet6_plumbed
+
+#
+# For the IPv4 and IPv6 interfaces that failed to plumb, find (or create)
+# IPMP meta-interfaces to host their data addresses.
+#
+[ -n "$inet_failed" ] && move_addresses inet
+[ -n "$inet6_failed" ] && move_addresses inet6
+
+# Run DHCP if requested. Skip boot-configured interface.
+interface_names="`echo /etc/dhcp.*[0-9] 2>/dev/null`"
+if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
+	#
+	# First find the primary interface. Default to the first
+	# interface if not specified. First primary interface found
+	# "wins". Use care not to "reconfigure" a net-booted interface
+	# configured using DHCP. Run through the list of interfaces
+	# again, this time trying DHCP.
+	#
+	i4d_fail=
+	firstif=
+	primary=
+	ORIGIFS="$IFS"
+	IFS="${IFS}."
+	set -- $interface_names
+
+	while [ $# -ge 2 ]; do
+		shift
+		[ -z "$firstif" ] && firstif=$1
+
+		for i in `shcat /etc/dhcp\.$1`; do
+			if [ "$i" = primary ]; then
+				primary=$1
+				break
+			fi
+		done
+
+		[ -n "$primary" ] && break
+		shift
+	done
+
+	[ -z "$primary" ] && primary="$firstif"
+	cmdline=`shcat /etc/dhcp\.${primary}`
+
+	if [ "$_INIT_NET_IF" != "$primary" ]; then
+		echo "starting DHCP on primary interface $primary"
+		/sbin/ifconfig $primary auto-dhcp primary $cmdline
+		# Exit code 4 means ifconfig timed out waiting for dhcpagent
+		[ $? != 0 ] && [ $? != 4 ] && i4d_fail="$i4d_fail $primary"
+	fi
+
+	set -- $interface_names
+
+	while [ $# -ge 2 ]; do
+		shift
+		cmdline=`shcat /etc/dhcp\.$1`
+		if [ "$1" != "$primary" -a \
+			"$1" != "$_INIT_NET_IF"  ]; then
+			echo "starting DHCP on interface $1"
+			/sbin/ifconfig $1 dhcp start wait 0 $cmdline
+			# Exit code can't be timeout when wait is 0
+			[ $? != 0 ] && i4d_fail="$i4d_fail $1"
+		fi
+		shift
+	done
+	IFS="$ORIGIFS"
+	unset ORIGIFS
+	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" "$i4d_fail"
+fi
+
+# In order to avoid bringing up the interfaces that have
+# intentionally been left down, perform RARP only if the system
+# has no configured hostname in /etc/nodename
+hostname="`shcat /etc/nodename 2>/dev/null`"
+if [ "$_INIT_NET_STRATEGY" = "rarp" -o -z "$hostname" ]; then
+	/sbin/ifconfig -adD4 auto-revarp netmask + broadcast + up
+fi
+
+#
+# If the /etc/defaultrouter file exists, process it now so that the next
+# stage of booting will have access to NFS.
+#
+if [ -f /etc/defaultrouter ]; then
+	while read router rubbish; do
+		case "$router" in
+			'#'* | '') ;;	#  Ignore comments, empty lines
+			*)	/sbin/route -n add default -gateway $router ;;
+		esac
+	done </etc/defaultrouter
+fi
+
+#
+# If we get here and were not asked to plumb any IPv4 interfaces, look
+# for boot properties that direct us.
+#
+# - The "network-interface" property is required and indicates the
+#   interface name.
+# - The "xpv-hcp" property, if present, is used by the hypervisor
+#   tools to indicate how the specified interface should be configured.
+#   Permitted values are "dhcp" and "off", where "off" indicates static
+#   IP configuration.
+#
+# In the case where "xpv-hcp" is set to "dhcp", no further properties
+# are required or examined.
+#
+# In the case where "xpv-hcp" is not present or set to "off", the
+# "host-ip" and "subnet-mask" properties are used to configure
+# the specified interface.  The "router-ip" property, if present,
+# is used to add a default route.
+#
+nic="`/sbin/devprop network-interface`"
+if smf_is_globalzone && [ -z "$inet_list" ] && [ -n "$nic" ]; then
+	hcp="`/sbin/devprop xpv-hcp`"
+	case "$hcp" in
+	"dhcp")
+		/sbin/ifconfig $nic plumb 2>/dev/null
+		[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
+			# The interface is successfully plumbed, so
+			# modify "inet_list" to force the exit code
+			# checks to work.
+			inet_list=$nic;
+			# Given that this is the only IPv4 interface,
+			# we assert that it is primary.
+			echo "starting DHCP on primary interface $primary";
+			/sbin/ifconfig $nic auto-dhcp primary;
+			# Exit code 4 means ifconfig timed out waiting
+			# for dhcpagent
+			[ $? != 0 ] && [ $? != 4 ] && \
+			    i4d_fail="$i4d_fail $nic";
+		)
+		;;
+
+	"off"|"")
+		/sbin/devprop host-ip subnet-mask router-ip | (
+			read ip;
+			read mask;
+			read router;
+			[ -n "$ip" ] && [ -n "$mask" ] && \
+				/sbin/ifconfig $nic plumb 2>/dev/null
+			[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
+				# The interface is successfully
+				# plumbed, so modify "inet_list" to
+				# force the exit code checks to work.
+				inet_list=$nic;
+				/sbin/ifconfig $nic  inet $ip \
+				    netmask $mask broadcast + up 2>/dev/null;
+				[ -n "$router" ] && route add \
+				    default $router 2>/dev/null;
+			)
+		)
+		;;
+	esac
+fi
+
+#
+# We tell smf this service is online if any of the following is true:
+# - no interfaces were configured for plumbing and no DHCP failures
+# - any non-loopback IPv4 interfaces are up and have a non-zero address
+# - there are any DHCP interfaces started
+# - any non-loopback IPv6 interfaces are up
+#
+# If we weren't asked to configure any interfaces, exit
+if [ -z "$inet_list" ] && [ -z "$inet6_list" ]; then
+	# Config error if DHCP was attempted without plumbed interfaces
+	[ -n "$i4d_fail" ] && exit $SMF_EXIT_ERR_CONFIG
+	exit $SMF_EXIT_OK
+fi
+
+# Any non-loopback IPv4 interfaces with usable addresses up?
+if [ -n "`/sbin/ifconfig -a4u`" ]; then
+    	/sbin/ifconfig -a4u | while read intf addr rest; do
+		[ $intf = inet ] && [ $addr != 127.0.0.1 ] &&
+		[ $addr != 0.0.0.0 ] && exit $SMF_EXIT_OK
+	done && exit $SMF_EXIT_OK
+fi
+
+# Any DHCP interfaces started?
+[ -n "`/sbin/ifconfig -a4 dhcp status 2>/dev/null`" ] && exit $SMF_EXIT_OK
+
+# Any non-loopback IPv6 interfaces up?
+if [ -n "`/sbin/ifconfig -au6`" ]; then
+	/sbin/ifconfig -au6 | while read intf addr rest; do
+		[ $intf = inet6 ] && [ $addr != ::1/128 ] && exit $SMF_EXIT_OK
+	done && exit $SMF_EXIT_OK
+fi
+
+# This service was supposed to configure something yet didn't.  Exit
+# with config error.
+exit $SMF_EXIT_ERR_CONFIG

@@ -1,0 +1,89 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# Arabia Type 6 (USB) key layout
+#
+# Note, on the console, this keyboard layout is exactly
+# the same as a US keyboard. This is because the console
+# may not have full font support for the characters
+# available in this language.
+#
+key  49  base '\\' shift | caps '\\' ctrl ^\ altg nop
+key  50 all hole        
+key 103  all hole        
+key  30  base 1 shift ! caps 1 ctrl 1 altg nop
+key  31  base 2 shift @ caps 2 ctrl ^@ altg nop
+key  32  base 3 shift # caps 3 ctrl 3 altg nop
+key  33  base 4 shift $ caps 4 ctrl 4 altg nop
+key  34  base 5 shift % caps 5 ctrl 5 altg nop
+key  35  base 6 shift ^ caps 6 ctrl ^^ altg nop
+key  36  base 7 shift & caps 7 ctrl 7 altg nop
+key  37  base 8 shift * caps 8 ctrl 8 altg nop
+key  38  base 9 shift ( caps 9 ctrl 9 altg nop
+key  39  base 0 shift ) caps 0 ctrl 0 altg nop
+key  45  base - shift _ caps - ctrl ^_ altg nop
+key  46  base = shift + caps = ctrl = altg nop
+key  20  base q shift Q caps Q ctrl ^Q altg nop
+key  26  base w shift W caps W ctrl ^W altg nop
+key  28  base y shift Y caps Y ctrl ^Y altg nop
+key  18  base o shift O caps O ctrl ^O altg nop
+key  19  base p shift P caps P ctrl ^P altg nop
+key  47  base [ shift { caps [ ctrl ^[ altg nop
+key  48  base ] shift } caps ] ctrl ^] altg nop
+key 224  all shiftkeys+leftctrl up shiftkeys+leftctrl      
+key   4  base a shift A caps A ctrl ^A altg nop
+key  22  base s shift S caps S ctrl ^S altg nop
+key  51  base ; shift : caps ; ctrl ; altg nop
+key  52  base '\'' shift '"' caps '\'' ctrl '\'' altg nop
+key  53  base ` shift ~ caps ` ctrl ^^ altg nop
+key 100  all hole        
+key  29  base z shift Z caps Z ctrl ^Z altg nop
+key  27  base x shift X caps X ctrl ^X altg nop
+key   6  base c shift C caps C ctrl ^C altg nop
+key  25  base v shift V caps V ctrl ^V altg nop
+key   5  base b shift B caps B ctrl ^B altg nop
+key  17  base n shift N caps N ctrl ^N altg nop
+key  16  base m shift M caps M ctrl '\r' altg nop
+key  54  base , shift < caps , ctrl , altg nop
+key  55  base . shift > caps . ctrl . altg nop
+key  56  base / shift ? caps / ctrl ^_ altg nop
+key  57  all shiftkeys+capslock        
+key 226  all shiftkeys+alt up shiftkeys+alt      
+key 101  all compose        
+key 230  all shiftkeys+altgraph up shiftkeys+altgraph      
+#
+#
+#
+# New function keys assigned old codes
+#
+key  73  all bf(8)        
+key  74  all rf(7)        
+key  75  all rf(9)        
+key  77  all rf(13)        
+key  78  all rf(15)        
+key  82  all string+uparrow        
+key  80  all string+leftarrow        
+key  81  all string+downarrow        
+key  79  all string+rightarrow        

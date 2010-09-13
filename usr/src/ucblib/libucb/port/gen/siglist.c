@@ -1,0 +1,87 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+/*
+ * University Copyright- Copyright (c) 1982, 1986, 1988
+ * The Regents of the University of California
+ * All Rights Reserved
+ *
+ * University Acknowledgment- Portions of this document are derived from
+ * software developed by the University of California, Berkeley, and its
+ * contributors.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*LINTLIBRARY*/
+
+#include <sys/types.h>
+#include <signal.h>
+#include "libc.h"
+
+#ifndef NSIG
+#define	NSIG 32
+#endif
+
+char	*sys_siglist[NSIG] = {
+	"Signal 0",
+	"Hangup",			/* SIGHUP */
+	"Interrupt",			/* SIGINT */
+	"Quit",				/* SIGQUIT */
+	"Illegal instruction",		/* SIGILL */
+	"Trace/BPT trap",		/* SIGTRAP */
+	"Abort",			/* SIGABRT */
+	"Emulator trap",		/* SIGEMT */
+	"Arithmetic exception",		/* SIGFPE */
+	"Killed",			/* SIGKILL */
+	"Bus error",			/* SIGBUS */
+	"Segmentation fault",		/* SIGSEGV */
+	"Bad system call",		/* SIGSYS */
+	"Broken pipe",			/* SIGPIPE */
+	"Alarm clock",			/* SIGALRM */
+	"Terminated",			/* SIGTERM */
+	"User defined signal 1",	/* SIGUSR1 */
+	"User defined signal 2",	/* SIGUSR2 */
+	"Child status change",		/* SIGCLD */
+	"Power-fail restart",		/* SIGPWR */
+	"Window changed",		/* SIGWINCH */
+	"Handset, line status change",	/* SIGURG */
+	"Pollable event occurred",	/* SIGPOLL */
+	"Stopped (signal)",		/* SIGSTOP */
+	"Stopped",			/* SIGTSTP */
+	"Continued",			/* SIGCONT */
+	"Stopped (tty input)",		/* SIGTTIN */
+	"Stopped (tty output)",		/* SIGTTOU */
+	"Virtual timer expired",	/* SIGVTALRM */
+	"Profiling timer expired",	/* SIGPROF */
+	"Cputime limit exceeded",	/* SIGXCPU */
+	"Filesize limit exceeded", 	/* SIGXFSZ */
+	"No runnable lwp",		/* SIGWAITING */
+	"Inter-lwp signal",		/* SIGLWP */
+};

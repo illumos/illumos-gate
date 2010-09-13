@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+-->
+
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+
+<!-- set the output properties -->
+<xsl:output method="html"/>
+
+<!-- root rule -->
+<xsl:template match="/">
+<HTML>
+  <HEAD><TITLE>Audit Trail Data</TITLE></HEAD>
+  <BODY BGColor="#FFFFFF" Text="#000000">
+  <CENTER>
+      <FONT FACE="Arial" SIZE="+1">
+    	<B>Audit Trail Data</B>
+      </FONT>
+      <BR/>
+ </CENTER>
+   <xsl:apply-templates/>
+  <HR/>
+  </BODY>
+</HTML>
+</xsl:template>
+
+<!-- suppress non-selected nodes-->
+<xsl:template match="*"/>
+
+<!-- main rule for document element -->
+<xsl:template match="audit">
+  <HR/>
+	<xsl:for-each select="record | file">
+		<xsl:if test="(self::file)">
+			<BR/>
+			<BR/>
+			<B>File: </B>
+			<I>time: </I>
+			<xsl:choose>
+				<xsl:when test="@time">
+					<xsl:value-of select="@time"/>
+					+ <xsl:value-of select="@msec"/>msec
+				</xsl:when>
+				<xsl:when test="@iso8601">
+					<xsl:value-of select="@iso8601"/>
+				</xsl:when>
+			</xsl:choose>
+			<BR/>
+			<xsl:value-of select="."/>
+		</xsl:if>
+		<xsl:if test="(self::record)">
+			<BR/>
+			<BR/>
+			<B>Event: </B>
+			<B><xsl:value-of select="@event"/></B><BR/>
+			<I>time: </I>
+			<xsl:choose>
+				<xsl:when test="@time">
+					<xsl:value-of select="@time"/>
+					+ <xsl:value-of select="@msec"/>msec
+				</xsl:when>
+				<xsl:when test="@iso8601">
+					<xsl:value-of select="@iso8601"/>
+				</xsl:when>
+			</xsl:choose>
+			<I>  vers: </I><xsl:value-of select="@version"/>
+	 		<I> mod: </I><xsl:value-of select="@modifier"/>
+	 		<I> host: </I><xsl:value-of select="@host"/>
+   			<xsl:apply-templates/>
+		</xsl:if>
+	</xsl:for-each>
+</xsl:template>
+
+<!-- Start of handling for remaining tokens -->
+
+<xsl:template match="text">
+	<BR/>
+	<I>TEXT: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="path">
+	<BR/>
+	<I>PATH: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="path_attr">
+	<BR/>
+	<I>PATH_ATTR </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="xattr">
+	<BR/>
+	<I>xattr: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="host">
+	<BR/>
+	<I>HOST: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="subject">
+	<BR/>
+	<I>SUBJECT </I>
+	<I> audit-uid: </I><xsl:value-of select="@audit-uid"/>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> gid: </I><xsl:value-of select="@gid"/>
+	<I> ruid: </I><xsl:value-of select="@ruid"/>
+	<I> rgid: </I><xsl:value-of select="@rgid"/>
+	<I> pid: </I><xsl:value-of select="@pid"/>
+	<I> sid: </I><xsl:value-of select="@sid"/>
+	<I> tid: </I><xsl:value-of select="@tid"/>
+</xsl:template>
+
+<xsl:template match="process">
+	<BR/>
+	<I>PROCESS </I>
+	<I> audit-uid: </I><xsl:value-of select="@audit-uid"/>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> gid: </I><xsl:value-of select="@gid"/>
+	<I> ruid: </I><xsl:value-of select="@ruid"/>
+	<I> rgid: </I><xsl:value-of select="@rgid"/>
+	<I> pid: </I><xsl:value-of select="@pid"/>
+	<I> sid: </I><xsl:value-of select="@sid"/>
+	<I> tid: </I><xsl:value-of select="@tid"/>
+</xsl:template>
+
+<xsl:template match="return">
+	<BR/>
+	<I>RETURN </I>
+	<I> errval: </I><xsl:value-of select="@errval"/>
+	<I> retval: </I><xsl:value-of select="@retval"/>
+</xsl:template>
+
+<xsl:template match="exit">
+	<BR/>
+	<I>EXIT </I>
+	<I> errval: </I><xsl:value-of select="@errval"/>
+	<I> retval: </I><xsl:value-of select="@retval"/>
+</xsl:template>
+
+<xsl:template match="sequence">
+	<BR/>
+	<I>SEQUENCE </I>
+	<I> seq-num: </I><xsl:value-of select="@seq-num"/>
+</xsl:template>
+
+<xsl:template match="fmri">
+	<BR/>
+	<I>FMRI: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="user">
+	<BR/>
+	<I>USER </I>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> username: </I><xsl:value-of select="@username"/>
+</xsl:template>
+
+<xsl:template match="group">
+	<BR/>
+	<I>GROUP </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="gid">
+	<BR/>
+	<I>gid: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="opaque">
+	<BR/>
+	<I>OPAQUE: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="liaison">
+	<BR/>
+	<I>LIAISON: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="argument">
+	<BR/>
+	<I>ARGUMENT </I>
+	<I> arg-num: </I><xsl:value-of select="@arg-num"/>
+	<I> value: </I><xsl:value-of select="@value"/>
+	<I> desc: </I><xsl:value-of select="@desc"/>
+</xsl:template>
+
+<xsl:template match="attribute">
+	<BR/>
+	<I>ATTRIBUTE </I>
+	<I> mode: </I><xsl:value-of select="@mode"/>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> gid: </I><xsl:value-of select="@gid"/>
+	<I> fsid: </I><xsl:value-of select="@fsid"/>
+	<I> nodeid: </I><xsl:value-of select="@nodeid"/>
+	<I> device: </I><xsl:value-of select="@device"/>
+</xsl:template>
+
+<xsl:template match="cmd">
+	<BR/>
+	<I>CMD </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="argv">
+	<BR/>
+	<I>argv: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="arge">
+	<BR/>
+	<I>arge: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="exec_args">
+	<BR/>
+	<I>EXEC_ARGS </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="arg">
+	<BR/>
+	<I>arg: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="exec_env">
+	<BR/>
+	<I>EXEC_ENV </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="env">
+	<BR/>
+	<I>env: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="arbitrary">
+	<BR/>
+	<I>ARBITRARY: </I>
+	<I> print: </I><xsl:value-of select="@print"/>
+	<I> type: </I><xsl:value-of select="@type"/>
+	<I> count: </I><xsl:value-of select="@count"/>
+	<BR/>
+	<xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="privilege">
+	<BR/>
+	<I>PRIVILEGE: </I>
+	<I> set-type: </I><xsl:value-of select="@set-type"/>
+	<BR/>
+	<xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="use_of_privilege">
+	<BR/>
+	<I>USE_OF_PRIVILEGE: </I>
+	<I> result: </I><xsl:value-of select="@result"/>
+	<BR/>
+	<xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="sensitivity_label">
+	<BR/>
+	<I>SENSITIVITY_LABEL: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="use_of_authorization">
+	<BR/>
+	<I>USE_OF_AUTHORIZATION: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="IPC">
+	<BR/>
+	<I>IPC </I>
+	<I> ipc-type: </I><xsl:value-of select="@ipc-type"/>
+	<I> ipc-id: </I><xsl:value-of select="@ipc-id"/>
+</xsl:template>
+
+<xsl:template match="IPC_perm">
+	<BR/>
+	<I>IPC_PERM </I>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> gid: </I><xsl:value-of select="@gid"/>
+	<I> creator-uid: </I><xsl:value-of select="@creator-uid"/>
+	<I> creator-gid: </I><xsl:value-of select="@creator-gid"/>
+	<I> mode: </I><xsl:value-of select="@mode"/>
+	<I> seq: </I><xsl:value-of select="@seq"/>
+	<I> key: </I><xsl:value-of select="@key"/>
+</xsl:template>
+
+<xsl:template match="ip_address">
+	<BR/>
+	<I>IP_ADDRESS: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="ip_port">
+	<BR/>
+	<I>IP_PORT: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="ip">
+	<BR/>
+	<I>IP </I>
+	<I> version: </I><xsl:value-of select="@version"/>
+	<I> service_type: </I><xsl:value-of select="@service_type"/>
+	<I> len: </I><xsl:value-of select="@len"/>
+	<I> id: </I><xsl:value-of select="@id"/>
+	<I> offset: </I><xsl:value-of select="@offset"/>
+	<I> time_to_live: </I><xsl:value-of select="@time_to_live"/>
+	<I> protocol: </I><xsl:value-of select="@protocol"/>
+	<I> cksum: </I><xsl:value-of select="@cksum"/>
+	<I> src_addr: </I><xsl:value-of select="@src_addr"/>
+	<I> dest_addr: </I><xsl:value-of select="@dest_addr"/>
+</xsl:template>
+
+<xsl:template match="old_socket">
+	<BR/>
+	<I>OLD_SOCKET </I>
+	<I> type: </I><xsl:value-of select="@type"/>
+	<I> port: </I><xsl:value-of select="@port"/>
+	<I> addr: </I><xsl:value-of select="@addr"/>
+</xsl:template>
+
+<xsl:template match="socket">
+	<BR/>
+	<I>SOCKET </I>
+	<I> sock_domain: </I><xsl:value-of select="@sock_domain"/>
+	<I> sock_type: </I><xsl:value-of select="@sock_type"/>
+	<I> lport: </I><xsl:value-of select="@lport"/>
+	<I> laddr: </I><xsl:value-of select="@laddr"/>
+	<I> fport: </I><xsl:value-of select="@fport"/>
+	<I> faddr: </I><xsl:value-of select="@faddr"/>
+</xsl:template>
+
+<xsl:template match="acl">
+	<BR/>
+	<I>ACL </I>
+	<xsl:choose>
+		<xsl:when test="@mode">	<!-- old ACL entry -->
+			<I> type: </I><xsl:value-of select="@type"/>
+			<I> value: </I><xsl:value-of select="@value"/>
+			<I> mode: </I><xsl:value-of select="@mode"/>
+		</xsl:when>
+		<xsl:otherwise>
+			<I> flags: </I><xsl:value-of select="@flags"/>
+			<I> id: </I><xsl:value-of select="@id"/>
+			<I> access_mask: </I><xsl:value-of select="@access_mask"/>
+			<I> type: </I><xsl:value-of select="@type"/>
+		</xsl:otherwise>
+	</xsl:choose>
+</xsl:template>
+
+<xsl:template match="tid">
+	<BR/>
+	<I>terminal id: </I>
+	<I> type=</I><xsl:value-of select="@type"/>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="ipadr">
+	<I> local-port: </I><xsl:value-of select="@local-port"/>
+	<I> remote-port: </I><xsl:value-of select="@remote-port"/>
+	<I> host: </I><xsl:value-of select="@host"/>
+</xsl:template>
+
+<xsl:template match="X_atom">
+	<BR/>
+	<I>X_ATOM: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="X_color_map">
+	<BR/>
+	<I>X_COLOR_MAP </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_cursor">
+	<BR/>
+	<I>X_CURSOR </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_font">
+	<BR/>
+	<I>X_FONT </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_graphic_context">
+	<BR/>
+	<I>X_GRAPHIC_CONTEXT </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_pixmap">
+	<BR/>
+	<I>X_PIXMAP </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_window">
+	<BR/>
+	<I>X_WINDOW </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+</xsl:template>
+
+<xsl:template match="X_property">
+	<BR/>
+	<I>X_PROPERTY: </I>
+	<I> xid: </I><xsl:value-of select="@xid"/><I> xcreator-uid: </I><xsl:value-of select="@xcreator-uid"/>
+	<BR/>
+	<xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="X_client">
+	<BR/>
+	<I>X_CLIENT: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="X_selection">
+	<BR/>
+	<I>X_SELECTION </I>
+	<xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="x_sel_text">
+	<BR/>
+	<I>x_sel_text: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="x_sel_type">
+	<BR/>
+	<I>x_sel_type: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="x_sel_data">
+	<BR/>
+	<I>x_sel_data: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="zone">
+	<BR/>
+	<I>ZONE </I>
+	<I> name: </I><xsl:value-of select="@name"/>
+</xsl:template>
+
+</xsl:stylesheet>

@@ -1,0 +1,52 @@
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# The tzselect command is located in usr/src/cmd/zic.
+#
+# tzselect.ksh
+#
+msgid  "%s: time zone files are not set up correctly"
+msgstr 
+msgid  "Please identify a location so that time zone rules "
+	"can be set correctly."
+msgstr 
+msgid  "Please select a continent or ocean."
+msgstr 
+msgid  "none - I want to specify the time zone using the POSIX "
+	"TZ format."
+msgstr 
+msgid  "Please enter a number in range."
+msgstr 
+msgid  "Please enter the desired value of the TZ environment "
+	"variable."
+msgstr 
+msgid  "For example, GST-10 is a zone named GST that is 10 hours "
+	"ahead (east) of UTC."
+msgstr 
+msgid  "\`%s\' is not a conforming POSIX time zone string."
+msgstr 
+msgid  "Please select a country or region."
+msgstr 
+msgid  "Please select one of the following time zone regions."
+msgstr 
+msgid  "Local time is now:       %s"
+msgstr 
+msgid  "Universal Time is now:   %s"
+msgstr 
+msgid  "The following information has been given:"
+msgstr 
+msgid  "Therefore TZ='%s' will be used."
+msgstr 
+msgid  "Is the above information OK?"
+msgstr 
+msgid  "Yes"
+msgstr 
+msgid  "No"
+msgstr 
+msgid  "Please enter 1 for Yes, or 2 for No."
+msgstr
+msgid  "Here is the TZ value again, this time on standard output:"
+msgstr 

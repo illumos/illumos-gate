@@ -1,0 +1,87 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# This file should be copied to /etc/inet/ipsecinit.conf to enable IPsec
+# systemwide policy (and as a side-effect, load IPsec kernel modules).
+# Even if this file has no entries, IPsec will be loaded if
+# /etc/inet/ipsecinit.conf exists.
+#
+# Add entries to protect the traffic using IPSEC. The entries in this
+# file are currently configured using ipsecconf from inetinit script
+# after /usr is mounted.
+#
+# For example,
+#
+#	 {rport 23} ipsec {encr_algs des encr_auth_algs md5}
+#
+# Or, in the older (but still usable) syntax
+#
+#        {dport 23} apply {encr_algs des encr_auth_algs md5 sa shared} 
+#        {sport 23} permit {encr_algs des encr_auth_algs md5} 
+#
+# will protect the telnet traffic originating from the host with ESP using 
+# DES and MD5.  Also:
+#
+#	 {raddr 10.5.5.0/24} ipsec {auth_algs any}
+#
+# Or, in the older (but still usable) syntax
+#
+#        {daddr 10.5.5.0/24} apply {auth_algs any sa shared} 
+#        {saddr 10.5.5.0/24} permit {auth_algs any} 
+#
+# will protect traffic to/from the 10.5.5.0 subnet with AH using any available
+# algorithm.
+#
+# To do basic filtering, a drop rule may be used. For example:
+#
+#	 {lport 23 dir in} drop {}
+#	 {lport 23 dir out} drop {}
+#
+# will disallow any remote system from telnetting in.
+#
+# If you are using IPv6, it may be useful to bypass neighbor discovery
+# to allow in.iked to work properly with on-link neighbors. To do that,
+# add the following lines:
+#
+#	 {ulp ipv6-icmp type 133-137 dir both } pass { }
+#
+# This will allow neighbor discovery to work normally.
+#
+# WARNING:	This file is read before default routes are established, and
+#		before any naming services have been started.  The
+#		ipsecconf(1M) command attempts to resolve names, but it will
+#		fail unless the machine uses files, or DNS and the DNS server
+#		is reachable via routing information before ipsecconf(1m)
+#		invocation.  (E.g. the DNS server is on-subnet, or DHCP
+#		has loaded up the default router already.)
+#
+#		It is suggested that for this file, use hostnames only if
+#		they are in /etc/hosts, or use numeric IP addresses.
+#
+#		If DNS gets used, the DNS server is implicitly trusted, which
+#		could lead to compromise of this machine if the DNS server
+#		has been compromised.
+#

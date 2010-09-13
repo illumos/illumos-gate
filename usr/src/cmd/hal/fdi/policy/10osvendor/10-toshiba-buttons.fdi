@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <!-- Only launch the addon for Toshiba laptops. -->
+  <device>
+    <match key="smbios.system.manufacturer" string="TOSHIBA">
+      <match key="system.formfactor" string="laptop">
+        <append key="info.addons" type="strlist">hald-addon-acpi-buttons-toshiba</append>
+        <append key="info.capabilities" type="strlist">button</append>
+      </match>
+    </match>
+  </device>
+
+</deviceinfo>

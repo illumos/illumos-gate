@@ -1,0 +1,102 @@
+-*- Mode: Outline -*-
+
+Before working on anything in this file, it's very important that you
+make contact with the core GRUB developers. Things herein might be
+slightly out of date or otherwise not easy to understand at first
+glance. So write to <bug-grub@gnu.org> first.
+
+Priorities:
+  Reported bugs generally have top priority.
+  Non-reported and non-encountered bugs (things we know don't work,
+    but don't really impede things) have lower priority.
+  Things in this file are ranked with one to three !; the more, the
+  higher priority.
+
+
+Things that should be done before 1.0:
+
+* Finish the Multiboot Speicification 0.7. !!!
+
+* Add more --disable-FOO options to configure, so that you can create a
+  minimum GRUB image. This is useful for boot floppies because of the size
+  restriction. !
+
+* Implement a new version of track_int13, using Virtual 8086 Mode. !!!
+
+* Add missing features of graphics support. !!
+
+Things that should _not_ be done before 1.0:
+
+* Add configuration inclusion support by adding a command "include". !
+
+* Add automatic configuration support.
+
+* Add bunzip2 support.
+
+* Define the module system.
+
+* Add BSD syntax support, using results of ioprobe to map drives. !
+  (0x1f0-0x1f7 = primary IDE, 0x170-0x176 = secondary,
+   0x1e8-0x1ef = tertiary, 0x168-0x16f = quaternary).
+
+* Add a real scripting language, possibly retaining backward
+  compatibility so that old config files can be used.
+
+* Add internationalization support, emulating gettext as much as is
+  feasible.
+
+* Support other architectures than i386-pc.
+
+* Add real memory management.
+
+
+Things that may be done anytime:
+
+* Port the script ``grub-install'' to OpenBSD. At least you will have to
+  modify the function `convert' so that it can translate a native device
+  name into the corresponding GRUB drive representation. !
+
+* Add a command to run a GRUB script file. !!
+
+* Add commands to manipulate the menu from the command-line interface. !
+
+* Make symbolic links work for BSD FFS.
+
+* Add indirect block support to the BSD FFS filesystem code, so files
+  larger than 16MB can be read.
+
+* Fix-up FreeBSD, NetBSD (and OpenBSD ?) command-line boot
+  parameters.
+
+* Support embedding a Stage 1.5 in the "bootloader" area of a FFS
+  partition. (We already have the code, but need an approval by an
+  expert before turning on the support. Any volunteers?)
+
+* Support embedding a Stage 1.5 in the EXT2_BOOT_LOADER_INO of an ext2fs
+  partition, so that it won't be accidentally erased or modified by
+  the kernel.
+
+* Add ISA PnP support.
+
+* Add more filesystems support (NTFS, etc.)
+
+* Add more remote console support (parallel and net).
+
+* Add (real) RAID support.
+
+? Add a partition naming syntax that means ``the first partition of
+  this type''.  We need this for clean Hurd install floppies.
+  Nope.  Improving the `find' command would solve this problem.
+
+* Add CDROM-chainloading support. It would be enough to support only
+  BIOSes which have bootable-CDROM support (so you may use the "Bootable
+  CDROM" BIOS calls). It is not trivial to support BIOSes without the
+  capability to boot CDROM.
+
+? Divide pxegrub into two parts, so the initial image doesn't exceed
+  the 32KB limit. I'm not sure if this is really necessary, because the
+  PXE standard just says that it is _recommended_ to improve the
+  modularity of a boot image. Obviously, this reason doesn't apply to
+  GRUB, as pxegrub is merely a secondary boot loader. So whether this
+  task should be done depends on if existing PXE ROMs support >32KB
+  images or not, after all.

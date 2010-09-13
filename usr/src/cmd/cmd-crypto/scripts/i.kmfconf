@@ -1,0 +1,116 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Class action script for "kmfconf" class files.
+#
+# This script appends the input file from the package to the 
+# /etc/crypto/kmf.conf file.
+#
+# The syntax of the input file is
+# keystore:modulepath=path[;option=option_str]
+# 
+#
+pkg_start="# Start $PKGINST"
+pkg_end="# End $PKGINST"
+tmpfile=/tmp/$$kmfconf
+error=no
+
+while read src dest
+do
+	[ "$src" = /dev/null ] && continue
+
+	if [ -f "$dest" ]
+	then
+		# For multiple input files; exit if error occurred in previous
+		# input file.
+		if [ "$error" = yes ]
+		then
+			echo "$0: failed to update $lastdest for $PKGINST."
+			exit 2
+		fi
+		lastdest=$dest
+
+		#
+		# If the package has been already installed, remove old entries
+		#
+		start=0;
+		end=0;
+		egrep -s "$pkg_start" $dest && start=1
+		egrep -s "$pkg_end" $dest && end=1
+
+		if [ $start -ne $end ]
+		then
+			echo "$0: missing Start or End delimiters for \
+			    $PKGINST in $dest."
+			echo "$0: $dest may be corrupted and was not updated."
+			error=yes
+			continue
+		fi
+
+		if [ $start -eq 1 ]
+		then
+			sed -e "/$pkg_start/,/$pkg_end/d" $dest > $tmpfile \
+                        || error=yes
+		else
+			cp $dest $tmpfile || error=yes
+		fi
+
+		#
+		# Check the input file syntax (should at least contain
+		# ":module_path=").  Then append the input entries with the
+		#scc package delimiters.
+		#
+		line_count=`wc -l $src | awk '{ print $1}'`
+		file_count=`grep ":modulepath=" $src | wc -l` 	
+		if [ $line_count -ne $file_count ]
+		then
+			echo "$0: Syntax Error - $src for $PKGINST."
+			error=yes
+			continue
+		else
+			echo "$pkg_start" >> $tmpfile || error=yes
+			cat $src >> $tmpfile || error=yes
+			echo "$pkg_end" >> $tmpfile || error=yes
+		fi
+    
+		# Install the updated config file and clean up the tmp file
+                if [ "$error" = no ]
+                then 
+			mv $tmpfile $dest || error=yes
+		fi
+		rm -f $tmpfile   	
+	else
+		echo "$0: ERROR - $dest doesn't exist for $PKGINST."
+		exit 2
+	fi
+done
+
+if [ "$error" = yes ]
+then
+	echo "$0: ERROR - failed to update $lastdest for $PKGINST."
+	exit 2
+fi
+
+exit 0

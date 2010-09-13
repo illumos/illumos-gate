@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	ses_close			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_errno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_errmsg			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_child			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_id			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_lookup			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_parent			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_props			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_prev_sibling		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_sibling		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_snapshot		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_target			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_type			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_open			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_root_node			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_scsi_target			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_snap_primary_enclosure	{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_snap_generation		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_strerror			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_walk			{ TYPE	= FUNCTION; FLAGS = extern };
+
+	nvlist_add_fixed_string		{ TYPE	= FUNCTION; FLAGS = extern };
+	nvlist_add_fixed_string_trunc	{ TYPE	= FUNCTION; FLAGS = extern };
+
+	ses_alloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_assert			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_error			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_free			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_nverror			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_panic			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_realloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_set_nverrno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_set_errno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_strdup			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_zalloc			{ TYPE	= FUNCTION; FLAGS = extern };
+
+	ses_plugin_ctlpage_lookup	{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_page_lookup		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_register		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_setspecific		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_getspecific		{ TYPE	= FUNCTION; FLAGS = extern };
+};

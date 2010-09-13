@@ -1,0 +1,1202 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma dictionary "PCI"
+
+#include <fm/topo_hc.h>
+
+#define PCI_DEV_FIT 1000
+#define PCI_BUS_FIT 500
+
+/*
+ * SERD parameters.
+ *
+ * Nonfatal dpe errors have to be recovered by the hardened driver which may
+ * cause intermittant performance/responsiveness problems, so we have tighter
+ * serd parameters for these. These are most likely errors in buffers/caches
+ * within devices and bridges, so use similar rates to cpu data cache parity
+ * errors.
+ * 
+ * We will be more conservative about nonfatal internal errors reported
+ * by the driver.
+ */
+#define NONFATAL_COUNT 6
+#define NONFATAL_TIME 2h
+#define NONFATAL_DPE_COUNT 3
+#define NONFATAL_DPE_TIME 168h
+
+#define	PCIFN		pcibus/pcidev/pcifn
+#define	PCIFNHZ		pcibus<>/pcidev<>/pcifn<>
+
+engine serd.io.device.nonfatal@PCIFN,
+	N=NONFATAL_COUNT, T=NONFATAL_TIME;
+
+engine serd.io.pci.nf-dpe@PCIFN,
+	N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
+
+engine serd.io.pci.nf-dpe-bus@pcibus,
+	N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
+
+#define	IS_LEAF \
+	(confprop_defined(PCIFN, TOPO_PCI_CLASS) && \
+	confprop(PCIFN, TOPO_PCI_CLASS) != "60400" && \
+	confprop(PCIFN, TOPO_PCI_CLASS) != "60401")
+
+#define	IS_BDG \
+	(confprop(PCIFN, TOPO_PCI_CLASS) == "60400" || \
+	confprop(PCIFN, TOPO_PCI_CLASS) == "60401")
+
+#define	FD_IS_LEAF \
+	(confprop_defined(pcibus/pcidev[fromdev]/pcifn, TOPO_PCI_CLASS) && \
+	confprop(pcibus/pcidev[fromdev]/pcifn, TOPO_PCI_CLASS) != "60400" && \
+	confprop(pcibus/pcidev[fromdev]/pcifn, TOPO_PCI_CLASS) != "60401")
+
+#define	IS_LF(f)	(confprop_defined(f, TOPO_PCI_CLASS) && \
+			confprop(f, TOPO_PCI_CLASS) != "60400" && \
+			confprop(f, TOPO_PCI_CLASS) != "60401")
+/*
+ * note general rule for errors is that for upstream propagations
+ * @PCIFN is the sending device while  for downstream
+ * propagations it is the receiving device.
+ */
+
+event fault.io.pci.device-interr-corr@PCIFN,
+	engine=serd.io.device.nonfatal@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.device-interr-unaf@PCIFN,
+	engine=serd.io.pci.nf-dpe@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.device-interr-deg@PCIFN, FITrate=PCI_DEV_FIT, retire=0;
+
+event fault.io.pci.device-interr@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.device-invreq@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.device-noresp@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.fw_corrupt@PCIFN, FITrate=PCI_DEV_FIT, retire=0;
+
+event fault.io.pci.fw_mismatch@PCIFN, FITrate=PCI_DEV_FIT, retire=0;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty hostbridge may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-d:	the device not to respond to an upstream request
+ *  - nr-drw-d:	the device not to respond to an upstream request
+ *  - ta-pw-d:	the device to send a target abort to an upstream request
+ *  - ta-drw-d:	the device to send a target abort to an upstream request
+ *  - serr-u:	the device to report itself in error
+ *  - badreq-pw-d:a bad downstream request - not parity error (may cause target
+ * 		to target abort or master abort)
+ *  - badreq-drw-d:a bad downstream request - not parity error (may cause
+ * 		target to target abort or master abort)
+ *  - ape-d:	address/parity to get corrupted during downstream transmission
+ *  - scpe-d:	split completion to get corrupted during downstream transmission
+ *  - dpe-d:	the device to transfer bad data and/or bad parity downstream
+ *  - retry-to-d:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
+ */
+#define	PCI_TO_HB pcibus/pcidev<todev>/pcifn<> {fromdev != 32 && todev == 32}
+#define	PCI_FROM_HB pcibus/pcidev<todev>/pcifn<> {fromdev == 32 && todev != 32}
+
+event error.io.pci.retry-to-d@PCIFN;
+event error.io.pci.nr-pw-d@PCIFN;
+event error.io.pci.nr-drw-d@PCIFN;
+event error.io.pci.ta-pw-d@PCIFN;
+event error.io.pci.ta-drw-d@PCIFN;
+event error.io.pci.badreq-pw-d@PCIFN;
+event error.io.pci.badreq-drw-d@PCIFN;
+event error.io.pci.f-dpe-d@PCIFN;
+event error.io.pci.deg-dpe-d@PCIFN;
+event error.io.pci.nf-dpe-d@PCIFN;
+event error.io.pci.ape-d@PCIFN;
+event error.io.pci.ape-u@PCIFN;
+event error.io.pci.dpdata-dw-d@PCIFN;
+event error.io.pci.dpdata-pw-d@PCIFN;
+event error.io.pci.dpdata-dr-d@PCIFN;
+event error.io.pci.dpdata-pw-u@PCIFN;
+event error.io.pci.dpdata-dw-u@PCIFN;
+event error.io.pci.dpdata-dr-u@PCIFN;
+event error.io.pci.ta-u@PCIFN;
+event error.io.pci.ma-u@PCIFN;
+event error.io.pci.perr-dw-u@PCIFN;
+event error.io.pci.perr-pw-u@PCIFN;
+event error.io.pci.perr-dr-u@PCIFN;
+event error.io.pci.badreq-drw-u@PCIFN;
+event error.io.pci.badreq-pw-u@PCIFN;
+event error.io.pci.device-serr@PCIFN;
+event error.io.pci.device-ta@PCIFN;
+event error.io.pci.device-par@PCIFN;
+event error.io.pci.serr-u@PCIFN;
+event error.io.pcix.scpe-d@PCIFN;
+event error.io.pcix.scpe-u@PCIFN;
+event error.io.pcix.spl-comp-ma-u@PCIFN;
+event error.io.pcix.spl-comp-ta-u@PCIFN;
+event error.io.pcix.spl-comp-ma-d@PCIFN;
+event error.io.pcix.spl-comp-ta-d@PCIFN;
+
+event ereport.io.pci.ma@PCIFN{within(5s)};
+event ereport.io.pci.rta@PCIFN{within(5s)};
+event ereport.io.pci.mdpe@PCIFN{within(5s)};
+event ereport.io.pci.sta@PCIFN{within(5s)};
+event ereport.io.pci.sserr@PCIFN{within(5s)};
+event ereport.io.pci.dpe@PCIFN{within(5s)};
+event ereport.io.pci.target-mdpe@PCIFN{within(5s)};
+event ereport.io.pci.target-rta@PCIFN{within(5s)};
+event ereport.io.pci.target-ma@PCIFN{within(5s)};
+event ereport.io.pcix.discard@PCIFN{within(5s)};
+
+prop fault.io.pci.device-noresp@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nr-pw-d@PCI_FROM_HB,
+    error.io.pci.nr-drw-d@PCI_FROM_HB,
+    error.io.pci.retry-to-d@PCI_FROM_HB;
+
+prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.badreq-pw-d@PCI_FROM_HB,
+    error.io.pci.badreq-drw-d@PCI_FROM_HB;
+
+prop fault.io.pci.device-interr-unaf@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nf-dpe-d@PCI_FROM_HB;
+
+prop fault.io.pci.device-interr-deg@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.deg-dpe-d@PCI_FROM_HB;
+
+prop fault.io.pci.device-interr@PCIFN (0)->
+    error.io.pci.device-par@PCIFN,
+    error.io.pci.device-ta@PCIFN,
+    error.io.pci.device-serr@PCIFN;
+
+prop error.io.pci.device-par@pcibus/pcidev[fromdev]/pcifn (1)->
+    error.io.pci.f-dpe-d@PCI_FROM_HB,
+    error.io.pcix.scpe-d@PCI_FROM_HB,
+    error.io.pci.ape-d@PCI_FROM_HB;
+
+prop error.io.pci.device-ta@pcibus/pcidev[fromdev]/pcifn (1)->
+    error.io.pci.ta-pw-d@PCI_FROM_HB,
+    error.io.pci.ta-drw-d@PCI_FROM_HB;
+
+prop error.io.pci.device-ta@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.sta@pcibus/pcidev<todev>/pcifn {
+	todev == fromdev && fromdev == 32 };
+
+prop error.io.pci.device-serr@PCIFN (2)->
+    error.io.pci.serr-u@PCIFN,
+    ereport.io.pci.sserr@PCIFN;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * ereport generation rules for hostbridge
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+prop error.io.pci.dpdata-pw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.dpe@PCI_TO_HB;
+
+prop error.io.pci.dpdata-dw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.dpe@PCI_TO_HB;
+
+prop error.io.pci.dpdata-dr-u@pcibus/pcidev[fromdev]/pcifn (2)->
+    ereport.io.pci.mdpe@PCI_TO_HB,
+    ereport.io.pci.dpe@PCI_TO_HB;
+
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pci.dpe@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
+
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
+
+prop error.io.pci.ma-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.ma@PCI_TO_HB;
+
+prop error.io.pci.ta-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.rta@PCI_TO_HB;
+
+prop error.io.pci.perr-dw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.mdpe@PCI_TO_HB;
+
+prop error.io.pci.perr-pw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.mdpe@PCI_TO_HB;
+
+prop error.io.pci.badreq-drw-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
+
+prop error.io.pci.badreq-pw-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
+
+prop error.io.pcix.scpe-u@PCIFN (1)->
+    error.io.pcix.spl-comp-ma-d@PCIFN,
+    error.io.pcix.spl-comp-ta-d@PCIFN;
+
+prop error.io.pcix.scpe-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.dpe@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB,
+    ereport.io.pci.sta@PCI_TO_HB;
+
+prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pcix.discard@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
+
+prop error.io.pcix.spl-comp-ta-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pcix.discard@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty PCI leaf device or pci-pci bridge may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-u:		the device not to respond to a valid downstream request
+ *  - nr-drw-u:		the device not to respond to a valid downstream request
+ *  - ta-pw-u:		the device responds with a ta to a valid downstream
+ *			request
+ *  - ta-drw-u:		the device responds with a ta to a valid downstream
+ *			request
+ *  - serr-u:		the device to report itself in error
+ *  - badreq-pw-u:	a bad upstream request (may cause target to target
+ *			abort or master abort)
+ *  - badreq-drw-u:	a bad upstream request (may cause target to target
+ *			abort or master abort)
+ *  - ape-u:		the transfer of bad address/parity upstream.
+ *  - scpe-u:		the transfer of bad split completion upstream.
+ *  - dpe-u:		the device to deliver bad data/parity upstream.
+ *  - retry-to-u:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
+ *
+ * A faulty PCI-X leaf device or bridge may also cause:
+ *
+ *  - tx-oor:		the device sends a byte count larger than the completers
+ *			address range.
+ *  - rx-unex-sc:	the device recieved a split completion with a tag
+ * 			which does not match any outstanding transaction.
+ */
+
+#define	PCI_NOT_HB pcibus/pcidev[fromdev]/pcifn {fromdev != 32}
+
+event error.io.pci.retry-to-u@PCIFN;
+event error.io.pci.nr-pw-u@PCIFN;
+event error.io.pci.nr-drw-u@PCIFN;
+event error.io.pci.ta-pw-u@PCIFN;
+event error.io.pci.ta-drw-u@PCIFN;
+event error.io.pci.f-dpe-u@PCIFN;
+event error.io.pci.deg-dpe-u@PCIFN;
+event error.io.pci.nf-dpe-u@PCIFN;
+event error.io.pci.flt-dpdata-pw-u@PCIFN;
+event error.io.pci.flt-dpdata-dw-u@PCIFN;
+event error.io.pci.flt-dpdata-dr-u@PCIFN;
+event error.io.pci.source-dpdata-u@PCIFN;
+event error.io.pci.f-source-dpdata-u@PCIFN;
+event error.io.pci.f-source-dpdata-u@PCIFN/PCIFN;
+event error.io.pci.deg-source-dpdata-u@PCIFN;
+event error.io.pci.deg-source-dpdata-u@PCIFN/PCIFN;
+event error.io.pci.nf-source-dpdata-u@PCIFN;
+event error.io.pci.nf-source-dpdata-u@PCIFN/PCIFN;
+event error.io.pci.perr-d@PCIFN;
+event error.io.pci.target-mdpe-d@PCIFN;
+event error.io.pci.target-mdpe-d@PCIFN/PCIFN;
+event error.io.pci.target-rta-d@PCIFN/PCIFN;
+event error.io.pci.target-ma-d@PCIFN/PCIFN;
+event error.io.pcix.tx-oor@PCIFN;
+event error.io.pcix.rx-unex-sc@PCIFN;
+event error.io.device.nf-device@PCIFN;
+event error.io.device.f-device@PCIFN;
+event error.io.device.deg-device@PCIFN;
+event error.io.service.restored@PCIFN;
+
+event ereport.io.pcix.oor@PCIFN{within(5s)};
+event ereport.io.pcix.unex-sc@PCIFN{within(5s)};
+event ereport.io.device.fw_corrupt@PCIFN{within(5s)};
+event ereport.io.device.fw_mismatch@PCIFN{within(5s)};
+event ereport.io.service.lost@PCIFN{within(5s)};
+event ereport.io.service.degraded@PCIFN{within(5s)};
+event ereport.io.service.unaffected@PCIFN{within(5s)};
+event ereport.io.service.restored@PCIFN{within(30s)};
+
+prop fault.io.pci.device-noresp@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nr-pw-u@PCI_NOT_HB,
+    error.io.pci.nr-drw-u@PCI_NOT_HB,
+    error.io.pci.retry-to-u@PCI_NOT_HB;
+
+prop fault.io.pci.device-interr-corr@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.device.nf-device@PCI_NOT_HB;
+
+prop fault.io.pci.device-interr-unaf@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nf-dpe-u@PCI_NOT_HB;
+
+prop fault.io.pci.device-interr-deg@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.device.deg-device@PCI_NOT_HB,
+    error.io.pci.deg-dpe-u@PCI_NOT_HB;
+
+prop fault.io.pci.device-interr@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.ta-pw-u@PCI_NOT_HB,
+    error.io.pci.ta-drw-u@PCI_NOT_HB,
+    error.io.pci.serr-u@PCI_NOT_HB,
+    error.io.pci.ape-u@PCI_NOT_HB,
+    error.io.pci.f-dpe-u@PCI_NOT_HB,
+    error.io.device.f-device@PCI_NOT_HB,
+    error.io.pcix.scpe-u@PCI_NOT_HB,
+    error.io.pcix.tx-oor@PCI_NOT_HB,
+    error.io.pcix.rx-unex-sc@PCI_NOT_HB;
+
+prop fault.io.pci.fw_corrupt@PCIFN {IS_LEAF} (1)->
+    ereport.io.device.fw_corrupt@PCIFN;
+
+prop fault.io.pci.fw_corrupt@PCIFN {IS_LEAF} (0)->
+    ereport.io.service.lost@PCIFN,
+    ereport.io.service.degraded@PCIFN;
+
+prop fault.io.pci.fw_mismatch@PCIFN {IS_LEAF} (1)->
+    ereport.io.device.fw_mismatch@PCIFN;
+
+prop fault.io.pci.fw_mismatch@PCIFN {IS_LEAF} (0)->
+    ereport.io.service.lost@PCIFN,
+    ereport.io.service.degraded@PCIFN;
+
+prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn {FD_IS_LEAF} (0)->
+    error.io.pci.badreq-drw-u@PCI_NOT_HB,
+    error.io.pci.badreq-pw-u@PCI_NOT_HB;
+
+prop error.io.pcix.tx-oor@PCIFN (1)->
+    ereport.io.pcix.oor@PCIFN;
+
+prop error.io.pcix.rx-unex-sc@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pcix.unex-sc@pcibus/pcidev<todev>/pcifn<> {fromdev != todev};
+
+prop error.io.pci.f-dpe-u@PCIFN (1)->
+    error.io.pci.flt-dpdata-pw-u@PCIFN,
+    error.io.pci.flt-dpdata-dw-u@PCIFN,
+    error.io.pci.flt-dpdata-dr-u@PCIFN;
+
+prop error.io.pci.f-dpe-u@PCIFN (1)->
+    error.io.pci.f-source-dpdata-u@PCIFN;
+
+prop error.io.pci.f-source-dpdata-u@PCIFN (1)->
+    error.io.pci.f-source-dpdata-u@PCIFN/PCIFNHZ;
+
+prop error.io.pci.f-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (1)->
+    error.io.pci.source-dpdata-u@PCIFN;
+
+prop error.io.pci.f-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (0)->
+    ereport.io.service.lost@PCIFN;
+
+prop error.io.pci.deg-dpe-u@PCIFN (1)->
+    error.io.pci.flt-dpdata-pw-u@PCIFN,
+    error.io.pci.flt-dpdata-dw-u@PCIFN,
+    error.io.pci.flt-dpdata-dr-u@PCIFN;
+
+prop error.io.pci.deg-dpe-u@PCIFN (1)->
+    error.io.pci.deg-source-dpdata-u@PCIFN;
+
+prop error.io.pci.deg-source-dpdata-u@PCIFN (1)->
+    error.io.pci.deg-source-dpdata-u@PCIFN/PCIFNHZ;
+
+prop error.io.pci.deg-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (1)->
+    error.io.pci.source-dpdata-u@PCIFN;
+
+prop error.io.pci.deg-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (1)->
+    ereport.io.service.degraded@PCIFN;
+
+prop error.io.pci.nf-dpe-u@PCIFN (1)->
+    error.io.pci.flt-dpdata-pw-u@PCIFN,
+    error.io.pci.flt-dpdata-dw-u@PCIFN,
+    error.io.pci.flt-dpdata-dr-u@PCIFN;
+
+prop error.io.pci.nf-dpe-u@PCIFN (1)->
+    error.io.pci.nf-source-dpdata-u@PCIFN;
+
+prop error.io.pci.nf-source-dpdata-u@PCIFN (1)->
+    error.io.pci.nf-source-dpdata-u@PCIFN/PCIFNHZ;
+
+prop error.io.pci.nf-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (1)->
+    error.io.pci.source-dpdata-u@PCIFN;
+
+prop error.io.pci.nf-source-dpdata-u@PCIFN { IS_LF(PCIFN) } (1)->
+    ereport.io.service.unaffected@PCIFN,
+    error.io.service.restored@PCIFN;
+
+prop error.io.pci.flt-dpdata-pw-u@PCIFN (1)->
+    error.io.pci.dpdata-pw-u@PCIFN;
+
+prop error.io.pci.flt-dpdata-pw-u@PCIFN { IS_BDG } (1)->
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.flt-dpdata-dw-u@PCIFN (2)->
+    error.io.pci.perr-d@PCIFN,
+    error.io.pci.dpdata-dw-u@PCIFN;
+
+prop error.io.pci.flt-dpdata-dr-u@PCIFN (2)->
+    error.io.pci.dpdata-dr-u@PCIFN,
+    error.io.pci.target-mdpe-d@PCIFN;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty pci-pci bridge may also cause
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-d:		the device not to respond to a valid upstream request
+ *  - nr-drw-d:		the device not to respond to a valid upstream request
+ *  - ta-pw-d:		the device responds with a ta to a valid upstream
+ *			request
+ *  - ta-drw-d:		the device responds with a ta to a valid upstream
+ *			request
+ *  - ape-d:	address/parity to get corrupted during downstream transmission.
+ *  - scpe-d:	split completion gets corrupted during downstream transmission.
+ *  - dpe-d:	data/parity to get corrupted during downstream transmission.
+ *  - retry-to-d:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
+ */
+
+event error.io.pci.ape-d@PCIFN/PCIFN;
+event error.io.pci.f-dpe-d@PCIFN/PCIFN;
+event error.io.pci.deg-dpe-d@PCIFN/PCIFN;
+event error.io.pci.nf-dpe-d@PCIFN/PCIFN;
+event error.io.pci.retry-to-d@PCIFN/PCIFN;
+event error.io.pci.nr-pw-d@PCIFN/PCIFN;
+event error.io.pci.nr-drw-d@PCIFN/PCIFN;
+event error.io.pci.ta-pw-d@PCIFN/PCIFN;
+event error.io.pci.ta-drw-d@PCIFN/PCIFN;
+event error.io.pcix.scpe-d@PCIFN/PCIFN;
+
+prop fault.io.pci.device-noresp@PCIFN (0)->
+    error.io.pci.nr-pw-d@PCIFN/PCIFN,
+    error.io.pci.nr-drw-d@PCIFN/PCIFN,
+    error.io.pci.retry-to-d@PCIFN/PCIFN;
+
+prop fault.io.pci.device-interr-unaf@PCIFN (0)->
+    error.io.pci.nf-dpe-d@PCIFN/PCIFN;
+
+prop fault.io.pci.device-interr-deg@PCIFN (0)->
+    error.io.pci.deg-dpe-d@PCIFN/PCIFN;
+
+prop fault.io.pci.device-interr@PCIFN (0)->
+    error.io.pci.ta-pw-d@PCIFN/PCIFN,
+    error.io.pci.ta-drw-d@PCIFN/PCIFN,
+    error.io.pci.ape-d@PCIFN/PCIFN,
+    error.io.pcix.scpe-d@PCIFN/PCIFN,
+    error.io.pci.f-dpe-d@PCIFN/PCIFN;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty PCI bus may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - ape-d:	address/parity to get corrupted during downstream transmission.
+ *  - scpe-d:	split completion gets corrupted during downstream transmission.
+ *  - dpe-d:	data/parity to get corrupted during downstream transmission.
+ *  - ape-u:	address/parity to get corrupted during upstream transmission.
+ *  - dpe-u:	data/parity to get corrupted during read upstream transmission.
+ *  - scpe-u:	split completion to get corrupted during upstream transmission.
+ */
+
+event fault.io.pci.bus-linkerr-unaf@pcibus,
+	engine=serd.io.pci.nf-dpe-bus@pcibus, FITrate=PCI_BUS_FIT;
+
+event fault.io.pci.bus-linkerr-deg@pcibus, FITrate=PCI_BUS_FIT, retire=0;
+
+event fault.io.pci.bus-linkerr@pcibus, FITrate=PCI_BUS_FIT;
+
+prop fault.io.pci.bus-linkerr-unaf@pcibus (0)->
+    error.io.pci.nf-dpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.nf-dpe-u@pcibus/pcidev<todev>/pcifn { todev != 32};
+
+prop fault.io.pci.bus-linkerr-deg@pcibus (0)->
+    error.io.pci.deg-dpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.deg-dpe-u@pcibus/pcidev<todev>/pcifn { todev != 32};
+
+prop fault.io.pci.bus-linkerr@pcibus (0)->
+    error.io.pci.ape-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.f-dpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.ape-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.f-dpe-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.scpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.scpe-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.tx-oor@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.rx-unex-sc@pcibus/pcidev<todev>/pcifn { todev != 32};
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * recursive rules for pci-pci bridges
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+
+event error.io.pci.serr-u@PCIFN/PCIFN;
+event error.io.pci.perr-dw-u@PCIFN/PCIFN;
+event error.io.pci.perr-pw-u@PCIFN/PCIFN;
+event error.io.pci.perr-d@PCIFN/PCIFN;
+event error.io.pci.dpdata-pw-u@PCIFN/PCIFN;
+event error.io.pci.dpdata-dw-u@PCIFN/PCIFN;
+event error.io.pci.dpdata-dr-u@PCIFN/PCIFN;
+event error.io.pci.dpdata-pw-fwd-d@PCIFN;
+event error.io.pci.dpdata-pw-fwd-d@PCIFN/PCIFN;
+event error.io.pci.dpdata-dw-fwd-d@PCIFN;
+event error.io.pci.dpdata-dw-fwd-d@PCIFN/PCIFN;
+event error.io.pci.dpdata-dr-fwd-d@PCIFN;
+event error.io.pci.dpdata-dr-fwd-d@PCIFN/PCIFN;
+event error.io.pci.source-perr-u@PCIFN;
+event error.io.pci.leaf-ape-d@PCIFN;
+event error.io.pci.ape-u@PCIFN/PCIFN;
+event error.io.pci.source-ape-u@PCIFN;
+event error.io.pci.badreq-pw-d@PCIFN/PCIFN;
+event error.io.pci.badreq-drw-d@PCIFN/PCIFN;
+event error.io.pci.badreq-pw-u@PCIFN/PCIFN;
+event error.io.pci.badreq-drw-u@PCIFN/PCIFN;
+event error.io.pci.ta-d@PCIFN;
+event error.io.pci.ta-d@PCIFN/PCIFN;
+event error.io.pci.ta-u@PCIFN/PCIFN;
+event error.io.pci.target-rta-d@PCIFN;
+event error.io.pci.target-ma-d@PCIFN;
+event error.io.pci.nr-pw-u@PCIFN/PCIFN;
+event error.io.pci.ta-pw-u@PCIFN/PCIFN;
+event error.io.pci.retry-to-u@PCIFN/PCIFN;
+event error.io.pcix.scpe-u@PCIFN/PCIFN;
+event error.io.pcix.source-scpe-u@PCIFN;
+event error.io.pcix.spl-comp-ma-u@PCIFN/PCIFN;
+event error.io.pcix.spl-comp-ta-u@PCIFN/PCIFN;
+event error.io.pci.ma-u@PCIFN/PCIFN;
+
+event ereport.io.pci.sec-ma@PCIFN{within(5s)};
+event ereport.io.pci.sec-sta@PCIFN{within(5s)};
+event ereport.io.pci.sec-rta@PCIFN{within(5s)};
+event ereport.io.pci.sec-mdpe@PCIFN{within(5s)};
+event ereport.io.pci.sec-dpe@PCIFN{within(5s)};
+event ereport.io.pci.sec-rserr@PCIFN{within(5s)};
+event ereport.io.pci.dto@PCIFN{within(5s)};
+event ereport.io.pcix.sec-spl-dis@PCIFN{within(5s)};
+event ereport.io.pcix.spl-dis@PCIFN{within(5s)};
+
+/*
+ * SERR# can propagate upstream and may be seen by other devices on the bus
+ */
+prop error.io.pci.serr-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<> {todev!=fromdev};
+
+prop error.io.pci.serr-u@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.sserr@PCIFN;
+
+prop error.io.pci.serr-u@PCIFN/PCIFN (2)->
+    ereport.io.pci.sec-rserr@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+/*
+ * PERR# can propagate upstream for delayed writes. For posted writes
+ * it turns into an SERR#.
+ */
+prop error.io.pci.perr-dw-u@PCIFN/PCIFN (2)->
+    ereport.io.pci.sec-mdpe@PCIFN,
+    error.io.pci.perr-dw-u@PCIFN;
+
+prop error.io.pci.perr-pw-u@PCIFN/PCIFN (2)->
+    ereport.io.pci.sec-mdpe@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+/*
+ * PERR# can propagate downstream (only for downstream dw parity error)
+ */
+prop error.io.pci.perr-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.perr-d@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.perr-d@PCIFN (1)->
+    error.io.pci.perr-d@PCIFN/PCIFNHZ;
+
+/*
+ * downstream target ereports are for any descendant device
+ *
+ * A hostbridge driver may generate "target-" ereports when knowledge of the
+ * physical address associated with a fault allows the target device to be
+ * determined. This is not a requirement of the Diagnosis Engine, but can be
+ * valuable when available.
+ */
+prop error.io.pci.target-mdpe-d@PCIFN (0)->
+    ereport.io.pci.target-mdpe@PCIFN;
+
+prop error.io.pci.target-mdpe-d@PCIFN (1)->
+    error.io.pci.target-mdpe-d@PCIFN/PCIFNHZ;
+
+prop error.io.pci.target-rta-d@PCIFN (0)->
+    ereport.io.pci.target-rta@PCIFN;
+
+prop error.io.pci.target-rta-d@PCIFN (1)->
+    error.io.pci.target-rta-d@PCIFN/PCIFNHZ;
+
+prop error.io.pci.target-ma-d@PCIFN (0)->
+    ereport.io.pci.target-ma@PCIFN;
+
+prop error.io.pci.target-ma-d@PCIFN (1)->
+    error.io.pci.target-ma-d@PCIFN/PCIFNHZ;
+
+/*
+ * target aborts propagate upstream
+ */
+prop error.io.pci.ta-u@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.sta@PCIFN;
+
+prop error.io.pci.ta-u@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.sta@PCIFN;
+
+prop error.io.pci.ta-u@PCIFN/PCIFN (2)->
+    ereport.io.pci.sec-rta@PCIFN,
+    error.io.pci.ta-u@PCIFN;
+
+/*
+ * bad data (ie invalid but not an ape or dpe) can propagate downstream,
+ * and at some point may result in a target or master abort
+ */
+prop error.io.pci.badreq-pw-d@PCIFN (1)->
+    error.io.pci.badreq-pw-d@PCIFN/PCIFNHZ,
+    error.io.pci.nr-pw-u@PCIFN,
+    error.io.pci.ta-pw-u@PCIFN;
+
+prop error.io.pci.badreq-pw-d@PCIFN { IS_LEAF } (0)->
+    error.io.pci.nr-pw-u@PCIFN,
+    error.io.pci.ta-pw-u@PCIFN;
+
+prop error.io.pci.badreq-drw-d@PCIFN (1)->
+    error.io.pci.badreq-drw-d@PCIFN/PCIFNHZ,
+    error.io.pci.nr-drw-u@PCIFN,
+    error.io.pci.ta-drw-u@PCIFN;
+
+prop error.io.pci.badreq-drw-d@PCIFN { IS_LEAF } (0)->
+    error.io.pci.nr-drw-u@PCIFN,
+    error.io.pci.ta-drw-u@PCIFN;
+
+prop error.io.pci.nr-pw-u@PCIFN/PCIFN (2)-> 
+    ereport.io.pci.sec-ma@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.ta-pw-u@PCIFN { IS_LEAF } (0)-> 
+    ereport.io.pci.sta@PCIFN;
+
+prop error.io.pci.ta-pw-u@PCIFN { IS_BDG } (1)-> 
+    ereport.io.pci.sta@PCIFN;
+
+prop error.io.pci.ta-pw-u@PCIFN/PCIFN (2)-> 
+    ereport.io.pci.sec-rta@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.nr-drw-u@PCIFN (1)->
+    error.io.pci.ma-u@PCIFN;
+
+prop error.io.pci.nr-drw-u@PCIFN (1)->
+    error.io.pci.target-rta-d@PCIFN,
+    error.io.pci.target-ma-d@PCIFN;
+
+prop error.io.pci.ma-u@PCIFN/PCIFN (1)->
+    ereport.io.pci.sec-ma@PCIFN;
+
+prop error.io.pci.ma-u@PCIFN/PCIFN (1)->
+    error.io.pci.ma-u@PCIFN,
+    error.io.pci.ta-u@PCIFN;
+
+prop error.io.pci.ta-drw-u@PCIFN (1)-> 
+    error.io.pci.ta-u@PCIFN;
+
+prop error.io.pci.ta-drw-u@PCIFN (1)-> 
+    error.io.pci.target-rta-d@PCIFN;
+
+/*
+ * bad data (ie invalid but not an ape or dpe) can propagate upstream,
+ * and at some point may result in a target or master abort
+ */
+prop error.io.pci.badreq-pw-u@PCIFN/PCIFN (1)->
+    error.io.pci.badreq-pw-u@PCIFN,
+    error.io.pci.nr-pw-d@PCIFN/PCIFN,
+    error.io.pci.ta-pw-d@PCIFN/PCIFN;
+
+prop error.io.pci.badreq-pw-u@PCIFN (0)->
+    error.io.pci.nr-pw-d@PCIFN,
+    error.io.pci.ta-pw-d@PCIFN;
+
+prop error.io.pci.nr-pw-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.ma@PCIFN;
+
+prop error.io.pci.nr-pw-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pci.ma@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.ta-pw-d@PCIFN/PCIFN (1)->
+    ereport.io.pci.sec-sta@PCIFN;
+
+prop error.io.pci.ta-pw-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.rta@PCIFN;
+
+prop error.io.pci.ta-pw-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pci.rta@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+/*
+ * for delayed writes we treat upstream badreq specially as rta always
+ * propagates back downstream to the leaf
+ */
+prop error.io.pci.badreq-drw-u@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.rta@PCIFN,
+    ereport.io.pci.ma@PCIFN; 
+
+prop error.io.pci.badreq-drw-u@PCIFN/PCIFN (1)->
+    ereport.io.pci.ma@PCIFN,
+    ereport.io.pci.rta@PCIFN;
+
+prop error.io.pci.badreq-drw-u@PCIFN/PCIFN (0)->
+    ereport.io.pci.sec-sta@PCIFN;
+
+prop error.io.pci.badreq-drw-u@PCIFN/PCIFN (0)->
+    error.io.pci.badreq-drw-u@PCIFN;
+
+prop error.io.pci.nr-drw-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.ma@PCIFN;
+
+prop error.io.pci.nr-drw-d@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.ma@PCIFN;
+
+prop error.io.pci.nr-drw-d@PCIFN { IS_BDG } (0)->
+    ereport.io.pci.sec-sta@PCIFN;
+
+prop error.io.pci.nr-drw-d@PCIFN (1)->
+    error.io.pci.ta-d@PCIFN/PCIFNHZ,
+    error.io.pci.nr-drw-d@PCIFN/PCIFNHZ;
+
+prop error.io.pci.ta-drw-d@PCIFN/PCIFN (1)->
+    ereport.io.pci.sec-sta@PCIFN;
+
+prop error.io.pci.ta-drw-d@PCIFN (1)->
+    error.io.pci.ta-d@PCIFN;
+
+prop error.io.pci.ta-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.rta@PCIFN;
+
+prop error.io.pci.ta-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pci.sec-sta@PCIFN,
+    ereport.io.pci.rta@PCIFN;
+
+prop error.io.pci.ta-d@PCIFN (1)->
+    error.io.pci.ta-d@PCIFN/PCIFNHZ;
+
+/*
+ * Request with address parity error must be detected by parent device
+ * and can optionally result in a target or master abort.
+ * It may also be detected by sibling devices on a bus
+ */
+prop error.io.pci.ape-u@PCIFN/PCIFN (3)->
+    ereport.io.pci.sec-dpe@PCIFN,
+    ereport.io.pci.sec-rserr@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.ape-u@PCIFN (0)->
+    error.io.pci.nr-drw-d@PCIFN,
+    error.io.pci.ta-drw-d@PCIFN,
+    error.io.pci.nr-pw-d@PCIFN,
+    error.io.pci.ta-pw-d@PCIFN;
+
+prop error.io.pci.ape-u@PCIFN (0)->
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.dpe@pcibus/pcidev<todev>/pcifn<> {fromdev != todev},
+    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<> {fromdev != todev};
+
+prop error.io.pci.ape-u@PCIFN (1)->
+    error.io.pci.source-ape-u@PCIFN;
+
+/*
+ * If the bridge sees an upstream split completion error (pci-x only) it could
+ * result in a number of things
+ * - for various faults in the split completion (eg address parity error)
+ *   we will respond with a target abort (which the child device will treat
+ *   as a split completion ta)
+ * - for other faults we can't tell who send the split completion and so
+ *   just drop the request (which the child device sees as a split
+ *   completion ma)
+ */
+prop error.io.pcix.scpe-u@PCIFN/PCIFN (0)->
+    ereport.io.pci.sec-sta@PCIFN,
+    ereport.io.pci.sec-dpe@PCIFN,
+    ereport.io.pci.sec-rserr@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pcix.scpe-u@PCIFN (1)->
+    error.io.pcix.spl-comp-ma-d@PCIFN,
+    error.io.pcix.spl-comp-ta-d@PCIFN;
+
+prop error.io.pcix.spl-comp-ma-d@PCIFN (1)->
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pcix.spl-comp-ma-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.sserr@PCIFN,
+    ereport.io.pcix.spl-dis@PCIFN;
+
+prop error.io.pcix.spl-comp-ma-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pcix.spl-dis@PCIFN,
+    ereport.io.pci.ma@PCIFN;
+
+prop error.io.pcix.spl-comp-ta-d@PCIFN (1)->
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pcix.spl-comp-ta-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.sserr@PCIFN,
+    ereport.io.pcix.spl-dis@PCIFN;
+
+prop error.io.pcix.spl-comp-ta-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pcix.spl-dis@PCIFN,
+    ereport.io.pci.rta@PCIFN;
+
+prop error.io.pcix.scpe-u@PCIFN (1)->
+    error.io.pcix.source-scpe-u@PCIFN;
+
+/*
+ * request with address parity error must be detected by child device
+ * and can optionally result in a target or master abort.
+ */
+prop error.io.pci.ape-d@PCIFN (1)->
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.ape-d@PCIFN { IS_LEAF } (0)->
+    error.io.pci.leaf-ape-d@PCIFN;
+
+prop error.io.pci.leaf-ape-d@PCIFN { IS_LEAF } (2)->
+    ereport.io.pci.sserr@PCIFN,
+    ereport.io.pci.dpe@PCIFN;
+
+prop error.io.pci.ape-d@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.dpe@PCIFN;
+
+prop error.io.pci.ape-d@PCIFN (0)->
+    error.io.pci.ta-pw-u@PCIFN,
+    error.io.pci.ta-drw-u@PCIFN,
+    error.io.pci.nr-pw-u@PCIFN,
+    error.io.pci.nr-drw-u@PCIFN;
+
+/*
+ * If the device sees a downstream split completion error (pci-x only) it could
+ * result in a number of things
+ * - for various faults in the split completion (eg address parity error)
+ *   we will respond with a target abort (which the parent bridge will treat
+ *   as a split completion ta)
+ * - for other faults we can't tell who send the split completion and so
+ *   just drop the request (which the parent bridge sees as a split
+ *   completion ma)
+ */
+prop error.io.pcix.scpe-d@PCIFN (0)->
+    ereport.io.pci.sta@PCIFN,
+    ereport.io.pci.dpe@PCIFN,
+    ereport.io.pci.sserr@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pcix.scpe-d@PCIFN (1)->
+    error.io.pcix.spl-comp-ma-u@PCIFN,
+    error.io.pcix.spl-comp-ta-u@PCIFN;
+
+prop error.io.pcix.spl-comp-ma-u@PCIFN/PCIFN (2)->
+    ereport.io.pcix.sec-spl-dis@PCIFN,
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pcix.spl-comp-ma-u@PCIFN/PCIFN (0)->
+    ereport.io.pci.sec-ma@PCIFN;
+
+prop error.io.pcix.spl-comp-ta-u@PCIFN/PCIFN (3)->
+    ereport.io.pcix.sec-spl-dis@PCIFN,
+    error.io.pci.serr-u@PCIFN,
+    ereport.io.pci.sec-rta@PCIFN;
+
+/*
+ * request with data parity error can propagate upstream
+ *
+ * for PCI/X (but not PCI) the split write can optionally be forwarded across
+ * the bridge, maintaining bad parity/ecc
+ *
+ * if there is a dpe on a retry on a delayed write, we don't send another
+ * retry, and eventually the dto timer will expire
+ */
+prop error.io.pci.dpdata-pw-u@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.dpdata-pw-u@PCIFN/PCIFN (3)->
+    ereport.io.pci.mdpe@PCIFN,
+    ereport.io.pci.sec-dpe@PCIFN,
+    error.io.pci.dpdata-pw-u@PCIFN;
+
+prop error.io.pci.dpdata-dw-u@PCIFN/PCIFN (1)->
+    ereport.io.pci.sec-dpe@PCIFN;
+
+prop error.io.pci.dpdata-dw-u@PCIFN/PCIFN (0)->
+    ereport.io.pci.mdpe@PCIFN,
+    error.io.pci.dpdata-dw-u@PCIFN;
+
+prop error.io.pci.dpdata-dw-u@PCIFN/PCIFN (0)->
+    error.io.pci.retry-to-u@PCIFN/PCIFN;
+
+prop error.io.pci.dpdata-dr-u@PCIFN/PCIFN (3)->
+    ereport.io.pci.sec-dpe@PCIFN,
+    ereport.io.pci.sec-mdpe@PCIFN,
+    error.io.pci.dpdata-dr-u@PCIFN;
+
+/*
+ * Request with data parity error can propagate downstream. A hardened
+ * leaf driver should handle the error, but may or may not be able to
+ * avoid service impact. We handle to two cases separately. If there is
+ * service impact we will fail immediately, if not we will feed into a SERD
+ * engine.
+ *
+ * for PCI/X (but not PCI) the split write can optionally be forwarded across
+ * the bridge, maintaining bad parity/ecc
+ *
+ * if there is a dpe on a retry on a delayed write, we don't send another
+ * retry, and eventually the dto timer will expire
+ */
+prop error.io.pci.f-dpe-d@PCIFN (1)->
+    error.io.pci.dpdata-pw-d@PCIFN,
+    error.io.pci.dpdata-dw-d@PCIFN,
+    error.io.pci.dpdata-dr-d@PCIFN;
+
+prop error.io.pci.f-dpe-d@PCIFN (1)->
+    error.io.pci.f-source-dpdata-u@PCIFN;
+
+prop error.io.pci.deg-dpe-d@PCIFN (1)->
+    error.io.pci.dpdata-pw-d@PCIFN,
+    error.io.pci.dpdata-dw-d@PCIFN,
+    error.io.pci.dpdata-dr-d@PCIFN;
+
+prop error.io.pci.deg-dpe-d@PCIFN (1)->
+    error.io.pci.deg-source-dpdata-u@PCIFN;
+
+prop error.io.pci.nf-dpe-d@PCIFN (1)->
+    error.io.pci.dpdata-pw-d@PCIFN,
+    error.io.pci.dpdata-dw-d@PCIFN,
+    error.io.pci.dpdata-dr-d@PCIFN;
+
+prop error.io.pci.nf-dpe-d@PCIFN (1)->
+    error.io.pci.nf-source-dpdata-u@PCIFN;
+
+prop error.io.pci.dpdata-pw-d@PCIFN (2)->
+    error.io.pci.perr-pw-u@PCIFN,
+    error.io.pci.dpdata-pw-fwd-d@PCIFN;
+
+prop error.io.pci.dpdata-pw-fwd-d@PCIFN { IS_LEAF } (1)->
+    error.io.pci.source-perr-u@PCIFN;
+
+prop error.io.pci.dpdata-pw-fwd-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.dpe@PCIFN;
+
+prop error.io.pci.dpdata-pw-fwd-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pci.dpe@PCIFN,
+    ereport.io.pci.sec-mdpe@PCIFN;
+
+prop error.io.pci.dpdata-pw-fwd-d@PCIFN (1)->
+    error.io.pci.dpdata-pw-fwd-d@PCIFN/PCIFNHZ;
+
+prop error.io.pci.dpdata-dw-d@PCIFN (3)->
+    error.io.pci.perr-dw-u@PCIFN,
+    error.io.pci.target-mdpe-d@PCIFN,
+    error.io.pci.dpdata-dw-fwd-d@PCIFN;
+
+prop error.io.pci.dpdata-dw-d@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.dpe@PCIFN;
+
+prop error.io.pci.dpdata-dw-d@PCIFN { IS_BDG } (0)->
+    error.io.pci.retry-to-d@PCIFN;
+
+prop error.io.pci.dpdata-dw-fwd-d@PCIFN { IS_LEAF } (1)->
+    error.io.pci.source-perr-u@PCIFN;
+
+prop error.io.pci.dpdata-dw-fwd-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.dpe@PCIFN;
+
+prop error.io.pci.dpdata-dw-fwd-d@PCIFN { IS_BDG } (0)->
+    ereport.io.pci.dpe@PCIFN,
+    ereport.io.pci.sec-mdpe@PCIFN;
+
+prop error.io.pci.dpdata-dw-fwd-d@PCIFN (0)->
+    error.io.pci.dpdata-dw-fwd-d@PCIFN/PCIFNHZ;
+
+prop error.io.pci.dpdata-dr-d@PCIFN (2)->
+    error.io.pci.dpdata-dr-fwd-d@PCIFN,
+    error.io.pci.perr-dr-u@PCIFN;
+
+prop error.io.pci.dpdata-dr-fwd-d@PCIFN { IS_LEAF } (1)->
+    error.io.pci.source-perr-u@PCIFN;
+
+prop error.io.pci.dpdata-dr-fwd-d@PCIFN { IS_LEAF } (0)->
+    ereport.io.pci.dpe@PCIFN,
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.dpdata-dr-fwd-d@PCIFN { IS_BDG } (2)->
+    ereport.io.pci.dpe@PCIFN,
+    ereport.io.pci.mdpe@PCIFN;
+
+prop error.io.pci.dpdata-dr-fwd-d@PCIFN (1)->
+    error.io.pci.dpdata-dr-fwd-d@PCIFN/PCIFNHZ;
+
+/*
+ * delayed read/write retry timeout can cause dto at a bridge
+ */
+prop error.io.pci.retry-to-u@PCIFN/PCIFN (0)->
+    error.io.pci.retry-to-u@PCIFN;
+
+prop error.io.pci.retry-to-u@PCIFN/PCIFN (1)->
+    ereport.io.pci.dto@PCIFN;
+
+prop error.io.pci.retry-to-u@PCIFN/PCIFN (0)->
+    error.io.pci.serr-u@PCIFN;
+
+prop error.io.pci.retry-to-d@PCIFN (0)->
+    error.io.pci.retry-to-d@PCIFN/PCIFN;
+
+prop error.io.pci.retry-to-d@PCIFN { IS_BDG } (1)->
+    ereport.io.pci.dto@PCIFN;
+
+prop error.io.pci.retry-to-d@PCIFN { IS_BDG } (0)->
+    error.io.pci.serr-u@PCIFN;
+
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * source- propagations.
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+event error.io.pci.source-ape-u@PCIFN/PCIFN;
+event error.io.pcix.source-scpe-u@PCIFN/PCIFN;
+
+prop error.io.pci.source-ape-u@PCIFN (1)->
+    error.io.pci.source-ape-u@PCIFN/PCIFNHZ;
+    
+prop error.io.pcix.source-scpe-u@PCIFN (1)->
+    error.io.pcix.source-scpe-u@PCIFN/PCIFNHZ;
+    
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * Handling of leaf driver detected internal errors. Use serd engine if
+ * no service impact - otherwise fail immediately
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+event ereport.io.device.inval_state@PCIFN{within(5s)};
+event ereport.io.device.no_response@PCIFN{within(5s)};
+event ereport.io.device.stall@PCIFN{within(5s)};
+event ereport.io.device.badint_limit@PCIFN{within(5s)};
+event ereport.io.device.intern_corr@PCIFN{within(5s)};
+event ereport.io.device.intern_uncorr@PCIFN{within(5s)};
+
+prop error.io.service.restored@PCIFN { IS_LEAF } (1)->
+    ereport.io.service.lost@PCIFN,
+    ereport.io.service.degraded@PCIFN;
+
+prop error.io.service.restored@PCIFN { IS_LEAF } (1)->
+    ereport.io.service.restored@PCIFN;
+
+prop error.io.device.f-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.device.inval_state@PCIFN,
+    ereport.io.device.no_response@PCIFN,
+    ereport.io.device.stall@PCIFN,
+    ereport.io.device.badint_limit@PCIFN,
+    ereport.io.device.intern_corr@PCIFN,
+    ereport.io.device.intern_uncorr@PCIFN;
+
+prop error.io.device.f-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.service.lost@PCIFN;
+
+prop error.io.device.deg-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.device.inval_state@PCIFN,
+    ereport.io.device.no_response@PCIFN,
+    ereport.io.device.stall@PCIFN,
+    ereport.io.device.badint_limit@PCIFN,
+    ereport.io.device.intern_corr@PCIFN,
+    ereport.io.device.intern_uncorr@PCIFN;
+
+prop error.io.device.deg-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.service.degraded@PCIFN;
+
+prop error.io.device.nf-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.device.inval_state@PCIFN,
+    ereport.io.device.no_response@PCIFN,
+    ereport.io.device.stall@PCIFN,
+    ereport.io.device.badint_limit@PCIFN,
+    ereport.io.device.intern_corr@PCIFN,
+    ereport.io.device.intern_uncorr@PCIFN;
+
+prop error.io.device.nf-device@PCIFN { IS_LEAF } (1)->
+    ereport.io.service.unaffected@PCIFN,
+    error.io.service.restored@PCIFN;
+
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * stub unused ereports
+ * - ignore rx-spl as we can't tell what message it was (and we should have
+ *   diagnosed the problem anyway from standard pci ereports)
+ * - ignore sec-spl-or/sec-spl-dly as these aren't really faults (tuning info)
+ * - ignore unex-spl/sec-unex-spl
+ * - ignore ecc.ue ereports (we get everything we need from dpe/mdpe)
+ * - ignore ecc.ce ereports for now (could do serd on these)
+ * - ignore nr ereport
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+
+event ereport.io.pci.nr@PCIFN{within(5s)};
+event ereport.io.pcix.unex-spl@PCIFN{within(5s)};
+event ereport.io.pcix.rx-spl@PCIFN{within(5s)};
+event ereport.io.pcix.sec-unex-spl@PCIFN{within(5s)};
+event ereport.io.pcix.sec-spl-or@PCIFN{within(5s)};
+event ereport.io.pcix.sec-spl-dly@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ce-addr@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ce-attr@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ce-data@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ue-addr@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ue-attr@PCIFN{within(5s)};
+event ereport.io.pcix.ecc.ue-data@PCIFN{within(5s)};
+event ereport.io.pcix.s-ce@PCIFN{within(5s)};
+event ereport.io.pcix.s-ue@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-addr@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-attr@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-data@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-addr@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-attr@PCIFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-data@PCIFN{within(5s)};
+event ereport.io.pcix.sec-s-ce@PCIFN{within(5s)};
+event ereport.io.pcix.sec-s-ue@PCIFN{within(5s)};
+
+event upset.io.pcix.discard@PCIFN;
+
+prop upset.io.pcix.discard@PCIFN (1)->
+    ereport.io.pci.nr@PCIFN,
+    ereport.io.pcix.rx-spl@PCIFN,
+    ereport.io.pcix.unex-spl@PCIFN,
+    ereport.io.pcix.sec-unex-spl@PCIFN,
+    ereport.io.pcix.sec-spl-or@PCIFN,
+    ereport.io.pcix.sec-spl-dly@PCIFN,
+    ereport.io.pcix.ecc.ce-addr@PCIFN,
+    ereport.io.pcix.ecc.ce-attr@PCIFN,
+    ereport.io.pcix.ecc.ce-data@PCIFN,
+    ereport.io.pcix.ecc.ue-addr@PCIFN,
+    ereport.io.pcix.ecc.ue-attr@PCIFN,
+    ereport.io.pcix.ecc.ue-data@PCIFN,
+    ereport.io.pcix.s-ce@PCIFN,
+    ereport.io.pcix.s-ue@PCIFN,
+    ereport.io.pcix.sec-ecc.ce-addr@PCIFN,
+    ereport.io.pcix.sec-ecc.ce-attr@PCIFN,
+    ereport.io.pcix.sec-ecc.ce-data@PCIFN,
+    ereport.io.pcix.sec-ecc.ue-addr@PCIFN,
+    ereport.io.pcix.sec-ecc.ue-attr@PCIFN,
+    ereport.io.pcix.sec-ecc.ue-data@PCIFN,
+    ereport.io.pcix.sec-s-ce@PCIFN,
+    ereport.io.pcix.sec-s-ue@PCIFN;

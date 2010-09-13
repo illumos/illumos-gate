@@ -1,0 +1,41 @@
+#
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	fmd_fmri_alloc		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_zalloc		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_free		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_set_errno	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_warn		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_auth2str	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strescape	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strdup		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strfree	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_rootdir	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_platform	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_drgen	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_topo_hold	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_topo_rele	{ TYPE = function; FLAGS = extern };
+};

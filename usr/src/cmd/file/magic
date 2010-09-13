@@ -1,0 +1,619 @@
+#
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# This file contains the dictionary of file format identifiers (magic strings)
+# used by file(1).  The fields of this file are as follows:
+#
+# (1) byte offset
+# (2) value type
+# (3) optional operator (= by default)
+# (4) value to match (numeric or string)
+# (5) string to be printed
+#
+# Numeric values may be decimal, octal, or hex.  Also note that the last string
+# may have one printf format specifier.  The '>' in occassional column 1's is
+# magic: it forces file(1) to continue scanning and matching additional lines.
+# The first line afterwards not so marked terminates the search.
+#
+# The entries for ELF are not needed anymore, as file(1) now uses the elf(3ELF)
+# routines to look at ELF files.  They remain, commented out, for reference.
+#
+#0	string		\177ELF		ELF
+#>4	byte		1		32-bit
+#>5	byte		1		LSB
+#>5	byte		2		MSB
+#>16	short		0		unknown type
+#>16	short		1		relocatable
+#>16	short		2		executable
+#>16	short		3		dynamic lib
+#>16	short		4		core file
+#>18	short		0		unknown machine
+#>18	short		1		WE32100
+#>18	short		2		SPARC
+#>18	short		3		80386
+#>18	short		4		M68000
+#>18	short		5		M88000
+#>18	short		6		i80486
+#>18	short		7		i860
+#>18	short		8		RS3000_BE
+#>18	short		9		UNKNOWN
+#>18	short		10		RS3000_LE
+#>18	short		11		RS6000
+#>18	short		12		UNKNOWN
+#>18	short		13		UNKNOWN
+#>18	short		14		UNKNOWN
+#>18	short		15		PA_RISC
+#>18	short		16		nCUBE
+#>18	short		17		VPP500
+#>18	short		18		SPARC32PLUS
+#>18	short		19		UNKNOWN
+#>18	short		20		PowerPC
+#>20	long		1		Version 1
+#>36	long		1		MAU Required
+257	string		ustar		USTAR tar archive
+>156	byte		88		extended format
+0	short		070701		cpio archive
+0	string		070701		ASCII cpio archive
+0	short		070702		cpio archive - CRC header
+0	string		070702		ASCII cpio archive - CRC header
+0	short		070707		cpio archive - CHR (-c) header
+0	string		070707		ASCII cpio archive - CHR (-c) header
+0	long		0177555		obsolete ar archive
+0	short		0177545		pdp11/pre System V ar archive
+0	long		0100554		apl workspace
+0	short		017037		packed data
+0	string		<ar>		System V Release 1 ar archive
+0	string		!<arch>		current ar archive
+0	short		0407		pdp11/pre System V vax executable
+>8	ushort		>0		not stripped
+>15	ubyte		>0		- version %ld
+0	short		0401		unix-rt ldp
+0	short		0405		pdp11 overlay
+0	short		0410		pdp11/pre System V vax pure executable
+>8	ushort		>0		not stripped
+>15	ubyte		>0		- version %ld
+0	short		0411		pdp11 separate I&D
+>8	ushort		>0		not stripped
+>15	ubyte		>0		- version %ld
+0	short		015001		Compiled Terminfo Entry
+# little-endian entry
+0	short		0432		Compiled Terminfo Entry
+0	short		0433		Curses screen image
+0	short		0434		Curses screen image
+0	short		0437		pdp11 kernel overlay
+0	short		0570		vax executable
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0575		vax pure executable
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0502		basic-16 executable
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0503		basic-16 executable (TV)
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0510		x86 executable
+>12	long		>0		not stripped
+0	short		0511		x86 executable (TV)
+>12	long		>0		not stripped
+0	short		0550		3b20 executable
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0551		3b20 executable (TV)
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0560		WE32000 executable
+>12	long		>0		not stripped
+>18	short		^00010000	- N/A on 3b2/300 w/paging
+>18	short		&00020000	- 32100 required
+>18	short		&00040000	and mau hardware required
+>20	short		0443		(target shared library)
+>20	short		0410		(swapped)
+>20	short		0413		(paged)
+>22	ushort		>0		- version %ld
+0	short		0561		WE32000 executable (TV)
+>12	long		>0		not stripped
+>18	short		&00020000	- 32100 required
+>18	short		&00040000	and mau hardware required
+>22	ushort		>0		- version %ld
+0	short		=0512		iAPX 286 executable small model (COFF)
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		=0522		iAPX 286 executable large model (COFF)
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0514		iAPX 386 executable (COFF) (deprecated)
+>12	long		>0		not stripped
+>22	ushort		>0		- version %ld
+0	short		0520		mc68k executable
+>12	long		>0		not stripped
+0	short		0521		mc68k executable (shared)
+>12	long		>0		not stripped
+0	short		0522		mc68k executable (shared demand paged)
+>12	long		>0		not stripped
+# big-endian entries for pure executables
+2	short		0410		pure
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+# little-endian entries for pure executables
+2	short		04001		pure
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+# big-endian entries for impure executables
+2	short		0407		impure
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+# little-endian entries for impure executables
+2	short		03401		impure
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+# big-endian entries for Sun demand paged executables
+2	short		0413		Sun demand paged
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+# little-endian entries for Sun demand paged executables
+2	short		05401		Sun demand paged
+>1	byte		0		sun2 executable
+>1	byte		1		mc68010 executable
+>1	byte		2		mc68020 executable
+>1	byte		3		SPARC executable
+>0	ubyte		>077		dynamically linked
+0	short		0x8001		Adobe PostScript Type 1 binary font (PFB)
+0	short		0x0180		Adobe PostScript Type 1 binary font (PFB)
+0	long		0x00010000	TrueType font file version 1.0 (TTF)
+0	long		0x00000100	TrueType font file version 1.0 (TTF)
+0	long		0xf00000ff	extended accounting file
+# little-endian entry
+0	long		0xff0000f0	extended accounting file
+0	byte		0x80		8086 relocatable (Microsoft)
+0	byte		0xf0		MS-DOS library
+0	short		0xff65		x.out
+>2	string		__.SYMDEF	randomized
+>0	byte		x		archive
+0	short		0x206		Microsoft a.out
+>0x1e	short		&0x10		overlay
+>0x1e	short		&0x2		separate
+>0x1e	short		&0x4		pure
+>0x1e	short		&0x800		segmented
+>0x1e	short		&0x400		standalone
+>0x1e	short		&0x8		fixed-stack
+>0x1c	byte		&0x80		byte-swapped
+>0x1c	byte		&0x40		word-swapped
+>0x10	long		>0		not-stripped
+>0x1e	short		^0xc000		pre-SysV
+>0x1c	byte		&0x4		86
+>0x1c	byte		&0x9		286
+>0x1c	byte		&0xa		386
+>0x1e	short		&0x1		executable
+>0x1e	short		^0x1		object file
+>0x1e	short		&0x40		Large Text
+>0x1e	short		&0x20		Large Data
+>0x1e	short		&0x120		Huge Objects Enabled
+0	short		0x10b		VAX demand load format a.out object file
+>0x10	long		>0		not stripped
+0	short		0x140		old Microsoft 8086 x.out
+>0x3	byte		&0x4		separate
+>0x3	byte		&0x2		pure
+>0	byte		&0x1		executable
+>0	byte		^0x1		relocatable
+>0x14	long		>0		not stripped
+0	long		0x10b		VAX demand load format a.out object file
+>0x10	long		>0		not stripped
+0	long		0x140		old Microsoft 8086 x.out
+>0x3	byte		&0x4		separate
+>0x3	byte		&0x2		pure
+>0	byte		&0x1		executable
+>0	byte		^0x1		relocatable
+>0x14	long		>0		not stripped
+0	long		0xe807		object file (z8000 a.out)
+0	long		0xe808		pure object file (z8000 a.out)
+0	long		0xe809		separate object file (z8000 a.out)
+0	long		0xe805		overlay object file (z8000 a.out)
+0	long		0x178		Bell 5.0 executable
+2	short		0410		Sun read-only text executable
+>2	short		0407		Sun old executable
+>1	byte		3		(SPARC)
+>1	byte		2		(68020)
+>1	byte		1		(68010)
+>1	byte		0		(Sun2)
+0	short		0143561		byte-swapped cpio archive
+0	long		0101555		PDP-11 single precision APL workspace
+0	long		0101554		PDP-11 double precision APL workspace
+0	long		0101557		VAX single precision APL workspace
+0	long		0101556		VAX double precision APL workspace
+0	short		017437		old packed data
+0	string		\037\036	packed data
+0	string		\377\037	compacted data
+0	string		\037\235	compressed data
+>2	byte&0x80	>0		block compressed
+>2	byte&0x1f	x		%d bits
+0	string		\037\213	gzip compressed data
+>2	byte		8		- deflate method
+>3	byte		&0x1		, ascii
+>3	byte		&0x2		, continuation
+>3	byte		&0x4		, extra field
+>3	byte		&0x8		, original file name
+>3	byte		&0x10		, comment
+>3	byte		&0x20		, encrypted
+>8	byte		2		, max compression
+>8	byte		4		, max speed
+0	string		!<arch>\n__.SYMDEF	archive random library
+0	long		0x1010101	MMDF mailbox
+0	string		<!OPS		Interleaf ASCII document
+24	string		SunGKS		SunGKS
+# version number follows, in the form m.n
+>0	string		GKSM		Metafile
+0	string		GKSM		GKS Metafile
+# version number follows, in the form <!OPS, Version n.n>
+0	string		%!PS-AdobeFont	Adobe PostScript ASCII font (PFA)
+0	string		%!		PostScript document
+>2	string		PS-Adobe	 conforming to level
+>10	string		-1.0		 1.0
+>10	string		-2.0		 2.0
+>10	string		-3.0		 3.0
+# Handle Microsoft PostScript files (CTRL-D%!)
+0	string		\004%!		PostScript document text
+# version ID follows, in the form PS-Adobe-nn
+0	string		Interpress/Xerox	Interpress document
+# version ID follows, in the form /n.n
+0	string		StartFontMetrics	Adobe font metrics
+0	string		StartFont	Adobe font bits
+0	long		0x137A2944	NeWS bitmap font
+0	long		0x137A2947	NeWS font family
+8	long		0x137A2B45	X11/NeWS bitmap font
+8	long		0x137A2B48	X11/NeWS font family
+# snoop files are always big-endian
+# big-endian entries, with ullong equivalent of string "snoop"
+0	ullong		0x736e6f6f70000000	Snoop capture file
+>8	long		>0		- version %ld
+# little-endian entries, with ullong equivalent of string "snoop"
+0	ullong		0x000000706f6f6e73	Snoop capture file
+>11	long		>0		- version %ld
+0	short		0436		vfont definition
+0	string		<MakerFile	Frame Maker document
+0	string		<MIFFile	Frame Maker MIF file
+0	string		<MML		Frame Maker MML file
+0	string		<BookFile	Frame Maker book file
+# Audio files are always big-endian so there are two sets of tables here.
+# The CPU endian architecture is determined via the ordering of the first 4 bytes
+# (the string ".snd"). The tables below have this value represented as a single
+# 4 byte long. If the architecture is big-endian the %d token can be used for
+# interpreting the sampling rate.
+# Since %d can't be done on the data for little endian machines the limitation
+# is that sampling rates not included in the x86 entries will not be recognized.
+#
+# big-endian entries
+#
+0	long		0x2e736e64	audio data:
+>12	long		1		8-bit u-law,
+>12	long		2		8-bit linear PCM,
+>12	long		3		16-bit linear PCM,
+>12	long		4		24-bit linear PCM,
+>12	long		5		32-bit linear PCM,
+>12	long		6		32-bit floating point,
+>12	long		7		64-bit floating point,
+>12	long		23		compressed (4-bit G.721 ADPCM),
+>12	long		24		compressed (8-bit G.722 ADPCM),
+>12	long		25		compressed (3-bit G.723 ADPCM),
+>12	long		26		compressed (5-bit G.723 ADPCM),
+>12	long		27		8-bit A-law,
+>20	long		1		mono,
+>20	long		2		stereo,
+>20	long		4		quad,
+>16	long		x		%d Hz
+#
+# little-endian entries
+#
+0	long		0x646e732e	audio data:
+>12	long		0x01000000	8-bit u-law,
+>12	long		0x02000000	8-bit linear PCM,
+>12	long		0x03000000	16-bit linear PCM,
+>12	long		0x04000000	24-bit linear PCM,
+>12	long		0x05000000	32-bit linear PCM,
+>12	long		0x06000000	32-bit floating point,
+>12	long		0x07000000	64-bit floating point,
+>12	long		0x17000000	compressed (4-bit G.721 ADPCM),
+>12	long		0x18000000	compressed (8-bit G.722 ADPCM),
+>12	long		0x19000000	compressed (3-bit G.723 ADPCM),
+>12	long		0x1a000000	compressed (5-bit G.723 ADPCM),
+>12	long		0x1b000000	8-bit A-law,
+>20	long		0x01000000	mono,
+>20	long		0x02000000	stereo,
+>20	long		0x04000000	quad,
+>16	long		0x401f0000	8000 Hz
+>16	long		0x80250000	9600 Hz
+>16	long		0x112b0000	11025 Hz
+>16	long		0x803e0000	16000 Hz
+>16	long		0xd4490000	18900 Hz
+>16	long		0x22560000	22050 Hz
+>16	long		0x007d0000	32000 Hz
+>16	long		0xa8930000	37800 Hz
+>16	long		0x44ac0000	44100 Hz
+>16	long		0x80bb0000	48000 Hz
+# .wav files are always little-endian
+# .wav big-endian entries, starting with long value for the string "RIFF"
+0	long		0x52494646	audio data:
+>34	short		0x0800		8-bit
+>34	short		0x1000		16-bit
+>20	short		0x0100		linear PCM,
+>20	short		0x0200		MS ADPCM,
+>20	short		0x0600		A-law,
+>20	short		0x0700		u-law,
+>20	short		0x1100		DVI ADPCM,
+>22	short		0x0100		mono
+>22	short		0x0200		stereo
+# .wav little-endian entries, starting with long value for the string "RIFF"
+0	long		0x46464952	audio data:
+>34	short		0x0008		8-bit
+>34	short		0x0010		16-bit
+>20	short		0x0001		linear PCM,
+>20	short		0x0002		MS ADPCM,
+>20	short		0x0006		A-law,
+>20	short		0x0007		u-law,
+>20	short		0x0011		DVI ADPCM,
+>22	short		0x0001		mono
+>22	short		0x0002		stereo
+# .aiff files are always big-endian
+# .aiff big-endian entries, starting with long value for the string "FORM"
+0	long		0x464f524d	audio data:
+>26	short		0x0008		8-bit linear PCM,
+>26	short		0x0010		16-bit linear PCM,
+>20	short		0x0001		mono
+>20	short		0x0002		stereo
+# .aiff little-endian entries, starting with long value for the string "FORM"
+0	long		0x4d524f46	audio data:
+>26	short		0x0800		8-bit linear PCM,
+>26	short		0x1000		16-bit linear PCM,
+>20	short		0x0100		mono
+>20	short		0x0200		stereo
+# .mid files are always big-endian
+# .mid big-endian entries, starting with long value for the string "MThd"
+0	long		0x4d546864	MIDI data:
+>8	short		x		type %u,
+>10	short		x		%u track(s)
+# .mid little-endian entry (the string "MThd")
+# can't translate big-endian type and track information
+0	long		0x6468544d	MIDI data
+#
+0	short		0x1010		PEX Binary Archive
+# rasterfiles are big-endian
+# big-endian rasterfile entries
+0	long		0x59a66a95	rasterfile,
+>4	long		>0		%ld x
+>8	long		>0		%ld x
+>12	long		>0		%ld
+>20	long		0		old format image
+>20	long		1		standard format image
+>20	long		2		run-length byte encoded image
+>20	long		3		XRGB or RGB format image
+>20	long		4		tiff format image
+>20	long		5		iff (TAAC format) image 
+>20	long		0xffff		experimental format image
+# little-endian rasterfile entries
+# cannot translate resolution stored as big-endian longs
+0	long		0x956aa659	rasterfile,
+>23	long		0		old format image
+>23	long		1		standard format image
+>23	long		2		run-length byte encoded image
+>23	long		3		XRGB or RGB format image
+>23	long		4		tiff format image
+>23	long		5		iff (TAAC format) image 
+>20	long		0xffff		experimental format image
+0	long		0x884f5053	Interleaf fast-saved document
+0	long		0x2a535441	Aster*x
+>7	long		0x574f5244		Words Document
+>7	long		0x47524150		Graphic
+>7	long		0x53505245		Spreadsheet
+>7	long		0x4d414352		Macro
+0	long		0x32323738	Aster*x Version 2
+>29	byte		0x36			Words Document
+>29	byte		0x35			Graphic
+>29	byte		0x32			Spreadsheet
+>29	byte		0x38			Macro
+4	string		pgscriptver	IslandWrite document
+13	string		DrawFile	IslandDraw document
+0	string		P1		PBM ascii file
+0	string		P2		PGM ascii file
+0	string		P3		PPM ascii file
+0	string		P4		PBM raw file
+0	string		P5		PGM raw file
+0	string		P6		PPM raw file
+0	string		\115\115	TIFF file, big-endian
+0	string		\111\111	TIFF file, little-endian
+0	string		GIF87a		GIF file, v87
+0	string		GIF89a		GIF file, v89
+0	string		\377\330\377\340	JPEG file
+0	string		\377\330\377\341	JPEG file
+0	string		\377\330\377\356	JPG file
+8	string		ILBM		IFF ILBM file
+0	string		\312\376\272\276	java class file
+36	string		acsp	Kodak Color Management System, ICC Profile
+0	string		%PDF		Adobe Portable Document Format (PDF) 
+>4	string		-1.0		v1.0
+>4	string		-1.1		v1.1
+>4	string		-1.2		v1.2
+>4	string		-1.3		v1.3
+>4	string		-1.4		v1.4
+>4	string		-1.5		v1.5
+0	string		<html		html document
+0	string		<HTML		html document
+0	string		<Html		html document
+0	string		<!doctype HTML	html document
+0	string		<!doctype Html	html document
+0	string		<!doctype html	html document
+0	string		<!DOCTYPE HTML	html document
+0	string		<!DOCTYPE Html	html document
+0	string		<!DOCTYPE html	html document
+0	string		<!Doctype HTML	html document
+0	string		<!Doctype Html	html document
+0	string		<!Doctype html	html document
+0	string		<head		html document
+0	string		<HEAD		html document
+0	string		<Head		html document
+0	string		<title		html document
+0	string		<TITLE		html document
+0	string		<Title		html document
+0	string		<?xml		XML document
+0	string		<?XML		XML document
+0	string		<?Xml		XML document
+0	string		\0211PNG	PNG image data
+0	string		.RMF		RealMedia file
+0	string		FlAsH-aRcHiVe	Flash Archive
+>13	string		-1.0		 1.0
+>13	string		-2.0		 2.0
+38	string		application/vnd.sun.xml.writer	StarOffice 7 Text Document
+38	string		application/vnd.sun.xml.calc	StarOffice 7 Spreadsheet
+38	string		application/vnd.sun.xml.draw	StarOffice 7 Drawing
+38	string		application/vnd.sun.xml.impress	StarOffice 7 Presentation
+38	string		application/vnd.sun.xml.math	StarOffice 7 Formula
+38	string		application/vnd.oasis.opendocument.chart	OpenDocument Chart
+38	string		application/vnd.oasis.opendocument.database	OpenDocument Database
+38	string		application/vnd.sun.xml.base			OpenDocument Database
+38	string		application/vnd.oasis.opendocument.formula	OpenDocument Formula
+38	string		application/vnd.oasis.opendocument.image	OpenDocument Image
+38	string		application/vnd.oasis.opendocument.text-web	HTML Document Template
+38	string		application/vnd.oasis.opendocument.text-	OpenDocument
+>78	string		template						Text Template
+>78	string		master							Master Document
+38	string		application/vnd.oasis.opendocument.text		OpenDocument Text
+38	string		application/vnd.oasis.opendocument.graphics	OpenDocument Drawing
+>81	string		-template						Template
+38	string		application/vnd.oasis.opendocument.presentation	OpenDocument Presentation
+>85	string		-template						Template
+38	string		application/vnd.oasis.opendocument.spreadsheet	OpenDocument Spreadsheet
+>84	string		-template						Template
+0	string		PK\003\004	ZIP archive
+0	string		MZ		DOS executable (EXE)
+0	string		LZ		DOS built-in
+0	byte		0xe9		DOS executable (COM)
+0	byte		0xeb		DOS executable (COM)
+0	string		\013\023\010\000	ksh compiled shell script executable
+24	long		60012		ufsdump archive file
+0	string		TZif		zoneinfo timezone data file
+0	string		BZh		bzip2 compressed data
+>3	byte		>47		, block size = %c00k
+0	string		SUNWcpch	Sun C compiler precompiled header
+0	string		SUNWCpch	Sun C++ compiler precompiled header
+0	string		\043\040PaCkAgE\040DaTaStReAm	package datastream
+0	short		0xcff1		CTF data file
+0	string		\177DOF		DTrace DOF data file
+0	string		\177FCF		fmd(1M) checkpoint file
+0	string		EFT\0		Fault tree file,
+>4	ushort		x		v%u
+>6	ushort		x		rev %u,
+>8	ushort		x		from esc v%u
+>10	ushort		x		rev %u
+0	string		_SM_		DMTF SMBIOS image
+>6	byte		x		version %u
+>7	byte		x		.%u
+0	byte		0x11		Solaris Audit File
+0	byte		0x78		Solaris Audit File 
+# ZFS send stream entries
+8	ullong		0x00000002f5bacbac	ZFS snapshot stream
+# little endian stream
+8	ullong		0xaccbbaf502000000	ZFS snapshot stream
+
+
+# Video files
+2	string		\001\272\041	MPEG Movie file
+0	string		\377\375	MPEG-1 Audio Layer 2
+0	string		\377\373	MPEG-1 Audio Layer 3
+0	string		\377\372	MPEG-1 Audio Layer 3
+0	string		\111\104\063	MPEG-1 Layer 3 with ID3v2
+
+# AVI and GVI files
+20	string	hdrlavih	RIFF Avi Video
+>36	ulong	>0		%u Max Bps,
+>64	ushort	x		%u X
+>68	ushort	x		%u,
+>48	ulong	x		%u frames
+
+20	string	goog		RIFF gvi
+>88	ulong	>0		%u Max Bps
+>116	ushort	x		%u X
+>120	ushort	x		%u,
+>100	ulong	x		%u frames
+
+# JPEG 2000 - jp2 image file.
+3	string		\014\152\120\040\040	JPEG 2000 Image file
+
+# iso 9660 CD-ROM image and El Torito Bootable standard
+32769	string		CD\0		ISO 9660 filesystem image
+>34823	string		EL\040TORITO	- El Torito
+
+# Palm Pilot files .pdb and .prc of some type.
+0x3c	string	TEXtREAd		Palm DOC file
+0x3c	string	SDocSilX		iSilo 3 Doc file for PalmPilot
+0x3c	string	applSil			iSilo Application file
+0x3c	string	appl			Palm Pilot Application
+0x3c	string	ToGoToGo		iSilo Doc file for Palm Pilot
+
+#SGI files with .rgb extention
+0	string	\001\332			SGI Image data,
+>2	byte	1			RLE,
+>2	byte	0			Verbatim,
+>5	ubyte	x			%u-D
+>7	ubyte	x			%u x
+>9	ubyte	x			%u, 
+>11	ubyte	x			%u channel(s)
+
+2048	string		PCD_IPI		Kodak Photo CD image pack file
+>0xe02	byte&0x03	0x00		, landscape mode
+>0xe02	byte&0x03	0x01		, portrait mode
+>0xe02	byte&0x03	0x02		, landscape mode
+>0xe02	byte&0x03	0x03		, portrait mode
+0	string		PCD_OPA		Kodak Photo CD overview pack file
+
+# MS Documents. Not much info available.
+0	string	\320\317\021\340\241\261\032\341	Microsoft
+>546	string	bjbj					Word
+>0	byte	<0					Document
+0	string	{\\rtf		Microsoft Rich Text Format Document
+
+# mp4 media format with different media files embedded in it
+4	string	ftyp		MPEG-4
+>8	string	isom		Base Media v1 [IS0 14496-12:2003]
+>8	string	iso2		Base Media v2 [ISO 14496-12:2005]
+>8	string	m4a\040		Apple iTunes AAC-LC (.M4A) Audio
+>8	string	m4v\040		Apple iTunes (.M4V) Video
+>8	string	qt		Apple QuickTime (.MOV/QT)
+>8	string	jp2		JPEG 2000 Image
+>8	string	jpm		JPEG 2000 Compound Image (.JPM) [ISO 15444-6]
+>8	string	jpx		JPEG 2000 w/ extensions (.JPX) [ISO 15444-2]
+>8	string	mp42		v2 [ISO 14496-14]
+4	string	moov		QuickTime MOV file

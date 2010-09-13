@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/computer">
+      <append key="info.callouts.add" type="strlist">hal-storage-cleanup-all-mountpoints</append>
+    </match>
+
+    <match key="storage.media_check_enabled" bool="true">
+      <append key="info.addons" type="strlist">hald-addon-storage</append>
+    </match>
+
+    <match key="volume.is_disc" bool="true">
+      <match key="volume.disc.has_audio" bool="true">
+        <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Volume</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Eject</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-eject</append>
+      </match>
+      <match key="volume.disc.is_blank" bool="true">
+        <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Volume</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Eject</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-eject</append>
+      </match>
+    </match>
+
+    <!-- this is to be able to mount media in drives we cannot poll, e.g. IDE Zip Drives and PC style floppy drives -->
+    <match key="storage.media_check_enabled" bool="false">
+      <match key="storage.no_partitions_hint" bool="true">
+
+        <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Volume</append>
+
+        <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Mount</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">ssas</append>
+	<append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">mount_point fstype extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-mount</append>
+
+        <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Unmount</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-unmount</append>
+
+        <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Eject</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-eject</append>
+
+        <!-- allow these mount options for all file systems -->
+        <append key="volume.mount.valid_options" type="strlist">ro</append>
+        <append key="volume.mount.valid_options" type="strlist">sync</append>
+        <append key="volume.mount.valid_options" type="strlist">dirsync</append>
+        <append key="volume.mount.valid_options" type="strlist">noatime</append>
+        <append key="volume.mount.valid_options" type="strlist">nodiratime</append>
+        <append key="volume.mount.valid_options" type="strlist">noexec</append>
+        <append key="volume.mount.valid_options" type="strlist">quiet</append>
+        <append key="volume.mount.valid_options" type="strlist">remount</append>
+	<append key="volume.mount.valid_options" type="strlist">exec</append>
+        <!-- As this is removable media give some leeway -->
+	<append key="volume.mount.valid_options" type="strlist">utf8</append>
+	<append key="volume.mount.valid_options" type="strlist">shortname=</append>
+	<append key="volume.mount.valid_options" type="strlist">codepage=</append>
+	<append key="volume.mount.valid_options" type="strlist">iocharset=</append>
+	<append key="volume.mount.valid_options" type="strlist">umask=</append>
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+
+      </match>
+    </match>
+
+
+    <match key="volume.fsusage" string="filesystem">
+
+      <!-- Here follow volumes we specifically want to ignore - it is the -->
+      <!-- responsibility of software higher in the stack (e.g. gnome-vfs) -->
+      <!-- amd mount programs (e.g. Mount() on HAL) to respect volume.ignore -->
+      <merge key="volume.ignore" type="bool">false</merge>
+
+      <match key="@block.storage_device:storage.removable" bool="false">
+
+        <!-- Should always ignore Apple Bootstrap partitions (it would be -->
+	<!-- a security hole to mount it) - TODO: should use the bootable -->
+  	<!-- flag from the Mac partition table instead -->
+        <match key="volume.fstype" string="hfs">
+	  <match key="volume.label" string="bootstrap">
+    	    <merge key="volume.ignore" type="bool">true</merge>
+	  </match>
+        </match>
+	
+        <!-- HP ships desktops with a recovery partition -->
+        <match key="volume.fstype" string="vfat">
+	  <match key="volume.label" string="HP_RECOVERY">
+	    <merge key="volume.ignore" type="bool">true</merge>
+	  </match>
+        </match>
+
+        <!-- EFI firmware partitions -->
+        <match key="volume.fstype" string="vfat">
+	  <match key="volume.label" string="EFI">
+	    <merge key="volume.ignore" type="bool">true</merge>
+	  </match>
+        </match>
+	
+      </match>
+
+
+      <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Volume</append>
+
+      <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Mount</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">ssas</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">mount_point fstype extra_options</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-mount</append>
+
+      <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Unmount</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-unmount</append>
+
+      <append key="org.freedesktop.Hal.Device.Volume.method_names" type="strlist">Eject</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_signatures" type="strlist">as</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_argnames" type="strlist">extra_options</append>
+      <append key="org.freedesktop.Hal.Device.Volume.method_execpaths" type="strlist">hal-storage-eject</append>
+
+      <!-- allow these mount options for all file systems -->
+      <append key="volume.mount.valid_options" type="strlist">ro</append>
+      <append key="volume.mount.valid_options" type="strlist">sync</append>
+      <append key="volume.mount.valid_options" type="strlist">dirsync</append>
+      <append key="volume.mount.valid_options" type="strlist">noatime</append>
+      <append key="volume.mount.valid_options" type="strlist">nodiratime</append>
+      <append key="volume.mount.valid_options" type="strlist">noexec</append>
+      <append key="volume.mount.valid_options" type="strlist">quiet</append>
+      <append key="volume.mount.valid_options" type="strlist">remount</append>
+      <append key="volume.mount.valid_options" type="strlist">exec</append>
+
+      <!-- allow these mount options for vfat -->
+      <match key="volume.fstype" string="vfat">
+	<append key="volume.mount.valid_options" type="strlist">utf8</append>
+	<append key="volume.mount.valid_options" type="strlist">shortname=</append>
+	<append key="volume.mount.valid_options" type="strlist">codepage=</append>
+	<append key="volume.mount.valid_options" type="strlist">iocharset=</append>
+	<append key="volume.mount.valid_options" type="strlist">umask=</append>
+	<append key="volume.mount.valid_options" type="strlist">dmask=</append>
+	<append key="volume.mount.valid_options" type="strlist">fmask=</append>
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+      </match>
+
+
+      <!-- allow these mount options for hfs -->
+      <match key="volume.fstype" string="hfs">
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+	<append key="volume.mount.valid_options" type="strlist">force</append>
+      </match>
+
+      <!-- allow these mount options for hfsplus -->
+      <match key="volume.fstype" string="hfsplus">
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+	<append key="volume.mount.valid_options" type="strlist">force</append>
+      </match>
+
+      <!-- allow these mount options for ntfs -->
+      <match key="volume.fstype" string="ntfs">
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+	<append key="volume.mount.valid_options" type="strlist">gid=</append>
+	<append key="volume.mount.valid_options" type="strlist">umask=</append>
+      </match>
+
+      <!-- allow these mount options for ext3 -->
+      <match key="volume.fstype" string="ext3">
+	<append key="volume.mount.valid_options" type="strlist">data=</append>
+      </match>
+
+      <!-- udf -->
+      <match key="volume.fstype" string="udf">
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+	<append key="volume.mount.valid_options" type="strlist">umask=</append>
+      </match>
+
+      <!-- iso9660 -->
+      <match key="volume.fstype" string="iso9660">
+	<append key="volume.mount.valid_options" type="strlist">utf8</append>
+	<append key="volume.mount.valid_options" type="strlist">uid=</append>
+	<append key="volume.mount.valid_options" type="strlist">mode=</append>
+	<append key="volume.mount.valid_options" type="strlist">iocharset=</append>
+      </match>
+
+      <!-- pcfs -->
+      <match key="volume.fstype" string="pcfs">
+	<append key="volume.mount.valid_options" type="strlist">foldcase</append>
+	<append key="volume.mount.valid_options" type="strlist">nofoldcase</append>
+      </match>
+
+      <!-- allow these unmount options -->
+      <append key="volume.unmount.valid_options" type="strlist">lazy</append>
+
+    </match>
+
+    <match key="storage.requires_eject" bool="true">
+        <!-- storage Eject causes eject on each volume on this storage -->
+        <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Storage</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_names" type="strlist">Eject</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Storage.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_execpaths" type="strlist">hal-storage-eject</append>
+
+        <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.Storage</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_names" type="strlist">CloseTray</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_signatures" type="strlist">as</append>
+	<append key="org.freedesktop.Hal.Device.Storage.method_argnames" type="strlist">extra_options</append>
+        <append key="org.freedesktop.Hal.Device.Storage.method_execpaths" type="strlist">hal-storage-closetray</append>
+    </match>
+  </device>
+</deviceinfo>

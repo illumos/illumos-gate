@@ -1,0 +1,46 @@
+#
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Link-editor mapfile to create an executable data segment definition within
+# an executable for applications which rely on this.  This is the default
+# for 32 bit x86 executable and all SPARC executables; this mapfile is
+# provided to facilitate an executable data segment for AMD64 executables.
+#
+# The link-editor does not use this file automatically, so one must use the
+# -M option to cc or ld:
+#
+#       cc -M /usr/lib/ld/map.execdata myprogram.c
+#
+
+$mapfile_version 2
+
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+};
+
+#
+# Executables can also create a separate executable bss segment.  Adding
+# the following line creates a bss segment.
+#
+# LOAD_SEGMENT bss { FLAGS = READ WRITE EXECUTE };
+#
+# See also /usr/lib/ld/map.noexdata.

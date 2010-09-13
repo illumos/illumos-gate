@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for bridging.
+-->
+
+<service_bundle type='manifest' name='SUNWbridge:bridge'>
+
+<service
+	name='network/bridge'
+	type='service'
+	version='1'>
+
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/local'/>
+	</dependency>
+
+	<dependency
+		name='datalink'
+		grouping='require_all'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/network/datalink-management'/>
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/bridged %i'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<property_group
+	    name='config'
+	    type='application'>
+		<stability value='Evolving' />
+		<propval name='priority' type='count' value='32768' />
+		<propval name='max-age' type='count' value='5120' />
+		<propval name='hello-time' type='count' value='512' />
+		<propval name='forward-delay' type='count' value='3840' />
+		<propval name='force-protocol' type='count' value='3' />
+		<propval name='debug' type='boolean' value='false' />
+		<propval name='table-maximum' type='count' value='10000' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>bridge</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+The "bridge" service provides Ethernet bridging and related protocols.
+			</loctext>
+		</description>
+		<documentation>
+			<manpage title='bridged' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

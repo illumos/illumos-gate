@@ -1,0 +1,52 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Only publish packages for the currently specified architecture
+#
+# This is somewhat nonintuitive.  In English:
+#
+#	For any action of type "set",
+#	if the "name" property matches the regex "variant.arch",
+#	and *every* occurrence of the "value" property does not match
+#		$ARCH, then don't publish it.
+#
+# ...in other words, if *any* occurrence of "value" matches $(ARCH),
+# then the negative lookahead assertion in the regex will fail, and we
+# won't abort based on the action.
+#
+<transform set name=variant.arch value=^(?!$(ARCH)).+$ -> abort>
+
+#
+# Don't publish nonredistributable manifests in an open-only build
+#
+$(OPEN_BUILD)<transform set name=org.opensolaris.redist value=nonredist|internal -> abort>
+
+#
+# Catch don't-publish settings from manifest-embedded transforms
+#
+<transform set name=osnet.publish value=false -> abort>
+<transform set name=osnet.publish -> drop>

@@ -1,0 +1,54 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# TCP_STRONG_ISS sets the TCP initial sequence number generation parameters.
+# Set TCP_STRONG_ISS to be:
+#	0 = Old-fashioned sequential initial sequence number generation.
+#	1 = Improved sequential generation, with random variance in increment.
+#	2 = RFC 1948 sequence number generation, unique-per-connection-ID.
+#
+TCP_STRONG_ISS=1
+#
+# ACCEPT6TO4RELAY sets the policy for 6to4 tunnels communicating with 6to4
+# Relay Routers as defined in RFC 3056.  Traffic sent from a 6to4 site to a
+# native IPv6 host will be tunneled over the IPv4 Internet to a 6to4 Relay
+# Router before being delivered to the native IPv6 host.  Enabling support
+# for sending/receiving traffic to/from a 6to4 Relay Router can create a
+# security risk for a 6to4 site, since there is no default trust
+# mechanism for communicating with Relay Routers.  Communication support
+# with 6to4 Relay Routers has been disabled by default.  ACCEPT6TO4RELAY
+# can be set to the following values:
+#	NO = Disables communication with 6to4 Relay Routers
+#	YES = Enables communication with 6to4 Relay Routers and thus native
+#	    IPv6 hosts through a 6to4 tunnel.
+#
+# When ACCEPT6TO4RELAY=YES, RELAY6TO4ADDR will be used to determine the
+# destination IPv4 address to be used as a tunnel endpoint when communicating
+# with 6to4 Relay Routers.  192.88.99.1 is the well-known 6to4 Relay Router
+# Anycast address as defined in RFC 3068.  This value may be changed to
+# the IPv4 unicast address of a particular 6to4 Relay Router, if desired.
+#
+ACCEPT6TO4RELAY=NO
+RELAY6TO4ADDR="192.88.99.1"

@@ -1,0 +1,239 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * #ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * There are a lot of nodes below the rmclomv node, define a shortname
+ */
+#define	RMCLOMV	/platform/pci@1e,600000/isa@7/rmc-comm@0,3e8/SUNW,rmclomv
+
+/*
+ * add disk leds
+ */
+name:/frutree/chassis/HDD0
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd0_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd0_act
+	REFPROP _location_parent name:/frutree/chassis/HDD0
+name:RMCLOMV/hdd0_service
+	REFPROP _location_parent name:/frutree/chassis/HDD0
+name:RMCLOMV/hdd0_ok2rm
+	REFPROP _location_parent name:/frutree/chassis/HDD0
+
+name:/frutree/chassis/HDD1
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd1_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd1_act
+	REFPROP _location_parent name:/frutree/chassis/HDD1
+name:RMCLOMV/hdd1_service
+	REFPROP _location_parent name:/frutree/chassis/HDD1
+name:RMCLOMV/hdd1_ok2rm
+	REFPROP _location_parent name:/frutree/chassis/HDD1
+
+name:/frutree/chassis/HDD2
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd2_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd2_act
+	REFPROP _location_parent name:/frutree/chassis/HDD2
+name:RMCLOMV/hdd2_service
+	REFPROP _location_parent name:/frutree/chassis/HDD2
+name:RMCLOMV/hdd2_ok2rm
+	REFPROP _location_parent name:/frutree/chassis/HDD2
+
+name:/frutree/chassis/HDD3
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/hdd3_ok2rm
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/hdd3_act
+	REFPROP _location_parent name:/frutree/chassis/HDD3
+name:RMCLOMV/hdd3_service
+	REFPROP _location_parent name:/frutree/chassis/HDD3
+name:RMCLOMV/hdd3_ok2rm
+	REFPROP _location_parent name:/frutree/chassis/HDD3
+
+/* add disk Device tables and _fru_parent refprops */
+#include "fru_HDD0_data.info"
+#include "fru_HDD1_data.info"
+#include "fru_HDD2_data.info"
+#include "fru_HDD3_data.info"
+
+/*
+ * power supplies
+ */
+#include "fru_PS0_data.info"
+#include "fru_PS1_data.info"
+#include "fru_PSU0_data.info"
+#include "fru_PSU1_data.info"
+#include "fru_PSU2_data.info"
+#include "fru_PSU3_data.info"
+
+/*
+ * SCSIBP info
+ */
+name:RMCLOMV/scsibp_t_amb
+	REFPROP _fru_parent /frutree/chassis/SCSIBP/system-board
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/scsi-fru-prom@0,a8
+	REFPROP _fru_parent /frutree/chassis/SCSIBP/system-board
+
+/*
+ * FAN info
+ */
+name:RMCLOMV/ft0_f0_tach
+	REFPROP	_location_parent name:/frutree/chassis/FT0/F0
+name:RMCLOMV/ft1_f0_tach
+	REFPROP _location_parent name:/frutree/chassis/FT1/F0
+name:RMCLOMV/ft1_f1_tach
+	REFPROP _location_parent name:/frutree/chassis/FT1/F1
+name:RMCLOMV/ft2_f0_tach
+	REFPROP	_location_parent name:/frutree/chassis/FT2/F0
+name:RMCLOMV/ft3_f0
+	REFPROP	_location_parent name:/frutree/chassis/FT3/F0
+
+/*
+ * fan leds info
+ */
+name:RMCLOMV/ft0_f0_act
+	REFPROP	_location_parent name:/frutree/chassis/FT0/F0
+name:RMCLOMV/ft0_f0_fault
+	REFPROP	_location_parent name:/frutree/chassis/FT0/F0
+name:RMCLOMV/ft1_f0_act
+	REFPROP _location_parent name:/frutree/chassis/FT1/F0
+name:RMCLOMV/ft1_f0_fault
+	REFPROP _location_parent name:/frutree/chassis/FT1/F0
+name:RMCLOMV/ft2_f0_act
+	REFPROP	_location_parent name:/frutree/chassis/FT2/F0
+name:RMCLOMV/ft2_f0_fault
+	REFPROP	_location_parent name:/frutree/chassis/FT2/F0
+
+/*
+ * SYS LEDs info
+ */
+name:RMCLOMV/sys_act
+	REFPROP _fru_parent name:/frutree/chassis/SYS/led-location
+name:RMCLOMV/sys_service
+	REFPROP _fru_parent name:/frutree/chassis/SYS/led-location
+name:RMCLOMV/sys_locate
+	REFPROP _fru_parent name:/frutree/chassis/SYS/led-location
+	PROP IsLocator string r 0 "true"
+	PROP LocatorName string r 0 "system"
+
+/*
+ * keyswitch info
+ */
+name:RMCLOMV/keyswitch
+	REFPROP _fru_parent name:/frutree/chassis/SYS/key-location
+	PROP Label string r 0 "SYSCTRL"

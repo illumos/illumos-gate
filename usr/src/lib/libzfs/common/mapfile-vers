@@ -1,0 +1,224 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	fletcher_2_native;
+	fletcher_2_byteswap;
+	fletcher_4_native;
+	fletcher_4_byteswap;
+	fletcher_4_incremental_native;
+	fletcher_4_incremental_byteswap;
+	libzfs_add_handle;
+	libzfs_dataset_cmp;
+	libzfs_errno;
+	libzfs_error_action;
+	libzfs_error_description;
+	libzfs_fini;
+	libzfs_fru_compare;
+	libzfs_fru_devpath;
+	libzfs_fru_lookup;
+	libzfs_fru_notself;
+	libzfs_fru_refresh;
+	libzfs_init;
+	libzfs_mnttab_cache;
+	libzfs_print_on_error;
+	zfs_allocatable_devs;
+	zfs_asprintf;
+	zfs_clone;
+	zfs_close;
+	zfs_create;
+	zfs_create_ancestors;
+	zfs_dataset_exists;
+	zfs_deleg_share_nfs;
+	zfs_destroy;
+	zfs_destroy_snaps;
+	zfs_expand_proplist;
+	zfs_get_handle;
+	zfs_get_name;
+	zfs_get_pool_handle;
+	zfs_get_user_props;
+	zfs_get_type;
+	zfs_history_event_names;
+	zfs_hold;
+	zfs_is_mounted;
+	zfs_is_shared;
+	zfs_is_shared_nfs;
+	zfs_is_shared_smb;
+	zfs_iter_children;
+	zfs_iter_dependents;
+	zfs_iter_filesystems;
+	zfs_iter_root;
+	zfs_iter_snapshots;
+	zfs_iter_snapshots_sorted;
+	zfs_mount;
+	zfs_name_to_prop;
+	zfs_name_valid;
+	zfs_nicenum;
+	zfs_nicestrtonum;
+	zfs_open;
+	zfs_path_to_zhandle;
+	zfs_promote;
+	zfs_prop_align_right;
+	zfs_prop_column_name;
+	zfs_prop_default_numeric;
+	zfs_prop_default_string;
+	zfs_prop_get;
+	zfs_prop_get_int;
+	zfs_prop_get_numeric;
+	zfs_prop_get_recvd;
+	zfs_prop_get_table;
+	zfs_prop_get_userquota_int;
+	zfs_prop_get_userquota;
+	zfs_prop_inherit;
+	zfs_prop_inheritable;
+	zfs_prop_init;
+	zfs_prop_is_string;
+	zfs_prop_readonly;
+	zfs_prop_set;
+	zfs_prop_string_to_index;
+	zfs_prop_to_name;
+	zfs_prop_user;
+	zfs_prop_userquota;
+	zfs_prop_valid_for_type;
+	zfs_prop_values;
+	zfs_prune_proplist;
+	zfs_receive;
+	zfs_refresh_properties;
+	zfs_release;
+	zfs_rename;
+	zfs_rollback;
+	zfs_send;
+	zfs_share;
+	zfs_shareall;
+	zfs_share_nfs;
+	zfs_share_smb;
+	zfs_show_diffs;
+	zfs_smb_acl_add;
+	zfs_smb_acl_purge;
+	zfs_smb_acl_remove;
+	zfs_smb_acl_rename;
+	zfs_snapshot;
+	zfs_spa_version;
+	zfs_spa_version_map;
+	zfs_type_to_name;
+	zfs_unmount;
+	zfs_unmountall;
+	zfs_unshare;
+	zfs_unshare_nfs;
+	zfs_unshare_smb;
+	zfs_unshareall;
+	zfs_unshareall_bypath;
+	zfs_unshareall_nfs;
+	zfs_unshareall_smb;
+	zfs_userspace;
+	zfs_userquota_prop_prefixes;
+	zfs_zpl_version_map;
+	zpool_add;
+	zpool_clear;
+	zpool_clear_label;
+	zpool_close;
+	zpool_create;
+	zpool_destroy;
+	zpool_disable_datasets;
+	zpool_dump_ddt;
+	zpool_enable_datasets;
+	zpool_expand_proplist;
+	zpool_explain_recover;
+	zpool_export;
+	zpool_export_force;
+	zpool_find_import;
+	zpool_find_import_cached;
+	zpool_find_vdev;
+	zpool_find_vdev_by_physpath;
+	zpool_fru_set;
+	zpool_get_config;
+	zpool_get_errlog;
+	zpool_get_handle;
+	zpool_get_history;
+	zpool_get_name;
+	zpool_get_physpath;
+	zpool_get_prop;
+	zpool_get_prop_int;
+	zpool_get_state;
+	zpool_get_status;
+	zpool_history_unpack;
+	zpool_import;
+	zpool_import_props;
+	zpool_import_status;
+	zpool_in_use;
+	zpool_iter;
+	zpool_label_disk;
+	zpool_mount_datasets;
+	zpool_name_to_prop;
+	zpool_obj_to_path;
+	zpool_open;
+	zpool_open_canfail;
+	zpool_prop_align_right;
+	zpool_prop_column_name;
+	zpool_prop_readonly;
+	zpool_prop_to_name;
+	zpool_prop_values;
+	zpool_read_label;
+	zpool_refresh_stats;
+	zpool_scan;
+	zpool_search_import;
+	zpool_set_history_str;
+	zpool_set_prop;
+	zpool_stage_history;
+	zpool_state_to_name;
+	zpool_unmount_datasets;
+	zpool_upgrade;
+	zpool_vdev_attach;
+	zpool_vdev_clear;
+	zpool_vdev_degrade;
+	zpool_vdev_detach;
+	zpool_vdev_fault;
+	zpool_vdev_name;
+	zpool_vdev_offline;
+	zpool_vdev_online;
+	zpool_vdev_remove;
+	zpool_vdev_split;
+	zprop_free_list;
+	zprop_get_list;
+	zprop_iter;
+	zprop_print_one_property;
+	zvol_check_dump_config;
+	zvol_volsize_to_reservation;
+    local:
+	*;
+};

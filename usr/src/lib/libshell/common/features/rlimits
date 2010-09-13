@@ -1,0 +1,3 @@
+hdr,sys	resource,vlimit
+lib	getrlimit,ulimit,vlimit
+typ	rlim_t sys/types.h sys/resource.h

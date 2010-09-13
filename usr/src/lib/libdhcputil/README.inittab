@@ -1,0 +1,294 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+Copyright (c) 2001 by Sun Microsystems, Inc.
+All rights reserved.
+
+Inittab Purpose, Goals, and Functionality
+Peter Memishian
+ident	"%Z%%M%	%I%	%E% SMI"
+
+PROBLEM STATEMENT
+=================
+
+Currently, each DHCP-related utility that needs to handle DHCP options
+uses ad-hoc methods for learning and using them, ranging from using
+hard-coded internal tables to providing published (but distinct)
+configuration files describing these options.
+
+Originally, when only the DHCP server needed to be concerned with DHCP
+options, not having a standard API for managing and parsing DHCP
+options was understandable.  Now, with four consumers of DHCP options
+in core Solaris (in.dhcpd, dhcpinfo, snoop, and dhcpmgr), the
+situation has spiraled out of control.  In addition to the obvious
+maintenance headache caused by the redundant code, it has also become
+a burden to our customers, who already have to cope with multiple
+places where DHCP option information is stored (dhcptags(4),
+dhcptab(4)).
+
+The inittab API is designed to reduce the confusion, both for the
+customer and the application developer.  Its goal is to provide a
+single configuration for applications to receive their DHCP option
+knowledge from and general routines for encoding and decoding DHCP
+options.
+
+INITTAB
+=======
+
+The inittab file contains information regarding the syntax and (to
+some degree) the semantics of DHCP options.  It is primarily a
+read-only file (like /etc/termcap) and should not need to be changed
+by users.  Experienced sysadmins may need to update this file to add
+new DHCP options, but this should be rare.
+
+The inittab file consists of inittab records, each being one line long
+and describing a particular option.  The format is based heavily on
+the format for defining symbols in dhcptab(4).  Each line has the
+following syntax:
+
+   option_name	category, code, type, granularity, maximum, consumers
+
+where:
+
+   `option_name' is user-interpretable name of the option (for use with
+      dhcpinfo(1M) for instance).  This field should at least be per-
+      category unique and ideally should be unique across all categories.
+      Of particular note is that options names in the STANDARD, SITE, and
+      VENDOR spaces should not overlap, or the behavior is undefined.
+
+   `category' is one of STANDARD, SITE, VENDOR, FIELD, or INTERNAL and
+      identifies the namespace in which the option falls.
+
+   `code' is the code of this option when it is sent over the
+      wire.  (note: in most cases, `code' uniquely identifies the
+      option, without a category.  however, in the case of internal
+      categories like FIELD or INTERNAL, `code' may be used for
+      other purposes and thus may not be globally unique).  This field
+      should be per-category unique and the STANDARD and SITE fields
+      should not have overlapping code fields or the behavior is
+      undefined.
+
+   `type' describes the payload associated with this option.  Valid
+      types are IP, ASCII, OCTET, NUMBER, BOOL, UNUMBER8, UNUMBER16,
+      UNUMBER32, SNUMBER8, SNUMBER16, and SNUMBER32.  For numbers,
+      a preceding `U' or `S' indicates whether the number is unsigned
+      or signed, and the trailing number indicates the number of bits
+      in the number.
+
+   `granularity' describes how many units of `type' payload make
+      up a whole value for this option.  In the case of `NUMBER',
+      granularity describes the number of bytes in the number.  Note
+      that `NUMBER' is preserved for compatibility, but the more
+      descriptive [SU]NUMBER{8,16,32,64} types should preferred.
+
+   `maximum' describes how many whole values are allowed for this
+      option.  0 indicates an infinite number.
+
+   `consumers' describe which programs make use of this information.
+      (`i' for dhcpinfo, `s' for snoop, `d' for in.dhcpd, and
+       `m' for dhcpmgr).
+
+A sample entry would be
+
+  StaticRt	STANDARD, 33, IP, 2, 0, isdm
+
+which describes an option named `StaticRt', that is in the STANDARD
+category (i.e., defined by the DHCP standard), and is option code
+33, which is of type `IP Address', consisting of a potentially
+infinite number of pairs of IP addresses.  Lastly, the consumers of
+option are dhcpinfo, snoop, in.dhcpd and dhcpmgr.
+
+Comments in the inittab file begin with `#', and end with a newline.
+Comments need not start at the beginning of a line.  Lines cannot be
+continued (with `\' for instance).
+
+The inittab file becomes the authoritative source for all DHCP options 
+for all DHCP option consumers, with the following exceptions and notes:
+
+   o  The DHCP agent and DHCP server both have their core protocol-
+      related functionality hardcoded into them, so changes to the
+      inittab file do not generally affect their inner workings.
+
+   o  A program can specify which entries it wants from the inittab.
+      This means that some DHCP options will never be used by some
+      programs, even if they are listed as a `consumer' of the given
+      option.  An example of this is that the DHCP server never
+      requests any fields with the VENDOR category. (VENDOR information
+      for the DHCP server comes from dhcptab(4) instead).
+
+   o  In general, changing provided information in a released inittab
+      file is ill-advised.  Adding new entries should be the extent
+      of the modifications that are performed.
+
+   o  The inittab C API also provides functions which allow programs
+      to verify that a given entry in the inittab file is correct
+      (which it does by consulting a compiled-in database of current
+      options).  In general, this functionality is only used where
+      absolutely necessary, since it nullifies some of the advantages
+      of having an inittab.
+
+   o  Where a symbol is defined both in the inittab and in dhcptab(4),
+      inittab is authoritative.  EXTEND symbol definitions in
+      dhcptab(4) will be deprecated in a future release of Solaris.
+
+C-LEVEL API
+===========
+
+Each inittab entry describes a specific DHCP option and is defined as
+a dhcp_symbol_t (as defined in usr/src/lib/libdhcputil/common/dhcp_symbol.h).
+
+In general, it is expected that inittab entries are acquired via
+inittab_load(), inittab_getbyname(), or inittab_getbycode() and passed
+as needed to the remaining inittab_XXX functions.  If consumers need
+to convert the inittab entries into a different format, then the
+fields inside the inittab entry may be read directly.  Some inittab
+functions return dynamically allocated parameters; all such parameters
+can be freed with free(3c).
+
+To get an inittab entry, one of the following API's must be used:
+
+    dhcp_symbol_t *
+    inittab_load(uchar_t categories, char consumer, size_t *n_entries);
+    
+    dhcp_symbol_t *
+    inittab_getbyname(uchar_t categories, char consumer, const char *name);
+    
+    dhcp_symbol_t *
+    inittab_getbycode(uchar_t categories, char consumer, unsigned int code);
+
+where the `categories' parameter consists of the following values OR'd
+together:
+
+    #define ITAB_CAT_STANDARD	0x01
+    #define ITAB_CAT_FIELD	0x02
+    #define ITAB_CAT_INTERNAL	0x04
+    #define ITAB_CAT_VENDOR	0x08
+    #define ITAB_CAT_SITE	0x10
+
+and the `consumer' field consists of one of the following:
+
+    #define ITAB_CONS_INFO	'i'
+    #define ITAB_CONS_SERVER	'd'
+    #define ITAB_CONS_SNOOP	's'
+    #define ITAB_CONS_MANAGER	'm'
+
+inittab_load() creates and returns an array of dhcp_symbol_t's made
+up of all the entries of the specified categories that are available
+to the provided consumer.  Note that there is no specified order to
+the entries returned.  The array is dynamically allocated, and the
+number of items in the array is returned in the `n_entries' parameter.
+
+inittab_getbyname()/inittab_getbycode() return an dhcp_symbol_t
+matching the given name or code for the provided category and the
+provided consumer.  The dhcp_symbol_t is dynamically allocated.
+
+Some inittab consumers may need to make sure that a given inittab
+entry has not been corrupted in the inittab file.  For those cases,
+inittab_verify() can be used to validate an inittab_entry against an
+internal table compiled into the inittab API:
+
+    int
+    inittab_verify(dhcp_symbol_t *inittab_ent,
+		   dhcp_symbol_t *internal_ent);
+
+where `inittab_ent' is an dhcp_symbol_t previously returned from
+inittab_load() or inittab_getbyX().  inittab_verify() returns
+ITAB_SUCCESS if `inittab_ent' is verified to be correct, ITAB_FAILURE
+if `inittab_ent' is incorrect, and ITAB_UNKNOWN if inittab_verify()
+doesn't know.  If `internal_ent' is non-NULL, it is filled in with the
+value of the option known internally to the inittab API.  Entries are
+verified using the `ds_category' and `ds_code' fields from the
+dhcp_symbol_t.  For ITAB_SUCCESS to be returned, the entry passed in
+and the internal entry both must have the same ds_gran, ds_max, and
+ds_type values.
+
+To perform encoding and decoding of DHCP options, the following
+routines are provided:
+
+    uchar_t *
+    inittab_encode(dhcp_symbol_t *inittab_ent, const char *data,
+		   uint16_t *lengthp, boolean_t just_payload);
+
+    const char *
+    inittab_decode(dhcp_symbol_t *inittab_ent, uchar_t *data,
+		   uint16_t length, boolean_t just_payload);
+
+Both of these routines take an `inittab_ent' that was previously
+returned from inittab_load() or inittab_getbyX().
+
+For inittab_encode(), `data' is an ASCII string to encode, and a
+pointer to a dynamically allocated byte-array representing the encoded
+option is returned.  The size of the resulting data returned is stored
+in `lengthp'.  Note that if the `just_payload' option is set, then
+only the payload of the option is returned (i.e., the option code and
+option length is left off the returned data).  To encode multiple
+items of a given type, separate the items by spaces, such as
+"109.108.21.1 148.232.2.1".  Octal data should be of the form "0xNN"
+where NN is a hexadecimal digit representing the byte.
+
+For inittab_decode(), `data' is a byte-array representing an encoded
+option, which is `length' bytes long.  A pointer to a dynamically
+allocated string representing the option's value in ASCII is returned.
+Note that if the `data' byte-array consists of just the payload of the
+option, then the `just_payload' option should be set.
+
+In addition, the following routines return extended error information
+for reporting parsing errors:
+
+    uchar_t *
+    inittab_encode_e(dhcp_symbol_t *inittab_ent, const char *data,
+		   uint16_t *lengthp, boolean_t just_payload, int *eerrno);
+
+    const char *
+    inittab_decode_e(dhcp_symbol_t *inittab_ent, uchar_t *data,
+		   uint16_t length, boolean_t just_payload, int *eerrno);
+
+
+The extended codes:
+
+/*
+ * DHCP Extended error codes
+ */
+#define ITAB_SYNTAX_ERROR       (-1)
+#define ITAB_BAD_IPADDR         (-2)
+#define ITAB_BAD_STRING         (-3)
+#define ITAB_BAD_OCTET          (-4)
+#define ITAB_BAD_NUMBER         (-5)
+#define ITAB_BAD_BOOLEAN        (-6)
+#define ITAB_NOT_ENOUGH_IP      (-7)
+#define ITAB_BAD_GRAN           (-8)
+
+
+ENVIRONMENT VARIABLES
+=====================
+
+In order to aid in debugging inittab-related problems, two environment
+variables, DHCP_INITTAB_DEBUG, and DHCP_INITTAB_PATH, can be set
+before starting a program which uses the inittab API.
+
+If DHCP_INITTAB_DEBUG is an exported environment variable, then the
+inittab API will print useful diagnostic messages handy in tracking
+down problems in the inittab file.  If DHCP_INITTAB_PATH is an
+exported environment variable, then its value is used as the location
+of the inittab file, instead of /etc/dhcp/inittab.
+
+--
+Peter Memishian, Internet Engineering, Solaris Software (meem@east.sun.com)

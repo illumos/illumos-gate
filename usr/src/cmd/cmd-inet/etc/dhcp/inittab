@@ -1,0 +1,184 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This file provides information about all supported DHCP options, for
+# use by DHCP-related programs.  This file should only be modified to
+# add support for SITE options for clients; no existing options should
+# be modified.  Only SITE options will be preserved during an upgrade.
+# If you need to configure the Solaris DHCP server to support the vendor 
+# options of a different client, see dhcptab(4) for details.  
+#
+# Please consult dhcp_inittab(4) for further information.  Note that
+# this interface is "Unstable" as defined by attributes(5).
+#
+
+Subnet		STANDARD,	1,	IP,	   1,	1,	sdmi
+UTCoffst	STANDARD,	2,	SNUMBER32, 1,	1,	sdmi
+Router		STANDARD,	3,	IP,	   1,	0,	sdmi
+Timeserv	STANDARD,	4,	IP,	   1,	0,	sdmi
+IEN116ns	STANDARD,	5,	IP,	   1,	0,	sdmi
+DNSserv		STANDARD,	6,	IP,	   1,	0,	sdmi
+Logserv		STANDARD,	7,	IP,	   1,	0,	sdmi
+Cookie		STANDARD,	8,	IP,	   1,	0,	sdmi
+Lprserv		STANDARD,	9,	IP,	   1,	0,	sdmi
+Impress		STANDARD,	10,	IP,	   1,	0,	sdmi
+Resource	STANDARD,	11,	IP,	   1,	0,	sdmi
+Hostname	STANDARD,	12,	ASCII,	   1,	0,	si
+Bootsize	STANDARD,	13,	UNUMBER16, 1,	1,	sdmi
+Dumpfile	STANDARD,	14,	ASCII,	   1,	0,	sdmi
+DNSdmain	STANDARD,	15,	ASCII,	   1,	0,	sdmi
+Swapserv	STANDARD,	16,	IP,	   1,	1,	sdmi
+Rootpath	STANDARD,	17,	ASCII,	   1,	0,	sdmi
+ExtendP		STANDARD,	18,	ASCII,	   1,	0,	sdmi
+IpFwdF		STANDARD,	19,	UNUMBER8,  1,	1,	sdmi
+NLrouteF	STANDARD,	20,	UNUMBER8,  1,	1,	sdmi
+PFilter		STANDARD,	21,	IP,	   2,	0,	sdmi
+MaxIpSiz	STANDARD,	22,	UNUMBER16, 1,	1,	sdmi
+IpTTL		STANDARD,	23,	UNUMBER8,  1,	1,	sdmi
+PathTO		STANDARD,	24,	UNUMBER32, 1,	1,	sdmi
+PathTbl		STANDARD,	25,	UNUMBER16, 1,	0,	sdmi
+MTU		STANDARD,	26,	UNUMBER16, 1,	1,	sdmi
+SameMtuF	STANDARD,	27,	UNUMBER8,  1,	1,	sdmi
+Broadcst	STANDARD,	28,	IP,	   1,	1,	sdmi
+MaskDscF	STANDARD,	29,	UNUMBER8,  1,	1,	sdmi
+MaskSupF	STANDARD,	30,	UNUMBER8,  1,	1,	sdmi
+RDiscvyF	STANDARD,	31,	UNUMBER8,  1,	1,	sdmi
+RSolictS	STANDARD,	32,	IP,	   1,	1,	sdmi
+StaticRt	STANDARD,	33,	IP,	   2,	0,	sdmi
+TrailerF	STANDARD,	34,	UNUMBER8,  1,	1,	sdmi
+ArpTimeO	STANDARD,	35,	UNUMBER32, 1,	1,	sdmi
+EthEncap	STANDARD,	36,	UNUMBER8,  1,	1,	sdmi
+TcpTTL		STANDARD,	37,	UNUMBER8,  1,	1,	sdmi
+TcpKaInt	STANDARD,	38,	UNUMBER32, 1,	1,	sdmi
+TcpKaGbF	STANDARD,	39,	UNUMBER8,  1,	1,	sdmi
+NISdmain	STANDARD,	40,	ASCII,	   1,	0,	sdmi
+NISservs	STANDARD,	41,	IP,	   1,	0,	sdmi
+NTPservs	STANDARD,	42,	IP,	   1,	0,	sdmi
+Vendor		STANDARD,	43,	OCTET,	   1,	0,	sdi
+NetBNms		STANDARD,	44,	IP,	   1,	0,	sdmi
+NetBDsts	STANDARD,	45,	IP,	   1,	0,	sdmi
+NetBNdT		STANDARD,	46,	UNUMBER8,  1,	1,	sdmi
+NetBScop	STANDARD,	47,	ASCII,	   1,	0,	sdmi
+XFontSrv	STANDARD,	48,	IP,	   1,	0,	sdmi
+XDispMgr	STANDARD,	49,	IP,	   1,	0,	sdmi
+ReqIP		STANDARD,	50,	IP,	   1,	1,	sdi
+LeaseTim	STANDARD,	51,	UNUMBER32, 1,	1,	sdmi
+OptOvrld	STANDARD,	52,	UNUMBER8,  1,	1,	sdi
+DHCPType	STANDARD,	53,	UNUMBER8,  1,	1,	sdi
+ServerID	STANDARD,	54,	IP,	   1,	1,	sdi
+ReqList		STANDARD,	55,	OCTET,	   1,	0,	sdi
+Message		STANDARD,	56,	ASCII,	   1,	0,	sdi
+DHCP_MTU	STANDARD,	57,	UNUMBER16, 1,	1,	sdi
+T1Time		STANDARD,	58,	UNUMBER32, 1,	1,	sdmi
+T2Time		STANDARD,	59,	UNUMBER32, 1,	1,	sdmi
+ClassID		STANDARD,	60,	ASCII,	   1,	0,	sdi
+ClientID	STANDARD,	61,	OCTET,	   1,	0,	sdi
+NW_dmain	STANDARD,	62,	ASCII,	   1,	0,	sdmi
+NWIPOpts	STANDARD,	63,	OCTET,	   1,	128,	sdmi
+NIS+dom		STANDARD,	64,	ASCII,	   1,	0,	sdmi
+NIS+serv	STANDARD,	65,	IP,	   1,	0,	sdmi
+TFTPsrvN	STANDARD,	66,	ASCII,	   1,	64,	sdmi
+OptBootF	STANDARD,	67,	ASCII,	   1,	128,	sdmi
+MblIPAgt	STANDARD,	68,	IP,	   1,	0,	sdmi
+SMTPserv	STANDARD,	69,	IP,	   1,	0,	sdmi
+POP3serv	STANDARD,	70,	IP,	   1,	0,	sdmi
+NNTPserv	STANDARD,	71,	IP,	   1,	0,	sdmi
+WWWservs	STANDARD,	72,	IP,	   1,	0,	sdmi
+Fingersv	STANDARD,	73,	IP,	   1,	0,	sdmi
+IRCservs	STANDARD,	74,	IP,	   1,	0,	sdmi
+STservs		STANDARD,	75,	IP,	   1,	0,	sdmi
+STDAservs	STANDARD,	76,	IP,	   1,	0,	sdmi
+UserClas	STANDARD,	77,	ASCII,	   1,	0,	sdi
+SLP_DA		STANDARD,	78,	OCTET,	   1,	0,	sdmi
+SLP_SS		STANDARD,	79,	OCTET,	   1,	0,	sdmi
+AgentOpt	STANDARD,	82,	OCTET,	   1,	0,	sdi
+FQDN		STANDARD,	89,	OCTET,	   1,	0,	sdmi
+
+#
+# DHCP packet fields.	Code field is byte offset into DHCP packet.
+#
+
+Opcode		FIELD,		0,	UNUMBER8,  1,	1,	id
+Htype		FIELD,		1,	UNUMBER8,  1,	1,	id
+HLen		FIELD,		2,	UNUMBER8,  1,	1,	id
+Hops		FIELD,		3,	UNUMBER8,  1,	1,	id
+Xid		FIELD,		4,	UNUMBER32, 1,	1,	id
+Secs		FIELD,		8,	UNUMBER16, 1,	1,	id
+Flags		FIELD,		10,	OCTET,	   1,	2,	id
+Ciaddr		FIELD,		12,	IP,	   1,	1,	id
+Yiaddr		FIELD,		16,	IP,	   1,	1,	id
+BootSrvA	FIELD,		20,	IP,	   1,	1,	idm
+Giaddr		FIELD,		24,	IP,	   1,	1,	id
+Chaddr		FIELD,		28,	OCTET,	   1,	16,	id
+BootSrvN	FIELD,		44,	ASCII,	   1,	64,	idm
+BootFile	FIELD,		108,	ASCII,	   1,	128,	idm
+Magic		FIELD,		236,	OCTET,	   1,	4,	id
+Options		FIELD,		240,	OCTET,	   1,	60,	id
+
+
+#
+# Internal fields.
+#
+
+Hostname	INTERNAL,	1024,	BOOL,	   0,	0,	dm
+LeaseNeg	INTERNAL,	1025,	BOOL,	   0,	0,	dm
+EchoVC		INTERNAL,	1026,	BOOL,	   0,	0,	dm
+BootPath	INTERNAL,	1027,	ASCII,	   1,	128,	dm
+
+
+#
+# SunOS vendor space -- see the Solaris System Administrator
+# documentation for more information on these options. 
+#
+
+SrootOpt	VENDOR,		1,	ASCII,	   1,	0,	smi
+SrootIP4	VENDOR,		2,	IP,	   1,	1,	smi
+SrootNM		VENDOR,		3,	ASCII,	   1,	0,	smi
+SrootPTH	VENDOR,		4,	ASCII,	   1,	0,	smi
+SswapIP4	VENDOR,		5,	IP,	   1,	1,	smi
+SswapPTH	VENDOR,		6,	ASCII,	   1,	0,	smi
+SbootFIL	VENDOR,		7,	ASCII,	   1,	0,	smi
+Stz		VENDOR,		8,	ASCII,	   1,	0,	smi
+SbootRS		VENDOR,		9,	UNUMBER16, 1,	1,	smi
+SinstIP4	VENDOR,		10,	IP,	   1,	1,	smi
+SinstNM		VENDOR,		11,	ASCII,	   1,	0,	smi
+SinstPTH	VENDOR,		12,	ASCII,	   1,	0,	smi
+SsysidCF	VENDOR,		13,	ASCII,	   1,	0,	smi
+SjumpsCF	VENDOR,		14,	ASCII,	   1,	0,	smi
+Sterm		VENDOR,		15,	ASCII,	   1,	0,	smi
+SbootURI	VENDOR,		16,	ASCII,	   1,	0,	smi
+SHTTPproxy	VENDOR,		17,	ASCII,	   1,	0,	smi
+
+#
+# Site option example:
+# The following option describes an option named ipPairs, that is in
+# the  SITE category, meaning it is defined by each individual site.
+# It is option code 132, which is of type IP Address, consisting of
+# a potentially infinite number of pairs of IP addresses.  (See 
+# dhcp_inittab(4) for details)
+#
+# ipPairs     SITE,           132,    IP,     2,      0,      sdmi
+#

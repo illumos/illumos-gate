@@ -1,0 +1,6 @@
+#
+# English locales are already in correct sorted order for the following
+# encodings: US-ASCII, ISO8859-1, ISO8859-15, and UTF-8. 
+#
+order \
+	\x00;...;\xff

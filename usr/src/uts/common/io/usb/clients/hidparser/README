@@ -1,0 +1,1639 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
+
+
+
+                  Hidparser: Solaris implementation
+		  _________________________________
+
+
+Report descriptors  are  basically  made of  items.   Items  can  be  'Main'
+items,  'Local' Items  and  'Global' Items. Local and  Global items  differ
+in their  scope. Local  items  hold their value only   within the main item
+in which  they are  defined  while global items retain their values through
+out all main items  unless *redefined*.
+
+Main Items  are  collection,  input, output and  feature and end collection
+items. Each  of  the  main  items are represented by an 'entity_item' struc-
+ture.  Solaris    maintains   global and  local items  as a  linked list of
+entity_attribute   structures  in the 'entity_item' structure.  Since local
+items are specific  to a main  item it   makes  sense to  keep  local items
+with in the main item.  List   of   global  items can't be kept as a single
+global list because they  can   get redefined in any  subsequent main  item
+and Solaris won't be able  to   know what  will  be the value for each main
+item. Hence they also  figure   in the list  maintained  by the entity_item
+structure.
+
+So how do we construct the tree ?
+
+Each main item forms a sibling or child of another main item except for the
+root  main  item which will  always be a Collection main item. Each collect-
+ion item  should be closed  by  an end  collection.  So  root  collection's
+sibling  will be an end  collection. Whatever  input,  output  and  feature
+items  which fall inside  a collection (please  see a collection as '{' and
+end  collection as '}' in  'C' language) will  form a child  of  the parent
+collection  with each of  them  forming  a sibling  of  each  other. i.e if
+an Input  main item comes  first within a  collection  then  it'll form the
+child of  the collection  with the subsequent  main  items  being linked as
+siblings  of each other.  When we reach an end collection, it must form the
+sibling of  the collection.  This applies for nested collections  also. i.e
+if a  collection falls within  another collection, it'll form  a  child  of
+the  parent collection with  the 'input','output' and 'feature' main  items
+falling within  the child collection forming a child  of child  collection.
+Whatever falls  outside the child collection,but inside a parent collection
+will form a sibling of the child collection.
+
+When  hidparser starts, it'll get the raw  descriptor in a structure called
+'hidparser_tok'  structure. Solaris  will  proceed by taking one byte first
+(which sort of forms a header and  indicates  how many  to  follow for each
+item for the 'item data') and then proceeds to take the  value for the item
+(which is the item data). This  'hidparser_tok'  structure  contains a list
+of global and local items. As  and when the parser encounters a global item
+it'll add it to the global item list. The same applies for local items also.
+The only difference is that if  a global item is getting redefined (i.e the
+global item is already present  in the gitem list),  then "the global item"
+(i.e one of the global item) is freed and the new one is put instead. Local
+items can get redefined without  disturbing the earlier  values.  This goes
+on till a main item is encountered. When a  main  item  is encountered  the
+global item list  is copied over to the entity_item structure and the local
+item list will start  where  the global item  list  stops ( in the 'entity_
+attribute' list). Before we start on the next item the local item list will
+be freed (in the hidparser_tok  structure) but the global item list will be
+maintained since their scope is through out the report descriptor.
+
+The two additions which has happened  in this  round  of  changes  are  the
+support for push|pop and delimiter items. 'push' basically asks the  parser
+to copy over the list of  global  items, while  'pop' takes the last pushed
+list as the current one. The entity_attribute_stack forms a stack of global
+item list pointers from which they can be pop-ed on the gitem list.'delimit-
+er'items basically allows you to interpret the data that is  being received
+differently depending on the way you use it and requires the parser to reco-
+gnize only the first 'usage' (which is what Solaris does with my changes).
+
+
+___________________________________________________________________________
+
+Example:
+
+
+Following is the report descriptor dump for Labtec Spaceball (you can  call
+it a mouse).
+
+hid1:   Index = 0       value =0x5
+hid1:   Index = 1       value =0x1
+hid1:   Index = 2       value =0x9
+hid1:   Index = 3       value =0x8
+hid1:   Index = 4       value =0xa1
+hid1:   Index = 5       value =0x1
+hid1:   Index = 6       value =0xa1
+hid1:   Index = 7       value =0x0
+hid1:   Index = 8       value =0x85
+hid1:   Index = 9       value =0x1
+hid1:   Index = 10      value =0x16
+hid1:   Index = 11      value =0x0
+hid1:   Index = 12      value =0x80
+hid1:   Index = 13      value =0x26
+hid1:   Index = 14      value =0xff
+hid1:   Index = 15      value =0x7f
+hid1:   Index = 16      value =0x9
+hid1:   Index = 17      value =0x30
+hid1:   Index = 18      value =0x9
+hid1:   Index = 19      value =0x31
+hid1:   Index = 20      value =0x9
+hid1:   Index = 21      value =0x32
+hid1:   Index = 22      value =0x75
+hid1:   Index = 23      value =0x10
+hid1:   Index = 24      value =0x95
+hid1:   Index = 25      value =0x3
+hid1:   Index = 26      value =0x81
+hid1:   Index = 27      value =0x2
+hid1:   Index = 28      value =0xc0
+hid1:   Index = 29      value =0xa1
+hid1:   Index = 30      value =0x0
+hid1:   Index = 31      value =0x85
+hid1:   Index = 32      value =0x2
+hid1:   Index = 33      value =0x9
+hid1:   Index = 34      value =0x33
+hid1:   Index = 35      value =0x9
+hid1:   Index = 36      value =0x34
+hid1:   Index = 37      value =0x9
+hid1:   Index = 38      value =0x35
+hid1:   Index = 39      value =0x75
+hid1:   Index = 40      value =0x10
+hid1:   Index = 41      value =0x95
+hid1:   Index = 42      value =0x3
+hid1:   Index = 43      value =0x81
+hid1:   Index = 44      value =0x2
+hid1:   Index = 45      value =0xc0
+hid1:   Index = 46      value =0xa1
+hid1:   Index = 47      value =0x2
+hid1:   Index = 48      value =0x85
+hid1:   Index = 49      value =0x3
+hid1:   Index = 50      value =0x5
+hid1:   Index = 51      value =0x1
+hid1:   Index = 52      value =0x9
+hid1:   Index = 53      value =0x3a
+hid1:   Index = 54      value =0x75
+hid1:   Index = 55      value =0x10
+hid1:   Index = 56      value =0x95
+hid1:   Index = 57      value =0x1
+hid1:   Index = 58      value =0x81
+hid1:   Index = 59      value =0x2
+hid1:   Index = 60      value =0x5
+hid1:   Index = 61      value =0x9
+hid1:   Index = 62      value =0x19
+hid1:   Index = 63      value =0x1
+hid1:   Index = 64      value =0x29
+hid1:   Index = 65      value =0xd
+hid1:   Index = 66      value =0x15
+hid1:   Index = 67      value =0x0
+hid1:   Index = 68      value =0x25
+hid1:   Index = 69      value =0x1
+hid1:   Index = 70      value =0x35
+hid1:   Index = 71      value =0x0
+hid1:   Index = 72      value =0x45
+hid1:   Index = 73      value =0x1
+hid1:   Index = 74      value =0x75
+hid1:   Index = 75      value =0x1
+hid1:   Index = 76      value =0x95
+hid1:   Index = 77      value =0xd
+hid1:   Index = 78      value =0x81
+hid1:   Index = 79      value =0x2
+hid1:   Index = 80      value =0x95
+hid1:   Index = 81      value =0x3
+hid1:   Index = 82      value =0x81
+hid1:   Index = 83      value =0x1
+hid1:   Index = 84      value =0xc0
+hid1:   Index = 85      value =0x5
+hid1:   Index = 86      value =0x1
+hid1:   Index = 87      value =0x9
+hid1:   Index = 88      value =0x3a
+hid1:   Index = 89      value =0xa1
+hid1:   Index = 90      value =0x2
+hid1:   Index = 91      value =0x15
+hid1:   Index = 92      value =0x80
+hid1:   Index = 93      value =0x25
+hid1:   Index = 94      value =0x7f
+hid1:   Index = 95      value =0x75
+hid1:   Index = 96      value =0x8
+hid1:   Index = 97      value =0x9
+hid1:   Index = 98      value =0x3a
+hid1:   Index = 99      value =0xa1
+hid1:   Index = 100     value =0x2
+hid1:   Index = 101     value =0x85
+hid1:   Index = 102     value =0x4
+hid1:   Index = 103     value =0x9
+hid1:   Index = 104     value =0x3a
+hid1:   Index = 105     value =0x95
+hid1:   Index = 106     value =0x4
+hid1:   Index = 107     value =0xb1
+hid1:   Index = 108     value =0x2
+hid1:   Index = 109     value =0xc0
+hid1:   Index = 110     value =0xa1
+hid1:   Index = 111     value =0x2
+hid1:   Index = 112     value =0x85
+hid1:   Index = 113     value =0x5
+hid1:   Index = 114     value =0x9
+hid1:   Index = 115     value =0x3a
+hid1:   Index = 116     value =0x95
+hid1:   Index = 117     value =0x1
+hid1:   Index = 118     value =0xb1
+hid1:   Index = 119     value =0x2
+hid1:   Index = 120     value =0xc0
+hid1:   Index = 121     value =0xa1
+hid1:   Index = 122     value =0x2
+hid1:   Index = 123     value =0x85
+hid1:   Index = 124     value =0x6
+hid1:   Index = 125     value =0x9
+hid1:   Index = 126     value =0x3a
+hid1:   Index = 127     value =0x95
+hid1:   Index = 128     value =0x1
+hid1:   Index = 129     value =0xb1
+hid1:   Index = 130     value =0x2
+hid1:   Index = 131     value =0xc0
+hid1:   Index = 132     value =0xa1
+hid1:   Index = 133     value =0x2
+hid1:   Index = 134     value =0x85
+hid1:   Index = 135     value =0x7
+hid1:   Index = 136     value =0x9
+hid1:   Index = 137     value =0x3a
+hid1:   Index = 138     value =0x95
+hid1:   Index = 139     value =0x10
+hid1:   Index = 140     value =0xb1
+hid1:   Index = 141     value =0x2
+hid1:   Index = 142     value =0xc0
+hid1:   Index = 143     value =0xa1
+hid1:   Index = 144     value =0x2
+hid1:   Index = 145     value =0x85
+hid1:   Index = 146     value =0x8
+hid1:   Index = 147     value =0x9
+hid1:   Index = 148     value =0x3a
+hid1:   Index = 149     value =0x95
+hid1:   Index = 150     value =0x10
+hid1:   Index = 151     value =0xb1
+hid1:   Index = 152     value =0x2
+hid1:   Index = 153     value =0xc0
+hid1:   Index = 154     value =0xa1
+hid1:   Index = 155     value =0x2
+hid1:   Index = 156     value =0x85
+hid1:   Index = 157     value =0x9
+hid1:   Index = 158     value =0x9
+hid1:   Index = 159     value =0x3a
+hid1:   Index = 160     value =0x95
+hid1:   Index = 161     value =0xc
+hid1:   Index = 162     value =0xb1
+hid1:   Index = 163     value =0x2
+hid1:   Index = 164     value =0xc0
+hid1:   Index = 165     value =0xa1
+hid1:   Index = 166     value =0x2
+hid1:   Index = 167     value =0x85
+hid1:   Index = 168     value =0xa
+hid1:   Index = 169     value =0x9
+hid1:   Index = 170     value =0x3a
+hid1:   Index = 171     value =0x95
+hid1:   Index = 172     value =0x1
+hid1:   Index = 173     value =0xb1
+hid1:   Index = 174     value =0x2
+hid1:   Index = 175     value =0xc0
+hid1:   Index = 176     value =0xa1
+hid1:   Index = 177     value =0x2
+hid1:   Index = 178     value =0x85
+hid1:   Index = 179     value =0xb
+hid1:   Index = 180     value =0x9
+hid1:   Index = 181     value =0x3a
+hid1:   Index = 182     value =0x95
+hid1:   Index = 183     value =0x1
+hid1:   Index = 184     value =0xb1
+hid1:   Index = 185     value =0x2
+hid1:   Index = 186     value =0xc0
+hid1:   Index = 187     value =0xa1
+hid1:   Index = 188     value =0x2
+hid1:   Index = 189     value =0x85
+hid1:   Index = 190     value =0xc
+hid1:   Index = 191     value =0x9
+hid1:   Index = 192     value =0x3a
+hid1:   Index = 193     value =0x95
+hid1:   Index = 194     value =0x1
+hid1:   Index = 195     value =0xb1
+hid1:   Index = 196     value =0x2
+hid1:   Index = 197     value =0xc0
+hid1:   Index = 198     value =0xa1
+hid1:   Index = 199     value =0x2
+hid1:   Index = 200     value =0x85
+hid1:   Index = 201     value =0xd
+hid1:   Index = 202     value =0x9
+hid1:   Index = 203     value =0x3a
+hid1:   Index = 204     value =0x95
+hid1:   Index = 205     value =0x2
+hid1:   Index = 206     value =0xb1
+hid1:   Index = 207     value =0x2
+hid1:   Index = 208     value =0xc0
+hid1:   Index = 209     value =0xc0
+hid1:   Index = 210     value =0xc0
+
+___________________________________________________________________________
+
+Item format:
+
+	------------------------------------
+	|data|data(8)|tag(4),type(2),size(2)|
+	------------------------------------
+                            |<------'ch'---------->|
+
+___________________________________________________________________________
+
+'hidparser_ReportDescriptor()' will call  'hidparser_scan()'  first.  Hence
+you will see the  'scanner'  output first.  The scanner will go through the
+first byte and set hidparser_tok_token to the tag|type value. hidparser_tok
+_leng  will be set to size and the 'data' part will be copied to tok_ text.
+'hidparser_ReportDescriptor'  will   call  'hidparser_ItemList()'  to  take 
+charge of the rest of the parsing.
+ 
+___________________________________________________________________________
+
+hidparser:      scanner: index  = 0x0 ch = 0x5 [ = 0x00000101 = tag[0],
+                                               type[1], size[1] ]
+
+hidparser:      scanner: parsed_length = 1 <========size[1] [Type 1 = Global
+			Tag[0] = Usage Page ]
+
+___________________________________________________________________________
+
+Here the length of 1 indicates that the parameter or value associated  with
+the usage page is contained in the next character/byte.
+
+___________________________________________________________________________
+
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x1
+___________________________________________________________________________
+
+The next byte contains a value of 0x1. If you look at the usage table spec
+you can see that value of 1 stands for Generic Desktop.
+___________________________________________________________________________
+
+hidparser:      scanner: lexical analyzer found 0x5 before translation
+hidparser:      scanner: aindex  = 0x2
+___________________________________________________________________________
+
+Here  'hidparser_ItemList()'  would have  been called,   which  again calls
+'hidparser_Items()'. The purpose of 'hidparser_Items()'  is to  get through
+all the Items and break when it encounters a main item.  'hidparser_Items()
+will  again  call  'hidparser_GlobalItem()'  and 'hidparser_LocalItem()' to
+make a list of entity attributes in the hidparser_tok structure.
+___________________________________________________________________________
+
+hidparser:      hidparser_GlobalItem:index = 0x0 token = 0x4 
+
+___________________________________________________________________________
+
+The above goes to gitem list.
+___________________________________________________________________________
+
+
+hidparser:      scanner: index  = 0x2 ch = 0x9 [ = 0x00001001 = tag[0],
+			type[2], size[1]]
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x8,index = 0x3
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x4
+hidparser:      hidparser_LocalItem:index = 0x2 token = 0x8
+___________________________________________________________________________
+
+The above goes to local item list in hidparser_tok_structure.
+___________________________________________________________________________
+
+hidparser:      scanner: index  = 0x4 ch = 0xa1 [= 0x10100001 = tag[a],
+			type[0], size[1]]
+hidparser:      scanner: parsed_length = 1	[ This is a main item ]
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x5
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x6
+
+____________________________________________________________________________
+
+Here 'hidparser_Items()' will break and pass the control back to 'hidparser_
+ItemList()' which will call 'hidparser_MainItem()'  to do things specific to
+a main item (like allocating  an entity_item  structure  and returning it in
+curr_ei).  'hidparser_MainItem()' will allocate an entity_item structure and
+copy the gitem list from hidparser tok structure and add the local item list
+to the end of global item list  (in  the  entity_item_attributes  member  of
+entity_item structure).
+
+____________________________________________________________________________
+
+hidparser:      hidparser_MainItem:index = 0x4 token = 0xa0
+hidparser:      scanner: index  = 0x6 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x0,index = 0x7
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x8
+hidparser:      Start Collection:cache_ei = 0xcab8d220, curr_ei = 0xcab8d220
+
+____________________________________________________________________________
+
+This forms the root collection.  'cache_ei'  or the cached  entity_item will
+always point to the last collection encountered.  Each entity_item structure
+will have a pointer to the previous collection.  This is basically to remove
+recursion when we support nested collections.  So if I have something like
+
+Collection
+	....
+	Collection
+		....
+		Collection
+		....
+		End Collection
+		....
+	End collection
+	....
+End Collection
+
+and if we assume  that  the parser is currently @ the third Collection item, 
+then cache_ei will point to the third collection, it's prev_ei will point to
+the second collection and it's prev_ei will point to the root collection. As
+we move down the first end collection, cache_ei would have changed to second
+collection and so on.
+____________________________________________________________________________
+
+hidparser:      hidparser_MainItem:index = 0x6 token = 0xa0
+
+____________________________________________________________________________
+
+We encounter  another collection here [ so a nested collection ].  This   'ei'
+will have a  global  item  list (only,  as there are no local items. Remember
+that  we  preserve  global  item list  in  the  hidparser_tok_structure while
+blanking out the local item list as we encounter a main item).
+____________________________________________________________________________
+
+hidparser:      scanner: index  = 0x8 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x9
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0xa
+hidparser:      Start Collection:cache_ei = 0xcab84db0, curr_ei = 0xcab84db0
+
+
+hidparser:      hidparser_GlobalItem:index = 0x8 token = 0x84
+_____________________________________________________________________________
+
+This is a global item. Will get added to already existent Usage page GI in the
+'hidparser_tok' structure.
+
+hidparser:      scanner: index  = 0xa ch = 0x16
+hidparser:      scanner: parsed_length = 2
+hidparser:      scanner: parsed_text[0] = 0x0,index = 0xb
+hidparser:      scanner: parsed_text[1] = 0x80,index = 0xc
+hidparser:      scanner: lexical analyzer found 0x16 before translation
+hidparser:      scanner: aindex  = 0xd
+hidparser:      hidparser_GlobalItem:index = 0xa token = 0x14
+hidparser:      scanner: index  = 0xd ch = 0x26
+hidparser:      scanner: parsed_length = 2
+hidparser:      scanner: parsed_text[0] = 0xff,index = 0xe
+hidparser:      scanner: parsed_text[1] = 0x7f,index = 0xf
+hidparser:      scanner: lexical analyzer found 0x26 before translation
+hidparser:      scanner: aindex  = 0x10
+hidparser:      hidparser_GlobalItem:index = 0xd token = 0x24
+hidparser:      scanner: index  = 0x10 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x30,index = 0x11
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x12
+hidparser:      hidparser_LocalItem:index = 0x10 token = 0x8
+hidparser:      scanner: index  = 0x12 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x31,index = 0x13
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x14
+hidparser:      hidparser_LocalItem:index = 0x12 token = 0x8
+hidparser:      scanner: index  = 0x14 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x32,index = 0x15
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x16
+hidparser:      hidparser_LocalItem:index = 0x14 token = 0x8
+hidparser:      scanner: index  = 0x16 ch = 0x75
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x10,index = 0x17
+hidparser:      scanner: lexical analyzer found 0x75 before translation
+hidparser:      scanner: aindex  = 0x18
+hidparser:      hidparser_GlobalItem:index = 0x16 token = 0x74
+hidparser:      scanner: index  = 0x18 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3,index = 0x19
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x1a
+hidparser:      hidparser_GlobalItem:index = 0x18 token = 0x94
+hidparser:      scanner: index  = 0x1a ch = 0x81
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x1b
+hidparser:      scanner: lexical analyzer found 0x81 before translation
+hidparser:      scanner: aindex  = 0x1c
+hidparser:      hidparser_MainItem:index = 0x1a token = 0x80
+hidparser:      scanner: index  = 0x1c ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x1d
+hidparser:      Main Item: token = 0x80, curr_ei = 0xcab7ecf8  will be  the
+	child of prev_ei = 0xcab84db0, cache_ei being 0xcab84db0
+
+___________________________________________________________________________
+
+This is the Input main item and will form the child of collection @ 0xcab84-
+db0.
+___________________________________________________________________________
+
+hidparser:      hidparser_MainItem:index = 0x1c token = 0xc0
+hidparser:      scanner: index  = 0x1d ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x0,index = 0x1e
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x1f
+hidparser:      End Collection: cache_ei = 0xcab84db0, curr_ei = 0xcab84630
+____________________________________________________________________________
+
+This  End collection and will for the right sibling of 0xcab84db0 which will
+make cache_ei point to root collection.
+____________________________________________________________________________
+
+hidparser:      hidparser_MainItem:index = 0x1d token = 0xa0
+hidparser:      scanner: index  = 0x1f ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x20
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x21
+hidparser:      Start Collection:cache_ei = 0xcab84750, curr_ei = 0xcab84750
+____________________________________________________________________________
+
+Again a Collection Item. 
+
+The tree corresponding to the above list will be
+
+hidparser:      Usage Page(0x1) <---------------------- GI
+hidparser:      Usage(0x8) <--------------------------- LI
+hidparser:      Collection(0x1)<----------------------- MI
+hidparser:           Usage Page(0x1)<------------------ Carried over GI
+hidparser:           Collection(0x0)<------------------ MI
+hidparser:                Usage Page(0x1)<------------- Carried over GI
+hidparser:                Report Id(0x1)<-------------- GI [ New ]
+hidparser:                Logical Minimum(0x8000)<----- GI
+hidparser:                Logical Maximum(0x7FFF)<----- GI
+hidparser:                Report Size(0x10)<----------- GI
+hidparser:                Report Count(0x3)<----------- GI
+hidparser:                Usage(0x30)<----------------- LI
+hidparser:                Usage(0x31)<----------------- LI
+hidparser:                Usage(0x32)<----------------- LI
+hidparser:                Input(0x2)<------------------ MI
+hidparser:           End Collection(0x0)<-------------- MI
+hidparser:           Usage Page(0x1)<------------------ Carried over GI
+hidparser:           Report Id(0x1)<------------------- Carried over GI
+hidparser:           Logical Minimum(0x8000)<----------   " "
+hidparser:           Logical Maximum(0x7FFF)<----------   " "
+hidparser:           Report Size(0x10)<----------------   " "
+hidparser:           Report Count(0x3)<----------------   " "
+hidparser:           Collection(0x0)<------------------ MI
+
+The actual tree corresponding to a descriptor dump will be
+
+
+      0x5, 0x1,              /* Usage Page (Generic Desktop)             */
+      0x9, 0x8,              /* Usage (0x8:Multi-axis controller)        */
+      0xa1, 0x1,             /* Collection (Application)                 */
+      0xa1, 0,               /*     Collection (Physical)                */
+      0x85, 0x1,             /*         Report ID (0x1)                  */
+      0x16, 0, 0x80,         /*         Logical Minimum (0x8000)         */
+      0x26, 0xff, 0x7f,      /*         Logical Maximum (0x7fff)         */
+      0x9, 0x30,             /*         Usage (0x30:X)                   */
+      0x9, 0x31,             /*         Usage (0x31:Y)                   */
+      0x9, 0x32,             /*         Usage (0x32:Z)                   */
+      0x75, 0x10,            /*         Report Size (0x10)               */
+      0x95, 0x3,             /*         Report Count (0x3)               */
+      0x81, 0x2,             /*         Input (Data, Variable, Absolute) */
+      0xc0,                  /*     End Collection                       */
+      0xa1, 0,               /*     Collection (Physical)                */
+
+As can be seen, the tree that Solaris constructs have carried over GI extra
+which is the only difference. But that doesn't make a difference in the way
+we handle data.
+
+There are somethings to be noted at this point. If subsequently we encount-
+er another  global item  which has already been defined (say report size),
+then we  will go to the  global list  maintained in the 'hidparser_tok' st-
+ructure and replace the already existant one  (i.e report size(0x10)  with
+the new one ).
+
+For end collection  main item, we don't attach the global item list to the
+entity item structure.
+
+The rest of the document is a continuation of where we left off the parsing.
+The theory of operation is the same. 
+
+___________________________________________________________________________
+
+
+hidparser:      hidparser_GlobalItem:index = 0x1f token = 0x84
+hidparser:      scanner: index  = 0x21 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x33,index = 0x22
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x23
+hidparser:      hidparser_LocalItem:index = 0x21 token = 0x8
+hidparser:      scanner: index  = 0x23 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x34,index = 0x24
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x25
+hidparser:      hidparser_LocalItem:index = 0x23 token = 0x8
+hidparser:      scanner: index  = 0x25 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x35,index = 0x26
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x27
+hidparser:      hidparser_LocalItem:index = 0x25 token = 0x8
+hidparser:      scanner: index  = 0x27 ch = 0x75
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x10,index = 0x28
+hidparser:      scanner: lexical analyzer found 0x75 before translation
+hidparser:      scanner: aindex  = 0x29
+hidparser:      hidparser_GlobalItem:index = 0x27 token = 0x74
+hidparser:      scanner: index  = 0x29 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3,index = 0x2a
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x2b
+hidparser:      hidparser_GlobalItem:index = 0x29 token = 0x94
+hidparser:      scanner: index  = 0x2b ch = 0x81
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x2c
+hidparser:      scanner: lexical analyzer found 0x81 before translation
+hidparser:      scanner: aindex  = 0x2d
+hidparser:      hidparser_MainItem:index = 0x2b token = 0x80
+hidparser:      scanner: index  = 0x2d ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x2e
+hidparser:      Main Item: token = 0x80, curr_ei = 0xcab7e098 will be the 
+	 child of prev_ei = 0xcab84750, cache_ei being 0xcab84750
+hidparser:      hidparser_MainItem:index = 0x2d token = 0xc0
+hidparser:      scanner: index  = 0x2e ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x2f
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x30
+hidparser:      End Collection: cache_ei = 0xcab84750, curr_ei = 0xcab7af40
+hidparser:      hidparser_MainItem:index = 0x2e token = 0xa0
+hidparser:      scanner: index  = 0x30 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3,index = 0x31
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x32
+hidparser:      Start Collection:cache_ei = 0xcab7ad30, curr_ei = 0xcab7ad30
+hidparser:      hidparser_GlobalItem:index = 0x30 token = 0x84
+hidparser:      scanner: index  = 0x32 ch = 0x5
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x33
+hidparser:      scanner: lexical analyzer found 0x5 before translation
+hidparser:      scanner: aindex  = 0x34
+hidparser:      hidparser_GlobalItem:index = 0x32 token = 0x4
+hidparser:      scanner: index  = 0x34 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x35
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x36
+hidparser:      hidparser_LocalItem:index = 0x34 token = 0x8
+hidparser:      scanner: index  = 0x36 ch = 0x75
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x10,index = 0x37
+hidparser:      scanner: lexical analyzer found 0x75 before translation
+hidparser:      scanner: aindex  = 0x38
+hidparser:      hidparser_GlobalItem:index = 0x36 token = 0x74
+hidparser:      scanner: index  = 0x38 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x39
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x3a
+hidparser:      hidparser_GlobalItem:index = 0x38 token = 0x94
+hidparser:      scanner: index  = 0x3a ch = 0x81
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x3b
+hidparser:      scanner: lexical analyzer found 0x81 before translation
+hidparser:      scanner: aindex  = 0x3c
+hidparser:      hidparser_MainItem:index = 0x3a token = 0x80
+hidparser:      scanner: index  = 0x3c ch = 0x5
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x9,index = 0x3d
+hidparser:      scanner: lexical analyzer found 0x5 before translation
+hidparser:      scanner: aindex  = 0x3e
+hidparser:      Main Item: token = 0x80, curr_ei = 0xcab7ad60 will be the
+	 child of prev_ei = 0xcab7ad30, cache_ei being 0xcab7ad30
+hidparser:      hidparser_GlobalItem:index = 0x3c token = 0x4
+hidparser:      scanner: index  = 0x3e ch = 0x19
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x3f
+hidparser:      scanner: lexical analyzer found 0x19 before translation
+hidparser:      scanner: aindex  = 0x40
+hidparser:      hidparser_LocalItem:index = 0x3e token = 0x18
+hidparser:      scanner: index  = 0x40 ch = 0x29
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xd,index = 0x41
+hidparser:      scanner: lexical analyzer found 0x29 before translation
+hidparser:      scanner: aindex  = 0x42
+hidparser:      hidparser_LocalItem:index = 0x40 token = 0x28
+hidparser:      scanner: index  = 0x42 ch = 0x15
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x0,index = 0x43
+hidparser:      scanner: lexical analyzer found 0x15 before translation
+hidparser:      scanner: aindex  = 0x44
+hidparser:      hidparser_GlobalItem:index = 0x42 token = 0x14
+hidparser:      scanner: index  = 0x44 ch = 0x25
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x45
+hidparser:      scanner: lexical analyzer found 0x25 before translation
+hidparser:      scanner: aindex  = 0x46
+hidparser:      hidparser_GlobalItem:index = 0x44 token = 0x24
+hidparser:      scanner: index  = 0x46 ch = 0x35
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x0,index = 0x47
+hidparser:      scanner: lexical analyzer found 0x35 before translation
+hidparser:      scanner: aindex  = 0x48
+hidparser:      hidparser_GlobalItem:index = 0x46 token = 0x34
+hidparser:      scanner: index  = 0x48 ch = 0x45
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x49
+hidparser:      scanner: lexical analyzer found 0x45 before translation
+hidparser:      scanner: aindex  = 0x4a
+hidparser:      hidparser_GlobalItem:index = 0x48 token = 0x44
+hidparser:      scanner: index  = 0x4a ch = 0x75
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x4b
+hidparser:      scanner: lexical analyzer found 0x75 before translation
+hidparser:      scanner: aindex  = 0x4c
+hidparser:      hidparser_GlobalItem:index = 0x4a token = 0x74
+hidparser:      scanner: index  = 0x4c ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xd,index = 0x4d
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x4e
+hidparser:      hidparser_GlobalItem:index = 0x4c token = 0x94
+hidparser:      scanner: index  = 0x4e ch = 0x81
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x4f
+hidparser:      scanner: lexical analyzer found 0x81 before translation
+hidparser:      scanner: aindex  = 0x50
+hidparser:      hidparser_MainItem:index = 0x4e token = 0x80
+hidparser:      scanner: index  = 0x50 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3,index = 0x51
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x52
+hidparser:      Main Item: token = 0x80, curr_ei = 0xcab7ecc8 will be the
+	 right sibling of prev_ei = 0xcab7ad60, cache_ei being 0xc
+ab7ad30
+hidparser:      hidparser_GlobalItem:index = 0x50 token = 0x94
+hidparser:      scanner: index  = 0x52 ch = 0x81
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x53
+hidparser:      scanner: lexical analyzer found 0x81 before translation
+hidparser:      scanner: aindex  = 0x54
+hidparser:      hidparser_MainItem:index = 0x52 token = 0x80
+hidparser:      scanner: index  = 0x54 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x55
+hidparser:      Main Item: token = 0x80, curr_ei = 0xcab7ec98 will be the
+	 right sibling of prev_ei = 0xcab7ecc8, cache_ei being 0xc
+ab7ad30
+hidparser:      hidparser_MainItem:index = 0x54 token = 0xc0
+hidparser:      scanner: index  = 0x55 ch = 0x5
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x56
+hidparser:      scanner: lexical analyzer found 0x5 before translation
+hidparser:      scanner: aindex  = 0x57
+hidparser:      End Collection: cache_ei = 0xcab7ad30, curr_ei = 0xcab7ad00
+hidparser:      hidparser_GlobalItem:index = 0x55 token = 0x4
+hidparser:      scanner: index  = 0x57 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x58
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x59
+hidparser:      hidparser_LocalItem:index = 0x57 token = 0x8
+hidparser:      scanner: index  = 0x59 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x5a
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x5b
+hidparser:      hidparser_MainItem:index = 0x59 token = 0xa0
+hidparser:      scanner: index  = 0x5b ch = 0x15
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x80,index = 0x5c
+hidparser:      scanner: lexical analyzer found 0x15 before translation
+hidparser:      scanner: aindex  = 0x5d
+hidparser:      Start Collection:cache_ei = 0xcab7ea58, curr_ei = 0xcab7ea58
+hidparser:      hidparser_GlobalItem:index = 0x5b token = 0x14
+hidparser:      scanner: index  = 0x5d ch = 0x25
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x7f,index = 0x5e
+hidparser:      scanner: lexical analyzer found 0x25 before translation
+hidparser:      scanner: aindex  = 0x5f
+hidparser:      hidparser_GlobalItem:index = 0x5d token = 0x24
+hidparser:      scanner: index  = 0x5f ch = 0x75
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x8,index = 0x60
+hidparser:      scanner: lexical analyzer found 0x75 before translation
+hidparser:      scanner: aindex  = 0x61
+hidparser:      hidparser_GlobalItem:index = 0x5f token = 0x74
+hidparser:      scanner: index  = 0x61 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x62
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x63
+hidparser:      hidparser_LocalItem:index = 0x61 token = 0x8
+hidparser:      scanner: index  = 0x63 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x64
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x65
+hidparser:      hidparser_MainItem:index = 0x63 token = 0xa0
+hidparser:      scanner: index  = 0x65 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x4,index = 0x66
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x67
+hidparser:      Start Collection:cache_ei = 0xcab7ea88, curr_ei = 0xcab7ea88
+hidparser:      hidparser_GlobalItem:index = 0x65 token = 0x84
+hidparser:      scanner: index  = 0x67 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x68
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x69
+hidparser:      hidparser_LocalItem:index = 0x67 token = 0x8
+hidparser:      scanner: index  = 0x69 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x4,index = 0x6a
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x6b
+hidparser:      hidparser_GlobalItem:index = 0x69 token = 0x94
+hidparser:      scanner: index  = 0x6b ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x6c
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0x6d
+hidparser:      hidparser_MainItem:index = 0x6b token = 0xb0
+hidparser:      scanner: index  = 0x6d ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x6e
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7acd0 will be the
+		child of prev_ei = 0xcab7ea88, cache_ei being 0xcab7ea88
+hidparser:      hidparser_MainItem:index = 0x6d token = 0xc0
+hidparser:      scanner: index  = 0x6e ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x6f
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x70
+hidparser:      End Collection: cache_ei = 0xcab7ea88, curr_ei = 0xcab7ab20
+hidparser:      hidparser_MainItem:index = 0x6e token = 0xa0
+hidparser:      scanner: index  = 0x70 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x5,index = 0x71
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x72
+hidparser:      Start Collection:cache_ei = 0xcab7aaf0, curr_ei = 0xcab7aaf0
+hidparser:      hidparser_GlobalItem:index = 0x70 token = 0x84
+hidparser:      scanner: index  = 0x72 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x73
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x74
+hidparser:      hidparser_LocalItem:index = 0x72 token = 0x8
+hidparser:      scanner: index  = 0x74 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x75
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x76
+hidparser:      hidparser_GlobalItem:index = 0x74 token = 0x94
+hidparser:      scanner: index  = 0x76 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x77
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0x78
+hidparser:      hidparser_MainItem:index = 0x76 token = 0xb0
+hidparser:      scanner: index  = 0x78 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x79
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7aac0 will be the
+		child of prev_ei = 0xcab7aaf0, cache_ei being 0xcab7aaf0
+hidparser:      hidparser_MainItem:index = 0x78 token = 0xc0
+hidparser:      scanner: index  = 0x79 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x7a
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x7b
+hidparser:      End Collection: cache_ei = 0xcab7aaf0, curr_ei = 0xcab7e548
+hidparser:      hidparser_MainItem:index = 0x79 token = 0xa0
+hidparser:      scanner: index  = 0x7b ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x6,index = 0x7c
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x7d
+hidparser:      Start Collection:cache_ei = 0xcab7ea28, curr_ei = 0xcab7ea28
+hidparser:      hidparser_GlobalItem:index = 0x7b token = 0x84
+hidparser:      scanner: index  = 0x7d ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x7e
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x7f
+hidparser:      hidparser_LocalItem:index = 0x7d token = 0x8
+hidparser:      scanner: index  = 0x7f ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0x80
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x81
+hidparser:      hidparser_GlobalItem:index = 0x7f token = 0x94
+hidparser:      scanner: index  = 0x81 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x82
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0x83
+hidparser:      hidparser_MainItem:index = 0x81 token = 0xb0
+hidparser:      scanner: index  = 0x83 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x84
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7e608 will be the
+		child of prev_ei = 0xcab7ea28, cache_ei being 0xcab7ea28
+hidparser:      hidparser_MainItem:index = 0x83 token = 0xc0
+hidparser:      scanner: index  = 0x84 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x85
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x86
+hidparser:      End Collection: cache_ei = 0xcab7ea28, curr_ei = 0xcab7e5d8
+hidparser:      hidparser_MainItem:index = 0x84 token = 0xa0
+hidparser:      scanner: index  = 0x86 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x7,index = 0x87
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x88
+hidparser:      Start Collection:cache_ei = 0xcab7e5a8, curr_ei = 0xcab7e5a8
+hidparser:      hidparser_GlobalItem:index = 0x86 token = 0x84
+hidparser:      scanner: index  = 0x88 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x89
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x8a
+hidparser:      hidparser_LocalItem:index = 0x88 token = 0x8
+hidparser:      scanner: index  = 0x8a ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x10,index = 0x8b
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x8c
+hidparser:      hidparser_GlobalItem:index = 0x8a token = 0x94
+hidparser:      scanner: index  = 0x8c ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x8d
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0x8e
+hidparser:      hidparser_MainItem:index = 0x8c token = 0xb0
+hidparser:      scanner: index  = 0x8e ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x8f
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7e578 will be the
+		child of prev_ei = 0xcab7e5a8, cache_ei being 0xcab7e5a8
+hidparser:      hidparser_MainItem:index = 0x8e token = 0xc0
+hidparser:      scanner: index  = 0x8f ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x90
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x91
+hidparser:      End Collection: cache_ei = 0xcab7e5a8, curr_ei = 0xcab7af10
+hidparser:      hidparser_MainItem:index = 0x8f token = 0xa0
+hidparser:      scanner: index  = 0x91 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x8,index = 0x92
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x93
+hidparser:      Start Collection:cache_ei = 0xcab7aa60, curr_ei = 0xcab7aa60
+hidparser:      hidparser_GlobalItem:index = 0x91 token = 0x84
+hidparser:      scanner: index  = 0x93 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x94
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0x95
+hidparser:      hidparser_LocalItem:index = 0x93 token = 0x8
+hidparser:      scanner: index  = 0x95 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x10,index = 0x96
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0x97
+hidparser:      hidparser_GlobalItem:index = 0x95 token = 0x94
+hidparser:      scanner: index  = 0x97 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x98
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0x99
+hidparser:      hidparser_MainItem:index = 0x97 token = 0xb0
+hidparser:      scanner: index  = 0x99 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0x9a
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7aa30 will be the
+		child of prev_ei = 0xcab7aa60, cache_ei being 0xcab7aa60
+hidparser:      hidparser_MainItem:index = 0x99 token = 0xc0
+hidparser:      scanner: index  = 0x9a ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0x9b
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0x9c
+hidparser:      End Collection: cache_ei = 0xcab7aa60, curr_ei = 0xcab7aa00
+hidparser:      hidparser_MainItem:index = 0x9a token = 0xa0
+hidparser:      scanner: index  = 0x9c ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x9,index = 0x9d
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0x9e
+hidparser:      Start Collection:cache_ei = 0xcab7a9d0, curr_ei = 0xcab7a9d0
+hidparser:      hidparser_GlobalItem:index = 0x9c token = 0x84
+hidparser:      scanner: index  = 0x9e ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0x9f
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0xa0
+hidparser:      hidparser_LocalItem:index = 0x9e token = 0x8
+hidparser:      scanner: index  = 0xa0 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xc,index = 0xa1
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0xa2
+hidparser:      hidparser_GlobalItem:index = 0xa0 token = 0x94
+hidparser:      scanner: index  = 0xa2 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xa3
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0xa4
+hidparser:      hidparser_MainItem:index = 0xa2 token = 0xb0
+hidparser:      scanner: index  = 0xa4 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xa5
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7a9a0 will be the
+		child of prev_ei = 0xcab7a9d0, cache_ei being 0xcab7a9d0
+hidparser:      hidparser_MainItem:index = 0xa4 token = 0xc0
+hidparser:      scanner: index  = 0xa5 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xa6
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0xa7
+hidparser:      End Collection: cache_ei = 0xcab7a9d0, curr_ei = 0xcab7a970
+hidparser:      hidparser_MainItem:index = 0xa5 token = 0xa0
+hidparser:      scanner: index  = 0xa7 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xa,index = 0xa8
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0xa9
+hidparser:      Start Collection:cache_ei = 0xcab7a940, curr_ei = 0xcab7a940
+hidparser:      hidparser_GlobalItem:index = 0xa7 token = 0x84
+hidparser:      scanner: index  = 0xa9 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0xaa
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0xab
+hidparser:      hidparser_LocalItem:index = 0xa9 token = 0x8
+hidparser:      scanner: index  = 0xab ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0xac
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0xad
+hidparser:      hidparser_GlobalItem:index = 0xab token = 0x94
+hidparser:      scanner: index  = 0xad ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xae
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0xaf
+hidparser:      hidparser_MainItem:index = 0xad token = 0xb0
+hidparser:      scanner: index  = 0xaf ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xb0
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7a910 will be the
+	 	child of prev_ei = 0xcab7a940, cache_ei being 0xcab7a940
+hidparser:      hidparser_MainItem:index = 0xaf token = 0xc0
+hidparser:      scanner: index  = 0xb0 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xb1
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0xb2
+hidparser:      End Collection: cache_ei = 0xcab7a940, curr_ei = 0xcab7a8e0
+hidparser:      hidparser_MainItem:index = 0xb0 token = 0xa0
+hidparser:      scanner: index  = 0xb2 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xb,index = 0xb3
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0xb4
+hidparser:      Start Collection:cache_ei = 0xcab7a8b0, curr_ei = 0xcab7a8b0
+hidparser:      hidparser_GlobalItem:index = 0xb2 token = 0x84
+hidparser:      scanner: index  = 0xb4 ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0xb5
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0xb6
+hidparser:      hidparser_LocalItem:index = 0xb4 token = 0x8
+hidparser:      scanner: index  = 0xb6 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0xb7
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0xb8
+hidparser:      hidparser_GlobalItem:index = 0xb6 token = 0x94
+hidparser:      scanner: index  = 0xb8 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xb9
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0xba
+hidparser:      hidparser_MainItem:index = 0xb8 token = 0xb0
+hidparser:      scanner: index  = 0xba ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xbb
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7a880 will be the
+	 	child of prev_ei = 0xcab7a8b0, cache_ei being 0xcab7a8b0
+hidparser:      hidparser_MainItem:index = 0xba token = 0xc0
+hidparser:      scanner: index  = 0xbb ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xbc
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0xbd
+hidparser:      End Collection: cache_ei = 0xcab7a8b0, curr_ei = 0xcab7a850
+hidparser:      hidparser_MainItem:index = 0xbb token = 0xa0
+hidparser:      scanner: index  = 0xbd ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xc,index = 0xbe
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0xbf
+hidparser:      Start Collection:cache_ei = 0xcab7a820, curr_ei = 0xcab7a820
+hidparser:      hidparser_GlobalItem:index = 0xbd token = 0x84
+hidparser:      scanner: index  = 0xbf ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0xc0
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0xc1
+hidparser:      hidparser_LocalItem:index = 0xbf token = 0x8
+hidparser:      scanner: index  = 0xc1 ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x1,index = 0xc2
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0xc3
+hidparser:      hidparser_GlobalItem:index = 0xc1 token = 0x94
+hidparser:      scanner: index  = 0xc3 ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xc4
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0xc5
+hidparser:      hidparser_MainItem:index = 0xc3 token = 0xb0
+hidparser:      scanner: index  = 0xc5 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xc6
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7a7f0 will be the
+	 	child of prev_ei = 0xcab7a820, cache_ei being 0xcab7a820
+hidparser:      hidparser_MainItem:index = 0xc5 token = 0xc0
+hidparser:      scanner: index  = 0xc6 ch = 0xa1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xc7
+hidparser:      scanner: lexical analyzer found 0xa1 before translation
+hidparser:      scanner: aindex  = 0xc8
+hidparser:      End Collection: cache_ei = 0xcab7a820, curr_ei = 0xcab7a7c0
+hidparser:      hidparser_MainItem:index = 0xc6 token = 0xa0
+hidparser:      scanner: index  = 0xc8 ch = 0x85
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0xd,index = 0xc9
+hidparser:      scanner: lexical analyzer found 0x85 before translation
+hidparser:      scanner: aindex  = 0xca
+hidparser:      Start Collection:cache_ei = 0xcab7a790, curr_ei = 0xcab7a790
+hidparser:      hidparser_GlobalItem:index = 0xc8 token = 0x84
+hidparser:      scanner: index  = 0xca ch = 0x9
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x3a,index = 0xcb
+hidparser:      scanner: lexical analyzer found 0x9 before translation
+hidparser:      scanner: aindex  = 0xcc
+hidparser:      hidparser_LocalItem:index = 0xca token = 0x8
+hidparser:      scanner: index  = 0xcc ch = 0x95
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xcd
+hidparser:      scanner: lexical analyzer found 0x95 before translation
+hidparser:      scanner: aindex  = 0xce
+hidparser:      hidparser_GlobalItem:index = 0xcc token = 0x94
+hidparser:      scanner: index  = 0xce ch = 0xb1
+hidparser:      scanner: parsed_length = 1
+hidparser:      scanner: parsed_text[0] = 0x2,index = 0xcf
+hidparser:      scanner: lexical analyzer found 0xb1 before translation
+hidparser:      scanner: aindex  = 0xd0
+hidparser:      hidparser_MainItem:index = 0xce token = 0xb0
+hidparser:      scanner: index  = 0xd0 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xd1
+hidparser:      Main Item: token = 0xb0, curr_ei = 0xcab7a760 will be the
+	 	child of prev_ei = 0xcab7a790, cache_ei being 0xcab7a790
+hidparser:      hidparser_MainItem:index = 0xd0 token = 0xc0
+hidparser:      scanner: index  = 0xd1 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xd2
+hidparser:      End Collection: cache_ei = 0xcab7a790, curr_ei = 0xcab7a730
+hidparser:      hidparser_MainItem:index = 0xd1 token = 0xc0
+hidparser:      scanner: index  = 0xd2 ch = 0xc0
+hidparser:      scanner: parsed_length = 0
+hidparser:      scanner: lexical analyzer found 0xc0 before translation
+hidparser:      scanner: aindex  = 0xd3
+hidparser:      End Collection: cache_ei = 0xcab7ea58, curr_ei = 0xcab7a700
+hidparser:      hidparser_MainItem:index = 0xd2 token = 0xc0
+hidparser:      scanner: eindex  = 0xd3
+hidparser:      End Collection: cache_ei = 0xcab8d220, curr_ei = 0xcab7a6d0
+hidparser:      Usage Page(0x1)
+hidparser:      Usage(0x8)
+hidparser:      Collection(0x1)
+hidparser:           Usage Page(0x1)
+hidparser:           Collection(0x0)
+hidparser:                Usage Page(0x1)
+hidparser:                Report Id(0x1)
+hidparser:                Logical Minimum(0x8000)
+hidparser:                Logical Maximum(0x7FFF)
+hidparser:                Report Size(0x10)
+hidparser:                Report Count(0x3)
+hidparser:                Usage(0x30)
+hidparser:                Usage(0x31)
+hidparser:                Usage(0x32)
+hidparser:                Input(0x2)
+hidparser:           End Collection(0x0)
+hidparser:           Usage Page(0x1)
+hidparser:           Report Id(0x1)
+hidparser:           Logical Minimum(0x8000)
+hidparser:           Logical Maximum(0x7FFF)
+hidparser:           Report Size(0x10)
+hidparser:           Report Count(0x3)
+hidparser:           Collection(0x0)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x8000)
+hidparser:                Logical Maximum(0x7FFF)
+hidparser:                Report Id(0x2)
+hidparser:                Report Size(0x10)
+hidparser:                Report Count(0x3)
+hidparser:                Usage(0x33)
+hidparser:                Usage(0x34)
+hidparser:                Usage(0x35)
+hidparser:                Input(0x2)
+hidparser:           End Collection(0x0)
+hidparser:           Usage Page(0x1)
+hidparser:           Logical Minimum(0x8000)
+hidparser:           Logical Maximum(0x7FFF)
+hidparser:           Report Id(0x2)
+hidparser:           Report Size(0x10)
+hidparser:           Report Count(0x3)
+hidparser:           Collection(0x2)
+hidparser:                Logical Minimum(0x8000)
+hidparser:                Logical Maximum(0x7FFF)
+hidparser:                Report Id(0x3)
+hidparser:                Usage Page(0x1)
+hidparser:                Report Size(0x10)
+hidparser:                Report Count(0x1)
+hidparser:                Usage(0x3A)
+hidparser:                Input(0x2)
+hidparser:                Report Id(0x3)
+hidparser:                Usage Page(0x9)
+hidparser:                Logical Minimum(0x0)
+hidparser:                Logical Maximum(0x1)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Report Size(0x1)
+hidparser:                Report Count(0xD)
+hidparser:                Usage Minimum(0x1)
+hidparser:                Usage Maximum(0xD)
+hidparser:                Input(0x2)
+hidparser:                Report Id(0x3)
+hidparser:                Usage Page(0x9)
+hidparser:                Logical Minimum(0x0)
+hidparser:                Logical Maximum(0x1)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Report Size(0x1)
+hidparser:                Report Count(0x3)
+hidparser:                Input(0x1)
+hidparser:           End Collection(0x0)
+hidparser:           Report Id(0x3)
+hidparser:           Logical Minimum(0x0)
+hidparser:           Logical Maximum(0x1)
+hidparser:           Physical Minimum(0x0)
+hidparser:           Physical Maximum(0x1)
+hidparser:           Report Size(0x1)
+hidparser:           Report Count(0x3)
+hidparser:           Usage Page(0x1)
+hidparser:           Usage(0x3A)
+hidparser:           Collection(0x2)
+hidparser:                Report Id(0x3)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Report Count(0x3)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Usage(0x3A)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x4)
+hidparser:                     Report Count(0x4)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x4)
+hidparser:                Report Count(0x4)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x5)
+hidparser:                     Report Count(0x1)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x5)
+hidparser:                Report Count(0x1)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x6)
+hidparser:                     Report Count(0x1)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x6)
+hidparser:                Report Count(0x1)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x7)
+hidparser:                     Report Count(0x10)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x7)
+hidparser:                Report Count(0x10)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x8)
+hidparser:                     Report Count(0x10)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x8)
+hidparser:                Report Count(0x10)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0x9)
+hidparser:                     Report Count(0xC)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0x9)
+hidparser:                Report Count(0xC)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0xA)
+hidparser:                     Report Count(0x1)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0xA)
+hidparser:                Report Count(0x1)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0xB)
+hidparser:                     Report Count(0x1)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0xB)
+hidparser:                Report Count(0x1)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0xC)
+hidparser:                     Report Count(0x1)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:                Physical Minimum(0x0)
+hidparser:                Physical Maximum(0x1)
+hidparser:                Usage Page(0x1)
+hidparser:                Logical Minimum(0x80)
+hidparser:                Logical Maximum(0x7F)
+hidparser:                Report Size(0x8)
+hidparser:                Report Id(0xC)
+hidparser:                Report Count(0x1)
+hidparser:                Collection(0x2)
+hidparser:                     Physical Minimum(0x0)
+hidparser:                     Physical Maximum(0x1)
+hidparser:                     Usage Page(0x1)
+hidparser:                     Logical Minimum(0x80)
+hidparser:                     Logical Maximum(0x7F)
+hidparser:                     Report Size(0x8)
+hidparser:                     Report Id(0xD)
+hidparser:                     Report Count(0x2)
+hidparser:                     Usage(0x3A)
+hidparser:                     Feature(0x2)
+hidparser:                End Collection(0x0)
+hidparser:           End Collection(0x0)
+hidparser:      End Collection(0x0)
+
+The actual tree is
+
+
+unsigned char hid_report_desc[] = {
+	0x5, 0x1,              /* Usage Page (Generic Desktop)             */
+	0x9, 0x8,              /* Usage (0x8:Multi-axis controller)        */
+	0xa1, 0x1,             /* Collection (Application)                 */
+	0xa1, 0,               /*     Collection (Physical)                */
+	0x85, 0x1,             /*         Report ID (0x1)                  */
+	0x16, 0, 0x80,         /*         Logical Minimum (0x8000)         */
+	0x26, 0xff, 0x7f,      /*         Logical Maximum (0x7fff)         */
+	0x9, 0x30,             /*         Usage (0x30:X)                   */
+	0x9, 0x31,             /*         Usage (0x31:Y)                   */
+	0x9, 0x32,             /*         Usage (0x32:Z)                   */
+	0x75, 0x10,            /*         Report Size (0x10)               */
+	0x95, 0x3,             /*         Report Count (0x3)               */
+	0x81, 0x2,             /*         Input (Data, Variable, Absolute) */
+	0xc0,                  /*     End Collection                       */
+	0xa1, 0,               /*     Collection (Physical)                */
+	0x85, 0x2,             /*         Report ID (0x2)                  */
+	0x9, 0x33,             /*         Usage (0x33:Rx)                  */
+	0x9, 0x34,             /*         Usage (0x34:Ry)                  */
+	0x9, 0x35,             /*         Usage (0x35:Rz)                  */
+	0x75, 0x10,            /*         Report Size (0x10)               */
+	0x95, 0x3,             /*         Report Count (0x3)               */
+	0x81, 0x2,             /*         Input (Data, Variable, Absolute) */
+	0xc0,                  /*     End Collection                       */
+	0xa1, 0x2,             /*     Collection (Logical)                 */
+	0x85, 0x3,             /*         Report ID (0x3)                  */
+	0x5, 0x1,              /*         Usage Page (Generic Desktop)     */
+	0x9, 0x3a,             /*         Usage (0x3a: Counted Buffer)     */
+	0x75, 0x10,            /*         Report Size (0x10)               */
+	0x95, 0x1,             /*         Report Count (0x1)               */
+	0x81, 0x2,             /*         Input (Data, Variable, Absolute) */
+	0x5, 0x9,              /*         Usage Page (Button)              */
+	0x19, 0x1,             /*         Usage Minimum (0x1)              */
+	0x29, 0xd,             /*         Usage Maximum (0xd)              */
+	0x15, 0,               /*         Logical Minimum (0)              */
+	0x25, 0x1,             /*         Logical Maximum (0x1)            */
+	0x35, 0,               /*         Physical Minimum (0)             */
+	0x45, 0x1,             /*         Physical Maximum (0x1)           */
+	0x75, 0x1,             /*         Report Size (0x1)                */
+	0x95, 0xd,             /*         Report Count (0xd)               */
+	0x81, 0x2,             /*         Input (Data, Variable, Absolute) */
+	0x95, 0x3,             /*         Report Count (0x3)               */
+	0x81, 0x1,             /*         Input (Constant, Array, Absolute) */
+	0xc0,                  /*     End Collection                       */
+	0x5, 0x1,              /*     Usage Page (Generic Desktop)         */
+	0x9, 0x3a,             /*     Usage (0x3a: Counted Buffer)         */
+	0xa1, 0x2,             /*     Collection (Logical)                 */
+	0x15, 0x80,            /*         Logical Minimum (0x80)           */
+	0x25, 0x7f,            /*         Logical Maximum (0x7f)           */
+	0x75, 0x8,             /*         Report Size (0x8)                */
+	0x9, 0x3a,             /*         Usage (0x3a: Counted Buffer)     */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x4,             /*             Report ID (0x4)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x4,             /*             Report Count (0x4)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x5,             /*             Report ID (0x5)              */
+	0x9, 0x3a,             /*             Usage (0x3a:Counted Buffer)  */
+	0x95, 0x1,             /*             Report Count (0x1)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x6,             /*             Report ID (0x6)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x1,             /*             Report Count (0x1)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x7,             /*             Report ID (0x7)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x10,            /*             Report Count (0x10)          */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x8,             /*             Report ID (0x8)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x10,            /*             Report Count (0x10)          */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0x9,             /*             Report ID (0x9)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0xc,             /*             Report Count (0xc)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0xa,             /*             Report ID (0xa)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x1,             /*             Report Count (0x1)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0xb,             /*             Report ID (0xb)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x1,             /*             Report Count (0x1)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0xc,             /*             Report ID (0xc)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x1,             /*             Report Count (0x1)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xa1, 0x2,             /*         Collection (Logical)             */
+	0x85, 0xd,             /*             Report ID (0xd)              */
+	0x9, 0x3a,             /*             Usage (0x3a: Counted Buffer) */
+	0x95, 0x2,             /*             Report Count (0x2)           */
+	0xb1, 0x2,             /*             Feature (Data, Variable, Absolute) */
+	0xc0,                  /*         End Collection                   */
+	0xc0,                  /*     End Collection                       */
+	0xc0,                  /* End Collection                           */
+};
+
+______________________________________________________________________________

@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# For packagers:
+#
+# This ruleset is useful for "system" components-- ones which are expected
+# to appear primarily in the global zone, but which may have some small
+# pieces (man pages, header files) which may need to appear in all zones.
+#
+# The current rules specify that all payload-bearing actions (file,
+# dir, hardlink, link) should appear *only* in the global zone, with
+# the following exceptions:
+#
+# 	- man pages appear in all zones
+# 	- header files appear in all zones
+# 	- mdb(1) modules appear in all zones
+#
+# You may well have other actions which you wish to appear in all zones.
+# An example would be an administrative utility for a driver which has
+# been virtualized to work within zones.  For those actions you wish to
+# appear in all zones, add the following attribute to your action.
+#
+#         variant.opensolaris.zone=__NODEFAULT
+#
+# You DO NOT need to specify __NODEFAULT for man pages, headers, or
+# mdb modules, as those are covered by the automatic rules below.
+#
+# Note: When you specify variant.opensolaris.zone=__NODEFAULT, the
+# net effect is that *no* variant.opensolaris.zone attribute will
+# appear in the post-processed manifest.
+#
+
+#
+# For packaging nerds:
+#
+# We have a problem to solve here: To make an action appear in all zones,
+# it should have *no* variant.opensolaris.zone attribute.  So it's a bit
+# more complicated to use "default".
+#
+# Here's what we do: we use "default" to set all payload bearing actions
+# which have no variant.opensolaris.zone attribute to be
+# variant.opensolaris.zone=global.  For those actions which need to appear
+# in all zones, the packager must specify
+# variant.opensolaris.zone=__NODEFAULT.  Additionally we have some rules
+# which set __NODEFAULT for a few classes of well known things, like man
+# pages and headers.
+#
+# We then go through and clean up all of the __NODEFAULTed attributes by
+# simply deleting them.
+# 
+
+# Man pages should appear in all zones.
+<transform dir file link hardlink path=.*/man/.* -> default variant.opensolaris.zone __NODEFAULT>
+<transform dir path=.*/man$ -> default variant.opensolaris.zone __NODEFAULT>
+
+# Headers should appear in all zones.
+<transform dir file link hardlink path=.*/include/.* -> default variant.opensolaris.zone __NODEFAULT>
+<transform dir path=.*/include$ -> default variant.opensolaris.zone __NODEFAULT>
+
+# MDB modules should appear in all zones, as one might debug a crash dump
+# in a zone.
+<transform dir file link hardlink path=.*/mdb/.* -> default variant.opensolaris.zone __NODEFAULT>
+<transform dir path=.*/mdb$ -> default variant.opensolaris.zone __NODEFAULT>
+
+# Everything else is global zone only unless the user overrides
+# action-by-action with __NODEFAULT.
+<transform dir file link hardlink -> default variant.opensolaris.zone global>
+
+#
+# Buff out the __NODEFAULT attributes. 
+#
+<transform dir file link hardlink -> delete variant.opensolaris.zone __NODEFAULT>

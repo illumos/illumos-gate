@@ -1,0 +1,352 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	au_to_arg32;
+	au_to_arg64;
+	au_to_process_ex;
+	au_to_return32;
+	au_to_return64;
+	au_to_subject_ex;
+	getaudit_addr;
+	setaudit_addr;
+} SUNW_1.1;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.8;
+
+SYMBOL_VERSION SUNW_0.8 {
+    global:
+	au_to_newgroups;
+	getauclassent_r;
+	getauclassnam_r;
+	getauevent_r;
+	getauevnam_r;
+	getauevnum_r;
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	au_close;
+	audit;
+	auditon;
+	au_open;
+	au_preselect;
+	au_to_arg;
+	au_to_attr;
+	au_to_cmd;
+	au_to_data;
+	au_to_groups;
+	au_to_in_addr;
+	au_to_ipc;
+	au_to_iport;
+	au_to_me;
+	au_to_opaque;
+	au_to_path;
+	au_to_process;
+	au_to_return;
+	au_to_socket;
+	au_to_subject;
+	au_to_text;
+	au_user_mask;
+	au_write;
+	endauclass;
+	endauevent;
+	getauclassent;
+	getauclassnam;
+	getaudit;
+	getauditflagsbin;
+	getauditflagschar;
+	getauevent;
+	getauevnam;
+	getauevnonam;
+	getauevnum;
+	getauid;
+	getfauditflags;
+	setauclass;
+	setaudit;
+	setauevent;
+	setauid;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	adr_char;
+	adr_count;
+	adrf_char;
+	adrf_int32;
+	adrf_int64;
+	adrf_peek;
+	adrf_short;
+	adrf_start;
+	adrf_u_char;
+	adrf_u_int32;
+	adrf_u_int64;
+	adrf_u_short;
+	adr_int32;
+	adr_uid;
+	adr_int64;
+	adrm_char;
+	adrm_int32;
+	adrm_int64;
+	adrm_short;
+	adrm_start;
+	adrm_u_char;
+	adrm_u_int32;
+	adrm_u_int64;
+	adrm_u_short;
+	adrm_uid;
+	adr_short;
+	adr_ushort;
+	adr_start;
+	adt_alloc_event;
+	adt_audit_enabled;
+	adt_audit_state;
+	adt_dup_session;
+	adt_end_session;
+	adt_export_session_data;
+	adt_free_event;
+	adt_get_asid;
+	adt_get_auid;
+	adt_get_mask;
+	adt_get_session_id;
+	adt_get_termid;
+	adt_get_unique_id;
+	adt_load_hostname;
+	adt_load_table;
+	adt_load_termid;
+	adt_load_ttyname;
+	adt_put_event;
+	adt_set_asid;
+	adt_set_auid;
+	adt_set_from_ucred;
+	adt_set_mask;
+	adt_set_proc;
+	adt_set_termid;
+	adt_set_user;
+	adt_start_session;
+	audit_allocate_argv;
+	audit_allocate_device;
+	audit_allocate_list;
+	audit_allocate_record;
+	audit_at_create;
+	audit_at_delete;
+	audit_cron_bad_user;
+	audit_cron_create_anc_file;
+	audit_cron_delete_anc_file;
+	audit_cron_is_anc_name;
+	audit_cron_mode;
+	audit_cron_new_job;
+	audit_cron_session;
+	audit_cron_setinfo;
+	audit_crontab_delete;
+	audit_crontab_modify;
+	audit_crontab_not_allowed;
+	audit_crontab_process_not_audited;
+	audit_cron_user_acct_expired;
+	__auditd_debug_file_open;
+	auditdoor;
+	__audit_dowarn;
+	__audit_dowarn2;
+	audit_ftpd_bad_pw;
+	audit_ftpd_excluded;
+	audit_ftpd_failure;
+	audit_ftpd_logout;
+	audit_ftpd_no_anon;
+	audit_ftpd_success;
+	audit_ftpd_unknown;
+	audit_halt_fail;
+	audit_halt_setup;
+	audit_halt_success;
+	audit_kadmind_auth;
+	audit_kadmind_unauth;
+	audit_krb5kdc_as_req;
+	audit_krb5kdc_tgs_req;
+	audit_krb5kdc_tgs_req_2ndtktmm;
+	audit_krb5kdc_tgs_req_alt_tgt;
+	audit_mountd_mount;
+	audit_mountd_setup;
+	audit_mountd_umount;
+	audit_reboot_fail;
+	audit_reboot_setup;
+	audit_reboot_success;
+	audit_rexd_fail;
+	audit_rexd_setup;
+	audit_rexd_success;
+	audit_rexecd_fail;
+	audit_rexecd_setup;
+	audit_rexecd_success;
+	audit_rshd_fail;
+	audit_rshd_setup;
+	audit_rshd_success;
+	audit_settid;
+	audit_shutdown_fail;
+	audit_shutdown_setup;
+	audit_shutdown_success;
+	__audit_syslog;
+	aug_audit;
+	aug_get_machine;
+	aug_get_port;
+	aug_init;
+	aug_na_selected;
+	aug_save_afunc;
+	aug_save_asid;
+	aug_save_auid;
+	aug_save_egid;
+	aug_save_euid;
+	aug_save_event;
+	aug_save_gid;
+	aug_save_me;
+	aug_save_na;
+	aug_save_namask;
+	aug_save_path;
+	aug_save_pid;
+	aug_save_policy;
+	aug_save_sorf;
+	aug_save_text;
+	aug_save_tid;
+	aug_save_uid;
+	aug_selected;
+	au_to_exec_args;
+	au_to_exec_env;
+	au_to_exit;
+	au_to_fmri;
+	au_to_header;
+	au_to_header_ex;
+	au_to_in_addr_ex;
+	au_to_label;
+	au_to_mylabel;
+	au_to_privset;
+	au_to_seq;
+	au_to_trailer;
+	au_to_uauth;
+	au_to_upriv;
+	au_to_user;
+	au_to_xatom;
+	au_to_xcolormap;
+	au_to_xclient;
+	au_to_xcursor;
+	au_to_xfont;
+	au_to_xgc;
+	au_to_xpixmap;
+	au_to_xproperty;
+	au_to_xselect;
+	au_to_xwindow;
+	cacheauclass;
+	cacheauclassnam;
+	cacheauevent;
+	cannot_audit;
+	__chkflags;
+	da_add_list;
+	da_check_logindevperm;
+	da_is_on;
+	da_open_devdb;
+	da_print_device;
+	da_remove_list;
+	da_rm_list_entry;
+	da_update_defattrs;
+	da_update_device;
+	do_getflags_scf;
+	do_getnaflags_scf;
+	do_getpluginconfig_scf;
+	do_getpolicy_scf;
+	do_getqbufsz_scf;
+	do_getqctrl_scf;
+	do_getqdelay_scf;
+	do_getqhiwater_scf;
+	do_getqlowater_scf;
+	do_setflags_scf;
+	do_setnaflags_scf;
+	do_setpluginconfig_scf;
+	do_setpolicy_scf;
+	do_setqbufsz_scf;
+	do_setqctrl_scf;
+	do_setqdelay_scf;
+	do_setqhiwater_scf;
+	do_setqlowater_scf;
+	enddadefent;
+	enddaent;
+	enddmapent;
+	freedadefent;
+	freedaent;
+	freedmapent;
+	free_static_att_kva;
+	getdadefent;
+	getdadeftype;
+	getdadmline;
+	getdaent;
+	getdanam;
+	getdatype;
+	getdevicerange;
+	getdmapdev;
+	getdmapdfield;
+	getdmapent;
+	getdmapfield;
+	getdmapnam;
+	getdmaptype;
+	get_policy;
+	__logpost;
+	plugin_avail_scf;
+	plugin_kva_ll_free;
+	prt_error_va;
+	setdadefent;
+	setdaent;
+	setdafile;
+	setdmapent;
+	setdmapfile;
+    local:
+	# These functions are aliased to "int" versions. Let those
+	# go into .SUNW_dynsymsort, and keep these out.
+	adrm_long		{ FLAGS = NODYNSORT };
+	adrm_u_long		{ FLAGS = NODYNSORT };
+	adrf_long		{ FLAGS = NODYNSORT };
+	adrf_u_long		{ FLAGS = NODYNSORT };
+	adrm_putlong		{ FLAGS = NODYNSORT };
+
+	# Reduce all remaining global symbols to local scope
+	*;
+};

@@ -1,0 +1,465 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#	This Makefile defines the build rules for the directory uts/i86pc
+#	and its children. These are the source files which are i86pc
+#	"implementation architecture" dependent.
+#
+#	The following two-level ordering must be maintained in this file.
+#	  Lines are sorted first in order of decreasing specificity based on
+#	  the first directory component.  That is, i86pc rules come before
+#	  intel rules come before common rules.
+#
+#	  Lines whose initial directory components are equal are sorted
+#	  alphabetically by the remaining components.
+
+#
+#	Section 1a: C object build rules
+#
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/conf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/authenticamd/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:                $(UTSBASE)/i86pc/io/acpi_drv/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/fipe/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/acpidev/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+SBD_IOCTL	= $(UTSBASE)/i86pc/sys/sbd_ioctl.h
+DRMACH_IO	= $(UTSBASE)/i86pc/io/acpi/drmach_acpi
+DRMACH_GENERR	= $(DRMACH_IO)/sbdgenerr
+DR_IO		= $(UTSBASE)/i86pc/io/dr
+DR_GENERR	= $(DR_IO)/sbdgenerr
+
+$(DRMACH_GENERR):	$(DR_IO)/sbdgenerr.pl
+	$(RM) $@
+	$(CAT) $(DR_IO)/sbdgenerr.pl > $@
+	$(CHMOD) +x $@
+
+$(DRMACH_IO)/drmach_err.c:	$(DRMACH_GENERR) $(SBD_IOCTL)
+	$(RM) $@
+	$(DRMACH_GENERR) EX86 < $(SBD_IOCTL) > $(DRMACH_IO)/drmach_err.c
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/drmach_acpi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/amd_iommu/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(DR_GENERR):			$(DR_IO)/sbdgenerr.pl
+	$(RM) $@
+	$(CAT) $(DR_IO)/sbdgenerr.pl > $@
+	$(CHMOD) +x $@
+
+$(DR_IO)/dr_err.c:		$(DR_GENERR) $(SBD_IOCTL)
+	$(RM) $@
+	$(DR_GENERR) ESBD < $(SBD_IOCTL) > $(DR_IO)/dr_err.c
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/dr/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ioat/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pci/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pciex/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/pciex/hotplug/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pcplusmp/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/apix/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ppm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ppm/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/tzmon/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/ml/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/os/cpupm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/vm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pciex/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/dis/i386/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xsvc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+#
+# dboot stuff is always 32 bit, linked to run with phys_addr == virt_addr
+#
+DBOOT_OBJS_DIR	= dboot/$(OBJS_DIR)
+DBOOT_MACH_32	= -D_BOOT_TARGET_i386
+DBOOT_MACH_64	= -D_BOOT_TARGET_amd64
+DBOOT_DEFS	= -D_BOOT $(DBOOT_MACH_$(CLASS))
+DBOOT_DEFS	+= -D_MACHDEP -D_KMEMUSER -U_KERNEL -D_I32LPx
+
+DBOOT_CC_INCL	= -I$(SRC)/common $(INCLUDE_PATH)
+DBOOT_AS_INCL	= $(AS_INC_PATH)
+
+DBOOT_AS	= $(ONBLD_TOOLS)/bin/$(MACH)/aw
+
+DBOOT_LINTS_DIR	= $(DBOOT_OBJS_DIR)
+DBOOT_LINTFLAGS_i86pc	= $(LINTFLAGS_i386_32) $(LINTTAGS_i386_32)
+
+DBOOT_LINTFLAGS = $(DBOOT_LINTFLAGS_$(PLATFORM)) $(LINTTAGS) $(C99LMODE) \
+	$(CPPFLAGS) $(DBOOT_DEFS)
+DBOOT_LOCAL_LINTFLAGS   = -c -dirout=$(DBOOT_LINTS_DIR) -I$(SRC)/common \
+	$(DBOOT_LINTFLAGS) $(DBOOT_LINTTAGS)
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+#
+# Stuff to build bios_call.o for the kernel.
+#
+MAPFILE_BIOS	= $(UTSBASE)/i86pc/conf/Mapfile.bios
+$(OBJS_DIR)/bios_call.o:    $(UTSBASE)/i86pc/ml/bios_call_src.s
+	$(COMPILE.s) -o $(OBJS_DIR)/bios_call_src.o \
+		$(UTSBASE)/i86pc/ml/bios_call_src.s
+	$(LD) -dn -M $(MAPFILE_BIOS)  \
+		-o $(OBJS_DIR)/bios_call_src $(OBJS_DIR)/bios_call_src.o
+	@echo "  .data"				> $(OBJS_DIR)/bios_call.s
+	@echo "  .globl bios_image"		>> $(OBJS_DIR)/bios_call.s
+	@echo "bios_image:"			>> $(OBJS_DIR)/bios_call.s
+	$(ELFEXTRACT) $(OBJS_DIR)/bios_call_src	>> $(OBJS_DIR)/bios_call.s
+	@echo "  .align 4"			>> $(OBJS_DIR)/bios_call.s
+	@echo "  .globl bios_size"		>> $(OBJS_DIR)/bios_call.s
+	@echo "bios_size:"			>> $(OBJS_DIR)/bios_call.s
+	@echo "  .long . - bios_image"		>> $(OBJS_DIR)/bios_call.s
+	$(COMPILE.s) -o $@ $(OBJS_DIR)/bios_call.s
+
+#
+# Stuff to build fb_swtch.o for the kernel.
+#
+MAPFILE_FBSWTCH	= $(UTSBASE)/i86pc/conf/Mapfile.fb_swtch
+$(OBJS_DIR)/fb_swtch.o:    $(UTSBASE)/i86pc/ml/fb_swtch_src.s
+	$(COMPILE.s) -o $(OBJS_DIR)/fb_swtch_src.o \
+		$(UTSBASE)/i86pc/ml/fb_swtch_src.s
+	$(LD) -dn -M $(MAPFILE_FBSWTCH)  \
+		-o $(OBJS_DIR)/fb_swtch_src $(OBJS_DIR)/fb_swtch_src.o
+	@echo "  .data"				> $(OBJS_DIR)/fb_swtch.s
+	@echo "  .globl fb_swtch_image"		>> $(OBJS_DIR)/fb_swtch.s
+	@echo "fb_swtch_image:"			>> $(OBJS_DIR)/fb_swtch.s
+	$(ELFEXTRACT) $(OBJS_DIR)/fb_swtch_src	>> $(OBJS_DIR)/fb_swtch.s
+	@echo "  .align 4"			>> $(OBJS_DIR)/fb_swtch.s
+	@echo "  .globl fb_swtch_size"		>> $(OBJS_DIR)/fb_swtch.s
+	@echo "fb_swtch_size:"			>> $(OBJS_DIR)/fb_swtch.s
+	@echo "  .long . - fb_swtch_image"	>> $(OBJS_DIR)/fb_swtch.s
+	$(COMPILE.s) -o $@ $(OBJS_DIR)/fb_swtch.s
+
+# ridiculous contortions ---
+ATOMIC_SUBDIR_32	= i386
+ATOMIC_SUBDIR_64	= amd64
+ATOMIC_SUBDIR		= $(ATOMIC_SUBDIR_$(CLASS))
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/atomic/$(ATOMIC_SUBDIR)/%.s
+	$(COMPILE.s) -o $@ $<
+
+#
+# dtrace stubs
+#
+
+$(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
+	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
+	    $(UNIQ) | $(NAWK) '{ \
+	    printf("\t.globl %s\n\t.type %s,@function\n%s:\n", \
+	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
+
+$(DTRACESTUBS):	$(DTRACESTUBS_O)
+	$(BUILD.SO) $(DTRACESTUBS_O)
+
+#
+#	Section 1b: Lint `object' build rules
+#
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/conf/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/authenticamd/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/acpi_drv/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/fipe/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpidev/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/drmach_acpi/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/amd_iommu/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/dr/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pciex/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/pciex/hotplug/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pcplusmp/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/apix/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/apix/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ppm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ppm/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/tzmon/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/os/cpupm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/boot/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/vm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pciex/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/dis/i386/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xsvc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+#
+# bios call has a funky name change while building
+#
+$(LINTS_DIR)/bios_call.ln:	$(UTSBASE)/i86pc/ml/bios_call_src.s
+	@($(LHEAD) $(LINT.s) $(UTSBASE)/i86pc/ml/bios_call_src.s  $(LTAIL))
+	@mv $(LINTS_DIR)/bios_call_src.ln $(LINTS_DIR)/bios_call.ln
+
+#
+# So does fb_swtch
+#
+$(LINTS_DIR)/fb_swtch.ln:	$(UTSBASE)/i86pc/ml/fb_swtch_src.s
+	@($(LHEAD) $(LINT.s) $(UTSBASE)/i86pc/ml/fb_swtch_src.s  $(LTAIL))
+	@mv $(LINTS_DIR)/fb_swtch_src.ln $(LINTS_DIR)/fb_swtch.ln
+
+#
+# dboot always compiles in 32-bit mode, so force lint to be 32-bit mode too.
+#
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/boot/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/i386/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))

@@ -1,0 +1,474 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved. 
+#
+
+. /lib/svc/share/smf_include.sh
+
+ROOT_PATH=""
+if [ $# -gt 1 ]; then
+	if [ $# -ne 3 -o "$2" != "-R" ]; then
+		echo "$0: invalid syntax"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+	if [ "$3" != "/" ]; then
+		ROOT_PATH=$3
+	fi
+fi
+if [ -n "$ROOT_PATH" -a "$1" != "start" ]; then
+	echo "$0: invalid syntax: -R allowed for start method only"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+if [ -n "$ROOT_PATH" -a ! -d "$ROOT_PATH" ]; then
+	echo "$0: invalid -R rootpath dir specified"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if smf_is_nonglobalzone; then
+	echo "$0: not supported in a local zone"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+rewrite_logindev()
+{
+	from="$1"
+	to="$2"
+	# Comment out audio, usb, removable-media, and hotpluggable device
+	# entries in /etc/logindevperm.
+	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
+	if [ ! -f $LOGINDEVPERM ]; then
+		return
+	fi
+	for line in \
+		"/dev/sound/" \
+		"/dev/removable-media/" \
+		"/dev/hotpluggable/" \
+		"/dev/usb/\[0-9a-f\]" \
+			; do
+		sed -e "s!^$from\([^# 	]\{1,\}[ 	}\{1,\}[0-9]\{1,\}[ 	]\{1,\}\)$line!$to\1$line!" \
+		    $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+	done
+	rm -f /tmp/tmp.$$
+}
+
+do_logindev()
+{
+	rewrite_logindev "" "#"
+}
+
+do_otherservices()
+{
+	# Setup dependent services
+	cat >> $ROOT_PATH/var/svc/profile/upgrade <<\__ENABLE_OTHERS
+		/usr/sbin/svcadm enable -s svc:/network/tnd:default
+		/usr/sbin/svcadm enable -s svc:/system/tsol-zones:default
+		/usr/sbin/svcadm enable svc:/network/rpc/rstat:default
+__ENABLE_OTHERS
+
+}
+
+do_audit_devalloc()
+{
+	# Ensure auditing and device allocation are enabled by
+	# default with Trusted Extensions.
+	if [ "$ROOT_PATH" = "/" -o "$ROOT_PATH" = "" ]; then
+		/usr/sbin/svcadm enable -s svc:/system/device/allocate:default
+		echo "Starting auditd ..."
+		/usr/sbin/audit -s
+	else
+		cat >> $ROOT_PATH/var/svc/profile/upgrade <<\_ENABLE_AUDITD
+			/usr/sbin/audit -s
+			/usr/sbin/svcadm enable -s svc:/system/device/allocate:default
+_ENABLE_AUDITD
+	fi
+}
+
+do_nscd()
+{
+# For Trusted Extensions, make nscd service transient in local zones.
+cat >> $ROOT_PATH/var/svc/profile/upgrade <<\_DEL_LOCAL_NSCD
+	if [ `/sbin/zonename` != "global" ]; then
+		nscd="svc:/system/name-service-cache"
+		duration=""
+		if /bin/svcprop -q -c -p startd/duration $nscd ; then
+			duration=`/bin/svcprop -c -p startd/duration $nscd`
+		fi
+		if [ "$duration" != "transient" ]; then
+			/usr/sbin/svccfg -s $nscd addpg startd framework
+			/usr/sbin/svccfg -s $nscd setprop \
+			    startd/duration = astring: transient
+			/usr/sbin/svccfg -s $nscd setprop stop/exec = :true
+			/usr/sbin/svcadm refresh $nscd
+		fi
+	fi
+_DEL_LOCAL_NSCD
+}
+
+do_bootupd()
+{
+	if [ -f $ROOT_PATH/platform/`/sbin/uname -m`/boot_archive ]; then
+		if [ -z "$ROOT_PATH" -o "$ROOT_PATH" = "/" ]; then
+			/sbin/bootadm update-archive
+		else
+			/sbin/bootadm update-archive -R $ROOT_PATH
+		fi
+	fi
+}
+
+setup_tx_changes(){
+#
+# No comments or blanks lines allowed in entries below
+#
+cat > ${TX_ENTRIES} << EOF
+dtlogin		account		requisite	pam_roles.so.1
+dtlogin		account		required	pam_unix_account.so.1
+dtsession	account		requisite	pam_roles.so.1
+dtsession	account		required	pam_unix_account.so.1
+gdm		account		requisite	pam_roles.so.1
+gdm		account		required	pam_unix_account.so.1
+xscreensaver	account		requisite	pam_roles.so.1
+xscreensaver	account		required	pam_unix_account.so.1
+passwd		account		requisite	pam_roles.so.1
+passwd		account		required	pam_unix_account.so.1
+dtpasswd	account		requisite	pam_roles.so.1
+dtpasswd	account		required	pam_unix_account.so.1
+tsoljds-tstripe	account		requisite	pam_roles.so.1
+tsoljds-tstripe	account		required	pam_unix_account.so.1
+other		account		required	pam_tsol_account.so.1
+EOF
+}
+
+do_addpam()
+{
+	PAM_TMP=/tmp/pam_conf.$$
+	TX_ENTRIES=$PAM_TMP/sct.$$
+	PAM_DEST=$ROOT_PATH/etc/pam.conf
+
+	mkdir $PAM_TMP  || exit $SMF_EXIT_ERR_FATAL
+	setup_tx_changes
+
+	# verify that pam.conf file exists...
+	if [ ! -f ${PAM_DEST} ]; then
+		echo "$0: ${PAM_DEST} not found; aborting"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	#
+	# Update pam.conf to append Trusted Extensions entries if not
+	# already present.
+	#
+	rm -f /tmp/pamconf.$$
+	while read e1 e2 e3 e4 e5
+	do
+		# If this is the 'other' entry, add it unless it already
+		# exists.
+		if [ $e1 = "other" ]; then
+			grep \
+"^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4" \
+			    $PAM_DEST >/dev/null 2>&1
+			if [ $? = 1 ] ; then
+				# Doesn't exist, enter into pam.conf
+				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
+				    >> /tmp/pamconf.$$
+			fi
+		else
+			# Add other entries unless they already have a
+			# stack of their own.
+			grep "^[# 	]*$e1[ 	][ 	]*$e2[ 	]" \
+			    $PAM_DEST >/dev/null 2>&1
+			if [ $? = 1 ] ; then
+				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
+				    >> /tmp/pamconf.$$ 
+			fi
+		fi
+	done < ${TX_ENTRIES}
+	# Append TX lines if any were not present already.
+	if [ -f /tmp/pamconf.$$ ] ; then
+		echo "# Entries for Trusted Extensions" >> $PAM_DEST
+		cat /tmp/pamconf.$$ >> $PAM_DEST
+		echo "$0: updating $PAM_DEST entries for Trusted Extensions;"
+		echo "$0: please examine/update any new entries"
+    		rm -f /tmp/pamconf.$$
+    	fi
+
+	rm -rf $PAM_TMP
+}
+
+do_pamremove()
+{
+	PAM_TMP=/tmp/pam_conf.$$
+	TX_ENTRIES=$PAM_TMP/sct.$$
+	PAM_DEST=$ROOT_PATH/etc/pam.conf
+	TMPFILE=$PAM_TMP/pam.conf
+
+	mkdir $PAM_TMP  || exit $SMF_EXIT_ERR_FATAL
+
+	# verify that pam.conf file exists...
+	if [ ! -f ${PAM_DEST} ]; then
+		echo "$0: ${PAM_DEST} not found; aborting"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+
+	grep '^[a-z].*pam_tsol_account' $PAM_DEST > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "$0: pam_tsol_account module not present," 
+		echo "$0: No changes were made to $PAM_DEST."
+		return
+	fi
+
+	grep -v pam_tsol_account $PAM_DEST > $TMPFILE
+	echo "$0: $PAM_DEST "tsol" entries removed"
+	cp $TMPFILE $PAM_DEST
+
+	rm -rf $PAM_TMP
+}
+
+do_commonstart()
+{
+	echo "$0: Updating $ROOT_PATH/etc/system..."
+	if [ ! -f ${ROOT_PATH}/etc/system ]; then
+		touch ${ROOT_PATH}/etc/system
+	fi
+
+	# Set sys_labeling in etc/system
+	grep -v "sys_labeling=" ${ROOT_PATH}/etc/system > /tmp/etc.system.$$
+	echo "set sys_labeling=1" >> /tmp/etc.system.$$
+	mv /tmp/etc.system.$$ ${ROOT_PATH}/etc/system
+	grep "set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+    		echo "$0: ERROR: cannot set sys_labeling in $ROOT_PATH/etc/system"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	# Setup dependent services
+	do_otherservices
+
+	do_logindev
+	do_audit_devalloc
+	do_nscd
+	do_addpam
+
+	do_bootupd
+}
+
+do_servicetag_register()
+{
+	ROOTDIR=$1
+	SOL_ARCH=`/sbin/uname -p`
+	SOL_VERS=`/sbin/uname -r`
+	TX_PROD_URN="urn:uuid:fc720df3-410f-11dc-9b8e-080020a9ed93"
+
+	if [ ! -x /usr/bin/stclient ]; then
+		return
+	fi
+
+	# if already registered then do nothing more here
+	inst=`/usr/bin/svcprop -p labeld/svctag_inst $SMF_FMRI 2>/dev/null`
+	if [ -n "$inst" ]; then
+		# this instance id was saved in a SMF property
+		/usr/bin/stclient -g -i $inst -r $ROOTDIR >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			# matching service tag found, so do nothing
+			return
+		else
+			# no match for instance id saved in SMF property
+			/usr/sbin/svccfg -s $SMF_FMRI delprop \
+			    labeld/svctag_inst
+			/usr/sbin/svcadm refresh $SMF_FMRI
+		fi
+	fi
+
+
+	# fall through: no service tag, or does not match saved instance id
+
+	# determine the urn of the parent (Solaris)
+	SOL_PROD_URN=""
+	case $SOL_VERS in
+	5.11)
+		SOL_PROD_URN="-F urn:uuid:6df19e63-7ef5-11db-a4bd-080020a9ed93"
+		;;
+	5.10)
+		SOL_PROD_URN="-F urn:uuid:5005588c-36f3-11d6-9cec-fc96f718e113"
+		;;
+	esac
+
+	# add the service tag
+	RC=`/usr/bin/stclient -a -p "Solaris Trusted Extensions"	\
+	    -e $SOL_VERS -t $TX_PROD_URN -P Solaris $SOL_PROD_URN	\
+	    -m Sun -A $SOL_ARCH -z global -S $0 -r $ROOTDIR`
+	if [ $? = 0 ]; then
+		# save instance id in SMF property
+		inst=`echo "$RC" | grep -i urn|awk -F=  '{print $2}'`
+		/usr/sbin/svccfg -s $SMF_FMRI setprop \
+		    labeld/svctag_inst = astring: "$inst"
+		/usr/sbin/svcadm refresh $SMF_FMRI
+	fi
+}
+
+do_servicetag_delete()
+{
+	if [ ! -x /usr/bin/stclient ]; then
+		return
+	fi
+
+	inst=`/usr/bin/svcprop -p labeld/svctag_inst $SMF_FMRI 2>/dev/null`
+
+	if [ -n "$inst" ]; then
+		# delete service tag
+		/usr/bin/stclient -d -i $inst
+		# delete saved instance id
+		/usr/sbin/svccfg -s $SMF_FMRI delprop labeld/svctag_inst
+		/usr/sbin/svcadm refresh $SMF_FMRI
+	fi
+}
+
+
+daemon_start()
+{
+	# If a labeld door exists, check for a labeld process and exit
+	# if the daemon is already running.
+	if [ -r /var/tsol/doors/labeld ]; then
+		if /usr/bin/pgrep -x -u 0 -P 1 labeld >/dev/null 2>&1; then
+			echo "$0: labeld is already running"
+			exit $SMF_EXIT_ERR_FATAL
+		fi
+	fi
+	/usr/bin/rm -f /var/tsol/doors/labeld
+	/usr/lib/labeld
+}
+
+PATH=/usr/sbin:/usr/bin; export PATH
+
+case "$1" in
+'start')
+	if [ -z "$ROOT_PATH" -o "$ROOT_PATH" = "/" ]; then
+		# native
+
+		if [ -z "$SMF_FMRI" ]; then
+			echo "$0: this script can only be invoked by smf(5)"
+			exit $SMF_EXIT_ERR_NOSMF
+		fi
+
+		tx_enabled=`/usr/bin/svcprop -c -p general/enabled $SMF_FMRI`
+		if [ "$tx_enabled" = "false" ]; then
+			# A sign of trying temporary enablement...no-no
+			echo "$0: Temporarily enabling Trusted Extensions is not allowed."
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		if (smf_is_system_labeled); then
+			do_servicetag_register /
+			daemon_start
+			exit $SMF_EXIT_OK
+		fi
+
+		# Make changes to enable Trusted Extensions
+		grep "^set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "$0: already enabled. Exiting."
+			exit $SMF_EXIT_OK
+		fi
+
+		if [ "`/usr/sbin/zoneadm list -c`" != "global" ]; then
+			echo "$0: Must remove zones before enabling Trusted Extensions."
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		do_commonstart
+
+		do_servicetag_register /
+
+		# start daemon proccess so our service doesn't go into
+		# maintenance state
+		daemon_start
+
+		echo "$0: Started.  Must reboot and configure Trusted Extensions."
+	else
+		# Support jumpstart etc
+
+		# Make changes to enable Trusted Extensions
+		grep "^set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "$0: already enabled. Exiting."
+			exit $SMF_EXIT_OK
+		fi
+
+		# Setup dependent services
+		cat >> $ROOT_PATH/var/svc/profile/upgrade <<\__TRUSTED_ENABLE
+			/usr/sbin/svcadm enable -s svc:/system/labeld:default
+__TRUSTED_ENABLE
+
+		do_commonstart
+		do_servicetag_register $ROOT_PATH
+		echo "$0: Started.  Must configure Trusted Extensions before booting."
+	fi
+	;;
+
+'stop')
+	tx_enabled=`/usr/bin/svcprop -c -p general/enabled $SMF_FMRI`
+	if [ "$tx_enabled" = "true" ]; then
+		/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld
+		exit $SMF_EXIT_OK
+	fi
+
+	if [ "`/usr/sbin/zoneadm list -c`" != "global" ]; then
+		echo "$0: Must remove zones before disabling Trusted Extensions."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	# Stop Trusted services.
+	/usr/sbin/svcadm disable svc:/system/tsol-zones:default 2>/dev/null
+	/usr/sbin/svcadm disable svc:/network/tnd:default 2>/dev/null
+
+	# Uncomment audio, usb, removable-media, and hotpluggable device
+	# entries in /etc/logindevperm.
+	rewrite_logindev "#" ""
+
+	# Remove sys_labeling from /etc/system
+	grep -v "sys_labeling" ${ROOT_PATH}/etc/system > /tmp/etc.system.$$
+	mv /tmp/etc.system.$$ ${ROOT_PATH}/etc/system
+	grep "sys_labeling" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+    		echo "$0: ERROR: cannot remove sys_labeling in $ROOT_PATH/etc/system"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	do_pamremove
+	do_servicetag_delete
+
+	do_bootupd
+
+	/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld
+	echo "$0: Stopped.  Will take effect at next boot."
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+exit $SMF_EXIT_OK
+
+

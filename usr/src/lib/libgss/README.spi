@@ -1,0 +1,112 @@
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+
+	The Service Provider Interface for libgss and its Mechanisms
+	------------------------------------------------------------
+
+1.  The libgss SPI upto 11/2004
+
+    Prior to PSARC 2004/810 the libgss SPI consisted of a function
+    provided by each mechanism whose return value is a pointer to a
+    structure full of references to the mechanism's entry points
+    (hereinafter: methods).
+
+    This structure does not include any hooks for versioning, which
+    means that additions of any mechanism methods at micro/patch
+    releases require patching libgss.so.1 and all the GSS mechanisms
+    shipped with Solaris (Kerberos V, DH, SPNEGO).
+
+2.  The libgss SPI after PSARC 2004/810
+
+    In order to avoid changing the gss_config struct and patching all
+    three mechanisms (four, if the dummy mech counts) and libgss
+    together and in anticipation of a cleaner SPI in the future (see
+    next section) the SPI after PSARC 2004/810 will be as before but
+    supplemented as follows:
+
+     - any new SPI mechanism methods will NOT be placed in gss_config,
+       instead there is a new gss_config_ext structure, which is to be
+       used _only_ by libgss (to avoid struct versioning and/or patch
+       issues), which should be extended to have a pointer to the new
+       method;
+
+     - there is a new libgss function, __gss_get_mechanism_ext(), which
+       is used to get at the gss_config_ext for a mechanism;
+
+     - __gss_get_mechanism_ext() uses dlsym() to build the
+       gss_config_ext struct for the mech by individually loading each
+       and every mechanism method that isn't part of the old gss_config
+       struct -- this happens only once per-method, of course; the
+       result is cached.
+
+       The symbol names that are dlsym()ed are of the form gssspi_* and
+       correspond to gss_*; e.g., gssspi_acquire_cred_with_password().
+
+       New methods also have a corresponding typedef named
+       <gss_func>_sfct -- the 's' in 'sfct' is for "SPI" and the 'fct'
+       is for "function."  This is used to keep cast expressions short.
+
+3.  The Future libgss SPI
+
+    Once the Solaris krb5 source is resync'ed with MIT krb5 1.4 there
+    will be no further need for the 'void *context' argument to all the
+    libgss mechanisms' methods.
+
+    At that point it will be possible to remove this 'void *context'
+    argument from all the libgss SPI function prototypes, the main
+    result of which will be that the mechanisms' methods will then have
+    the same function signature as the corresponding GSS-API functions.
+
+    We can then rename all mechanisms' methods from <mech>_<gss-func> to
+    <gss-func>.  The corresponding typedefs will be renamed to
+    <gss-func>_fct.
+
+    The SPI, then, will be almost exactly the same as the API.
+
+    There will be some minor differences, primarily that some API
+    functions won't have a corresponding SPI method, such as
+    gss_release_buffer(3GSS), for example.
+
+    Some time later we may open the SPI to third party implementors;
+    this could be particularly useful as a way to get access to 3rd
+    party implementations of SPKM and LIPKEY (assuming any ever exist --
+    SPKM's is a very problematic specification).
+
+    Third party mechanisms should just export all the symbols for the
+    GSS-API functions, like MIT krb5 does, but functions which libgss
+    won't call (e.g., gss_release_buffer(3GSS)) should either not be
+    implemented or should be weak symbols.
+
+    Solaris native mechanisms may still provide the mechanism method
+    registration function as usual for optimization purposes -- to
+    reduce the number of calls to dlsym().
+
+    Mechanisms that do not provide the old method registration function
+    will be loaded as follows:
+
+     - libgss will look for and find the mechanism's
+       GSS_Indicate_mechs() method and will call it to discover the
+       mechanism provider's mechanism OIDs.
+
+     - libgss will dlsym() each mechanism provider SPI method.

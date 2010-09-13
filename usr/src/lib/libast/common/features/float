@@ -1,0 +1,1191 @@
+set	prototyped
+set	nooptimize
+set	stdio FEATURE/isoc99
+hdr	float,limits,math,values
+lib	fpclassify,frexp,frexpl,ldexp,ldexpl,finite,finitel,isinf,isinfl,isnan,isnanl,signbit,copysign,copysignl FEATURE/isoc99 math.h -lm
+
+tst	ast_no_um2fm note{ no unsigned intmax => floatmax cast }end nolink{
+	#include "FEATURE/common"
+	int
+	main()
+	{
+		_ast_fltmax_t		f = 0;
+		unsigned _ast_intmax_t	i = 0;
+		f = i;
+		i = f;
+		return f == i;
+	}
+}end
+
+tst	ast_mpy_overflow_fpe note{ fpe on mpy overflow }end noexecute{
+	int
+	main()
+	{
+		float	f;
+		float	p;
+		int	i;
+
+		i = 0;
+		p = f = 1.0;
+		do
+		{
+			p = f;
+			f *= 2.0;
+		} while (f != p && ++i < 1024);
+		return 0;
+	}
+}end
+
+tst	ast_div_underflow_fpe note{ fpe on div underflow }end noexecute{
+	int
+	main()
+	{
+		float	f;
+		float	p;
+		int	i;
+
+		i = 0;
+		p = f = 1.0;
+		do
+		{
+			p = f;
+			f /= 2.0;
+		} while (f != p && ++i < 1024);
+		return 0;
+	}
+}end
+
+macro{
+	#if _hdr_float
+	#include <float.h>
+	#endif
+	#if _hdr_limits
+	#include <limits.h>
+	#endif
+	#if _hdr_math
+	#include <math.h>
+	#endif
+	#if _hdr_values
+	#include <values.h>
+	#endif
+
+	#if !defined(FLT_MIN_EXP) && defined(FMINEXP)
+	#define FLT_MIN_EXP	FMINEXP
+	#endif
+	#if !defined(FLT_MIN) && defined(MINFLOAT)
+	#define FLT_MIN		MINFLOAT
+	#endif
+	#if !defined(FLT_MAX_EXP) && defined(FMAXEXP)
+	#define FLT_MAX_EXP	FMAXEXP
+	#endif
+	#if !defined(FLT_MAX) && defined(MAXFLOAT)
+	#define FLT_MAX		MAXFLOAT
+	#endif
+
+	#if !defined(DBL_MIN_EXP) && defined(DMINEXP)
+	#define DBL_MIN_EXP	DMINEXP
+	#endif
+	#if !defined(DBL_MIN) && defined(MINDOUBLE)
+	#define DBL_MIN		MINDOUBLE
+	#endif
+	#if !defined(DBL_MAX_EXP) && defined(DMAXEXP)
+	#define DBL_MAX_EXP	DMAXEXP
+	#endif
+	#if !defined(DBL_MAX) && defined(MAXDOUBLE)
+	#define DBL_MAX		MAXDOUBLE
+	#endif
+
+	<<"#include <ast_common.h>">>
+	#if _hdr_float
+	<<"#include <float.h>">>
+	#endif
+	#if _hdr_math
+	<<"#include <math.h>">>
+	#endif
+	#ifdef FLT_DIG
+	<<"#ifndef FLT_DIG">>
+	<<"#define FLT_DIG">>		FLT_DIG
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MAX
+	<<"#ifndef FLT_MAX">>
+	<<"#define FLT_MAX">>		FLT_MAX
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MAX_10_EXP
+	<<"#ifndef FLT_MAX_10_EXP">>
+	<<"#define FLT_MAX_10_EXP">>	FLT_MAX_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MAX_EXP
+	<<"#ifndef FLT_MAX_EXP">>
+	<<"#define FLT_MAX_EXP">>	FLT_MAX_EXP
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MIN
+	<<"#ifndef FLT_MIN">>
+	<<"#define FLT_MIN">>		FLT_MIN
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MIN_10_EXP
+	<<"#ifndef FLT_MIN_10_EXP">>
+	<<"#define FLT_MIN_10_EXP">>	FLT_MIN_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef FLT_MIN_EXP
+	<<"#ifndef FLT_MIN_EXP">>
+	<<"#define FLT_MIN_EXP">>	FLT_MIN_EXP
+	<<"#endif">>
+	#endif
+
+	#ifdef DBL_DIG
+	<<"#ifndef DBL_DIG">>
+	<<"#define DBL_DIG">>		DBL_DIG
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MAX
+	<<"#ifndef DBL_MAX">>
+	<<"#define DBL_MAX">>		DBL_MAX
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MAX_10_EXP
+	<<"#ifndef DBL_MAX_10_EXP">>
+	<<"#define DBL_MAX_10_EXP">>	DBL_MAX_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MAX_EXP
+	<<"#ifndef DBL_MAX_EXP">>
+	<<"#define DBL_MAX_EXP">>	DBL_MAX_EXP
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MIN
+	<<"#ifndef DBL_MIN">>
+	<<"#define DBL_MIN">>		DBL_MIN
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MIN_10_EXP
+	<<"#ifndef DBL_MIN_10_EXP">>
+	<<"#define DBL_MIN_10_EXP">>	DBL_MIN_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef DBL_MIN_EXP
+	<<"#ifndef DBL_MIN_EXP">>
+	<<"#define DBL_MIN_EXP">>	DBL_MIN_EXP
+	<<"#endif">>
+	#endif
+
+	#ifdef LDBL_DIG
+	<<"#ifndef LDBL_DIG">>
+	<<"#define LDBL_DIG">>		LDBL_DIG
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MAX
+	<<"#ifndef LDBL_MAX">>
+	<<"#define LDBL_MAX">>		LDBL_MAX
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MAX_10_EXP
+	<<"#ifndef LDBL_MAX_10_EXP">>
+	<<"#define LDBL_MAX_10_EXP">>	LDBL_MAX_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MAX_EXP
+	<<"#ifndef LDBL_MAX_EXP">>
+	<<"#define LDBL_MAX_EXP">>	LDBL_MAX_EXP
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MIN
+	<<"#ifndef LDBL_MIN">>
+	<<"#define LDBL_MIN">>		LDBL_MIN
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MIN_10_EXP
+	<<"#ifndef LDBL_MIN_10_EXP">>
+	<<"#define LDBL_MIN_10_EXP">>	LDBL_MIN_10_EXP
+	<<"#endif">>
+	#endif
+	#ifdef LDBL_MIN_EXP
+	<<"#ifndef LDBL_MIN_EXP">>
+	<<"#define LDBL_MIN_EXP">>	LDBL_MIN_EXP
+	<<"#endif">>
+	#endif
+}end
+
+tst	- note{ missing floating point limits }end output{
+	#include "FEATURE/common"
+	#include <stdio.h>
+	#if _hdr_float
+	#include <float.h>
+	#endif
+	#if _hdr_limits
+	#include <limits.h>
+	#endif
+	#if _hdr_math
+	#include <math.h>
+	#endif
+	#if _hdr_values
+	#include <values.h>
+	#endif
+	#include <signal.h>
+	#ifdef SIGFPE
+	static int caught = 0;
+	#if _STD_
+	static void catch(int sig)
+	#else
+	static void catch(sig) int sig;
+	#endif
+	{
+		signal(sig, SIG_IGN);
+		caught++;
+	}
+	#endif
+	int
+	main()
+	{
+		register int		i;
+		register int		s;
+		float			f;
+		float			pf;
+		float			mf;
+		float			xf;
+		double			d;
+		double			pd;
+		double			md;
+		char*			fp;
+	#if _ast_fltmax_double
+		char*			fs = "";
+		char*			ds = "";
+	#else
+		_ast_fltmax_t		l;
+		_ast_fltmax_t		pl;
+		_ast_fltmax_t		ml;
+		char*			fs = "F";
+		char*			ds = "";
+		char*			ls = "L";
+	#endif
+		unsigned long		u;
+		unsigned _ast_intmax_t	w;
+		unsigned _ast_intmax_t	pw;
+		unsigned _ast_intmax_t	x;
+		unsigned short		us;
+		unsigned int		ui;
+		unsigned long		ul;
+		unsigned _ast_intmax_t	uq;
+	
+	#ifdef SIGFPE
+		signal(SIGFPE, catch);
+	#endif
+		printf("\n");
+		printf("\n");
+		us = 0;
+		us = ~us;
+		i = 0;
+		while (us /= 10)
+			i++;
+		printf("#define USHRT_DIG		%d\n", i);
+		ui = 0;
+		ui = ~ui;
+		i = 0;
+		while (ui /= 10)
+			i++;
+		printf("#define UINT_DIG		%d\n", i);
+		ul = 0;
+		ul = ~ul;
+		i = 0;
+		while (ul /= 10)
+			i++;
+		printf("#define ULONG_DIG		%d\n", i);
+		if (sizeof(uq) > sizeof(ul))
+		{
+			uq = 0;
+			uq = ~uq;
+			i = 0;
+			while (uq /= 10)
+				i++;
+			printf("#define ULLONG_DIG		%d\n", i);
+			printf("#define UINTMAX_DIG		ULLONG_DIG\n");
+		}
+		else
+			printf("#define UINTMAX_DIG		ULONG_DIG\n");
+		printf("\n");
+		w = 1;
+		do
+		{
+			pw = w;
+			w *= 2;
+			f = (_ast_intmax_t)w;
+			x = (_ast_intmax_t)f;
+		} while (w > pw && w == x);
+		w = (pw - 1) + pw;
+		u = ~0;
+		if (u > w)
+			u = w;
+		printf("#define FLT_ULONG_MAX		%lu.0F\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define FLT_ULLONG_MAX		%llu.0F\n", w);
+			printf("#define FLT_UINTMAX_MAX		FLT_ULLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define FLT_ULLONG_MAX		FLT_ULONG_MAX\n");
+			printf("#define FLT_UINTMAX_MAX		FLT_ULONG_MAX\n");
+		}
+		u /= 2;
+		w /= 2;
+		printf("#define FLT_LONG_MAX		%lu.0F\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define FLT_LLONG_MAX		%llu.0F\n", w);
+			printf("#define FLT_INTMAX_MAX		FLT_LLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define FLT_LLONG_MAX		FLT_LONG_MAX\n");
+			printf("#define FLT_INTMAX_MAX		FLT_LONG_MAX\n");
+		}
+		u++;
+		w++;
+		printf("#define FLT_LONG_MIN		(-%lu.0F)\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define FLT_LLONG_MIN		(-%llu.0F)\n", w);
+			printf("#define FLT_INTMAX_MIN		FLT_LLONG_MIN\n");
+		}
+		else
+		{
+			printf("#define FLT_LLONG_MIN		FLT_LONG_MIN\n");
+			printf("#define FLT_INTMAX_MIN		FLT_LONG_MIN\n");
+		}
+	#ifdef FLT_DIG
+		s = FLT_DIG;
+	#else
+		f = pf = 1.0;
+		s = -1;
+		do
+		{
+			s++;
+			f *= 10.0;
+		} while (f != (f + pf));
+	#endif
+	#if defined(FLT_MIN) && defined(FLT_MIN_EXP)
+		i = FLT_MIN_EXP;
+		mf = FLT_MIN;
+	#else
+		i = 3;
+		f = pf = 1.0;
+		do
+		{
+			i--;
+			mf = pf;
+			pf = f;
+			f /= 2.0;
+		} while (f < pf);
+	#ifdef FLT_MIN_EXP
+		i = FLT_MIN_EXP;
+	#endif
+	#ifdef FLT_MIN
+		mf = FLT_MIN;
+	#endif
+	#endif
+	#ifndef FLT_DIG
+		printf("#ifndef FLT_DIG\n");
+		printf("#define FLT_DIG			%d\n", s);
+		printf("#endif\n");
+	#endif
+	#ifndef FLT_MIN
+		printf("#ifndef FLT_MIN\n");
+		printf("#define FLT_MIN			%.*E%s\n", s + 1, mf, fs);
+		printf("#endif\n");
+	#endif
+	#ifndef FLT_MIN_EXP
+		printf("#ifndef FLT_MIN_EXP\n");
+		printf("#define FLT_MIN_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#if defined(FLT_MAX) && defined(FLT_MAX_EXP)
+		i = FLT_MAX_EXP;
+		f = FLT_MAX;
+	#else
+		i = -1;
+		f = pf = 1.0;
+		do
+		{
+			i++;
+			mf = pf;
+			pf = f;
+			f *= 2.0;
+		} while (f > pf);
+	#ifdef FLT_MAX_EXP
+		i = FLT_MAX_EXP;
+	#endif
+	#ifdef FLT_MAX
+		f = FLT_MAX;
+	#endif
+	#endif
+	#ifdef FLT_MAX_EXP
+		i = FLT_MAX_EXP;
+	#else
+		f = 1;
+		do
+		{
+			f *= 2.0;
+		} while (mf == (mf + f));
+		f = (mf - f) * 2.0 + f;
+	#endif
+		xf = f;
+	#ifndef FLT_MAX
+		printf("#ifndef FLT_MAX\n");
+		printf("#define FLT_MAX			%.*E%s\n", s + 1, f, fs);
+		printf("#endif\n");
+	#endif
+	#ifndef FLT_MAX_EXP
+		printf("#ifndef FLT_MAX_EXP\n");
+		printf("#define FLT_MAX_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef FLT_MIN_10_EXP
+		i = FLT_MIN_10_EXP;
+	#else
+		i = 2;
+		f = 1.0;
+		do
+		{
+			i--;
+			pf = f;
+			f /= 10.0;
+		} while (f < pf);
+	#endif
+	#ifndef FLT_MIN_10_EXP
+		printf("#ifndef FLT_MIN_10_EXP\n");
+		printf("#define FLT_MIN_10_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef FLT_MAX_10_EXP
+		i = FLT_MAX_10_EXP;
+	#else
+		i = -2;
+		f = 1.0;
+		do
+		{
+			i++;
+			pf = f;
+			f *= 10.0;
+		} while (f > pf);
+	#endif
+	#ifndef FLT_MAX_10_EXP
+		printf("#ifndef FLT_MAX_10_EXP\n");
+		printf("#define FLT_MAX_10_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+
+		printf("\n");
+		w = 1;
+		do
+		{
+			pw = w;
+			w *= 2;
+			d = (_ast_intmax_t)w;
+			x = (_ast_intmax_t)d;
+		} while (w > pw && w == x);
+		w = (pw - 1) + pw;
+		u = ~0;
+		if (u > w)
+			u = w;
+		printf("#define DBL_ULONG_MAX		%lu.0\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define DBL_ULLONG_MAX		%llu.0\n", w);
+			printf("#define DBL_UINTMAX_MAX		DBL_ULLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define DBL_ULLONG_MAX		DBL_ULONG_MAX\n");
+			printf("#define DBL_UINTMAX_MAX		DBL_ULONG_MAX\n");
+		}
+		u /= 2;
+		w /= 2;
+		printf("#define DBL_LONG_MAX		%lu.0\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define DBL_LLONG_MAX		%llu.0\n", w);
+			printf("#define DBL_INTMAX_MAX		DBL_LLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define DBL_LLONG_MAX		DBL_LONG_MAX\n");
+			printf("#define DBL_INTMAX_MAX		DBL_LONG_MAX\n");
+		}
+		u++;
+		w++;
+		printf("#define DBL_LONG_MIN		(-%lu.0)\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define DBL_LLONG_MIN		(-%llu.0)\n", w);
+			printf("#define DBL_INTMAX_MIN		DBL_LLONG_MIN\n");
+		}
+		else
+		{
+			printf("#define DBL_LLONG_MIN		DBL_LONG_MIN\n");
+			printf("#define DBL_INTMAX_MIN		DBL_LONG_MIN\n");
+		}
+	#ifdef DBL_DIG
+		s = DBL_DIG;
+	#else
+		d = pd = 1.0;
+		s = -1;
+		do
+		{
+			s++;
+			d *= 10.0;
+		} while (d != (d + pd));
+	#endif
+	#if defined(DBL_MIN) && defined(DBL_MIN_EXP)
+		i = DBL_MIN_EXP;
+		md = DBL_MIN;
+	#else
+		i = 3;
+		d = pd = 1.0;
+		do
+		{
+			i--;
+			md = pd;
+			pd = d;
+			d /= 2.0;
+		} while (d < pd);
+	#ifdef DBL_MIN_EXP
+		i = DBL_MIN_EXP;
+	#endif
+	#ifdef DBL_MIN
+		md = DBL_MIN;
+	#endif
+	#endif
+	#ifndef DBL_DIG
+		printf("#ifndef DBL_DIG\n");
+		printf("#define DBL_DIG			%d\n", s);
+		printf("#endif\n");
+	#endif
+	#ifndef DBL_MIN
+		printf("#ifndef DBL_MIN\n");
+		printf("#define DBL_MIN			%.*E%s\n", s + 1, md, ds);
+		printf("#endif\n");
+	#endif
+	#ifndef DBL_MIN_EXP
+		printf("#ifndef DBL_MIN_EXP\n");
+		printf("#define DBL_MIN_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#if defined(DBL_MAX) && defined(DBL_MAX_EXP)
+		i = DBL_MAX_EXP;
+		d = DBL_MAX;
+	#else
+		i = -1;
+		d = pd = 1.0;
+		do
+		{
+			i++;
+			md = pd;
+			pd = d;
+			d *= 2.0;
+		} while (d > pd);
+		d = 1.0;
+		do
+		{
+			d *= 2.0;
+		} while (md == (md + d));
+		d = (md - d) * 2.0 + d;
+	#ifdef DBL_MAX_EXP
+		i = DBL_MAX_EXP;
+	#endif
+	#ifdef DBL_MAX
+		d = DBL_MAX;
+	#endif
+	#endif
+	#ifndef DBL_MAX
+		printf("#ifndef DBL_MAX\n");
+		printf("#define DBL_MAX			%.*E%s\n", s + 1, d, ds);
+		printf("#endif\n");
+	#endif
+	#ifndef DBL_MAX_EXP
+		printf("#ifndef DBL_MAX_EXP\n");
+		printf("#define DBL_MAX_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef DBL_MIN_10_EXP
+		i = DBL_MIN_10_EXP;
+	#else
+		i = 2;
+		d = 1.0;
+		do
+		{
+			i--;
+			pd = d;
+			d /= 10.0;
+		} while (d < pd);
+	#endif
+	#ifndef DBL_MIN_10_EXP
+		printf("#ifndef DBL_MIN_10_EXP\n");
+		printf("#define DBL_MIN_10_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef DBL_MAX_10_EXP
+		i = DBL_MAX_10_EXP;
+	#else
+		i = -2;
+		d = 1.0;
+		do
+		{
+			i++;
+			pd = d;
+			d *= 10.0;
+		} while (d > pd);
+	#endif
+	#ifndef DBL_MAX_10_EXP
+		printf("#ifndef DBL_MAX_10_EXP\n");
+		printf("#define DBL_MAX_10_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+
+	#if !_ast_fltmax_double
+		printf("\n");
+		w = 1;
+		do
+		{
+			pw = w;
+			w *= 2;
+			l = (_ast_intmax_t)w;
+			x = (_ast_intmax_t)l;
+		} while (w > pw && w == x);
+		w = (pw - 1) + pw;
+		u = ~0;
+		if (u > w)
+			u = w;
+		printf("#define LDBL_ULONG_MAX		%lu.0L\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define LDBL_ULLONG_MAX		%llu.0L\n", w);
+			printf("#define LDBL_UINTMAX_MAX	LDBL_ULLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define LDBL_ULLONG_MAX		LDBL_ULONG_MAX\n");
+			printf("#define LDBL_UINTMAX_MAX	LDBL_ULONG_MAX\n");
+		}
+		u /= 2;
+		w /= 2;
+		printf("#define LDBL_LONG_MAX		%lu.0L\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define LDBL_LLONG_MAX		%llu.0L\n", w);
+			printf("#define LDBL_INTMAX_MAX		LDBL_LLONG_MAX\n");
+		}
+		else
+		{
+			printf("#define LDBL_LLONG_MAX		LDBL_LONG_MAX\n");
+			printf("#define LDBL_INTMAX_MAX		LDBL_LONG_MAX\n");
+		}
+		u++;
+		w++;
+		printf("#define LDBL_LONG_MIN		(-%lu.0L)\n", u);
+		if (sizeof(w) > sizeof(u))
+		{
+			printf("#define LDBL_LLONG_MIN		(-%llu.0L)\n", w);
+			printf("#define LDBL_INTMAX_MIN		LDBL_LLONG_MIN\n");
+		}
+		else
+		{
+			printf("#define LDBL_LLONG_MIN		LDBL_LONG_MIN\n");
+			printf("#define LDBL_INTMAX_MIN		LDBL_LONG_MIN\n");
+		}
+	#ifdef LDBL_DIG
+		s = LDBL_DIG;
+	#else
+		l = pl = 1.0L;
+		s = -1;
+		do
+		{
+			s++;
+			l *= 10.0L;
+		} while (l != (l + pl));
+	#endif
+	#if defined(LDBL_MIN) && defined(LDBL_MIN_EXP)
+		i = LDBL_MIN_EXP;
+		ml = LDBL_MIN;
+	#else
+		i = 3;
+		l = pl = 1.0L;
+		do
+		{
+			i--;
+			ml = pl;
+			pl = l;
+			l /= 2.0L;
+		} while (l < pl);
+	#ifdef LDBL_MIN_EXP
+		i = LDBL_MIN_EXP;
+	#endif
+	#ifdef LDBL_MIN
+		ml = LDBL_MIN;
+	#endif
+	#endif
+	#ifndef LDBL_DIG
+		printf("#ifndef LDBL_DIG\n");
+		printf("#define LDBL_DIG		%d\n", s);
+		printf("#endif\n");
+	#endif
+	#ifndef LDBL_MIN
+		printf("#ifndef LDBL_MIN\n");
+		printf("#define LDBL_MIN		%.*LE%s\n", s + 1, ml, ls);
+		printf("#endif\n");
+	#endif
+	#ifndef LDBL_MIN_EXP
+		printf("#ifndef LDBL_MIN_EXP\n");
+		printf("#define LDBL_MIN_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#if defined(LDBL_MAX) && defined(LDBL_MAX_EXP)
+		i = LDBL_MAX_EXP;
+		l = LDBL_MAX;
+	#else
+		i = -1;
+		l = pl = 1.0L;
+		do
+		{
+			i++;
+			ml = pl;
+			pl = l;
+			l *= 2.0L;
+		} while (l > pl);
+		l = 1.0L;
+		do
+		{
+			l *= 2.0L;
+		} while (ml == (ml + l));
+		l = (ml - l) * 2.0L + l;
+	#ifdef LDBL_MAX_EXP
+		i = LDBL_MAX_EXP;
+	#endif
+	#ifdef LDBL_MAX
+		l = LDBL_MAX;
+	#endif
+	#endif
+	#ifndef LDBL_MAX
+		printf("#ifndef LDBL_MAX\n");
+		printf("#define LDBL_MAX		%.*LE%s\n", s + 1, l, ls);
+		printf("#endif\n");
+	#endif
+	#ifndef LDBL_MAX_EXP
+		printf("#ifndef LDBL_MAX_EXP\n");
+		printf("#define LDBL_MAX_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef LDBL_MIN_10_EXP
+		i = LDBL_MIN_10_EXP;
+	#else
+		i = 2;
+		l = 1.0L;
+		do
+		{
+			i--;
+			pl = l;
+			l /= 10.0L;
+		} while (l < pl);
+	#endif
+	#ifndef LDBL_MIN_10_EXP
+		printf("#ifndef LDBL_MIN_10_EXP\n");
+		printf("#define LDBL_MIN_10_EXP		(%d)\n", i);
+		printf("#endif\n");
+	#endif
+
+	#ifdef LDBL_MAX_10_EXP
+		i = LDBL_MAX_10_EXP;
+	#else
+		i = -2;
+		l = 1.0L;
+		do
+		{
+			i++;
+			pl = l;
+			l *= 10.0L;
+		} while (l > pl);
+	#endif
+	#ifndef LDBL_MAX_10_EXP
+		printf("#ifndef LDBL_MAX_10_EXP\n");
+		printf("#define LDBL_MAX_10_EXP		%d\n", i);
+		printf("#endif\n");
+	#endif
+		fp = "LDBL";
+	#else
+		fp = "DBL";
+	#endif
+
+	printf("\n");
+	printf("#define FLTMAX_UINTMAX_MAX	%s_UINTMAX_MAX\n", fp);
+	printf("#define FLTMAX_INTMAX_MAX	%s_INTMAX_MAX\n", fp);
+	printf("#define FLTMAX_INTMAX_MIN	%s_INTMAX_MIN\n", fp);
+
+	#ifdef SIGFPE
+		if (!caught)
+		{
+	#if !__MVS__
+			f = xf;
+			f *= 2;
+			if (!f)
+	#endif
+				caught = 1;
+		}
+		if (caught)
+			printf("\n#define _ast_fltsig		%d\n", SIGFPE);
+	#endif
+
+		printf("\n");
+	#if !_lib_frexp
+		printf("extern double		frexp(double, int*);\n");
+	#endif
+	#if !_lib_frexpl
+		printf("extern _ast_fltmax_t	frexpl(_ast_fltmax_t, int*);\n");
+	#endif
+	#if !_lib_ldexp
+		printf("extern double		ldexp(double, int);\n");
+	#endif
+	#if !_lib_ldexpl
+		printf("extern _ast_fltmax_t	ldexpl(_ast_fltmax_t, int);\n");
+	#endif
+
+		return 0;
+	}
+}end
+
+tst	- note{ double exponent bitfoolery }end output{
+	#include "FEATURE/common"
+	#include <stdio.h>
+	typedef union _dbl_exp_u
+	{
+		unsigned _ast_int4_t	e[sizeof(double) / 4];
+		double			f;
+	} _ast_dbl_exp_t;
+	int
+	main()
+	{
+		int			i;
+		int			j;
+		unsigned _ast_int4_t	e;
+		_ast_dbl_exp_t		a;
+		_ast_dbl_exp_t		b;
+		a.f = 1;
+		b.f = 2;
+		for (i = 0; i < sizeof(a.e) / sizeof(a.e[0]); i++)
+			if (e = a.e[i] ^ b.e[i])
+			{
+				for (j = i + 1; j < sizeof(a.e) / sizeof(a.e[0]); j++)
+					if (a.e[j] ^ b.e[j])
+						return 0;
+				printf("typedef union _ast_dbl_exp_u\n{\n\tuint32_t\t\te[sizeof(double)/4];\n\tdouble\t\t\tf;\n} _ast_dbl_exp_t;\n\n");
+				printf("#define _ast_dbl_exp_index	%d\n", i);
+				for (i = 0; !(e & 1); e >>= 1, i++);
+				printf("#define _ast_dbl_exp_shift	%d\n\n", i);
+				return 0;
+			}
+		return 0;
+	}
+}end
+
+tst	- note{ long double exponent bitfoolery }end output{
+	#include "FEATURE/common"
+	#include <stdio.h>
+	typedef union _ast_fltmax_exp_u
+	{
+		unsigned _ast_int4_t	e[sizeof(_ast_fltmax_t) / 4];
+		_ast_fltmax_t		f;
+	} _ast_fltmax_exp_t;
+	int
+	main()
+	{
+		int			i;
+		int			j;
+		unsigned _ast_int4_t	e;
+		_ast_fltmax_exp_t	a;
+		_ast_fltmax_exp_t	b;
+		a.f = 1;
+		b.f = 2;
+		for (i = 0; i < sizeof(a.e) / sizeof(a.e[0]); i++)
+			if (e = a.e[i] ^ b.e[i])
+			{
+				for (j = i + 1; j < sizeof(a.e) / sizeof(a.e[0]); j++)
+					if (a.e[j] ^ b.e[j])
+						return 0;
+				printf("typedef union _fltmax_exp_u\n{\n\tuint32_t\t\te[sizeof(_ast_fltmax_t)/4];\n\t_ast_fltmax_t\t\tf;\n} _ast_fltmax_exp_t;\n\n");
+				printf("#define _ast_fltmax_exp_index\t%d\n", i);
+				for (i = 0; !(e & 1); e >>= 1, i++);
+				printf("#define _ast_fltmax_exp_shift\t%d\n\n", i);
+				return 0;
+			}
+		return 0;
+	}
+}end
+
+tst	- -DN=1 - -DN=2 note{ _ast_fltmax_t maximum integral type }end output{
+	#include <stdio.h>
+	int
+	main()
+	{
+	#if N == 1
+		unsigned long long	m;
+		long double		f = 123.456;
+
+		m = f;
+		if (!m || f == m)
+			return 1;
+		printf("#define _ast_flt_unsigned_max_t	unsigned long long\n");
+	#else
+		printf("#define _ast_flt_unsigned_max_t	unsigned long\n");
+	#endif
+		return 0;
+	}
+}end
+
+tst	- -DSCAN=1 - -lm -DSTRTO=1 - -DMAC=1 - -DDIV=1 - -DEXP=1 - -DADD=1 - -DMPY=1 note{ INF and NAN memory representations }end output{
+	#if MAC
+	#define _AIX_COMPATIBILITY	1
+	#define _FP_MODE_VARIABLE	1
+	#endif
+	#include "FEATURE/common"
+	#include <stdio.h>
+	#include <sys/types.h>
+	#include <signal.h>
+	#if _hdr_float
+	#include <float.h>
+	#endif
+	#if _hdr_limits
+	#include <limits.h>
+	#endif
+	#if _hdr_math
+	#include <math.h>
+	#endif
+	#if _hdr_values
+	#include <values.h>
+	#endif
+	#if STRTO && _hdr_stdlib
+	#include <stdlib.h>
+	#endif
+	#if !defined(FLT_MAX) && defined(MAXFLOAT)
+	#define FLT_MAX		MAXFLOAT
+	#endif
+	#if !defined(DBL_MAX) && defined(MAXDOUBLE)
+	#define DBL_MAX		MAXDOUBLE
+	#endif
+	#if _ast_fltmax_double
+	#undef	LDBL_MAX
+	#endif
+	static void
+	#if _STD_
+	list(const char* typ, const char* var, void* val, int siz)
+	#else
+	list(typ, var, val, siz)
+	char* typ;
+	char* var;
+	void* val;
+	int siz;
+	#endif
+	{
+		register unsigned char*	u = (unsigned char*)val;
+		register unsigned char*	e = u + siz;
+	
+		printf("#define _ast_%s_%s_init\t0x%02x", typ, var, *u);
+		while (++u < e)
+			printf(",0x%02x", *u);
+		printf("\n");
+	}
+	int
+	main()
+	{
+	#if SCAN || STRTO
+	#undef	NAN
+	#define NAN	"NaN"
+	#undef	INF
+	#define INF	"INF"
+	{
+		float	f;
+
+	#if SCAN
+		if (sscanf(NAN, "%g", &f) != 1)
+			return 1;
+	#else
+		f = atof(NAN);
+	#endif
+		list("flt", "nan", &f, sizeof(f));
+	#if SCAN
+		if (sscanf(INF, "%g", &f) != 1)
+			return 1;
+	#else
+		f = atof(INF);
+	#endif
+		list("flt", "inf", &f, sizeof(f));
+	}
+	{
+		double	f;
+	#if STRTO
+		char*	e;
+	#endif
+
+	#if SCAN
+		if (sscanf(NAN, "%lg", &f) != 1)
+			return 1;
+	#else
+		f = strtod(NAN, &e);
+		if (*e)
+			return 1;
+	#endif
+		list("dbl", "nan", &f, sizeof(f));
+	#if SCAN
+		if (sscanf(INF, "%lg", &f) != 1)
+			return 1;
+	#else
+		f = strtod(INF, &e);
+		if (*e)
+			return 1;
+	#endif
+		list("dbl", "inf", &f, sizeof(f));
+	}
+	#ifdef LDBL_MAX
+	{
+		long double	f;
+	#if STRTO
+		char*	e;
+	#endif
+
+	#if SCAN
+		if (sscanf(NAN, "%Lg", &f) != 1)
+			return 1;
+	#else
+		f = strtold(NAN, &e);
+		if (*e)
+			return 1;
+	#endif
+		list("ldbl", "nan", &f, sizeof(f));
+	#if SCAN
+		if (sscanf(INF, "%Lg", &f) != 1)
+			return 1;
+	#else
+		f = strtold(INF, &e);
+		if (*e)
+			return 1;
+	#endif
+		list("ldbl", "inf", &f, sizeof(f));
+	}
+	#endif
+	#else
+	#ifdef SIGFPE
+		signal(SIGFPE, SIG_IGN);
+	#endif
+	#ifdef FLT_MAX
+		{
+			float	f = FLT_MAX;
+	#if DIV
+			float	z = 0;
+
+			f = 0.0 / z;
+			if (!f)
+				return 1;
+			list("flt", "nan", &f, sizeof(f));
+			f = 1.0 / z;
+			list("flt", "inf", &f, sizeof(f));
+	#else
+	#if ADD
+			f += f;
+	#endif
+	#if EXP
+			f = exp(f);
+	#endif
+	#if MPY
+			f *= 2;
+	#endif
+	#if MAC
+			f = FLT_QNAN;
+	#endif
+			list("flt", "nan", &f, sizeof(f));
+	#if MAC
+			f = FLT_INFINITY;
+	#endif
+			list("flt", "inf", &f, sizeof(f));
+	#endif
+		}
+	#endif
+	#ifdef DBL_MAX
+		{
+			double	f = DBL_MAX;
+	#if DIV
+			double	z = 0;
+
+			f = 0.0 / z;
+			if (!f)
+				return 1;
+			list("dbl", "nan", &f, sizeof(f));
+			f = 1.0 / z;
+			list("dbl", "inf", &f, sizeof(f));
+	#else
+	#if ADD
+			f += f;
+	#endif
+	#if EXP
+			f = exp(f);
+	#endif
+	#if MPY
+			f *= 2;
+	#endif
+	#if MAC
+			f = DBL_QNAN;
+	#endif
+			list("dbl", "nan", &f, sizeof(f));
+	#if MAC
+			f = DBL_INFINITY;
+	#endif
+			list("dbl", "inf", &f, sizeof(f));
+	#endif
+		}
+	#endif
+	#ifdef LDBL_MAX
+		{
+			long double	f = LDBL_MAX;
+	#if DIV
+			long double	z = 0;
+
+			f = 0.0 / z;
+			if (!f)
+				return 1;
+			list("ldbl", "nan", &f, sizeof(f));
+			f = 1.0 / z;
+			list("ldbl", "inf", &f, sizeof(f));
+	#else
+	#if ADD
+			f += f;
+	#endif
+	#if EXP
+			f = exp(f);
+	#endif
+	#if MPY
+			f *= 2;
+	#endif
+	#if MAC
+			f = LDBL_QNAN;
+	#endif
+			list("ldbl", "nan", &f, sizeof(f));
+	#if MAC
+			f = LDBL_INFINITY;
+	#endif
+			list("ldbl", "inf", &f, sizeof(f));
+	#endif
+		}
+	#endif
+	#endif
+		return 0;
+	}
+}end

@@ -1,0 +1,119 @@
+#! /usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+
+files='/etc/user_attr /etc/security/auth_attr /etc/security/exec_attr
+    /etc/security/prof_attr'
+
+PKGINST=
+export PKGINST
+
+irbac=/usr/sadm/install/scripts/i.rbac
+
+if [ ! -x $irbac ]
+then
+	echo "${irbac}: not found."
+	exit $SMF_EXIT_ERR_FATAL
+fi
+
+case "$1" in
+start|refresh)
+	;;
+stop)
+	exit $SMF_EXIT_OK;;
+*)
+	echo "Usage: $0 { start | refresh | stop }"
+	exit $SMF_EXIT_ERR_FATAL;;
+esac
+	
+tmp_rbac=`/usr/bin/mktemp -d /tmp/rbac.XXXXXX`
+if [ -z "$tmp_rbac" ]
+then
+	echo "Could not create temporary directory."
+	exit $SMF_EXIT_ERR_FATAL
+fi
+tmp_frag=$tmp_rbac/frag
+tmp_file=$tmp_rbac/file
+
+for f in $files
+do
+	d=${f}.d
+	if [ ! -d ${d} ]
+	then
+		# No directory, nothing to do
+		continue
+	fi
+	# cache user/owner of file to update
+	ownergroup=`ls -ln $f | awk '{printf("%s:%s\n", $3, $4);'}`
+	#
+	# List all the files in the directory and the destination file
+	# in the order of their timestamp.  Older files are displayed
+	# first.  If a fragment file is listed before the destination
+	# file, it is an older fragment that has already been processed.
+	# If a fragment file is listed after the destination file, it is
+	# new, and the destination file must be updated.
+	#
+	# Comments are processed separately from the other file contents.
+	# For new fragments only, the comments are processed as they are
+	# encountered.  For all fragments, the non-comment contents are
+	# saved in a temporary file.  After all fragments have been
+	# processed, and only if new fragments were found, the contents
+	# of the temporary file are processed.  This ensures that older
+	# but still valid entries are retained in the destination file.
+	#
+	/usr/bin/rm -f $tmp_file
+	new_frag=0
+	update=0
+	for frag in `ls -tr $f $d/* 2> /dev/null`
+	do
+		if [ "$frag" = "$f" ]
+		then
+			new_frag=1
+			continue
+		fi
+		if [ -f "$frag" ]
+		then
+			if [ $new_frag -eq 1 ]
+			then
+				/usr/bin/rm -f $tmp_frag
+				/usr/bin/grep '^#' $frag > $tmp_frag
+				update=1
+				echo $tmp_frag $f | $irbac
+			fi
+			/usr/bin/grep -v '^#' $frag >> $tmp_file
+		fi
+	done
+	if [ $update -eq 1 ]
+	then
+		echo $tmp_file $f | $irbac
+		chown $ownergroup $f
+	fi
+done
+
+/usr/bin/rm -rf $tmp_rbac
+
+exit $SMF_EXIT_OK

@@ -1,0 +1,95 @@
+The advanced software technology department has been collecting useful C
+routines in a single library called libast.  libast is used by nmake, the
+nmake cpp (which is mainly based on another library (libpp)), CIA
+(C information abstractor from Robin Chen), and a collection of other
+/bin and /usr/bin commands that benefit from concentrating functionality
+in libast.
+
+More detail is available in the man pages.  libast contains:
+
+  (1)	routines to support a generic environment for
+	a variety of UNIX operating system variants
+
+  (2)	routines that update standard libc routines
+
+  (3)	routines shared between several commands
+
+If you already have nmake 2.0 or newer installed then use
+`nmake install' from this directory, otherwise use
+ship/shipin from the root of the distribution directory tree.
+
+Some of the routines not found in section 3:
+
+hash:			generic, scoped hash table support
+
+	hashalloc	create a hash table or push new scope
+	hashdump	debug dump of one or all hash tables
+	hashfree	free a hashalloc()'d table
+	hashlook	low level name lookup
+	hashscan	entry generator for scoped table scan
+	hashsize	explicitly change table size (usually automatic)
+	hashwalk	apply function to each table entry
+	memhash		return hash code for n-char chunk of memory
+	strhash		return hash code for null terminated string
+
+include/ast:		libast support headers
+
+	align.h		compile time type alignmnent support
+	dirent.h	POSIX directory(3) interface definitions
+	error.h		error() interface definitions
+	ftw.h		ftwalk() interface definitions
+	hash.h		hash*() interface definitions
+	ls.h		strls() interface definitions
+	re.h		re*() interface definitions
+	tar.h		POSIX ustar format interface definitions
+	tm.h		tm*() interface definitions
+
+misc:
+
+	cmdargs		apply a sequence of cmd line option parsers
+	cmdopen		like popen() but stdin and stdout are specified
+	cvtatoe		convert ASCII to EBCDIC
+	cvtetoa		convert EBCDIC to ASCII
+	error		output generic error and trace messages
+	ftwalk		an ftw(3) that works -- used in new tw(1)
+	getcwd		uses $PWD if ok, doesn't use /bin/pwd
+	getshell	return full path of shell for cmdopen()
+	ooptget		optget() for obsolete ar(1) and tar(1) options
+	optget		YA getopt(3) but no argc or error message output
+	pathaccess	find file with specific acces on list of dirs
+	pathcanon	canonicalize path name in place
+	pathcmd		return full path name of executable using $PATH
+	pathroot	determine `related root' directory for command
+	perror		uses strerror()
+	readargs	append each line of file to argv[0]
+
+re:			egrep(1) and ed(1) style re's from V9
+			(not the good awk(1) algorithm)
+
+	recomp		compile re pattern
+	reerror		report re*() errors
+	reexec		match string using compiled re
+	resub		ed(1) style substitute using last reexec()
+
+string:
+
+	chresc		return next char in string converting \ sequences
+	ctoi		convert char constant string to int
+	strcopy		like strcpy(3) but returns end of destination
+	strdup		malloc(3) and strcpy(3) smashed together
+	strerror	return error message string given errno
+	stresc		convert \ sequences in string in place
+	streval		evaluate C expression in string
+	strls		ls -l format support
+	strmatch	Korn shell file pattern match
+	strmode		return ls -l style output given st.st_mode
+	strsignal	return signal id string given SIG* number
+	strtape		convert generic tape unit to /dev/* file
+	token		generate space separated tokens in string
+
+tm:			time conversion support
+
+	tmdate		convert date string to time_t
+	tmform		format time_t to date string
+	tmmake		return current time_t
+	tmtime		convert struct tm to time_t

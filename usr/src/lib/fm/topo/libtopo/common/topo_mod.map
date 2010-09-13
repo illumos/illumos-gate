@@ -1,0 +1,94 @@
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	topo_node_range_create		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_range_destroy		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_bind			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_unbind		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_name			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_setspecific		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_getspecific		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_node_instance		{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_mod_alloc			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_zalloc			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_free			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_nvalloc		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_nvdup			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_strfree		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_strdup			{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_mod_clrdebug		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_setdebug		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_dprintf		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_errmsg			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_errno			{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_mod_load			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_unload			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_register		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_unregister		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_enumerate		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_enummap		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_release		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_getspecific		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_setspecific		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_hcfmri			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_devfmri		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_cpufmri		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_pkgfmri		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_modfmri		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_nvl2str		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_str2nvl		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_auth			{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_mod_walk_init		{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_mod_smbios			{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_method_register		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_method_unregister		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_method_unregister_all	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_method_invoke		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_method_sensor_failure	{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_prop_method_register	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_method_unregister	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_int32		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_uint32		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_int64		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_uint64		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_string		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_fmri		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_int32_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_uint32_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_int64_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_uint64_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_string_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_set_fmri_array	{ TYPE = FUNCTION; FLAGS = extern };
+	topo_prop_inherit		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_pgroup_create		{ TYPE = FUNCTION; FLAGS = extern };
+};

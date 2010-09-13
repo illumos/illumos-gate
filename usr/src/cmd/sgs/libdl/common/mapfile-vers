@@ -1,0 +1,132 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+$if _x86 && _ELF64
+$add amd64
+$endif
+
+# Starting with SUNW_1.5 and dlamd64getunwind(), the amd64
+# platform is one version ahead of the other platforms.
+$if amd64
+SYMBOL_VERSION SUNW_1.6 {
+$else
+SYMBOL_VERSION SUNW_1.5 {
+$endif
+	global:
+		dl_iterate_phdr		{ TYPE = FUNCTION };
+$if amd64
+} SUNW_1.5;
+
+SYMBOL_VERSION SUNW_1.5 {
+	global:
+		dlamd64getunwind	{ TYPE = FUNCTION };
+$endif
+} SUNW_1.4;
+
+SYMBOL_VERSION SUNW_1.4 {
+	global:
+		dladdr1			{ TYPE = FUNCTION };
+} SUNW_1.3;
+
+SYMBOL_VERSION SUNW_1.3 {
+	global:
+		SUNW_1.3;
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+	global:
+		SUNW_1.2;
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+	global:
+		dldump			{ TYPE = FUNCTION };
+		dlinfo			{ TYPE = FUNCTION };
+		dlmopen			{ TYPE = FUNCTION };
+} SUNW_0.8;
+
+SYMBOL_VERSION SUNW_0.8 {
+	global:
+		dladdr			{ TYPE = FUNCTION };
+} SUNW_0.7;
+
+
+#
+# For most platforms, SUNW_0.7 contains dlclose, dlerror, dlopen, and dlsym.
+# For ABI reasons, 32-bit sparc puts them in SISCD_2.3 instead, and SUNW_0.7
+# exists solely so that SUNW_0.8 can inherit from it on all platforms.
+#
+SYMBOL_VERSION SUNW_0.7 {
+	global:
+$if _sparc && _ELF32
+		SUNW_0.7;
+} SISCD_2.3;
+
+SYMBOL_VERSION SISCD_2.3 {
+	global:
+$endif
+		dlclose			{ TYPE = FUNCTION };
+		dlerror			{ TYPE = FUNCTION };
+		dlopen			{ TYPE = FUNCTION };
+		dlsym			{ TYPE = FUNCTION };
+};
+
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+	global:
+		_ld_libc		{ TYPE = FUNCTION };
+		_dlinfo			{ TYPE = FUNCTION };
+		_dldump			{ TYPE = FUNCTION };
+		_dlmopen		{ TYPE = FUNCTION };
+		_dlopen			{ TYPE = FUNCTION };
+		_dlerror		{ TYPE = FUNCTION };
+		_dlsym			{ TYPE = FUNCTION };
+		_dlclose		{ TYPE = FUNCTION };
+		_dladdr			{ TYPE = FUNCTION };
+		_dladdr1		{ TYPE = FUNCTION };
+
+$if amd64
+		_dlamd64getunwind	{ TYPE = FUNCTION };
+$endif
+
+	local:
+		*;
+};

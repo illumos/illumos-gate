@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# diablo: DAISY WHEEL PRINTERS
+#
+# The A manufacturer represents Diablo, DTC, Xerox, Qume, and other Daisy
+# wheel terminals until such time as terminfo distinguishes between them
+# enough to justify separate codes.
+1620|1640|450|diablo 1620,
+	cr=^M, cud1=^J, ind=^J, bel=^G, tbc=\E2, hts=\E1, hpa=\E\t%i%p1%c, kbs=^H,
+	cub1=^H, cols#132, ff=^L, hc, hu=\EU, hd=\ED, os, ht=^I, cuu1=\E\n,
+1620-m8|1640-m8|diablo 1620 w/8 column left margin,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cols#124, is2=\r        \E9, use=1620,
+# DTC 382 with VDU.  Has no ed so we fake it with el.  Standout works but
+# won't go away without dynamite.  The terminal has tabs, but I'm getting
+# tired of fighting the braindamage.  If no tab is set or the terminal's
+# in a bad mood, it glitches the screen around all of memory.  Note that
+# return puts a blank ("a return character") in the space the cursor was
+# at, so we use ^P return (and thus ^P newline for newline).  Note also
+# that if you turn off tabs and let Unix expand tabs, curses won't work
+# (current version) because it doesn't turn off this bit, and cursor
+# addressing sends a tab for row/column 9.  What a losing terminal!  I
+# have been unable to get tabs set in all 96 lines - it always leaves at
+# least one line with no tabs in it, and once you tab through that line,
+# it completely weirds out.
+dtc|mc0|dtc382|382,
+	.if=/usr/lib/tabset/dtcvdu,
+	bel=^G, cud1=^J, ind=^J, il1=^P^Z, am, cub1=^H,
+	cols#80, el=^P^U, clear=^P^]$<20>, cup=^P^Q%p2%c%p1%c, dch1=^X,
+	dl1=^P^S, rmir=^Pi, home=^P^R, smir=^PI, cnorm=^Pb, cvvis=^PB, pad=\177,
+	rmcup=^P^]$<20>, lines#24, cuf1=^PR, .rmso=^P \200, .smso=^P \002^PF,
+	smul=^P \020, rmul=^P \200, cuu1=^P^L, xhp, lm#96,
+	da, db, cr=^P^M, ed=^P^U^P^S^P^S,
+dtc300s|300|300s|dtc 300s,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G,
+	kbs=^h, cub1=^H, cols#132, ff=^L, hc, hu=\EH, hd=\Eh, os, ht=^I, cuu1=^Z,
+gsi,
+	cub1=^H, cols#132, hc, hd=\Eh, hu=\EH, os, ht=^I, cuu1=^Z,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+aj830|aj832|aj|anderson jacobson,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	cub1=^H, hc, hd=\E9, hu=\E8, os, cuu1=\E7,
+# From cbosg!ucbvax!pur-ee!cincy!chris Thu Aug 20 09:09:18 1981
+# This is incomplete, but it's a start.
+5520|nec|spinwriter|nec 5520,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G,
+	kbs=^h, cub1=^H, cols#132, ff=^L, hc, hu=\E]s\E9\E]W, hd=\E]s\n\E]W,
+	os, ht=^I, cuu1=\E9,
+qume5|qume|Qume Sprint 5,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G,
+	kbs=^h, cub1=^H, cols#80, ff=^L, hc, hu=\EH, hd=\Eh, os, ht=^I, cuu1=^Z,
+# I suspect the xerox1720 is the same as the diablo 1620.
+x1720|x1700|1700|x1750|xerox 1720,
+	cols#132, cub1=^H, ff=^L, hc, os, ht=^I, 
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	tbc=\E2, hts=\E1,

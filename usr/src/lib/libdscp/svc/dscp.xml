@@ -1,0 +1,144 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNW:dscp'>
+
+<service
+	name='platform/sun4u/dscp'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<!-- Required for the basic networking to be up -->
+	<dependency
+	    name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<!-- Required as non-root local directories could be accessed -->
+	<dependency
+	    name='local-filesystems'
+	    type='service'
+	    grouping='require_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<!-- Required for the DSCP IPsec keys to be installed -->
+	<dependency
+	    name='sckmd'
+	    type='service'
+	    grouping='optional_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/platform/sun4u/sckmd:default' />
+	</dependency>
+
+	<!-- On OPL platform, the 'dcs' requires the DSCP to be up -->
+	<dependent
+	    name='dscp_dcs'
+	    grouping='optional_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/platform/sun4u/dcs:default' />
+	</dependent>
+
+	<!-- The FMA event-Transport module requires the DSCP to be up -->
+	<dependent
+	    name='dscp_fmd'
+	    grouping='optional_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/system/fmd:default' />
+	</dependent>
+
+	<!--
+		The 'ntp' service on an OPL domain can be configured 
+		with SP as the NTP server, so create a dependency such that
+		the 'ntp' service is started after the DSCP service. 
+	-->
+	<dependent
+	    name='dscp_ntp'
+	    grouping='optional_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/network/ntp:default' />
+	</dependent>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/lib/svc/method/svc-dscp %m'
+	    timeout_seconds='60' />
+
+	<exec_method
+	    type='method'
+	    name='refresh'
+	    exec='/lib/svc/method/svc-dscp %m'
+	    timeout_seconds='60' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec='/lib/svc/method/svc-dscp %m'
+	    timeout_seconds='60' />
+
+	<property_group name='application' type='framework'>
+		<stability value='Evolving' />
+		<propval name='auto_enable' type='boolean' value='true' />
+	</property_group>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				DSCP Service
+			</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+				This service starts DSCP on
+				SPARC Enterprise Servers.
+			</loctext>
+		</description>
+		<documentation>
+			<manpage title='prtdscp' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

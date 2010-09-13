@@ -1,0 +1,60 @@
+-*- text -*-
+
+This is a list of random notes for GRUB maintainers. If you are not a
+maintainer, you need to ask maintainers to do these instead of doing
+these yourself.
+
+How to update the online manual: (FIXME: this is obsoelete)
+1. Copy docs/*.texi (excluding "multiboot.texi") to fencepost.gnu.org.
+2. Make a symbolic link from ~mohit/gnudoc/gnudoc_template to the
+   directory under which *.texi were copied, if the link isn't present.
+3. Run ``~mohit/gnudoc/gendocs.sh grub "GNU GRUB Manual"''.
+4. Copy the contents of the directory ``manual'' to
+   gnudist.gnu.org:~ftp/gnu/Manuals/grub-VERSION (VERSION is, for
+   example, 1.0).
+5. Run ``ln -sf grub-VERSION grub'' in gnudist.gnu.org:~ftp/gnu/Manuals.
+6. Run ``cd grub; ln -s grub.html index.html''.
+7. Verify the new online manual with a WWW browser.
+8. Update manual.html by hand.
+
+How to release a version:
+1. Check out the source tree from the CVS from scratch.
+2. Check if ``make distcheck'' succeeds.
+3. Run ``util/grub-image''.
+4. Check the resulted images, for example, using bochs.
+5. Copy grub-VERSION.tar.gz, grub-VERSION-i386-pc.tar.gz and
+   grub-VERSION-i386-pc.ext2fs to fencepost.gnu.org:~ftp/gnu/grub.
+6. Move older files in that directory above to the directory ``old'',
+   if you think they are eyesores.
+7. Post an announcement to bug-grub@gnu.org. It would be a good idea to
+   send a carbon copy to bug-hurd@gnu.org and
+   debian-hurd@lists.debian.org. If the announcement is for a stable
+   version, you can inform info-gnu@gnu.org as well.
+8. Optionally, post an announcement to Freshmeat.net.
+
+Legal issues:
+1. If a patch is not significant (in size), you don't have to care about
+   the copyright.
+2. If a patch is significant, you shouldn't apply the patch to the CVS.
+   Before doing that, you must ask the contributor to assign or disclaim
+   the copyright. Send ``/gd/gnuorg/request-assign.changes'' or
+   ``/gd/gnuorg/request-assign.future'' to the contributor, and wait
+   until the FSF finishes the legal work.
+3. You can check if a contributor has already assigned his/her copyright
+   to the FSF by looking at ``/gd/gnuorg/copyright.list''.
+
+What you should have in your mind:
+1. Don't add features unnecessarily! You may think it is a Good Thing to
+   have more features, but you must be prepared for more burdens.
+   DO THAT ONLY IF YOU BELIEVE THAT THE FEATURE IS ESSENTIAL.
+2. Don't break backward-compatibility! Don't apply any patch which could
+   break existing features. Otherwise you would receive a lot of
+   complaints. DO THAT ONLY IF YOU BELIEVE THAT THE INCOMPATIBILITY IS
+   INEVITABLE.
+3. Write good code. Be not satisfied with ad hoc workarounds or quick
+   hacks. NEVER WRITE BAD CODE.
+
+Resources:
+* http://www.gnu.org/prep/maintain_toc.html
+* http://www.gnu.org/prep/standards_toc.html
+* http://www.gnu.org/server/fsf-html-style-sheet.html

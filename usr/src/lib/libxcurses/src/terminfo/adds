@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# adds: ADDS
+#
+# Regent: lowest common denominator, works on all regents.
+regent|adds regent series,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, clear=^L,
+	cup=^K%p1%' '%+%c^P%p1%{10}%/%{16}%*%p1%{10}%m%+%c,
+	cols#80, home=^A, lines#24, ll=^A^Z, cuf1=^F, cuu1=^Z,
+# Regent 100 has a bug where if computer sends escape when user is holding
+# down shift key it gets confused, so we avoid escape.
+regent100|adds regent 100,
+	cup=^K%p1%' '%+%c^P%p1%{10}%/%{16}%*%p1%{10}%m%+%c,
+	kf1=^B1\r, kf2=^B2\r, kf3=^B3\r, kf4=^B4\r,
+	kf5=^B5\r, kf6=^B6\r, kf7=^B7\r, kf8=^B8\r,
+	khome=^A, kcub1=^U, kcuf1=^F, kcuu1=^Z, kcud1=^J, use=regent,
+# Regent 20, untested
+regent20|adds regent 20,
+	ed=\Ek, el=\EK, cup=\EY%p1%' '%+%c%p2%' '%+%c, use=regent,
+regent25|adds regent 25,
+	kf0=^B0\r, kf1=^B1\r, kf2=^B2\r, kf3=^B3\r, kf4=^B4\r,
+	kf5=^B5\r, kf6=^B6\r, kf7=^B7\r, kf8=^B8\r, kf9=^B9\r,
+	khome=^A, kcub1=^U, kcuf1=^F, kcuu1=^Z, kcud1=^J, use=regent20,
+# Regent 40: untested
+regent40|adds regent 40,
+	il1=\EM, dl1=\El, is2=\EB, rmso=\E0@, smso=\E0P,
+	rmul=\E0@, smul=\E0`, flash=\ED\Ed, use=regent25,
+# If you have standout problem with regent 200, try smso=\ER\EOP,rmso=\E0@\EV,
+regent60|regent200|adds Regent 60,
+	dch1=\EE, rmir=\EF, smir=\EF, is2=\EV\EB, use=regent40,
+regent60na|regent 60 w/no arrow keys,
+	kcub1@, kcuf1@, kcuu1@, kcud1@, use=regent60,
+# Note: if return acts weird on a980, check internal switch #2
+# on the top chip on the CONTROL pad board.
+a980|adds consul 980,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\E^N$<13>, am, cub1=^H,
+	clear=^L$<1>^K@, cup=^K%p1%'@'%+%c\E^E%p1%2d, cols#80, dl1=\E^O$<13>,
+	kf0=\E0, kf1=\E1, kf2=\E2, kf3=\E3, kf4=\E4,
+	kf5=\E5, kf6=\E6, kf7=\E7, kf8=\E8, kf9=\E9,
+	lines#24, cuf1=\E^E01, smso=^Y^^^N, rmso=^O, cuu1=$<9>,
+# From Onyx:edward  Thu Jul  9 09:27:33 1981
+viewpoint|addsviewpoint|adds viewpoint,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, lines#24, cols#80,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c, ed=\Ek, el=\EK, cuf1=^F,
+	cuu1=^Z, clear=^L, ll=^A, kcub1=^U, kcuf1=^F, kcud1=^J, kcuu1=^Z, khome=^A,
+	smso=^N, rmso=^O, smul=^N, rmul=^O, is2=^O\E0`, cvvis=^O\E0P, cnorm=^O\E0`,

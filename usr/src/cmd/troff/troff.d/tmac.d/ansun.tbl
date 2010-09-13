@@ -1,0 +1,86 @@
+.\"		Copyright Notice 
+.\"
+.\"Notice of copyright on this source code product does not indicate 
+.\"publication.
+.\"
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.	\" TS - table start
+.de TS
+.br
+.ul 0
+.ti \\n(.iu
+.sp \\n(DDu
+.if \\n(PL=1 .ll 5i
+.if \\$1H .TQ
+.nr IX 1
+.rn TH TM
+.rn ET TH
+..
+.de ET 
+.if \\n(.d>.5v .nr T. 0
+.if \\n(.d>.5v .T# 0
+.di
+.nr TQ \\n(.i
+.nr HT 1
+.in 0
+.mk #a
+.mk #b
+.mk #c
+.mk #d
+.mk #e
+.mk #f
+.TT
+.in \\n(TQu
+.mk #T
+..
+.de TQ
+.di TT
+.nr IT 1
+..
+.	\" TM - end table header (begun with .TS H)
+.\".de TM
+.\"..
+.	\" TE - table end
+.de TE
+.rn TH ET
+.rn TM TH
+.nr IX 0
+.if \\n(IT>0 .if \\n(HT=0 \{\
+.	di
+.	nr UR \\n(.u
+.	nf
+.	TT
+.	if \\n(UR>0 .fi
+.\}
+.nr IT 0
+.nr tC 0
+.nr HT 0
+.sp \\n(DDu
+.ll \\n(LLu
+.rm a+ b+ c+ d+ e+ f+ g+ h+ i+ j+ k+ l+ m+ n+
+.rr a- b- c- d- e- f- g- h- i- j- k- l- m-
+.rr a| b| c| d| e| f| g| h| i| j| k| l| m|
+.rr 32 33 34 35 36 37 38 40 79 80 81 82
+..

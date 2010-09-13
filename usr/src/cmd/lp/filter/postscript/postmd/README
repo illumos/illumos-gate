@@ -1,0 +1,53 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+A program that can be used to display a matrix as a gray scale image on PostScript
+printers. May be useful if you have a large matrix and want a simple way to look
+for patterns. Although I haven't been anywhere close, I expect a 600x600 matrix
+is a very optimistic upper bound on a 300 dpi printer using 5 shades of gray and
+8.5x11 inch paper.
+
+Matrix elements are a series of floating point numbers arranged in the input file
+in row major order. By default each matrix is assumed to be square and the number
+of rows (and columns) is set to the square root of the number of elements in the
+input file. White space, including newlines, is not used to determine the matrix
+dimensions. Each matrix element is mapped into an integer in the range 0 to 255
+(254 by default) and PostScript's image operator maps that integer into a gray
+scale appropriate for your printer.
+
+The mapping from floating point matrix elements to integers is controlled by an
+interval list and grayscale map. The default interval list is "-1,0,1" which
+partitions the real line into 7 regions, while the default grayscale map gets
+darker as the regions move from left to right along the real line. The -i option
+changes the interval list and the -g option modifies the grayscale mapping. Check
+the man page for more details.
+
+By default 6 byte patterns are used, but any number can be selected with the -b
+option. 6 byte patterns are a tradeoff that achieves a good (but not necessarily
+optimal) performance across the wide variety of currently available PostScript
+printers. Decreasing the pattern size often helps some on printers with fast
+processors (eg. PS-810s) while increasing the pattern size speeds things up on
+older printers (eg. PS-800s). In the limited number of tests I ran -b10 worked
+best on PS800s and -b4 gave the best performance on PS-810s. If you want a
+different default pattern size change the initialization of bytespp (near line
+175 in postmd.c) before you compile the program.
+

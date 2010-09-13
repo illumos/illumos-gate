@@ -1,0 +1,280 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+#	This Makefile defines all file modules and build rules for the
+# directory uts/intel and its children. These are the source files which
+# are specific to x86 processor architectures.
+#
+
+#
+#	Core (unix) objects
+#
+CORE_OBJS +=		\
+	arch_kdi.o	\
+	copy.o		\
+	copy_subr.o	\
+	cpc_subr.o	\
+	ddi_arch.o	\
+	ddi_i86.o	\
+	ddi_i86_asm.o	\
+	desctbls.o	\
+	desctbls_asm.o	\
+	exception.o	\
+	float.o		\
+	fmsmb.o		\
+	fpu.o		\
+	i86_subr.o	\
+	lock_prim.o	\
+	ovbcopy.o	\
+	polled_io.o	\
+	sseblk.o	\
+	sundep.o	\
+	swtch.o		\
+	sysi86.o
+
+#
+# 64-bit multiply/divide compiler helper routines
+# used only for ia32
+#
+
+SPECIAL_OBJS_32 +=	\
+	muldiv.o
+
+#
+#	Generic-unix Module
+#
+GENUNIX_OBJS +=		\
+	archdep.o	\
+	getcontext.o	\
+	install_utrap.o	\
+	lwp_private.o	\
+	prom_enter.o	\
+	prom_exit.o	\
+	prom_panic.o	\
+	sendsig.o	\
+	syscall.o
+
+
+#
+#	PROM Routines
+#
+GENUNIX_OBJS +=		\
+	prom_env.o	\
+	prom_emul.o	\
+	prom_getchar.o	\
+	prom_init.o	\
+	prom_node.o	\
+	prom_printf.o	\
+	prom_prop.o	\
+	prom_putchar.o	\
+	prom_reboot.o	\
+	prom_version.o
+
+#
+#	file system modules
+#
+CORE_OBJS +=		\
+	prmachdep.o
+
+#
+#	ZFS file system module
+#
+ZFS_OBJS +=		\
+	spa_boot.o
+
+#
+#	Decompression code
+#
+CORE_OBJS += decompress.o
+
+#
+#	Microcode utilities
+#
+CORE_OBJS += ucode_utils.o
+
+#
+#	Driver modules
+#
+AGPGART_OBJS +=	agpgart.o agp_kstat.o
+AGPTARGET_OBJS += agptarget.o
+AMD64GART_OBJS += amd64_gart.o
+ARCMSR_OBJS += arcmsr.o
+ATA_OBJS += $(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
+	ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
+	sil3xxx.o
+BSCBUS_OBJS += bscbus.o
+BSCV_OBJS += bscv.o
+CMDK_OBJS += cmdk.o
+CMLB_OBJS += cmlb.o
+CPUNEX_OBJS += cpunex.o
+DADK_OBJS += dadk.o
+DCOPY_OBJS += dcopy.o
+DNET_OBJS += dnet.o dnet_mii.o
+FD_OBJS += fd.o
+GDA_OBJS += gda.o
+GHD_OBJS += ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
+	ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
+I915_OBJS += i915_dma.o i915_drv.o i915_irq.o i915_mem.o \
+	i915_gem.o i915_gem_debug.o i915_gem_tiling.o
+NSKERN_OBJS += nsc_asm.o
+PCICFG_OBJS += pcicfg.o
+PCI_PCINEXUS_OBJS += pci_pci.o
+PCIEB_OBJS += pcieb_x86.o
+PIT_BEEP_OBJS += pit_beep.o
+POWER_OBJS += power.o
+PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o \
+			pci_memlist.o pci_resource.o
+RADEON_OBJS += r300_cmdbuf.o radeon_cp.o radeon_drv.o \
+			radeon_state.o radeon_irq.o radeon_mem.o
+SD_OBJS += sd.o sd_xbuf.o
+
+HECI_OBJS += 		\
+	heci_init.o	\
+	heci_intr.o	\
+	heci_interface.o \
+	io_heci.o	\
+	heci_main.o
+
+STRATEGY_OBJS += strategy.o
+UCODE_OBJS += ucode_drv.o
+VGATEXT_OBJS += vgatext.o vgasubr.o
+
+#
+#	Kernel linker
+#
+KRTLD_OBJS +=		\
+	bootrd.o	\
+	ufsops.o	\
+	hsfs.o		\
+	doreloc.o	\
+	kobj_boot.o	\
+	kobj_convrelstr.o \
+	kobj_crt.o	\
+	kobj_isa.o	\
+	kobj_reloc.o
+
+#
+#	misc. modules
+#
+ACPICA_OBJS	+= dbcmds.o dbdisply.o \
+		   dbexec.o dbfileio.o dbhistry.o dbinput.o dbstats.o \
+		   dbutils.o dbxface.o evevent.o evgpe.o evgpeblk.o \
+		   evmisc.o evregion.o evrgnini.o evsci.o evxface.o \
+		   evxfevnt.o evxfregn.o hwacpi.o hwgpe.o hwregs.o \
+		   hwsleep.o hwtimer.o dsfield.o dsinit.o dsmethod.o \
+		   dsmthdat.o dsobject.o dsopcode.o dsutils.o dswexec.o \
+		   dswload.o dswscope.o dswstate.o exconfig.o exconvrt.o \
+		   excreate.o exdump.o exfield.o exfldio.o exmisc.o \
+		   exmutex.o exnames.o exoparg1.o exoparg2.o exoparg3.o \
+		   exoparg6.o exprep.o exregion.o exresnte.o exresolv.o \
+		   exresop.o exstore.o exstoren.o exstorob.o exsystem.o \
+		   exutils.o psargs.o psopcode.o psparse.o psscope.o \
+		   pstree.o psutils.o pswalk.o psxface.o nsaccess.o \
+		   nsalloc.o nsdump.o nsdumpdv.o nseval.o nsinit.o \
+		   nsload.o nsnames.o nsobject.o nsparse.o nssearch.o \
+		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
+		   rsaddr.o rscalc.o rscreate.o rsdump.o \
+		   rsinfo.o rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
+		   rsutils.o rsxface.o tbfadt.o tbfind.o tbinstal.o  \
+		   tbutils.o tbxface.o tbxfroot.o \
+		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
+		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
+		   utobject.o utresrc.o utxface.o acpica.o acpi_enum.o \
+		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
+		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
+		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
+		   dmwalk.o psloop.o nspredef.o hwxface.o hwvalid.o \
+		   utlock.o utids.o nsrepair.o nsrepair2.o
+
+AGP_OBJS += agpmaster.o
+FBT_OBJS += fbt.o
+SDT_OBJS += sdt.o
+
+#
+#	AMD8111 NIC driver module
+#
+AMD8111S_OBJS += amd8111s_main.o amd8111s_hw.o
+
+#
+#	Pentium Performance Counter BackEnd module
+#
+P123_PCBE_OBJS = p123_pcbe.o
+
+#
+#	Pentium 4 Performance Counter BackEnd module
+#
+P4_PCBE_OBJS = p4_pcbe.o
+
+#
+#	AMD Opteron/Athlon64 Performance Counter BackEnd module
+#
+OPTERON_PCBE_OBJS = opteron_pcbe.o
+
+#
+#	Intel Core Architecture Performance Counter BackEnd module
+#
+CORE_PCBE_OBJS = core_pcbe.o
+
+#
+#	AMR module
+#
+AMR_OBJS = amr.o
+
+#
+#	IOMMULIB module
+#
+IOMMULIB_OBJS = iommulib.o
+
+#
+#	Brand modules
+#
+SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
+S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
+
+#
+#	special files
+#
+MODSTUB_OBJ +=	 	\
+	modstubs.o
+
+BOOTDEV_OBJS +=		\
+	bootdev.o
+
+INC_PATH	+= -I$(UTSBASE)/intel
+
+
+CPR_INTEL_OBJS +=	cpr_intel.o
+
+#
+# AMD family 0xf memory controller module
+#
+include $(SRC)/common/mc/mc-amd/Makefile.mcamd
+MCAMD_OBJS	+= \
+	$(MCAMD_CMN_OBJS) \
+	mcamd_drv.o \
+	mcamd_dimmcfg.o \
+	mcamd_subr.o \
+	mcamd_pcicfg.o

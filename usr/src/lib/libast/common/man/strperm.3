@@ -1,0 +1,109 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH STRPERM 3
+.SH NAME
+strperm \- evaluate file permission expression
+.SH SYNOPSIS
+.L "int strperm(char* s, char** e, int p)"
+.SH DESCRIPTION
+.I strperm
+applies a file permission expression in the nul-terminated string
+.I s
+to the initial file permission mask
+.IR p .
+The new permission mask is returned.
+If 
+.I e
+not 0 then
+.I *e
+is set to point to the first unrecognized character in
+.IR s .
+.PP
+A tape device specification is composed of one or more
+.I who-op-permission
+terms separated by
+.BR , .
+.I who
+selects portions of the permission bits and may be any combination of:
+.TP 3
+.B u
+the user permission bits;
+.TP
+.B g
+the group permission bits;
+.TP
+.B o
+the `other' permission bits;
+.TP
+.B a
+all permission bits.
+.PP
+If omitted, all permission bits are selected.
+.I op
+specifies how the original permission
+.I p
+is to be modified:
+.TP 3
+.B +
+.br
+.ns
+.B |
+the new bits are set in
+.IR p ;
+.TP 3
+.B \-
+the new bits are cleared in
+.IR p ;
+.TP
+.B &
+the new bits are and'd with
+.IR p ;
+.TP
+.B =
+the select bits in
+.I p
+are set equal to the new bits
+.PP
+A permission expression term may also be an octal number.
+Octal specifications are inherently non-portable.
+Refer to
+.IR chmod (1)
+for an explanation of this form.
+.SH "SEE ALSO"
+chmod(1), ls(1), strmode(3)

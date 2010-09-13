@@ -1,0 +1,67 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/floating-point-scrubber@$(PKGVERS)
+set name=pkg.description value="FP Scrubber configuration files"
+set name=pkg.summary value="FP Scrubber configuration files"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=sparc
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/fps
+dir path=usr/lib/fps/sun4u
+dir path=usr/lib/fps/sun4u/UltraSPARC-III
+dir path=usr/lib/fps/sun4u/UltraSPARC-III+
+dir path=usr/lib/fps/sun4u/UltraSPARC-IIIi
+dir path=usr/lib/fps/sun4u/UltraSPARC-IV
+dir path=usr/lib/fps/sun4u/UltraSPARC-IV+
+file path=lib/svc/manifest/system/fpsd.xml group=sys mode=0444
+file path=usr/lib/fps/fpsd mode=0555
+file path=usr/lib/fps/sun4u/UltraSPARC-III/fptest mode=0555
+legacy pkg=SUNWfsr desc="FP Scrubber configuration files (ROOT)" \
+    name="FP Scrubber configuration files (ROOT)"
+legacy pkg=SUNWfsu desc="FP Scrubber daemon and test" \
+    name="FP Scrubber daemon and test"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/fps/sun4u/UltraSPARC-III+/fptest \
+    target=../UltraSPARC-III/fptest
+link path=usr/lib/fps/sun4u/UltraSPARC-IIIi/fptest \
+    target=../UltraSPARC-III/fptest
+link path=usr/lib/fps/sun4u/UltraSPARC-IV+/fptest \
+    target=../UltraSPARC-III/fptest
+link path=usr/lib/fps/sun4u/UltraSPARC-IV/fptest \
+    target=../UltraSPARC-III/fptest

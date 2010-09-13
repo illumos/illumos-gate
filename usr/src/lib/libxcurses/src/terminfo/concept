@@ -1,0 +1,111 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996, by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# concept: (HUMAN DESIGNED SYSTEMS)
+#
+# From vax135!hpk  Sat Jun 27 07:41:20 1981
+# Extensive changes to c108 by arpavax:eric Feb 1982
+#
+# There seem to be a number of different versions of the C108 PROMS
+# (with bug fixes in its Z-80 program).
+# The first one that we had would lock out the keyboard of you
+# sent lots of short lines (like /usr/dict/words) at 9600 baud.
+# Try that on your C108 and see if it sends a ^S when you type it.
+# If so, you have an old version of the PROMs.
+# The old one also messed up running in with a 132-character line-length.
+# You should configure the C108 to send ^S/^Q before running this.
+# It is much faster (at 9600 baud) than the c100 because the delays
+# are not fixed.
+# Old cursor addressing that didn't understand > 95:
+#	cup=\Ea%p1%' '%+%c%p2%' '%+%c,
+c108|c108-8p|concept108-8p|concept 108 w/8 pages,
+	rmcup=\Ev  ^B p\Ep\r\n, use=c108-4p, 
+c108-4p|concept108-4p|concept 108 w/4 pages,
+	cr=^M, cud1=^J, ind=^J, bel=^G, 
+	is2=\EU\E F\Ef\E7\E5\E8\El\ENH\EK\E\200\Eo&\200\Eo\47\E\E!,
+	smcup=\EU\Ev  8p\Ep\r, rmcup=\Ev  ^A p\Ep\r\n,
+	il1=\E^R, cub1=^H, ed=\E^C, el=\E^S, clear=\E?\E^E, cols#80,
+	cup=\Ea%p1%?%p1%{95}%>%t^A%c%{96}%-%;%' '%+%c%p2%?%p2%{95}%>%t^A%c%{96}%-%;%' '%+%c,
+	dch1=\E^A, dl1=\E^B, rmir=\E\200, eo, smir=\E^P, lines#24, mir,
+	cuf1=\E=, kbs=^h, ul, cuu1=\E;, db, smul=\EG, rmul=\Eg,
+	cvvis=\EW, cnorm=\Ew, in, am, xenl, flash=\Ek$<50>\EK,
+	smkx=\EX, rmkx=\Ex, kcuu1=\E;,
+	kcud1=\E<, kcub1=\E>, kcuf1=\E=, khome=\E?,
+	kf1=\E5, kf2=\E6, kf3=\E7, kf4=\E8, kf5=\E9, kf6=\E:,
+	smso=\ED, rmso=\Ed, dim=\EE, bold=\ED, rev=\ED, sgr0=\Ee\Ed\Eg\Ec,
+c108-rv-8p|concept 108 w/8 pages in reverse video,
+	smcup=\EU\Ev  8p\Ep\r, rmcup=\Ev  ^B p\Ep\r\n, use=c108-rv-4p, 
+c108-rv-4p|concept 108 w/4 pages in reverse video,
+	flash=\EK\200\200\200\200\200\200\200\200\200\200\200\200\200\200\Ek,
+	is2=\EU\E F\Ef\E7\E5\E8\El\ENH\Ek\E\200\Eo&\200\Eo\47\E\E!,
+	use=c108-4p, 
+c108-na|c108-na-8p|concept 108 w/8 pages no arrows,
+	smkx@, rmkx@, kf7=\E;, kf8=\E<, kf9=\E=, use=c108-8p,
+c108-rv-na|c108-rv-na-8p|concept 108 w/8 pages no arrows in rev video,
+	smkx@, rmkx@, kf7=\E;, kf8=\E<, kf9=\E=, use=c108-rv-8p,
+# this needs new frotz in the cup capability for 2-char addrs when > 95....
+c108-w|c108-w-8p|concept 108 w/8 pages in wide mode,
+	is2=\EU\E F\Ef\E7\E5\E8\El\ENH\EK\E\200\Eo&\200\Eo\47\E\E",
+	smcup=\EU\Ev  8^AD\Ep\r, rmcup=\Ev  ^A0^AD\Ep\r\n,
+	cup=\Ea%p1%?%p1%{95}%>%t^A%c%{96}%-%;%' '%+%c%p2%?%p2%{95}%>%t^A%c%{96}%-%;%' '%+%c,
+	cols#132, use=c108-8p,
+# Concepts have only window relative cursor addressing, not screen relative.
+# To get it to work right here, smcup/rmcup (which were invented for the
+# concept) lock you into a one page window for screen style programs.
+# To get out of the one page window, we use a clever trick:
+# we set the window size to zero ("\Ev    " in rmcup) which the terminal
+# recognizes as an error and resets the window to all of memory.
+# This trick works on c100 but does not on c108, sigh.
+#
+# Some tty drivers use cr3 for concept, others use nl3, hence the delays on
+# cr and ind below.  This padding is only needed at 9600 baud.
+# One or the other is commented out depending on local conventions.
+# 2 nulls padding on rmcup isn't always enough.  6 works fine.  Maybe less
+# than 6 but more than 2 will work.
+concept100|c100|concept|c104|c100-4p|concept 100,
+	is2=\EU\Ef\E7\E5\E8\El\ENH\EK\E\200\Eo&\200\Eo\47\E,
+	cr=$<9>^M, ind=^J,
+#	cr=^M, ind=^J$<9>,
+	bel=^G, cud1=^J, smcup=\EU\Ev  8p\Ep\r, rmcup=\Ev    $<6>\Ep\r\n,
+	il1=\E^R$<3*>, am, cub1=^H, ed=\E^C$<16*>, el=\E^U$<16>, clear=^L$<2*>,
+	cup=\Ea%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\E^A$<16*>, dl1=\E^B$<3*>,
+	rmir=\E\200, eo, smir=\E^P, in, ip=$<16*>, lines#24, mir, cuf1=\E=,
+	ht=\t$<8>, kbs=^h, ul, cuu1=\E;, db, smul=\EG, rmul=\Eg,
+	xenl, cvvis=\EW, cnorm=\Ew, flash=\Ek$<20>\EK,
+	pb#9600, vt#8,
+	smul=\EG, rmul=\Eg, smso=\EE\ED, rmso=\Ed\Ee,
+	dim=\EE, rev=\ED, blink=\EC, prot=\EI, invis=\EH, sgr0=\EN\200,
+	rep=\Er%p1%c%p2%' '%+%c$<.2*>, smkx=\EX, rmkx=\Ex,
+	kcuu1=\E;, kcud1=\E<, kcub1=\E>, kcuf1=\E=, khome=\E?,
+	kf1=\E5, kf2=\E6, kf3=\E7,
+c100-rvpp|c100-rv4ppp|c100 with printer port,
+	is2=\EU\Ef\E7\E5\E8\El\ENH\Ek\E\200\Eo&\200\Eo!\200\EQ"\EY(^W\Eo\47\E,
+	use=c100-rv,
+c100-rvna|c100-rv4pna|c100 with no arrows,
+	smkx@, rmkx@, use=c100-rv,
+c100-rv|c100-rv4p|concept100-rv|c100 rev video,
+	is2=\EU\Ef\E7\E5\E8\El\ENH\Ek\E\200\Eo&\200\Eo\47\E,
+	flash=\EK$<20>\Ek, cvvis@, cnorm@, smso=\EE, rmso=\Ee, use=c100,

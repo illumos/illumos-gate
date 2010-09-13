@@ -1,0 +1,119 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This makefile contains workaround defines to be shared
+# by Makefile.i86pc and the genunix Makefile.
+#
+
+#
+# SWAPGS May Fail To Read Correct GS Base
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_88
+
+#
+# Software Prefetches May Report A Page Fault
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_91
+
+#
+# RSM Auto-Halt Restart Returns To Incorrect RIP
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_93
+
+#
+# RET Instruction May Return To Incorrect EIP
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_95
+
+#
+# DRAM scrubber must not be enabled on a node with discontiguous cs range
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_99
+
+#
+# Compatibility Mode Branches Transfer to Illegal Address
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_100
+
+#
+# DRAM Scrubber May Cause Data Corruption When Using Node-Interleaved Memory
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_101
+
+#
+# CPUID Instruction May Return Incorrect Model Number in Some Processors
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_108
+
+#
+# Certain Reverse REP MOVS May Produce Unpredictable Behaviour
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_109
+
+#
+# Sequential Execution Across Non_Canonical Boundary Caused Processor Hang
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_121
+
+#
+# TLB Flush Filter May Cause Cohenrency Problem in Multiprocessor Systems
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_122
+
+#
+# Bypassed Reads May Cause Data Corruption of System Hang in Dual Core
+# Processors
+#
+# Solaris does not currently support PowerNow which is required for this
+# Erratum. Check anyway.
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_123
+
+#
+# Multiprocessor Systems with Four or More Cores May Deadlock Waiting for a
+# Probe Response
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_131
+
+#
+# TSC may drift when C1-Clock ramping enabled
+#
+WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6336786
+
+#
+# Mutex primitives don't work as expected
+#
+WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6323525
+
+#
+# Some Registered DIMMs incompatible with address parity feature
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_172
+
+#
+# L2 Eviction May Occur During Processor Operation To Set
+# Accessed or Dirty Bit.
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_298

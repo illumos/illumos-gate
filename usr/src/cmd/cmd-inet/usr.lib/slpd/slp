@@ -1,0 +1,79 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Service Method Support Script for the SLP service
+#
+# - operates a proxy for slpd which brings up the JVM to run slpd
+#   when required by a client; this prevents keeping JVM's alive
+#   when the service is not in use.
+#
+
+. /lib/svc/share/smf_include.sh
+
+CONF=/etc/inet/slp.conf
+JAVA_BIN=/usr/j2se/bin/java
+CLASSPATH=/usr/share/lib/slp/slpd.jar
+MAIN_CLASS=com.sun.slp.slpd
+SLPD_HOME=/usr/lib/inet
+SLPD=slpd
+SLPD_BIN=$SLPD_HOME/$SLPD
+
+case "$1" in
+'start')
+	# Start slpd proxy (as a fragile dependency, conf file must exist)
+	$SLPD_BIN -f $CONF >/dev/msglog 2>&1 &
+	;;
+
+'stop')
+	# Kill the slpd proxy.
+	/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` $SLPD
+
+	# If a configuration file exists signal a shutdown to the real slpd.
+	[ -f $CONF  ] && {
+		$JAVA_BIN -classpath $CLASSPATH \
+       		    $MAIN_CLASS stop -f $CONF >/dev/msglog 2>&1 &
+
+	       	# Give the above slpd instance a chance to signal
+	       	# a shutdown to the real slpd instance. If after
+	       	# this time it has hung kill it.
+	       	sleep 5
+
+	       	# The pattern must not exceed 80 chars!
+	       	/usr/bin/pkill -x -f -u 0 -P 1,$$  -z `smf_zonename` \
+	       	    "${JAVA_BIN}.*-classpath ${CLASSPATH} .*"		
+	}
+
+	# Kill the slpd proxy service contract
+	smf_kill_contract $2 TERM 1
+	[ $? -ne 0 ] && exit 1
+	;;
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit 0

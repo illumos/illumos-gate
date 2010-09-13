@@ -1,0 +1,644 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH HASH 3
+.SH NAME
+hash \- hash table support (obsolete: use \fBcdt\fP instead)
+.SH SYNOPSIS
+.L "#include <hash.h>"
+.SH DESCRIPTION
+The
+.I hash
+routines manipulate collections of dynamic, scoped hash tables.
+.PP
+A hash table provides an association between a
+.I key
+and its
+.IR value .
+A
+.I key
+is a sequence of 
+.L char
+elements and a
+.I value
+is a user supplied pointer to the value.
+Each hash table has a dynamic number of slots,
+each pointing to the head of a forward linked
+.IR "collision chain" .
+.PP
+Hashing occurs as follows:
+a
+.I "hash function"
+takes a
+.I key
+as an argument and returns a non-negative index.
+The index modulo the table size produces a
+slot that points to a
+.IR "collision chain" .
+The collision chain is sequentially searched until a match is found for
+.IR key .
+The hash tables are automatically resized as new entries are added.
+.PP
+Each hash table has one key type.
+The default key type is a pointer to a null-terminated string.
+The alternate key type is a pointer to a fixed length byte buffer,
+declared for a given table by the
+.L hashalloc()
+function described below.
+.PP
+Hash table information is partitioned into two parts for efficient scoping.
+The
+.I root
+part contains fixed information that is shared among a set of related
+hash tables.
+The remaining information is maintained on a per-table basis.
+.PP
+These basic types are defined in the header file
+.B hash.h
+(alternate names are listed in parenthesis):
+.TP
+.L "Hash_table_t (HASHTABLE)"
+The per-table information.
+The readonly public elements are:
+.RS
+.TP
+.L "int buckets"
+The number of table entries.
+.TP
+.L "char* name"
+The hash table name.
+.TP
+.L "root"
+The root information.
+The public elements are:
+.RS
+.TP
+.L "int root->accesses"
+The number of lookups.
+.TP
+.L "int root->collisions"
+The number of lookup collisions.
+.RE
+.TP
+.L "Hash_table_t* scope"
+The table that this scope covers, 
+.L NULL
+if the table is not a scope.
+.TP
+.L "int size"
+The current hash table size.
+.RE
+.TP
+.L "Hash_bucket_t (HASHBUCKET)"
+A collision chain hash bucket.
+The public structure elements are:
+.RS
+.TP
+.L "char* hashname(Hash_bucket_t*)"
+Returns a pointer to the hash bucket key given the bucket pointer.
+.TP
+.L "char* value"
+The value associated with the key.
+.RE
+.TP
+.L "Hash_header_t (HASHHEADER)"
+The hash bucket header that must be the first element in all user defined
+buckets.
+.L HASH_VALUE
+may not be used with user defined buckets.
+.TP
+.L "Hash_position_t (HASHPOSITION)"
+Stores the hash table position for
+.LR hashscan .
+The public elements are:
+.RS
+.TP
+.L "Hash_bucket_t* bucket"
+The current hash bucket pointer.
+.RE
+.PP
+The routines are:
+.TP
+.L "Hash_table_t* hashalloc(Hash_table_t* ref, int op, ...)"
+Creates a new hash table and returns a pointer to the table.
+.IR malloc (3)
+is used to allocate space for the table.
+.L NULL
+is returned if the table cannot be created.
+.L ref
+is a pointer to a reference hash table that provides
+default values for unspecified information.
+The new hash table and
+.L ref
+share the same root information.
+If
+.L ref
+is
+.L NULL
+then new root information is created for the new table.
+The remaining arguments appear in
+.I op-arg
+pairs, followed by a final
+.L 0
+argument.
+The
+.I op-arg
+pairs are:
+.RS
+.TP
+.L "HASH_alloc, (char(*)()) alloc"
+.L alloc
+is a function that is called to process
+.L Hash_bucket_t
+.L value
+assignments.
+The single argument is
+.L "char* value"
+and the processed
+.L char*
+value is returned.
+.TP
+.L "HASH_clear, int flags"
+.L flags
+are the
+.L ref
+flags to be cleared in the new hash table.
+See
+.L HASH_set
+below.
+.TP
+.L "HASH_compare, (int(*)()) compare"
+Specifies an alternate
+.I key
+comparison function.
+The arguments and return value for
+.L compare
+are the same as for
+.IR strncmp (3)
+if
+.L HASH_namesize
+is specified and
+.IR strcmp (3)
+otherwise.
+The first argument is the 
+.I key
+from the current hash bucket on the 
+.I "collision chain"
+and the second argument is the user supplied 
+.IR key .
+.TP
+.L "HASH_free, (int(*)()) free"
+.L free
+is a function that is called when a hash bucket is freed.
+If
+.L HASH_BUCKET
+was set in
+.L hashalloc
+then the hash bucket pointer is passed, otherwise the bucket
+.L value 
+pointer is passed.
+.TP
+.L "HASH_hash, (int(*)()) hash"
+Specifies an alternate
+.I key
+hash function.
+A
+.L char*
+key argument (and, if
+.L HASH_namesize
+is specified, an
+.L int
+key size argument) is passed to
+.LR hash .
+The return value must be a non-negative
+.LR int .
+.TP
+.L "HASH_meanchain, int meanchain"
+Specifies the mean collision chain length.
+The hash table is automatically resized when this value is exceeded.
+The default mean chain length is 2.
+.TP
+.L "HASH_name, char* name"
+Associates
+.L name
+with the hash table.
+Used by
+.LR hashdump) .
+.TP
+.L "HASH_namesize, int namesize"
+The fixed size in bytes for
+.I keys
+in the table.
+If
+.L namesize
+is 0 (the default) then the
+.I keys
+are interpreted as null-terminated strings.
+.TP
+.L "HASH_set, int flags"
+Changes the hash table flags by
+.IR or ing
+in
+.LR flags .
+The flags, which may be 
+.IR or ed
+together, are:
+.RS
+.TP
+.L HASH_ALLOCATE
+Keys for new hash table entries are to be copied to data areas obtained from
+.IR malloc (3).
+.TP
+.L HASH_FIXED
+Fixes the hash table size, disabling any automatic table resizing.
+.TP
+.L HASH_SCOPE
+The new hash table is a scope that is to be pushed on top of
+.LR ref .
+.L ref
+must be
+.RL non- NULL .
+.RE
+.TP
+.L "HASH_va_list, va_list ap"
+.L ap
+is a
+.L va_list
+variable argument list pointer
+(see
+.LR <stdarg.h> ).
+.RE
+.TP
+.L "Hash_table_t* hashfree(Hash_table_t* tab)"
+The hash table
+.L tab
+is freed.
+The scope covered table pointer is returned,
+.L NULL
+if
+.L tab
+is not a scope.
+.TP
+.L "char* hashlook(Hash_table_t* tab, char* name, int flags, char* value)"
+Operates on the key
+.L name
+in the hash table
+.L tab
+according to
+.L flags
+and 
+.LR value .
+A
+.L Hash_bucket_t
+pointer is returned unless otherwise noted.
+There are three basic lookup operations:
+.RS
+.TP
+.L HASH_CREATE
+.L name
+is entered into the top level scope if it does not already exist.
+If
+.L name
+also appears in a lower scope and
+.L HASH_ALLOC
+is set for the table then the new bucket will share the
+.L name
+field value with the lower scope.
+.TP
+.L HASH_DELETE
+.L name
+is deleted from the top level scope if it exists.
+.L NULL
+is returned.
+.TP
+.L HASH_LOOKUP
+The scopes are searched in order from top to bottom for
+.L name .
+The bucket pointer for the first occurrence is returned.
+.L NULL
+is returned if
+.L name
+is not found.
+.RE
+The basic operations may be qualified by the following
+(the qualifiers are restricted to the basic operations in
+the parenthesized list):
+.RS
+.TP
+.L "HASH_BUCKET (HASH_CREATE,HASH_DELETE,HASH_LOOKUP)"
+.L name
+is a pointer to a bucket that has already been entered into the table.
+.TP
+.L "HASH_FIXED (HASH_CREATE)"
+.L value
+is taken to be the size of the hash bucket to be created for
+.L name
+in the top level scope.
+The minimum bucket size is silently restricted to
+.LR sizeof(Hash_header_t) .
+.TP
+.L "HASH_INSTALL (HASH_CREATE)"
+.L name
+is a pointer to a bucket that has not been entered into the table.
+.TP
+.L "HASH_NOSCOPE (HASH_LOOKUP)"
+The lookup is restricted to the top level scope.
+.TP
+.L "HASH_OPAQUE (HASH_CREATE,HASH_DELETE)"
+Sets
+.L (HASH_CREATE)
+or clears
+.L (HASH_DELETE)
+the
+.I opaque
+property for the bucket.
+An opaque bucket is not visible in lower scopes.
+.TP
+.L "HASH_SCOPE (HASH_CREATE,HASH_DELETE)"
+All scopes are searched for the bucket.
+If the bucket is not found for
+.L HASH_CREATE
+then a new bucket is created in the lowest scope.
+.TP
+.L "HASH_VALUE (HASH_CREATE,HASH_LOOKUP)"
+For
+.L HASH_CREATE
+the bucket
+.L value
+field is set to
+.L value
+and the bucket
+.L name
+value is returned.
+For
+.L HASH_LOOKUP
+the bucket
+.L value 
+field is returned,
+.L NULL
+if the bucket is not found.
+.RE
+If
+.L name
+.L NULL
+then the name from the most recent
+.L hashlook()
+is used, avoiding recomputation of some internal parameters.
+.TP
+.L "char* hashget(Hash_table_t* tab, char* name)"
+Returns the value
+associated with the key
+.L name
+in the hash table
+.LR tab .
+If
+.L name
+is
+.L NULL
+then the name from the most recent
+.L hashget()
+is used, avoiding recomputation of some internal parameters.
+.L NULL
+is returned if
+.L name
+is not in the table.
+All scope covered tables are searched.
+.TP
+.L "Hash_bucket_t* hashlast(Hash_table_t* tab)"
+Returns a pointer to the most recent hash bucket for
+.LR tab .
+The value is set by
+.LR hashlook() ,
+.L hashscan()
+and
+.LR hashwalk() .
+.TP
+.L "char* hashput(Hash_table_t* tab, char* name, char* value)"
+Set the value of the key
+.L name
+to
+.L value
+in the top level scope of the hash table
+.LR tab .
+.L name
+is entered into the top level scope if necessary.
+The (possibly re-allocated) key name pointer is returned
+(see
+.LR HASH_ALLOCATE ).
+If
+.L name
+is 0 then the most recent lookup
+.L name
+to
+.L hashlook()
+or
+.L hashget()
+is used.
+This eliminates a re-hash and re-lookup of
+.LR name .
+.TP
+.L "int hashwalk(Hash_table_t* tab, int flags, (int(*)()) walker, char* handle)"
+The function
+.L walker
+is applied to each entry (not covered by a scope starting at
+.LR tab )
+in the hash table
+.LR tab .
+If
+.L flags
+is 
+.L HASH_NOSCOPE
+then only the top level hash table is used, otherwise the walk includes
+all scope covered tables.
+.L walker
+is called with
+.L char*
+.I key
+as the first argument,
+.L char*
+.I value
+as the second argument, and
+.L char*
+.I handle
+as the third argument.
+.I handle
+may be
+.LR 0 .
+The walk terminates after the last entry or when
+.L walker
+returns a negative value.
+The return value of the last call to
+.L walker
+is returned.
+Only one walk may be active within a collection of scoped tables.
+.TP
+.L "Hash_position_t* hashscan(Hash_table_t* tab, int flags)"
+Returns a
+.L Hash_position_t
+pointer for a sequential scan on the hash table
+.LR tab .
+If
+.L flags
+is 
+.L HASH_NOSCOPE
+then only the top level hash table is used, otherwise the scan includes
+all scope covered tables.
+Only one scan may be active within a collection of scoped tables.
+.L hashdone()
+must be called to terminate the scan.
+.L 0
+is returned on error.
+.TP
+.L "Hash_bucket_t* hashnext(Hash_position_t* pos)"
+Returnes a pointer to the next bucket in the sequential scan set up by
+.L hashscan()
+on
+.LR pos .
+If no elements remain then
+.L 0
+is returned.
+.TP
+.L "void hashdone(Hash_position_t* pos)"
+Completes a scan initiated by 
+.L hashscan()
+on 
+.LR pos .
+.TP
+.L "int hashset(Hash_table_t* tab, int flags)"
+Sets the flags for the hash table
+.L tab
+by
+.IR or ing
+in
+.LR flags .
+Only
+.L HASH_ALLOCATE
+and
+.L HASH_FIXED
+may be set.
+.TP
+.L "int hashclear(Hash_table_t* tab, int flags)"
+Clears the flags for the hash table
+.L tab
+by masking out
+.LR flags .
+Only
+.L HASH_ALLOCATE
+and
+.L HASH_FIXED
+may be cleared.
+.TP
+.L "void hashdump(Hash_table_t* tab, int flags)"
+Dumps hash table accounting info to standard error.
+If
+.L tab
+is 
+.L NULL
+then all allocated hash tables are dumped, otherwise only information on
+.L tab
+is dumped.
+If
+.L flags
+is 
+.L HASH_BUCKET
+then the hash bucket
+.I key-value
+pairs for each collision chain are also dumped.
+.TP
+.L "void hashsize(Hash_table_t* tab, int size)"
+Changes the size of the hash table
+.L tab
+to
+.L size
+where
+.L size
+must be a power of 2.
+Explicit calls to this routine are not necessary as hash tables
+are automatically resized.
+.TP
+.L "int strhash(char* name)"
+Hashes the null terminated character string
+.L name
+using a linear congruent pseudo-random number generator algorithm
+and returns a non-negative
+.L int
+hash value.
+.TP
+.L "int memhash(char* buf, int siz)"
+Hashes the buffer
+.L buf
+of
+.L siz
+bytes using a linear congruent pseudo-random number generator algorithm
+and returns a non-negative
+.L int
+hash value.
+.TP
+.L "long strsum(char* name, long sum)"
+Returns a running 31-bit checksum of the string
+.L name
+where
+.L sum
+is
+.L 0
+on the first call and
+the return value from a previous
+.L memsum
+or
+.L strsum
+call otherwise.
+The checksum value is consistent across all implementations.
+.TP
+.L "long memsum(char* buf, int siz, long sum)"
+Returns a running 31-bit checksum of buffer
+.L buf
+of
+.L siz
+bytes where
+.L sum
+is
+.L 0
+on the first call and
+the return value from a previous
+.L memsum
+or
+.L strsum
+call otherwise.
+The checksum value is consistent across all implementations.
+.SH "SEE ALSO"
+sum(1)

@@ -1,0 +1,68 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+This directory contains sample programs that demonstrate how to use libelf.
+Manual pages for libelf routines are located in section 3e: Library Functions.
+
+Each of these sample programs displays, or manipulates information from a ELF
+file.  Each program uses libelf differently.  To learn more about ELF files
+and their format refer to the "Linker & Libraries Guide", which is part of the
+"Software Developer Collection", and the "System V Application Binary
+Interface".
+
+The following source files are provided:
+
+pcom.c		print comment: prints the .comment section of an ELF file.
+		Demonstrates how to examine a file opened with
+		elf_begin(ELF_C_READ)
+
+acom.c		append comment: appends to, or creates a .comment section
+		within an ELF file.  Demonstrates the updating of a file with
+		elf_begin(ELF_C_RDWR)
+
+dcom.c		delete comment: deletes a .comment section from an ELF file.
+		Demonstrates the creation of a ELF file with
+		elf_begin(ELF_C_WRITE)
+
+tpcom.c		threaded print comment:  a threaded version of pcom.c.
+		Demonstrates that libelf is MT-Safe and can be used by a
+		threaded program.
+
+dispsyms.c	print symbols:  scans a ELF file for any symbol tables
+		(SHT_SYMTAB, SHT_DYNSYM, or SHT_SUNW_LDYNSYM) and
+		displays the symbol tables contents.
+
+Makefile	make file to build the above programs.
+
+
+Building the demos
+------------------
+
+To build the programs:
+
+  % make all
+
+To test the programs:
+
+  % make test

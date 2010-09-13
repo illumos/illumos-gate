@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# trapstat provides two families of trap tables for SPARC platforms, one for
+# sun4u, and one for sun4v.  Previous implementations provided these families by
+# invoking a platform specific binary (/usr/platform/$PLATFORM/sbin/trapstat).
+# trapstat itself was linked to /usr/lib/platexec, a shell script used to
+# discover the platform name, and exec the associated platform specific binary.
+#
+# The two trapstat trap tables are now encapsulated behind a symbol capabilities
+# routine get_trap_entry().  An instance of this routine is provided for sun4u,
+# and sun4v, and are identified with a machine hardware name via using
+# ../common/mapfile-cap.
+#
+# These object capabilities relocatable objects are then translated into symbol
+# capabilities relocatable objects, pics/symcap.o.
+# 
+# The sun4u and sun4v families of symbol capabilities object are eventually
+# included in the final build of trapstat.
+
+$(SYMCAP):	$(OBJCAP)
+$(OBJCAP):	$(OBJECTS)
+
+# Combine all pic objects into one relocatable object.  Assign any capabilities
+# to this object, and define the interface.
+
+objcap.o:	$(OBJECTS) $(MAPFILE-CAP)
+		$(LD) -r -o $@ $(MAPOPT-CAP) -Breduce $(OBJECTS)
+
+# Convert the combined object capabilities object into a symbol capabilities
+# object.
+
+symcap.o:	$(OBJCAP)
+		$(LD) -r -o $@ -z symbolcap $(OBJCAP)
+
+# Create original object.
+
+%.o:		../sun4/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+clean:
+		$(RM) $(OBJECTS)
+
+lint:
+
+include		$(SRC)/cmd/Makefile.targ

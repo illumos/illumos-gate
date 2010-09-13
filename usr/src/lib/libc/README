@@ -1,0 +1,238 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+The Solaris Process Model Unification project:
+	PSARC/2002/117 Solaris Process Model Unification
+	4470917 Solaris Process Model Unification
+folded libthread into libc and has led to some fundamental changes
+in the rules by which code in libc must be developed and maintained.
+
+All code in libc must be both MT-Safe and Fork-Safe
+and where possible (almost everywhere), Async-Signal-Safe.
+
+To this end, the following rules should be followed:
+
+Almost all internal libc locks (mutexes and read-write locks)
+should be acquired and released via these interfaces:
+
+	mutex_t some_lock = DEFAULTMUTEX;
+
+	lmutex_lock(&some_lock);
+	... do something critical ...
+	lmutex_unlock(&some_lock);
+
+	rwlock_t some_rw_lock = DEFAULTRWLOCK;
+
+	lrw_rdlock(&some_rw_lock);
+	... multiple threads can do something ...
+	lrw_unlock(&some_rw_lock);
+
+	lrw_wrlock(&some_rw_lock);
+	... only one thread can do something ...
+	lrw_unlock(&some_rw_lock);
+
+The above l* versions of the mutex and rwlock interfaces do more
+than the ordinary interfaces:  They define critical regions in
+which the calling thread cannot be suspended (making the region
+fork-safe) and in which the calling thread has all signals deferred
+(making the region async-signal-safe).
+
+However, certain rules apply to the code within these critical regions:
+
+	- The code must be of guaranteed short duration; no calls
+	  to interfaces that might block indefinitely are allowed.
+	  This means no calls into stdio or syslog() and no calls
+	  to cond_wait() unless there is a guarantee of an almost-
+	  immediate call to cond_signal() or cond_broadcast()
+	  from elsewhere.
+
+	- The code cannot call any non-l* synchronization
+	  primitives (mutex_lock(), _private_mutex_lock(),
+	  rw_wrlock(), rw_rdlock(), sema_wait(), etc.)
+
+	- The code cannot call any functions outside of libc,
+	  including application callbacks and functions from
+	  dlopen()ed objects, such as those in the I18N code.
+
+	- Because malloc(), calloc(), realloc(), and free()
+	  are designed to be interposed upon, they fall into
+	  the previous case of prohibition.  None of these can
+	  be called by a thread while in a critical region.
+
+There is a private memory allocator for use internally to libc.
+It cannot be interposed upon and it is safe to use while in
+a critical region (or for that matter while not in a critical
+region; it is async-signal-safe and fork-safe):
+
+	void *lmalloc(size_t);
+	void lfree(void *, size_t);
+
+	void *libc_malloc(size_t);
+	void *libc_realloc(void *, size_t);
+	char *libc_strdup(const char *);
+	void libc_free(void *);
+
+lmalloc() and lfree() are the basic interfaces.  The libc_*()
+variants are built on top of lmalloc()/lfree() but they have
+the same interface signatures as the corresponding functions
+without the 'libc_' prefix.  lmalloc() and libc_malloc()
+return zeroed memory blocks.  Note that lmalloc()/lfree()
+require the caller to remember the size parameter passed
+to lmalloc() and to pass the same value to lfree().
+
+Memory allocated by lmalloc() can only be freed by lfree().
+Memory allocated by libc_malloc(), libc_realloc(), or libc_strdup()
+can only be freed by libc_free().  Never pass such allocated
+memory out of libc if the caller of libc is expected to free it.
+
+lmalloc()/lfree() is a small and simple power of two allocator.
+Do not use it as a general-purpose allocator.  Be kind to it.
+
+There is a special mutual exclusion interface that exists for
+cases, like code in the I18N interfaces, where mutual exclusion
+is required but the above rules cannot be followed:
+
+	int fork_lock_enter(const char *);
+	void fork_lock_exit(void);
+
+fork_lock_enter() does triple-duty.  Not only does it serialize
+calls to fork() and forkall(), but it also serializes calls to
+thr_suspend() (fork() and forkall() also suspend other threads),
+and furthermore it serializes I18N calls to functions in other
+dlopen()ed L10N objects that might be calling malloc()/free().
+Use it in general like this:
+
+	(void) fork_lock_enter(NULL);
+	... serialized; do something that might call malloc ...
+	fork_lock_exit();
+
+The 'const char *' argument to fork_lock_enter() should always
+be NULL except for two special cases:
+	- When called from fork() or forkall()
+	- When called from pthread_atfork()
+This enforces the prohibition against calling fork() or pthread_atfork()
+from a pthread_atfork()-registered fork handler function while a fork()
+prologue or epilogue is in progress.  If _THREAD_ERROR_DETECTION is set
+to 1 or 2 in the environment, such cases will draw a nasty message and
+will dump core if _THREAD_ERROR_DETECTION=2.  fork_lock_enter() returns
+non-zero only if it is called from a fork handler.  This is of interest
+only to callers that have to do something about this condition; the
+return value should be ignored in all other cases (fork_lock_enter()
+never actually fails).
+
+It is an error to call fork_lock_enter() while in a critical region
+(that is, while holding any internal libc lock).
+
+On return from fork_lock_enter(), no internal libc locks are held
+but a flag has been set to cause other callers of fork_lock_enter()
+to delay (via _cond_wait()) until fork_lock_exit() is called.
+
+These are the rules to follow for memory allocation:
+
+  - If a function acquires an internal libc lock or is called while
+    an internal libc lock is held:
+
+	* The malloc family cannot be used.
+
+	* lmalloc or libc_malloc should be used.  The memory must
+	  be released by lfree or libc_free, respectively.
+
+	* lfree takes an argument to tell the size of the releasing
+	  memory.  If the function does not know the size at the
+	  releasing point, libc_malloc and libc_free should be used.
+
+	* As the memory allocated by lmalloc or libc_malloc needs
+	  to be released by lfree or libc_free and these are internal
+	  to libc, they cannot be used to allocate memory that might
+	  be released by application code outside libc.
+
+	* If the memory allocation by malloc() cannot be avoided and
+	  the scalability of the function does not matter much, the
+	  function can be serialized with fork_lock_enter() instead
+	  of lmutex_lock().
+
+	* If the memory allocation by malloc() cannot be avoided and
+	  the scalability of the function does matter, another
+	  implementation of the function will be necessary.
+
+In a DEBUG build of libc:
+	make THREAD_DEBUG=-DTHREAD_DEBUG install
+many of these rules are enforced by ASSERT() statements scattered about
+in the libc sources.  This is the default mode for building libc when
+a DEBUG nightly build is performed.
+
+-----
+
+Some i18n code cannot be distributed as open source.  To enable the rest of
+libc to be distributed as open source, those i18n files now live in a
+separate libc_i18n directory.  Those source files are position-independently
+compiled and are archived into the libc_i18n.a library.  The libc_i18n.a
+archive library is installed into the $(ROOTFS_LIBDIR) and
+$(ROOTFS_LIBDIR64) directories.  During link phase, libc.so.1 links with
+libc_i18n.a in the proto area.  Therefore, the build of the libc_i18n tree
+needs to be done before the build of the libc tree.  Also the compilation
+conditions such as the setting of CFLAGS and CPPFLAGS for the libc_i18n
+stuff need to be compatible with the ones for the libc stuff.  Whenever
+changes that affect the compilation conditions of libc occur, the changes
+should be propagated to libc_i18n.
+
+-----
+
+The putback of the project:
+	6416832 libaio and librt can and should be folded into libc
+introduced several libc-private locking interfaces:
+	void	sig_mutex_lock(mutex_t *);
+	void	sig_mutex_unlock(mutex_t *);
+	int	sig_mutex_trylock(mutex_t *);
+	int	sig_cond_wait(cond_t *, mutex_t *);
+	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+which are declared in both "thr_uberdata.h" and "mtlib.h".
+
+They are used in specialized code in libc, like the asynchronous i/o code.
+Unlike the lmutex_lock() and lmutex_unlock() interfaces described above,
+these interfaces do not define critical regions, but signals are
+deferred while locks acquired by these functions are held, making
+their use be async-signal safe.  Calls to malloc(), calloc(), realloc(),
+and free() are permissible while holding such locks.
+
+These interfaces were brought over from code in the former libaio
+and librt and are necessary because, where they are used, the code
+must execute potentially long-term waits and must be cancelable.
+sig_cond_wait() and sig_cond_reltimedwait() are cancellation points.
+
+These interfaces are available for other uses inside libc, as
+the need arises.  (There is no need if the code does not perform
+long-term waits.)  Just follow a few rules to be self-consistent:
+ - Don't mix calls to mutex_[un]lock(), lmutex_[un]lock() and
+   sig_mutex_[un]lock() on the same mutex.
+ - Don't call cond_wait() with a mutex acquired by sig_mutex_lock();
+   call sig_cond_wait() or sig_cond_reltimedwait().
+ - Use pthread_cleanup_push() and pthread_cleanup_pop() to make
+   your code cancellation-safe.
+ - The sig_*() interfaces are not in themselves fork-safe.
+   You have to employ other logic to make your code fork-safe.
+   See the tail of postfork1_child() for examples.

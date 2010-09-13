@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/computer">
+      <append key="info.addons" type="strlist">hald-addon-cpufreq</append>
+    </match>
+  </device>
+</deviceinfo>

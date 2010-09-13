@@ -1,0 +1,133 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+.KEEP_STATE:
+.SUFFIXES:
+
+include ../../Makefile.libstand
+
+SRCS += \
+	bcmp.c \
+	bcopy.c \
+	bsearch.c \
+	bzero.c \
+	ctime.c \
+	ctype.c \
+	errno.c \
+	getopt.c \
+	memchr.c \
+	memcmp.c \
+	memcpy.c \
+	memccpy.c \
+	memmove.c \
+	memset.c \
+	qsort.c \
+	string.c \
+	strtol.c \
+	strtoul.c
+
+# We don't want thread-specific errno's in kmdb, as we're single-threaded.
+DTS_ERRNO=
+
+INCDIRS = \
+	../../../common/libstand \
+	../../libstand \
+	$(ROOT)/usr/include
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS = $(INCDIRS:%=-I%) -D_KMDB
+
+#
+# kmdb is a kernel module, so we'll use the kernel's build flags.
+CFLAGS += $(STAND_FLAGS_32)
+CFLAGS64 += $(STAND_FLAGS_64)
+
+ASFLAGS += -P -D_ASM
+
+LINTFLAGS += -n -errtags=yes
+CLINTFILES = $(SRCS:%.c=%.ln)
+LINTFILES = $(CLINTFILES:%.s=%.ln)
+
+LIB = libstand.a
+COBJS = $(SRCS:%.c=%.o)
+OBJS = $(COBJS:%.s=%.o)
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJS) $(LINTFILES)
+
+install all: $(LIB)
+
+$(LIB): $(OBJS)
+	$(AR) r $(LIB) $(OBJS)
+
+clobber clean:
+	$(RM) $(LIB) $(OBJS) $(LINTFILES)
+
+lint: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES)
+
+#
+# Dynamic rules for object construction
+#
+
+%.o: ../../../common/libstand/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/util/i386/%.s
+	$(COMPILE.s) $<
+
+%.o: ../../libstand/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../libstand/%.s
+	$(COMPILE.s) -o $@ $<
+
+#
+# Lint
+#
+
+%.ln: ../../../common/libstand/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/i386/%.s
+	$(LINT.s) -c $<
+
+%.ln: ../../libstand/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.s
+	$(LINT.s) -c $<

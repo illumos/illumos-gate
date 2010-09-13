@@ -1,0 +1,48 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+include ../../../Makefile.tools
+
+#
+# A `make install' from the tools directory needs to work, even if the rest of
+# the tree hasn't been built.  As such, we need to tell the ctf builds how
+# to find the ctf specific headers located outside the tools subtree. We also 
+# want to tell them how to get to the common tools source files.
+# 
+# For additonal details on the ordering of includes via -I, see the comments
+# in $(SRC)/tools/ctf/common/ctf_headers.h.
+# 
+
+HDRDIRS= \
+	-_gcc=-nostdinc \
+	-I../../common \
+	-I$(SRC) \
+	-I/usr/include \
+	-I$(SRC)/uts/common
+
+CPPFLAGS += $(HDRDIRS)
+CFLAGS += $(CCVERBOSE)

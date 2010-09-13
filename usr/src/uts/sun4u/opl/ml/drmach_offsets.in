@@ -1,0 +1,59 @@
+\
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+
+#include <sys/types.h>
+#include <sys/sysmacros.h>
+#include <sys/param.h>
+#include <sys/machparam.h>
+#include <sys/systm.h>
+#include <sys/machsystm.h>
+#include <sys/cpuvar.h>
+
+#include <sys/drmach.h>
+
+drmach_copy_rename_critical_t	DRMACH_COPY_RENAME_CRITICAL_SIZE
+	scf_reg_base
+	scf_td
+	save_log
+	save_local
+	pstate
+	delay
+	run
+	fmem
+	loop
+	loop_rtn
+	inst_loop_ret
+	fmem_issued
+
+drmach_scf_regs_t		SCF_REG_SIZE
+	scf_command
+	scf_status
+	scf_version
+	scf_tdata
+	scf_rdata
+	scf_status_ex
+
+drmach_fmem_mbox_t		FMEM_MBOX_SIZE
+	stat
+	error

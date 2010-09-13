@@ -1,0 +1,185 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+$(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
+	$(LD) -r $(BREDUCE) $(ZNOVERSION) $(ZDEFS) -M$(MAPFILE) -o $@ $(OBJS) \
+	    $(KMDBLIBS)
+
+$(PROG): $(PROG).core $(KCTLOBJS)
+	$(LD) -dy -r -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(KCTLOBJS)
+	$(KMDB_FPTEST)
+	$(SETDYNFLAG) -f DF_1_IGNMULDEF,DF_1_NOKSYMS $@
+
+clean.lint:
+	$(RM) $(ALLLINTFILES)
+
+clean:
+	$(RM) $(OBJS) $(KCTLOBJS) $(PROG).core $(MAPFILE)
+	$(RM) $(MAPFILE_INTERMEDIATE)
+	$(RM) kmdb_terminfo.c kmdb_modlinktest.c kmdb_modlinktest.o
+	$(RM) kaif_off.h kmdb_context_off.h
+	$(RM) mdb_lex.c mdb_grammar.c mdb_grammar.h y.tab.h y.tab.c y.output
+
+clobber: clean clean.lint
+	$(RM) $(PROG)
+
+dmods:
+
+#
+# Specialized object construction
+#
+kmdb_terminfo.c: 	../../../common/mdb/mdb_termio.c \
+			../../../common/kmdb/kmdb_terminfo_skel.c
+	$(TIGEN) -s ../../../common/kmdb/kmdb_terminfo_skel.c \
+	    -t ../../../common/mdb/mdb_termio.c \
+	    $(SUPPORTED_TERMS) > $@
+
+$(MAPFILE_INTERMEDIATE): $(MAPFILE_SOURCES) $(MAPFILE_TEMPLATE)
+	$(HDR2MAP) -t $(MAPFILE_TEMPLATE) $(MAPFILE_SOURCES) >$@
+
+$(MAPFILE): $(MAPFILE_INTERMEDIATE)
+	$(CPP) -P $(SACPPFLAGS) <$(MAPFILE_INTERMEDIATE) >$@
+
+mdb_lex.c: ../../../common/mdb/mdb_lex.l mdb_grammar.h
+	$(LEX) $(LFLAGS) ../../../common/mdb/mdb_lex.l > $@
+
+mdb_grammar.h mdb_grammar.c: ../../../common/mdb/mdb_grammar.y
+	$(YACC) $(YFLAGS) ../../../common/mdb/mdb_grammar.y
+	@$(MV) y.tab.h mdb_grammar.h
+	@$(MV) y.tab.c mdb_grammar.c
+
+#
+# These should really be combined into a dynamic rule, but there's a bug in
+# dmake that'll cause it to get confused about dependencies if we do.
+#
+
+kaif_off.h := CPPFLAGS += $(SACPPCFLAGS)
+
+kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
+	$(MAP2LINKTEST) <$(MAPFILE_INTERMEDIATE) >$@
+	$(CPP) -P $(SACPPFLAGS) <$(MAPFILE_INTERMEDIATE) >$(MAPFILE)
+
+#
+# Dynamic rules for object construction
+#
+%.o: ../../../common/kmdb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../../common/kmdb/kctl/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../../common/kmdb/kctl/%.s
+	$(COMPILE.s) -o $@ $<
+
+%.o: ../../../common/mdb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../kmdb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../kmdb/%.s
+	$(COMPILE.s) -o $@ $<
+
+%.o: ../../kmdb/kctl/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: ../../kmdb/kctl/%.s
+	$(COMPILE.s) -o $@ $<
+
+%.o: ../../mdb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: %.s
+	$(COMPILE.s) -o $@ $<
+
+%.o: kctl/%.s
+	$(COMPILE.s) -o $@ $<
+
+%.o: $(SRC)/common/net/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+#
+# Lint
+#
+
+%.ln: ../../../common/kmdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../../common/kmdb/kctl/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../../common/kmdb/kctl/%.s
+	$(LINT.s) -c $<
+
+%.ln: ../../../common/mdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../kmdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../kmdb/%.s
+	$(LINT.s) -c $<
+
+%.ln: ../../kmdb/kctl/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../kmdb/kctl/%.s
+	$(LINT.s) -c $<
+
+%.ln: ../../mdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.c
+	$(LINT.c) -c $<
+
+%.ln: %.s
+	$(LINT.s) -c $<
+
+%.ln: kctl/%.s
+	$(LINT.s) -c $<
+
+%.ln: $(SRC)/common/net/util/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/%.c
+	$(LINT.c) -c $<

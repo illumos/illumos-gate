@@ -1,0 +1,30 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+The current version of GRUB is based on
+	grub-0.97 from ftp://alpha.gnu.org/gnu/grub/
+
+Graphics patch from Red Hat:
+	http://ruslug.rutgers.edu/~mcgrof/grub-images/patches/historic/redhat/
+
+	NOTES:
+	According to http://ruslug.rutgers.edu/~mcgrof/grub-images/
+	the original author of this graphics patch is
+
+		Paulo Cesar Pereira de Andrade
+
+	The original graphics patch file is the grub-0.93-graphics.patch
+	which is for GRUB 0.93.  The file grub-0.95-graphics.patch
+	is for GRUB 0.95 (after manually patched with the 0.93 changes
+	by Jongki.Suwandi@sun.com).
+
+	There is a linux bootsplashproject which turns off verbose mode even
+	in kernel: http://www/bootsplash.org/
+
+GRUB 0.95 diskless patches by Feng Shuo:
+	grub-0.95-diskless-patch-2.patch
+	grub-0.95-diskless-patch-2-undi.patch
+
+	http://savannah.gnu.org/bugs/?func=detailitem&item_id=9408
+
+Solaris VTOC and ufs support, developed by Shudong Zhou
+	Webrevs are available at http://boot.eng/

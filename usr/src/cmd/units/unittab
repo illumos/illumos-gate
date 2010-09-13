@@ -1,0 +1,573 @@
+/
+/ Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+/ Use is subject to license terms.
+/
+/ Copyright (c) 1980 Regents of the University of California.
+/ All rights reserved.  The Berkeley Software License Agreement
+/ specifies the terms and conditions for redistribution.
+/
+
+/ ident	"%Z%%M%	%I%	%E% SMI"
+/ dimensions
+m			*a*
+kg			*b*
+sec			*c*
+coul			*d*
+candela			*e*
+dollar			*f*
+radian			*g*
+bit			*h*
+erlang			*i*
+degC			*j*
+
+/ Authoritative places to get updated values:
+/    http://physics.nist.gov/cuu/
+/    http://www.npl.co.uk/npl/reference/index.html
+/ Less authoritative but very useful for non-SI units is
+/    http://www.ex.ac.uk/cimt/dictunit/dictunit.htm
+
+/ constants
+
+fuzz			1
+pi			3.14159265358979323846 fuzz
+/ speed of light in a vacuum
+c			2.99792458+8 m/sec
+/ standard acceleration due to gravity
+g			9.80665 m/sec2
+/ Astronomical Unit
+au			1.4959787069+11 m fuzz
+/ Avagadro's number
+mole			6.022137+23 fuzz
+/ charge on an electron
+e			1.6021773-19 coul fuzz
+/ covert mass to energy (e.g., you have: kilogram energy  you want: megaton tnt)
+energy			c2
+/ convert mass to weight (e.g., use "lb-force" to get a pound of force)
+force			g
+/ density of mercury expressed as weight/volume)
+mercury			1.33322+5 kg/m2-sec2
+hg			mercury
+
+/ dimensionless
+
+degree			1|180 pi-radian
+circle			2 pi-radian
+turn			2 pi-radian
+grade			.9 degree
+arcdeg			1 degree
+arcmin			1|60 arcdeg
+ccs			1|36 erlang
+arcsec			1|60 arcmin
+
+steradian		radian2
+sphere			4 pi-steradian
+sr			steradian
+
+/ Time
+
+second			sec
+s			sec
+minute			60 sec
+min			minute
+hour			60 min
+hr			hour
+day			24 hr
+da			day
+week			7 day
+/ Mean tropical year in the year 2000.  This decreases by .00000615 per century.
+year			365.2421896698 day fuzz
+yr			year
+month			1|12 year
+ms			millisec
+us			microsec
+
+/ Mass
+
+gram			millikg
+gm			gram
+mg			milligram
+metricton		kilokg
+
+/ Avoirdupois
+
+lb			.45359237 kg
+lbf			lb g
+ounce			1|16 lb
+oz			ounce
+dram			1|16 oz
+dr			dram
+grain			1|7000 lb
+gr			grain
+shortton		2000 lb
+ton			shortton
+longton			2240 lb
+
+/ Apothecary
+
+scruple			20 grain
+apdram			60 grain
+apounce			480 grain
+appound			5760 grain
+
+/ Length
+
+meter			m
+metre			m
+cm			centimeter
+mm			millimeter
+km			kilometer
+nm			nanometer
+micron			micrometer
+angstrom		decinanometer
+
+inch			2.54 cm
+in			inch
+foot			12 in
+feet			foot
+ft			foot
+yard			3 ft
+yd			yard
+rod			5.5 yd
+rd			rod
+mile			5280 ft
+mi			mile
+
+british			1200|3937 m/ft
+nmile			1852m
+
+acre			4840 yd2
+
+cc			cm3
+liter			kilocc
+litre			liter
+ml			milliliter
+
+/ US Liquid
+
+gallon			231 in3
+imperial		1.20095
+gal			gallon
+quart			1|4 gal
+qt			quart
+pint			1|2 qt
+pt			pint
+
+floz			1|16 pt
+fldr			1|8 floz
+
+/ US Dry
+
+dry			268.8025 in3/gallon
+peck			8 dry-quart
+pk			peck
+bushel			4 peck
+bu			bushel
+
+/ British
+
+brgallon		4.54609 litre
+brquart			1|4 brgallon
+brpint			1|2 brquart
+brgill			1|4 brpint
+brfloz			1|20 brpint
+brpeck			9.09218 litre
+brbushel		4 brpeck
+
+/ Energy Work
+
+newton			kg-m/sec2
+nt			newton
+joule			nt-m
+/ There are 5 different small calories.  The one used here is the "IT
+/ calorie".  The "USA calorie" or "thermochemical calorie" is 4.184 joule
+/ (exact).  The "calorie at 15 deg C" is 4.1855 joule fuzz.  The "calorie
+/ at 20 deg C" is 4.1819 joule fuzz.  The "mean calorie" is 4.19002 joule
+/ fuzz.  The large Calorie is a thousand of (one of) these calories.
+cal			4.1868 joule
+
+/ Electrical
+
+coulomb			coul
+ampere			coul/sec
+amp			ampere
+watt			joule/sec
+volt			watt/amp
+ohm			volt/amp
+mho			/ohm
+farad			coul/volt
+henry			sec2/farad
+weber			volt-sec
+
+/ Light & Radiation
+
+cd			candela
+lumen			cd sr
+lux			cd sr/m2
+/ actual radiation dose
+gray			joule/kg
+/ effective radiation dose
+sievert			joule/kg
+
+/ Temperature
+
+kelvin			degC
+rankine			5|9 kelvin
+degF			rankine
+/ note that degF and degC are suitable for converting temperature intervals,
+/ but not actual temperatures on the Fahrenheit and Celsius scales.
+
+/ Money
+/ epoch May 22, 1998
+/ floating rates from Los Angeles Times
+/ fixed rates from http://dylee.keel.econ.ship.edu/intntl/intfin/currencies.htm
+/ Currencies pegged by the country to another currency are shown exactly
+/ (of course, they are still subject to change).  Others are shown as "fuzz".
+
+$			dollar
+argentinapeso		1.0000 $
+australiadollar		0.6297 $   fuzz
+brazilreal		0.8705 $   fuzz
+britainpound		1.6327 $   fuzz
+canadadollar		0.9899 $   fuzz
+chilepeso		0.002204 $ fuzz
+chinayuanrenminbi	0.1208 $   fuzz
+colombiapeso		0.000719 $ fuzz
+czechkoruna		0.0308 $   fuzz
+denmarkkrone		1.491 $    fuzz
+dominicanrepublicpeso	0.0664 $   fuzz
+equadorsucre		0.000196 $ fuzz
+egyptpound		0.2927 $   fuzz
+hongkongdollar		1|7.73 $
+hungaryforint		1|211.02 $ fuzz
+indiarupee		0.0247 $   fuzz
+indonesiarupiah		1|11050 $  fuzz
+iranrial		0.000333 $ fuzz
+iraqdinar		1|.3109 $
+israelnewshekel		0.2743 $   fuzz
+israelshekel		.001 israelnewshekel
+israelpound		.1 israelshekel
+japanyen		0.007419 $ fuzz
+jordandinar		1.4134 $   fuzz
+lebanonpound		1|1519.5 $ fuzz
+malaysiaringgit		0.2654 $   fuzz
+malaysiadollar		malaysiaringgit
+mexicopeso		0.115781 $ fuzz
+newzealanddollar	0.5338 $   fuzz
+norwaykrone		0.1342 $   fuzz
+pakistanrupee		0.0229 $   fuzz
+perusol			0.3532 $   fuzz
+perunewsol		perusol
+philippinespeso		0.0258 $   fuzz
+polandnewzloty		0.2882 $   fuzz
+russiaruble		0.1624 $   fuzz
+saudiarabiariyal	0.2667 $   fuzz
+singaporedollar		0.6109 $   fuzz
+slovakiakoruna		0.0293 $   fuzz
+southafricarand		0.1968 $   fuzz
+southkoreawon		0.00072 $  fuzz
+swedenkrona		0.1302 $   fuzz
+switzerlandfranc	0.6841 $   fuzz
+taiwannewdollar		0.0298 $   fuzz
+thailandbaht		0.02541 $  fuzz
+turkeylira		1|253780 $ fuzz
+uaedirham		0.2724 $   fuzz
+uruguaypeso		0.0966 $   fuzz
+venezuelabolivar	1|535.5 $  fuzz
+
+/ The euro and currencies tied to it.
+/ See http://www.x-rates.com/faq_euro.html
+/ or http://europa.eu.int/euro/html/entry.html
+/ euro to $ as of 16 Jan 2002.
+euro			0.8834 $ fuzz
+austriaschilling	1|13.7603 euro
+belgiumfranc		1|40.3399 euro
+finlandmarkka		1|5.94573 euro
+francefranc		1|6.55957 euro
+germanymark		1|1.95583 euro
+greecedrachma		1|340.750 euro
+irelandpound		1|.787564 euro
+italylira		1|1936.27 euro
+luxembourgfranc		1|40.3399 euro
+netherlandsguilder	1|2.20371 euro
+portugalescudo		1|200.482 euro
+spainpeseta		1|166.386 euro
+
+mark			germanymark
+bolivar			venezuelabolivar
+peseta			spainpeseta
+rand			southafricarand
+escudo			portugalescudo
+sol			perusol
+guilder			netherlandsguilder
+peso			mexicopeso
+yen			japanyen
+lira			italylira
+dinar			iraqdinar
+rial			iranrial
+rupee			indiarupee
+drachma			greecedrachma
+franc			francefranc
+markka			finlandmarkka
+sucre			equadorsucre
+pound			britainpound
+poundsterling		britainpound
+/ cruzeiro		brazilcruzeiro
+
+/ PDP-11
+
+baud			bit/sec
+byte			8 bit
+word			2 byte
+block			512 byte
+K			1024 word
+tc			578 block
+rktrack			12 block
+rkcylinder		2 rktrack
+rk			203 rkcylinder
+rptrack			10 block
+rpcylinder		20 rptracks
+rp			406 rpcylinder
+rftrack			8 block
+rfshoe			8 rftrack
+rfdisk			16 rfshoe
+rf			2 rfdisk
+
+/ Trivia
+
+%			1|100
+admiraltyknot		6080 ft/hr
+apostilb		cd/pi-m2
+are			1+2 m2
+arpentcan		27.52 mi
+arpentlin		191.835 ft
+astronomicalunit	au
+atmosphere		1.01325+5 nt/m2
+atm			atmosphere
+atomicmassunit		gm/mole
+amu			atomicmassunit
+bag			94 lb
+bakersdozen		13
+bar			1+5 nt/m2
+barie			1-1 nt/m2
+barleycorn		1|3 in
+barn			1-28 m2
+barrel			42 gal
+barye			1-1 nt/m2
+/ radiation activity
+becquerel		/sec
+bev			1+9 e-volt
+biot			10 amp
+blondel			cd/pi-m2
+boardfoot		144 in3
+bolt			40 yd
+boltzmann		1.38066-23 joule/degC fuzz
+k			boltzmann
+bottommeasure		1|40 in
+britishthermalunit	cal lb-degF/gm-degC
+btu			britishthermalunit
+refrigeration		12000 btu/ton-hour
+buck			dollar
+cable			720 ft
+caliber			1-2 in
+calorie			cal
+carat			205 mg
+cent			centidollar
+cental			100 lb
+centesimalminute	1-2 grade
+centesimalsecond	1-4 grade
+century			100 year
+cfs			ft3/sec
+chain			66 ft
+circularinch		1|4 pi-in2
+circularmil		1-6|4 pi-in2
+clusec			1-8 mm-hg m3/s
+coomb			4 bu
+cord			128 ft3
+cordfoot		cord
+crith			9.06-2 gm
+cubit			18 in
+cup			1|2 pt
+curie			3.7+10 /sec
+dalton			amu
+decade			10 yr
+dioptre			/m
+displacementton		35 ft3
+doppelzentner		100 kg
+dozen			12
+drop			.03 cm3
+dyne			cm-gm/sec2
+electronvolt		e-volt
+ell			45 in
+engineerschain		100 ft
+engineerslink		100|100 ft
+equivalentfootcandle	lumen/pi-ft2
+equivalentlux	lumen/pi-m2
+equivalentphot		cd/pi-cm2
+erg			cm2-gm/sec2
+ev			e-volt
+faraday			9.652+4 coul
+fathom			6 ft
+fermi			1-15 m
+fifth			4|5 qt
+fin			5 dollar
+finger			7|8 in
+firkin			9 gal
+footcandle		lumen/ft2
+footlambert		cd/pi-ft2
+fortnight		14 da
+franklin		3.33564-10 coul
+frigorie		kilocal
+furlong			220 yd
+/ Universal Gravitational Constant
+G			6.673-11 m3/kg-sec2 fuzz
+galileo			1-2 m/sec2
+gamma			1-9 weber/m2
+gauss			1-4 weber/m2
+geodeticfoot		british-ft
+geographicalmile	1852 m
+gilbert			7.95775-1 amp
+gill			1|4 pt
+gross			144
+gunterschain		22 yd
+hand			4 in
+/ Planck's constant
+hbar			1.054573-34 joule-sec fuzz
+h			2 pi hbar
+hectare			1+4 m2
+hefnercandle		.92 cd
+hertz			/sec
+hogshead		2 barrel
+hd			hogshead
+homestead		1|4 mi2
+horsepower		550 ft-lb-g/sec
+hp			horsepower
+hyl			gm force sec2/m
+hz			/sec
+imaginarycubicfoot	1.4 ft3
+/ radio intensity
+jansky			1-26 watt/m2-hz
+jeroboam		4|5 gal
+karat			1|24
+kcal			kilocal
+kcalorie		kilocal
+kev			1+3 e-volt
+key			kg
+khz			1+3 /sec
+kilderkin		18 gal
+knot			nmile/hr
+lambert			cd/pi-cm2
+langley			cal/cm2
+last			80 bu
+league			3 mi
+lightyear		c-yr
+line			1|12 in
+link			66|100 ft
+longhundredweight	112 lb
+longquarter		28 lb
+lusec			1-6 mm-hg m3/s
+mach			331.46 m/sec
+magnum			2 qt
+marineleague		3 nmile
+maxwell			1-8 weber
+metriccarat		200 mg
+mev			1+6 e-volt
+mgd			megagal/day
+mh			millihenry
+mhz			1+6 /sec
+mil			1-3 in
+millenium		1000 year
+minersinch		1.5 ft3/min
+minim			1|60 fldr
+mo			month
+mpg			mile/gal
+mph			mile/hr
+nail			1|16 yd
+nauticalmile		nmile
+nit			cd/m2
+noggin			1|8 qt
+nox			1-3 lux
+ns			nanosec
+oersted			2.5+2 pi-amp/m
+oe			oersted
+pace			36 in
+palm			3 in
+parasang		3.5 mi
+parsec			au-radian/arcsec
+pascal			nt/m2
+pc			parsec
+pennyweight		1|20 oz
+percent			%
+perch			rd
+pf			picofarad
+phot			lumen/cm2
+pica			1|6 in
+pieze			1+3 nt/m2
+pipe			4 barrel
+point			1|72 in
+poise			gm/cm-sec
+pole			rd
+poundal			ft-lb/sec2
+pdl			poundal
+proof			1|200
+psi			lb-g/in2
+quarter			9 in
+quartersection		1|4 mi2
+quintal			100 kg
+quire			25
+/ actual radiation dose
+rad			1-2 gray
+ream			500
+registerton		100 ft3
+rehoboam		156 floz
+/ effective radiation dose
+rem			1-2 sievert
+rhe			10 m2/nt-sec
+/ ionization power of radiation
+rontgen			2.58-4 coul/kg
+roentgen		rontgen
+rood			1.21+3 yd2
+rope			20 ft
+rutherford		1+6 /sec
+/ This is the rydberg energy (ionization energy of hydrogen assuming infinite
+/ mass nucleus).  To get the "rydberg constant", use rydberg/h-c
+rydberg			13.605698 ev fuzz
+sabin			1 ft2
+sack			3 bu
+seam			8 bu
+section			mi2
+shippington		40 ft3
+shorthundredweight	100 lb
+shortquarter		25 lb
+siemens			/ohm
+sigma			microsec
+skein			120 yd
+skot			1-3 apostilb
+slug			lb-g-sec2/ft
+span			9 in
+spat			4 pi sr
+spindle			14400 yd
+square			100 ft2
+stere			m3
+sthene			1+3 nt
+stilb			cd/cm2
+stoke			1-4 m2/sec
+stone			14 lb
+strike			2 bu
+surveyfoot		british-ft
+surveyorschain		66 ft
+surveyorslink		66|100 ft
+tablespoon		4 fldr
+teaspoon		4|3 fldr
+tesla			weber/m2
+therm			1+5 btu
+thermie			1+6 cal
+timberfoot		ft3
+tnt			4.6+6 m2/sec2
+tonne			1+6 gm
+torr			mm hg
+township		36 mi2
+tun			8 barrel
+water			.22491|2.54 kg/m2-sec2
+wey			40 bu
+weymass			252 lb
+Xunit			1.00202-13m

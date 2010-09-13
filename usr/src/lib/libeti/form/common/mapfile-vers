@@ -1,0 +1,251 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	current_field;
+	data_ahead;
+	data_behind;
+	dup_field;
+	dynamic_field_info;
+	field_arg;
+	field_back;
+	field_buffer;
+	field_count;
+	field_fore;
+	field_index;
+	field_info;
+	field_init;
+	field_just;
+	field_opts;
+	field_opts_off;
+	field_opts_on;
+	field_pad;
+	field_status;
+	field_term;
+	field_type;
+	field_userptr;
+	form_driver;
+	form_fields;
+	form_init;
+	form_opts;
+	form_opts_off;
+	form_opts_on;
+	form_page;
+	form_sub;
+	form_term;
+	form_userptr;
+	form_win;
+	free_field;
+	free_fieldtype;
+	free_form;
+	link_field;
+	link_fieldtype;
+	move_field;
+	new_field;
+	new_fieldtype;
+	new_form;
+	new_page;
+	pos_form_cursor;
+	post_form;
+	scale_form;
+	set_current_field;
+	set_field_back;
+	set_field_buffer;
+	set_field_fore;
+	set_field_init;
+	set_field_just;
+	set_field_opts;
+	set_field_pad;
+	set_field_status;
+	set_field_term;
+	set_field_type;
+	set_fieldtype_arg;
+	set_fieldtype_choice;
+	set_field_userptr;
+	set_form_fields;
+	set_form_init;
+	set_form_opts;
+	set_form_page;
+	set_form_sub;
+	set_form_term;
+	set_form_userptr;
+	set_form_win;
+	set_max_field;
+	set_new_page;
+	unpost_form;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_adjust_cursor;
+	__advance;
+	_beg_field;
+	_beg_line;
+	__braelist;
+	__braslist;
+	__bravar;
+	_buf_to_win;
+	__cclass;
+	__cflg;
+	_checkchar;
+	_checkfield;
+	_clr_eof;
+	_clr_eol;
+	_clr_field;
+	_copyarg;
+	_data_beg;
+	_data_end;
+	_data_entry;
+	_data_manipulation;
+	_data_navigation;
+	_DEFAULT_FIELD;
+	_DEFAULT_FIELDTYPE;
+	_DEFAULT_FORM;
+	_del_char;
+	_del_line;
+	_del_prev;
+	_del_word;
+	_down_char;
+	_down_field;
+	_end_field;
+	_end_line;
+	__eptr_;
+	__execute;
+	_field_navigation;
+	_first_active;
+	_first_field;
+	_first_page;
+	_freearg;
+	__getrnge;
+	_grow_field;
+	_ins_char;
+	_ins_line;
+	_ins_mode;
+	__i_size	{ TYPE = DATA; FILTER = libc.so.1; SIZE = 0x4 };
+	_last_field;
+	_last_page;
+	_left_char;
+	_left_field;
+	_lib_version;
+	__lptr_;
+	_makearg;
+	_misc_request;
+	_new_line;
+	_next_char;
+	_next_choice;
+	_nextchoice;
+	_next_field;
+	_next_line;
+	_next_page;
+	_next_word;
+	_ovl_mode;
+	_page_navigation;
+	_pos_form_cursor;
+	_prev_char;
+	_prev_choice;
+	_prevchoice;
+	_prev_field;
+	_prev_line;
+	_prev_page;
+	_prev_word;
+	_right_char;
+	_right_field;
+	__rpop;
+	__rpush;
+	_scr_bchar;
+	_scr_bhpage;
+	_scr_bline;
+	_scr_bpage;
+	_scr_fchar;
+	_scr_fhpage;
+	_scr_fline;
+	_scr_fpage;
+	_scr_hbhalf;
+	_scr_hbline;
+	_scr_hfhalf;
+	_scr_hfline;
+	_set_current_field;
+	_set_form_page;
+	_sfirst_field;
+	__size;
+	_slast_field;
+	_snext_field;
+	__sp_;
+	_sprev_field;
+	__st;
+	__stmax;
+	_sync_attrs;
+	_sync_buffer;
+	_sync_field;
+	_sync_linked;
+	_sync_opts;
+	TYPE_ALNUM;
+	TYPE_ALPHA;
+	TYPE_ENUM;
+	TYPE_INTEGER;
+	TYPE_NUMERIC;
+	TYPE_REGEXP;
+	_up_char;
+	_update_current;
+	_up_field;
+	_validate;
+	_validation;
+	_whsp_beg;
+	_whsp_end;
+	_win_to_buf;
+	__xpop;
+	__xpush;
+
+	__loc1	{
+		TYPE = DATA;
+		FILTER = libc.so.1;
+$if _ELF32
+		SIZE = 0x4;
+$elif _ELF64
+		SIZE = 0x8;
+$else
+$error unknown ELFCLASS
+$endif
+	};
+
+    local:
+	*;
+};

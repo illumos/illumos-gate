@@ -1,0 +1,1610 @@
+#!/usr/bin/perl
+
+# This utility translates from aspppd configuration to Solaris PPP 4.0
+# (or ANU ppp-2.4.0; aka pppd).  It can also revert to previous aspppd
+# configuration (discarding the pppd configuration), but does not
+# translate new configuration files into old.
+#
+# This script provides only a suggested translation for your existing
+# aspppd configuration.  You will need to evaluate for yourself
+# whether the translation is appropriate for your operating
+# environment.
+
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# Steps in translation:
+#	- parse /etc/asppp.cf
+#	- check for aspppls in /etc/passwd (or NIS) 
+#	- read in current /etc/ppp/options configuration file
+#	- read list of configured serial ports from pmadm
+#	- read in UUCP configuration files
+#	- create translated configuration
+#	- write files back out
+
+# Known issues:
+#	- translation with point-to-multipoint is incomplete
+
+use Getopt::Std;
+use Fcntl;
+use POSIX qw(tmpnam ENOSYS);
+use Sys::Hostname;
+
+# Secure the path if we're running under RBAC.
+$ENV{PATH} = ( "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/ucb" )
+    if $< != $>;
+
+# General path names that can be configured.
+local($rootetc) =	"/etc/";
+local($passwd) =	$rootetc . "passwd";
+local($passwdlck) =	$rootetc . ".pwd.lock";
+local($asfile) =	$rootetc . "asppp.cf";
+local($astemp) =	$rootetc . "asppp.temp.cf";
+local($asmoved) =	$rootetc . "asppp.saved.cf";
+local($uucpdir) =	$rootetc . "uucp/";
+local($Devices) =	$uucpdir . "Devices";
+local($Devconfig) =	$uucpdir . "Devconfig";
+local($Dialers) =	$uucpdir . "Dialers";
+local($Dialcodes) =	$uucpdir . "Dialcodes";
+local($Limits) =	$uucpdir . "Limits";
+local($Sysfiles) =	$uucpdir . "Sysfiles";
+local($Systems) =	$uucpdir . "Systems";
+local($pppdir) =	$rootetc . "ppp/";
+local($options) =	$pppdir . "options";
+local($ttyprefix) =	$pppdir . "options.";
+local($peersdir) =	$pppdir . "peers/";
+local($initd) =		$rootetc . "init.d/";
+local($asctl) =		$initd . "asppp";
+local($pppdctl) =	$initd . "pppd";
+local($sedpasswd) =	"/tmp/sed-passwd";
+
+# Fake asppp keyword used to keep track of dial-in paths.
+local($isdialin) = "-is-dial-in";
+
+# Limits and Sysfiles are keyed on "service=".
+# Devconfig is keyed on "service=" and "device=".
+# Dialcodes, Dialers, Systems, and Devices are single keyword files.
+# Devices alone may have multiple entries for a given key.
+
+# Internal data structures
+local(@sysfiles,@limits,@devconfig);
+local(@sysdefault) = ( "systems=" . $Systems, "dialers=" . $Dialers,
+		       "devices=" . $Devices );
+local(@limitdefault) = ( "max=-1" );
+local(@devdefault) = ( "pop=", "push=", "connecttime=-1", "expecttime=-1",
+		       "msgtime=-1" );
+
+# List of keywords for which ifconfig takes an additional parameter.
+local($ifconfigtakes) = (
+	addif => 1,
+	removeif => 1,
+	auth_algs => 1,
+	encr_algs => 1,
+	encr_auth_algs => 1,
+	broadcast => 1,
+	destination => 1,
+	index => 1,
+	metric => 1,
+	modinsert => 1,
+	modremove => 1,
+	mtu => 1,
+	netmask => 1,
+	set => 1,
+	subnet => 1,
+	tdst => 1,
+	tsrc => 1,
+	wait => 1,
+
+# These are keywords, but do not take an additional parameter.
+	ether => 0,
+	inet => 0,
+	inet6 => 0,
+	arp => 0,
+	-arp => 0,
+	auto-revarp => 0,
+	modlist => 0,
+	plumb => 0,
+	unplumb => 0,
+	private => 0,
+	-private => 0,
+	nud => 0,
+	-nud => 0,
+	trailers => 0,
+	-trailers => 0,
+	up => 0,
+	down => 0,
+	xmit => 0,
+	-xmit => 0,
+	auto-dhcp => 0,
+	dhcp => 0,
+	primary => 0,
+	drop => 0,
+	extend => 0,
+	inform => 0,
+	ping => 0,
+	release => 0,
+	start => 0,
+	status => 0
+);
+
+# print number of something in English.
+sub nof
+{
+    local($num, $item, @rest) = @_;
+    print "No ", $item, "s", @rest if $num == 0;
+    print "1 ", $item, @rest if $num == 1;
+    print $num, " ", $item, "s", @rest if $num > 1;
+}
+
+# ask a yes or no question.
+sub yesno
+{
+    local ($query, $default) = @_;
+    local ($ans, $defans);
+
+    return $default unless (-t STDIN) && (-t STDOUT) && !$opt_n;
+    $defans = $default ? "Yn" : "yN";
+    while (1) {
+	print $query, " [", $defans, "]? ";
+	chomp($ans = <STDIN>);
+	return $default unless $ans;
+	return 1 if $ans =~ /^[Yy1Tt]/;
+	return 0 if $ans =~ /^[Nn0Ff]/;
+	print "Please enter 'y' or 'n'.\n";
+    }
+}
+
+# Put quotes around a string, if necessary.
+# The tests here aren't perfect -- they think that \\\' isn't an
+# escaped quote -- but they're good enough.
+sub requote
+{
+    local($_) = @_;
+    if (/^$/) {
+	"\"\"";
+    } elsif (/^'/ || /[^\\]'/ || /\\\\'/) {
+# Has unescaped quotes; must use " or redo quoting.
+	if (/^"/ || /[^\\]"/ || /\\\\"/) {
+# Both kinds of quotes; redo the quoting.
+	    s/^"/\\"/;
+	    s/([^\\]|\\\\)"/$1\\"/g;
+	}
+	"\"" . $_ . "\"";
+    } elsif (/^"/ || /[^\\]"/ || /\\\\"/) {
+	"'" . $_ . "'";
+    } elsif (/\s/) {
+	"\"" . $_ . "\"";
+    } else {
+	$_;
+    }
+}
+
+# Get a single line from a UUCP configuration file and return as a
+# reference to an array of words.  Removes comments and escapes.
+# (This is a modified version of the standard Perl shellwords function
+# that understands C escape sequences and continuation lines.)
+# Optionally returns lead-in, source text, and trailing component
+# for editing.
+sub uucpline
+{
+    local($input, $file, $triplet) = @_;
+    local(@words,$snippet,$field,$havefield,$cont,@triparray,$maytrail);
+
+    $cont = "";
+    $maytrail = "";
+    while (<$input>) {
+	# remove leading whitespace
+	if (s/^(\s+)//) {
+	    $maytrail .= $1;
+	}
+	if ($cont eq "") {
+	    if (s/^(\#(.|\n)*)$//) {
+		$triparray[0] .= $maytrail . $1;
+		$maytrail = "";
+		next;
+	    }
+	    if (s/^(\\?\n?)$//) {
+		$triparray[0] .= $maytrail . $1;
+		$maytrail = "";
+		next;
+	    }
+	    $triparray[0] .= $maytrail;
+	    $maytrail = "";
+	}
+	$snippet = $_;
+	if (s/^(([^\#\\]|\\.)*)\\\n$//) {
+	    $maytrail .= $snippet;
+	    $cont .= $1;
+	    next;
+	}
+	if (/^(([^\\\#]|\\[^\#])*)(\#?(.|\n)*)$/) {
+	    $_ = $maytrail . $1;
+	    $maytrail = $3;
+	    if (s/((\s|\n)*)$//) {
+		$maytrail = $1 . $maytrail;
+	    }
+	    $triparray[1] = $_;
+	}
+	$_ = $cont . $snippet;
+	$cont = "";
+	s/\n$//;
+	while ($_ ne '') {
+	    for (;;) {
+		if (s/^#.*//) {
+		    last;
+		} elsif (s/^"(([^"\\]|\\.)*)"//) {
+		    $snippet = $1;
+		} elsif (s/^"//) {
+		    warn "Unmatched double quote in $file: \"$_\n";
+		} elsif (s/^'(([^'\\]|\\.)*)'//) {
+		    $snippet = $1;
+		} elsif (s/^'//) {
+		    warn "Unmatched single quote in $file: '$_\n";
+		} elsif (s/^\\s//) {
+# \s works in chat, but not in the pppd option files
+		    $snippet = " ";
+		} elsif (s/^(\\.)//) {
+		    $snippet = $1;
+		} elsif (s/^([^\s\\'"#]+)//) {
+		    $snippet = $1;
+		} else {
+		    s/^\s+//;
+		    last;
+		}
+		$havefield = 1;
+		$field .= $snippet;
+	    }
+	    push(@words, $field) if $havefield;
+	    $havefield = 0;
+	    $field = '';
+	}
+	last;
+    }
+    $triparray[2] .= $maytrail;
+    @$triplet = @triparray;
+    warn "Bad continuation line in $file: $cont\n" if $cont ne '';
+    \@words;
+}
+
+# Given a logical UUCP file name, return a list of all of the files
+# that should be read.
+sub uucpfiles
+{
+    local ($file) = @_;
+    local (@flist, $value) = ();
+
+    for $value (@sysfiles, @sysdefault) {
+	if ($value =~ /^$file=/i) {
+	    $value =~ s/^$file=//i;
+	    for $file (split /:/, $value) {
+		$file = $uucpdir . $file if $file !~ /^\//;
+		push @flist, $file;
+	    }
+	    last;
+	}
+    }
+    @flist;
+}
+
+# Given a file name and some key words, parse the contents of the file
+# and return a reference to a hash constructed from this.  All keys
+# except the last must match exactly.  The last is used to order the
+# hash.
+sub uucpkeyfile
+{
+    local($file,@keylist) = @_;
+    local($lastkey,$keyval,$words,$i,$flag,%byservice);
+
+    open(SVCFILE, '<' . $file) || return undef;
+    $lastkey = pop @keylist;
+    while (@{$words = uucpline(SVCFILE, $file)}) {
+	$flag = 1;
+	foreach $keyval (@keylist) {
+	    $flag = 0;
+	    $i = 0;
+	    while ($i < @$words) {
+		if ($$words[$i] eq $keyval) {
+		    splice @$words, $i, 1;
+		    $flag = 1;
+		    last;
+		}
+		$i++;
+	    }
+	    last unless $flag;
+	}
+	next unless $flag;
+	foreach $i (0 .. @{$words}) {
+	    if (@{$words}[$i] =~ /^$lastkey(.*)/i) {
+		splice @{$words}, $i, 1;
+		$byservice{$1} = $words;
+		last;
+	    }
+	}
+    }
+    close SVCFILE;
+    \%byservice;
+}
+
+# This reads a UUCP file that is keyed on the first token on each
+# line.  Duplicates are not permitted; the first encountered is used
+# and the rest are silently discarded.  A hash indexed on the first
+# token and containing an array of tokens in each bucket is returned.
+# Used for Dialcodes, Dialers, and Systems.
+sub uucpposfiles
+{
+    local(@files) = @_;
+    local($keyval,$words,%keyeddata);
+
+    foreach $file (@files) {
+	if (!open(POSFILE, '<' . $file)) {
+	    warn "$file: $!\n";
+	    next;
+	}
+	while (@{$words = uucpline(POSFILE, $file)}) {
+	    $keyval = shift @{$words};
+	    next if $keyeddata{$keyval};
+	    $keyeddata{$keyval} = $words;
+	}
+	close POSFILE;
+    }
+    \%keyeddata;
+}
+
+# This reads a UUCP file that is keyed on the first token on each line
+# and may have duplicate entries.  Each entry of the hash contains an
+# array.  Each entry of that array points to an array of tokens
+# representing one parsed line.  Used for the Devices file.
+sub uucpdevices
+{
+    local(@files) = @_;
+    local($keyval,$words,%keyeddata);
+
+    foreach $file (@files) {
+	if (!open(POSFILE, '<' . $file)) {
+	    warn "$file: $!\n";
+	    next;
+	}
+	while (@{$words = uucpline(POSFILE, $file)}) {
+	    $keyval = shift @{$words};
+	    push @{$keyeddata{$keyval}}, $words;
+	}
+	close POSFILE;
+    }
+    \%keyeddata;
+}
+
+# For a path defined in asppp.cf, copy over defaults, validate the
+# required options, and save in the hash to be returned.
+sub savepath
+{
+    local($paths, $options, $defref) = @_;
+    local($peer,$intf);
+
+    return if $options == $defref;
+    foreach $key (keys %$defref) {
+	$$options{$key} = $$defref{$key} unless defined($$options{$key});
+    }
+    $peer = $$options{"peer_system_name"};
+    warn("Discarded path with no peer system name.\n"), return
+	unless defined($peer);
+    $intf = $$options{"interface"};
+    warn("Missing interface on path to peer \"$peer\".\n"), return
+	unless defined($intf);
+    warn("Bad interface $intf on path to peer \"$peer\".\n"), return
+	unless $intf =~ /^ipd([0-9]+|ptp[0-9]+|ptp\*)$/;
+    warn("Missing peer IP address for point-to-multipoint path to \"",
+	$peer, "\".\n"), return
+	if $intf =~ /^ipd[0-9]+$/ && !defined($$options{"peer_ip_address"});
+    warn "Multiple definitions of path to peer \"$peer\".\n",
+	if defined($paths{$peer});
+    warn "Odd version number ", $$options{"version"},
+	" encountered in path to peer \"", $peer, "\" (ignored).\n"
+	if defined($$options{"version"}) && $$options{"version"} != 1;
+    $paths{$peer} = $options;
+}
+
+# Parse through asppp.cf. Unlike the UUCP files, lines don't matter
+# here.  The parsing is modal, with "path" introducing a PPP session
+# description and "defaults" reverting back to global definitions.
+sub readaspppcf
+{
+    local($aspppcf) = @_;
+    local(%aspppdkey) = (
+	chap_name		=> 1,
+	chap_peer_secret	=> 1,
+	chap_peer_name		=> 1,
+	chap_secret		=> 1,
+	debug_level		=> 1,
+	default_route		=> 0,
+	ifconfig		=> -1,
+	inactivity_timeout	=> 1,
+	interface		=> 1,
+# sic; aspppd is seriously confused!  ACCM isn't in IPCP.
+	ipcp_async_map		=> 1,
+	ipcp_compression	=> 1,
+	lcp_compression		=> 1,
+	lcp_mru			=> 1,
+	negotiate_address	=> 1,
+	pap_id			=> 1,
+	pap_password		=> 1,
+	pap_peer_id		=> 1,
+	pap_peer_password	=> 1,
+	peer_ip_address		=> 1,
+	peer_system_name	=> 1,
+	require_authentication	=> 2,
+	version			=> 1,
+	will_do_authentication	=> 2
+    );
+    local($words,$word,$prevword,$i,$errors,%defaults,%ifconfig,%paths);
+    local($options);
+
+    open ASPPPD, "<" . $aspppcf || die "$aspppcf: $!\n";
+    print "Reading configuration from $aspppcf\n" if $opt_v;
+    $defaults{inactivity_timeout} = 120;
+    $defaults{ipcp_compression} = "vj";
+    $defaults{lcp_compression} = "on";
+    $options = \%defaults;
+    while (@{$words = uucpline(ASPPPD, $aspppcf)}) {
+	if ($$words[0] =~ /^ifconfig$/i) {
+	    warn "$prevword with missing argument ignored.\n"
+		if defined($prevword);
+	    undef $prevword;
+	    shift @$words;	# discard 'ifconfig' keyword
+	    $word = shift @$words;
+	    warn("Bad interface on ifconfig $word.\n"), next
+		unless $word =~ /^ipd([0-9]+|ptp[0-9]+)$/;
+	    $ifconfig{$word} = \@$words;
+	    next;
+	}
+	unshift @{$words}, $prevword if defined($prevword);
+	undef $prevword;
+	while ($word = lc(shift @{$words})) {
+	    $_ = $word;
+	    if (/^defaults$/i) {
+		savepath(\%paths, $options, \%defaults);
+		$options = \%defaults;
+		next ;
+	    }
+	    if (/^path$/i) {
+		local(%pathopts);
+		savepath(\%paths, $options, \%defaults);
+		$options = \%pathopts;
+		next;
+	    }
+	    if (!defined($i = $aspppdkey{$word})) {
+		die "Too many errors in $aspppcf; aborting.\n"
+		    if ++$errors > 5;
+		warn "Ignoring unknown keyword $word in $aspppcf\n";
+		next;
+	    }
+	    warn("$_ unexpected; remainder of line ignored.\n"),
+		last if $i == -1;
+	    warn("Duplicate $_ in path ignored.\n"), next
+		if $options != \%defaults && defined($$options{$_});
+	    $$options{$_} = 1 if $i == 0;
+	    next if $i == 0;
+	    $prevword = $_, last unless defined($word = shift @{$words});
+	    $$options{$_} = $word if $i == 1;
+	    if ($i == 2) {
+		undef $$options{$_}, next if $word =~ /^off$/;
+		$$options{$_} = $word;
+		if ($word = shift @{$words}) {
+		    if ($word =~ /^(p|ch)ap$/) {
+			$$options{$_} .= " " . $word;
+		    } else {
+			unshift @{$words}, $word;
+		    }
+		}
+	    }
+	}
+    }
+    warn "Odd trailing keyword \"$prevword\" ignored in $aspppcf\n"
+	if $prevword;
+    savepath(\%paths, $options, \%defaults);
+    die "No paths defined for aspppd.\n" if 0+(keys %paths) == 0;
+    die "No interfaces defined for aspppd.\n" if 0+(keys %ifconfig) == 0;
+    if ($opt_v) {
+	nof 0+(keys %paths), "path", " and ";
+	nof 0+(keys %ifconfig), "interface", " defined for aspppd.\n";
+    }
+    close ASPPPD;
+    ( \%ifconfig, \%paths );
+}
+
+# Read /etc/passwd (or NIS) and return hash of users for whom
+# the default shell is aspppls.  Each hash entry contains the user's
+# home directory path.
+sub readpasswd
+{
+    local(%users,@pwe);
+
+    setpwent();
+    while (@pwe = getpwent()) {
+	$users{$pwe[0]} = $pwe[7] if $pwe[8] =~ /\/aspppls$/;
+    }
+    endpwent();
+    nof 0+(keys %users), "aspppd dial in user", " found.\n"
+	if $opt_v;
+    \%users;
+}
+
+# Parse through pmadm output to find enabled serial ports.
+# Field 9 has 'I' (modem dial-out only or initialize only), 'b'
+# (bidirectional) or is blank (modem dial-in only or terminal-hardwired).
+# For that latter case, field 18 (software-carrier) has 'y'.
+# Field 3 has 'x' if disabled.
+sub getserialports
+{
+    local(%dialin, %dialout);
+
+    open PMADM, "pmadm -L|" || (warn "pmadm: $!\n", return undef);
+    while (<PMADM>) {
+	split /:/;
+	if ($_[3] !~ /x/) {
+	    $dialin{$_[2]} = $_[8] if $_[9] ne "I";
+	    $dialout{$_[2]} = $_[8] if $_[9] ne "";
+	}
+    }
+    close PMADM;
+    ( \%dialin, \%dialout );
+}
+
+# Convert an ifconfig statement into a local and remote address pair.
+sub ifconf_addr
+{
+    local($ifconf) = @_;
+    local($arg, $narg, $lcladdr, $remaddr);
+
+    shift @$ifconf;	# lose the interface name
+    while (@$ifconf) {
+	local($arg, $narg);
+	$arg = shift @$ifconf;
+	$narg = shift @$ifconf if $ifconfigtakes{$arg};
+	if (exists($ifconfigtakes{$arg})) {
+	    if ($arg eq "set") {
+		$lcladdr = $narg;
+	    } elsif ($arg eq "destination") {
+		$remaddr = $narg;
+	    }
+	} elsif (!defined($lcladdr)) {
+	    $lcladdr = $arg;
+	} elsif (!defined($remaddr)) {
+	    $remaddr = $arg;
+	}
+    }
+    ( $lcladdr, $remaddr );
+}
+
+# Convert a hash of aspppd options into an array of pppd options.  The
+# third argument ($chatpath) is undef for dial-in or a path to the
+# chat script file otherwise.
+sub convert_options
+{
+    local ($pppdargs, $opts, $chatpath, $user) = @_;
+
+# Do the pppd option conversions.
+    push(@$pppdargs, "defaultroute") if $$opts{default_route};
+    push(@$pppdargs, "idle " . $$opts{inactivity_timeout})
+	if $$opts{inactivity_timeout} != 0;
+    push(@$pppdargs, "asyncmap " . $$opts{ipcp_async_map})
+	if $$opts{ipcp_async_map};
+    push(@$pppdargs, "novj") if !$$opts{ipcp_compression};
+    local($peer);
+    if ($$opts{require_authentication}) {
+	local (@authopts);
+	if ($$opts{require_authentication} =~ /chap/) {
+	    push(@authopts, "require-chap");
+	    $peer = $$opts{chap_peer_name};
+	} else {
+	    push(@authopts, "require-pap");
+	    $peer = $$opts{pap_peer_id};
+	}
+	push(@authopts, "remotename " . requote($peer)) if $peer;
+	push(@authopts, "auth");
+	if ($chatpath) {
+	    push(@$pppdargs, @authopts);
+	} elsif ($dialin_auth == 3) {
+# mixed authentication; must use wrapper script.
+	    local($sfile) = $pppdir . "dial-in." . $user;
+	    $scriptfiles{$sfile}  = "#!/bin/sh\n";
+	    $scriptfiles{$sfile} .= "exec /usr/bin/pppd @authopts\n";
+	    $dialinshell{$user} = $sfile;
+	}
+    } elsif ($dialin_auth < 2) {
+	push(@$pppdargs, "noauth");
+    }
+    push(@$pppdargs, "noaccomp nopcomp") if !$$opts{lcp_compression};
+    push(@$pppdargs, "mru " . $$opts{lcp_mru}) if $$opts{lcp_mru};
+    push(@$pppdargs, "noipdefault ipcp-accept-local")
+	if $$opts{negotiate_address};
+    local($myname,$csecret,$psecret,$passopt);
+    if ($$opts{will_do_authentication} =~ /chap/i) {
+	$myname = $$opts{chap_name};
+	$csecret = $$opts{chap_secret};
+    }
+    $myname = "" if !$myname;
+    if ($$opts{will_do_authentication} =~ /pap/i) {
+	if ($myname ne "" && $$opts{pap_id} ne "" &&
+	    $myname ne $$opts{pap_id}) {
+	    warn "pppd cannot have separate local names for PAP and CHAP; using CHAP name:\n";
+	    warn "\t\"$myname\"\n";
+	} else {
+	    $myname = $$opts{pap_id} if $$opts{pap_id} ne "";
+	}
+	$psecret = $$opts{pap_password};
+    }
+    if ($$opts{will_do_authentication}) {
+	if ($chatpath &&
+	    ($$opts{will_do_authentication} !~ /chap/i ||
+	     $$opts{will_do_authentication} !~ /pap/i ||
+	     $csecret eq $psecret)) {
+	    push(@$pppdargs,
+		"password " . requote($csecret ? $csecret : $psecret));
+	    $passopt = 1;
+	}
+	push @$pppdargs, "user " . requote($myname);
+	push(@$pppdargs, "remotename " . requote($peer))
+	  if $peer && !$$opts{require_authentication};
+    } else {
+	$myname = "NeverAuthenticate";
+    }
+
+    push(@$pppdargs, "debug") if $$opts{debug_level} >= 8;
+    push(@$pppdargs, "kdebug 3") if $$opts{debug_level} >= 9;
+    local($lcladdr, $remaddr) = ifconf_addr($$ifconfig{$$opts{interface}});
+    if ($chatpath) {
+	if ($$opts{debug_level} >= 4) {
+	    push(@pppdargs, "connect \"/usr/bin/chat -vf $chatpath\"");
+	} else {
+	    push(@pppdargs, "connect \"/usr/bin/chat -f $chatpath\"");
+	}
+	push(@$pppdargs, "user " . requote($myname));
+	local($str) = $remaddr;
+	$str = $$opts{peer_ip_address} if $$opts{peer_ip_address};
+	push(@$pppdargs, $lcladdr . ":" . $str)
+	    if !$opt_s && ($lcladdr || $str);
+    } else {
+	push(@$pppdargs, "user " . requote($myname))
+	    if $myname eq "NeverAuthenticate";
+    }
+    if ($$opts{interface} && $opt_s) {
+	if ($$opts{interface} =~ /^ipd[0-9]+$/) {
+	    push(@$pppdargs, $lcladdr . ":") if $lcladdr;
+	} elsif ($$opts{interface} =~ /^ipd(|ptp)([0-9]+)$/) {
+	    push(@pppdargs, "unit " . $2);
+	} else {
+	    push(@pppdargs, "plumbed");
+	}
+    }
+
+# Convert the secrets
+    if ($chatpath) {
+	$addsecret = "";
+    } elsif ($$opts{peer_ip_address}) {
+	$addsecret = " " . $$opts{peer_ip_address};
+    } else {
+	$addsecret = " *";
+    }
+    if ($$opts{require_authentication}) {
+	local($lclname, $secret, $authf);
+	$lclname = $$opts{will_do_authentication} ? $myname : hostname();
+	if ($$opts{require_authentication} =~ /chap/) {
+	    $secret = $$opts{chap_peer_secret};
+	    $authf = \%chapsecrets;
+	} else {
+	    $secret = $$opts{pap_peer_password};
+	    $authf = \%papsecrets;
+	}
+	${$$authf{$peer}}{$lclname} = requote($secret) . $addsecret;
+    }
+    if ($$opts{will_do_authentication} && !$passopt) {
+	${$chapsecrets{$myname}}{$peer} = requote($csecret) if $csecret;
+	${$papsecrets{$myname}}{$peer} = requote($psecret) if $psecret;
+    }
+}
+
+# Translate options for a dial-in user.
+sub translatedialin
+{
+    local($peer) = @_;
+
+    $optname = $$dialinusers{$peer};
+    $optname .= "/" if $optname !~ /\/$/;
+    $optname .= ".ppprc";
+    if (exists($optfiles{$optname})) {
+	warn "Home directories of $peer and $optuser{$optname} are the same ($optfiles{$optname}\n";
+	warn "Ignoring configuration for $peer.\n";
+	return;
+    }
+    $optuser{$optname} = $peer;
+    $dialinshell{$peer} = "/usr/bin/pppd";
+    local (@pppdargs);
+    convert_options(\@pppdargs, $$paths{$peer}, undef, $peer);
+    push @pppdargs, "nologfd";
+    $optfiles{$optname} = \@pppdargs;
+}
+
+# Translate ifconfig entries in asppp.cf into either an ifconfig
+# script for strict translation or a set of per-port IP addresses
+# for normal translation.  Also translate ipdX interfaces into
+# Ethernet aliases to make routing daemon happy.
+sub translateifconfig
+{
+    local (@ifconfiglist,$cstr,$etherif,$intf,$ifconf,$addstr,$port);
+    
+    open IFLIST, "/usr/sbin/ifconfig -au4|" || die "cannot run ifconfig: $!\n";
+    while (<IFLIST>) {
+	$etherif = $1 if !$etherif && /^([^:]*).*UP.*BROADCAST/;
+    }
+    close IFLIST;
+    $etherif = $1 if !$etherif && glob("/etc/hostname.*") =~ /[^\.]*.(.*)/;
+    $etherif = $1 if !$etherif && glob("/etc/dhcp.*") =~ /[^\.]*.(.*)/;
+    $etherif = "hme0" if !$etherif;
+    
+    $cstr = "";
+    foreach $intf (keys %$ifconfig) {
+	$ifconf = $$ifconfig{$intf};
+	if ($intf =~ /ipd[0-9]+/) {
+	    shift @$ifconf;
+	    $cstr .= "ifconfig $etherif addif @$ifconf\n";
+	}
+    }
+
+    $ndialin = 0+(keys %$dialin);
+    $addstr = "";
+    foreach $intf (keys %downif) {
+	$ifconf = $downif{$intf};
+	if ($intf =~ /ipdptp([0-9]+)/ && --$ndialin >= 0) {
+	    push @ifconfiglist, $ifconf;
+	    $addstr .= "ifconfig sppp" . $1 . " @$ifconf\n";
+	}
+    }
+    if ($ndialin > 0) {
+	if (@ifconfiglist) {
+	    print "Fewer ifconfigs (", $#ifconfiglist+1,
+	    ") than dial-in lines (", $ndialin+$#ifconfiglist+1, ")\n";
+	} else {
+	    print "No ifconfigs for ";
+	    nof $ndialin, "dial-in port", ".\n";
+	}
+    } elsif ($ndialin < 0) {
+	if (@ifconfiglist) {
+	    print "Ignoring ", -$ndialin, " of ";
+	    nof $#ifconfiglist-$ndialin+1, "ifconfig",
+	    " (too few dial-in ports)\n";
+	} else {
+	    print "Ignoring all ";
+	    nof -$ndialin, "ifconfig line", " (no dial-in ports)\n";
+	}
+    }
+
+    if ($opt_s) {
+	# Strict translation uses pre-plumbed interfaces.
+	$cstr .= $addstr;
+    } else {
+	foreach $port (values %$dialin) {
+	    last if !@ifconfiglist;
+	    $port =~ s+/dev/++;
+	    $port =~ s+/+.+g;
+	    $optfile = $ttyprefix . $port;
+	    $ifconf = pop @ifconfiglist;
+	    local ($lcladdr, $remaddr) = ifconf_addr($ifconf);
+	    next if !defined($lcladdr) || !defined($remaddr);
+	    local (@pppdargs) = $lcladdr . ":" . $remaddr;
+	    $optfiles{$optfile} = \@pppdargs;
+	}
+    }
+    $scriptfiles{$pppdir . "ifconfig"} = $cstr if $cstr;
+}
+
+# Attempt to modify global passwd file using sed script stored in
+# the $sedpasswd temporary file.
+sub rewrite_passwd
+{
+    print "Updating local passwd file (if any).\n" if $opt_v;
+    if (!sysopen(PWDLCK, $passwdlck, O_WRONLY|O_CREAT, 0600)) {
+	warn "Unable to lock password file: $!\n";
+    } else {
+	$lockstr = pack "ssLLiiLLLL", F_WRLCK, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+	eval {
+	    local $SIG{ARLM} = sub {
+		die "alarm while locking password file\n"
+	    };
+	    alarm 15;
+	    fcntl PWDLCK, F_SETLKW, $lockstr ||
+	      die "cannot lock password file: $!\n";
+	    alarm 0;
+	};
+	if ($@) {
+	    warn $@;
+	} else {
+	    warn "Password update failed.\n"
+	      if (system("sed -f $sedpasswd < $passwd > ${passwd}.new") ||
+		  !(rename "${passwd}.new", $passwd));
+	}
+	$lockstr = pack "ssLLiiLLLL", F_UNLCK, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+	fcntl PWDLCK, F_SETLK, $lockstr;
+	close PWDLCK;
+    }
+    if (($ypmaster = `/usr/bin/ypwhich 2>/dev/null`) && $? == 0) {
+	$ypmaster =~ /(.*)\n/;
+	($ypmaster) = gethostbyname($1);
+	($thishost) = gethostbyname(hostname);
+	if ($ypmaster eq $thishost) {
+	    system("cd /var/yp && make")
+	      if yesno("Rebuild NIS/YP maps", $opt_y);
+	} else {
+	    warn "Not running on NIS/YP master $1; unable to update user shells\n";
+	    print "Use 'sed -f $sedpasswd <$passwd >${passwd}.new' on the master\n";
+	    print "and then remake the NIS/YP database.\n";
+	    undef $sedpasswd;
+	}
+    }
+    unlink $sedpasswd if $sedpasswd;
+}
+
+# Show usage message.
+sub usage
+{
+    print "Usage:\n\n";
+    print "\t$0 [-rsvy]\n\n";
+    print "    -n - non-interactive mode.\n";
+    print "    -r - revert back to aspppd configuration.\n";
+    print "    -s - use strict translation.\n";
+    print "    -v - print more detail of the operations performed.\n";
+    print "    -y - assume 'yes' as default answer where reasonable.\n";
+    exit;
+}
+
+# Correct an environment variable so that it points at either a useful
+# executable program, or nothing at all.
+sub fixpath
+{
+    local ($prog, $deflt) = @_;
+
+    $prog = $deflt if $prog eq "";
+    if ($prog !~ /^(\.\/|\/)/) {
+	local ($_) = $ENV{PATH};
+	$_ = "/bin:/usr/bin:/sbin:/usr/sbin" if $_ eq "";
+	split /:/;
+	foreach (@_) {
+	    $prog = $_ . "/" . $prog, last if -x $_ . "/" . $prog;
+	}
+    }
+    $prog = "" if !(-x $prog);
+    $prog;
+}
+
+getopts('nrsvy') || usage;
+
+die "Need permission to modify system files.\n"
+    unless ($> == 0 || yesno "This script should be run as root.  Continue");
+
+if ($opt_r) {
+    local ($intemp);
+
+# Revert to previous configuration.  Just rename the aspppd file back
+# and undo changes to the passwd file.
+
+    die "No saved aspppd configuration exists.\n" unless -f $asmoved;
+    if (-e $astemp) {
+	die "$astemp is not a file\n" unless -f $asfile;
+	unlink $astemp || die "Cannot remove temporary $astemp: $!\n";
+    }
+    $intemp = 0;
+    if (-e $asfile) {
+	die "$asfile is not a file\n" unless -f $asfile;
+	die "Not modifying configuration.\n"
+	    unless yesno "Remove existing $asfile", $opt_y;
+	rename $asfile, $astemp || die "Cannot rename existing $asfile: $!\n";
+	$intemp = 1;
+    }
+
+    if (rename $asmoved, $asfile) {
+	unlink $astemp || warn "$astemp: $!\n" if $intemp;
+    } else {
+	$failure = "Cannot rename $asmoved to $asfile: $!\n";
+	rename $astemp, $asfile ||
+	    die "$failure\nand cannot recover: $!\n" .
+		"Saved current asppp.cf in $astemp\n"
+		    if $intemp;
+	die $failure;
+    }
+
+    $( = $);
+    $< = $>;
+
+    system($pppdctl, "stop") if -x $pppdctl;
+    # remove pppd autostart files.
+    unlink $pppdir . "ifconfig";
+    unlink $pppdir . "demand";
+
+    system($asctl, "start") if -x $asctl;
+
+    open SEDFILE, ">$sedpasswd" || die "Cannot write $sedpasswd: $!\n";
+    local ($escdir) = $pppdir;
+    $escdir =~ s+/+\\/+g;
+    print SEDFILE "/${escdir}dial-in\\./s+[^:]*\$+/usr/sbin/aspppls+\n";
+    print SEDFILE "/\\/usr\\/bin\\/pppd/s+[^:]*\$+/usr/sbin/aspppls+\n";
+    close SEDFILE;
+
+    rewrite_passwd;
+
+    exit 0;
+}
+
+$aspppcf = $asfile;
+if (!(-f $asfile)) {
+    die "No aspppd configuration exists; nothing to convert.\n"
+	unless -f $asmoved;
+    die "No changes made.\n"
+	unless yesno "Already converted; rerun anyway";
+    $aspppcf = $asmoved;
+}
+
+print "This script provides only a suggested translation for your existing aspppd\n";
+print "configuration.  You will need to evaluate for yourself whether the translation\n";
+print "is appropriate for your operating environment.\n";
+die "No changes made.\n"
+  unless yesno "Continue", 1;
+
+# Read in the asppp.cf file first; there's no reason to continue on to
+# the UUCP files if this file isn't readable or has no paths defined.
+local($ifconfig, $paths) = readaspppcf($aspppcf);
+
+# Loop over the ifconfigs and build a list of the down ones.
+foreach $intf (keys %$ifconfig) {
+    local(@words) = @{$$ifconfig{$intf}};
+    while ($word = shift @words) {
+	shift @words if $ifconfigtakes{$word};
+	if ($word =~ /^down$/) {
+	    warn("Why is $intf declared down?\n"), last
+		if $intf =~ /^ipd[0-9]+$/;
+	    $downif{$intf} = $$ifconfig{$intf};
+	    delete $$ifconfig{$intf};
+	    last;
+	}
+    }
+}
+
+# Read /etc/passwd for dial-in users configured for aspppd.
+local($dialinusers) = readpasswd;
+
+# Read in existing pppd configuration.  All we really care about
+# is the setting of the "auth" option.
+undef $authoption;
+if (open(OPTIONS,"<" . $options)) {
+    while (@{$words = uucpline(OPTIONS, $options)}) {
+	while ($_ = pop @$words) {
+	    $authoption = $_ if /auth/i;
+	}
+    }
+    close OPTIONS;
+    $authoption = "unknown" if !defined($authoption);
+}
+
+$dialin_auth = 0;
+if ($authoption =~ /^auth$/i) {
+    $dialin_auth = 1;
+} elsif ($authoption =~ /^noauth$/i) {
+    $dialin_auth = 2;
+} elsif (defined($authoption)) {
+    $dialin_auth = 3;
+}
+
+# Check that there's a path for each dial in user
+foreach $user (keys %$dialinusers) {
+    if (!defined($$paths{$user})) {
+	warn "Dial-in user ", $user,
+	    " does not have a corresponding dial-in path.\n";
+	delete $$dialinusers{$user};
+	next;
+    }
+    $intf = ${$$paths{$user}}{"interface"};
+    if ($intf eq "ipdptp*") {
+	if (0+keys(%downif) == 0) {
+	    warn "Dial-in user $path has no available \"down\" interfaces.\n";
+	    delete $$dialinusers{$user};
+	    next;
+	}
+    } else {
+	if (!defined($downif{$intf}) && !defined($$ifconfig{$intf})) {
+	    warn "Dial-in path $user has undefined $intf; deleted.\n";
+	    delete $$dialinusers{$user};
+	    next;
+	}
+    }
+    ${$$paths{$user}}{$isdialin} = 1;
+# 0 - no info (no options file, "noauth" on call)
+# 1 - all auth ("auth" in options, "noauth" on call)
+# 2 - all noauth ("noauth" in options)
+# 3 - mixed; use auth ("noauth" in options, wrapper script for "auth")
+    if (${$$paths{$user}}{require_authentication}) {
+	if ($dialin_auth == 2) {
+	    $dialin_auth = 3;
+	} elsif ($dialin_auth == 0) {
+	    $dialin_auth = 1;
+	}
+    } else {
+	if ($dialin_auth == 1) {
+	    $dialin_auth = 3;
+	} elsif ($dialin_auth == 0) {
+	    $dialin_auth = 2;
+	}
+    }
+}
+
+# Get lists of usable dial-in and dial-out ports.
+local($dialin,$dialout) = getserialports;
+
+# Read and parse the UUCP Sysfiles, Devconfig, and Limits files.
+# These are keyed with the "service=" string.  The Sysfiles file can
+# augment or override the list of files read for a given service.
+print "Reading UUCP configuration.\n" if $opt_v;
+@sysfiles = @{${uucpkeyfile($Sysfiles,"service=")}{"ppp"}};
+@limits = @{${uucpkeyfile($Limits,"service=")}{"ppp"}};
+%devconfig = %{uucpkeyfile($Devconfig,"service=ppp","device=")};
+
+# Now read in the UUCP files corresponding to this service.
+$systems = uucpposfiles(uucpfiles("systems"));
+$dialers = uucpposfiles(uucpfiles("dialers"));
+$dialcodes = uucpposfiles($Dialcodes);
+$devices = uucpdevices(uucpfiles("devices"));
+
+# just to make sure
+$$dialcodes{""} = ();
+
+# Loop over paths.  Dial-out only paths are translated into demand-dial
+# configurations.  Dial-in only paths are translated into appropriate
+# log-in entries.
+local (@bidirectional);
+foreach $peer (keys %$paths) {
+    if (exists($$systems{$peer})) {
+	$sline = $$systems{$peer};
+	if ($$sline[0] eq "Never") {
+	    if (${$$paths{$peer}}{$isdialin}) {
+		translatedialin($peer);
+	    } else {
+		print "We never call $peer, and he never calls us.\n"
+		    if $opt_v;
+	    }
+	    delete $$paths{$peer};
+	    next;
+	}
+	push @bidirectional, $peer if ${$$paths{$peer}}{$isdialin};
+	print "Ignoring time restriction on $peer\n"
+	    if $$sline[0] ne "Any";
+	$dlist = $$devices{$$sline[1]};
+	$class = $$sline[2];
+	$i = 0;
+	while ($i < @$dlist) {
+	    local($dev) = $$dlist[$i];
+	    if ($$dev[1] ne "-") {
+		print "Ignoring device $$dev[0]; 801-type not supported.\n";
+		splice @$dlist, $i, 1;
+		next;
+	    }
+	    $i++;
+
+	    # Make sure that classes match.
+	    next if $$dev[2] ne "Any" && $class ne "Any" && $$dev[2] ne $class;
+	    # Prepend "/dev/" if it's not present in the device name.
+	    if (exists($$dialout{$$dev[0]})) {
+		# This just seems odd.
+		$dname = $$dialout{$$dev[0]};
+		$dname =~ s+/dev/term/+/dev/cua/+;
+	    } else {
+		$dname = ($$dev[0] =~ m+^/+ ? $$dev[0] : ("/dev/" . $$dev[0]));
+	    }
+	    # Skip devices that aren't supposed to be used for dial-out.
+	    next if $dname =~ m+^/dev/term/+;
+	    next if $dname =~ m+^/dev/tty[a-z]$+;
+	    # Make sure this is a character device and we have access to it.
+	    next unless -w $dname && -c $dname;
+	    warn "Dialer for $$dev[3] is missing.\n"
+		unless exists($warned{$$dev[3]}) ||
+		    exists($$dialers{$$dev[3]});
+	    $warned{$$dev[3]} = 1;
+
+	    # Expand keywords from Dialcodes file.  Should have \T or \D.
+	    $phone = $$sline[3];
+	    $xphone = ($$dev[4] eq "\\T" && $phone =~ /^([A-Za-z]*)(.*)$/ ?
+	        "@{$$dialcodes{$1}}" . $2 : $phone);
+
+	    # Make a copy of the dialing script.
+	    local(@dials) = @{$$dialers{$$dev[3]}};
+
+	    # Translate dial tone and wait characters from Dialers file.
+	    $_ = shift @dials;
+	    s[(.)(.)]{
+		local($from,$to) = ($1,$2);
+		$phone =~ s+(^|[^\\])$from+$1$to+gx;
+		$xphone =~ s+(^|[^\\])$from+$1$to+gx;
+	    }ge;
+
+	    # Translate escapes in dial specification.  Chat has a \T,
+	    # but uses \U instead of \D.
+	    local($needt, $needu, $isexpect, @chats) = ("", "", 1);
+	    foreach $str (@dials) {
+		push(@chats, "") if $str eq "";
+		local ($ostr) = "";
+		if ($isexpect) {
+		    while ($str =~ s/([^\\]*)\\(.)//) {
+			local($lead, $_) = ($1, $2);
+			/[Mm]/ ? ($ostr .= $lead) :
+			/[Ee]/ ? ($sorrye = 1, $ostr .= $lead) :
+			($ostr .= $lead . "\\" . $_);
+		    }
+		} else {
+		    while ($str =~ s/([^\\]*)\\(.)//) {
+			local($lead, $_) = ($1, $2);
+			/T/ ? ($needt = " -T '$xphone'",
+			       $ostr .= $lead . "\\T") :
+			/D/ ? ($needu = " -U '$phone'",
+			       $ostr .= $lead . "\\U") :
+			/M/ ? ($ostr .= $lead,
+			       ($ostr ne "" ? push(@chats, $ostr, "\\c"):0),
+			       push(@chats, "HANGUP", "OFF"), $ostr = "") :
+			/m/ ? ($ostr .= $lead,
+			       ($ostr ne "" ? push(@chats, $ostr, "\\c"):0),
+			       push(@chats, "HANGUP", "ON"), $ostr = "") :
+			/[Ee]/ ? ($sorrye = 1, $ostr .= $lead) :
+			/[dp]/ ? ($ostr .= $lead . "\\" . $_ . "\\" . $_) :
+			/c/ ? ($str eq "" ? ($ostr .= $lead . "\\c") : 0) :
+			($ostr .= $lead . "\\" . $_);
+		    }
+		}
+		$ostr .= $str;
+		push @chats, $ostr if $ostr ne "";
+		$isexpect = !$isexpect;
+	    }
+
+	    # Pad out dial list if we're missing a "send" string and tack
+	    # on the chat list from the Systems file.
+	    if (defined $$sline[4]) {
+		push @chats, "\\c" if !$isexpect;
+		push @chats, (splice @$sline, 4);
+	    }
+
+	    $chatfile = $pppdir . "chat.$peer.$$dev[3]";
+	    if (-e $chatfile) {
+		print "$chatfile already exists.\n";
+		if (!yesno("Should it be overwritten",$opt_y)) {
+		    if (yesno("Should it be used as-is")) {
+			warn "Using $chatfile as-is; it may not be correct.\n";
+		    } else {
+			for ($n = 0; ; $n++) {
+			    last if !(-e $chatfile . "." . $n);
+			}
+			$chatfile .= "." . $n;
+			print "Using $chatfile instead.\n";
+			$chatfiles{$chatfile} = \@chats;
+		    }
+		} else {
+		    $overwrite{$chatfile} = 1;
+		    $chatfiles{$chatfile} = \@chats;
+		}
+	    } else {
+		$chatfiles{$chatfile} = \@chats;
+	    }
+
+	    push @pppdargs, $dname;
+	    push @pppdargs, $class if $class =~ /^[0-9]+$/;
+	    push @pppdargs, "demand";
+	    convert_options(\@pppdargs,$$paths{$peer},
+		$chatfile . $needt . $needu, undef);
+
+	    $optname = $peersdir . $peer;
+	    if (-e $optname) {
+		print "$optname already exists.\n";
+		if (!yesno("Should it be overwritten", $opt_y)) {
+		    if (yesno("Should it be used as-is")) {
+			warn "Using $optname as-is; it may not be correct.\n";
+		    } else {
+			for ($n = 0; ; $n++) {
+			    last if !(-e $optname . "." . $n);
+			}
+			$optname .= "." . $n;
+			print "Using $optname instead.\n";
+			$optfiles{$optname} = \@pppdargs;
+		    }
+		} else {
+		    $overwrite{$optname} = 1;
+		    $optfiles{$optname} = \@pppdargs;
+		}
+	    } else {
+		$optfiles{$optname} = \@pppdargs;
+	    }
+	    $scriptfiles{$pppdir . "demand"} .= "/usr/bin/pppd file $optname\n";
+	    last;
+	}
+    } elsif (${$$paths{$peer}}{$isdialin}) {
+    	translatedialin($peer);
+    } else {
+	warn "Path $peer has no dial-in user nor Systems file entry.\n";
+	delete $$paths{$peer};
+    }
+}
+
+warn "Chat cannot do echo checking; requests for this removed.\n" if $sorrye;
+
+if (@bidirectional) {
+    print "\nWarning:  The following paths are bidirectional:\n";
+    print "\t@bidirectional\n\n";
+    print "Bidirectional paths (with entries in both Systems and passwd) do not translate\n";
+    print "into Solaris PPP 4.0 semantics in an exact manner.  The dial-out portion will\n";
+    print "use the designated interface, but the dial-in portion will use any available\n";
+    print "interface.\n";
+    while ($peer = pop @bidirectional) {
+	delete $ {$$paths{$peer}}{interface};
+	translatedialin($peer);
+    }
+}
+
+translateifconfig;
+
+# Create an /etc/ppp/options if we need to.
+if (!defined($authoption) && $dialin_auth > 0) {
+    local (@pppdopts);
+    push @pppdopts, "lock";
+    push @pppdopts, "auth" if $dialin_auth == 1;
+    push @pppdopts, "noauth" if $dialin_auth > 1;
+    $optfiles{$options} = \@pppdopts;
+}
+# Translate option files to plain text.
+foreach $file (keys %optfiles) {
+    local ($opts) = $optfiles{$file};
+    local ($cstr) = "";
+    $cstr .= shift(@$opts) . "\n" while @$opts;
+    $optfiles{$file} = $cstr;
+}
+# Change "auth" to "noauth" or add "noauth" to /etc/ppp/options.
+if (defined($authoption) && $authoption ne "noauth" && $dialin_auth == 3) {
+    local(@triplet, $cstr);
+    if ($authoption eq "unknown") {
+	warn "Adding 'noauth' to $options\n";
+    } else {
+	warn "Changing 'auth' in $options to 'noauth'\n";
+    }
+    open(OPTIONS,"<" . $options) || die "$options disappeared: $!\n";
+    while (@{$words = uucpline(OPTIONS, $options, \@triplet)}) {
+	$cstr .= $triplet[0];
+	if (grep(/auth/, @$words)) {
+	    local(@newwords) = map { $_ = "noauth" if /auth/; $_ } @$words;
+	    $cstr .= "@newwords";
+	} else {
+	    $cstr .= $triplet[1];
+	}
+	while (pop @$words) {
+	    $authoption = $_ if /auth/i;
+	}
+	$cstr .= $triplet[2];
+    }
+    $cstr .= $triplet[0] . $triplet[2];
+    close OPTIONS;
+    $cstr .= "\n" if $cstr !~ /\n$/;
+    $cstr .= "noauth\n" if $authoption eq "unknown";
+    $optfiles{$options} = $cstr;
+}
+
+# Create a sed script to fix the users' shell paths.
+if (0+(keys %dialinshell) != 0) {
+    $cstr = "";
+    foreach $peer (keys %dialinshell) {
+	$cstr .= "/^$peer:/s+[^:]*/aspppls\$+$dialinshell{$peer}+\n";
+    }
+    $scriptfiles{$sedpasswd} = $cstr;
+}
+
+print "\nPreparing to write out translated configuration:\n";
+
+# Enumerate the files we'll write.
+$nfiles = 0;
+if (0+(keys %chatfiles) != 0) {
+    print "    ";
+    nof 0+(keys %chatfiles), "chat file", ":\n";
+    foreach $file (keys %chatfiles) {
+	$nfiles++;
+	print "\t$nfiles.  $file\n";
+	local ($chats) = $chatfiles{$file};
+	local ($cstr) = "";
+	while (@$chats) {
+	    $cstr .= requote(shift(@$chats));
+	    $cstr .= " " . requote(shift(@$chats)) if @$chats;
+	    $cstr .= "\n";
+	}
+	local (@filerec) = ( $file, $cstr );
+	push @allfiles, \@filerec;
+    }
+}
+if (0+(keys %optfiles) != 0) {
+    print "    ";
+    nof 0+(keys %optfiles), "option file", ":\n";
+    foreach $file (keys %optfiles) {
+	$nfiles++;
+	print "\t$nfiles.  $file\n";
+	local (@filerec) = ( $file, $optfiles{$file} );
+	push @allfiles, \@filerec;
+    }
+}
+if (0+(keys %scriptfiles) != 0) {
+    print "    ";
+    nof 0+(keys %scriptfiles), "script file", ":\n";
+    foreach $file (keys %scriptfiles) {
+	$nfiles++;
+	print "\t$nfiles.  $file\n";
+	local (@filerec) = ( $file, $scriptfiles{$file} );
+	push @allfiles, \@filerec;
+    }
+}
+
+# Merge new secrets needed with existing ones, if any.
+sub merge_secrets
+{
+    local ($addsecrets, $fname) = @_;
+    local ($file, $cstr, @triplet, $newsecret);
+
+    $nfiles++;
+    $file = $pppdir . $fname;
+    print "\t$nfiles.  $file\n";
+    if (open(SECRETS, '<' . $pppdir . $fname)) {
+	while (@{$words = uucpline(SECRETS, $pppdir . $fname, \@triplet)}) {
+	    $cstr .= $triplet[0];
+	    $newsecret = $ {$$addsecrets{$$words[0]}}{$$words[1]};
+	    if (defined $newsecret) {
+		$cstr .= requote($$words[0]) . " " . requote($$words[1]) .
+		  " " . $newsecret;
+		delete $ {$$addsecrets{$$words[0]}}{$$words[1]};
+	    } else {
+		$cstr .= $triplet[1];
+	    }
+	    $cstr .= $triplet[2];
+	}
+	close SECRETS;
+	$cstr .= $triplet[0] . $triplet[2];
+    }
+    foreach $key1 (keys (%$addsecrets)) {
+	foreach $key2 (keys (%{$$addsecrets{$key1}})) {
+	    $cstr .= requote($key1) . " " . requote($key2) . " " .
+	      $ {$$addsecrets{$key1}}{$key2} . "\n";
+	}
+    }
+    local (@filerec) = ( $file, $cstr );
+    push @allfiles, \@filerec;
+}
+
+$nchap = 0+(keys %chapsecrets) != 0;
+$npap = 0+(keys %papsecrets) != 0;
+if ($nchap != 0 || $npap != 0) {
+    print "    ";
+    nof $nchap + $npap, "secrets file", ":\n";
+    merge_secrets(\%chapsecrets, "chap-secrets") if $nchap != 0;
+    merge_secrets(\%papsecrets, "pap-secrets") if $npap != 0;
+}
+
+die "Nothing to write back; I'm done.\n" if $nfiles == 0;
+
+$PAGER = fixpath($ENV{PAGER}, "/usr/bin/less");
+$EDITOR = fixpath($ENV{EDITOR}, "/usr/bin/vi");
+$SHELL = fixpath($ENV{SHELL}, "/usr/bin/ksh");
+
+END {
+    if ($tempname) {
+	unlink($tempname) or
+	    die "Cannot remove temporary file $tempname: $!\n";
+    }
+}
+
+sub show_file_options
+{
+    print "\nEnter option number:\n";
+    print "\t1 - view contents of file on standard output\n";
+    print "\t2 - view contents of file using $PAGER\n" if $PAGER ne "";
+    print "\t3 - edit contents of file using $EDITOR\n" if $EDITOR ne "";
+    print "\t4 - delete/undelete file from list\n";
+    print "\t5 - rename file in list\n";
+    print "\t6 - show file list again\n";
+    print "\t7 - escape to shell (or \"!cmd\")\n";
+    print "\t8 - abort without saving anything\n";
+    print "\t9 - save all files and exit (default)\n";
+}
+
+# If interactive, then allow user to view and modify converted data.
+if ((-t STDIN) && (-t STDOUT) && !$opt_n) {
+    show_file_options();
+    while (1) {
+	print "Option:  ";
+	chomp($ans = <STDIN>);
+	if ($ans eq "?" || $ans =~ /^h/i) {
+	    show_file_options();
+	    next;
+	}
+	if ($ans eq "") {
+	    last if yesno "Saving all files.  Are you sure";
+	    next;
+	}
+	last if $ans == 9;
+	print("Aborted.\n"), exit if $ans == 8;
+	if ($ans =~ /^!/ || $ans == 7) {
+	    if ($ans =~ /^!(.+)/) {
+		system($1);
+	    } else {
+		print("Interactive shell access not permitted here.\n"), next
+		    if $< != $>;
+		system($SHELL);
+	    }
+	} elsif ($ans == 6) {
+	    for ($i = 0; $i < $nfiles; $i++) {
+		print "\t", $i+1, ".  $allfiles[$i][0]",
+		    ($deleted[$i] ? "   (deleted)" : ""), "\n";
+	    }
+	} elsif ($ans > 0 && $ans < 6) {
+	    $fnum = 0;
+	    if ($nfiles > 1) {
+		print "File number (1 .. $nfiles):  ";
+		chomp($fnum = <STDIN>);
+		if ($fnum < 1 || $fnum > $nfiles) {
+		    print "Unknown file (must be 1 to $nfiles).\n";
+		    next;
+		}
+		$fnum--;
+	    }
+	    if ($ans == 5) {
+		print "Current name is $allfiles[$fnum][0]\n";
+		print "New name:  ";
+		chomp($fname = <STDIN>);
+		print("Unchanged\n"), next if $fname eq "";
+		$allfiles[$fnum][0] = $fname;
+	    }
+	    if ($deleted[$fnum]) {
+		if (yesno("File " . $fnum+1 .
+		   " ($allfiles[$fnum][0]) is deleted; undelete",1)) {
+		    undef $deleted[$fnum];
+		}
+		next;
+	    }
+	    if ($ans == 1) {
+		print $allfiles[$fnum][1];
+	    } elsif ($ans == 2 && $PAGER ne "") {
+		$i = 0;
+		do {
+		    if (++$i > 5) {
+			warn "Unable to open temporary file: $!";
+			undef $tempname;
+			last;
+		    }
+		    $tempname = tmpnam();
+		} until sysopen(FH, $tempname, O_RDWR|O_CREAT|O_EXCL);
+		next if !$tempname;
+		print FH $allfiles[$fnum][1];
+		close FH;
+		system($PAGER, $tempname);
+		unlink($tempname) ||
+		    warn "Trouble removing temporary file: $!";
+		undef $tempname;
+	    } elsif ($ans == 3 && $EDITOR ne "") {
+		$i = 0;
+		do {
+		    if (++$i > 5) {
+			warn "Unable to open temporary file: $!";
+			undef $tempname;
+			last;
+		    }
+		    $tempname = tmpnam();
+		} until sysopen(FH, $tempname, O_RDWR|O_CREAT|O_EXCL);
+		next if !$tempname;
+		chown $<, $(, $tempname;
+		print FH $allfiles[$fnum][1];
+		close FH;
+		$i = system($EDITOR, $tempname);
+		if ($i == 0) {
+		    if (open FH, "<" . $tempname) {
+			read FH, $allfiles[$fnum][1], (-s $tempname);
+			close FH;
+		    }
+		} else {
+		    print "Editor dropped core.\n" if $? & 128;
+		    print "Editor terminated on signal ", $? & 127, "\n"
+			if $? & 127;
+		    print "Editor returned error ", $? >> 8, "\n"
+			if $? >> 8;
+		}
+		unlink($tempname) ||
+		    warn "Trouble removing temporary file: $!";
+		undef $tempname;
+	    } elsif ($ans == 4) {
+		$deleted[$fnum] = 1;
+	    }
+	}
+    }
+}
+
+print "\n";
+
+# Interactive part is over.  Become real.
+$( = $);
+$< = $>;
+
+print "Stopping aspppd\n" if $opt_v;
+system($asctl, "stop") if -x $asctl;
+
+print "Saving all files\n" if $opt_v;
+for ($i = 0; $i < $nfiles; $i++) {
+    $filerec = $allfiles[$i];
+    if ($deleted[$i]) {
+	delete $scriptfiles{$$filerec[0]};
+	next;
+    }
+    print "Saving $$filerec[0]\n" if $opt_v;
+    $$filerec[0] =~ m+(.*)/+;
+    if ($1 eq "") {
+	# this is ok; just a top level file
+    } elsif (!(-d $1)) {
+	local ($exdir) = $1;
+	while ($exdir && !(-d $exdir)) {
+	    $exdir =~ m+(.*)/+;
+	    $exdir = $1;
+	}
+	if ($exdir) {
+	    local ($dir) = $1;
+	    $dir =~ m+$exdir/([^/]*)(.*)+;
+	    local ($tomake, $rest) = ($1, $2);
+	    mkdir $exdir . "/" . $tomake, 0775;
+	    if ($! == ENOSYS) {
+		warn "Unable to make directory $exdir/$tomake; automount point.\n";
+		next;
+	    }
+	    if ($! != 0) {
+		warn "Unable to make directory $exdir/$tomake: $!\n";
+		next;
+	    }
+	    if (system("mkdir", "-p", $dir) != 0) {
+		warn "Failed to make $dir\n";
+		next;
+	    }
+	} else {
+	    warn "$1 doesn't appear to have a useful path.\n";
+	    next;
+	}
+    }
+    undef $fileerr;
+    local ($fname) = $$filerec[0];
+    if (-e $fname && !$overwrite{$chatfile}) {
+	print "$fname already exists.\n"
+	  if (-t STDIN) && (-t STDOUT) && !$opt_n;
+	if (!yesno("Should it be overwritten",$opt_y)) {
+	    warn "Using $fname as-is; it may not be correct.\n";
+	    next;
+	}
+    }
+    if (sysopen(OUTFILE, $$filerec[0], O_WRONLY|O_CREAT|O_TRUNC, 0600)) {
+	print OUTFILE $$filerec[1] || ($fileerr = $!);
+	close OUTFILE || ($fileerr = $!);
+    } else {
+	$fileerr = $!;
+    }
+    warn "Unable to write $$filerec[0]: $fileerr\n" if $fileerr;
+}
+
+local(@scripts) = keys %scriptfiles;
+if (@scripts) {
+    print "Making scripts executable\n" if $opt_v;
+    system("chmod", "u+x", @scripts);
+}
+
+rewrite_passwd if exists($scriptfiles{$sedpasswd});
+
+# clean up after a previous translation.
+unlink $pppdir . "ifconfig" if !$scriptfiles{$pppdir . "ifconfig"};
+unlink $pppdir . "demand" if !$scriptfiles{$pppdir . "demand"};
+
+(rename($asfile, $asmoved) || warn "Cannot move $asfile: $!\n")
+  if $aspppcf ne $astemp;
+
+system($pppdctl, "start") if -x $pppdctl;
+
+# use Dumpvalue;
+# my $dumper = new Dumpvalue;
+# $dumper->set(globPrint => 1);
+# $dumper->dumpValue($ifconfig);

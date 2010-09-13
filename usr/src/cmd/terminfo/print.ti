@@ -1,0 +1,947 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+######################################################################
+#
+# Generic entry for the C.Itoh 8510 printer and emulations:
+#
+
+citoh+basic,
+
+#   The 8510 I use only allows 79 columns!
+	cols#79,
+
+	lines#66,
+	it#8,
+
+	orc#1,
+	orhi#10,
+	orl#24,
+	orvi#144,
+
+	cr=\r,
+	cud1=\n,
+	cuf1=\s,
+	ff=\f,
+	ht=\t,
+
+	cpi=%?%p1%{10}%=%t\EN%e%p1%{12}%=%t\EE%e%p1%{16}%=%p1%{17}%=%O%t\EQ%;,
+	cvr=%?%p1%{0}%>%p1%{100}%<%&%t\ET%p1%02d%;,
+
+	is1=^Q^X,
+	is2=\Ec1\Ev66.,
+
+	smso=\E!,
+	rmso=\E",
+	smul=\EX,
+	rmul=\EY,
+	bold=\E!,
+	ssubm=\Es2,
+	rsubm=\Es0,
+	ssupm=\Es1,
+	rsupm=\Es0,
+	swidm=^N,
+	rwidm=^O,
+	sgr0=\E"\EY\Es0^O,
+	sgr=%?%p1%p6%|%t\E!%e\E"%;%?%p2%t\EX%e\EY%;,
+
+	rep=\ER%p2%03d%p1%c,
+
+	snlq=\Em2,
+	snrmq=\Em1,
+	sdrfq=\Em0,
+
+	smglp=\EL%p1%03d,
+	smgrp=\E/%{1}%p1%+%03d,
+
+	slines=\Ev%p1%02d.,
+	u9=\Ev%p1%02d.,
+
+citoh+low,
+
+	npins#8,
+	spinv#68,
+	spinh#136,
+
+	porder=8\,7\,6\,5\,4\,3\,2\,1;0,
+
+	sbim=\ES%p1%04d,
+
+	birep=\EV%p2%04d%p3%c,
+
+	bitwin#1,
+	bitype#1,
+
+#	Set the line spacing to 17/144 inch to get (almost) 68 dots
+#	per inch vertically (8 * 144/17).
+#	Set the character spacing to compressed (1/17 inch or 17
+#	characters per inch); at 136 dots per inch horizontally this
+#	means 8 dots per character.
+#	Set the left margin at the left edge of the image.
+#	The C.Itoh doesn't have parameterized vertical motion,
+#	so we simulate it with linefeeds. Assume we never need
+#	to move more than 63 lines (at 17/144 LPI).
+#	Set uni-directional motion; bi-directional causes a wavy
+#	image.
+	defbi=%?%p5%{1}%=%t\ET17\EQ\EL%p1%{8}%/%03d%p2%{8}%/%Py%?%gy%{31}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{32}%-%Py%;%?%gy%{15}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{16}%-%Py%;%?%gy%{7}%>%t\n\n\n\n\n\n\n\n%gy%{8}%-%Py%;%?%gy%{3}%>%t\n\n\n\n%gy%{4}%-%Py%;%?%gy%{1}%>%t\n\n%gy%{2}%-%Py%;%?%gy%{0}%>%t\n%;\E>%;,
+
+	endbi=\EA\EP\EL001\E<,
+
+	binel=\n\r\EL%p1%{8}%/%03d,
+
+######################################################################
+#
+# Specific printers:
+#
+
+citoh|8510|C.Itoh 8510 printer,
+
+	bufsz#1024,
+	cps#120,
+
+	use=citoh+basic, use=citoh+low,
+
+######################################################################
+#
+# Generic entry for the daisy wheel printers and emulations:
+#
+
+#
+# Basic capabilities:
+#
+daisy+basic,
+
+	daisy,
+
+	cols#132,
+	lines#66,
+
+	orc#12,
+	orhi#120,
+	orl#8,
+	orvi#48,
+
+	cr=^M,
+	cud1=^J,
+	cuf1=\s,
+	ff=^L,
+	ht=^I,
+	hpa=%?%p1%{100}%<%t\EC%p1%02d%e%p1%{110}%<%t\ECA%p1%{100}%-%d%e%p1%{120}%<%t\ECB%p1%{110}%-%d%e%p1%{130}%<%t\ECC%p1%{120}%-%d%e%p1%{140}%<%t\ECD%p1%{130}%-%d%e%p1%{150}%<%t\ECE%p1%{140}%-%d%e%p1%{160}%<%t\ECF%p1%{150}%-%d%;,
+	vpa=%?%p1%{100}%<%t\EP%p1%02d%e%p1%{110}%<%t\EPA%p1%{100}%-%d%e%p1%{120}%<%t\EPB%p1%{110}%-%d%e%p1%{130}%<%t\EPC%p1%{120}%-%d%e%p1%{140}%<%t\EPD%p1%{130}%-%d%e%p1%{150}%<%t\EPE%p1%{140}%-%d%e%p1%{160}%<%t\EPF%p1%{150}%-%d%;,
+
+	chr=%?%p1%{100}%<%t\EE%p1%02d%e%p1%{110}%<%t\EEA%p1%{100}%-%d%e%p1%{120}%<%t\EEB%p1%{110}%-%d%e%p1%{130}%<%t\EEC%p1%{120}%-%d%e%p1%{140}%<%t\EED%p1%{130}%-%d%e%p1%{150}%<%t\EEE%p1%{140}%-%d%e%p1%{160}%<%t\EEF%p1%{150}%-%d%;,
+	cvr=%?%p1%{100}%<%t\EL%p1%02d%e%p1%{110}%<%t\ELA%p1%{100}%-%d%e%p1%{120}%<%t\ELB%p1%{110}%-%d%e%p1%{130}%<%t\ELC%p1%{120}%-%d%e%p1%{140}%<%t\ELD%p1%{130}%-%d%e%p1%{150}%<%t\ELE%p1%{140}%-%d%e%p1%{160}%<%t\ELF%p1%{150}%-%d%;,
+
+	is2=\E\rP\EW\E.\EL08\EE12\E%\E<,
+
+	smso=\EQ,
+	rmso=\ER,
+	smul=\EI,
+	rmul=\EJ,
+	bold=\EKd,
+	sshm=\EQ,
+	rshm=\ER,
+	sgr0=\ER\EM\EJ,
+	sgr=%?%p1%t\EQ%e\ER%;%?%p2%t\EI%e\EJ%;%?%p6%t\EKd%e\EM%;,
+
+	smgb=\E-,
+	smgl=\E9,
+	smgr=\E0,
+	smgt=\E+,
+
+	slines=\EF%p1%02d,
+	u9=\EF%p1%02d,
+
+#
+# Graphics capabilities:
+#
+daisy+lowres,
+
+#
+#	We could use the graphics on/graphics off control sequences
+#	(ESC G/ESC 4) but for these problems:
+#
+#		- graphics mode gets turned off when a \r is received;
+#		- printing a character doesn't cause motion, which
+#		  means that each ``cell'' must be followed by a space;
+#		- to get the best aspect ratio, three horizontal dots
+#		  must be sent per ``cell'' (using the ESC 3 graphics mode
+#		  (1/60 instead of 1/120) alleviates this problem but
+#		  gives a worse aspect ratio).
+#
+#	So instead we set the HMI and VMI to 1/40 and 1/48 inch,
+#	respectively.
+#
+	npins#1,
+	spinv#48,
+	spinh#40,
+
+	porder=o\,o\,o\,o\,1\,1\,1\,o;32,
+
+	bitwin#1,
+	bitype#1,
+
+	birep=%?%p3%{32}%=%t\EH%p2%{3}%*%Px%gx%{256}%/%{64}%+%c%gx%{256}%m%{16}%/%{64}%+%c%gx%{16}%m%{64}%+%c%;,
+
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\EL01\EE03%p1%{3}%*%Px\r\EH%gx%{256}%/%{64}%+%c%gx%{256}%m%{16}%/%{64}%+%c%gx%{16}%m%{64}%+%c\EV%p2%{256}%/%{64}%+%c%p2%{256}%m%{16}%/%{64}%+%c%p2%{16}%m%{64}%+%c\E>%;,
+
+	endbi=\EL08\EE12\E<,
+
+	binel=\n\r%p1%{3}%*%Px\EH%gx%{256}%/%{64}%+%c%gx%{256}%m%{16}%/%{64}%+%c%gx%{16}%m%{64}%+%c,
+
+######################################################################
+#
+# Specific printers:
+#
+
+daisy,
+
+	use=daisy+basic, use=daisy+lowres,
+
+qume|sprint11|Qume Sprint 11,
+
+	bufsz#500,
+	cps#55,
+
+	use=daisy,
+
+######################################################################
+#
+# Generic entries for the various DEC printers and emulations.
+#
+#	The dec+... entries are really for any ANSI X3.64 printer,
+#	but "ansi" is already used for terminals. It would be more
+#	work to do "use=ansi" because there are too many screen
+#	oriented caps that would have to be removed.
+#
+
+#
+# Basic capabilities:
+#
+dec+basic,
+
+	cols#132,
+	lines#66,
+	it#8,
+
+	cpix,
+	orc#1,
+	orhi#10,
+	orl#2,
+	orvi#12,
+
+#
+# FIX? Are xhpa and xvpa really needed?
+	xhpa,
+	xvpa,
+
+	cr=^M,
+	ff=^L,
+	ht=^I,
+	cud1=^J,
+	cuf1=\s,
+	cuu1=\EM,
+	cud=\E[%p1%de,
+	cuf=\E[%p1%da,
+	hpa=\E[%p1%d`,
+	vpa=\E[%p1%dd,
+	nel=\EE,
+
+	is1=\Ec,
+	is2=\E[20l,
+
+	cpi=%?%p1%{10}%=%t\E[w%e%p1%{12}%=%t\E[2w%e%p1%{5}%=%t\E[5w%e%p1%{13}%=%p1%{14}%=%O%t\E[3w%e%p1%{16}%=%p1%{17}%=%O%t\E[4w%e%p1%{6}%=%t\E[6w%e%p1%{7}%=%t\E[7w%e%p1%{8}%=%t\E[8w%;,
+	lpi=%?%p1%{2}%=%t\E[4z%e%p1%{3}%=%t\E[5z%e%p1%{4}%=%t\E[6z%e%p1%{6}%=%t\E[z%e%p1%{8}%=%t\E[2z%e%p1%{12}%=%t\E[3z%;,
+
+	csnm=%?%p1%{0}%=%tusascii%e%p1%{1}%=%tenglish%e%p1%{2}%=%tfinnish%e%p1%{3}%=%tjapanese%e%p1%{4}%=%tnorwegian%e%p1%{5}%=%tswedish%e%p1%{6}%=%tgermanic%e%p1%{7}%=%tfrench%e%p1%{8}%=%tcanadian_french%e%p1%{9}%=%titalian%e%p1%{10}%=%tspanish%e%p1%{11}%=%tline%e%p1%{12}%=%tsecurity%e%p1%{13}%=%tebcdic%e%p1%{14}%=%tapl%e%p1%{15}%=%tmosaic%;,
+	scs=%?%p1%{0}%=%t\E(B%e%p1%{1}%=%t\E(A%e%p1%{2}%=%t\E(C%e%p1%{3}%=%t\E(D%e%p1%{4}%=%t\E(E%e%p1%{5}%=%t\E(H%e%p1%{6}%=%t\E(K%e%p1%{7}%=%t\E(R%e%p1%{8}%=%t\E(Q%e%p1%{9}%=%t\E(Y%e%p1%{10}%=%t\E(Z%e%p1%{11}%=%t\E(0%e%p1%{12}%=%t\E(1%e%p1%{13}%=%t\E(3%e%p1%{14}%=%t\E(8%e%p1%{15}%=%t\E(}%;,
+
+	sshm=\E[5m,
+	rshm=\E[m,
+
+	smgtp=\E[%p1%dr,
+	smgbp=\E[;%p1%dr,
+	smglp=\E[%{1}%p1%+%ds,
+	smgrp=\E[;%{1}%p1%+%ds,
+
+	slines=\E[%p1%dt,
+	u9=\E[%p1%dt,
+
+#
+# Graphics capabilities (low resolution, 6-pin):
+#
+dec+low,
+
+	npins#6,
+	spinv#72,
+	spinh#75,
+
+	porder=o\,o\,6\,5\,4\,3\,2\,1;63,
+
+	bitwin#1,
+	bitype#1,
+
+	birep=!%p2%d%p3%c,
+
+#	X is in 1/75 increments; set char spacing to 1/16.7
+#	increments to allow us to get close; column is X*16.7/75.
+#	Y is in 1/72 increments; set line spacing to 1/12
+#	increments to allow us to get close; line is Y/6.
+	defbi=%?%p5%{1}%=%t\E[4w\E[%p1%{167}%*%{750}%/%d`\E[w\E[3z\E[%p2%{6}%/%dd\E[z\EP0q%;,
+
+	endbi=^X,
+
+	binel=-,
+
+	bicr=$,
+
+######################################################################
+#
+# Specific printers:
+#
+
+la100|DEC LA100 Printer,
+
+	use=dec+basic, use=dec+low,
+
+ln03|DEC LN03 Laser Printer,
+
+#	I'm guessing here. I think the ln03 can scale up to 6.
+#	X is in 1/75 increments; set char spacing to 1/16.7
+#	increments to allow us to get close; column is X*16.7/75.
+#	Y is in 1/72 increments; set line spacing to 1/12
+#	increments to allow us to get close; line is Y/6.
+	defbi=%?%p5%{0}%>%p5%{7}%<%&%t\E[4w\E[%p1%{167}%*%{750}%/%d`\E[w\E[3z\E[%p2%{6}%/%dd\E[z\EP9;0;%p5%dq"1;1%;,
+
+	use=dec+basic, use=dec+low,
+
+######################################################################
+#
+# Epson LQ-2500
+#
+
+#
+# Basic capabilities:
+#
+ep2500+basic,
+
+	cols#136,
+	lines#66,
+	it#8,
+
+	cpix,
+	orc#6,
+	orhi#60,
+	orl#30,
+	orvi#180,
+
+	cr=^M,
+	cud1=^J,
+	cuf1=\s,
+	cub1=\b,
+	ff=^L,
+	ht=^I,
+
+	cpi=%?%p1%{10}%=%t^R\EP%e%p1%{12}%=%t^R\EM%e%p1%{20}%=%t^O\EM%e%p1%{17}%=%t^O\EP%;,
+	cvr=%?%p1%{0}%>%p1%{256}%<%&%t\E3%p1%c%;,
+
+	is1=^Q^X,
+	is2=\E@\E%0\EO,
+
+	csnm=%?%p1%{0}%=%tcharacter_set_1%e%p1%{1}%=%tcharacter_set_2%e%p1%{2}%=%tusa%e%p1%{3}%=%tfrench%e%p1%{4}%=%tgerman%e%p1%{5}%=%tuk%e%p1%{6}%=%tdanish1%e%p1%{7}%=%tswedish%e%p1%{8}%=%titalian%e%p1%{9}%=%tspanish1%e%p1%{10}%=%tjapanese%e%p1%{11}%=%tnorwegian%e%p1%{12}%=%tdanish2%e%p1%{13}%=%tspanish2%e%p1%{14}%=%tlatin_american%;,
+	scs=%?%p1%{0}%=%t\E7%e%p1%{1}%=%t\E6%e%p1%{1}%>%p1%{15}%<%&%t\ER%p1%{126}%+%c%;
+
+	smso=\EE,
+	rmso=\EF,
+	smul=\E-1,
+	rmul=\E-0,
+	bold=\EG,
+	sshm=\EE,
+	rshm=\EF,
+	ssubm=\ES1,
+	rsubm=\ET,
+	ssupm=\ES0,
+	rsupm=\ET,
+	swidm=\EW1,
+	rwidm=\EW0,
+	sitm=\E4,
+	ritm=\E5,
+	sgr0=\EF\E-0\EH\ET\EW0\E5,
+	sgr=%?%p1%t\EE%e\EF%;%?%p2%t\E-1%e\E-0%;%?%p6%t\EG%e\EH%;,
+
+#
+#	For now we can't set the margin in the first (0th) column
+#	due to limitations in the Curses code. This should be changed
+#	in the future. For now, shift right 1. Note that the right
+#	margin is the last USEABLE column in Terminfo, but is 1
+#	PAST that for the Epson.
+	smglp=%?%p1%{256}%<%t\El%p1%{1}%+%c%;,
+	smgrp=%?%p1%{256}%<%t\EQ%p1%{2}%+%c%;,
+
+	slines=%?%p1%{0}%>%p1%{128}%<%&%t\EC%p1%c%;,
+	u9=%?%p1%{0}%>%p1%{128}%<%&%t\EC%p1%c%;,
+
+	snrmq=\Ex0,
+	snlq=\Ex1,
+
+#
+# Graphics capabilities:
+#
+ep2500+low,
+
+	npins#8,
+	spinv#60,
+	spinh#60,
+
+	porder=1\,2\,3\,4\,5\,6\,7\,8;0,
+
+	sbim=\EK%p1%{256}%m%c%p1%{256}%/%c,
+
+	bitwin#1,
+	bitype#1,
+
+#	Set the line spacing to 8/60 inch (7.5 lines per inch)
+#	to get 60 dots per inch vertically (7.5 lines/" * 8 pins/line).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 60 dots per inch horizontally this means 6
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\E3\030^R\EP\EB%p2%{8}%/%c$<>\ED%p1%{6}%/%c$<>\013\r\t%;,
+
+	endbi=\E3\036,
+
+	binel=\n\r\t,
+
+	bicr=\r\t,
+
+#
+# Graphics capabilities:
+#
+ep2500+high,
+
+	npins#24,
+	spinv#180,
+	spinh#180,
+
+	porder=1\,2\,3\,4\,5\,6\,7\,8\,9\,10\,11\,12\,13\,14\,15\,16\,17\,18\,19\,20\,21\,22\,23\,24;0,
+
+	sbim=\E*\047%p1%{256}%m%c%p1%{256}%/%c,
+
+#	Set the line spacing to 8/60 inch (7.5 lines per inch)
+#	to get 180 dots per inch vertically (7.5 lines/" * 24 pins/line).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 180 dots per inch horizontally this means 18
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\E3\030^R\EP\EB%p2%{24}%/%c$<>\ED%p1%{18}%/%c$<>\013\r\t%;,
+
+	use=ep2500+low,
+
+#
+# Color capability:
+#
+ep2500+color,
+
+	colors#3,
+
+	setcolor=%?%p1%{0}%=%t\Er0%;%?%p1%{1}%=%t\Er2%;%?%p1%{2}%=%t\Er1%;%?%p1%{3}%=%t\Er4%;,
+
+	colornm=%?%p1%{0}%=%tblack%;%?%p1%{1}%=%tcyan%;%?%p1%{2}%=%tmagenta%;%?%p1%{3}%=%tyellow%;%?%p1%{4}%=%torange=yellow+magenta%;%?%p1%{5}%=%tgreen=yellow+cyan%;%?%p1%{6}%=%tviolet=magenta+cyan%;%?%p1%{7}%=%tbrown=magenta+black%;,
+
+######################################################################
+#
+# Specific printers:
+#
+
+epson2500|Epson LQ-2500; low resolution,
+
+	use=ep2500+basic, use=ep2500+low, use=ep2500+color,
+
+epson2500-hi|Epson LQ-2500; high resolution,
+
+	use=ep2500+basic, use=ep2500+high, use=ep2500+color,
+
+epson2500-80|Epson LQ-2500; low resolution; 80-col,
+
+	cols#80,
+	use=ep2500+basic, use=ep2500+low, use=ep2500+color,
+
+epson2500-hi80|Epson LQ-2500; high resolution; 80-col,
+
+	cols#80,
+	use=ep2500+basic, use=ep2500+high, use=ep2500+color,
+
+######################################################################
+#
+# Generic entry for the HP Laserjet printers and emulations:
+#
+
+#
+# Basic capabilities:
+#
+hplaser+basic,
+
+	cols#80,
+	lines#60,
+
+	orc#12,
+	orhi#120,
+	orl#8,
+	orvi#48,
+
+	cr=^M,
+	cud1=^J,
+	cuf1=\s,
+	cud=\E&a+%p1%dR,
+	cuf=\E&a+%p1%dC,
+	ff=^L,
+	hpa=\E&a%p1%dC,
+	vpa=\E&a%p1%dR,
+
+	cpi=%?%p1%{10}%=%t\E&k0S%e%p1%{17}%=%t\E&k2S%;,
+	chr=%?%p1%{0}%>%p1%{127}%<%t\E&k%p1%dH%;,
+	cvr=%?%p1%{0}%>%p1%{127}%<%t\E&l%p1%dC%;,
+	lpi=%?%p1%{1}%=%t\E&l1D%e%p1%{2}%=%t\E&l2D%e%p1%{3}%=%t\E&l3D%e%p1%{4}%=%t\E&l4D%e%p1%{6}%=%t\E&l6D%e%p1%{8}%=%t\E&l8D%e%p1%{12}%=%t\E&l12D%e%p1%{16}%=%t\E&l16D%e%p1%{24}%=%t\E&l24D%e%p1%{48}%=%t\E&l48D%;,
+
+# Reset printer and set how EOL is handled.
+# \E&k0G is cr=cr, lf=lf, ff=ff
+# \E&k1G is cr=cr+lf, lf=lf, ff=ff
+# \E&k2G is cr=cr, lf=cr+lf, ff=cr+ff (this is what UNIX uses)
+# \E&k3G is cr=cr+lf, lf=cr+lf, ff=cr+ff
+
+	is2=\EE\E&k2G,
+	mgc=\E9,
+
+	rmul=\E&d\100,
+	ritm=\E(s0S,
+	smul=\E&dD,
+	sitm=\E(s1S,
+	smgtp=\E&l%p1%{1}%+%dE,
+	smgbp=\E&l%p1%{1}%+%dF,
+	smglp=\E&a%p1%dL,
+	smgrp=\E&a%p1%dM,
+
+#Set top margin at +2 offset
+	smgtp=\E&l%p1%dE,
+
+#Set page length
+	slines=\E&l%p1P,
+	u9=\E&l%p1P,
+
+#
+# Graphics capabilities:
+#
+hplaser+high,
+
+	npins#8,
+	spinv#300,
+	spinh#300,
+
+	porder=1\,2\,3\,4\,5\,6\,7\,8;0,
+
+	sbim=\E*b%p1%dW,
+
+	bitwin#1,
+	bitype#2,
+
+#	    X (or Y) * scale * 12/5 == pos in decipoints (12/5 == 720/300)
+	defbi=%?%p5%{0}%>%p5%{5}%<%&%t\E&a%p1%p5%*%{12}%*%{5}%/%dH\E&a%p2%p5%*%{12}%*%{5}%/%dV\E*t%{300}%p5%/%dR\E*r1A%;,
+
+	endbi=\E*rB,
+
+######################################################################
+#
+# Specific printers:
+#
+
+hplaserjet|hplaser|HP Laserjet I,
+
+	use=hplaser+basic, use=hplaser+high,
+
+######################################################################
+#
+# Generic entries for the various IBM printers and emulations.
+#
+
+###################################
+#
+# IBM Graphics
+#
+
+#
+# Basic capabilities:
+#
+ibmg+basic,
+
+	cols#80,
+	lines#66,
+	it#8,
+
+	cpix,
+	orc#1,
+	orhi#10,
+	orl#12,
+	orvi#72,
+
+	cr=^M,
+	ff=^L,
+	ht=^I,
+	cud1=^J,
+	cuf1=\s,
+
+	cpi=%?%p1%{10}%=%t^R%e%p1%{16}%=%p1%{17}%=%O%t^O%;,
+	cvr=%?%p1%{0}%>%p1%{256}%<%&%t\EA%p1%c\E2%;,
+
+	is1=^X,
+	is2=^R\EA\014\E2\EF\EH\EW0\ET\E-0\E7\EO,
+
+	csnm=%?%p1%{0}%=%p1%{1}%=%O%tcharacter_set_1%e%p1%{2}%=%tcharacter_set_2%;,
+	scs=%?%p1%{0}%=%p1%{1}%=%O%t\E7%e%p1%{2}%=%t\E6%;,
+
+	smso=\EE,
+	rmso=\EF,
+	smul=\E-1,
+	rmul=\E-0,
+	bold=\EG,
+	smacs=\E6,
+	rmacs=\E7,
+	sshm=\EE,
+	rshm=\EF,
+	ssubm=\ES1,
+	rsubm=\ET,
+	ssupm=\ES0,
+	rsupm=\ET,
+	swidm=\EW1,
+	rwidm=\EW0,
+	sgr0=\EF\E-0\EH\E7\ET\EW0,
+	sgr=%?%p1%t\EE%e\EF%;%?%p2%t\E-1%e\E-0%;%?%p6%t\EG%e\EH%;%?%p9%t\E6%e\E7%;,
+
+	slines=%?%p1%{0}%>%p1%{128}%<%&%t\EC%p1%c%;,
+	u9=%?%p1%{0}%>%p1%{128}%<%&%t\EC%p1%c%;,
+
+#
+# Graphics capabilities (low resolution, 9-pin):
+#
+ibmg+low,
+
+	npins#8,
+	spinv#72,
+	spinh#60,
+
+	porder=1\,2\,3\,4\,5\,6\,7\,8;0,
+
+	sbim=\EK%p1%{256}%m%c%p1%{256}%/%c,
+
+	bitwin#1,
+	bitype#1,
+
+#	Set the line spacing to 8/72 inch (9 lines per inch)
+#	to get 72 dots per inch vertically (9 lines/inch * 8 pins/line).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 60 dots per inch horizontally this means 6
+#	dots per character.
+#	The IBM Graphics doesn't have parameterized motion,
+#	so we simulate it with linefeeds and spaces.
+#	Assume we never need to move across more than 63 colums
+#	or down more than 31 lines. 
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\EA\010\E2^R%p2%{8}%/%Py%?%gy%{15}%>%t\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%gy%{16}%-%Py%;%?%gy%{7}%>%t\n\n\n\n\n\n\n\n%gy%{8}%-%Py%;%?%gy%{3}%>%t\n\n\n\n%gy%{4}%-%Py%;%?%gy%{1}%>%t\n\n%gy%{2}%-%Py%;%?%gy%{0}%>%t\n%;\r%p1%{6}%/%Px%?%gx%{31}%>%t                                %gx%{32}%-%Px%;%?%gx%{15}%>%t                %gx%{16}%-%Px%;%?%gx%{7}%>%t        %gx%{8}%-%Px%;%?%gx%{3}%>%t    %gx%{4}%-%Px%;%?%gx%{1}%>%t  %gx%{2}%-%Px%;%?%gx%{0}%>%t %;%;,
+
+	endbi=\EA\014\E2,
+
+	binel=\n\r%p1%{6}%/%Px%?%gx%{31}%>%t                                %gx%{32}%-%Px%;%?%gx%{15}%>%t                %gx%{16}%-%Px%;%?%gx%{7}%>%t        %gx%{8}%-%Px%;%?%gx%{3}%>%t    %gx%{4}%-%Px%;%?%gx%{1}%>%t  %gx%{2}%-%Px%;%?%gx%{0}%>%t %;,
+
+	bicr=\r%p1%{6}%/%Px%?%gx%{31}%>%t                                %gx%{32}%-%Px%;%?%gx%{15}%>%t                %gx%{16}%-%Px%;%?%gx%{7}%>%t        %gx%{8}%-%Px%;%?%gx%{3}%>%t    %gx%{4}%-%Px%;%?%gx%{1}%>%t  %gx%{2}%-%Px%;%?%gx%{0}%>%t %;,
+
+###################################
+#
+# IBM Color 
+#
+
+#
+# Basic capabilities:
+#
+ibmc+basic,
+
+	cub1=\b,
+
+	is1=^Q^X,
+	is2=^R\EA\014\E2\EF\EH\EW0\ET\E-0\E7\EO\ER\E50\EM0\EX^A\210\Eb\ECB,
+
+	smglp=\EX%p1%{1}%+%c%p2%{1}%+%c,
+
+	use=ibmg+basic,
+
+#
+# Graphics capabilities (low resolution, 9-pin, 5:6 aspect ratio):
+#
+ibmc+low+5x6,
+
+	spinv#84,
+	spinh#70,
+
+#	Set 5:6 aspect ratio.
+#	Set the line spacing to 7/72 inch (10.29 lines per inch)
+#	to get approximately 84 dots per inch vertically
+#	(10.29 lines/inch * 8 pins/line equals 82.28 dots per inch).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 70 dots per inch horizontally this means 7
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\En^B\E1^R\EB%p2%{8}%/%c$<>\ED%p1%{7}%/%c$<>\013\r\t%;,
+
+	binel=\n\r\t,
+
+	bicr=\r\t,
+
+	use=ibmg+low,
+
+#
+# Graphics capabilities (low resolution, 9-pin, 1:1 aspect ratio):
+#
+ibmc+low+1x1,
+
+	spinh#84,
+
+#	Set 1:1 aspect ratio.
+#	Set the line spacing to 7/72 inch (10.29 lines per inch)
+#	to get approximately 84 dots per inch vertically
+#	(10.29 lines/inch * 8 pins/line equals 82.28 dots per inch).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 84 dots per inch horizontally this means 8.4
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\En^A\E1^R\EB%p2%{8}%/%c$<>\ED%p1%{10}%*%{84}%/%c$<>\013\r\t%;,
+
+	use=ibmc+low+5x6,
+
+#
+# Color capability:
+#
+ibmc+color,
+
+	colors#3,
+
+	setcolor=%?%p1%{0}%=%t\Eb%;%?%p1%{1}%=%t\Ec%;%?%p1%{2}%=%t\Em%;%?%p1%{3}%=%t\Ey%;,
+
+	colornm=%?%p1%{0}%=%tblack%;%?%p1%{1}%=%tcyan%;%?%p1%{2}%=%tmagenta%;%?%p1%{3}%=%tyellow%;%?%p1%{4}%=%torange=yellow+magenta%;%?%p1%{5}%=%tgreen=yellow+cyan%;%?%p1%{6}%=%tviolet=magenta+cyan%;%?%p1%{7}%=%tbrown=magenta+black%;,
+
+###################################
+#
+# IBM Proprinter XL:
+#
+#	This printer appears to be a superset of the IBM Graphics
+#	and IBM Color printers, with a 24-wire printhead. The entry
+#	below uses the full capabilities of the superset and printhead.
+#	The printer has an Alternate Graphics Mode (AGM) that changes
+#	the vertical resolution from 1/216" to 1/180", and the graphics
+#	aspect ratio from 5:6 to 1:1. HOWEVER, there does not appear to
+#	be a control sequence that switches into this mode--it must be
+#	done by hand!
+#
+
+#
+# Basic capabilities (printer not in AGM):
+#
+ibmxl+basic,
+
+	orc#12,
+	orhi#120,
+	orl#36,
+	orvi#216,
+
+	cub1=\b,
+
+	cpi=%?%p1%{10}%=%t^R%e%p1%{12}%=%t\E:%e%p1%{17}%=%t^O%;,
+	cvr=%?%p1%{0}%>%p1%{256}%<%&%t\E3%p1%c%;,
+
+	is1=^Q^X,
+	is2=^R\EP0\EA\014\E2\EC\102\EO\ER\Eb\E50\EF\EH\EW0\ET\E-0\E_0\E7,
+	is3=\EX\001\120,
+
+	use=ibmg+basic,
+
+#
+# Basic capabilities (printer in AGM):
+#
+ibmxlagm+basic,
+
+	orl#30,
+	orvi#180,
+
+	is2=^R\EP0\EA\012\E2\EC\102\EO\ER\Eb\E50\EF\EH\EW0\ET\E-0\E_0\E7,
+
+	use=ibmxl+basic,
+
+#
+# Graphics capabilities (low resolution, 8-pin, 5:6 aspect ratio):
+#
+ibmxl+low+5x6,
+
+	spinv#72,
+	spinh#60,
+
+#	Set the line spacing to 8/72 inch (9 lines per inch)
+#	to get 72 dots per inch vertically (9 lines/" * 8 pins/line).
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 60 dots per inch horizontally this means 6
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\EA\010\E2^R\EB%p2%{8}%/%c$<>\ED%p1%{6}%/%c$<>\013\r\t%;,
+
+	use=ibmc+low+5x6,
+
+#
+# Graphics capabilities (low resolution, 8-pin, 1:1 aspect ratio):
+#
+ibmxl+low+1x1,
+
+	spinv#60,
+
+#	In AGM the "defbi" cap from ibmxl+low+5x6 will work. The
+#	line spacing will be 8/60 inch to get 60 dots per inch, using
+#	the same control sequence.
+
+	use=ibmxl+low+5x6,
+
+#
+# Graphics capabilities (high resolution, 24-pin, 5:6 aspect ratio):
+#
+#	This doesn't work as the pin spacing doesn't get set to
+#	1/216 inch, but stays at 1/180 inch, even out of AGM.
+#
+
+#
+# Graphics capabilities (high resolution, 24-pin, 1:1 aspect ratio):
+#
+ibmxl+high+1x1,
+
+	npins#24,
+	spinv#180,
+	spinh#180,
+
+	porder=1\,2\,3\,4\,5\,6\,7\,8\,9\,10\,11\,12\,13\,14\,15\,16\,17\,18\,19\,20\,21\,22\,23\,24;0,
+
+	sbim=\E*\047%p1%{256}%m%c%p1%{256}%/%c,
+
+#	Set the line spacing to 8/60 inch (7.5 lines per inch)
+#	to get 180 dots per inch vertically (7.5 lines/" * 24 pins/line).
+#	This requires the printer or emulation in Alternate Graphics Mode.
+#	Set the character spacing to pica (1/10 inch or 10 characters
+#	per inch); at 180 dots per inch horizontally this means 18
+#	dots per character.
+#	Set vertical and horizontal tab stops at the upper left corner
+#	of the image, then tab to the upper left corner.
+#	Note: $<> is a true null (only works with special Curses routine).
+#	THIS ASSUMES WE START AT THE TOP OF THE PAGE! (although
+#	maybe not in the first column.)
+	defbi=%?%p5%{1}%=%t\EA\010\E2^R\EB%p2%{24}%/%c$<>\ED%p1%{18}%/%c$<>\013\r\t%;,
+
+	use=ibmc+low+5x6,
+
+######################################################################
+#
+# Specific printers:
+#
+
+ibmgraphics|ibmproprinter|proprinter|IBM Graphics printer,
+
+	use=ibmg+basic, use=ibmg+low,
+
+ibmcolor|IBM Color printer; 5:6 aspect ratio,
+
+	use=ibmc+basic, use=ibmc+low+5x6, use=ibmc+color,
+
+ibmcolor-1x1|IBM Color printer; 1:1 aspect ratio,
+
+	use=ibmc+basic, use=ibmc+low+1x1, use=ibmc+color,
+
+ibmxl|IBM Proprinter XL; 5:6 aspect ratio; low resolution,
+
+	cols#136,
+	is3=\EX\001\210,
+	use=ibmxl+basic, use=ibmxl+low+5x6, use=ibmc+color,
+
+ibmxl-1x1|IBM Proprinter XL in AGM; 1:1 aspect ratio; low resolution,
+
+	cols#136,
+	is3=\EX\001\210,
+	use=ibmxlagm+basic, use=ibmxl+low+1x1, use=ibmc+color,
+
+ibmxl-1x1-hi|IBM Proprinter XL in AGM; 1:1 aspect ratio; high resolution,
+
+	cols#136,
+	is3=\EX\001\210,
+	use=ibmxlagm+basic, use=ibmxl+high+1x1, use=ibmc+color,
+
+ibmxl-80|IBM Proprinter XL; 5:6 aspect ratio; low resolution; 80-col,
+
+	use=ibmxl+basic, use=ibmxl+low+5x6, use=ibmc+color,
+
+ibmxl-1x1-80|IBM Proprinter XL in AGM; 1:1 aspect ratio; low res; 80-col,
+
+	use=ibmxlagm+basic, use=ibmxl+low+1x1, use=ibmc+color,
+
+ibmxl-1x1-hi80|IBM Proprinter XL in AGM; 1:1 aspect ratio; high res; 80-col,
+
+	use=ibmxlagm+basic, use=ibmxl+high+1x1, use=ibmc+color,
+
+##############################################################
+#
+# HP plotter:
+#
+
+7550|hp7550|HP7550|Hewlett Packard 7550A,
+	bufsz#5000,
+	is2=.@5000;2:.I81;;17:.NO;19:.P;1:.(,

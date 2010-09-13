@@ -1,0 +1,161 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+
+-->
+
+<!--Element Definitions-->
+
+<!ELEMENT fsoption	EMPTY>
+<!ATTLIST fsoption	name		CDATA #REQUIRED>
+
+<!ELEMENT filesystem	(fsoption)* >
+
+<!ATTLIST filesystem	special		CDATA #REQUIRED
+			raw		CDATA ""
+			directory	CDATA #REQUIRED
+			type		CDATA #REQUIRED>
+
+<!--
+ The "inherited-pkg-dir" element may no longer be specified in a
+ configuration, however we retain the definition to aid with migration
+ of existing configurations.
+-->
+
+<!ELEMENT inherited-pkg-dir	EMPTY>
+
+<!ATTLIST inherited-pkg-dir	directory	CDATA #REQUIRED>
+
+<!ELEMENT network	EMPTY>
+
+<!ATTLIST network	address		CDATA ""
+			allowed-address	CDATA ""
+			defrouter	CDATA ""
+			physical	CDATA #REQUIRED>
+
+<!ELEMENT device	EMPTY>
+
+<!ATTLIST device	match		CDATA #REQUIRED>
+
+<!--
+	Historically, the deleted-device element denoted a used-to-be
+	device element.  This was used to keep track of device elements
+	deleted or modified by the user, and to cleanse /dev of such
+	entries at next zone boot.
+
+	With the ability to now configure devices dynamically, this
+	requirement no longer exists, but this element MUST remain in
+	perpetuity, since it is possible that an upgraded zone could
+	carry a deleted-device element, and would therefore fail XML
+	validation if removed
+-->
+<!ELEMENT deleted-device	EMPTY>
+
+<!ATTLIST deleted-device	match		CDATA #REQUIRED>
+
+<!ELEMENT rctl-value	EMPTY>
+
+<!ATTLIST rctl-value	priv		CDATA #REQUIRED
+			limit		CDATA #REQUIRED
+			action		CDATA #REQUIRED>
+
+<!ELEMENT rctl		(rctl-value)*>
+
+<!ATTLIST rctl		name		CDATA #REQUIRED>
+
+<!ELEMENT attr		EMPTY>
+
+<!ATTLIST attr		name		CDATA #REQUIRED
+			type		(boolean | int | string | uint)
+					#REQUIRED
+			value		CDATA #REQUIRED>
+
+<!ELEMENT dataset	EMPTY>
+
+<!ATTLIST dataset	name		CDATA #REQUIRED>
+
+<!ELEMENT package	EMPTY>
+
+<!ATTLIST package	name		CDATA #REQUIRED
+			version		CDATA #REQUIRED>
+
+<!ELEMENT obsoletes	EMPTY>
+<!ATTLIST obsoletes	id		CDATA #REQUIRED>
+
+<!ELEMENT incompatible	EMPTY>
+<!ATTLIST incompatible	id		CDATA #REQUIRED>
+
+<!ELEMENT patch	(obsoletes | incompatible)* >
+
+<!ATTLIST patch		id		CDATA #REQUIRED>
+
+<!ELEMENT dev-perm	EMPTY>
+
+<!ATTLIST dev-perm	name		CDATA #REQUIRED
+			uid		CDATA #REQUIRED
+			gid		CDATA #REQUIRED
+			mode		CDATA #REQUIRED
+			acl		CDATA #REQUIRED>
+
+<!--
+	The tmp_pool element is separate from the pset element so that
+	we can track the importance value at the pool level, where it
+	belongs, instead of at the pset level.  Once we have msets this
+	will be important since tmp psets and tmp msets will share a common
+	pool-level importance.
+-->
+<!ELEMENT tmp_pool	EMPTY>
+
+<!ATTLIST tmp_pool	importance	CDATA #REQUIRED>
+
+<!ELEMENT pset		EMPTY>
+
+<!ATTLIST pset		ncpu_min	CDATA #REQUIRED
+			ncpu_max	CDATA #REQUIRED>
+
+<!ELEMENT mcap		EMPTY>
+
+<!ATTLIST mcap		physcap		CDATA #REQUIRED>
+
+<!ELEMENT admin 	EMPTY>
+
+<!ATTLIST admin     	user		CDATA #REQUIRED
+                    	auths		CDATA #REQUIRED>
+
+<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device |
+			deleted-device | rctl | attr | dataset | package |
+			patch | dev-perm | tmp_pool | pset |
+			mcap | admin)*>
+
+<!ATTLIST zone		name		CDATA #REQUIRED
+			zonepath	CDATA #REQUIRED
+			autoboot	(true | false) #REQUIRED
+			ip-type		CDATA ""
+			hostid		CDATA ""
+			pool		CDATA ""
+			limitpriv	CDATA ""
+			bootargs	CDATA ""
+			brand		CDATA ""
+			scheduling-class	CDATA ""
+			fs-allowed	CDATA ""
+			version		NMTOKEN #FIXED '1'>

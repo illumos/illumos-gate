@@ -1,0 +1,87 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# SAMPLE0 diagcode dictionary -- used by "make test" target only
+#
+# this sample dictionary tests code type 0, the smallest type,
+# since the bits required to hold the value is less than 22.
+#
+FMDICT: name=SAMPLE0 idname=Hello version=1 maxkey=5
+#
+# here's a worked by hand example for key: "fault.one fault.two"
+#
+#   Dictname: "SAMPLE0"
+#    Dictval: 5: below 2^21-1
+#   Format 0: DICT-XXXX-XX
+#              2 bits code type
+#              2 bits size
+#             21 bits dictval
+#              8 bits checksum
+#  Code type: 01
+#  Code size: 00
+#    Dictval: 000000000000000000101
+#   Checksum: 11100
+#  Converted:
+#             01000 = 8
+#             00000 = 0
+#             00000 = 0
+#             00000 = 0
+#             00101 = 5
+#             11100 = V
+#SUNW-MSG-ID: SAMPLE0-8000-5V
+#
+# test of minor versioning: the string below should be ignored
+fault.one fault.three fault.two=2 "this is all three faults"
+fault.one fault.three=1
+fault.one=7
+fault.two=6
+fault.one fault.two=5
+fault.three=4
+fault.three fault.two=3
+#
+#TEST:open:0
+#TEST:codelen:0:32
+#TEST:getprop:0:name:SAMPLE0
+#TEST:getprop:0:version:1
+#TEST:getprop:0:maxkey:5
+#TEST:getprop:0:idname:Hello
+#TEST:key2code:0:fault.two fault.one:SAMPLE0-8000-5V
+#TEST:key2code:0:fault.one fault.two:SAMPLE0-8000-5V
+#TEST:key2code:0:fault.one fault.two fault.one:SAMPLE0-8000-5V
+#TEST:key2code:0:fault.one fault.two fault.one fault.one fault.two:SAMPLE0-8000-5V
+#TEST:key2code:ENOMSG:fault.one fault.poop
+#TEST:close
+#TEST:open:0
+#TEST:maxkey:0:6
+#TEST:code2key:EINVAL:SAMPLE0-7000-5S:fault.one fault.two
+#TEST:code2key:EINVAL:SAMPLE0-8010-5S:fault.one fault.two
+#TEST:code2key:EINVAL:SAMPLE0-8000-5T:fault.one fault.two
+#TEST:code2key:EINVAL:SAMPLE0-8000-S5:fault.one fault.two
+#TEST:code2key:EINVAL:SAMPLE0-0800-5S:fault.one fault.two
+#TEST:code2key:0:SAMPLE0-8000-5V:fault.one fault.two
+#TEST:close
+#

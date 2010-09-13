@@ -1,0 +1,127 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	addipsecalg;
+	addipsecproto;
+	bail;
+	bail_msg;
+	dbgstr2num;
+	delipsecalgbyname;
+	delipsecalgbynum;
+	delipsecprotobyname;
+	delipsecprotobynum;
+	do_inet_ntop;
+	do_interactive;
+	dump_aalg;
+	dump_ealg;
+	dump_key;
+	dump_sadb_idtype;
+	dump_sockaddr;
+	env;
+	_errfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_errxfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	getipsecalgs;
+	getipsecprotos;
+	in_masktoprefix;
+	interactive;
+	ipsecalgs_diag;
+	ipsecproto_get_exec_mode;
+	ipsecproto_set_exec_mode;
+	ipsecutil_exit;
+	ipsec_convert_sens_to_bslabel;
+	ipsec_convert_bslabel_to_string;
+	ipsec_convert_bslabel_to_hex;
+	ipsec_convert_sl_to_sens;
+	keysock_diag;
+	kmc_insert_mapping;
+	kmc_lookup_by_cookie;
+	lineno;
+	lines_added;
+	lines_parsed;
+	list_ints;
+	nflag;
+	bytecnt2out;
+	bytecnt2str;
+	debugfile;
+	my_fmri;
+	opensavefile;
+	parsedbgopts;
+	pflag;
+	print_address;
+	print_asn1_name;
+	print_diagnostic;
+	print_eprop;
+	print_ident;
+	print_key;
+	print_kmc;
+	print_lifetimes;
+	print_prop;
+	print_sa;
+	print_sadb_msg;
+	print_samsg;
+	print_sens;
+	print_spirange;
+	print_supp;
+	printsatime;
+	privstr2num;
+	readfile;
+	rparsealg;
+	rparseidtype;
+	rparsesatype;
+	save_address;
+	save_assoc;
+	save_ident;
+	save_key;
+	save_lifetime;
+	secs2out;
+	secs2str;
+	spdsock_diag;
+	spdsock_get_ext;
+	_verrfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_verrxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_vwarnfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_vwarnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_warnfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_warnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+    local:
+	*;
+};

@@ -1,0 +1,165 @@
+#
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+# External interface requirements
+SYMBOL_SCOPE {
+	global:
+#		Plwp_iter			{ FLAGS = EXTERN };
+#		Pmapping_iter			{ FLAGS = EXTERN };
+
+		_mdb_ks_ncpu			{ FLAGS = EXTERN };
+		_mdb_ks_pageshift		{ FLAGS = EXTERN };
+		_mdb_ks_pagesize		{ FLAGS = EXTERN };
+
+		mdb				{ FLAGS = EXTERN };
+		mdb_add_walker			{ FLAGS = EXTERN };
+		mdb_alloc			{ FLAGS = EXTERN };
+		mdb_call_dcmd			{ FLAGS = EXTERN };
+		mdb_callback_add		{ FLAGS = EXTERN };
+		mdb_callback_remove		{ FLAGS = EXTERN };
+		mdb_cpuset_find			{ FLAGS = EXTERN };
+		mdb_ctf_array_info		{ FLAGS = EXTERN };
+		mdb_ctf_enum_name		{ FLAGS = EXTERN };
+		mdb_ctf_lookup_by_addr		{ FLAGS = EXTERN };
+		mdb_ctf_lookup_by_name		{ FLAGS = EXTERN };
+		mdb_ctf_member_iter		{ FLAGS = EXTERN };
+		mdb_ctf_offsetof		{ FLAGS = EXTERN };
+		mdb_ctf_type_cmp		{ FLAGS = EXTERN };
+		mdb_ctf_type_invalidate		{ FLAGS = EXTERN };
+		mdb_ctf_type_kind		{ FLAGS = EXTERN };
+		mdb_ctf_type_name		{ FLAGS = EXTERN };
+		mdb_ctf_type_reference		{ FLAGS = EXTERN };
+		mdb_ctf_type_resolve		{ FLAGS = EXTERN };
+		mdb_ctf_type_size		{ FLAGS = EXTERN };
+		mdb_ctf_type_valid		{ FLAGS = EXTERN };
+		mdb_ctf_vread			{ FLAGS = EXTERN };
+		mdb_ddi_pathname		{ FLAGS = EXTERN };
+		mdb_dec_indent			{ FLAGS = EXTERN };
+		mdb_devinfo2driver		{ FLAGS = EXTERN };
+		mdb_devinfo2statep		{ FLAGS = EXTERN };
+		mdb_dlpi_prim			{ FLAGS = EXTERN };
+		mdb_dump64			{ FLAGS = EXTERN };
+		mdb_dumpptr			{ FLAGS = EXTERN };
+		mdb_eval			{ FLAGS = EXTERN };
+		mdb_fdio_create_path		{ FLAGS = EXTERN };
+		mdb_fdio_fileno			{ FLAGS = EXTERN };
+		mdb_ffs				{ FLAGS = EXTERN };
+		mdb_flush			{ FLAGS = EXTERN };
+		mdb_fread			{ FLAGS = EXTERN };
+		mdb_free			{ FLAGS = EXTERN };
+		mdb_fwrite			{ FLAGS = EXTERN };
+		mdb_gelf_create			{ FLAGS = EXTERN };
+		mdb_gelf_destroy		{ FLAGS = EXTERN };
+		mdb_gelf_sect_by_name		{ FLAGS = EXTERN };
+		mdb_gelf_sect_load		{ FLAGS = EXTERN };
+		mdb_getareg			{ FLAGS = EXTERN };
+		mdb_get_dot			{ FLAGS = EXTERN };
+		mdb_get_lbolt			{ FLAGS = EXTERN };
+		mdb_get_pipe			{ FLAGS = EXTERN };
+		mdb_get_soft_state_byaddr	{ FLAGS = EXTERN };
+		mdb_get_state			{ FLAGS = EXTERN };
+		mdb_get_xdata			{ FLAGS = EXTERN };
+		mdb_gethrtime			{ FLAGS = EXTERN };
+		mdb_getopts			{ FLAGS = EXTERN };
+		mdb_inc_indent			{ FLAGS = EXTERN };
+		mdb_inval_bits			{ FLAGS = EXTERN };
+		mdb_io_destroy			{ FLAGS = EXTERN };
+		mdb_iob_clrflags		{ FLAGS = EXTERN };
+		mdb_iob_getflags		{ FLAGS = EXTERN };
+		mdb_iob_resize			{ FLAGS = EXTERN };
+		mdb_iob_setflags		{ FLAGS = EXTERN };
+		mdb_layered_walk		{ FLAGS = EXTERN };
+		mdb_lookup_by_addr		{ FLAGS = EXTERN };
+		mdb_lookup_by_name		{ FLAGS = EXTERN };
+		mdb_lookup_by_obj		{ FLAGS = EXTERN };
+		mdb_mac_addr			{ FLAGS = EXTERN };
+		mdb_major_to_name		{ FLAGS = EXTERN };
+		mdb_mblk_count			{ FLAGS = EXTERN };
+		mdb_memio_create		{ FLAGS = EXTERN };
+		mdb_name_to_major		{ FLAGS = EXTERN };
+		mdb_nhconvert			{ FLAGS = EXTERN };
+		mdb_object_iter			{ FLAGS = EXTERN };
+		mdb_one_bit			{ FLAGS = EXTERN };
+		mdb_page2pfn			{ FLAGS = EXTERN };
+		mdb_page_lookup			{ FLAGS = EXTERN };
+		mdb_pfn2page			{ FLAGS = EXTERN };
+		mdb_pid2proc			{ FLAGS = EXTERN };
+		mdb_pread			{ FLAGS = EXTERN };
+		mdb_printf			{ FLAGS = EXTERN };
+		mdb_prop_kernel			{ FLAGS = EXTERN };
+		mdb_prop_postmortem		{ FLAGS = EXTERN };
+		mdb_pwalk			{ FLAGS = EXTERN };
+		mdb_pwalk_dcmd			{ FLAGS = EXTERN };
+		mdb_pwrite			{ FLAGS = EXTERN };
+		mdb_qinfo			{ FLAGS = EXTERN };
+		mdb_qname			{ FLAGS = EXTERN };
+		mdb_qops_install		{ FLAGS = EXTERN };
+		mdb_qops_remove			{ FLAGS = EXTERN };
+		mdb_qrnext_default		{ FLAGS = EXTERN };
+		mdb_qwnext			{ FLAGS = EXTERN };
+		mdb_qwnext_default		{ FLAGS = EXTERN };
+		mdb_read_refstr			{ FLAGS = EXTERN };
+		mdb_readstr			{ FLAGS = EXTERN };
+		mdb_readsym			{ FLAGS = EXTERN };
+		mdb_readvar			{ FLAGS = EXTERN };
+		mdb_remove_walker		{ FLAGS = EXTERN };
+		mdb_set_dot			{ FLAGS = EXTERN };
+		mdb_set_pipe			{ FLAGS = EXTERN };
+		mdb_snprintf			{ FLAGS = EXTERN };
+		mdb_strtoull			{ FLAGS = EXTERN };
+		mdb_tgt_notsup			{ FLAGS = EXTERN };
+		mdb_vnode2path			{ FLAGS = EXTERN };
+		mdb_vread			{ FLAGS = EXTERN };
+		mdb_vtype2chr			{ FLAGS = EXTERN };
+		mdb_vwrite			{ FLAGS = EXTERN };
+		mdb_walk			{ FLAGS = EXTERN };
+		mdb_walk_dcmd			{ FLAGS = EXTERN };
+		mdb_warn			{ FLAGS = EXTERN };
+		mdb_whatis_done			{ FLAGS = EXTERN };
+		mdb_whatis_flags		{ FLAGS = EXTERN };
+		mdb_whatis_match		{ FLAGS = EXTERN };
+		mdb_whatis_overlaps		{ FLAGS = EXTERN };
+		mdb_whatis_register		{ FLAGS = EXTERN };
+		mdb_whatis_report_address	{ FLAGS = EXTERN };
+		mdb_whatis_report_object	{ FLAGS = EXTERN };
+		mdb_writestr			{ FLAGS = EXTERN };
+		mdb_writesym			{ FLAGS = EXTERN };
+		mdb_writevar			{ FLAGS = EXTERN };
+		mdb_zalloc			{ FLAGS = EXTERN };
+};

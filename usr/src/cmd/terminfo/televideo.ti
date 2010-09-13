@@ -1,0 +1,321 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+# # --------------------------------
+#
+# televideo: TELEVIDEO
+#
+# Manufacturer:	TELEVIDEO
+# Class:	III
+tvi803,
+	clear=\E*$<10>, use=tvi950,
+#
+tvi910|910|old televideo 910,
+	am, msgr, xenl, xon,
+	cols#80, lines#24, xmc#1,
+	bel=^G, cbt=\EI, clear=\E+^Z, cr=\r, cub1=\b, cud1=\n,
+	cuf1=\f, cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	ed=\EY, el=\ET, home=^^, hpa=\E]%p1%'\s'%+%c, ht=\t,
+	if=/usr/share/lib/tabset/stdcrt, ind=\n, kbs=\b,
+	kcub1=\b, kcud1=\n, kcuf1=\f, kcuu1=^K, kf0=^A@\r,
+	kf1=^AA\r, kf2=^AB\r, kf3=^AC\r, kf4=^AD\r, kf5=^AE\r,
+	kf6=^AF\r, kf7=^AG\r, kf8=^AH\r, kf9=^AI\r, khome=^^,
+	rmso=\E(, rmul=\EG0, smso=\E), smul=\EG8,
+	vpa=\E[%p1%'\s'%+%c,
+tvi910+|910+|televideo 910 PLUS,
+	dch1=\EW, dl1=\ER$<5*>, dsl=\E(, ich1=\EQ,
+	il1=\EE$<5*>,
+	use=tvi910,
+#
+# Info:
+#	There are some tvi's that require incredible amounts of padding
+#	and some that don't. I'm assuming 912 and 920 are the old slow 
+#	ones, and 912b, 912c, 920b, 920c are the new ones that don't 
+#	need padding.
+#
+tvi912|912|920|tvi920|old televideo,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE$<33*>, am,
+	cub1=^H, el=\ET, cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=^Z,
+	cols#80, dch1=\EW, dl1=\ER$<33*>,
+	kbs=^h, kcuu1=^K, kcud1=^J, kcub1=^H, kcuf1=^L,
+	kf0=^A@\r, kf1=^AA\r, kf2=^AB\r, kf3=^AC\r, kf4=^AD\r,
+	kf5=^AE\r, kf6=^AF\r, kf7=^AG\r, kf8=^AH\r, kf9=^AI\r,
+	home=^^, ich1=\EQ, lines#24, ht=^I,
+	rmso=\Ek, smso=\Ej, cuu1=^K, smul=\El, rmul=\Em, xmc#1,
+# Info:
+#	the 912 has a <funct> key that's like shift: <funct>8 xmits 
+#	"^A8\r". The 920 has this plus real function keys that xmit 
+#	different things.
+#	Terminfo makes you use the funct key on the 912 but the real 
+#	keys on the 920.
+#
+912b|912c|tvi912b|tvi912c|tvi|new televideo 912,
+	il1=\EE$<5*>, dl1=\ER$<5*>, use=tvi912,
+920b|920c|tvi920b|tvi920c|new televideo 920,
+	kf0=^A@\r, kf1=^AA\r, kf2=^AB\r, kf3=^AC\r, kf4=^AD\r, kf5=^AE\r,
+	kf6=^AF\r, kf7=^AG\r, kf8=^AH\r, kf9=^AI\r, use=tvi912b,
+# Info:
+#	We got some new tvi912c' that act really weird on the regular 
+#	termcap, so one of our gurus worked this up. Seems that cursor 
+#	addressing is broken.
+#
+912cc|tvi912cc|tvi912 at cowell college,
+	cup@, use=tvi912c,
+# Info:
+#	Two page TVI 912/920.
+#	set to page 1 when entering ex (\E-17 )
+#	reset to page 0 when exiting ex (\E-07 )
+#
+tvi912-2p|tvi920-2p|912-2p|920-2p|tvi-2p|televideo w/2 pages,
+	smcup=\E-17 , rmcup=\E-07 , use=tvi912,
+tvi950-ap|tvi 950 w/alt pages,
+	is2=\E\\1, smcup=\E-06 , rmcup=\E-16 , use=tvi950,
+tvi950-b|bare tvi950 no is2,
+	is2@, use=tvi950,
+tvi950-ns|tvi950 w/no standout,
+	smso@, rmso@, smul@, rmul@, use=tvi950,
+# Info:
+#	Now that we have is1, is2, and is3, these should be factored.
+#	
+#	is2 for all 950's.  It sets the following attributes:
+#	
+#	full duplex (\EDF)		write protect off (\E()
+#	
+#	conversation mode (\EC)	graphics mode off (\E%)
+#	
+#	white on black (\Ed)		auto page flip off (\Ew)
+#	
+#	turn off status line (\Eg)	clear status line (\Ef\r)
+#	
+#	normal video (\E0)		monitor mode off (\EX or \Eu)
+#	
+#	edit mode (\Er)		load blank char to space (\Ee\040)
+#	
+#	line edit mode (\EO)		enable buffer control (^O)
+#	
+#	protect mode off (\E\047)	duplex edit keys (\El)
+#	
+#	program unshifted send key to send line all (\E016)
+#	
+#	program shifted send key to send line unprotected (\E004)
+#	
+#	set the following to nulls:
+#		field	delimiter (\Ex0\0\0)
+#		line	delimiter (\Ex1\0\0)
+#		start-protected	field delimiter (\Ex2\0\0)
+#		end-protected	field delimiter (\Ex3\0\0)
+#	
+#
+tvi950|950|televideo950,
+	am, hs, mir, msgr, xenl, xon,
+	cols#80, lh#0, lines#24, lw#0, nlab#0, xmc#1,
+	acsc=mExJlFtMjHqKvOkGuLwNnI, bel=^G, cbt=\EI,
+	clear=\E*, cr=\r, cub1=\b, cud1=\n, cuf1=\f,
+	cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K, dch1=\EW,
+	dl1=\ER, dsl=\Eg\Ef\r, ed=\Ey, el=\Et,
+	flash=\Eb$<20>\Ed, fsl=\r, home=^^, ht=\t, hts=\E1,
+	il1=\EE, ind=\n,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E'\E(\E%%\Ew\EX\Ee\s^O\El\E016\E004\Ex0\200\200\Ex1\200\200\Ex2\200\200\Ex3\200\200\Ex4\r\200\Ef\r,
+	kbs=\b, kcub1=\b, kcud1=^V, kcuf1=\f, kcuu1=^K,
+	kf0=^A0\r, kf1=^A@\r, kf2=^AA\r, kf3=^AB\r, kf4=^AC\r,
+	kf5=^AD\r, kf6=^AE\r, kf7=^AF\r, kf8=^AG\r, kf9=^AH\r,
+	khome=^^, mc4=\Ea, mc5=\E`, ri=\Ej, rmacs=\E%%,
+	rmir=\Er, smacs=\E$, smir=\Eq, smso=\EG4, smul=\EG8,
+	tbc=\E3, tsl=\Eg\Ef,
+# Info:
+#	is2 for 950 with two pages adds the following:
+#	set 48 line page (\E\\2)
+#	
+#	place cursor at page 0, line 24, column 1 (\E-07 )
+#	
+#	set local (no send) edit keys (\Ek)
+#	
+#	two page 950 adds the following:
+#		when entering ex, set 24 line page (\E\\1)
+#		when exiting ex, reset 48 line page (\E\\2)
+#		place cursor at 0,24,1 (\E-07 )
+#	
+#	set duplex (send) edit keys (\El) when entering vi
+#	set local (no send) edit keys (\Ek) when exiting vi
+#
+tvi950-2p|950-2p|televideo950 w/2 pages,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\2\E-07 ,
+	rmcup=\E\\2\E-07 , smcup=\E\\1\E-07 ,
+	smkx=\El, rmkx=\Ek, use=tvi950,
+# Info:
+#	 is2 for 950 with four pages adds the following:
+#		set 96 line page (\E\\3)
+#		place cursor at page 0, line 24, column 1 (\E-07 )
+#	
+#	 four page 950 adds the following:
+#		when entering ex, set 24 line page (\E\\1)
+#		when exiting ex, reset 96 line page (\E\\3)
+#			 place cursor at 0,24,1 (\E-07 )
+#
+tvi950-4p|950-4p|televideo950 w/4 pages,
+	is2=\EDF\EC\Ed\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\3\E-07 ,
+	rmcup=\E\\3\E-07 , smcup=\E\\1\E-07 ,
+	smkx=\El, rmkx=\Ek, use=tvi950,
+# Info:
+#	 is2 for reverse video 950 changes the following:
+#		set reverse video (\Ed)
+#	
+#	 set flash accordingly (\Ed ...nulls... \Eb)
+#
+tvi950-rv|950-rv|televideo950 rev video,
+	tbc=\E3, hts=\E1,
+	is2=\EDF\EC\Eb\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\El\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0, flash=\Ed$<20>\Eb, use=tvi950,
+# Info:
+#	 uses the appropriate entries from 950-2p and 950-rv
+#
+tvi950-rv-2p|950-rv-2p|televideo950 rev video w/2 pages,
+	is2=\EDF\EC\Eb\EG0\Eg\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\2\E-07 ,
+	rmcup=\E\\2\E-07 , smcup=\E\\1\E-07 ,
+	smkx=\El, rmkx=\Ek, use=tvi950-rv,
+# Info:
+#	 uses the appropriate entries from 950-4p and 950-rv
+#
+tvi950-rv-4p|950-rv-4p|televideo950 rev video w/4 pages,
+	is2=\EDF\EC\Eb\EG0\Er\EO\E\047\E(\E%\Ew\EX\Ee ^O
+	\Ek\E016\E004\Ex0\0\0\Ex1\0\0\Ex2\0\0
+	\Ex3\0\0\Ex4\r\0\E\\3\E-07 ,
+	rmcup=\E\\3\E-07 , smcup=\E\\1\E-07 ,
+	smkx=\El, rmkx=\Ek, use=tvi950-rv,
+#	 Terminal Configuration Assumptions:
+#		1) Edit keys transmit (DUPE on S2 bit 1 down)
+#		2) Actually a 925 (not in 912/920 emulation)
+#		3) Visual Bell assumes a default of white on black
+#		4) Page attributes for special display
+#		5) This uses a solid underscore cursor when not in vi. 
+#			Solid Block cursor in vi.
+#		6) No function key definitions are given
+#		7) Only one page of memory is available
+#
+tvi925|925|televideo 925,
+	am, bel=^G, bw, cbt=\EI, clear=^Z, cnorm=\E.4, cols#80,
+	cr=^M, cub1=^H, cud1=^J, cud1=^V,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, cuu1=^K, cvvis=\E.2,
+	dch1=\EW, dl1=\ER, dsl=\Eh, ed=\EY, el=\ET,
+	flash=\Eb$<20>\Ed, fsl=\r\Eg, home=^^, hs,
+	ht=^I, hts=\E1, ich1=\EQ, il1=\EE, ind=^J,
+	kbs=^H, kcub1=^H, kcud1=^V, kcuf1=^L, kcuu1=^K,
+	kf0=^AI\r, kf1=^A@\r, kf2=^AA\r, kf3=^AB\r, kf4=^AC\r,
+	kf5=^AD\r, kf6=^AE\r, kf7=^AF\r, kf8=^AG\r, kf9=^AH\r,
+	khome=^^, kich1=\EQ, kdch1=\EW, kil1=\EE, kdl1=\ER,
+	kclr=^Z, kel=\ET, ked=\EY,
+	lines#24, rmso=\EG0, rmul=\EG0, smso=\EG4, smul=\EG8,
+	tbc=\E3, tsl=\Eh\Ef, ul, xmc#1,
+#
+#
+#
+tvi914|old televideo,
+	am, xon,
+	cols#80, lines#24, xmc#1,
+	bel=^G, cbt=\EI, clear=^Z, cr=\r, cub1=\b, cud1=^V,
+	cuf1=\f, cup=\E=%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=^K,
+	dch1=\EW, dl1=\ER, ed=\EY, el=\ET, home=^^, ich1=\EQ,
+	il1=\EE, ind=\n, kbs=\b, kcub1=\b, kcud1=^V, kcuf1=\f,
+	kcuu1=^K, khome=\b, rmso=\EG0, rmul=\EG0, smso=\EG4,
+	smul=\EG8,
+#
+#
+tvi970|970|televideo 970,
+	da, db, mir, msgr, ul, xon,
+	cols#80, lines#24,
+	bel=^G, bold=\E[1m, cbt=\E[1Z, clear=\E[;H\E[2J,
+	cnorm=\E[?7h\E[1V, cr=\r, csr=\E[%p1%2.2d;%p2%2.2dr,
+	cub1=\b, cud1=\E[B, cuf1=\E[C,
+	cup=\E[%i%p1%2.2d;%p2%2.2dH, cuu1=\E[A,
+	cvvis=\E[?7l\E[1U, dch1=\E[1P, dl1=\E[1M, ed=\E[J,
+	el=\E[K, flash=\E[?5h\E[?5l, home=\E[1;1H,
+	hpa=\E[%p1%2.2dG, il1=\E[1L, ind=\n, kbs=\b,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	khome=\E[H, ll=\E[24;1H, rev=\E[7m, rmir=\E[4l,
+	rmso=\E[0m, rmul=\E[0m, sgr0=\E[m, smir=\E[4h,
+	smso=\E[7m, smul=\E[4m, vpa=\E[%p1%2.2dd,
+# The terminal should be set up with the following configuration
+# for televideo 970's:
+# under MAIN COMM: comm - cnv; duplx - fdx; send/rcv - no echo;
+#                   parity -no;stop bit - 1; data bits- 8;
+#                   rcv ctrl - xon/off; xmit ctrl - no;
+# under EDIT: ins/rpl - rpl; ctrl rep - proc; matopg - single;
+#             autowrap - wrap; edit bound - pg; editing ext - ln;
+#             horz edit - rt; vert edit - dwn; autotab - move;
+# under STATUS 1: guarded xfer - ungrd; multi-area xfer - all;
+#                 xfer term - part; ln xfer - pg; xfer exec - immed;
+#                 pg xfer - pg;
+#
+tvi970-ns|970-ns|televideo 970 with no standout,
+	mir, xon,
+	cols#80, lines#24,
+	bel=^G, clear=\E[;H\E[2J, cr=\r, cub1=\b, cud1=\E[B,
+	cuf1=\E[C, cup=\E[%i%p1%2.2d;%p2%2.2dH, cuu1=\E[A,
+	dch1=\E[P, dl1=\E[M, ed=\E[J, el=\E[K, home=\E[H,
+	hpa=\E[%p1%dG, ht=\t, il1=\E[L, ind=\n,
+	is2=^O\E[m\E[?3l\E[?5l\E[?7h\E[?8h, kbs=\b,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	rmir=\E[4l, rmso=\E[m, rmul=\E[m, smir=\E[4h,
+	smso=\E[7m, smul=\E[4m,
+tvi970-r|970-r|televideo970 reverse video,
+	da, db, mir, msgr, ul, xon,
+	cols#80, lines#24,
+	bel=^G, bold=\E[1m, cbt=\E[1Z, clear=\E[;H\E[2J,
+	cnorm=\E[?7h\E[1V, cr=\r, csr=\E[%p1%2.2d;%p2%2.2dr,
+	cub1=\b, cud1=\E[B, cuf1=\E[C,
+	cup=\E[%i%p1%2.2d;%p2%2.2dH$<5>, cuu1=\E[A,
+	cvvis=\E[?7l\E[1U, dch1=\E[1P, dl1=\E[1M, ed=\E[J,
+	el=\E[K, flash=\E[?5l\E[?5h, home=\E[1;1H,
+	hpa=\E[%p1%2.2dG, il1=\E[1L, ind=\n, kbs=\b,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	khome=\E[H, ll=\E[24;1H, rev=\E[7m, rmir=\E[4l,
+	rmso=\E[0m, rmul=\E[0m, sgr0=\E[m, smir=\E[4h,
+	smso=\E[7m, smul=\E[4m, vpa=\E[%p1%2.2dd,
+tvi970-rw|970-rw|televideo970 reverse video 132 col,
+	da, db, mir, msgr, ul, xon,
+	cols#132, lines#24,
+	bel=^G, bold=\E[1m, cbt=\E[1Z, clear=\E[;H\E[2J,
+	cnorm=\E[?7h\E[1V, cr=\r, csr=\E[%p1%2.2d;%p2%2.2dr,
+	cub1=\b, cud1=\E[B, cuf1=\E[C,
+	cup=\E[%i%p1%2.2d;%p2%2.2dH$<5>, cuu1=\E[A,
+	cvvis=\E[?7l\E[1U, dch1=\E[1P, dl1=\E[1M, ed=\E[J,
+	el=\E[K, flash=\E[?5l\E[?5h, home=\E[1;1H,
+	hpa=\E[%p1%2.2dG, il1=\E[1L, ind=\n, kbs=\b,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	khome=\E[H, ll=\E[24;1H, rev=\E[7m, rmir=\E[4l,
+	rmso=\E[0m, rmul=\E[0m, sgr0=\E[m, smir=\E[4h,
+	smso=\E[7m, smul=\E[4m, vpa=\E[%p1%2.2dd,

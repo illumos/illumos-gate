@@ -1,0 +1,82 @@
+#
+# Sample boot menu configuration file
+#
+
+# Boot automatically after 30 secs.
+timeout 30
+
+# By default, boot the first entry.
+default 0
+
+# Fallback to the second entry.
+fallback 1
+
+# For booting GNU/Hurd
+title  GNU/Hurd
+root   (hd0,0)
+kernel /boot/gnumach.gz root=hd0s1
+module /boot/serverboot.gz
+
+# For booting GNU/Linux
+title  GNU/Linux
+root (hd1,0)
+kernel /vmlinuz root=/dev/hdb1
+#initrd /initrd.img
+
+# For booting GNU/kFreeBSD
+title  GNU/kFreeBSD
+root   (hd0,2,a)
+kernel /boot/loader.gz
+
+# For booting GNU/kNetBSD
+title  GNU/kNetBSD
+root   (hd0,2,a)
+kernel --type=netbsd /boot/knetbsd.gz
+
+# For booting Mach (getting kernel from floppy)
+title  Utah Mach4 multiboot
+root   (hd0,2)
+pause  Insert the diskette now!!
+kernel (fd0)/boot/kernel root=hd0s3
+module (fd0)/boot/bootstrap
+
+# For booting FreeBSD
+title  FreeBSD
+root   (hd0,2,a)
+kernel /boot/loader
+
+# For booting NetBSD
+title  NetBSD
+root   (hd0,2,a)
+kernel --type=netbsd /netbsd
+
+# For booting OpenBSD
+title  OpenBSD
+root   (hd0,2,a)
+kernel --type=netbsd /bsd
+
+# For booting OS/2
+title OS/2
+root  (hd0,1)
+makeactive
+# chainload OS/2 bootloader from the first sector
+chainloader +1
+# This is similar to "chainload", but loads a specific file
+#chainloader /boot/chain.os2
+
+# For booting Windows NT or Windows95
+title Windows NT / Windows 95 boot menu
+rootnoverify (hd0,0)
+makeactive
+chainloader  +1
+# For loading DOS if Windows NT is installed
+# chainload /bootsect.dos
+
+# For installing GRUB into the hard disk
+title Install GRUB into the hard disk
+root    (hd0,0)
+setup   (hd0)
+
+# Change the colors.
+title Change the colors
+color light-green/brown blink-red/blue

@@ -1,0 +1,365 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * This file defines the standard set of inlines and translators to be made
+ * available for all D programs to use to examine process model state.
+ */
+
+#pragma D depends_on module procfs
+
+/*
+ * The following miscellaneous constants are used by the proc(4) translators
+ * defined below.  These are assigned the latest values from the system .h's.
+ */
+inline char SSLEEP = @SSLEEP@;
+#pragma D binding "1.0" SSLEEP
+inline char SRUN = @SRUN@;
+#pragma D binding "1.0" SRUN
+inline char SZOMB = @SZOMB@;
+#pragma D binding "1.0" SZOMB
+inline char SSTOP = @SSTOP@;
+#pragma D binding "1.0" SSTOP
+inline char SIDL = @SIDL@;
+#pragma D binding "1.0" SIDL
+inline char SONPROC = @SONPROC@;
+#pragma D binding "1.0" SONPROC
+inline char SWAIT = @SWAIT@;
+#pragma D binding "1.0" SWAIT
+
+inline int PR_STOPPED = @PR_STOPPED@;
+#pragma D binding "1.0" PR_STOPPED
+inline int PR_ISTOP = @PR_ISTOP@;
+#pragma D binding "1.0" PR_ISTOP
+inline int PR_DSTOP = @PR_DSTOP@;
+#pragma D binding "1.0" PR_DSTOP
+inline int PR_STEP = @PR_STEP@;
+#pragma D binding "1.0" PR_STEP
+inline int PR_ASLEEP = @PR_ASLEEP@;
+#pragma D binding "1.0" PR_ASLEEP
+inline int PR_PCINVAL = @PR_PCINVAL@;
+#pragma D binding "1.0" PR_PCINVAL
+inline int PR_ASLWP = @PR_ASLWP@;
+#pragma D binding "1.0" PR_ASLWP
+inline int PR_AGENT = @PR_AGENT@;
+#pragma D binding "1.0" PR_AGENT
+inline int PR_DETACH = @PR_DETACH@;
+#pragma D binding "1.0" PR_DETACH
+inline int PR_DAEMON = @PR_DAEMON@;
+#pragma D binding "1.0" PR_DAEMON
+inline int PR_IDLE = @PR_IDLE@;
+#pragma D binding "1.4" PR_IDLE
+inline int PR_ISSYS = @PR_ISSYS@;
+#pragma D binding "1.0" PR_ISSYS
+inline int PR_VFORKP = @PR_VFORKP@;
+#pragma D binding "1.0" PR_VFORKP
+inline int PR_ORPHAN = @PR_ORPHAN@;
+#pragma D binding "1.0" PR_ORPHAN
+inline int PR_NOSIGCHLD = @PR_NOSIGCHLD@;
+#pragma D binding "1.4" PR_NOSIGCHLD
+inline int PR_WAITPID = @PR_WAITPID@;
+#pragma D binding "1.4" PR_WAITPID
+inline int PR_FORK = @PR_FORK@;
+#pragma D binding "1.0" PR_FORK
+inline int PR_RLC = @PR_RLC@;
+#pragma D binding "1.0" PR_RLC
+inline int PR_KLC = @PR_KLC@;
+#pragma D binding "1.0" PR_KLC
+inline int PR_ASYNC = @PR_ASYNC@;
+#pragma D binding "1.0" PR_ASYNC
+inline int PR_MSACCT = @PR_MSACCT@;
+#pragma D binding "1.0" PR_MSACCT
+inline int PR_BPTADJ = @PR_BPTADJ@;
+#pragma D binding "1.0" PR_BPTADJ
+inline int PR_PTRACE = @PR_PTRACE@;
+#pragma D binding "1.0" PR_PTRACE
+inline int PR_MSFORK = @PR_MSFORK@;
+#pragma D binding "1.0" PR_MSFORK
+
+inline char PR_MODEL_ILP32 = @PR_MODEL_ILP32@;
+#pragma D binding "1.0" PR_MODEL_ILP32
+inline char PR_MODEL_LP64 = @PR_MODEL_LP64@;
+#pragma D binding "1.0" PR_MODEL_LP64
+
+inline char SOBJ_NONE = @SOBJ_NONE@;
+#pragma D binding "1.0" SOBJ_NONE
+inline char SOBJ_MUTEX = @SOBJ_MUTEX@;
+#pragma D binding "1.0" SOBJ_MUTEX
+inline char SOBJ_RWLOCK = @SOBJ_RWLOCK@;
+#pragma D binding "1.0" SOBJ_RWLOCK
+inline char SOBJ_CV = @SOBJ_CV@;
+#pragma D binding "1.0" SOBJ_CV
+inline char SOBJ_SEMA = @SOBJ_SEMA@;
+#pragma D binding "1.0" SOBJ_SEMA
+inline char SOBJ_USER = @SOBJ_USER@;
+#pragma D binding "1.0" SOBJ_USER
+inline char SOBJ_USER_PI = @SOBJ_USER_PI@;
+#pragma D binding "1.0" SOBJ_USER_PI
+inline char SOBJ_SHUTTLE = @SOBJ_SHUTTLE@;
+#pragma D binding "1.0" SOBJ_SHUTTLE
+
+inline int SI_USER = @SI_USER@;
+#pragma D binding "1.0" SI_USER
+inline int SI_LWP = @SI_LWP@;
+#pragma D binding "1.0" SI_LWP
+inline int SI_QUEUE = @SI_QUEUE@;
+#pragma D binding "1.0" SI_QUEUE
+inline int SI_TIMER = @SI_TIMER@;
+#pragma D binding "1.0" SI_TIMER
+inline int SI_ASYNCIO = @SI_ASYNCIO@;
+#pragma D binding "1.0" SI_ASYNCIO
+inline int SI_MESGQ = @SI_MESGQ@;
+#pragma D binding "1.0" SI_MESGQ
+inline int SI_RCTL = @SI_RCTL@;
+#pragma D binding "1.0" SI_RCTL
+inline int ILL_ILLOPC = @ILL_ILLOPC@;
+#pragma D binding "1.0" ILL_ILLOPC
+inline int ILL_ILLOPN = @ILL_ILLOPN@;
+#pragma D binding "1.0" ILL_ILLOPN
+inline int ILL_ILLADR = @ILL_ILLADR@;
+#pragma D binding "1.0" ILL_ILLADR
+inline int ILL_ILLTRP = @ILL_ILLTRP@;
+#pragma D binding "1.0" ILL_ILLTRP
+inline int ILL_PRVOPC = @ILL_PRVOPC@;
+#pragma D binding "1.0" ILL_PRVOPC
+inline int ILL_PRVREG = @ILL_PRVREG@;
+#pragma D binding "1.0" ILL_PRVREG
+inline int ILL_COPROC = @ILL_COPROC@;
+#pragma D binding "1.0" ILL_COPROC
+inline int ILL_BADSTK = @ILL_BADSTK@;
+#pragma D binding "1.0" ILL_BADSTK
+inline int FPE_INTDIV = @FPE_INTDIV@;
+#pragma D binding "1.0" FPE_INTDIV
+inline int FPE_INTOVF = @FPE_INTOVF@;
+#pragma D binding "1.0" FPE_INTOVF
+inline int FPE_FLTDIV = @FPE_FLTDIV@;
+#pragma D binding "1.0" FPE_FLTDIV
+inline int FPE_FLTOVF = @FPE_FLTOVF@;
+#pragma D binding "1.0" FPE_FLTOVF
+inline int FPE_FLTUND = @FPE_FLTUND@;
+#pragma D binding "1.0" FPE_FLTUND
+inline int FPE_FLTRES = @FPE_FLTRES@;
+#pragma D binding "1.0" FPE_FLTRES
+inline int FPE_FLTINV = @FPE_FLTINV@;
+#pragma D binding "1.0" FPE_FLTINV
+inline int FPE_FLTSUB = @FPE_FLTSUB@;
+#pragma D binding "1.0" FPE_FLTSUB
+inline int SEGV_MAPERR = @SEGV_MAPERR@;
+#pragma D binding "1.0" SEGV_MAPERR
+inline int SEGV_ACCERR = @SEGV_ACCERR@;
+#pragma D binding "1.0" SEGV_ACCERR
+inline int BUS_ADRALN = @BUS_ADRALN@;
+#pragma D binding "1.0" BUS_ADRALN
+inline int BUS_ADRERR = @BUS_ADRERR@;
+#pragma D binding "1.0" BUS_ADRERR
+inline int BUS_OBJERR = @BUS_OBJERR@;
+#pragma D binding "1.0" BUS_OBJERR
+inline int TRAP_BRKPT = @TRAP_BRKPT@;
+#pragma D binding "1.0" TRAP_BRKPT
+inline int TRAP_TRACE = @TRAP_TRACE@;
+#pragma D binding "1.0" TRAP_TRACE
+inline int CLD_EXITED = @CLD_EXITED@;
+#pragma D binding "1.0" CLD_EXITED
+inline int CLD_KILLED = @CLD_KILLED@;
+#pragma D binding "1.0" CLD_KILLED
+inline int CLD_DUMPED = @CLD_DUMPED@;
+#pragma D binding "1.0" CLD_DUMPED
+inline int CLD_TRAPPED = @CLD_TRAPPED@;
+#pragma D binding "1.0" CLD_TRAPPED
+inline int CLD_STOPPED = @CLD_STOPPED@;
+#pragma D binding "1.0" CLD_STOPPED
+inline int CLD_CONTINUED = @CLD_CONTINUED@;
+#pragma D binding "1.0" CLD_CONTINUED
+inline int POLL_IN = @POLL_IN@;
+#pragma D binding "1.0" POLL_IN
+inline int POLL_OUT = @POLL_OUT@;
+#pragma D binding "1.0" POLL_OUT
+inline int POLL_MSG = @POLL_MSG@;
+#pragma D binding "1.0" POLL_MSG
+inline int POLL_ERR = @POLL_ERR@;
+#pragma D binding "1.0" POLL_ERR
+inline int POLL_PRI = @POLL_PRI@;
+#pragma D binding "1.0" POLL_PRI
+inline int POLL_HUP = @POLL_HUP@;
+#pragma D binding "1.0" POLL_HUP
+
+/*
+ * Translate from the kernel's proc_t structure to a proc(4) psinfo_t struct.
+ * We do not provide support for pr_size, pr_rssize, pr_pctcpu, and pr_pctmem.
+ * We also do not fill in pr_lwp (the lwpsinfo_t for the representative LWP)
+ * because we do not have the ability to select and stop any representative.
+ * Also, for the moment, pr_wstat, pr_time, and pr_ctime are not supported,
+ * but these could be supported by DTrace in the future using subroutines.
+ * Note that any member added to this translator should also be added to the
+ * kthread_t-to-psinfo_t translator, below.
+ */
+#pragma D binding "1.0" translator
+translator psinfo_t < proc_t *T > {
+	pr_nlwp = T->p_lwpcnt;
+	pr_pid = T->p_pidp->pid_id;
+	pr_ppid = T->p_ppid;
+	pr_pgid = T->p_pgidp->pid_id;
+	pr_sid = T->p_sessp->s_sidp->pid_id;
+	pr_uid = T->p_cred->cr_ruid;
+	pr_euid = T->p_cred->cr_uid;
+	pr_gid = T->p_cred->cr_rgid;
+	pr_egid = T->p_cred->cr_gid;
+	pr_addr = (uintptr_t)T;
+
+	pr_ttydev = (T->p_sessp->s_vp == NULL) ? (dev_t)-1 :
+	    (T->p_sessp->s_dev == `rwsconsdev) ? `uconsdev :
+	    (T->p_sessp->s_dev == `rconsdev) ? `uconsdev : T->p_sessp->s_dev;
+
+	pr_start = T->p_user.u_start;
+	pr_fname = T->p_user.u_comm;
+	pr_psargs = T->p_user.u_psargs;
+	pr_argc = T->p_user.u_argc;
+	pr_argv = T->p_user.u_argv;
+	pr_envp = T->p_user.u_envp;
+
+	pr_dmodel = (T->p_model == @DATAMODEL_ILP32@) ?
+	    PR_MODEL_ILP32 : PR_MODEL_LP64;
+
+	pr_taskid = T->p_task->tk_tkid;
+	pr_projid = T->p_task->tk_proj->kpj_id;
+	pr_poolid = T->p_pool->pool_id;
+	pr_zoneid = T->p_zone->zone_id;
+	pr_contract = (T->p_ct_process == NULL) ? -1 :
+	    T->p_ct_process->conp_contract.ct_id;
+};
+
+/*
+ * Translate from the kernel's kthread_t structure to a proc(4) psinfo_t
+ * struct.  Lacking a facility to define one translator only in terms of
+ * another, we explicitly define each member by using the proc_t-to-psinfo_t
+ * translator, above; any members added to that translator should also be
+ * added here.  (The only exception to this is pr_start, which -- due to it
+ * being a structure -- cannot be defined in terms of a translator at all.)
+ */
+#pragma D binding "1.0" translator
+translator psinfo_t < kthread_t *T > {
+	pr_nlwp = xlate <psinfo_t> (T->t_procp).pr_nlwp;
+	pr_pid = xlate <psinfo_t> (T->t_procp).pr_pid;
+	pr_ppid = xlate <psinfo_t> (T->t_procp).pr_ppid;
+	pr_pgid = xlate <psinfo_t> (T->t_procp).pr_pgid;
+	pr_sid = xlate <psinfo_t> (T->t_procp).pr_sid;
+	pr_uid = xlate <psinfo_t> (T->t_procp).pr_uid;
+	pr_euid = xlate <psinfo_t> (T->t_procp).pr_euid;
+	pr_gid = xlate <psinfo_t> (T->t_procp).pr_gid;
+	pr_egid = xlate <psinfo_t> (T->t_procp).pr_egid;
+	pr_addr = xlate <psinfo_t> (T->t_procp).pr_addr;
+	pr_ttydev = xlate <psinfo_t> (T->t_procp).pr_ttydev;
+	pr_start = (timestruc_t)xlate <psinfo_t> (T->t_procp).pr_start;
+	pr_fname = xlate <psinfo_t> (T->t_procp).pr_fname;
+	pr_psargs = xlate <psinfo_t> (T->t_procp).pr_psargs;
+	pr_argc = xlate <psinfo_t> (T->t_procp).pr_argc;
+	pr_argv = xlate <psinfo_t> (T->t_procp).pr_argv;
+	pr_envp = xlate <psinfo_t> (T->t_procp).pr_envp;
+	pr_dmodel = xlate <psinfo_t> (T->t_procp).pr_dmodel;
+	pr_taskid = xlate <psinfo_t> (T->t_procp).pr_taskid;
+	pr_projid = xlate <psinfo_t> (T->t_procp).pr_projid;
+	pr_poolid = xlate <psinfo_t> (T->t_procp).pr_poolid;
+	pr_zoneid = xlate <psinfo_t> (T->t_procp).pr_zoneid;
+	pr_contract = xlate <psinfo_t> (T->t_procp).pr_contract;
+};
+
+/*
+ * Translate from the kernel's kthread_t structure to a proc(4) lwpsinfo_t.
+ * We do not provide support for pr_nice, pr_oldpri, pr_cpu, or pr_pctcpu.
+ * Also, for the moment, pr_start and pr_time are not supported, but these
+ * could be supported by DTrace in the future using subroutines.
+ */
+#pragma D binding "1.0" translator
+translator lwpsinfo_t < kthread_t *T > {
+	pr_flag = ((T->t_state == @TS_STOPPED@) ? (PR_STOPPED |
+	    ((!(T->t_schedflag & @TS_PSTART@)) ? PR_ISTOP : 0)) :
+	    ((T->t_proc_flag & @TP_PRVSTOP@) ? PR_STOPPED | PR_ISTOP : 0)) |
+	    ((T == T->t_procp->p_agenttp) ? PR_AGENT : 0) |
+	    ((!(T->t_proc_flag & @TP_TWAIT@)) ? PR_DETACH : 0) |
+	    ((T->t_proc_flag & @TP_DAEMON@) ? PR_DAEMON : 0) |
+	    ((T->t_procp->p_pidflag & @CLDNOSIGCHLD@) ? PR_NOSIGCHLD : 0) |
+	    ((T->t_procp->p_pidflag & @CLDWAITPID@) ? PR_WAITPID : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_FORK@) ? PR_FORK : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_RUNLCL@) ? PR_RLC : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_KILLCL@) ? PR_KLC : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_ASYNC@) ? PR_ASYNC : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_BPTADJ@) ? PR_BPTADJ : 0) |
+	    ((T->t_procp->p_proc_flag & @P_PR_PTRACE@) ? PR_PTRACE : 0) |
+	    ((T->t_procp->p_flag & @SMSACCT@) ? PR_MSACCT : 0) |
+	    ((T->t_procp->p_flag & @SMSFORK@) ? PR_MSFORK : 0) |
+	    ((T->t_procp->p_flag & @SVFWAIT@) ? PR_VFORKP : 0) |
+	    (((T->t_procp->p_flag & @SSYS@) ||
+	    (T->t_procp->p_as == &`kas)) ? PR_ISSYS : 0) |
+	    ((T == T->t_cpu->cpu_idle_thread) ? PR_IDLE : 0);
+
+	pr_lwpid = T->t_tid;
+	pr_addr = (uintptr_t)T;
+	pr_wchan = (uintptr_t)T->t_lwpchan.lc_wchan;
+	pr_stype = T->t_sobj_ops ? T->t_sobj_ops->sobj_type : 0;
+
+	pr_state = (T->t_proc_flag & @TP_PRVSTOP@) ? SSTOP :
+	    (T->t_state == @TS_SLEEP@) ? SSLEEP :
+	    (T->t_state == @TS_RUN@) ? SRUN :
+	    (T->t_state == @TS_ONPROC@) ? SONPROC :
+	    (T->t_state == @TS_ZOMB@) ? SZOMB :
+	    (T->t_state == @TS_STOPPED@) ? SSTOP :
+	    (T->t_state == @TS_WAIT@) ? SWAIT : 0;
+
+	pr_sname = (T->t_proc_flag & @TP_PRVSTOP@) ? 'T' :
+	    (T->t_state == @TS_SLEEP@) ? 'S' :
+	    (T->t_state == @TS_RUN@) ? 'R' :
+	    (T->t_state == @TS_ONPROC@) ? 'O' :
+	    (T->t_state == @TS_ZOMB@) ? 'Z' :
+	    (T->t_state == @TS_STOPPED@) ? 'T' :
+	    (T->t_state == @TS_WAIT@) ? 'W' : '?';
+
+	pr_syscall = T->t_sysnum;
+	pr_pri = T->t_pri;
+	pr_clname = `sclass[T->t_cid].cl_name;
+	pr_onpro = T->t_cpu->cpu_id;
+	pr_bindpro = T->t_bind_cpu;
+	pr_bindpset = T->t_bind_pset;
+	pr_lgrp = T->t_lpl->lpl_lgrpid;
+};
+
+inline psinfo_t *curpsinfo = xlate <psinfo_t *> (curthread->t_procp);
+#pragma D attributes Stable/Stable/Common curpsinfo
+#pragma D binding "1.0" curpsinfo
+
+inline lwpsinfo_t *curlwpsinfo = xlate <lwpsinfo_t *> (curthread);
+#pragma D attributes Stable/Stable/Common curlwpsinfo
+#pragma D binding "1.0" curlwpsinfo
+
+inline string cwd = curthread->t_procp->p_user.u_cdir->v_path == NULL ?
+    "<unknown>" : stringof(curthread->t_procp->p_user.u_cdir->v_path);
+#pragma D attributes Stable/Stable/Common cwd
+#pragma D binding "1.0" cwd
+
+inline string root = curthread->t_procp->p_user.u_rdir == NULL ? "/" :
+    curthread->t_procp->p_user.u_rdir->v_path == NULL ? "<unknown>" :
+    stringof(curthread->t_procp->p_user.u_rdir->v_path);
+#pragma D attributes Stable/Stable/Common root
+#pragma D binding "1.0" root

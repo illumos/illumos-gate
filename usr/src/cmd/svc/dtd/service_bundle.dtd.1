@@ -1,0 +1,1091 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+-->
+
+<!--
+  Service description DTD
+
+    Most attributes are string values (or an individual string from a
+    restricted set), but attributes with a specific type requirement are
+    noted in the comment describing the element.
+-->
+
+<!--
+  XInclude support
+
+    A series of service bundles may be composed via the xi:include tag.
+    smf(5) tools enforce that all bundles be of the same type.
+-->
+
+<!--
+     These entities are used for the property, propval and property_group
+     elements, that require type attributes for manifest, while for profiles
+     the type attributes are only implied.
+-->
+
+<!ENTITY % profile "IGNORE">
+<!ENTITY % manifest "INCLUDE">
+
+<!ELEMENT xi:include
+  (xi:fallback)
+  >
+<!ATTLIST xi:include
+  href CDATA #REQUIRED
+  parse (xml|text) "xml"
+  encoding CDATA #IMPLIED
+  xmlns:xi CDATA #FIXED "http://www.w3.org/2001/XInclude"
+  >
+
+<!ELEMENT xi:fallback
+  ANY
+  >
+<!ATTLIST xi:fallback
+  xmlns:xi CDATA #FIXED "http://www.w3.org/2001/XInclude"
+  >
+
+<!--
+  stability
+
+    This element associates an SMI stability level with the parent
+    element.  See attributes(5) for an explanation of interface
+    stability levels.
+
+    Its attribute is
+
+	value	The stability level of the parent element.
+-->
+
+<!ELEMENT stability EMPTY>
+
+<!ATTLIST stability
+	value		( Standard | Stable | Evolving | Unstable |
+			External | Obsolete ) #REQUIRED >
+
+<!-- Property value lists -->
+
+<!--
+  value_node
+
+    This element represents a single value within any of the typed
+    property value lists.
+
+    Its attribute is
+
+	value	The value for this node in the list.
+-->
+
+<!ELEMENT value_node EMPTY>
+
+<!ATTLIST value_node
+	value CDATA #REQUIRED>
+
+<!--
+  count_list
+  integer_list
+  opaque_list
+  host_list
+  hostname_list
+  net_address_list
+  net_address_v4_list
+  net_address_v6_list
+  time_list
+  astring_list
+  ustring_list
+  boolean_list
+  fmri_list
+  uri_list
+
+    These elements represent the typed lists of values for a property.
+    Each contains one or more value_node elements representing each
+    value on the list.
+
+    None of these elements has attributes.
+-->
+
+<!ELEMENT count_list
+	( value_node+ )>
+
+<!ATTLIST count_list>
+
+<!ELEMENT integer_list
+	( value_node+ )>
+
+<!ATTLIST integer_list>
+
+<!ELEMENT opaque_list
+	( value_node+ )>
+
+<!ATTLIST opaque_list>
+
+<!ELEMENT host_list
+	( value_node+ )>
+
+<!ATTLIST host_list>
+
+<!ELEMENT hostname_list
+	( value_node+ )>
+
+<!ATTLIST hostname_list>
+
+<!ELEMENT net_address_list
+	( value_node+ )>
+
+<!ATTLIST net_address_list>
+
+<!ELEMENT net_address_v4_list
+	( value_node+ )>
+
+<!ATTLIST net_address_v4_list>
+
+<!ELEMENT net_address_v6_list
+	( value_node+ )>
+
+<!ATTLIST net_address_v6_list>
+
+<!ELEMENT time_list
+	( value_node+ )>
+
+<!ATTLIST time_list>
+
+<!ELEMENT astring_list
+	( value_node+ )>
+
+<!ATTLIST astring_list>
+
+<!ELEMENT ustring_list
+	( value_node+ )>
+
+<!ATTLIST ustring_list>
+
+<!ELEMENT boolean_list
+	( value_node+ )>
+
+<!ATTLIST boolean_list>
+
+<!ELEMENT fmri_list
+	( value_node+ )>
+
+<!ATTLIST fmri_list>
+
+<!ELEMENT uri_list
+	( value_node+ )>
+
+<!ATTLIST uri_list>
+
+<!-- Properties and property groups -->
+
+<!--
+   property
+
+     This element is for a singly or multiply valued property within a
+     property group.  It contains an appropriate value list element,
+     which is expected to be consistent with the type attribute.
+
+     Its attributes are
+
+	name	The name of this property.
+
+	type	The data type for this property.
+
+	override These values should replace values already in the
+		repository.
+-->
+
+<![%profile;[
+<!ELEMENT property
+	( count_list | integer_list | opaque_list | host_list | hostname_list |
+	net_address_list | net_address_v4_list | net_address_v6_list |
+	time_list | astring_list | ustring_list | boolean_list | fmri_list |
+	uri_list )? >
+
+<!ATTLIST property
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
+	override	( true | false ) "false" >
+]]>
+	
+<![%manifest;[
+<!ELEMENT property
+	( count_list | integer_list | opaque_list | host_list | hostname_list |
+	net_address_list | net_address_v4_list | net_address_v6_list |
+	time_list | astring_list | ustring_list | boolean_list | fmri_list |
+	uri_list )? >
+
+<!ATTLIST property
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #REQUIRED
+	override	( true | false ) "false" >
+]]>
+
+<!--
+   propval
+
+     This element is for a singly valued property within a property
+     group.  List-valued properties must use the property element above.
+
+     Its attributes are
+
+	name	The name of this property.
+
+	type	The data type for this property.
+
+	value	The value for this property.  Must match type
+		restriction of type attribute.
+
+	override This value should replace any values already in the
+		repository.
+-->
+
+<![%profile;[
+<!ELEMENT propval EMPTY>
+
+<!ATTLIST propval
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
+	value		CDATA #REQUIRED
+	override	( true | false ) "false" >
+]]>
+
+<![%manifest;[
+<!ELEMENT propval EMPTY>
+
+<!ATTLIST propval
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #REQUIRED
+	value		CDATA #REQUIRED
+	override	( true | false ) "false" >
+]]>
+
+<!--
+  property_group
+
+    This element is for a set of related properties on a service or
+    instance.  It contains an optional stability element, as well as
+    zero or more property-containing elements.
+
+    Its attributes are
+
+	name	The name of this property group.
+
+	type	A category for this property group.  Groups of type
+		"framework", "implementation" or "template" are primarily
+		of interest to the service management facility, while
+		groups of type "application" are expected to be only of
+		interest to the service to which this group is attached.
+		Other types may be introduced using the service symbol
+		namespace conventions.
+
+	delete	If in the repository, this property group should be removed.
+-->
+
+<![%profile;[
+<!ELEMENT property_group
+	( stability?, ( propval | property )* )>
+
+<!ATTLIST property_group
+	name		CDATA #REQUIRED
+	type		CDATA #IMPLIED
+	delete		( true | false ) "false" >
+]]>
+
+<![%manifest;[
+<!ELEMENT property_group
+	( stability?, ( propval | property )* )>
+
+<!ATTLIST property_group
+	name		CDATA #REQUIRED
+	type		CDATA #REQUIRED
+	delete		( true | false ) "false" >
+]]>
+
+<!--
+  service_fmri
+
+    This element defines a reference to a service FMRI (for either a
+    service or an instance).
+
+    Its attribute is
+
+	value	The FMRI.
+-->
+
+<!ELEMENT service_fmri EMPTY>
+
+<!ATTLIST service_fmri
+	value		CDATA #REQUIRED>
+
+<!-- Dependencies -->
+
+<!--
+  dependency
+
+    This element identifies a group of FMRIs upon which the service is
+    in some sense dependent.  Its interpretation is left to the
+    restarter to which a particular service instance is delegated.  It
+    contains a group of service FMRIs, as well as a block of properties.
+
+    Its attributes are
+
+	name	The name of this dependency.
+
+	grouping The relationship between the various FMRIs grouped
+		here; "require_all" of the FMRIs to be online, "require_any"
+		of the FMRIs to be online, or "exclude_all" of the FMRIs
+		from being online or in maintenance for the dependency to
+		be satisfied.  "optional_all" dependencies are satisfied
+		when all of the FMRIs are either online or unable to come
+		online (because they are disabled, misconfigured, or one
+		of their dependencies is unable to come online).
+
+	restart_on The type of events from the FMRIs that the service should
+		be restarted for.  "error" restarts the service if the
+		dependency is restarted due to hardware fault.  "restart"
+		restarts the service if the dependency is restarted for
+		any reason, including hardware fault.  "refresh" restarts
+		the service if the dependency is refreshed or restarted for
+		any reason.  "none" will never restart the service due to
+		dependency state changes.
+
+	type	The type of dependency: on another service ('service'), on
+		a filesystem path ('path'), or another dependency type.
+
+	delete	This dependency should be deleted.
+-->
+
+<!ELEMENT dependency
+	( service_fmri*, stability?, ( propval | property )* ) >
+
+<!ATTLIST dependency
+	name		CDATA #REQUIRED
+	grouping	( require_all | require_any | exclude_all |
+			optional_all ) #REQUIRED
+	restart_on	( error | restart | refresh | none ) #REQUIRED
+	type		CDATA #REQUIRED
+	delete		( true | false ) "false" >
+
+<!-- Dependents -->
+
+<!--
+  dependent
+
+    This element identifies a service which should depend on this service.  It
+    corresponds to a dependency in the named service.  The grouping and type
+    attributes of that dependency are implied to be "require_all" and
+    "service", respectively.
+
+    Its attributes are
+
+	name	The name of the dependency property group to create in the
+		dependent entity.
+
+	grouping The grouping relationship of the dependency property
+		group to create in the dependent entity.  See "grouping"
+		attribute on the dependency element.
+
+	restart_on The type of events from this service that the named service
+		should be restarted for.
+
+	delete	True if this dependent should be deleted.
+
+	override Whether to replace an existing dependent of the same name.
+
+-->
+
+<!ELEMENT dependent
+	( service_fmri, stability?, ( propval | property )* ) >
+
+<!ATTLIST dependent
+	name		CDATA #REQUIRED
+	grouping	( require_all | require_any | exclude_all |
+			optional_all) #REQUIRED
+	restart_on	( error | restart | refresh | none) #REQUIRED
+	delete		( true | false ) "false"
+	override	( true | false ) "false" >
+
+<!-- Method execution context, security profile, and credential definitions -->
+
+<!--
+  envvar
+
+    An environment variable. It has two attributes:
+
+	name	The name of the environment variable.
+	value	The value of the environment variable.
+-->
+
+<!ELEMENT envvar EMPTY>
+
+<!ATTLIST envvar
+	name		CDATA #REQUIRED
+	value		CDATA #REQUIRED >
+
+<!--
+  method_environment
+
+    This element defines the environment for a method. It has no
+    attributes, and one or more envvar child elements.
+-->
+
+<!ELEMENT method_environment (envvar+) >
+
+<!ATTLIST method_environment>
+
+<!--
+  method_profile
+
+    This element indicates which exec_attr(5) profile applies to the
+    method context being defined.
+
+    Its attribute is
+
+	name	The name of the profile.
+-->
+
+<!ELEMENT method_profile EMPTY>
+
+<!ATTLIST method_profile
+	name		CDATA #REQUIRED >
+
+<!--
+  method_credential
+
+    This element specifies credential attributes for the execution
+    method to use.
+
+    Its attributes are
+
+	user	The user ID, in numeric or text form.
+
+	group	The group ID, in numeric or text form.  If absent or
+		":default", the group associated with the user in the
+		passwd database.
+
+	supp_groups Supplementary group IDs to be associated with the
+		method, separated by commas or spaces.  If absent or
+		":default", initgroups(3C) will be used.
+
+	privileges An optional string specifying the privilege set.
+
+	limit_privileges An optional string specifying the limit
+		privilege set.
+-->
+
+<!ELEMENT method_credential EMPTY>
+
+<!ATTLIST method_credential
+	user		CDATA #REQUIRED
+	group		CDATA #IMPLIED
+	supp_groups	CDATA #IMPLIED
+	privileges	CDATA #IMPLIED
+	limit_privileges CDATA #IMPLIED >
+
+<!--
+  method_context
+
+    This element combines credential and resource management attributes
+    for execution methods.  It may contain a method_environment, or
+    a method_profile or method_credential element.
+
+    Its attributes are
+
+	working_directory The home directory to launch the method from.
+		":default" can be used as a token to indicate use of the
+		user specified by the credential or profile specified.
+
+	project	The project ID, in numeric or text form.  ":default" can
+		be used as a token to indicate use of the project
+		identified by getdefaultproj(3PROJECT) for the non-root
+		user specified by the credential or profile specified.
+		If the user is root, ":default" designates the project
+		the restarter is running in.
+
+	resource_pool The resource pool name to launch the method on.
+		":default" can be used as a token to indicate use of the
+		pool specified in the project(4) entry given in the
+		"project" attribute above.
+-->
+<!ELEMENT method_context
+	( (method_profile | method_credential)?, method_environment? ) >
+
+<!ATTLIST method_context
+	working_directory	CDATA #IMPLIED
+	project			CDATA #IMPLIED
+	resource_pool		CDATA #IMPLIED >
+
+<!-- Restarter delegation, methods, and monitors -->
+
+<!--
+  exec_method
+
+    This element describes one of the methods used by the designated
+    restarter to act on the service instance.  Its interpretation is
+    left to the restarter to which a particular service instance is
+    delegated.  It contains a set of attributes, an optional method
+    context, and an optional stability element for the optional
+    properties that can be included.
+
+    Its attributes are
+
+	type	The type of method, either "method" or "monitor".
+
+	name	Name of this execution method.  The method names are
+		usually a defined interface of the restarter to which an
+		instance of this service is delegated.
+
+	exec	The string identifying the action to take.  For
+		svc.startd(1M), this is a string suitable to pass to
+		exec(2).
+
+	timeout_seconds [integer] Duration, in seconds, to wait for this
+		method to complete.  A '0' or '-1' denotes an infinite
+		timeout.
+
+	delete	If in the repository, the property group for this method
+		should be removed.
+-->
+
+<!ELEMENT exec_method
+	( method_context?, stability?, ( propval | property )* ) >
+
+<!ATTLIST exec_method
+	type		( method | monitor ) #REQUIRED
+	name		CDATA #REQUIRED
+	exec		CDATA #REQUIRED
+	timeout_seconds	CDATA #REQUIRED
+	delete		( true | false ) "false" >
+
+<!--
+  restarter
+
+    A flag element identifying the restarter to which this service or
+    service instance is delegated.  Contains the FMRI naming the
+    delegated restarter.
+
+    This element has no attributes.
+-->
+
+<!ELEMENT restarter
+	( service_fmri ) >
+
+<!ATTLIST restarter>
+
+<!--
+  Templates
+-->
+
+<!--
+  doc_link
+
+    The doc_link relates a resource described by the given URI to the
+    service described by the containing template.  The resource is
+    expected to be a documentation or elucidatory reference of some
+    kind.
+
+    Its attributes are
+
+      name      A label for this resource.
+
+      uri       A URI to the resource.
+-->
+
+<!ELEMENT doc_link EMPTY>
+
+<!ATTLIST doc_link
+	name		CDATA #REQUIRED
+	uri		CDATA #REQUIRED >
+
+<!--
+  manpage
+
+    The manpage element connects the reference manual page to the
+    template's service.
+
+    Its attributes are
+
+      title     The manual page title.
+
+      section   The manual page's section.
+
+      manpath   The MANPATH environment variable, as described in man(1)
+                that is required to reach the named manual page
+-->
+
+<!ELEMENT manpage EMPTY>
+
+<!ATTLIST manpage
+	title		CDATA #REQUIRED
+	section		CDATA #REQUIRED
+	manpath		CDATA ":default" >
+
+<!--
+  documentation
+
+    The documentation element groups an arbitrary number of doc_link
+    and manpage references.
+
+    It has no attributes.
+-->
+
+<!ELEMENT documentation
+	( doc_link | manpage )* >
+
+<!ATTLIST documentation>
+
+<!--
+  loctext
+
+    The loctext element is a container for localized text.
+
+    Its sole attribute is
+
+	xml:lang The name of the locale, in the form accepted by LC_ALL,
+		etc.  See locale(5).
+-->
+<!ELEMENT loctext
+        (#PCDATA) >
+
+<!ATTLIST loctext
+        xml:lang	CDATA #REQUIRED >
+
+<!--
+  description
+
+    The description holds a set of potentially longer, localized strings that
+    consist of a short description of the service.
+
+    The description has no attributes.
+-->
+<!ELEMENT description
+        ( loctext+ ) >
+
+<!ATTLIST description>
+
+<!--
+  common_name
+
+    The common_name holds a set of short, localized strings that
+    represent a well-known name for the service in the given locale.
+
+    The common_name has no attributes.
+-->
+<!ELEMENT common_name
+        ( loctext+ ) >
+
+<!ATTLIST common_name>
+
+<!--
+  units
+
+    The units a numerical property is expressed in.
+-->
+
+<!ELEMENT units
+	( loctext+ ) >
+
+<!ATTLIST units>
+
+<!--
+  visibility
+
+    Expresses how a property is typically accessed.  This isn't
+    intended as access control, but as an indicator as to how a
+    property is used.
+
+    Its attributes are:
+
+      value     'hidden', 'readonly', or 'readwrite' indicating that
+		the property should be hidden from the user, shown but
+		read-only, or modifiable.
+-->
+
+<!ELEMENT visibility EMPTY>
+
+<!ATTLIST visibility
+	value	( hidden | readonly | readwrite ) #REQUIRED >
+
+<!--
+  value
+
+    Describes a legal value for a property value, and optionally contains a
+    human-readable name and description for the specified property
+    value.
+
+    Its attributes are:
+
+      name	A string representation of the value.
+-->
+
+<!ELEMENT value
+	( common_name?, description? ) >
+
+<!ATTLIST value
+	name	CDATA #REQUIRED >
+
+<!--
+  values
+
+    Human-readable names and descriptions for valid values of a property.
+-->
+
+<!ELEMENT values
+	(value+) >
+
+<!ATTLIST values>
+
+<!--
+  cardinality
+
+    Places a constraint on the number of values the property can take
+    on.
+
+    Its attributes are:
+	min	minimum number of values
+	max	maximum number of values
+
+    Both attributes are optional.  If min is not specified, it defaults to
+    0.  If max is not specified it indicates an unlimited number of values.
+    If neither is specified this indicates 0 or more values.
+-->
+
+<!ELEMENT cardinality EMPTY>
+
+<!ATTLIST cardinality
+	min	CDATA "0"
+	max	CDATA "18446744073709551615">
+
+<!--
+  internal_separators
+
+    Indicates the separators used within a property's value used to
+    separate the actual values.  Used in situations where multiple
+    values are packed into a single property value instead of using a
+    multi-valued property.
+-->
+
+<!ELEMENT internal_separators
+	(#PCDATA) >
+
+<!ATTLIST internal_separators>
+
+<!--
+  range
+
+    Indicates a range of possible integer values.
+
+    Its attributes are:
+
+      min	The minimum value of the range (inclusive).
+      max	The maximum value of the range (inclusive).
+-->
+
+<!ELEMENT range EMPTY>
+
+<!ATTLIST range
+	min	CDATA #REQUIRED
+	max	CDATA #REQUIRED >
+
+<!--
+  constraints
+
+    Provides a set of constraints on the values a property can take on.
+-->
+
+<!ELEMENT constraints
+	( value*, range* ) >
+<!ATTLIST constraints>
+
+<!--
+  include_values
+
+    Includes an entire set of values in the choices block.
+
+    Its attributes are:
+
+	type    Either "constraints" or "values", indicating an
+		inclusion of all values allowed by the property's
+		constraints or all values for which there are
+		human-readable names and descriptions, respectively.
+-->
+
+<!ELEMENT include_values EMPTY>
+
+<!ATTLIST include_values
+	type	( constraints | values ) #REQUIRED >
+
+<!--
+  choices
+
+    Provides a set of common choices for the values a property can take
+    on.  Useful in those cases where the possibilities are unenumerable
+    or merely inconveniently legion, and a manageable subset is desired
+    for presentation in a user interface.
+-->
+
+<!ELEMENT choices
+	( value*, range*, include_values* ) >
+
+<!ATTLIST choices>
+
+<!--
+  prop_pattern
+
+
+    The prop_pattern describes one property of the enclosing property group
+    pattern.
+
+    Its attributes are:
+
+	name    The property's name.
+	type    The property's type.
+	required
+		If the property group is present, this property is required.
+
+	type can be omitted if required is false.
+-->
+
+<!ELEMENT prop_pattern
+	( common_name?, description?, units?, visibility?, cardinality?,
+	  internal_separators?, values?, constraints?, choices? ) >
+
+<!ATTLIST prop_pattern
+	name		CDATA	#REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
+	required	( true | false )	"false" >
+
+<!--
+  pg_pattern
+
+    The pg_pattern describes one property group.
+    Depending on the element's attributes, these descriptions may apply
+    to just the enclosing service/instance, instances of the enclosing
+    service, delegates of the service (assuming it is a restarter), or
+    all services.
+
+    Its attributes are:
+
+	name    The property group's name.  If not specified, it
+		matches all property groups with the specified type.
+	type    The property group's type.  If not specified, it
+		matches all property groups with the specified name.
+	required
+		If the property group is required.
+	target	The scope of the pattern, which may be all, delegate,
+		instance, or this.  'all' is reserved for framework use
+		and applies the template to all services on the system.
+		'delegate' is reserved for restarters, and means the
+		template applies to all services which use the restarter.
+		'this' would refer to the defining service or instance.
+		'instance' can only be used in a service's template block,
+		and means the definition applies to all instances of this
+		service.
+
+-->
+
+<!ELEMENT pg_pattern
+	( common_name?, description?, prop_pattern* ) >
+
+<!ATTLIST pg_pattern
+	name		CDATA	""
+	type		CDATA	""
+	required	( true | false )	"false"
+	target		( this | instance | delegate | all )	"this" >
+
+<!--
+  template
+
+    The template contains a collection of metadata about the service.
+    It contains a localizable string that serves as a common,
+    human-readable name for the service.  (This name should be less than
+    60 characters in a single byte locale.)  The template may optionally
+    contain a longer localizable description of the service, a
+    collection of links to documentation, either in the form of manual
+    pages or in the form of URI specifications to external documentation
+    sources (such as docs.sun.com).
+
+    The template has no attributes.
+-->
+<!ELEMENT template
+        ( common_name, description?, documentation?, pg_pattern* ) >
+
+<!ATTLIST template>
+
+<!-- Notification Parameters -->
+
+<!ELEMENT paramval EMPTY>
+
+<!ATTLIST paramval
+	name		CDATA #REQUIRED
+	value		CDATA #REQUIRED>
+
+<!ELEMENT parameter
+	( value_node* )>
+
+<!ATTLIST parameter
+	name		CDATA #REQUIRED>
+
+<!ELEMENT event EMPTY>
+
+<!ATTLIST event
+	value		CDATA #REQUIRED>
+
+<!ELEMENT type
+	( ( parameter | paramval )* )>
+
+<!ATTLIST type
+	name		CDATA #REQUIRED
+	active		( true | false ) "true" >
+
+<!--
+  notification parameters
+
+    This element sets the notification parameters for Software Events and
+    Fault Management problem lifecycle events.
+-->
+
+<!ELEMENT notification_parameters
+	( event, type+ )>
+
+<!ATTLIST notification_parameters>
+
+<!-- Services and instances -->
+
+<!--
+  create_default_instance
+
+    A flag element indicating that an otherwise empty default instance
+    of this service (named "default") should be created at install, with
+    its enabled property set as given.
+
+    Its attribute is
+
+	enabled	[boolean] The initial value for the enabled state of
+		this instance.
+-->
+
+<!ELEMENT create_default_instance EMPTY >
+
+<!ATTLIST create_default_instance
+	enabled		( true | false ) #REQUIRED >
+
+<!--
+  single_instance
+
+    A flag element stating that this service can only have a single
+    instance on a particular system.
+-->
+
+<!ELEMENT single_instance EMPTY>
+
+<!ATTLIST single_instance>
+
+<!--
+  instance
+
+    The service instance is the object representing a software component
+    that will run on the system if enabled.  It contains an enabled
+    element, a set of dependencies on other services, potentially
+    customized methods or configuration data, an optional method
+    context, and a pointer to its restarter.  (If no restarter is
+    specified, the master restarter, svc.startd(1M), is assumed to be
+    responsible for the service.)
+
+    Its attributes are
+
+	name	The canonical name for this instance of the service.
+
+	enabled	[boolean] The initial value for the enabled state of
+		this instance.
+-->
+
+<!ELEMENT instance
+	( restarter?, dependency*, dependent*, method_context?,
+	exec_method*, notification_parameters*, property_group*,
+	template? ) >
+
+<!ATTLIST instance
+	name		CDATA #REQUIRED
+	enabled		( true | false ) #REQUIRED >
+
+<!--
+  service
+
+    The service contains the set of instances defined by default for
+    this service, an optional method execution context, any default
+    methods, the template, and various restrictions or advice applicable
+    at installation.  The method execution context and template elements
+    are required for service_bundle documents with type "manifest", but
+    are optional for "profile" or "archive" documents.
+
+    Its attributes are
+
+	name	The canonical name for the service.
+
+	version	[integer] The integer version for this service.
+
+	type	Whether this service is a simple service, a delegated
+		restarter, or a milestone (a synthetic service that
+		collects a group of dependencies).
+-->
+
+<!ELEMENT service
+	( create_default_instance?, single_instance?, restarter?,
+	dependency*, dependent*, method_context?, exec_method*,
+	notification_parameters*, property_group*, instance*,
+	stability?, template? ) >
+
+<!ATTLIST service
+	name		CDATA #REQUIRED
+	version		CDATA #REQUIRED
+	type		( service | restarter | milestone ) #REQUIRED >
+
+<!--
+  service_bundle
+
+    The bundle possesses two attributes:
+
+	type	How this file is to be understood by the framework (or
+		used in a non-framework compliant way). Standard types
+		are 'archive', 'manifest', and 'profile'.
+	
+	name	A name for the bundle.  Manifests should be named after
+		the package which delivered them; profiles should be
+		named after the "feature set nickname" they intend to
+		enable.
+-->
+
+<!ELEMENT service_bundle
+	( service_bundle* | service* | xi:include* )>
+
+<!ATTLIST service_bundle
+	type		CDATA #REQUIRED
+	name		CDATA #REQUIRED>

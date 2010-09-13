@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <device>
+    <match key="hiddev.application_pages" contains="Power Device Page">
+      <append key="info.addons" type="strlist">hald-addon-hid-ups</append>
+    </match>
+  </device>
+
+  <device>
+    <match key="power_management.type" string="acpi">
+      <append key="info.addons" type="strlist">hald-addon-acpi</append>
+    </match>
+  </device>
+
+  <device>
+    <match key="button.type" string="lid">
+      <match key="linux.pmu_type" exists="true">
+	<append key="info.addons" type="strlist">hald-addon-pmu</append>
+      </match>
+    </match>
+  </device>
+
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/computer">
+      <append key="info.interfaces" type="strlist">org.freedesktop.Hal.Device.SystemPowerManagement</append>
+
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Suspend</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist">i</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist">num_seconds_to_sleep</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-suspend</append>
+
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Hibernate</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-hibernate</append>
+
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Shutdown</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-shutdown</append>
+
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Reboot</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-reboot</append>
+
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">SetPowerSave</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist">b</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist">enable_power_save</append>
+      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-set-power-save</append>
+    </match>
+  </device>
+      
+</deviceinfo>

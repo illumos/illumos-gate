@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+# The following lines define the keyboard layouts supported in kernel.
+# The /usr/bin/kbd (-s option) reads the file to get the keyboard layout
+# infomation.
+# To add the new keytable, the new layout name and number need be defined
+# below.
+# 
+# Note: all the entries in this file should be kept in alphabetical
+# order so that the kbd -s presents them in that way.
+#
+
+
+Albanian=264
+Arabic=1
+Belarusian=261
+Belgian=2
+Brazilian=272
+Bulgarian=260
+Canadian-Bilingual=3
+Croatian=259
+Czech=5
+Danish=6
+Dutch=18
+Dvorak=273
+Estonian=274
+Finnish=7
+French=8
+French-Canadian=4
+Hungarian=12
+German=9
+Greek=10
+Icelandic=258
+Italian=14
+Japanese-type6=271
+Japanese=15
+Korean=16
+Latin-American=17
+Lithuanian=265
+Latvian=266
+Macedonian=267
+Malta_UK=263
+Malta_US=262
+Norwegian=19
+Polish=21
+Portuguese=22
+Romanian=275
+Russian=23
+Serbia-And-Montenegro=257
+Slovak=24
+Slovenian=256
+Spanish=25
+Swedish=26
+Swiss-French=27
+Swiss-German=28
+Traditional-Chinese=30
+TurkishF=35
+TurkishQ=31
+UK-English=32
+US-English=33

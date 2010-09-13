@@ -1,0 +1,1234 @@
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+ident	"%Z%%M%	%I%	%E% SMI"
+
+
+**  PLEASE NOTE:
+**
+**  This document discusses aspects of the DHCPv4 client design that have
+**  since changed (e.g., DLPI is no longer used).  However, since those
+**  aspects affected the DHCPv6 design, the discussion has been left for
+**  historical record.
+
+
+DHCPv6 Client Low-Level Design
+
+Introduction
+
+  This project adds DHCPv6 client-side (not server) support to
+  Solaris.  Future projects may add server-side support as well as
+  enhance the basic capabilities added here.  These future projects
+  are not discussed in detail in this document.
+
+  This document assumes that the reader is familiar with the following
+  other documents:
+
+  - RFC 3315: the primary description of DHCPv6
+  - RFCs 2131 and 2132: IPv4 DHCP
+  - RFCs 2461 and 2462: IPv6 NDP and stateless autoconfiguration
+  - RFC 3484: IPv6 default address selection
+  - ifconfig(1M): Solaris IP interface configuration
+  - in.ndpd(1M): Solaris IPv6 Neighbor and Router Discovery daemon
+  - dhcpagent(1M): Solaris DHCP client
+  - dhcpinfo(1): Solaris DHCP parameter utility
+  - ndpd.conf(4): in.ndpd configuration file
+  - netstat(1M): Solaris network status utility
+  - snoop(1M): Solaris network packet capture and inspection
+  - "DHCPv6 Client High-Level Design"
+
+  Several terms from those documents (such as the DHCPv6 IA_NA and
+  IAADDR options) are used without further explanation in this
+  document; see the reference documents above for details.
+
+  The overall plan is to enhance the existing Solaris dhcpagent so
+  that it is able to process DHCPv6.  It would also have been possible
+  to create a new, separate daemon process for this, or to integrate
+  the feature into in.ndpd.  These alternatives, and the reason for
+  the chosen design, are discussed in Appendix A.
+
+  This document discusses the internal design issues involved in the
+  protocol implementation, and with the associated components (such as
+  in.ndpd, snoop, and the kernel's source address selection
+  algorithm).  It does not discuss the details of the protocol itself,
+  which are more than adequately described in the RFC, nor the
+  individual lines of code, which will be in the code review.
+
+  As a cross-reference, Appendix B has a summary of the components
+  involved and the changes to each.
+
+
+Background
+
+  In order to discuss the design changes for DHCPv6, it's necessary
+  first to talk about the current IPv4-only design, and the
+  assumptions built into that design.
+
+  The main data structure used in dhcpagent is the 'struct ifslist'.
+  Each instance of this structure represents a Solaris logical IP
+  interface under DHCP's control.  It also represents the shared state
+  with the DHCP server that granted the address, the address itself,
+  and copies of the negotiated options.
+
+  There is one list in dhcpagent containing all of the IP interfaces
+  that are under DHCP control.  IP interfaces not under DHCP control
+  (for example, those that are statically addressed) are not included
+  in this list, even when plumbed on the system.  These ifslist
+  entries are chained like this:
+
+  ifsheadp -> ifslist -> ifslist -> ifslist -> NULL
+	        net0	  net0:1     net1
+
+  Each ifslist entry contains the address, mask, lease information,
+  interface name, hardware information, packets, protocol state, and
+  timers.  The name of the logical IP interface under DHCP's control
+  is also the name used in the administrative interfaces (dhcpinfo,
+  ifconfig) and when logging events.
+
+  Each entry holds open a DLPI stream and two sockets.  The DLPI
+  stream is nulled-out with a filter when not in use, but still
+  consumes system resources.  (Most significantly, it causes data
+  copies in the driver layer that end up sapping performance.)
+
+  The entry storage is managed by a insert/hold/release/remove model
+  and reference counts.  In this model, insert_ifs() allocates a new
+  ifslist entry and inserts it into the global list, with the global
+  list holding a reference.  remove_ifs() removes it from the global
+  list and drops that reference.  hold_ifs() and release_ifs() are
+  used by data structures that refer to ifslist entries, such as timer
+  entries, to make sure that the ifslist entry isn't freed until the
+  timer has been dispatched or deleted.
+
+  The design is single-threaded, so code that walks the global list
+  needn't bother taking holds on the ifslist structure.  Only
+  references that may be used at a different time (i.e., pointers
+  stored in other data structures) need to be recorded.
+
+  Packets are handled using PKT (struct dhcp; <netinet/dhcp.h>),
+  PKT_LIST (struct dhcp_list; <dhcp_impl.h>), and dhcp_pkt_t (struct
+  dhcp_pkt; "packet.h").  PKT is just the RFC 2131 DHCP packet
+  structure, and has no additional information, such as packet length.
+  PKT_LIST contains a PKT pointer, length, decoded option arrays, and
+  linkage for putting the packet in a list.  Finally, dhcp_pkt_t has a
+  PKT pointer and length values suitable for modifying the packet.
+
+  Essentially, PKT_LIST is a wrapper for received packets, and
+  dhcp_pkt_t is a wrapper for packets to be sent.
+
+  The basic PKT structure is used in dhcpagent, inetboot, in.dhcpd,
+  libdhcpagent, libwanboot, libdhcputil, and others.  PKT_LIST is used
+  in a similar set of places, including the kernel NFS modules.
+  dhcp_pkt_t is (as the header file implies) limited to dhcpagent.
+
+  In addition to these structures, dhcpagent maintains a set of
+  internal supporting abstractions.  Two key ones involved in this
+  project are the "async operation" and the "IPC action."  An async
+  operation encapsulates the actions needed for a given operation, so
+  that if cancellation is needed, there's a single point where the
+  associated resources can be freed.  An IPC action represents the
+  user state related to the private interface used by ifconfig.
+
+
+DHCPv6 Inherent Differences
+
+  DHCPv6 naturally has some commonality with IPv4 DHCP, but also has
+  some significant differences.
+
+  Unlike IPv4 DHCP, DHCPv6 relies on link-local IP addresses to do its
+  work.  This means that, on Solaris, the client doesn't need DLPI to
+  perform any of the I/O; regular IP sockets will do the job.  It also
+  means that, unlike IPv4 DHCP, DHCPv6 does not need to obtain a lease
+  for the address used in its messages to the server.  The system
+  provides the address automatically.
+
+  IPv4 DHCP expects some messages from the server to be broadcast.
+  DHCPv6 has no such mechanism; all messages from the server to the
+  client are unicast.  In the case where the client and server aren't
+  on the same subnet, a relay agent is used to get the unicast replies
+  back to the client's link-local address.
+
+  With IPv4 DHCP, a single address plus configuration options is
+  leased with a given client ID and a single state machine instance,
+  and the implementation binds that to a single IP logical interface
+  specified by the user.  The lease has a "Lease Time," a required
+  option, as well as two timers, called T1 (renew) and T2 (rebind),
+  which are controlled by regular options.
+
+  DHCPv6 uses a single client/server session to control the
+  acquisition of configuration options and "identity associations"
+  (IAs).  The identity associations, in turn, contain lists of
+  addresses for the client to use and the T1/T2 timer values.  Each
+  individual address has its own preferred and valid lifetime, with
+  the address being marked "deprecated" at the end of the preferred
+  interval, and removed at the end of the valid interval.
+
+  IPv4 DHCP leaves many of the retransmit decisions up to the client,
+  and some things (such as RELEASE and DECLINE) are sent just once.
+  Others (such as the REQUEST message used for renew and rebind) are
+  dealt with by heuristics.  DHCPv6 treats each message to the server
+  as a separate transaction, and resends each message using a common
+  retransmission mechanism.  DHCPv6 also has separate messages for
+  Renew, Rebind, and Confirm rather than reusing the Request
+  mechanism.
+
+  The set of options (which are used to convey configuration
+  information) for each protocol are distinct.  Notably, two of the
+  mistakes from IPv4 DHCP have been fixed: DHCPv6 doesn't carry a
+  client name, and doesn't attempt to impersonate a routing protocol
+  by setting a "default route."
+
+  Another welcome change is the lack of a netmask/prefix length with
+  DHCPv6.  Instead, the client uses the Router Advertisement prefixes
+  to set the correct interface netmask.  This reduces the number of
+  databases that need to be kept in sync.  (The equivalent mechanism
+  in IPv4 would have been the use of ICMP Address Mask Request /
+  Reply, but the BOOTP designers chose to embed it in the address
+  assignment protocol itself.)
+
+  Otherwise, DHCPv6 is similar to IPv4 DHCP.  The same overall
+  renew/rebind and lease expiry strategy is used, although the state
+  machine events must now take into account multiple IAs and the fact
+  that each can cause RENEWING or REBINDING state independently.
+
+
+DHCPv6 And Solaris
+
+  The protocol distinctions above have several important implications.
+  For the logical interfaces:
+
+    - Because Solaris uses IP logical interfaces to configure
+      addresses, we must have multiple IP logical interfaces per IA
+      with IPv6.
+
+    - Because we need to support multiple addresses (and thus multiple
+      IP logical interfaces) per IA and multiple IAs per client/server
+      session, the IP logical interface name isn't a unique name for
+      the lease.
+
+  As a result, IP logical interfaces will come and go with DHCPv6,
+  just as happens with the existing stateless address
+  autoconfiguration support in in.ndpd.  The logical interface names
+  (visible in ifconfig) have no administrative significance.
+
+  Fortunately, DHCPv6 does end up with one fixed name that can be used
+  to identify a session.  Because DHCPv6 uses link local addresses for
+  communication with the server, the name of the IP logical interface
+  that has this link local address (normally the same as the IP
+  physical interface) can be used as an identifier for dhcpinfo and
+  logging purposes.
+
+
+Dhcpagent Redesign Overview
+
+  The redesign starts by refactoring the IP interface representation.
+  Because we need to have multiple IP logical interfaces (LIFs) for a
+  single identity association (IA), we should not store all of the
+  DHCP state information along with the LIF information.
+
+  For DHCPv6, we will need to keep LIFs on a single IP physical
+  interface (PIF) together, so this is probably also a good time to
+  reconsider the way dhcpagent represents physical interfaces.  The
+  current design simply replicates the state (notably the DLPI stream,
+  but also the hardware address and other bits) among all of the
+  ifslist entries on the same physical interface.
+
+  The new design creates two lists of dhcp_pif_t entries, one list for
+  IPv4 and the other for IPv6.  Each dhcp_pif_t represents a PIF, with
+  a list of dhcp_lif_t entries attached, each of which represents a
+  LIF used by dhcpagent.  This structure mirrors the kernel's ill_t
+  and ipif_t interface representations.
+
+  Next, the lease-tracking needs to be refactored.  DHCPv6 is the
+  functional superset in this case, as it has two lifetimes per
+  address (LIF) and IA groupings with shared T1/T2 timers.  To
+  represent these groupings, we will use a new dhcp_lease_t structure.
+  IPv4 DHCP will have one such structure per state machine, while
+  DHCPv6 will have a list.  (Note: the initial implementation will
+  have only one lease per DHCPv6 state machine, because each state
+  machine uses a single link-local address, a single DUID+IAID pair,
+  and supports only Non-temporary Addresses [IA_NA option].  Future
+  enhancements may use multiple leases per DHCPv6 state machine or
+  support other IA types.)
+
+  For all of these new structures, we will use the same insert/hold/
+  release/remove model as with the original ifslist.
+
+  Finally, the remaining items (and the bulk of the original ifslist
+  members) are kept on a per-state-machine basis.  As this is no
+  longer just an "interface," a new dhcp_smach_t structure will hold
+  these, and the ifslist structure is gone.
+
+
+Lease Representation
+
+  For DHCPv6, we need to track multiple LIFs per lease (IA), but we
+  also need multiple LIFs per PIF.  Rather than having two sets of
+  list linkage for each LIF, we can observe that a LIF is on exactly
+  one PIF and is a member of at most one lease, and then simplify: the
+  lease structure will use a base pointer for the first LIF in the
+  lease, and a count for the number of consecutive LIFs in the PIF's
+  list of LIFs that belong to the lease.
+
+  When removing a LIF from the system, we need to decrement the count
+  of LIFs in the lease, and advance the base pointer if the LIF being
+  removed is the first one.  Inserting a LIF means just moving it into
+  this list and bumping the counter.
+
+  When removing a lease from a state machine, we need to dispose of
+  the LIFs referenced.  If the LIF being disposed is the main LIF for
+  a state machine, then all that we can do is canonize the LIF
+  (returning it to a default state); this represents the normal IPv4
+  DHCP operation on lease expiry.  Otherwise, the lease is the owner
+  of that LIF (it was created because of a DHCPv6 IA), and disposal
+  means unplumbing the LIF from the actual system and removing the LIF
+  entry from the PIF.
+
+
+Main Structure Linkage
+
+  For IPv4 DHCP, the new linkage is straightforward.  Using the same
+  system configuration example as in the initial design discussion:
+
+          +- lease  +- lease       +- lease
+          |  ^      |  ^           |  ^
+          |  |      |  |           |  |
+          \  smach  \  smach       \  smach
+           \ ^|      \ ^|           \ ^|
+            v|v       v|v            v|v
+            lif ----> lif -> NULL     lif -> NULL
+            net0      net0:1          net1
+            ^                         ^
+            |                         |
+  v4root -> pif --------------------> pif -> NULL
+            net0                      net1
+
+  This diagram shows three separate state machines running (with
+  backpointers omitted for clarity).  Each state machine has a single
+  "main" LIF with which it's associated (and named).  Each also has a
+  single lease structure that points back to the same LIF (count of
+  1), because IPv4 DHCP controls a single address allocation per state
+  machine.
+
+  DHCPv6 is a bit more complex.  This shows DHCPv6 running on two
+  interfaces (more or fewer interfaces are of course possible) and
+  with multiple leases on the first interface, and each lease with
+  multiple addresses (one with two addresses, the second with one).
+
+            lease ----------------> lease -> NULL   lease -> NULL
+            ^   \(2)                |(1)            ^   \ (1)
+            |    \                  |               |    \
+            smach \                 |               smach \
+            ^ |    \                |               ^ |    \
+            | v     v               v               | v     v
+            lif --> lif --> lif --> lif --> NULL    lif --> lif -> NULL
+            net0    net0:1  net0:4  net0:2          net1    net1:5
+            ^                                       ^
+            |                                       |
+  v6root -> pif ----------------------------------> pif -> NULL
+            net0                                    net1
+
+  Note that there's intentionally no ordering based on name in the
+  list of LIFs.  Instead, the contiguous LIF structures in that list
+  represent the addresses in each lease.  The logical interfaces
+  themselves are allocated and numbered by the system kernel, so they
+  may not be sequential, and there may be gaps in the list if other
+  entities (such as in.ndpd) are also configuring interfaces.
+
+  Note also that with IPv4 DHCP, the lease points to the LIF that's
+  also the main LIF for the state machine, because that's the IP
+  interface that dhcpagent controls.  With DHCPv6, the lease (one per
+  IA structure) points to a separate set of LIFs that are created just
+  for the leased addresses (one per IA address in an IAADDR option).
+  The state machine alone points to the main LIF.
+
+
+Packet Structure Extensions
+
+  Obviously, we need some DHCPv6 packet data structures and
+  definitions.  A new <netinet/dhcp6.h> file will be introduced with
+  the necessary #defines and structures.  The key structure there will
+  be:
+
+	struct dhcpv6_message {
+		uint8_t		d6m_msg_type;
+		uint8_t		d6m_transid_ho;
+		uint16_t	d6m_transid_lo;
+	};
+	typedef	struct dhcpv6_message	dhcpv6_message_t;
+
+  This defines the usual (non-relay) DHCPv6 packet header, and is
+  roughly equivalent to PKT for IPv4.
+
+  Extending dhcp_pkt_t for DHCPv6 is straightforward, as it's used
+  only within dhcpagent.  This structure will be amended to use a
+  union for v4/v6 and include a boolean to flag which version is in
+  use.
+
+  For the PKT_LIST structure, things are more complex.  This defines
+  both a queuing mechanism for received packets (typically OFFERs) and
+  a set of packet decoding structures.  The decoding structures are
+  highly specific to IPv4 DHCP -- they have no means to handle nested
+  or repeated options (as used heavily in DHCPv6) and make use of the
+  DHCP_OPT structure which is specific to IPv4 DHCP -- and are
+  somewhat expensive in storage, due to the use of arrays indexed by
+  option code number.
+
+  Worse, this structure is used throughout the system, so changes to
+  it need to be made carefully.  (For example, the existing 'pkt'
+  member can't just be turned into a union.)
+
+  For an initial prototype, since discarded, I created a new
+  dhcp_plist_t structure to represent packet lists as used inside
+  dhcpagent and made dhcp_pkt_t valid for use on input and output.
+  The result is unsatisfying, though, as it results in code that
+  manipulates far too many data structures in common cases; it's a sea
+  of pointers to pointers.
+
+  The better answer is to use PKT_LIST for both IPv4 and IPv6, adding
+  the few new bits of metadata required to the end (receiving ifIndex,
+  packet source/destination addresses), and staying within the overall
+  existing design.
+
+  For option parsing, dhcpv6_find_option() and dhcpv6_pkt_option()
+  functions will be added to libdhcputil.  The former function will
+  walk a DHCPv6 option list, and provide safe (bounds-checked) access
+  to the options inside.  The function can be called recursively, so
+  that option nesting can be handled fairly simply by nested loops,
+  and can be called repeatedly to return each instance of a given
+  option code number.  The latter function is just a convenience
+  wrapper on dhcpv6_find_option() that starts with a PKT_LIST pointer
+  and iterates over the top-level options with a given code number.
+
+  There are two special considerations for the use of these library
+  interfaces: there's no "pad" option for DHCPv6 or alignment
+  requirements on option headers or contents, and nested options
+  always follow a structure that has type-dependent length.  This
+  means that code that handles options must all be written to deal
+  with unaligned data, and suboption code must index the pointer past
+  the type-dependent part.
+
+
+Packet Construction
+
+  Unlike DHCPv4, DHCPv6 places the transaction timer value in an
+  option.  The existing code sets the current time value in
+  send_pkt_internal(), which allows it to be updated in a
+  straightforward way when doing retransmits.
+
+  To make this work in a simple manner for DHCPv6, I added a
+  remove_pkt_opt() function.  The update logic just does a remove and
+  re-adds the option.  We could also just assume the presence of the
+  option, find it, and modify in place, but the remove feature seems
+  more general.
+
+  DHCPv6 uses nesting options.  To make this work, two new utility
+  functions are needed.  First, an add_pkt_subopt() function will take
+  a pointer to an existing option and add an embedded option within
+  it.  The packet length and existing option length are updated.  If
+  that existing option isn't a top-level option, though, this means
+  that the caller must update the lengths of all of the enclosing
+  options up to the top level.  To do this, update_v6opt_len() will be
+  added.  This is used in the special case of adding a Status Code
+  option to an IAADDR option within an IA_NA top-level option.
+
+
+Sockets and I/O Handling
+
+  DHCPv6 doesn't need or use either a DLPI or a broadcast IP socket.
+  Instead, a single unicast-bound IP socket on a link-local address
+  would be the most that is needed.  This is roughly equivalent to
+  if_sock_ip_fd in the existing design, but that existing socket is
+  bound only after DHCP reaches BOUND state -- that is, when it
+  switches away from DLPI.  We need something different.
+
+  This, along with the excess of open file descriptors in an otherwise
+  idle daemon and the potentially serious performance problems in
+  leaving DLPI open at all times, argues for a larger redesign of the
+  I/O logic in dhcpagent.
+
+  The first thing that we can do is eliminate the need for the
+  per-ifslist if_sock_fd.  This is used primarily for issuing ioctls
+  to configure interfaces -- a task that would work as well with any
+  open socket -- and is also registered to receive any ACK/NAK packets
+  that may arrive via broadcast.  Both of these can be eliminated by
+  creating a pair of global sockets (IPv4 and IPv6), bound and
+  configured for ACK/NAK reception.  The only functional difference is
+  that the list of running state machines must be scanned on reception
+  to find the correct transaction ID, but the existing design
+  effectively already goes to this effort because the kernel
+  replicates received datagrams among all matching sockets, and each
+  ifslist entry has a socket open.
+
+  (The existing code for if_sock_fd makes oblique reference to unknown
+  problems in the system that may prevent binding from working in some
+  cases.  The reference dates back some seven years to the original
+  DHCP implementation.  I've observed no such problems in extensive
+  testing and if any do show up, they will be dealt with by fixing the
+  underlying bugs.)
+
+  This leads to an important simplification: it's no longer necessary
+  to register, unregister, and re-register for packet reception while
+  changing state -- register_acknak() and unregister_acknak() are
+  gone.  Instead, we always receive, and we dispatch the packets as
+  they arrive.  As a result, when receiving a DHCPv4 ACK or DHCPv6
+  Reply when in BOUND state, we know it's a duplicate, and we can
+  discard.
+
+  The next part is in minimizing DLPI usage.  A DLPI stream is needed
+  at most for each IPv4 PIF, and it's not needed when all of the
+  DHCP instances on that PIF are bound.  In fact, the current
+  implementation deals with this in configure_bound() by setting a
+  "blackhole" packet filter.  The stream is left open.
+
+  To simplify this, we will open at most one DLPI stream on a PIF, and
+  use reference counts from the state machines to determine when the
+  stream must be open and when it can be closed.  This mechanism will
+  be centralized in a set_smach_state() function that changes the
+  state and opens/closes the DLPI stream when needed.
+
+  This leads to another simplification.  The I/O logic in the existing
+  dhcpagent makes use of the protocol state to select between DLPI and
+  sockets.  Now that we keep track of this in a simpler manner, we no
+  longer need to switch out on state in when sending a packet; just
+  test the dsm_using_dlpi flag instead.
+
+  Still another simplification is in the handling of DHCPv4 INFORM.
+  The current code has separate logic in it for getting the interface
+  state and address information.  This is no longer necessary, as the
+  LIF mechanism keeps track of the interface state.  And since we have
+  separate lease structures, and INFORM doesn't acquire a lease, we no
+  longer have to be careful about canonizing the interface on
+  shutdown.
+
+  Although the default is to send all client messages to a well-known
+  multicast address for servers and relays, DHCPv6 also has a
+  mechanism that allows the client to send unicast messages to the
+  server.  The operation of this mechanism is slightly complex.
+  First, the server sends the client a unicast address via an option.
+  We may use this address as the destination (rather than the
+  well-known multicast address for local DHCPv6 servers and relays)
+  only if we have a viable local source address.  This means using
+  SIOCGDSTINFO each time we try to send unicast.  Next, the server may
+  send back a special status code: UseMulticast.  If this is received,
+  and if we were actually using unicast in our messages to the server,
+  then we need to forget the unicast address, switch back to
+  multicast, and resend our last message.
+
+  Note that it's important to avoid the temptation to resend the last
+  message every time UseMulticast is seen, and do it only once on
+  switching back to multicast: otherwise, a potential feedback loop is
+  created.
+
+  Because IP_PKTINFO (PSARC 2006/466) has integrated, we could go a
+  step further by removing the need for any per-LIF sockets and just
+  use the global sockets for all but DLPI.  However, in order to
+  facilitate a Solaris 10 backport, this will be done separately as CR
+  6509317.
+
+  In the case of DHCPv6, we already have IPV6_PKTINFO, so we will pave
+  the way for IPv4 by beginning to using this now, and thus have just
+  a single socket (bound to "::") for all of DHCPv6.  Doing this
+  requires switching from the old BSD4.2 -lsocket -lnsl to the
+  standards-compliant -lxnet in order to use ancillary data.
+
+  It may also be possible to remove the need for DLPI for IPv4, and
+  incidentally simplify the code a fair amount, by adding a kernel
+  option to allow transmission and reception of UDP packets over
+  interfaces that are plumbed but not marked IFF_UP.  This is left for
+  future work.
+
+
+The State Machine
+
+  Several parts of the existing state machine need additions to handle
+  DHCPv6, which is a superset of DHCPv4.
+
+  First, there are the RENEWING and REBINDING states.  For IPv4 DHCP,
+  these states map one-to-one with a single address and single lease
+  that's undergoing renewal.  It's a simple progression (on timeout)
+  from BOUND, to RENEWING, to REBINDING and finally back to SELECTING
+  to start over.  Each retransmit is done by simply rescheduling the
+  T1 or T2 timer.
+
+  For DHCPv6, things are somewhat more complex.  At any one time,
+  there may be multiple IAs (leases) that are effectively in renewing
+  or rebinding state, based on the T1/T2 timers for each IA, and many
+  addresses that have expired.
+
+  However, because all of the leases are related to a single server,
+  and that server either responds to our requests or doesn't, we can
+  simplify the states to be nearly identical to IPv4 DHCP.
+
+  The revised definition for use with DHCPv6 is:
+
+    - Transition from BOUND to RENEWING state when the first T1 timer
+      (of any lease on the state machine) expires.  At this point, as
+      an optimization, we should begin attempting to renew any IAs
+      that are within REN_TIMEOUT (10 seconds) of reaching T1 as well.
+      We may as well avoid sending an excess of packets.
+
+    - When a T1 lease timer expires and we're in RENEWING or REBINDING
+      state, just ignore it, because the transaction is already in
+      progress.
+
+    - At each retransmit timeout, we should check to see if there are
+      more IAs that need to join in because they've passed point T1 as
+      well, and, if so, add them.  This check isn't necessary at this
+      time, because only a single IA_NA is possible with the initial
+      design.
+
+    - When we reach T2 on any IA and we're in BOUND or RENEWING state,
+      enter REBINDING state.  At this point, we have a choice.  For
+      those other IAs that are past T1 but not yet at T2, we could
+      ignore them (sending only those that have passed point T2),
+      continue to send separate Renew messages for them, or just
+      include them in the Rebind message.  This isn't an issue that
+      must be dealt with for this project, but the plan is to include
+      them in the Rebind message.
+
+    - When a T2 lease timer expires and we're in REBINDING state, just
+      ignore it, as with the corresponding T1 timer.
+
+    - As addresses reach the end of their preferred lifetimes, set the
+      IFF_DEPRECATED flag.  As they reach the end of the valid
+      lifetime, remove them from the system.  When an IA (lease)
+      becomes empty, just remove it.  When there are no more leases
+      left, return to SELECTING state to start over.
+
+  Note that the RFC treats the IAs as separate entities when
+  discussing the renew/rebind T1/T2 timers, but treats them as a unit
+  when doing the initial negotiation.  This is, to say the least,
+  confusing, especially so given that there's no reason to expect that
+  after having failed to elicit any responses at all from the server
+  on one IA, the server will suddenly start responding when we attempt
+  to renew some other IA.  We rationalize this behavior by using a
+  single renew/rebind state for the entire state machine (and thus
+  client/server pair).
+
+  There's a subtle timing difference here between DHCPv4 and DHCPv6.
+  For DHCPv4, the client just sends packets more and more frequently
+  (shorter timeouts) as the next state gets nearer.  DHCPv6 treats
+  each as a transaction, using the same retransmit logic as for other
+  messages.  The DHCPv6 method is a cleaner design, so we will change
+  the DHCPv4 implementation to do the same, and compute the new timer
+  values as part of stop_extending().
+
+  Note that it would be possible to start the SELECTING state earlier
+  than waiting for the last lease to expire, and thus avoid a loss of
+  connectivity.  However, it this point, there are other servers on
+  the network that have seen us attempting to Rebind for quite some
+  time, and they have not responded.  The likelihood that there's a
+  server that will ignore Rebind but then suddenly spring into action
+  on a Solicit message seems low enough that the optimization won't be
+  done now.  (Starting SELECTING state earlier may be done in the
+  future, if it's found to be useful.)
+
+
+Persistent State
+
+  IPv4 DHCP has only minimal need for persistent state, beyond the
+  configuration parameters.  The state is stored when "ifconfig dhcp
+  drop" is run or the daemon receives SIGTERM, which is typically done
+  only well after the system is booted and running.
+
+  The daemon stores this state in /etc/dhcp, because it needs to be
+  available when only the root file system has been mounted.
+
+  Moreover, dhcpagent starts very early in the boot process.  It runs
+  as part of svc:/network/physical:default, which runs well before
+  root is mounted read/write:
+
+     svc:/system/filesystem/root:default ->
+        svc:/system/metainit:default ->
+           svc:/system/identity:node ->
+              svc:/network/physical:default
+           svc:/network/iscsi_initiator:default ->
+              svc:/network/physical:default
+
+  and, of course, well before either /var or /usr is mounted.  This
+  means that any persistent state must be kept in the root file
+  system, and that if we write before shutdown, we have to cope
+  gracefully with the root file system returning EROFS on write
+  attempts.
+
+  For DHCPv6, we need to try to keep our stable DUID and IAID values
+  stable across reboots to fulfill the demands of RFC 3315.
+
+  The DUID is either configured or automatically generated.  When
+  configured, it comes from the /etc/default/dhcpagent file, and thus
+  does not need to be saved by the daemon.  If automatically
+  generated, there's exactly one of these created, and it will
+  eventually be needed before /usr is mounted, if /usr is mounted over
+  IPv6.  This means a new file in the root file system,
+  /etc/dhcp/duid, will be used to hold the automatically generated
+  DUID.
+
+  The determination of whether to use a configured DUID or one saved
+  in a file is made in get_smach_cid().  This function will
+  encapsulate all of the DUID parsing and generation machinery for the
+  rest of dhcpagent.
+
+  If root is not writable at the point when dhcpagent starts, and our
+  attempt fails with EROFS, we will set a timer for 60 second
+  intervals to retry the operation periodically.  In the unlikely case
+  that it just never succeeds or that we're rebooted before root
+  becomes writable, then the impact will be that the daemon will wake
+  up once a minute and, ultimately, we'll choose a different DUID on
+  next start-up, and we'll thus lose our leases across a reboot.
+
+  The IAID similarly must be kept stable if at all possible, but
+  cannot be configured by the user.  To do make these values stable,
+  we will use two strategies.  First the IAID value for a given
+  interface (if not known) will just default to the IP ifIndex value,
+  provided that there's no known saved IAID using that value.  Second,
+  we will save off the IAID we choose in a single /etc/dhcp/iaid file,
+  containing an array of entries indexed by logical interface name.
+  Keeping it in a single file allows us to scan for used and unused
+  IAID values when necessary.
+
+  This mechanism depends on the interface name, and thus will need to
+  be revisited when Clearview vanity naming and NWAM are available.
+
+  Currently, the boot system (GRUB, OBP, the miniroot) does not
+  support installing over IPv6.  This could change in the future, so
+  one of the goals of the above stability plan is to support that
+  event.
+
+  When running in the miniroot on an x86 system, /etc/dhcp (and the
+  rest of the root) is mounted on a read-only ramdisk.  In this case,
+  writing to /etc/dhcp will just never work.  A possible solution
+  would be to add a new privileged command in ifconfig that forces
+  dhcpagent to write to an alternate location.  The initial install
+  process could then do "ifconfig <x> dhcp write /a" to get the needed
+  state written out to the newly-constructed system root.
+
+  This part (the new write option) won't be implemented as part of
+  this project, because it's not needed yet.
+
+
+Router Advertisements
+
+  IPv6 Router Advertisements perform two functions related to DHCPv6:
+
+    - they specify whether and how to run DHCPv6 on a given interface.
+    - they provide a list of the valid prefixes on an interface.
+
+  For the first function, in.ndpd needs to use the same DHCP control
+  interfaces that ifconfig uses, so that it can launch dhcpagent and
+  trigger DHCPv6 when necessary.  Note that it never needs to shut
+  down DHCPv6, as router advertisements can't do that.
+
+  However, launching dhcpagent presents new problems.  As a part of
+  the "Quagga SMF Modifications" project (PSARC 2006/552), in.ndpd in
+  Nevada is now privilege-aware and runs with limited privileges,
+  courtesy of SMF.  Dhcpagent, on the other hand, must run with all
+  privileges.
+
+  A simple work-around for this issue is to rip out the "privileges="
+  clause from the method_credential for in.ndpd.  I've taken this
+  direction initially, but the right longer-term answer seems to be
+  converting dhcpagent into an SMF service.  This is quite a bit more
+  complex, as it means turning the /sbin/dhcpagent command line
+  interface into a utility that manipulates the service and passes the
+  command line options via IPC extensions.
+
+  Such a design also begs the question of whether dhcpagent itself
+  ought to run with reduced privileges.  It could, but it still needs
+  the ability to grant "all" (traditional UNIX root) privileges to the
+  eventhook script, if present.  There seem to be few ways to do this,
+  though it's a good area for research.
+
+  The second function, prefix handling, is also subtle.  Unlike IPv4
+  DHCP, DHCPv6 does not give the netmask or prefix length along with
+  the leased address.  The client is on its own to determine the right
+  netmask to use.  This is where the advertised prefixes come in:
+  these must be used to finish the interface configuration.
+
+  We will have the DHCPv6 client configure each interface with an
+  all-ones (/128) netmask by default.  In.ndpd will be modified so
+  that when it detects a new IFF_DHCPRUNNING IP logical interface, it
+  checks for a known matching prefix, and sets the netmask as
+  necessary.  If no matching prefix is known, it will send a new
+  Router Solicitation message to try to find one.
+
+  When in.ndpd learns of a new prefix from a Router Advertisement, it
+  will scan all of the IFF_DHCPRUNNING IP logical interfaces on the
+  same physical interface and set the netmasks when necessary.
+  Dhcpagent, for its part, will ignore the netmask on IPv6 interfaces
+  when checking for changes that would require it to "abandon" the
+  interface.
+
+  Given the way that DHCPv6 and in.ndpd control both the horizontal
+  and the vertical in plumbing and removing logical interfaces, and
+  users do not, it might be worthwhile to consider roping off any
+  direct user changes to IPv6 logical interfaces under control of
+  in.ndpd or dhcpagent, and instead force users through a higher-level
+  interface.  This won't be done as part of this project, however.
+
+
+ARP Hardware Types
+
+  There are multiple places within the DHCPv6 client where the mapping
+  of DLPI MAC type to ARP Hardware Type is required:
+
+  - When we are constructing an automatic, stable DUID for our own
+    identity, we prefer to use a DUID-LLT if possible.  This is done
+    by finding a link-layer interface, opening it, reading the MAC
+    address and type, and translating in the make_stable_duid()
+    function in libdhcpagent.
+
+  - When we translate a user-configured DUID from
+    /etc/default/dhcpagent into a binary representation, we may have
+    to deal with a physical interface name.  In this case, we must
+    open that interface and read the MAC address and type.
+
+  - As part of the PIF data structure initialization, we need to read
+    out the MAC type so that it can be used in the BOOTP/DHCPv4
+    'htype' field.
+
+  Ideally, these would all be provided by a single libdlpi
+  implementation.  However, that project is on-going at this time and
+  has not yet integrated.  For the time being, a dlpi_to_arp()
+  translation function (taking dl_mac_type and returning an ARP
+  Hardware Type number) will be placed in libdhcputil.
+
+  This temporary function should be removed and this section of the
+  code updated when the new libdlpi from Clearview integrates.
+
+
+Field Mappings
+
+  Old (all in ifslist)	New
+  next			dhcp_smach_t.dsm_next
+  prev			dhcp_smach_t.dsm_prev
+  if_hold_count		dhcp_smach_t.dsm_hold_count
+  if_ia			dhcp_smach_t.dsm_ia
+  if_async		dhcp_smach_t.dsm_async
+  if_state		dhcp_smach_t.dsm_state
+  if_dflags		dhcp_smach_t.dsm_dflags
+  if_name		dhcp_smach_t.dsm_name (see text)
+  if_index		dhcp_pif_t.pif_index
+  if_max		dhcp_lif_t.lif_max and dhcp_pif_t.pif_max
+  if_min		(was unused; removed)
+  if_opt		(was unused; removed)
+  if_hwaddr		dhcp_pif_t.pif_hwaddr
+  if_hwlen		dhcp_pif_t.pif_hwlen
+  if_hwtype		dhcp_pif_t.pif_hwtype
+  if_cid		dhcp_smach_t.dsm_cid
+  if_cidlen		dhcp_smach_t.dsm_cidlen
+  if_prl		dhcp_smach_t.dsm_prl
+  if_prllen		dhcp_smach_t.dsm_prllen
+  if_daddr		dhcp_pif_t.pif_daddr
+  if_dlen		dhcp_pif_t.pif_dlen
+  if_saplen		dhcp_pif_t.pif_saplen
+  if_sap_before		dhcp_pif_t.pif_sap_before
+  if_dlpi_fd		dhcp_pif_t.pif_dlpi_fd
+  if_sock_fd		v4_sock_fd and v6_sock_fd (globals)
+  if_sock_ip_fd		dhcp_lif_t.lif_sock_ip_fd
+  if_timer		(see text)
+  if_t1			dhcp_lease_t.dl_t1
+  if_t2			dhcp_lease_t.dl_t2
+  if_lease		dhcp_lif_t.lif_expire
+  if_nrouters		dhcp_smach_t.dsm_nrouters
+  if_routers		dhcp_smach_t.dsm_routers
+  if_server		dhcp_smach_t.dsm_server
+  if_addr		dhcp_lif_t.lif_v6addr
+  if_netmask		dhcp_lif_t.lif_v6mask
+  if_broadcast		dhcp_lif_t.lif_v6peer
+  if_ack		dhcp_smach_t.dsm_ack
+  if_orig_ack		dhcp_smach_t.dsm_orig_ack
+  if_offer_wait		dhcp_smach_t.dsm_offer_wait
+  if_offer_timer	dhcp_smach_t.dsm_offer_timer
+  if_offer_id		dhcp_pif_t.pif_dlpi_id
+  if_acknak_id		dhcp_lif_t.lif_acknak_id
+  if_acknak_bcast_id	v4_acknak_bcast_id (global)
+  if_neg_monosec	dhcp_smach_t.dsm_neg_monosec
+  if_newstart_monosec	dhcp_smach_t.dsm_newstart_monosec
+  if_curstart_monosec	dhcp_smach_t.dsm_curstart_monosec
+  if_disc_secs		dhcp_smach_t.dsm_disc_secs
+  if_reqhost		dhcp_smach_t.dsm_reqhost
+  if_recv_pkt_list	dhcp_smach_t.dsm_recv_pkt_list
+  if_sent		dhcp_smach_t.dsm_sent
+  if_received		dhcp_smach_t.dsm_received
+  if_bad_offers		dhcp_smach_t.dsm_bad_offers
+  if_send_pkt		dhcp_smach_t.dsm_send_pkt
+  if_send_timeout	dhcp_smach_t.dsm_send_timeout
+  if_send_dest		dhcp_smach_t.dsm_send_dest
+  if_send_stop_func	dhcp_smach_t.dsm_send_stop_func
+  if_packet_sent	dhcp_smach_t.dsm_packet_sent
+  if_retrans_timer	dhcp_smach_t.dsm_retrans_timer
+  if_script_fd		dhcp_smach_t.dsm_script_fd
+  if_script_pid		dhcp_smach_t.dsm_script_pid
+  if_script_helper_pid	dhcp_smach_t.dsm_script_helper_pid
+  if_script_event	dhcp_smach_t.dsm_script_event
+  if_script_event_id	dhcp_smach_t.dsm_script_event_id
+  if_callback_msg	dhcp_smach_t.dsm_callback_msg
+  if_script_callback	dhcp_smach_t.dsm_script_callback
+
+  Notes:
+
+    - The dsm_name field currently just points to the lif_name on the
+      controlling LIF.  This may need to be named differently in the
+      future; perhaps when Zones are supported.
+
+    - The timer mechanism will be refactored.  Rather than using the
+      separate if_timer[] array to hold the timer IDs and
+      if_{t1,t2,lease} to hold the relative timer values, we will
+      gather this information into a dhcp_timer_t structure:
+
+	dt_id		timer ID value
+	dt_start	relative start time
+
+  New fields not accounted for above:
+
+  dhcp_pif_t.pif_next		linkage in global list of PIFs
+  dhcp_pif_t.pif_prev		linkage in global list of PIFs
+  dhcp_pif_t.pif_lifs		pointer to list of LIFs on this PIF
+  dhcp_pif_t.pif_isv6		IPv6 flag
+  dhcp_pif_t.pif_dlpi_count	number of state machines using DLPI
+  dhcp_pif_t.pif_hold_count	reference count
+  dhcp_pif_t.pif_name		name of physical interface
+  dhcp_lif_t.lif_next		linkage in per-PIF list of LIFs
+  dhcp_lif_t.lif_prev		linkage in per-PIF list of LIFs
+  dhcp_lif_t.lif_pif		backpointer to parent PIF
+  dhcp_lif_t.lif_smachs		pointer to list of state machines
+  dhcp_lif_t.lif_lease		backpointer to lease holding LIF
+  dhcp_lif_t.lif_flags		interface flags (IFF_*)
+  dhcp_lif_t.lif_hold_count	reference count
+  dhcp_lif_t.lif_dad_wait	waiting for DAD resolution flag
+  dhcp_lif_t.lif_removed	removed from list flag
+  dhcp_lif_t.lif_plumbed	plumbed by dhcpagent flag
+  dhcp_lif_t.lif_expired	lease has expired flag
+  dhcp_lif_t.lif_declined	reason to refuse this address (string)
+  dhcp_lif_t.lif_iaid		unique and stable 32-bit identifier
+  dhcp_lif_t.lif_iaid_id	timer for delayed /etc writes
+  dhcp_lif_t.lif_preferred	preferred timer for v6; deprecate after
+  dhcp_lif_t.lif_name		name of logical interface
+  dhcp_smach_t.dsm_lif		controlling (main) LIF
+  dhcp_smach_t.dsm_leases	pointer to list of leases
+  dhcp_smach_t.dsm_lif_wait	number of LIFs waiting on DAD
+  dhcp_smach_t.dsm_lif_down	number of LIFs that have failed
+  dhcp_smach_t.dsm_using_dlpi	currently using DLPI flag
+  dhcp_smach_t.dsm_send_tcenter	v4 central timer value; v6 MRT
+  dhcp_lease_t.dl_next		linkage in per-state-machine list of leases
+  dhcp_lease_t.dl_prev		linkage in per-state-machine list of leases
+  dhcp_lease_t.dl_smach		back pointer to state machine
+  dhcp_lease_t.dl_lifs		pointer to first LIF configured by lease
+  dhcp_lease_t.dl_nlifs		number of configured consecutive LIFs
+  dhcp_lease_t.dl_hold_count	reference counter
+  dhcp_lease_t.dl_removed	removed from list flag
+  dhcp_lease_t.dl_stale		lease was not updated by Renew/Rebind
+
+
+Snoop
+
+  The snoop changes are fairly straightforward.  As snoop just decodes
+  the messages, and the message format is quite different between
+  DHCPv4 and DHCPv6, a new module will be created to handle DHCPv6
+  decoding, and will export a interpret_dhcpv6() function.
+
+  The one bit of commonality between the two protocols is the use of
+  ARP Hardware Type numbers, which are found in the underlying BOOTP
+  message format for DHCPv4 and in the DUID-LL and DUID-LLT
+  construction for DHCPv6.  To simplify this, the existing static
+  show_htype() function in snoop_dhcp.c will be renamed to arp_htype()
+  (to better reflect its functionality), updated with more modern
+  hardware types, moved to snoop_arp.c (where it belongs), and made a
+  public symbol within snoop.
+
+  While I'm there, I'll update snoop_arp.c so that when it prints an
+  ARP message in verbose mode, it uses arp_htype() to translate the
+  ar_hrd value.
+
+  The snoop updates also involve the addition of a new "dhcp6" keyword
+  for filtering.  As a part of this, CR 6487534 will be fixed.
+
+
+IPv6 Source Address Selection
+
+  One of the customer requests for DHCPv6 is to be able to predict the
+  address selection behavior in the presence of both stateful and
+  stateless addresses on the same network.
+
+  Solaris implements RFC 3484 address selection behavior.  In this
+  scheme, the first seven rules implement some basic preferences for
+  addresses, with Rule 8 being a deterministic tie breaker.
+
+  Rule 8 relies on a special function, CommonPrefixLen, defined in the
+  RFC, that compares leading bits of the address without regard to
+  configured prefix length.  As Rule 1 eliminates equal addresses,
+  this always picks a single address.
+
+  This rule, though, allows for additional checks:
+
+   Rule 8 may be superseded if the implementation has other means of
+   choosing among source addresses.  For example, if the implementation
+   somehow knows which source address will result in the "best"
+   communications performance.
+
+  We will thus split Rule 8 into three separate rules:
+
+  - First, compare on configured prefix.  The interface with the
+    longest configured prefix length that also matches the candidate
+    address will be preferred.
+
+  - Next, check the type of address.  Prefer statically configured
+    addresses above all others.  Next, those from DHCPv6.  Next,
+    stateless autoconfigured addresses.  Finally, temporary addresses.
+    (Note that Rule 7 will take care of temporary address preferences,
+    so that this rule doesn't actually need to look at them.)
+
+  - Finally, run the check-all-bits (CommonPrefixLen) tie breaker.
+
+  The result of this is that if there's a local address in the same
+  configured prefix, then we'll prefer that over other addresses.  If
+  there are multiple to choose from, then will pick static first, then
+  DHCPv6, then dynamic.  Finally, if there are still multiples, we'll
+  use the "closest" address, bitwise.
+
+  Also, this basic implementation scheme also addresses CR 6485164, so
+  a fix for that will be included with this project.
+
+
+Minor Improvements
+
+  Various small problems with the system encountered during
+  development will be fixed along with this project.  Some of these
+  are:
+
+  - List of ARPHRD_* types is a bit short; add some new ones.
+
+  - List of IPPORT_* values is similarly sparse; add others in use by
+    snoop.
+
+  - dhcpmsg.h lacks PRINTFLIKE for dhcpmsg(); add it.
+
+  - CR 6482163 causes excessive lint errors with libxnet; will fix.
+
+  - libdhcpagent uses gettimeofday() for I/O timing, and this can
+    drift on systems with NTP.  It should use a stable time source
+    (gethrtime()) instead, and should return better error values.
+
+  - Controlling debug mode in the daemon shouldn't require changing
+    the command line arguments or jumping through special hoops.  I've
+    added undocumented ".DEBUG_LEVEL=[0-3]" and ".VERBOSE=[01]"
+    features to /etc/default/dhcpagent.
+
+  - The various attributes of the IPC commands (requires privileges,
+    creates a new session, valid with BOOTP, immediate reply) should
+    be gathered together into one look-up table rather than scattered
+    as hard-coded tests.
+
+  - Remove the event unregistration from the command dispatch loop and
+    get rid of the ipc_action_pending() botch.  We'll get a
+    zero-length read any time the client goes away, and that will be
+    enough to trigger termination.  This fix removes async_pending()
+    and async_timeout() as well, and fixes CR 6487958 as a
+    side-effect.
+
+  - Throughout the dhcpagent code, there are private implementations
+    of doubly-linked and singly-linked lists for each data type.
+    These will all be removed and replaced with insque(3C) and
+    remque(3C).
+
+
+Testing
+
+  The implementation was tested using the TAHI test suite for DHCPv6
+  (www.tahi.org).  There are some peculiar aspects to this test suite,
+  and these issues directed some of the design.  In particular:
+
+  - If Renew/Rebind doesn't mention one of our leases, then we need to
+    allow the message to be retransmitted.  Real servers are unlikely
+    to do this.
+
+  - We must look for a status code within IAADDR and within IA_NA, and
+    handle the paradoxical case of "NoAddrAvail."  That doesn't make
+    sense, as a server with no addresses wouldn't use those options.
+    That option makes more sense at the top level of the message.
+
+  - If we get "UseMulticast" when we were already using multicast,
+    then ignore the error code.  Sending another request would cause a
+    loop.
+
+  - TAHI uses "NoBinding" at the top level of the message.  This
+    status code only makes sense within an IA, as it refers to the
+    GUID:IAID binding, which doesn't exist outside an IA.  We must
+    ignore such errors -- treat them as success.
+
+
+Interactions With Other Projects
+
+  Clearview UV (vanity naming) will cause link names, and thus IP
+  interface names, to become changeable over time.  This will break
+  the IAID stability mechanism if UV is used for arbitrary renaming,
+  rather than as just a DR enhancement.
+
+  When this portion of Clearview integrates, this part of the DHCPv6
+  design may need to be revisited.  (The solution will likely be
+  handled at some higher layer, such as within Network Automagic.)
+
+  Clearview is also contributing a new libdlpi that will work for
+  dhcpagent, and is thus removing the private dlpi_io.[ch] functions
+  from this daemon.  When that Clearview project integrates, the
+  DHCPv6 project will need to adjust to the new interfaces, and remove
+  or relocate the dlpi_to_arp() function.
+
+
+Futures
+
+  Zones currently cannot address any IP interfaces by way of DHCP.
+  This project will not fix that problem, but the DUID/IAID could be
+  used to help fix it in the future.
+
+  In particular, the DUID allows the client to obtain separate sets of
+  addresses and configuration parameters on a single interface, just
+  like an IPv4 Client ID, but it includes a clean mechanism for vendor
+  extensions.  If we associate the DUID with the zone identifier or
+  name through an extension, then we have a really simple way of
+  allocating per-zone addresses.
+
+  Moreover, RFC 4361 describes a handy way of using DHCPv6 DUID/IAID
+  values with IPv4 DHCP, which would quickly solve the problem of
+  using DHCP for IPv4 address assignment in non-global zones as well.
+
+  (One potential risk with this plan is that there may be server
+  implementations that either do not implement the RFC correctly or
+  otherwise mishandle the DUID.  This has apparently bitten some early
+  adopters.)
+
+  Implementing the FQDN option for DHCPv6 would, given the current
+  libdhcputil design, require a new 'type' of entry for the inittab6
+  file.  This is because the design does not allow for any simple
+  means to ``compose'' a sequence of basic types together.  Thus,
+  every type of option must either be a basic type, or an array of
+  multiple instances of the same basic type.
+
+  If we implement FQDN in the future, it may be useful to explore some
+  means of allowing a given option instance to be a sequence of basic
+  types.
+
+  This project does not make the DNS resolver or any other subsystem
+  use the data gathered by DHCPv6.  It just makes the data available
+  through dhcpinfo(1).  Future projects should modify those services
+  to use configuration data learned via DHCPv6.  (One of the reasons
+  this is not being done now is that Network Automagic [NWAM] will
+  likely be changing this area substantially in the very near future,
+  and thus the effort would be largely wasted.)
+
+
+Appendix A - Choice of Venue
+
+  There are three logical places to implement DHCPv6:
+
+    - in dhcpagent
+    - in in.ndpd
+    - in a new daemon (say, 'dhcp6agent')
+
+  We need to access parameters via dhcpinfo, and should provide the
+  same set of status and control features via ifconfig as are present
+  for IPv4.  (For the latter, if we fail to do that, it will likely
+  confuse users.  The expense for doing it is comparatively small, and
+  it will be useful for testing, even though it should not be needed
+  in normal operation.)
+
+  If we implement somewhere other than dhcpagent, then we need to give
+  that new daemon (in.ndpd or dhcp6agent) the same basic IPC features
+  as dhcpagent already has.  This means either extracting those bits
+  (async.c and ipc_action.c) into a shared library or just copying
+  them.  Obviously, the former would be preferred, but as those bits
+  depend on the rest of the dhcpagent infrastructure for timers and
+  state handling, this means that the new process would have to look a
+  lot like dhcpagent.
+
+  Implementing DHCPv6 as part of in.ndpd is attractive, as it
+  eliminates the confusion that the router discovery process for
+  determining interface netmasks can cause, along with the need to do
+  any signaling at all to bring DHCPv6 up.  However, the need to make
+  in.ndpd more like dhcpagent is unattractive.
+
+  Having a new dhcp6agent daemon seems to have little to recommend it,
+  other than leaving the existing dhcpagent code untouched.  If we do
+  that, then we end up with two implementations that do many similar
+  things, and must be maintained in parallel.
+
+  Thus, although it leads to some complexity in reworking the data
+  structures to fit both protocols, on balance the simplest solution
+  is to extend dhcpagent.
+
+
+Appendix B - Cross-Reference
+
+  in.ndpd
+
+    - Start dhcpagent and issue "dhcp start" command via libdhcpagent
+    - Parse StatefulAddrConf interface option from ndpd.conf
+    - Watch for M and O bits to trigger DHCPv6
+    - Handle "no routers found" case and start DHCPv6
+    - Track prefixes and set prefix length on IFF_DHCPRUNNING aliases
+    - Send new Router Solicitation when prefix unknown
+    - Change privileges so that dhcpagent can be launched successfully
+
+  libdhcputil
+
+    - Parse new /etc/dhcp/inittab6 file
+    - Handle new UNUMBER24, SNUMBER64, IPV6, DUID and DOMAIN types
+    - Add DHCPv6 option iterators (dhcpv6_find_option and
+      dhcpv6_pkt_option)
+    - Add dlpi_to_arp function (temporary)
+
+  libdhcpagent
+
+    - Add stable DUID and IAID creation and storage support
+      functions and add new dhcp_stable.h include file
+    - Support new DECLINING and RELEASING states introduced by DHCPv6.
+    - Update implementation so that it doesn't rely on gettimeofday()
+      for I/O timeouts
+    - Extend the hostconf functions to support DHCPv6, using a new
+      ".dh6" file
+
+  snoop
+
+    - Add support for DHCPv6 packet decoding (all types)
+    - Add "dhcp6" filter keyword
+    - Fix known bugs in DHCP filtering
+
+  ifconfig
+
+    - Remove inet-only restriction on "dhcp" keyword
+
+  netstat
+
+    - Remove strange "-I list" feature.
+    - Add support for DHCPv6 and iterating over IPv6 interfaces.
+
+  ip
+
+    - Add extensions to IPv6 source address selection to prefer DHCPv6
+      addresses when all else is equal
+    - Fix known bugs in source address selection (remaining from TX
+      integration)
+
+  other
+
+    - Add ifindex and source/destination address into PKT_LIST.
+    - Add more ARPHDR_* and IPPORT_* values.

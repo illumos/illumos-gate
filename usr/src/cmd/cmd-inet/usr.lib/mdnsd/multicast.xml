@@ -1,0 +1,155 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+
+-->
+
+<service_bundle type='manifest' name='SUNWdsdr:multicast'>
+
+<service
+	name='network/dns/multicast'
+	type='service'
+	version='1'>
+
+	<dependency
+		name='loopback'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependency name='net-physical'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/physical' />
+	</dependency>
+
+	<dependency
+	    name='identity'
+	    grouping='optional_all'
+	    restart_on='refresh'
+	    type='service'>
+		<service_fmri value='svc:/system/identity:node' />
+	</dependency>
+
+	<dependency
+	    name='system-log'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/system-log' />
+	</dependency>
+
+	<instance name='default' enabled='false' >
+
+		<exec_method
+		    type='method'
+		    name='start'
+		    exec='/usr/lib/inet/mdnsd'
+		    timeout_seconds='60'>
+		    <method_context>
+			    <method_credential user='root' group='root' />
+		    </method_context>
+		</exec_method>
+
+		<exec_method
+		    type='method'
+		    name='stop'
+		    exec=':kill'
+		    timeout_seconds='60' />
+
+		<!-- to start stop mdns service -->
+		<property_group name='general' type='framework'>
+			<propval name='action_authorization' type='astring' 
+				value='solaris.smf.manage.mdns' />
+			<propval name='value_authorization' type='astring' 
+				value='solaris.smf.manage.mdns' />
+		</property_group>
+
+		<!-- Properties in this group are used by nss_mdns module -->
+		<property_group name='nss_mdns_config' type='application'>
+			<stability value='Unstable' />
+
+			<!-- mDNS domain search property list. Users must
+			     explicitly add mDNS search option values and
+			     none are provided here by default.
+			     <property name='search' type='astring'>
+				<astring_list>
+					<value_node value='local'/>
+				</astring_list>
+			     </property>
+			-->
+			<property name='domain' type='astring'>
+				<astring_list>
+					<value_node value='local'/>
+					<value_node value='254.169.in-addr.arpa'/>
+					<value_node value='8.e.f.ip6.arpa'/>
+					<value_node value='9.e.f.ip6.arpa'/>
+					<value_node value='a.e.f.ip6.arpa'/>
+					<value_node value='b.e.f.ip6.arpa'/>
+				</astring_list>
+			</property>
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.mdns' />
+		</property_group>
+
+		<property_group name='firewall_context' type='com.sun,fw_definition'>
+			<propval name='name' type='astring' value='mdns' />
+		</property_group>
+
+		<property_group name='firewall_config' type='com.sun,fw_configuration'>
+			<propval name='policy' type='astring' value='use_global' />
+			<propval name='apply_to' type='astring' value='' />
+			<propval name='exceptions' type='astring' value='' />
+			<propval name='value_authorization' type='astring'
+			    value='solaris.smf.value.firewall.config' />
+		</property_group>
+	
+	</instance>
+
+        <stability value='Unstable' />
+
+	<template>
+
+	<common_name>
+		<loctext xml:lang='C'>DNS Service Discovery and Multicast DNS
+		</loctext>
+	</common_name>
+	<documentation>
+		<manpage title='mdnsd' section='1M' />
+		<doc_link name='Service Discovery OpenSolaris Project Page'
+		uri="http://opensolaris.org/os/project/nwam/service-discovery/"/>
+	</documentation>
+
+	</template>
+</service>
+
+</service_bundle>

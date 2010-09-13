@@ -1,0 +1,18 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Licensed under the Academic Free License version 2.1
+#
+
+prefix=/usr
+exec_prefix=${prefix}
+libdir=__LIBDIR__
+includedir=${prefix}/include
+
+Name: hal
+Description: Free desktop hardware abstraction layer
+Version: __VERSION__
+Requires: dbus-1
+Libs: -L${libdir} -lhal
+Cflags: -DDBUS_API_SUBJECT_TO_CHANGE -I${includedir}/hal

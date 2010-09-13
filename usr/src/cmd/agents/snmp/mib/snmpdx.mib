@@ -1,0 +1,542 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1997 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+--
+-- --------------------------------------------------------------------------
+-- snmpdx.mib
+--      MIB for the SNMP Master Agent included with Solstice Enterprise Agents
+--
+-- Release version = 1.0
+-- Patch level     = 0
+-- --------------------------------------------------------------------------
+--
+
+SUN-MASTER-AGENT-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+	enterprises
+		FROM RFC1155-SMI
+	OBJECT-TYPE, DisplayString
+		FROM RFC1212;
+  sun 	OBJECT IDENTIFIER ::= { enterprises 42 }
+  products OBJECT IDENTIFIER ::= { sun 2 }
+  sunMasterAgent 	OBJECT IDENTIFIER ::= { products 15 }
+
+
+--
+-- ********** Global Master agent Information ******
+--
+
+  sunMasterAgentStatusFile	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This file stores the process id's of all the sub agents
+		 that are invoked by the master agent.
+		 The purpose of this file is for Master Agent recovery in
+		 case the Master Agent dies or is killed. When the Master
+		 Agent restarts, the entries in this file will indicate
+		 which subagents are spawned by it previously and what
+		 were their port numbers." 
+	::= { sunMasterAgent 1 }
+
+  sunMasterAgentResourceConfigFile	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This file is exclusively used by the Master Agent.
+		 When the Master Agent comes up, it reads this file.
+		 This files stores information for all those agents
+		 that can be managed by the Master Agent. Each entry
+		 in the configuration file also includes the methods
+		 for invoking these subagents. It is also possible for
+		 a subagent not to have an entry in this configuration
+		 file. Such a subagent can dynamically come up and
+		 register with the Master Agent when it comes up."
+	::= { sunMasterAgent 2 }
+
+  sunMasterAgentConfigurationDir	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This is the directory that contains the configuration
+		 files for the Master Agent."
+	::= { sunMasterAgent 3 }
+
+  sunMasterAgentTrapPort	OBJECT-TYPE
+	SYNTAX	INTEGER 
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This is the port that master agent opens to receive SNMP trap
+		 notifications from various subagents. The master agent 
+		 forwards these traps to the managers appropriately."
+	::= { sunMasterAgent 4 }
+
+  sunCheckSubAgentName OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"This variable is of use to the sub agents only. It is
+		 used by the sub agents to check with the master agent
+		 to  check for duplicate sub agent names."
+	::= { sunMasterAgent 5 }
+
+  sunMasterAgentPollInterval OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This variable speicifies the time interval after which
+		 the Master Agent will perform activities other than
+		 receiving/sending of SNMP messages. The other activities
+		 include trying to find out if there is a change in the
+		 resource file, discover if all the agents are responding,
+		 and other such routine house keeping activities.
+ 		 This field contains values in seconds."
+	::= { sunMasterAgent 6 }
+
+  sunMasterAgentMaxAgentTimeOut OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The value of this field can be specified in microseconds.
+		 This field signifies the max allowed time-out a subagent
+		 can request during registration; e.g., when the Master
+		 Agent sends a request to a subagent. It waits for some
+		 time-out to receive the response. This time-out can be
+		 specified in the registration file or can also be set
+		 using dynamic registration. If an agent sets this time-out
+		 outrageously high, it can create problems for the
+		 Master Agent and other agents. To avoid such a problem,
+		 the Master Agent can have a policy of specifying a
+		 maximum value for which the Master Agent will wait for
+		 a response from the subagent. This maximum value of
+		 time-out is specified with this variable."
+	::= { sunMasterAgent 7 }
+
+--
+-- *********** agentTable **************
+--
+  sunSubAgentTable	OBJECT-TYPE
+	SYNTAX	SEQUENCE OF SunSubAgentEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"This table lists all the sub-agents that are registered
+		 with the master agent. The list contains the names of all
+		 the sub agents that are currently running on the system.
+		 Some of these sub agents could be invoked by the master
+		 agent and other's could have benn invoked by other means."
+	::= { sunMasterAgent 8 }
+
+  sunSubAgentTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in sunSubAgentTable."
+	::= { sunMasterAgent 9 }
+
+--
+-- ************** agentEntry(Table Entry) ************
+--
+  sunSubAgentEntry 	OBJECT-TYPE
+	SYNTAX	SunSubAgentEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION	
+		"An entry in the sub-agent table."
+	INDEX { sunSubAgentID }
+	::= { sunSubAgentTable 1}
+
+  SunSubAgentEntry ::=
+	SEQUENCE {
+		sunSubAgentID
+			INTEGER,
+		sunSubAgentStatus
+			INTEGER,
+		sunSubAgentTimeout
+			INTEGER,
+		sunSubAgentPortNumber
+			INTEGER,
+		sunSubAgentRegistrationFile
+			DisplayString,
+		sunSubAgentAccessControlFile
+			DisplayString,
+		sunSubAgentExecutable
+			DisplayString,
+		sunSubAgentVersionNum
+			DisplayString,
+		sunSubAgentProcessID
+			INTEGER,
+		sunSubAgentName
+			DisplayString,
+  		sunSubAgentSystemUpTime
+			TimeTicks,
+		sunSubAgentWatchDogTime
+			INTEGER
+	}
+
+
+  sunSubAgentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"This is the id for each sub agent that is running and
+		 registered with the master agent."
+	::= { sunSubAgentEntry 1 }
+
+  sunSubAgentStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { init(1), load(2), active(3), inactive(4), destroy(5) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"This variable provides the state of the sub-agent. When the
+		 sub-agent is started the state is 'init'. Once the sub-agent
+		 has read it's configuration files, but has not registered
+		 with the master , the state is 'load'. After the 'load'
+		 state the  sub-agent goes into 'active' state. In this state
+		 the sub-agent has registered with the master agent and
+		 would respond to any requests from the master agent and can
+		 also generate traps."
+	::= { sunSubAgentEntry 2 }
+
+  sunSubAgentTimeout 	OBJECT-TYPE
+	SYNTAX	INTEGER 
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The max. time for which the master agent would wait
+		 for a  sub-agent to complete the request. The value is
+		 specified in usec. "
+	::= { sunSubAgentEntry 3 }
+
+  sunSubAgentPortNumber 	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The port number of the sub-agent on which it listens for
+		 requests from the master agent."
+	::= { sunSubAgentEntry 4 }
+
+  sunSubAgentRegistrationFile 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"This is the registration file of a sub-agent. Each sub-agent
+		 has its own registration file. This file contains information
+		 pertinent to each agent. The information includes the name
+		 of the agent, the subtree OIDs managed by the respective
+		 agent, request time out, the preferred port number, etc."
+	::= { sunSubAgentEntry 5 }
+
+  sunSubAgentAccessControlFile 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"This is a file that has the access control information
+		 for each sub agent. It stores SNMP-related community
+		 information. Every subagent and a Master Agent can have
+		 its own access control file."
+	::= { sunSubAgentEntry 6 }
+
+  sunSubAgentExecutable 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The executable file of the sub-agent."
+	::= { sunSubAgentEntry 7 }
+  
+  sunSubAgentVersionNum 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The version number  of the sub-agent."
+	::= { sunSubAgentEntry 8 }
+
+  sunSubAgentProcessID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The process id of the sub-agent."
+	::= { sunSubAgentEntry 9 }
+
+  sunSubAgentName 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The name of the sub-agent. This is assigned by the user."
+	::= { sunSubAgentEntry 10 }
+
+  sunSubAgentSystemUpTime 	OBJECT-TYPE
+	SYNTAX	TimeTicks
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The system up time of the sub-agent."
+	::= { sunSubAgentEntry 11 }
+
+  sunSubAgentWatchDogTime 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"This timeout is used by the Master Agent to determine
+		 if the subagent is up or not. The Master Agent will poll
+		 the subagent only if there has been no activity between
+		 the Master Agent and the subagent for this specified
+		 interval. This interval is specified in seconds."
+	::= { sunSubAgentEntry 12 }
+
+
+
+--
+-- ********** SubTreeConfigurationTable ****************
+--
+  sunSubTreeConfigurationTable        OBJECT-TYPE
+        SYNTAX SEQUENCE OF SunSubTreeConfigurationEntry
+        ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION
+                "This is the table of subtree registration requests made
+		 by the sub agents. The enteries in this table also include
+		 the sub tree OID's of those agents that are invkoed by
+		 the master agent. This table thus consists of enteries
+		 as configured in the sub agent registration files. These
+		 sub tree OID's are flattened into a OID sub tree dispatch
+		 table in the master agent which is also defined in this MIB."
+        ::= { sunMasterAgent 10 }
+
+  sunSubTreeConfigurationTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in sunSubTreeConfigurationTable."
+	::= { sunMasterAgent 11 }
+
+--
+-- ************** RegTreeEntry(Table Entry) ************
+--
+  sunSubTreeConfigurationEntry        OBJECT-TYPE
+        SYNTAX SunSubTreeConfigurationEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                "An entry for table registration."
+        INDEX { sunSubTreeAgentID, sunSubTreeIndex }
+        ::= { sunSubTreeConfigurationTable 1 }
+
+  SunSubTreeConfigurationEntry ::=
+        SEQUENCE {
+		sunSubTreeIndex
+			INTEGER,
+		sunSubTreeAgentID
+			INTEGER,
+		sunSubTreeOID
+			OBJECT IDENTIFIER,
+		sunSubTreeStartColumn
+			INTEGER,
+		sunSubTreeEndColumn
+			INTEGER,
+		sunSubTreeStartRow
+			INTEGER,
+		sunSubTreeEndRow
+			INTEGER,
+--		sunSubTreeView
+--			DisplayString,
+		sunSubTreeStatus
+			INTEGER
+	}
+
+  sunSubTreeIndex 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The index of the table registration."
+	::= { sunSubTreeConfigurationEntry 1 }
+
+  sunSubTreeAgentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"ID of the sub-agent."
+	::= { sunSubTreeConfigurationEntry  2 }
+
+  sunSubTreeOID 	OBJECT-TYPE
+	SYNTAX	OBJECT IDENTIFIER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The oid of the subtree table that is being registered. A
+		 sub agent can have multiple sub tree oid's registered
+		 as seperate enteries."
+	::= { sunSubTreeConfigurationEntry 3 }
+
+  sunSubTreeStartColumn 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Starting column of the sub table."
+	::= { sunSubTreeConfigurationEntry  4 }
+
+  sunSubTreeEndColumn 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Ending column of the sub table."
+	::= { sunSubTreeConfigurationEntry  5 }
+
+  sunSubTreeStartRow 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Starting row of the sub table."
+	::= { sunSubTreeConfigurationEntry  6 }
+
+  sunSubTreeEndRow 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Ending row of the sub table."
+	::= { sunSubTreeConfigurationEntry  7 }
+
+
+  sunSubTreeStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The variable allows to activate or delete the enteries
+		 in this table."
+	::= { sunSubTreeConfigurationEntry 8 }
+
+--
+-- ********** RegTreeTable ****************
+--
+  sunSubTreeDispatchTable        OBJECT-TYPE
+        SYNTAX SEQUENCE OF SunSubTreeDispatchEntry
+        ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION
+                "This table lists all the OID enteries that are
+		 used by the master agent to dispatch the requests to the
+		 sub agents. This table is based on the sub-tree
+		 registration configured in the sub agents registration
+		 files."
+        ::= { sunMasterAgent 12 }
+
+  sunSubTreeDispatchTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in sunSubTreeDispatchTable."
+	::= { sunMasterAgent 13 }
+
+
+--
+-- ************** Dispatch Table ************
+--
+  sunSubTreeDispatchEntry        OBJECT-TYPE
+        SYNTAX SunSubTreeDispatchEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                "An entry for tree registration."
+        INDEX { sunSubTreeDispatchAgentID, sunSubTreeDispatchIndex }
+        ::= { sunSubTreeDispatchTable 1 }
+
+  SunSubTreeDispatchEntry ::=
+        SEQUENCE {
+		sunSubTreeDispatchIndex
+			INTEGER,
+		sunSubTreeDispatchAgentID
+			INTEGER,
+		sunSubTreeDispatchOID
+			OBJECT IDENTIFIER,
+		sunSubTreeDispatchStatus
+			INTEGER
+	}
+
+
+  sunSubTreeDispatchIndex 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The index of the dispatch table entry."
+	::= { sunSubTreeDispatchEntry 1 }
+
+  sunSubTreeDispatchAgentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		""
+	::= { sunSubTreeDispatchEntry  2 }
+
+  sunSubTreeDispatchOID 	OBJECT-TYPE
+	SYNTAX	OBJECT IDENTIFIER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The oid of the subtree."
+	::= { sunSubTreeDispatchEntry 3 }
+
+
+  sunSubTreeDispatchStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The variable allows to activate or delete the enteries
+		 in this table."
+	::= { sunSubTreeDispatchEntry 4 }
+
+
+END

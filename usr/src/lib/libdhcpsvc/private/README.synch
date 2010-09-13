@@ -1,0 +1,176 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+DHCP Service Library Synchronization
+Peter Memishian, Solaris Software, meem@east.sun.com
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+Introduction
+============
+
+When writing DHCP service libraries (i.e., public modules) that provide
+access to locally-backed datastores (i.e., have their backing datastore on
+the same machine that the module is running on), it can be difficult for
+the module author to synchronize access to the underlying datastore between
+multiple processes, multiple threads within a single process, multiple
+threads within multiple processes, and multiple threads within multiple
+processes on multiple machines.
+
+The goal of DHCP Service Library Synchronization is to simplify the design
+of modules using locally-backed datastores by pushing these issues up into
+the DHCP service library framework: by designing your module to use this
+framework, your code becomes simpler and your design cleaner.
+
+What does DHCP Service Library Synchronization do for me?
+=========================================================
+
+It synchronizes access to several of the DHCP Service Library public-layer
+functions; the particular synchronization guarantees vary depending on the
+underlying function being called:
+
+	add_d?()	per-container exclusive-perimeter
+	delete_d?()	per-container exclusive-perimeter
+	modify_d?()	per-container exclusive-perimeter
+	lookup_d?()	per-container shared-perimeter
+	all others	no synchronization provided
+
+The term `per-container exclusive perimeter' access means that only one
+thread may be inside the per-container "perimeter" at a time; that means
+that if one thread is inside add_dn() for a given container, no other thread
+may be inside add_dn() (or delete_dn(), modify_dn(), and lookup_dn() for
+that same container).  However, other threads may be within routines that
+provide no synchronization guarantees such as close_dn().
+
+The term `per-container shared perimeter' access means that multiple threads
+may be inside the perimeter, as long as they are all in routines which have
+either no synchronization guarantees or also have `per-container shared
+perimeter' access.  For instance, multiple threads may be within lookup_dt()
+concurrently, but another thread may not be in add_dt() at the same time.
+
+Note that the preceding discussion assumes that all the threads being
+serialized are all running on the same machine.  However, there's also an
+optional facility which provides synchronization across multiple threads on
+multiple machines as well; see the discussion on cross-host synchronization
+below.
+
+How do I write my module to use DHCP Service Library Synchronization?
+=====================================================================
+
+Write your module just as you normally would.  Of course, when writing your
+code, you get to take advantage of the synchronization guarantees this
+architecture makes for you.
+
+When you're done writing your module, then add the following to one of your
+C source files:
+
+  /*
+   * This symbol and its value tell the private layer that it must provide
+   * synchronization guarantees via dsvclockd(1M) before calling our *_dn()
+   * and *_dt() methods.  Please see $SRC/lib/libdhcpsvc/private/README.synch
+   */
+  int dsvc_synchtype = DSVC_SYNCH_DSVCD;
+
+Next, note that if you want to use cross-host synchronization, you'll need
+to bitwise-or in the DSVC_SYNCH_CROSSHOST flag as well -- however, please
+read the discussion below regarding cross-host synchronization first!
+
+The private layer synchronizes access to similarly named containers; that
+is, all requests for a given (location, container_name, container_version,
+datastore) tuple are synchronized with respect to one another.  One
+implication of this approach is that there must not be two tuples which
+identify the same container -- for instance, (/var/dhcp, dhcptab, 1,
+SUNWfiles) and (/var/dhcp/, dhcptab, 1, SUNWfiles) name the same container
+but are distinct tuples and thus would not be synchronized with respect to
+one another!
+
+To address this issue, the `location' field given in the above tuple is
+required to have the property that no two location names map to the same
+location.  Public modules whose `location' field does not meet this
+constraint must implement a mkloctoken() method, prototyped below, which
+maps a location into a token which does meet the constraints.  In the above
+scenario, mkloctoken() would use realpath(3C) to perform the mapping.
+
+	int mkloctoken(const char *location, char *token, size_t tokensize);
+
+The location to map is passed in as `location', which must be mapped into an
+ASCII `token' of `tokensize' bytes or less.  The function should return
+DSVC_SUCCESS or a DSVC_* error code describing the problem on failure.  Note
+that modules which do not use synchronization or already have location names
+which meet the constraints need not provide mkloctoken().
+
+Cross-host Synchronization
+==========================
+
+Datastores wishing to make use of cross-host synchronization have an
+additional constraint: the `location' must be the name of a directory which
+is shared and accessible by all hosts which are accessing the datastore.
+This constraint is because the code is uses NFS-based file locking to
+perform the synchronization.  While this is a severe limitation, only
+SUNWfiles currently uses this feature, and even that is only for backward
+compatibility.  We discourage use of this feature in future datastore
+implementations.
+
+How does it work?
+=================
+
+It is helpful but not necessary to understand how this architecture works.
+Furthermore, the internal details are still evolving; if you rely on any
+details here, the only guarantee is that your code will break someday.
+
+The easiest way to explain the architecture is by example; thus, assume you
+have a module `mymod' that you want to use with DHCP Service Library
+Synchronization.  Then, for each method specified in the DHCP Server
+Performance Project specification, the following happens:
+
+	1. The private layer is called with the specified method
+	   (as specified in the DHCP Server Performance Project spec)
+
+	2. The private layer locates the underlying public module
+	   to invoke, given the settings in /etc/inet/dhcpsvc.conf.
+	   (as specified in the DHCP Server Performance Project spec)
+
+	3. The private layer detects that this module is one that
+	   requires use of DHCP Service Library Synchronization (by
+	   checking the value of the module's dsvc_synchtype symbol).
+
+	4. If this method is one for which synchronization guarantees
+	   are provided, the private layer sends a "lock" request
+	   across a door to the DHCP service door server daemon (also
+	   known as the lock manager), dsvclockd.
+
+	5. The dsvclockd daemon receives the lock request and attempts
+	   to lock a given container for either exclusive or shared
+	   access (depending on the request).  If the lock request was
+	   "nonblocking" and the lock cannot be immediately acquired,
+	   a DSVC_BUSY error is returned.  Otherwise, the daemon waits
+	   until it acquires the lock and sends a DSVC_SUCCESS reply
+	   back.
+
+	6. Assuming the lock could be obtained (if it was necessary;
+	   see step 4), the private layer locates the appropriate
+	   method in `ds_mymod.so' module, and calls it.
+
+	7. Once the method has completed (successfully or otherwise),
+	   if this was a method which required a "lock" request, the
+	   private layer sends an "unlock" request to the dsvclockd.
+
+        8. The private layer returns the reply to the caller.

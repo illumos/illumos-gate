@@ -1,0 +1,243 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	endzoneent;
+	getzoneent;
+	getzoneent_private;
+	putzoneent;
+	setzoneent;
+	zonecfg_access;
+	zonecfg_add_attr;
+	zonecfg_add_dev;
+	zonecfg_add_ds;
+	zonecfg_add_filesystem;
+	zonecfg_add_fs_option;
+	zonecfg_add_admin;
+	zonecfg_add_nwif;
+	zonecfg_add_patch;
+	zonecfg_add_patch_obs;
+	zonecfg_add_pkg;
+	zonecfg_add_pset;
+	zonecfg_add_rctl;
+	zonecfg_add_rctl_value;
+	zonecfg_add_scratch;
+	zonecfg_aliased_rctl_ok;
+	zonecfg_apply_rctls;
+	zonecfg_attach_manifest;
+	zonecfg_authorize_users;
+	zonecfg_bind_pool;
+	zonecfg_bind_tmp_pool;
+	zonecfg_call_zoneadmd;
+	zonecfg_check_handle;
+	zonecfg_close_scratch;
+	zonecfg_construct_rctlblk;
+	zonecfg_create_snapshot;
+	zonecfg_deauthorize_user;
+	zonecfg_deauthorize_users;
+	zonecfg_default_brand;
+	zonecfg_default_privset;
+	zonecfg_delete_admin;
+	zonecfg_delete_admins;
+	zonecfg_delete_attr;
+	zonecfg_delete_dev;
+	zonecfg_delete_ds;
+	zonecfg_delete_filesystem;
+	zonecfg_delete_mcap;
+	zonecfg_delete_nwif;
+	zonecfg_delete_pset;
+	zonecfg_delete_rctl;
+	zonecfg_delete_scratch;
+	zonecfg_del_all_resources;
+	zonecfg_destroy;
+	zonecfg_destroy_snapshot;
+	zonecfg_destroy_tmp_pool;
+	zonecfg_detached;
+	zonecfg_detach_save;
+	zonecfg_devperms_apply;
+	zonecfg_dev_manifest;
+	zonecfg_enable_rcapd;
+	zonecfg_endadminent;
+	zonecfg_endattrent;
+	zonecfg_enddevent;
+	zonecfg_enddevperment;
+	zonecfg_enddsent;
+	zonecfg_endfsent;
+	zonecfg_endnwifent;
+	zonecfg_endrctlent;
+	zonecfg_find_mounts;
+	zonecfg_find_scratch;
+	zonecfg_fini_handle;
+	zonecfg_free_fs_option_list;
+	zonecfg_free_rctl_value_list;
+	zonecfg_get_aliased_rctl;
+	zonecfg_get_attach_handle;
+	zonecfg_get_attr_boolean;
+	zonecfg_getadminent;
+	zonecfg_getattrent;
+	zonecfg_get_attr_int;
+	zonecfg_get_attr_string;
+	zonecfg_get_attr_uint;
+	zonecfg_get_autoboot;
+	zonecfg_get_bootargs;
+	zonecfg_get_brand;
+	zonecfg_get_dflt_sched_class;
+	zonecfg_getdevent;
+	zonecfg_getdevperment;
+	zonecfg_getdsent;
+	zonecfg_getfsent;
+	zonecfg_get_fs_allowed;
+	zonecfg_get_handle;
+	zonecfg_get_hostid;
+	zonecfg_get_iptype;
+	zonecfg_get_limitpriv;
+	zonecfg_getmcapent;
+	zonecfg_get_name;
+	zonecfg_get_name_by_uuid;
+	zonecfg_getnwifent;
+	zonecfg_getpkgdata;
+	zonecfg_get_pool;
+	zonecfg_get_poolname;
+	zonecfg_get_privset;
+	zonecfg_getpsetent;
+	zonecfg_getrctlent;
+	zonecfg_get_root;
+	zonecfg_get_sched_class;
+	zonecfg_get_scratch;
+	zonecfg_get_snapshot_handle;
+	zonecfg_get_template_handle;
+	zonecfg_get_uuid;
+	zonecfg_get_xml_handle;
+	zonecfg_get_zonepath;
+	zonecfg_grab_lock_file;
+	zonecfg_ifname_exists;
+	zonecfg_in_alt_root;
+	zonecfg_insert_userauths;
+	zonecfg_init_handle;
+	zonecfg_init_lock_file;
+	zonecfg_is_rctl;
+	zonecfg_is_scratch;
+	zonecfg_lock_file_held;
+	zonecfg_lock_scratch;
+	zonecfg_lookup_admin;
+	zonecfg_lookup_attr;
+	zonecfg_lookup_dev;
+	zonecfg_lookup_ds;
+	zonecfg_lookup_filesystem;
+	zonecfg_lookup_mcap;
+	zonecfg_lookup_nwif;
+	zonecfg_lookup_pset;
+	zonecfg_lookup_rctl;
+	zonecfg_modify_admin;
+	zonecfg_modify_attr;
+	zonecfg_modify_dev;
+	zonecfg_modify_ds;
+	zonecfg_modify_filesystem;
+	zonecfg_modify_mcap;
+	zonecfg_modify_nwif;
+	zonecfg_modify_pset;
+	zonecfg_modify_rctl;
+	zonecfg_notify_bind;
+	zonecfg_notify_critical_abort;
+	zonecfg_notify_critical_enter;
+	zonecfg_notify_critical_exit;
+	zonecfg_notify_unbind;
+	zonecfg_num_resources;
+	zonecfg_open_scratch;
+	zonecfg_ping_zoneadmd;
+	zonecfg_release_lock_file;
+	zonecfg_remove_fs_option;
+	zonecfg_remove_rctl_value;
+	zonecfg_remove_userauths;
+	zonecfg_reverse_scratch;
+	zonecfg_rm_aliased_rctl;
+	zonecfg_rm_detached;
+	zonecfg_same_net_address;
+	zonecfg_save;
+	zonecfg_setadminent;
+	zonecfg_setattrent;
+	zonecfg_set_aliased_rctl;
+	zonecfg_set_autoboot;
+	zonecfg_set_bootargs;
+	zonecfg_set_brand;
+	zonecfg_setdevent;
+	zonecfg_setdevperment;
+	zonecfg_setdsent;
+	zonecfg_setfsent;
+	zonecfg_set_fs_allowed;
+	zonecfg_set_hostid;
+	zonecfg_set_iptype;
+	zonecfg_set_limitpriv;
+	zonecfg_set_name;
+	zonecfg_setnwifent;
+	zonecfg_set_pool;
+	zonecfg_setrctlent;
+	zonecfg_set_root;
+	zonecfg_set_sched;
+	zonecfg_set_swinv;
+	zonecfg_set_zonepath;
+	zonecfg_strerror;
+	zonecfg_str_to_bytes;
+	zonecfg_update_userauths;
+	zonecfg_validate_zonename;
+	zonecfg_valid_auths;
+	zonecfg_valid_alias_limit;
+	zonecfg_valid_fs_type;
+	zonecfg_valid_importance;
+	zonecfg_valid_memlimit;
+	zonecfg_valid_ncpus;
+	zonecfg_valid_net_address;
+	zonecfg_valid_rctl;
+	zonecfg_valid_rctlblk;
+	zonecfg_valid_rctlname;
+	zonecfg_verify_save;
+	zonecfg_warn_poold;
+	zone_get_brand;
+	zone_get_devroot;
+	zone_get_id;
+	zone_get_rootpath;
+	zone_get_state;
+	zone_get_zonepath;
+	zone_set_state;
+	zone_state_str;
+    local:
+	*;
+};

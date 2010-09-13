@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2000, 2008, Oracle and/or its affiliates. All rights reserved.
+#
+
+TYPEMAP
+	projid_t	T_IV
+	const char *	T_PV
+	uint_t		T_UV
+
+INPUT
+
+OUTPUT
+

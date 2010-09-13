@@ -1,0 +1,65 @@
+\
+\ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+
+\
+\ offsets.in: input file to produce assym.h using the ctfstabs program
+\
+
+#include "libc_int.h"
+#include "thr_uberdata.h"
+#include <setjmp.h>
+
+TLS_index
+	ti_moduleid
+	ti_tlsoffset
+
+tls_t		SIZEOF_TLS_T
+	tls_data
+	tls_size
+
+\#define	UL_TLSENT	UL_TLS+TLS_DATA
+\#define	UL_NTLSENT	UL_TLS+TLS_SIZE
+
+ulwp_t
+	ul_tls
+	ul_ustack
+	ul_vfork
+	ul_schedctl
+	ul_schedctl_called
+	ul_siglink
+	ul_sigmask
+
+stack_t
+	ss_sp
+	ss_size
+
+\#define	UC_MCONTEXT_GREGS	UC_MCONTEXT+GREGS
+
+ucontext_t	SIZEOF_UCONTEXT_T
+	uc_mcontext
+
+mcontext_t
+	gregs
+
+sigjmp_buf	SIZEOF_SIGJMP_BUF

@@ -1,0 +1,19 @@
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Licensed under the Academic Free License version 2.1
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libpolkit
+Description: library for querying and setting system-wide policy
+Version: __VERSION__
+Requires: glib-2.0
+Libs: -L${libdir} -lpolkit
+Cflags: -I${includedir}/libpolkit

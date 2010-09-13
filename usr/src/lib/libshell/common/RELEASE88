@@ -1,0 +1,422 @@
+This is a list of changes that have been made since the 11/16/88 version
+of ksh.
+
+1.  New features in 12/28/93
+    a.	Associative arrays.  The new version of ksh supports both
+        associate arrays and the older indexed arrays with the same
+	array syntax.  A new -A option of typeset is used to declare
+	an array to be associative.  As with indexed arrays, $name is
+	equivalent to ${name[0]}.  The prefix operator ! was added
+	to the parameter expansion syntax to expand to the list of
+	indices.  For example, ${!name[@]} expands to the list of array
+	indices for variable name.
+
+    b.	Several additions have been made to shell arithmetic:
+	1.  The shell now performs floating point arithmetic.  The
+	    typeset options -F and -E have been added for floating
+	    point and scientific notation respectively.
+	2.  The prefix and postfix ++ and -- operators.
+	3.  The comma and ?: operators.
+	4.  The math library functions.
+	5.  An arithmetic for statement of the form
+		for ((expr1; expr2; expr3))
+		do	...
+		done
+	6.  Integer arithmetic extended up to base 64.
+
+    c.  Some additions to the macro expansion syntax have been made
+	to specify substrings and sub-arrays:
+	1.  ${name:expr} expands to the substring of ${name} starting at
+	    the character position defined by arithmetic expression expr.
+	2.  ${name:expr1:expr2} expands to the substring of ${name} starting
+	    at expr1 and consisting of at most expr2 characters.
+	3.  ${name[@]:expr} expands to the values of ${name[@]} starting at
+	    the element defined by arithmetic expression expr.
+	4.  ${name[@]:expr1:expr2} expands to at most expr2 values of
+	    ${name} starting at expr1.
+	5.  ${@:expr} expands the positional parameters starting at expr.
+	6.  ${@:expr1:expr2} expands to at most expr2 positional parameters
+	    starting at expr1.
+	7.  ${!name} expands to the name of the variable named by name.
+	    It will expand to name unless name is reference variable.
+	8.  ${!name[sub]} expands to the name of the subscript of the
+	    given variable.  If sub is @ or * the list of subscripts
+	    is generated.
+	9.  ${!prefix*} and ${!prefix@} expand to the list of variable
+	    names beginning with prefix.
+	10. The substring operators, # and % can be now be applied
+	    with aggregates (@ or *) and are applied to each.
+	11. ${name/pattern/string} expands to the value of name with
+	    the first occurrence of pattern replaced by string.
+	    With aggregates (@ or *) this operation is applied to each.
+	12. ${name/#pattern/string} Same as above but the pattern
+	    to be replaced must match at the beginning.
+	13. ${name/%pattern/string} Same as above but the pattern
+	    to be replaced must match at the end.
+	14. ${name//pattern/string} expands to the value of name with
+	    the each occurrence of pattern replaced by string.
+	    With aggregates (@ or *) this operation is applied to each.
+
+    d.  The name space for variables has been extended.  The character '.'
+	can be used at the beginning of a name, and to separate identifiers
+	within a name.  However, to create a name of the form, foo.bar,
+	the variable foo must exist. The namespace starting with .sh
+	is reserved for shell implementation variables.  Exported
+	variable cannot contain a '.'.
+
+    e.  Compound assignments.  The assignment syntax, varname=value,
+	has been extended to allow assignments of the form
+	varname=(assignment_list).  As elsewhere in the shell
+	spaces or tabs are optional around the parentheses, and
+	no space is permitted between the varname and the =.  The
+	assignment_list can be one of the following:
+	1.  A list of words.  In this case each word is expanded as
+	    in a for list and the resulting items become elements
+	    of the indexed array varname. 
+	2.  A list of subscript assignments in the form
+	    [subscript]=value.  In this, these elements become 
+	    elements of the associative array varname. 
+	3.  A list of assignments; simple or compound.  In this
+	    case, each assignment is made to varname.name, where
+	    name is the name of the enclosed assignment.
+	4.  Assignments in the form of readonly or typeset
+	    statements.  In this case each assignment is made as
+	    in 3 above, and the attributes are given to the
+	    corresponding variable.
+	In case 3 and 4 above, the value of "$varname" after
+	the above assignment is (assignment_list), where the
+	assignment_list produced would reproduce all of the
+	variables under varname.*.
+
+    f.  Function names of the form variable.action (called discipline
+	functions) can be defined where variable is any valid variable
+	name and action is get, set, or unset.  The function variable.get
+	is invoked each time the variable is referenced.  The set
+	discipline is invoked each time the variable is assigned to.
+	The unset discipline is invoked when a variable is unset.
+	The new variables .sh.name, .sh.subscript, and .sh.value are
+	defined inside the function body.  Other shell extensions
+	may have their own set of discipline functions.
+
+    g.	The compound command !, which negates the return value of the
+	following pipeline, has been added.
+
+    h.	On systems that support dynamic loading with dlopen(), it is
+	now possible to add built-in commands at runtime with the
+	a builtin command named builtin. 
+
+    i.	The following builtins have been added:
+	1.  command name [ ... ]
+	2.  sleep [decimal-seconds]
+	3.  builtin [-ds] [-f file] [name...]
+	4.  getconf name [pathname]
+	5.  disown [job...]
+
+    j.	An addition format for literal strings, $'....' can
+	be used where ever literal strings are valid.  The string
+	inside the single quotes will be converted using the ANSI-C
+	escape conventions.  Additionally, the escape sequence \E
+	expands to the escape character (default \033) whenever ANSI-C
+	escape sequences are recognized.
+
+    k.  A typeset -n option has been added which causes the value of a
+	variable to be treated as a reference to another variable so that
+	variables can be indirectly named.  For example, if $1 contains
+	the name of a variable, then typeset -n foo=$1 causes the variable
+	foo to be synonymous with the variable whose name is $1.  A builtin
+	alias, nameref='typeset -n' has been added to aid mnemonics.
+	Reference names cannot contain a '.'.  Whenever that portion of
+	a variable up to the first '.' matches a reference name, the
+	reference value is substituted.  For example, with nameref foo=.top,
+	then ${foo.bar} is equivalent to ${.top.bar}.  When used as the
+	index of a for or select loop, each assignment causes a
+	new name reference to occur.
+	
+    l.	The KEYBD trap has been added which is triggered when a key
+	or escape sequence is typed while reading from the keyboard
+	in an edit mode.  This, combined with some new variables
+	makes it possible to program your key bindings in ksh.
+
+    m.	New variables have been added:
+	1.  FIGNORE defines a set of file names to be ignored in each
+	    directory when performing pathname expansion, replacing
+	    the rule that requires that a leading . be matched explicitly.
+	2.  Variable sh.edchar contains the value of the keyboard character
+	    that has been entered when processing a KEYBD trap.  If the value
+	    is changed as part of the trap action, then the new value replaces
+	    the key or keys that caused the trap.
+	3.  Variable sh.edcol is set to the character position of the cursor
+	    within the input buffer during a KEYBD trap.
+	4.  Variable sh.edmode is set to the escape character when in vi
+	    insert mode.
+	5.  Variable sh.edtext is set to the contents of the input buffer
+	    during a KEYBD trap.
+	6.  HISTEDIT is checked before FCEDIT.  FCEDIT is obsolete.
+	7.  HISTCMD is the number of the current command in the history
+	    file.
+	8.  Variable .sh.version is set to the version string for
+	    this shell.
+	9.  Variable .sh.name is set to the name of the variable
+	    that that was referenced or assigned to when executing a get
+	    or set discipline function.
+	10. Variable .sh.subscript is set to the subscript for the variable
+	    that was referenced or assign to when executing a get or
+	    set discipline function.
+	11. Variable .sh.value is set to the new value for the variable
+	    that was assigned to when executing the set discipline function.
+
+    n.	New invocation and set -o options have been added:
+	1.  set -o notify (or set -b) causes background completion messages
+	    to be displayed as soon as the job completes.
+	2.  There is a compile time option named KIA which enables
+	    creation of a relational database for commands, variables
+	    and functions defined and referenced by a script.  The
+	    option -I <filename>, causes the database to be generated
+	    in <filename>.  The database format can be queried via
+	    the cql command.
+    o.	ksh93 can read and evaluate pre-compiled scripts generated by
+	a separate program called shcomp.
+    p.  More work on internationalization has been added:
+	1.  The decimal point character is processed per locale
+	2.  A $  can be placed in front of each string to indicate
+	    that the string needs translation but is otherwise ignored.
+	    This means that if a message catalog of all $"..." strings
+	    is generated, then a program such as print $"hello world"
+	    could display "bonjour monde" in the french locale.
+    q.	Backreferences have been added to pattern matching.  The sequence
+	\d, where d is a digit from 1-9, matches the same string as
+	the d-th previous parenthesis group.  Backreferences
+	can be used within patterns, and within replacement strings
+	with any of the ${name/...} operators.
+
+2.  Changes made in 12/28/93
+    a.	The output format of many commands has changed as follows:
+	1.  System error messages are displayed whenever a failure
+	    is caused by a system call.
+	2.  The exit status has changed in many cases:
+	    a.	USAGE messages cause an exit status of 2.
+	    b.	Commands not found cause exit - 127.
+	    c.	Command found, but not executable - 126.
+	    d.	Terminated because of signal -	256+sig
+	3.  The output of values from built-ins that contain special
+	    characters are quoted in a manner that then can be re-input.
+	4.  The trace output puts quotes around the output so that it
+	    can be reused as input.
+	5.  The output for trap is in a format that can be reinput the
+	    the shell to restore the traps.
+	6.  kill -l lists the signal names without numbers as
+	    required by the POSIX standard.
+
+    b.	The following changes have been made to shell functions:
+	1.  The semantics of functions declared with name() has changed
+	    to conform with the IEEE-POSIX 1003.2 standard.  In particular,
+	    these functions are executed in a dot script environment rather
+	    than a separated function environment so that there are no
+	    local variables and no scoping for traps.
+	2.  Functions declared as function name, preserve the old ksh
+	    semantics can be also used as the first argument to the dot (.)
+	    command to have them executed in a dot script environment.
+	
+    c.	The command search rules have changed as follows:
+	1.  Special built-ins (those with a dagger in front of them) are
+	    executed first.
+	2.  Functions are executed next.
+	3.  Other built-ins that do not require an executable version
+	    (for example cd and read) come next.
+	4.  If the command name contains a slash, the pathname corresponding
+	    to the command name is executed.
+	5.  If name corresponds to a previously encountered pathname
+	    on the PATH variable, the corresponding command is executed.
+	6.  If the command name does not contain a slash, then the PATH
+	    variable is used to find an executable by that name.  If
+	    the directory that the command is found is also contained in
+	    the FPATH variable, then the command treated as a function.
+	    If the shell has a built-in version of the command corresponding
+	    to this command, then the built-in version of this command
+	    is executed.  Otherwise, the shell remembers that pathname
+	    corresponding to this command name and executes this pathname.
+	7.  If the name is not found on PATH, then the directories in
+	    FPATH are searched.  If found, then the command is executed
+	    as a function.
+
+    d.	Built-in commands options now conform to the IEEE-POSIX 1003.2
+	conventions with some additions.  In particular,
+		name -?
+	will now print a Usage line for name, except for true, false,
+	colon, login, newgrp, echo, [, and command.
+
+    e.	Tilde expansion is now performed as part of the word expansions.
+	The effect of this is that if word begins with ~ in ${name op word},
+	it will be expanded unless escaped.
+
+    f.  Pathname expansion is no longer performed on redirection words
+	unless the shell is interactive.
+
+    g.	Changes to shell and options:
+	1.  The -n option has been enhanced to produce more warning and
+	    portability messages.
+	2.  The -C option is equivalent to -o noclobber.  Files are
+	    created with O_EXCL when -C is on.
+
+    h.	The following changes have been made to [[...]]:
+	1.  A string by itself is equivalent to -n string.
+	2.  -e has been added as equivalent to -a.
+	3.  == has been added as equivalent =.
+	4.  -a and = are now considered obsolete.
+	5.  Arithmetic comparisons are now considered obsolete.
+
+    i.	kill has been changed as follows:
+	1.  Signal names can be upper case or lower case.
+	2.  Numerical arguments to kill -l cause the given signal names to
+	    be displayed.
+	3.  String arguments to kill -l cause the given signal numbers to
+	    be displayed.
+	4.  Synopsis changed for getopts conformance.
+
+    j.	print has a -f format option which is equivalent to
+	the IEEE POSIX printf.  Both print -f format, and
+	printf have the following extensions from IEEE POSIX:
+	1.  Floating point formats are supported.
+	2.  Size and precision specifications can be *.
+	3.  The %d option can take an argument after precision to
+	    specify the base that the number will be displayed.
+	4.  A %q format can be used to output a string quoted so
+	    that it can be re-input to the shell.
+	5.  A %P format can be used to output the shell pattern which
+	    corresponds to the give extended regular expression.
+	6.  For numerical fields, the arguments can be arithmetic
+	    expressions which will be evaluated.
+	7.  The %n format works as described in ANSI-C.
+
+    k.	The following changes have been made to fc:
+	1.  It has been renamed hist.  fc is now a predefined alias.
+	2.  hist uses ${HISTEDIT:-$FCEDIT}.  FCEDIT is obsolete.
+	3.  A new -s option is equivalent to the obsolete -e -.
+	4.  If the first argument refers to a command earlier than the
+	    first accessible command, it now implies the first accessible
+	    command, so that hist -l 1 lists all accessible history commands.
+
+    l.	The dot command (.) has changed as follows:
+	1.  The argument can be the name of a function declared as
+	    function name.  The function will execute without creating a
+	    new scope.
+	2.  If there are arguments to the given script or function,
+	    the positional parameters are restored to their original
+	    value when . completes.
+
+    m.  The read built-in has been changed as follows:
+    	1.  A -A option to read has been added to allow the fields to be
+	    read into an indexed array.
+	2.  A -t n option has been added which causes read to
+	    timeout after n seconds when reading from a slow device.
+	3.  A -d char option has been added which causes the read
+	    to terminate at char rather than at new-line.
+	
+    n.	The trap command has been changed as follows:
+	1.  Trap names can be either upper case or lower case.
+	2.  Trap -p cause only the specified trap values to be displayed. 
+	3.  The value of trap in a subshell will be the value in the parent
+	    shell until a call to trap which changes the trap settings has
+	    been made.  Thus, savetraps=$(trap) works as required by the
+	    POSIX standard.
+
+    o.  The exec command has been extended as follows:
+	1.  The -c option clears the environment first.
+	2.  The -a name option sets argv[0] to name for the program.
+
+    p.	true and false are built-ins, not aliases to built-ins.
+
+    q.	test has been modified to conform to the IEEE-POSIX 1003.2
+	standard when there are three or less arguments.
+
+    r.	umask -S option displays the mask in a symbolic format.
+
+    s.	wait now returns the correct exit status of any previous
+	background job that has not been waited for, not just
+	the most recent one.
+
+    t.  The whence built-in has an option -a which causes all
+	uses for the given command name to be reported.
+
+    u.  unalias has -a option to clear all the aliases.
+ 
+    v.	The times built-in command has been removed.  The time
+	reserved word, without a command, gives time cumulative
+	time for the shell and its children.  A built-in alias
+	for times should enable scripts using times to continue
+	to run.
+
+    w.	Command substitution and arithmetic substitution will now be
+	performed for PS1, ENV, and PS4 evaluation in addition to
+	parameter expansion.
+
+    x.  The SECONDS variable now displays elapsed time in floating
+	point seconds with 3 places after the decimal point by
+	default.
+
+    y.  The getopts built-in now handles the complete libast optget
+	functionality.  If any errors have occurred with getopts
+	when it has reached the end of arguments, then the Usage
+	message will be generated from the option string and the
+	exit status from getopts will be 2 rather than 1.  The
+	usage message will be stored in the OPTARG variable if
+	the option string contains a leading colon; otherwise
+	it will be printed on standard error automatically.
+
+    z.	THE ENV file is only processed for interactive shell
+	invocations.  In addition, the -x attributes for
+	aliases and functions is ignored.
+
+    aa. The built-in edit modes have been changed as follows:
+	1. The pathname completion and pathname listing options
+	   now perform command completion and command listing
+	   when applied to a word in the command position.
+	2. In emacs mode ^N as the first related command after
+	   the prompt will move to the next command relative to the
+	   last known history position.
+	3. In emacs mode, successive kill and delete commands will
+	   accumulate their data in the kill buffer, by appending or
+	   prepending as appropriate.  This mode will be reset by any
+	   command not adding something to the kill buffer.
+	4. The control-T of emacs mode has been changed to behave like
+	   control-T in gnu-emacs.
+    bb. The TMOUT variable also sets a limit for select timeouts
+	and default timeouts for read.
+
+
+4.  The source code has undergone significant modification.
+    a.	Much of the code has been rewritten,  In many cases this has
+	resulted in significant performance improvement.
+
+    b.  The code is organized differently.  See the README files
+	for more details.
+
+    c.	Most configuration parameters now get generated using
+	the FEATURE mechanism of nmake.  Other options are set
+	in the OPTIONS file.
+
+    c.	The are several new compile time options. See the README
+	file for details.  Some of the old ones have been removed.
+
+    d.	The install script is a Mamfile that is generated by
+	nmake and processed by a script that comes with the
+	distribution.
+
+    e.	There are far fewer global names.  This should make it
+	must easier to add built-in commands without worrying
+	about conflicts.
+		
+    f.	The code uses the sfio library which makes it possible
+	to mix with stdio.
+
+    g.	The code is written in ANSI C with full prototypes.
+	The code is based on the IEEE POSIX 1003.1 standard.
+	The code can be compiled with K&R C and with C++ by
+	using the ANSI cpp that comes with nmake or running
+	the code through the proto filter before pre-processing.
+	This happens automatically with our shipping system.
+
+    h.  There is a programming interface for capturing references
+	and assignment to shell variables.  It is also possible
+	to intercept variable creation and supply the array processing
+	function for that variable.  See nval.3 for a description.

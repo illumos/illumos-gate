@@ -1,0 +1,1201 @@
+#ident	"%Z%%M%	%I%	%E% SMI" mwc
+
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License, Version 1.0 only
+(the "License").  You may not use this file except in compliance
+with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+		Enterprise: Public Layer Test Specification
+		===========================================
+
+ABSTRACT
+
+	This document describes a test specification intended to be used
+in the development of tests designed to validate the service provider
+layer API described in Section 2.2 of the Enterprise DHCP Service
+Architecture Specification (ARCH) [1]. The first test is a basic sanity
+test, designed to verify that the API works as designed when fed data
+in the correct form. The second test is a full test, which compliments
+the basic sanity test by providing cases which test the stability and
+MT-safeness of the API.
+
+TEST APPLICATION
+
+	Test suite(s) written to this specification should be run on
+every available public module on the reference platform of each of the
+supported architectures (sparcv8, sparcv9, IA32, IA64) for each build
+of the ON consolidation. See "Enterprise Reference platforms" [2] for
+more information.
+
+TEST PREPARATION
+	
+	The packages SUNWdhc{df,db,dn} containing the public module(s)
+under test need to be installed in /usr/lib/inet/dhcp/svc on the machine
+under test. The data service(s) (if necessary) which hosts the data
+store must be configured and running. A data store container directory
+(location) within the data service must exist and be empty. The machine
+under test must have the appropriate authorization (root user) for
+accessing the hosting data service. Note that it is important to note
+whether the data service is hosted on the test machine, or whether the
+data service is hosted on a different machine and the machine under
+test is a client of that data service. Where the data service is hosted
+will have an affect on the test results, particularly performance.
+
+BASIC SANITY TEST
+
+	Description
+
+		This test validates the basic operation of service
+	provider layer API function calls when presented with valid
+	arguments in a valid run environment. It is implemented as a
+	multithreaded program running a single thread to exercise the API
+	referenced in Section 2.2 of ARCH [1]. This program should create
+	dhcptab and dhcp network containers within the data store, and
+	exercise the *_dt and *_dn calls to add, modify, and delete
+	multiple records. The result of the add, modify, and delete
+	operations must be validated between each operation. The program
+	should be written such that the initial condition described under
+	TEST PREPARATION is restored. Operations are PASS/FAIL, and must
+	be compared against a human-verified expect file.
+
+	Test Data
+		
+	Item			Description		Application
+	====			===========		===========
+	<location>	Public module specific		status, list,
+			path name to container		open_dt,
+			directory (e.g. /var/dhcp	remove_dt,
+			for 'files' data store).	open_dn,
+							remove_dn
+
+	<Server IP>	System under test's IP		N/A
+			address.
+	
+	dt records	As follows:			*_dt
+
+	SrootOpt s Vendor=SUNW.Ultra-1 SUNW.i86pc,1,ASCII,1,0
+	SrootIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,2,IP,1,1
+	SrootNM  s Vendor=SUNW.Ultra-1 SUNW.i86pc,3,ASCII,1,0
+	SrootPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,4,ASCII,1,0
+	SswapIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,5,IP,1,1
+	SswapPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,6,ASCII,1,0
+	SbootFIL s Vendor=SUNW.Ultra-1 SUNW.i86pc,7,ASCII,1,0
+	Stz      s Vendor=SUNW.Ultra-1 SUNW.i86pc,8,ASCII,1,0
+	SbootRS  s Vendor=SUNW.Ultra-1 SUNW.i86pc,9,NUMBER,2,1
+	SinstIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,10,IP,1,1
+	SinstNM  s Vendor=SUNW.Ultra-1 SUNW.i86pc,11,ASCII,1,0
+	SinstPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,12,ASCII,1,0
+	SsysidCF s Vendor=SUNW.Ultra-1 SUNW.i86pc,13,ASCII,1,0
+	SjumpsCF s Vendor=SUNW.Ultra-1 SUNW.i86pc,14,ASCII,1,0
+	Sterm    s Vendor=SUNW.Ultra-1 SUNW.i86pc,15,ASCII,1,0
+	Locale   m :UTCoffst=-18000:
+	Solaris  m :SrootIP4=129.148.174.27:SrootNM="atlantic": \
+	       :SinstIP4=129.148.174.27:SinstNM="atlantic": \
+	       :Sterm="xterm":BootSrvA=129.148.174.27:
+	sparc    m \
+:SrootPTH="/export/s28/solaris1of2.s28s_wos/latest/Solaris_8/Tools/Boot": \
+	       :SinstPTH="/export/s28/solaris1of2.s28s_wos/latest":
+	sun4u    m :Include=Solaris:Include=sparc:
+	i86pc    m :Include=Solaris:SbootFIL="/platform/i86pc/kernel/unix": \
+	           :SinstPTH="/export/s28/solaris1of2.s28x_wos/latest": \
+:SrootPTH="/export/s28/solaris1of2.s28x_wos/latest/Solaris_8/Tools/Boot":
+	SUNW.i86pc m :Include=i86pc:
+	SUNW.Ultra-1 m :SbootFIL="/platform/sun4u/kernel/sparcv9/unix": \
+	               :Include=sun4u:
+	172.21.0.0 m :Subnet=255.255.0.0:Router=172.21.0.2: \
+		     :Broadcst=172.21.255.255:
+	atlantic m :Include=Locale:Timeserv=129.148.174.27:LeaseTim=3600: \
+	           :LeaseNeg:Hostname:DNSdmain="snt.east.sun.com": \
+		   :DNSserv=172.21.0.1:
+	010800207E8A02 m :Impress=172.22.255.27:
+
+	
+	172.21.0.0	Dhcp network container.		*_dn
+
+	dn records	~3000, as follows:		*_dn
+
+	00 00 172.21.0.6  <Server IP> 0 atlantic
+			.
+			.
+			.
+	00 00 172.21.12.6 <Server IP> 0 atlantic
+
+	Generic Data Store Status
+	=========================
+
+	Case #1	status:
+
+		Call function with <location>. PASS if DSVC_SUCCESS is
+	returned, FAIL otherwise. If this case fails, abort the test.
+
+	Case #2 version:
+		
+		Call function. Version value returned must be one (1)
+	for PASS. If this case fails, abort the test.
+
+	Case #3 capability:
+		
+		Call function. Compare returned capability against
+	confirmed capability known for the public module under test.
+	Match is PASS.
+
+	Case #4 list:
+
+		Call function with <location>. PASS if DSVC_NOENT is
+	returned, listppp is NULL, and count is set to 0. As part of
+	Test preparation, there should be *no* containers of any kind in
+	the underlying data service of the public module. If this case
+	fails, abort the test.
+
+	dhcptab Container API
+	=====================
+
+	Case #5 alloc_dtrec:
+
+		Call function, verify that a non-NULL dt_rec_t pointer
+	is returned. Free result with free_dtrec.
+
+	Case #6 open_dt:
+
+		Create a dhcptab at <location> specifying DSVC_CREATE |
+	DSVC_READ | DSVC_WRITE. Preserve handpp for use in the following
+	cases. PASS if DSVC_SUCCESS is returned, abort the test 
+	otherwise.
+
+	Case #7 add_dt:
+
+		7.1. Initialize container.
+
+			Using the handle returned in case #6, add the
+		dhcptab test records to the dhcptab. Verify that the
+		dhcptab exists by calling list.
+
+		7.2. Attempt to add duplicate record.
+
+			Attempt to add the SbootRS symbol definition and
+		172.21.0.0 macro definition to the dhcptab container.
+		PASS if DSVC_EXISTS is returned in both cases.
+
+	Case #8 lookup_dt:
+
+		8.1. Verify case #7. 
+
+			Using a count value of -1 and a "query" value
+		initialized by DSVC_QINIT (Figure 5 of ARCH[1]), verify
+		that the contents of the dhcptab container match the
+		test data. Note that the order of the records returned
+		may not be the same as the order in which they were
+		added in case #7.
+
+		8.2 Verify dhcptab container type.
+
+			8.2.1. Look for all records with a DT_QTYPE
+			value of "s". Verify that only the "s" type
+			records are returned.
+
+			8.2.2. Look for all records with a DT_QTYPE
+			value of "m". Verify that only the "m" type
+			records are returned.
+
+			8.2.3. Look for DT_QKEY of "atlantic". Verify
+			that only the macro "atlantic" is returned, and
+			the value is correct.
+
+			8.2.4. Look for DTQKEY of i86pc and not a
+			DT_QTYPE of "m". Verify that only the macro
+			"i86pc" is returned.
+
+	Case #9 modify_dt:
+
+		9.1 Modify dhcptab container records
+
+			9.1.1. Using lookup_dt to find the record with a
+			DT_QKEY of "Sterm", change the name of the
+			record from "Sterm" to "sTERM". Use lookup_dt to
+			verify that the original record has been
+			renamed.
+
+			9.1.2. Using lookup_dt to find the record with a
+			DT_QKEY of "Solaris", change the value portion
+			of the record to be:
+
+			:SrootIP4=129.148.174.27:SrootNM="atlantic": \
+			:SinstIP4=129.148.174.27:SinstNM="atlantic": \
+			:sTERM="sun-cmd":BootSrvA=129.148.174.27:
+
+			Using lookup_dt, reexecute the lookup and verify
+			that the value portion of the record has been
+			modified correctly.
+
+	Case #10 delete_dt:
+
+		Using lookup_dt to find the record with a DT_QKEY of
+	"SUNW.Ultra-1", delete this record. Verify using lookup_dt that
+	this record can no longer be found (DSVC_NOENT).
+
+	Case #11 close_dt:
+
+		Close the open instance of the dhcptab container. Verify
+	that close_dt returns DSVC_SUCCESS.
+
+	Case #12 remove_dt:
+
+		Remove the dhcptab container. Verify that it no longer
+	exists using list.
+
+	dhcp network Container API
+	==========================
+
+	Case #13 open_dn:
+
+		Using DSVC_CREATE | DSVC_READ | DSVC_WRITE, create a
+	dhcp network container (called <network address>). Preserve the
+	handle returned for later use in the following test cases. PASS
+	if DSVC_SUCCESS is returned, terminate the test otherwise.
+	Verify that the dhcp network container exists using list.
+
+	Case #14 add_dn:
+
+		14.1. Initialize container.
+
+			Using the handle returned in case #13, add the
+		dhcp network test records to the dhcp network container.
+		Verify that the dhcp network container exists by
+		calling list.
+
+		14.2. Attempt to add duplicate record.
+
+			Attempt to add the 172.21.0.254 client record
+		to the <network address> dhcp network container. PASS
+		if DSVC_EXISTS is returned.
+
+	Case #15 lookup_dn:
+
+		15.1. Verify case #14.
+
+			Using a "count" of -1 and a "query" value
+		initialized using DSVC_QINIT (Figure 5 of ARCH[1]),
+		verify that the contents of the <network address>
+		container match the test data. "records" should equal
+		the number of records added in case #14. Note that the
+		order of the records returned may not be the same as the
+		order in which they were added in case #14.
+
+		15.2. Verify <network address> dhcp network container
+		type.
+
+			15.2.1. Look for all records with a DN_QCIP of
+			<network address>+100. Verify that only one
+			record (with a cip of <network address>+100 is
+			returned.
+
+			15.2.2. Look for all records with a DN_QMACRO
+			value of "atlantic". Verify that all records
+			are returned ("records" == 3000). Note that the
+			records returned may not be in the same order in
+			which they were added as part of case #14.
+
+	Case #16 modify_dn:
+
+		16.1. Using lookup_dn to find the record with a DN_QCIP
+		of <network address>+10, change the lease field to
+		1/1/2000 and the flags field to MANUAL. Use lookup_dn to
+		verify that the original record has been changed.
+
+		16.2. Using lookup_dn to find the record with a
+		DN_QFLAGS of MANUAL. Change the dn_cid field to
+		01080020FFFFFF, dn_flags field to MANUAL+AUTOMATIC,
+		dn_sip field to 172.23.0.77, dn_lease field to -1,
+		dn_macro field to "happy", and the dn_comment field to
+		"This is a test". Use lookup_dn to verify that the
+		original record has been changed correctly.
+
+	Case #17 delete_dn:
+
+		Using lookup_dn to find the record with a DN_QCIP of
+	<network address>+101, delete this record. Verify using
+	lookup_dn that this record can no longer be found.
+
+	Case #18 close_dn:
+
+		Close the open instance of the dhcp network container
+	<network address>. Verify that close_dn returns DSVC_SUCCESS.
+
+	Case #19 remove_dn:
+
+		Remove the dhcp network container <network address>.
+	Verify that the container is in fact gone using list.
+
+FULL TEST
+
+	Description
+		
+		This suite verifies that the dhcptab and dhcp network
+	table API function calls respond correctly when presented with
+	incorrect data. It also validates the MT-safeness of the API.
+	The test suite should allow any number of concurrent threads or
+	test suite processes to be invoked. The data must remain
+	consistent as measured at certain points during the test in
+	order for the test to be considered to have passed successfully.
+
+	Test Data
+		
+	Item			Description		Application
+	====			===========		===========
+	<location>	Public module specific		status, list,
+			path name to container		open_dt,
+			directory (e.g. /var/dhcp	remove_dt,
+			for 'files' data store).	open_dn,
+							remove_dn
+
+	<Server IP>	System under test's IP		N/A
+			address.
+	
+	dt records	As follows:			*_dt
+
+	SrootOpt s Vendor=SUNW.Ultra-1 SUNW.i86pc,1,ASCII,1,0
+	SrootIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,2,IP,1,1
+	SrootNM  s Vendor=SUNW.Ultra-1 SUNW.i86pc,3,ASCII,1,0
+	SrootPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,4,ASCII,1,0
+	SswapIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,5,IP,1,1
+	SswapPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,6,ASCII,1,0
+	SbootFIL s Vendor=SUNW.Ultra-1 SUNW.i86pc,7,ASCII,1,0
+	Stz      s Vendor=SUNW.Ultra-1 SUNW.i86pc,8,ASCII,1,0
+	SbootRS  s Vendor=SUNW.Ultra-1 SUNW.i86pc,9,NUMBER,2,1
+	SinstIP4 s Vendor=SUNW.Ultra-1 SUNW.i86pc,10,IP,1,1
+	SinstNM  s Vendor=SUNW.Ultra-1 SUNW.i86pc,11,ASCII,1,0
+	SinstPTH s Vendor=SUNW.Ultra-1 SUNW.i86pc,12,ASCII,1,0
+	SsysidCF s Vendor=SUNW.Ultra-1 SUNW.i86pc,13,ASCII,1,0
+	SjumpsCF s Vendor=SUNW.Ultra-1 SUNW.i86pc,14,ASCII,1,0
+	Sterm    s Vendor=SUNW.Ultra-1 SUNW.i86pc,15,ASCII,1,0
+	Locale   m :UTCoffst=-18000:
+	Solaris  m :SrootIP4=129.148.174.27:SrootNM="atlantic": \
+	       :SinstIP4=129.148.174.27:SinstNM="atlantic": \
+	       :Sterm="xterm":BootSrvA=129.148.174.27:
+	sparc    m \
+:SrootPTH="/export/s28/solaris1of2.s28s_wos/latest/Solaris_8/Tools/Boot": \
+	       :SinstPTH="/export/s28/solaris1of2.s28s_wos/latest":
+	sun4u    m :Include=Solaris:Include=sparc:
+	i86pc    m :Include=Solaris:SbootFIL="/platform/i86pc/kernel/unix": \
+	           :SinstPTH="/export/s28/solaris1of2.s28x_wos/latest": \
+:SrootPTH="/export/s28/solaris1of2.s28x_wos/latest/Solaris_8/Tools/Boot":
+	SUNW.i86pc m :Include=i86pc:
+	SUNW.Ultra-1 m :SbootFIL="/platform/sun4u/kernel/sparcv9/unix": \
+	               :Include=sun4u:
+	172.21.0.0 m :Subnet=255.255.0.0:Router=172.21.0.2: \
+		     :Broadcst=172.21.255.255:
+	atlantic m :Include=Locale:Timeserv=129.148.174.27:LeaseTim=3600: \
+	           :LeaseNeg:Hostname:DNSdmain="snt.east.sun.com": \
+		   :DNSserv=172.21.0.1:
+	010800207E8A02 m :Impress=172.22.255.27:
+
+	
+	172.21.0.0	Dhcp network container.		*_dn
+
+	dn records	~3000, as follows:		*_dn
+
+	00 00 172.21.0.6  <Server IP> 0 atlantic
+			.
+			.
+			.
+	00 00 172.21.12.6 <Server IP> 0 atlantic
+
+	Case #1:
+		Disable the underlying data service. How this is done
+	is data service-dependent. Call each of status, version,
+	capability, list, open_dt, remove_dt, open_dn, and remove_dn.
+	PASS if the function returns DSVC_INTERNAL or
+	DSVC_MODULE_ERROR. What is returned is data service-specific. If
+	this test FAILs (e.g. a function returns DSVC_SUCCESS, terminate
+	the test run.
+
+	Cleanup: Reenable the underlying data service.
+
+	dhcptab Container API
+	=====================
+
+	Case #2 list_dt:
+
+		2.1. Invalid Location
+
+			Call function with an invalid <location>. PASS
+		if DSVC_INVAL is returned. If this case fails, abort
+		the test.
+
+		2.2. No container
+
+			Verify that list returns DSVC_NOENT.
+
+	Case #3 open_dt:
+
+		3.1. No container
+			
+			Call function with DSVC_READ | DSVC_WRITE.
+		Verify that  DSVC_NOENT is returned.
+
+		3.2. NON_BLOCK
+
+			Using DSVC_CREATE | DSVC_READ | DSVC_WRITE,
+		call open_dt to create a dhcptab container. Call
+		close_dt to close the handle. Call open_dt with
+		DSVC_READ | DSVC_WRITE | DSVC_NONBLOCK. Depending on
+		whether the public module supports it (see module doc),
+		the function should return either DSVC_SUCCESS or
+		DSVC_UNSUPPORTED. If NON_BLOCK access is supported,
+		endeavor to make the underlying service temporarily
+		unavailable (e.g: NIS+: checkpoint the database). Call
+		open_dt again with the same flags (read, write,
+		nonblock). open_dt must fail and return DSVC_BUSY.
+
+		Cleanup: re-enable underlying service, close the open
+		handle.
+
+		3.3. Container exists
+
+			Call function with DSVC_CREATE | DSVC_READ |
+		DSVC_WRITE. Verify that the function returns
+		DSVC_EXISTS.
+
+		Cleanup: remove the dhcptab container using remove_dt.
+
+	Case #4 add_dt:
+
+		Create and load the dhcptab as per Case #6 and Case #7.1
+	of the Basic Sanity Test.
+
+		4.1. Record exists
+
+			Attempt to add a test dhcptab record to the
+		dhcptab. Verify that DSVC_EXISTS is returned.
+
+		4.2. Busy
+			
+			Close open handle with close_dt. Reopen with
+		DSVC_NONBLOCK specified. If nonblocking semantics are
+		supported, then make the data service busy through the
+		use of a data service-specific technique and attempt to
+		add an additional dhcptab record. Verify that DSVC_BUSY
+		is returned. Remove the data service busy condition and
+		reattempt the add operation. Verify that DSVC_SUCCESS is
+		returned. close_dt the container.
+
+		4.3. Read only
+
+			Close any open handles. Reopen the dhcptab with
+		DSVC_READ access only. If success is returned, attempt
+		to add a new record to the dhcptab. Verify that
+		DSVC_ACCESS is returned. close_dt the handle. Note that
+		some data store modules may return DSVC_UNSUPPORTED for
+		read-only access.
+
+		Cleanup: Close open handles, remove the dhcptab using
+		remove_dt.
+
+	Case #5 lookup_dt:
+
+		Create and load the dhcptab as per Case #6 and Case #7.1
+	of the Basic Sanity Test.
+
+		5.1. Record does not exist.
+
+			Produce a dhcptab container query that would not
+		be satisfied by the test data. Verify that DSVC_SUCCESS
+		is returned, and "records" is 0.
+
+		5.2. Busy
+
+			Close dhcptab handle with close_dt. Reopen with
+		DSVC_NONBLOCK specified. IF DSVC_SUCCESS is returned
+		(Nonblocking access is supported), using a data
+		service-specific technique for making the service busy,
+		attempt to perform a valid lookup of a dhcptab record.
+		Verify that DSVC_BUSY is returned. Remove the busy
+		condition, and reattempt the lookup. Verify that
+		DSVC_SUCCESS is returned, and that the data returned is
+		valid. close_dt the handle.
+
+		5.3. Write only
+
+			Reopen the dhcptab container with DSVC_WRITE
+		access only. If success is returned, attempt to perform
+		lookup_dt's using any syntactically legal query for the
+		dhcptab. Verify that DSVC_ACCESS is returned. close_dt
+		the handle.
+
+		5.4. Multiple matching records
+
+			Reopen the dhcptab container as per case
+		#6 and case #7.1 of the Basic Sanity Test. Using
+		modify_dt, change the dt_key for the SrootOpt symbol
+		such that the key value is now sun4u. Form a query which
+		simply specifies a DT_QKEY value of "sun4u". Verify that
+		exactly two records are returned, and that there values
+		are what is expected (one a macro, the other a symbol,
+		with the appropriate values).
+
+		Cleanup: Remove the dhcptab container using remove_dt.
+
+	Case #6 modify_dt:
+
+		Create and load the dhcptab container as per Case #6
+	and Case #7.1 of the Basic Sanity Test.
+
+		6.1. Unknown record
+
+			Fabricate dt_rec_t elements initialized with
+		data known not to exist in the dhcptab. Attempt to
+		modify these elements. Verify that DSVC_NOENT is
+		returned.
+
+		6.2. Update Collision #1
+
+			Use lookup_dt to find a valid dhcptab record.
+		Change the signature on the resultant dt_rec_t. Attempt
+		to modify the record. Verify that DSVC_COLLISION is
+		returned.
+
+		6.3. Update Collision #2
+
+			Use lookup_dt to find a valid dhcptab record.
+		Attempt to rename the record to one that already exists
+		(dt_key + dt_type). Verify that DSVC_EXISTS is returned.
+
+		6.4. Busy
+
+			Close the dhcptab with close_dt. Reopen with
+		DSVC_NONBLOCK specified. If DSVC_SUCCESS is returned (it
+		is supported), acquire a valid dhcptab record using
+		lookup_dt. Using a data service specific technique for
+		making the service busy, attempt to modify the value
+		(non-key fields) of the record. Verify that DSVC_BUSY is
+		returned. Remove the busy condition, and reattempt the
+		modify. Verify that DSVC_SUCCESS is returned.
+		Reacquire the record. Verify that the contents have been
+		suitably updated. close_dt the container.
+
+		6.5. Read only
+
+			Reopen the dhcptab with DSVC_READ access only.
+		If success is returned, locate a valid container record
+		using the appropriate query to lookup_dt. Modify the
+		contents of the record. Attempt to commit the modify to
+		the dhcptab. Verify that DSVC_ACCESS is returned.
+		close_dt the dhcptab handle.
+
+		Cleanup: Remove the dhcptab using remove_dt.
+
+	Case #7 free_dtrec_list:
+
+		This function should be used to release the results of
+	lookup_dt calls. Its operation must be validated by running this
+	test under bcheck with -memuse, and ensuring that no free blocks
+	remain after exit. Note that the test must be written with care
+	to make this case useful (free any allocated memory when it is
+	no longer needed).
+
+	Case #8 delete_dt:
+
+		Create and load the dhcptab container as per Case #6 and
+	Case #7.1 of the Basic Sanity Test.
+
+		8.1 Unknown record
+
+			Fabricate dt_rec_t containing a record known
+		not to exist in the dhcptab. Attempt to delete the
+		record. Verify that DSVC_NOENT is returned.
+
+		8.2 Busy
+
+			Close the dhcptab with close_dt. Reopen with
+		DSVC_NONBLOCK specified. If DSVC_SUCCESS is returned,
+		acquire a valid dhcptab container record using
+		lookup_dt. Using a data service specific technique for
+		making the service busy, attempt to delete the record.
+		Verify that DSVC_BUSY is returned. Remove the busy
+		condition, and reattempt the delete. Verify that
+		DSVC_SUCCESS is returned. Attempt to reacquire the
+		record. Verify that the record has in fact been deleted.
+		Close the dhcptab using close_dt.
+
+		8.3 Read only
+
+			Reopen the dhcptab container with DSVC_READ
+		access only. If success is returned, locate a valid
+		dhcptab record using an appropriate query to lookup_dt.
+		Attempt to delete the record. Verify that DSVC_ACCESS is
+		returned. Close the dhcptab using close_dt.
+
+		Cleanup: Remove the dhcptab using remove_dt.
+
+	Case #9 close_dt:
+
+		Verify that this function handles nonblocking semantics
+	correctly. Create a dhcptab as per case #6 of the Basic Sanity
+	Test, with the exception that DSVC_NONBLOCK is specified. If
+	nonblocking mode is supported, then using a data service
+	specific technique for making the service busy, attempt to close
+	the dhcptab handle returned by open_dt. Verify that DSVC_BUSY
+	is returned. Remove the busy condition, and reattempt the
+	close_dt. Verify that DSVC_SUCCESS is returned.
+
+	Cleanup: Remove the dhcptab container using remove_dt.
+
+	Case #10 remove_dt:
+
+		Verify that this function handles nonblocking semantics
+	correctly. Create a dhcptab container as per Case #6 of the Basic
+	Sanity Test. Close open handle using close_dt. Reopen with
+	DSVC_NONBLOCK specified. If nonblocking mode is supported, using
+	a data service specific technique for making the service busy,
+	attempt to remove the dhcptab container. Verify that DSVC_BUSY is
+	returned. Remove the busy condition, and reattempt the remove.
+	Verify that the dhcptab container is removed using list and that
+	the function returns DSVC_SUCCESS.
+	
+	Cleanup: Close the open handle using close_dt (ignore result).
+
+	dhcp network Container API
+	==========================
+
+	Case #11 list_dn:
+
+		11.1. Invalid Location
+
+			Call function with an invalid <location>. PASS
+		if DSVC_INVAL is returned. If this case fails, abort
+		the test.
+
+		11.2. No container
+
+			Verify that list returns DSVC_NOENT.
+
+	Case #12 open_dn:
+
+		12.1. No container
+
+			Call function with DSVC_READ | DSVC_WRITE and
+		<network address>. Verify that DSVC_NOENT is returned.
+
+		12.2. NON_BLOCK
+
+			Using the flag values of DSVC_CREATE |
+		DSVC_READ | DSVC_WRITE | DSVC_NONBLOCK, the function
+		to create a dhcp network container called <network
+		address>. Depending on whether the public module
+		supports nonblocking semantics (see module doc),
+		the function should return either DSVC_SUCCESS or
+		DSVC_UNSUPPORTED. If NON_BLOCK access is supported,
+		endeavor to make the underlying service temporarily
+		unavailable (e.g: NIS+: checkpoint the database). Call
+		open_dn again with the same flags (read, write,
+		nonblock). open_dn must fail and return DSVC_BUSY.
+
+		Cleanup: re-enable underlying service, close the open
+		handle.
+
+		12.3. Container exists.
+
+			Using the flag values DSVC_CREATE | DSVC_READ |
+		DSVC_WRITE, attempt to open <network address>. Verify
+		that the function returns DSVC_EXISTS.
+
+		Cleanup: Remove the <network address> dhcp network
+		container using remove_dn.
+
+	Case #13 add_dn:
+
+		Create and load the <network address> dhcp network
+	container as per Case #13 and Case #14.1 of the Basic Sanity
+	Test.
+
+		13.1. Record exists
+
+			Attempt to add a test dhcp network record to
+		the <network address> dhcp network container. Verify
+		that DSVC_EXISTS is returned.
+
+		13.2. Busy
+			
+			Close open handle with close_dn. Reopen with
+		DSVC_NONBLOCK specified. If nonblocking semantics are
+		supported, then make the data service busy through the
+		use of a data service-specific technique and attempt to
+		add an additional dhcp network record. Verify that
+		DSVC_BUSY is returned. Remove the data service busy
+		condition and reattempt the add operation. Verify that
+		DSVC_SUCCESS is returned. close_dn the container.
+
+		13.3. Read only
+
+			Close any open handles. Reopen the <network
+		address> dhcp network container with DSVC_READ access
+		only. If success is returned, attempt to add a new
+		record to the dhcp network container. Verify that
+		DSVC_ACCESS is returned. close_dn the handle. Note that
+		some data store modules may return DSVC_UNSUPPORTED for
+		read-only access.
+
+		Cleanup: Close open handles, remove the <network
+		address> dhcp network container using remove_dn.
+
+	Case #14 lookup_dn:
+
+		Create and load the <network address> dhcp network
+	container as per Case #13 and Case #14.1 of the Basic Sanity
+	Test.
+
+		14.1. Record does not exist.
+
+			Produce a dhcp network container query that
+		would not be satisfied by the test data. Verify that
+		DSVC_SUCCESS is returned, and "records" is 0.
+
+		14.2. Busy
+
+			Close the <network address> dhcp network handle
+		with close_dn. Reopen with DSVC_NONBLOCK specified. If
+		DSVC_SUCCESS is returned (Nonblocking access is
+		supported), using a data service-specific technique for
+		making the service busy, attempt to perform a valid
+		lookup of a dhcp network record. Verify that DSVC_BUSY
+		is returned. Remove the busy condition, and reattempt
+		the lookup. Verify that DSVC_SUCCESS is returned, and
+		that the data returned is valid. close_dn the handle.
+
+		14.3. Write only
+
+			Reopen the dhcp network container with DSVC_WRITE
+		access only. If success is returned, attempt to perform
+		lookup_dn's using any syntactically legal query for the
+		<network address> dhcp network container. Verify that
+		DSVC_ACCESS is returned. close_dn the handle.
+
+		14.4. Multiple matching records
+
+			Reopen the dhcp network container as per case
+		#13 and case #14.1 of the Basic Sanity Test. Using
+		modify_dn, change the dn_cid fields for records <network
+		address>+1 through <network address>+217 to 01BADDCAFE.
+		Form a query which simply specifies a DN_QCID of
+		01BADDCAFE. Confirm that exactly 216 records are
+		returned, and that their CIP range is correct.
+
+		Cleanup: Remove the <network address> dhcp network
+		container using remove_dn.
+
+	Case #15 modify_dn:
+
+		Create and load the <network address> dhcp network
+	container as per Case #13 and Case #14.1 of the Basic Sanity
+	Test.
+
+		15.1. Unknown record
+
+			Fabricate dn_rec_t elements initialized with
+		data known not to exist in the dhcp network container.
+		Attempt to modify these elements. Verify that DSVC_NOENT
+		is returned.
+
+		15.2. Update Collision #1
+
+			Use lookup_dn to find a valid dhcp network record.
+		Change the signature on the resultant dn_rec_t. Attempt
+		to modify the record. Verify that DSVC_COLLISION is
+		returned.
+
+		15.3. Update Collision #2
+
+			Use lookup_dn to find a valid dhcp network record.
+		Attempt to rename the record to one that already exists
+		(dn_cid, dn_flags, dn_cip, dn_sip, dn_lease, dn_macro).
+		Verify that DSVC_EXISTS is returned.
+
+		15.4. Busy
+
+			Close the dhcp network container with close_dn.
+		Reopen with DSVC_NONBLOCK specified. If DSVC_SUCCESS is
+		returned (nonblocking semantics are supported), acquire
+		a valid dhcp network record using lookup_dn. Using a
+		data service specific technique for making the service
+		busy, attempt to modify the value (non-key fields) of
+		the record. Verify that DSVC_BUSY is returned. Remove
+		the busy condition, and reattempt the modify. Verify
+		that DSVC_SUCCESS is returned. Reacquire the record.
+		Verify that the contents have been suitably updated.
+		close_dn the container.
+
+		15.5. Read only
+
+			Reopen the dhcp network container with DSVC_READ
+		access only. If success is returned, locate a valid
+		container record using the appropriate query to
+		lookup_dn. Modify the contents of the record. Attempt
+		to commit the modify to the dhcp network container.
+		Verify that DSVC_ACCESS is returned. close_dn the
+		dhcp network container handle.
+
+		Cleanup: Remove the dhcp network container using
+		remove_dn.
+
+	Case #16 free_dnrec_list:
+
+		This function should be used to release the results of
+	lookup_dn calls. Its operation must be validated by running this
+	test under bcheck with -memuse, and ensuring that no free blocks
+	remain after exit. Note that the test must be written with care
+	to make this case useful (free any allocated memory when it is
+	no longer needed).
+
+	Case #17 delete_dn:
+
+		Create and load the <network address> dhcp network
+	container as per Case #13 and Case #14.1 of the Basic Sanity
+	Test.
+
+		17.1 Unknown record
+
+			Fabricate dn_rec_t containing a record known
+		not to exist in the dhcp network container. Attempt
+		to delete the record. Verify that DSVC_NOENT is returned.
+
+		17.2 Busy
+
+			Close the dhcp network container with close_dn.
+		Reopen with DSVC_NONBLOCK specified. If DSVC_SUCCESS is
+		returned, acquire a valid dhcp network container record
+		using lookup_dn. Using a data service specific technique
+		for making the service busy, attempt to delete the record.
+		Verify that DSVC_BUSY is returned. Remove the busy
+		condition, and reattempt the delete. Verify that
+		DSVC_SUCCESS is returned. Attempt to reacquire the
+		record. Verify that the record has in fact been deleted.
+		Close the dhcp network container using close_dn.
+
+		17.3 Read only
+
+			Reopen the dhcp network container with DSVC_READ
+		access only. If success is returned, locate a valid
+		dhcp network record using an appropriate query to
+		lookup_dn. Attempt to delete the record. Verify that
+		DSVC_ACCESS is returned. Close the dhcp network
+		container using close_dn.
+
+		Cleanup: Remove the dhcp network container using
+		remove_dn.
+
+	Case #18 close_dn:
+
+		Verify that this function handles nonblocking semantics
+	correctly. Create the <network address> dhcp network container
+	as per case #13 of the Basic Sanity Test, with the exception
+	that DSVC_NONBLOCK is specified. If nonblocking mode is
+	supported, then using a data service specific technique for
+	making the service busy, attempt to close the dhcp network
+	handle returned by open_dn. Verify that DSVC_BUSY is returned.
+	Remove the busy condition, and reattempt the close_dn. Verify
+	that DSVC_SUCCESS is returned.
+
+	Cleanup: Remove the dhcp network container using remove_dn.
+
+	Case #19 remove_dn:
+
+		Verify that this function handles nonblocking semantics
+	correctly. Create the <network address> dhcp network container
+	as per Case #13 of the Basic Sanity Test, with the exception
+	that DSVC_NONBLOCK is specified. If nonblocking mode is
+	supported, using a data service specific technique for making
+	the service busy, attempt to remove the dhcp network container.
+	Verify that DSVC_BUSY is returned. Remove the busy condition,
+	and reattempt the remove. Verify that the <network address> dhcp
+	network container is removed using list and that the function
+	returns DSVC_SUCCESS.
+	
+	Cleanup: Close the open handle using close_dn (ignore result).
+
+	Case #20 Multi-access stress
+
+		Public layer modules are not required to manage reference
+	counts for open instances. So while individual handles are
+	considered to be MT-safe (and parallel access to containers is
+	suitably protected), an application using the service provider
+	layer API must synchronize close and/or container remove
+	operations among threads such that no threads hold handles to a
+	container after the handle has been closed or the container has
+	been removed.
+
+		This case assumes a test which is multi-threaded, and
+	can run the following test using from 1 to THREADS threads. The
+	test can also be run in multiple concurrent processes.
+
+		The goal of this test is to ensure that the API is
+	MT-safe with respect to the containers and the records contained
+	within those containers. This goal is accomplished by verifying
+	that the end result of the test is consistent.
+
+	Tunable default values:
+
+		PROCESSES: 20
+		THREADS: 20
+
+		20.1 The dhcptab container test
+
+			20.1.1 open_dt
+
+				Create a dhcptab using DSVC_CREATE |
+			DSVC_READ | DSVC_WRITE. If DSVC_EXISTS is
+			returned, retry the open attempt w/o the
+			DSVC_CREATE flag. Log that this event occurred.
+			Handle will be used for balance of test. If any
+			other error occurs, terminate the test as
+			failed.
+
+			20.1.2 add_dt
+
+				Add the test data records to the dhcptab
+			container. If DSVC_EXISTS is returned, skip that
+			record, and continue attempting to add the other
+			records. Log that this event occurred. If any
+			other error occurs, terminate the test as
+			failed.
+
+			20.1.3 lookup_dt
+
+				Using DT_QKEY of "atlantic" and DT_QTYPE
+			of "m", find the atlantic record. Compare its
+			value against the test data. If it has
+			changed, then output a message to this affect.
+			If any error occurs, terminate the test as failed.
+
+			20.1.4 modify_dt
+
+				Using the results of 20.1.3, change the
+			record as follows. If it is no different from
+			the test data, change the value to:
+
+		:Timeserv=129.148.174.28:LeaseTim=86400: \
+		:Hostname:DNSdmain="east.sun.com":DNSserv=172.23.3.3:
+
+				If it doesn't match the test data
+			value, change the LeaseTim by incrementing it by
+			one. Attempt to update the record. If it fails
+			with DSVC_COLLISION, retry 20.1.3 and 20.1.4 for
+			three attempts. Log message if modify was
+			unsuccessful. If any other error occurs,
+			terminate the test as failed.
+
+			20.1.5 delete_dt
+
+				Use lookup_dt to find a DT_QKEY of
+			"SjumpsCF" and a  DT_QTYPE of "s". If it does
+			not exist, log a message. If it does exist,
+			attempt to delete it. If DSVC_NOENT is returned,
+			log a message.
+
+			20.1.6 close_dt
+
+				Use close_dt to close the open handle.
+			If DSVC_NOENT is returned, log a message.
+
+			20.1.7 epilogue
+				
+				Compare the resultant dhcptab container
+			to the test data. The only differences should be
+			a changed value of the atlantic macro as
+			expected from 20.1.4 and the SjumpsCF symbol
+			should be removed. Any other inconsistency means
+			the test has failed.
+
+			Clean up: Remove the dhcptab container.
+
+		20.2 The dhcp network table container test
+
+			20.2.1 open_dn
+
+				Create a <network address> dhcp network
+			table using DSVC_CREATE | DSVC_READ | DSVC_WRITE.
+			If DSVC_EXISTS is returned, retry the open
+			attempt w/o the DSVC_CREATE flag. Log that this
+			event occurred. Handle will be used for balance
+			of test. If any other error occurs, terminate
+			the test as failed.
+
+			20.2.2 add_dn
+
+				Add the test data records to the dhcp
+			network table container. If DSVC_EXISTS is
+			returned, skip that record, and continue
+			attempting to add the other records. Log that
+			this event occurred. If any other error occurs,
+			terminate the test as failed.
+
+			20.2.3 lookup_dn
+
+				Find the DN_QCIP of <network address>+102
+			record. Compare its value against the test data.
+			If it has changed, then output a message to this
+			affect. If any error occurs, terminate the test
+			as failed.  
+
+			20.2.4 modify_dn
+
+				Using the results of 20.2.3, change the
+			record as follows. If it is no different from
+			the test data, change the value to:
+
+01DEADBEEF 03 <network address>+102 172.23.3.3 941619403 Solaris
+
+				If it doesn't match the test data
+			value, change dn_lease by incrementing it by
+			one. Attempt to update the record. If it fails
+			with DSVC_COLLISION, retry 20.2.3 and 20.2.4 for
+			three attempts. Log message if modify was
+			unsuccessful.  If any other error occurs,
+			terminate the test as failed.
+
+			20.2.5 delete_dn
+
+				Use lookup_dn to find a DN_QCIP of
+			<network address>+1001. If it does not exist,
+			log a message. If it does exist, attempt to
+			delete it. If DSVC_NOENT is returned, log a
+			message.
+
+			20.2.6 close_dn
+
+				Use close_dn to close the open handle.
+			If DSVC_NOENT is returned, log a message.
+
+			20.2.7 epilogue
+				
+				The <network address> dhcp network
+			container should be consistent at the end of
+			a test run. The only differences should be a
+			changed value of the <network address>+102
+			record with the value as per 20.2.4 and the
+			lease time potentially incremented, as well as
+			the <network address>+1001 record missing. 
+			Any other inconsistency means the test has
+			failed.
+
+			Cleanup: remove <network address> dhcp network
+		container.
+
+		20.3 Multi-process run
+
+			Run 20.1 and 20.2 in PROCESSES separate
+		processes.
+
+		20.4 Multi-threaded run, single process
+
+			Run 20.1 and 20.2 in THREADS separate threads
+		within a single process.
+
+		20.5 Multi-process, Multi-threaded run
+
+			Run 20.1 and 20.2 in PROCESSES separate
+		processes each spawning THREADS separate threads.
+
+	Case #21 Capacity
+
+		This test case endeavors to probe the stability and the
+	performance of the public module implementation when:
+
+		a) The data storage containers are filled to capacity.
+
+		b) The data storage containers are overfilled.
+
+		Note that while the number of records within a dhcptab
+	container could be infinite, the number of records within a dhcp
+	network container is bounded by the number of possible IP
+	addresses within the network represented by the container. If a
+	class A network is represented, there can be up to 16,777,215
+	possible records. The total number of records supported by a
+	public module (with some overhead for container information) is
+	the upper bound. That total number could be influenced by
+	settings in the underlying hosting data service, or by the
+	available memory or disk resources of the machine under test.
+	Since record sizes for dhcptab and dhcp network containers
+	differ, discovering the maximum number of possible records
+	requires some dynamic experimentation by the test itself.
+
+		21.1 Initialization
+
+			Call capability. The max number of possible
+		records for the environment under test will be contained
+		within the returned structure as will some estimate of
+		the operations per second claimed by the public module
+		in the run environment. A dhcptab will be created with
+		contains 1/3 of the maximum number of records. One or
+		more dhcp network containers will be created to contain
+		the balance of the records. A multithreaded program can
+		create the containers and load them with single threads,
+		one for each container. A consistent series of records
+		must be added to the dhcptab (monotonically increasing
+		symbol / macro records created, each with unique value
+		portions which could be calculated by the key fields of
+		the record). dhcp network container records simply contain
+		records unique by client IP address.
+
+		Initialization will stop when no more records can be
+		added to the system (XXX - what sort of error code would
+		be returned? DSVC_INTERNAL?). Operations per second
+		must be measured during the initialization process to
+		determine whether it is close to the advertised number
+		(XXX - how could this be verified?).
+
+		21.2 Modify
+
+			For every existing dhcp network record, modify
+		the lease time such that it is set to the number of
+		modify operations done during this subcase (first one ==
+		1, last 1+N). Measure operations per second during this
+		process.
+
+		21.3 Add
+
+			Attempt to add a new dhcptab and a new dhcp
+		network container(s) record. This operation should fail
+		(XXX expected results?).
+
+		21.4 Lookup
+
+			Form a configured number of legal queries (TBD
+		tunable) for the dhcptab and dhcp network container(s).
+		Validate that the data returned is what is expected
+		based upon knowledge of relationship between the record
+		being searched for and the expected value based upon the
+		search parameters. PASS if queries are successful.
+		Measure operations per second during this process for
+		comparison against advertised number.
+
+		21.5 Delete
+
+			Using lookup and delete, find and delete every
+		single record added by the test. Confirm that the
+		containers contain no records. Measure operations per
+		second during this process for comparison against the
+		advertised number.
+
+		Cleanup: Remove the containers.
+
+REFERENCES
+
+	[1] "Enterprise DHCP Service Architecture Specification", mwc,
+	6/25/1999.
+
+	[2] "Enterprise Reference Hardware Platforms", mwc, 10/23/1999.

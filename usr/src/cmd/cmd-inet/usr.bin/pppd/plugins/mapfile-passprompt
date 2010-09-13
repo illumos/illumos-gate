@@ -1,0 +1,31 @@
+#
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# External declarations - used to suppress -zdefs errors.
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	add_options	{ TYPE = FUNCTION; FLAGS = extern };	#  From  pppd
+	detached	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	error		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	pap_passwd_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	remote_name	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	slprintf	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	sys_close	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	warn		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+};

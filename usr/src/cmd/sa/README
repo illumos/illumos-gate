@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+ Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ident	"%Z%%M%	%I%	%E% SMI"
+
+README 1.9 of 5/8/89
+
+Instruction of daily report generation:
+
+1.  The line
+
+    /usr/lib/sa/sadc /var/adm/sa/sa`date +%d`
+
+    is executed by the start method for the system/sar:default service,
+    if enabled
+
+    sadc is executed once, such that a special record is written to
+    the daily data file when UNIX restarts.
+
+2.  The execution of shell script
+    sa1 [t n]
+    causes data collection program to write system activity
+    counters n times at every t-second interval on data file.
+    If t and n are not specified, it writes data once.
+    According to your installation's requirement, enter
+    entries of executing  sa1 [t n] in /var/spool/cron/crontabs/sys
+    to collect system activity data.
+    For example, entries
+
+    0 8-17 * * 1-5 su sys -c "/usr/lib/sa/sa1 1200 3 &" and
+    0 18-23 * * 1-5 su sys -c "/usr/lib/sa/sa1 &"
+
+    cause data collection program to be activated at every hour
+    on the hour from 8:00 to 23:00 on weekdays.
+    Moreover, It writes data on data file 3 times at every 20
+    minutes interval from 8:00 to 17:00 and once at other times.
+
+3.  Shell procedure sa2 will invoke sar command to generate
+    the daily report from the data file.  Its usage is
+
+    sa2 [-options] [-s hh:mm] [-e hh:mm] [-i ss]
+
+    where -s and -e specify the report starting and ending times
+    respectively, -i specifies the report data interval in seconds.
+    If they are not specified, all data from the data file are to
+    be reported.  -options are report options, see manual page
+    sar.1 for description.
+
+    Make an entry to execute sa2 in /var/spool/cron/crontabs.
+    For instance, entry
+
+    5 18 * * 1-5 su adm -c "/usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 3600
+    -ubd &"
+
+    causes the invocation of sar command at 18:05.  It generates
+    the daily report that includes the hourly cpu utilization,
+    buffer usage and disk and tape  activities from 8:00 to 18:01.

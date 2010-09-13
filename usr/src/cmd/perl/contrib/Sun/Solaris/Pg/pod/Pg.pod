@@ -1,0 +1,223 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# Sun::Solaris::Pg documentation
+#
+
+=head1 NAME
+
+Solaris::Pg - Perl interface to Processor Group kstats
+
+=head1 SYNOPSYS
+
+  use Solaris::Pg;
+
+  $p = Solaris::Pg->new(-cpudata=> 1, -tags=> 1, -swload=> 1);
+
+  @pgs = $p->all();
+
+  @pgs_depth = $p->all_depth_first();
+
+  @pgs_breadth = $p->all_breadth_first();
+
+  @leaves = $p->leaves();
+
+  $root = $p->root;
+
+  $p->update();
+
+  $leaf = $leaves[0];
+
+  $name = $p->sh_name($leaf);
+
+  @names = $p->sharing_relationships();
+
+  @tags = $p->tags($leaf);
+
+  $p1 = Solaris::Pg->new(-cpudata=> 1, -tags=> 1, -swload=> 1);
+
+  if ($p->has_utilization()) {
+    $utilization = $p->utilization($p1, $leaf);
+    $capacity = $p->capacity($p1, $leaf);
+    $accuracy = $p->accuracy($p1, $leaf);
+    $tdelta = $p->tdelta($p1);
+  }
+
+  $sw_utilization = $p->sw_utilization($p1, $leaf);)
+
+
+=head1 DESCRIPTION
+
+The Solaris::Pg module provides an interface to the Solaris PG information
+available through B<pg> and B<pg_cpu> kstats. The module provides an object
+oriented interface.
+
+=head1 METHODS
+
+=head2 new
+
+Create a new Pg instance. The new() function accepts arguments in the form of a
+hash. The following subarguments are supported:
+
+=over
+
+=item -cpudata
+
+Collect per-CPU data from kstats if this is True.
+
+=item  -tags
+
+Match PGs to physical relationships if this is True.
+
+=item  -swload
+
+Collect software CPU load if this is True.
+
+=back
+
+=head2 root
+
+Return ID of the root of Processor Group hierarchy.
+
+=head2 all
+
+Return list of all PGs sorted by ID.
+
+=head2 all_depth_first()
+
+Return list of all PGs sorted by walking the PG hierarchy depth first, starting
+from root.
+
+=head2 all_breadth_first()
+
+Return list of all PGs sorted by walking the PG hierarchy breadth first,
+starting from root.
+
+=head2 cpus(PG)
+
+Return list of all CPUs in the PG specified. The list is sorted by CPU ID.
+
+=head2 generation([PG])
+
+Return the generation number for the given PG. Without arguments, return the
+generation number for the whole snapshot. Different generation number means that
+PG configuration may have changed.
+
+=head2 parent(PG)
+
+Return parent ID or undef if there is no parent.
+
+=head2 children(PG)
+
+Return list of children for the PG.
+
+=head2 is_leaf(PG)
+
+Returns T iff PG is leaf.
+
+=head2 leaves
+
+Returns list of leaf PGs.
+
+=head2 level(PG)
+
+Return the numeric level of PG in the hierarchy, starting from root which has
+level zero.
+
+=head2 sh_name(PG)
+
+Returns sharing name for the PG.
+
+=head2  sharing_relationships([PG], ...)
+
+Without any arguments, returns the list of sharing relationships in the
+snapshot. Relationships are sorted by the level in the hierarchy If any PGs are
+given on the command line, only return sharing relationships for given PGs, but
+still keep them sorted.
+
+=head2 tags(PG)
+
+Return list of strings describing physical relationships ('core', 'chip') for the given PG.
+
+=head2 update()
+
+Update utilization and generation data in the PG snapshot.
+
+=head2 has_utilization(PG)
+
+Returns True if given PG hasd data about hardware utilization.
+
+=head2 utilization(PGOBJ, PG)
+
+Return numeric utilization for the time interval represented by two PG objects
+for the given PG. Utilization is a difference in utilization value between two
+snapshots. The given PG must belong to the same generation in both snapshots.
+Returns B<undef> if utilization can not be obtained.
+
+=head2 sw_utilization(PGOBJ, PG)
+
+Return numeric software utilization for the time interval represented by two PG
+objects for the given PG. Utilization is a difference in utilization value
+between two snapshots. The given PG must belong to the same generation in both
+snapshots. Returns B<undef> if utilization can not be obtained. Software
+utilization is combined CPU load for all CPUs in the PG. Returns B<undef> if
+utilization can not be obtained.
+
+=head2 sw_utilization(PGOBJ, PG, CPU)
+
+Return utilization for the PG for a given CPU in a given PG. Utilization is a
+difference in utilization value between two snapshots. We can only compare
+utilization between PGs having the same generation ID. Returns B<undef> if
+utilization can not be obtained.
+
+=head2 capacity(PGOBJ, PG)
+
+Return numeric capacity for the time interval represented by two PG objects for
+the given PG. Note that the actual capacity is the maximum of all capacities
+across all PGs of this type.The given PG must belong to the same generation in
+both snapshots. Returns B<undef> if capacities can not be obtained.
+
+=head2 accuracy(PGOBJ, PG)
+
+Return accuracy of utilization calculation between two snapshots The accuracy is
+determined based on the total time spent running and not running the counters.
+If T1 is the time counters were running during the period and T2 is the time
+they were turned off, the accuracy is T1 / (T1 + T2), expressed in percentages.
+
+=head2 tdelta(PGOBJ, PG)
+
+Return time interval between two snapshots for the given PG. The time is expressed in seconds and is a floating-point number.
+
+=head2 EXPORT
+
+None by default.
+
+=head1 SEE ALSO
+
+L<pginfo(1)>, L<pgstat(1)>
+
+=cut
+

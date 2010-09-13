@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for the Kerberos administration daemon
+-->
+
+<service_bundle type='manifest' name='SUNWkrbr:kadmin'>
+
+<service
+	name='network/security/kadmin'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance/>
+
+	<dependency
+		name='dns'
+		grouping='require_all'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/network/dns/client' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/krb5/kadmind'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+				user='root'
+				group='root'
+				privileges='basic,!file_link_any,!proc_info,!proc_session,net_privaddr,proc_audit,file_dac_write'
+			/>
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' />
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Kerberos administration daemon </loctext>
+		</common_name>
+		<documentation>
+			<manpage title='kadmind' section='1M'
+			    manpath='/usr/share/man' />
+		</documentation>
+        </template>
+</service>
+
+</service_bundle>

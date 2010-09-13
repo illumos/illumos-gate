@@ -1,0 +1,126 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	current_item;
+	free_item;
+	free_menu;
+	item_count;
+	item_description;
+	item_index;
+	item_init;
+	item_name;
+	item_opts;
+	item_opts_off;
+	item_opts_on;
+	item_term;
+	item_userptr;
+	item_value;
+	item_visible;
+	menu_back;
+	menu_driver;
+	menu_fore;
+	menu_format;
+	menu_grey;
+	menu_init;
+	menu_items;
+	menu_mark;
+	menu_opts;
+	menu_opts_off;
+	menu_opts_on;
+	menu_pad;
+	menu_pattern;
+	menu_sub;
+	menu_term;
+	menu_userptr;
+	menu_win;
+	new_item;
+	new_menu;
+	pos_menu_cursor;
+	post_menu;
+	scale_menu;
+	set_current_item;
+	set_item_init;
+	set_item_opts;
+	set_item_term;
+	set_item_userptr;
+	set_item_value;
+	set_menu_back;
+	set_menu_fore;
+	set_menu_format;
+	set_menu_grey;
+	set_menu_init;
+	set_menu_items;
+	set_menu_mark;
+	set_menu_opts;
+	set_menu_pad;
+	set_menu_pattern;
+	set_menu_sub;
+	set_menu_term;
+	set_menu_userptr;
+	set_menu_win;
+	set_top_row;
+	top_row;
+	unpost_menu;
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_affect_change;
+	_chk_current;
+	_chk_top;
+	_connect;
+	_Default_Item;
+	_Default_Menu;
+	_disconnect;
+	_draw;
+	_lib_version;
+	_link_items;
+	_match;
+	_movecurrent;
+	_move_post_item;
+	_position_cursor;
+	_post_item;
+	_scale;
+	_show;
+    local:
+	*;
+};

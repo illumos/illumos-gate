@@ -1,0 +1,77 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+include ../../Makefile.grub
+include ../Makefile.solaris.defs
+
+
+GRUB		= grub
+GRUB_OBJS	= asmstub.o main.o
+$(GRUB)		:= LIBS = ../stage2/libgrub.a ../lib/libcommon.a -lcurses
+$(GRUB)		:= LDFLAGS += $(LDLIBS.cmd)
+$(GRUB)		:= CCLD = $(CC)
+
+#
+# The grub shell interposes on the getopt() family.  Should direct bindings be
+# enabled, these interfaces should be explicitly defined as interposes.  Use a
+# mapfile to associate the necessary interposer definitions.
+#
+MAPFILES	= $(MAPFILE.INT)
+
+INCLUDES	= -I. -I.. -I../stage1 -I../stage2 -I../lib
+CFLAGS		+= -O2
+LINKFLAGS	+= -O2 $(MAPFILES:%=-Wl,-M%)
+CPPFLAGS	+= -DGRUB_UTIL=1 -DFSYS_EXT2FS=1 -DFSYS_FAT=1 -DFSYS_FFS=1 \
+		   -DFSYS_ISO9660=1 -DFSYS_JFS=1 -DFSYS_MINIX=1 \
+		   -DFSYS_REISERFS=1 -DFSYS_ZFS=1 -DFSYS_UFS2=1 -DFSYS_VSTAFS=1 \
+		   -DFSYS_XFS=1 -DUSE_MD5_PASSWORDS=1 -DSUPPORT_HERCULES=1 \
+		   -DSUPPORT_SERIAL=1 
+
+PROGRAMS	= $(GRUB)
+
+INSTALL_DIR	= $(ROOT_BOOT_GRUB)/bin
+INSTALL_TARGETS	= $(PROGRAMS:%=$(INSTALL_DIR)/%)
+
+$(INSTALL_DIR)/% := FILEMODE = 0555
+
+#
+# Source files to be installed in $(SRC_DIR).
+#
+SRC_DIR		= $(ROOT_SRC)/grub
+SRC_FILES	= Makefile.am Makefile.in asmstub.c main.c
+
+INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
+
+
+all: $(PROGRAMS)
+
+$(GRUB): $(GRUB_OBJS) $(MAPFILES)
+	$(LINK) -o $@ $(GRUB_OBJS) $(LIBS)
+	$(POST_PROCESS)
+
+$(GRUB_OBJS): $$(@:.o=.c)
+	$(CC) $(CFLAGS) -c -o $@ $(@:.o=.c)
+
+
+install: all $(INSTALL_TARGETS)
+
+$(INSTALL_DIR)/%: $(INSTALL_DIR) %
+	$(INS.file)
+
+$(SRC_DIR)/%: $(SRC_DIR) %
+	$(INS.file)
+
+$(INSTALL_DIR) $(SRC_DIR):
+	$(INS.dir)
+
+
+clean: _FORCE
+	$(RM) *.o
+
+clobber: clean
+	$(RM) $(PROGRAMS)
+
+_FORCE:

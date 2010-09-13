@@ -1,0 +1,182 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * # ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * supported prop types: void, int, uint, float, string
+ * supported prop access_modes: r, w, rw
+ *
+ * VERSION <version_number>  -- supported version number is 1.0
+ *
+ * name:<namepath> --     gives the anchor node
+ *      where <namepath> is <nodename>[@<bus-addr>][?<prop>=<val>]
+ *
+ * _class:<classpath> --   gives the anchor node
+ *      where <classpath> is <classname>[@<bus-addr>][?<prop>=<val>]
+ *
+ * NODE <name> <class>
+ *       {describes a subtree}
+ * ENDNODE
+ *
+ * PROP <name> <type> <access_mode> [<size> <value>] -- per property
+ *
+ * REFPROP <name> <dstnode>
+ *
+ * REFNODE <name> <class> with <destnode> -- Associates a new node
+ *       with <destnode> if exists
+ *       where 
+ *             <name> is the nodename
+ *             <class> is the picl class.
+ *             <destnode> is name:<namepath> or _class:<classpath>
+ *
+ * If "name:" or "_class:" is not specified in the <path>,
+ * the default is "name:"
+ *
+ */
+#define PLATFORM_CLASS	jbus
+
+VERSION 1.1
+NODE frutree picl
+    NODE chassis fru
+	/*
+	 * SunMC physical view view_points for this platform
+	 * This will get moved to a separate SunMC physical view plugin later.
+	 */
+	PROP ViewPoints string r 0 "front rear side"
+
+	/*
+	 * Motherboard
+	 */
+	NODE MB location
+	    PROP SlotType string r 0 "system-board"
+	    PROP Label string r 0 "MB"
+	ENDNODE
+
+	/*
+	 * Front panel interface board
+	 */
+	NODE FIOB location
+	    PROP SlotType string r 0 "system-board"
+	    PROP Label string r 0 "FIOB"
+	    NODE system-board fru
+		 PROP FRUDataAvailable void r
+		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom@0,a4
+		NODE RM0 location
+		    PROP SlotType string r 0 "cdrom-slot"
+		    PROP Label string r 0 "RM0"
+		ENDNODE
+	    ENDNODE
+	ENDNODE
+
+	NODE F0 location
+	    PROP SlotType string r 0 "fan-unit"
+	    PROP Label string r 0 "F0"
+	    REFNODE system-fan0 fru WITH _class:/PLATFORM_CLASS/cpu?ID=0
+	ENDNODE
+	NODE F1 location
+	    PROP SlotType string r 0 "fan-unit"
+	    PROP Label string r 0 "F1"
+	    REFNODE system-fan1 fru WITH _class:/PLATFORM_CLASS/cpu?ID=1
+	ENDNODE
+	NODE F2 location
+	    PROP SlotType string r 0 "fan-unit"
+	    PROP Label string r 0 "F2"
+	    NODE system-fan2 fru
+	    ENDNODE
+	ENDNODE
+	NODE F3 location
+	    PROP SlotType string r 0 "fan-unit"
+	    PROP Label string r 0 "F3"
+	    NODE system-fan3 fru
+	    ENDNODE
+	ENDNODE
+	NODE F4 location
+	    PROP SlotType string r 0 "fan-unit"
+	    PROP Label string r 0 "F4"
+	    NODE system-fan4 fru
+	    ENDNODE
+	ENDNODE
+
+	/*
+	 * Power Supply
+ 	 */
+	NODE PS0 location
+	    PROP SlotType string r 0 "power-supply"
+	    PROP Label string r 0 "PS0"
+	    NODE power-supply fru
+		 PROP FRUDataAvailable void r
+		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/psu-fru-prom@0,ae
+	    ENDNODE
+	ENDNODE
+
+	/*
+	 * SAS/SATA Backplane
+	 */
+	NODE SAS-BP fru				
+	    PROP FRUDataAvailable void r
+	    REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/sas-backplane-fru-prom@0,a6
+	    NODE HDD0 location
+		PROP SlotType string r 0 "disk-slot"
+		PROP Label string r 0 "HDD0"
+	    ENDNODE
+	    NODE HDD1 location
+		PROP SlotType string r 0 "disk-slot"
+		PROP Label string r 0 "HDD1"
+	    ENDNODE
+	    NODE HDD2 location
+		PROP SlotType string r 0 "disk-slot"
+		PROP Label string r 0 "HDD2"
+	    ENDNODE
+	    NODE HDD3 location
+		PROP SlotType string r 0 "disk-slot"
+		PROP Label string r 0 "HDD3"
+	    ENDNODE
+	ENDNODE
+    ENDNODE
+ENDNODE
+
+/*
+ * Add disk fru nodes for disks which are present.
+ */
+name:/frutree/chassis/SAS-BP/HDD0
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
+
+name:/frutree/chassis/SAS-BP/HDD1
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
+
+name:/frutree/chassis/SAS-BP/HDD2
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
+
+name:/frutree/chassis/SAS-BP/HDD3
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
+
+/*
+ * Removable Media on front-io board
+ */
+name:/frutree/chassis/FIOB/system-board/RM0
+REFNODE cdrom fru WITH name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+
+#include "system-board.info"
+

@@ -1,0 +1,143 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# This file brings down all that is needed to build the
+# core Infiniband code. 
+#
+
+# header files
+find_files "s.*.h"	\
+	usr/src/uts/common/sys/ib	\
+	usr/src/uts/common/sys		\
+	usr/src/uts/sparc/sys		\
+	usr/src/uts/sparc/v7/sys	\
+	usr/src/uts/sparc/v9/sys	\
+	usr/src/uts/sun/sys		\
+	usr/src/uts/intel/sys		\
+	usr/src/uts/intel/ia32/sys	\
+	usr/src/uts/common/rpc		\
+	usr/src/uts/common/netinet	\
+	usr/src/uts/common/inet		\
+	usr/src/uts/common/net		\
+	usr/src/uts/common/vm		\
+	usr/src/uts/common/gssapi
+
+# cfgadm plugin directory
+find_files "s.*"	\
+	usr/src/lib/cfgadm_plugins/ib
+
+# warlock
+find_files "s.*"	\
+	usr/src/uts/common/io/warlock
+
+# to compile the drivers/modules
+find_files "s.*"	\
+	usr/src/uts/sparc/ib		\
+	usr/src/uts/sparc/ibcm		\
+	usr/src/uts/sparc/ibdm		\
+	usr/src/uts/sparc/ibmf		\
+	usr/src/uts/sparc/ibtl		\
+	usr/src/uts/sparc/ibp		\
+	usr/src/uts/sparc/rpcib		\
+	usr/src/uts/intel/ib		\
+	usr/src/uts/intel/ibcm		\
+	usr/src/uts/intel/ibdm		\
+	usr/src/uts/intel/ibmf		\
+	usr/src/uts/intel/ibtl		\
+	usr/src/uts/intel/ibp		\
+	usr/src/uts/intel/rpcib	
+
+# packaging files
+find_files "s.*" usr/src/pkg/license_files
+echo_file usr/src/pkg/manifests/SUNWib.mf
+echo_file usr/src/pkg/manifests/SUNWtavor.mf
+
+# extra files needed
+find_files "s.*"	\
+	usr/src/uts/common/os		\
+	usr/src/uts/common/rpc		\
+	usr/src/uts/intel/asm		\
+	usr/src/uts/intel/amd64
+
+# lvm
+find_files "s.*.x"	\
+	usr/src/uts/common/sys/lvm
+
+# makefiles
+echo_file  usr/src/Makefile.master
+echo_file  usr/src/Makefile.master.64
+echo_file  usr/src/req.flg
+echo_file  usr/src/Makefile.psm
+echo_file  usr/src/Makefile.psm.targ
+echo_file  usr/src/uts/Makefile
+echo_file  usr/src/uts/Makefile.targ
+echo_file  usr/src/uts/Makefile.uts
+echo_file  usr/src/uts/sun/Makefile.files
+echo_file  usr/src/uts/sun/Makefile.rules
+echo_file  usr/src/uts/common/Makefile.files
+echo_file  usr/src/uts/common/Makefile.rules
+echo_file  usr/src/uts/common/sys/Makefile
+echo_file  usr/src/uts/common/sys/lvm/Makefile
+echo_file  usr/src/uts/sparc/Makefile
+echo_file  usr/src/uts/sparc/Makefile.files
+echo_file  usr/src/uts/sparc/Makefile.rules
+echo_file  usr/src/uts/sparc/Makefile.sparc
+echo_file  usr/src/uts/sparc/Makefile.sparc.shared
+echo_file  usr/src/uts/sparc/Makefile.targ
+echo_file  usr/src/uts/sparc/Makefile.targ.shared
+echo_file  usr/src/uts/sparc/ml/sparc.il
+echo_file  usr/src/uts/sparc/req.flg
+echo_file  usr/src/uts/intel/Makefile
+echo_file  usr/src/uts/intel/Makefile.files
+echo_file  usr/src/uts/intel/Makefile.rules
+echo_file  usr/src/uts/intel/Makefile.intel
+echo_file  usr/src/uts/intel/Makefile.intel.shared
+echo_file  usr/src/uts/intel/Makefile.targ
+echo_file  usr/src/uts/intel/Makefile.targ.shared
+echo_file  usr/src/uts/intel/ia32/ml/ia32.il
+echo_file  usr/src/uts/sun4/Makefile.files
+echo_file  usr/src/uts/sun4/Makefile.rules
+echo_file  usr/src/uts/sun4u/Makefile
+echo_file  usr/src/uts/sun4u/Makefile.files
+echo_file  usr/src/uts/sun4u/Makefile.rules
+echo_file  usr/src/uts/sun4u/Makefile.sun4u
+echo_file  usr/src/uts/sun4u/Makefile.sun4u.shared
+echo_file  usr/src/uts/sun4u/Makefile.targ
+echo_file  usr/src/uts/sun4u/Makefile.targ.shared
+echo_file  usr/src/uts/sun4u/Makefile.workarounds
+echo_file  usr/src/uts/sfmmu/Makefile.files
+echo_file  usr/src/uts/sfmmu/Makefile.rules
+echo_file  usr/src/uts/sparc/v9/Makefile.files
+echo_file  usr/src/uts/sparc/v9/Makefile.rules
+echo_file  usr/src/cmd/Makefile
+echo_file  usr/src/cmd/Makefile.cmd
+echo_file  usr/src/cmd/Makefile.targ
+echo_file  usr/src/pkg/Makefile
+echo_file  exception_lists/packaging
+echo_file  exception_lists/packaging.closed
+echo_file  exception_lists/packaging.open
+find_files "s.*" usr/src/common/mapfiles

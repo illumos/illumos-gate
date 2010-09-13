@@ -1,0 +1,104 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH MODECANON 3
+.SH NAME
+modecanon \- canonical file mode representation
+.SH SYNOPSIS
+#include <modex.h>
+
+int    modei(int \fIexternal\fP);
+int    modex(int \fIinternal\fP);
+.EE
+.SH DESCRIPTION
+POSIX threw out the file type bit macros and replaced them with
+function-like macros that test file type.
+This is bad in many ways, the worst of which is that it provides
+no way for a user program to synthesize file types in the mode bits.
+.IR pax (1),
+.IR tar (1)
+and
+.IR cpio (1)
+are examples of user programs that must convert between the internal mode
+representation and a private external representation.
+These routines provide a canonical external representation
+with macros to access and synthesize the bits in the external
+representation.
+.PP
+.L modei
+takes an external mode representation
+.I external
+and returns the equivalent internal representation.
+.PP
+.L modex
+takes an internal mode representation
+.I internal
+and returns the equivalent external representation.
+.PP
+The traditional bit access macro (\f5S_\fP prefix changes to \f5X_\fP) are:
+.L X_IFMT ,
+.L X_IFSOCK ,
+.L X_IFLNK ,
+.L X_IFCTG ,
+.L X_IFREG ,
+.L X_IFBLK ,
+.L X_IFDIR ,
+.L X_IFCHR ,
+.L X_IFIFO ,
+.L X_IPERM ,
+.L X_ISUID ,
+.L X_ISGID ,
+.L X_ISVTX ,
+.L X_IRUSR ,
+.L X_IWUSR ,
+.L X_IXUSR ,
+.L X_IRGRP ,
+.L X_IWGRP ,
+.L X_IXGRP ,
+.L X_IROTH ,
+.L X_IWOTH ,
+.L X_IXOTH ,
+.L X_IRWXU ,
+.L X_IRWXG
+and
+.L X_IRWXO .
+.LI X_ITYPE( mode )
+returns the type bits for 
+.IR mode .
+.SH "SEE ALSO"
+pax(1), stat(2)

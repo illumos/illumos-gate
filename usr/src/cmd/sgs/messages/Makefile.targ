@@ -1,0 +1,76 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# cmd/sgs/messages/Makefile.targ
+
+all:		$(POFILE)
+
+include		$(SRC)/cmd/Makefile.targ
+
+catalog \
+install:	$(MSGDOMAIN)/$(POFILE)
+
+$(MSGDOMAIN)/$(POFILE): \
+		$(MSGDOMAIN) $(POFILE)
+		$(RM) $(MSGDOMAIN)/$(POFILE)
+		cp $(POFILE) $(MSGDOMAIN)
+
+delete lint:
+
+clean:
+		$(RM) $(CLEANFILES)
+
+# The elfedit modules message files need a special rule that runs
+# the elfedit catalog target. It generates module messages files
+# as part of that process.
+$(POFILES_ELFEDIT_MODULES) :
+		@ cd ../../elfedit; pwd; $(MAKE) catalog
+
+$(POFILE):	$(POFILES) $(POFILES_ELFEDIT_MODULES)
+		$(RM) $(POFILE)
+		cat $(POFILES) $(POFILES_ELFEDIT_MODULES) > $(POFILE)
+
+
+# Install a local version of the message catalog.  Test using: LANG=piglatin
+
+test:		$(MSGDIR)/$(TEST_MOFILE)
+
+$(MSGDIR)/$(TEST_MOFILE): \
+		$(MSGDIR) $(TEST_MSGID) $(TEST_MSGSTR)
+		$(RM) $(MSGDIR)/$(TEXT_DOMAIN).mo
+		sort -n $(TEST_MSGID) $(TEST_MSGSTR) | \
+			sed -e "s/ *[0-9]*	//" > $(TEST_POFILE)
+		$(MSGFMT) -o $(MSGDIR)/$(TEST_MOFILE) $(TEST_POFILE)
+
+$(TEST_MSGID):	$(POFILE)
+		grep "^msgid" $(POFILE) | \
+			$(SGSMSG_PIGLATIN_NL) 1 > $(TEST_MSGID)
+
+$(TEST_MSGSTR):	$(POFILE)
+		cat $(POFILE) | $(SGSTOOLS)/$(MACH)/piglatin | \
+		    grep "^sgidmay" | sed -e "s/^sgidmay/msgstr/" | \
+		    $(SGSMSG_PIGLATIN_NL) 2 > $(TEST_MSGSTR)
+
+$(MSGDIR):
+		-@mkdir -p $(MSGDIR)

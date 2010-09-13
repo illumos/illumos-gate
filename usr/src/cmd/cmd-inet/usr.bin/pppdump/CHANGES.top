@@ -1,0 +1,9 @@
+ident	"%Z%%M%	%I%	%E% SMI"
+
+Copyright (c) 2000 by Sun Microsystems, Inc.
+All rights reserved.
+
+This code is extracted from the ANU ppp-2.4.0 package and modified to
+build in a Solaris environment.  You can get the original source here:
+
+	ftp://linuxcare.com.au/pub/ppp

@@ -1,0 +1,98 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+OLD_CONF=/etc/default/syslogd
+
+. /lib/svc/share/smf_include.sh
+
+convert()
+{
+	svccfg -s svc:/system/system-log setprop config/log_from_remote = $1
+	if [ $? -ne 0 ]; then
+		svccfg -s svc:/system/system-log addpg config application
+		svccfg -s svc:/system/system-log \
+		    addpropvalue config/log_from_remote boolean: $1
+		if [ $? -ne 0 ] ; then
+			echo 'Failed to set remote syslog-logging'
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+	fi
+	echo "Incorporated ${OLD_CONF} settings into SMF. See syslogd(1m)."
+	awk '{
+		if ($1 ~ /^LOG_FROM_REMOTE=/) {
+			print "# LOG_FROM_REMOTE is now set using "
+			    "svccfg(1m), see syslog(1m).";
+		} else {
+			print $0;
+		}
+	}' ${OLD_CONF} >${OLD_CONF}.new && cp ${OLD_CONF}.new ${OLD_CONF}
+	rm -f ${OLD_CONF}.new
+}
+
+if [ ! -f /etc/syslog.conf ]; then
+	echo "/etc/syslog.conf is missing. Exiting."
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if [ ! -x /usr/sbin/syslogd ]; then
+	echo "Executable /usr/sbin/syslogd not found. Exiting"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if smf_is_globalzone; then
+	#
+	# Before syslogd starts, save any messages from
+	# previous crash dumps so that messages appear
+	# in chronological order.
+	#
+	/usr/bin/savecore -m
+	if [ -r /etc/dumpadm.conf ]; then
+		. /etc/dumpadm.conf
+		[ -n "$DUMPADM_DEVICE" -a \
+	    	"x$DUMPADM_DEVICE" != xswap ] && \
+	    	/usr/bin/savecore -m -f $DUMPADM_DEVICE
+	fi
+fi
+if [ ! -f /var/adm/messages ]; then
+	/usr/bin/cp /dev/null /var/adm/messages
+	/usr/bin/chmod 0644 /var/adm/messages
+fi
+remote=`awk -F= '
+	/^LOG_FROM_REMOTE=[yY][Ee][Ss]/ {print "true"}
+	/^LOG_FROM_REMOTE=[Nn][Oo]/     {print "false"}' < ${OLD_CONF}`
+case ${remote} in
+"")
+    ;;
+"true"|"false")
+    convert ${remote}
+    ;;
+*)
+    echo "Unsupported value in for LOG_FROM_REMOTE in ${OLD_CONF}"
+    exit $SMF_EXIT_ERR_CONFIG
+    ;;
+esac
+
+/usr/sbin/syslogd >/dev/msglog 2>&1 &

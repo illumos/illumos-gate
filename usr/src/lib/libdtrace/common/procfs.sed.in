@@ -1,0 +1,163 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This file is a sed script which is first preprocessed by cpp or cc -E to
+ * define a set of sed directives which replace #define tokens with their
+ * values.  After preprocessing, the sed script is run over procfs.d.in to
+ * replace the #define tokens listed below to create the finished procfs.d.
+ * Refer to the rules in libdtrace/Makefile.com for more information.
+ */
+
+#include <sys/model.h>
+#include <sys/thread.h>
+#include <sys/proc.h>
+#include <sys/procfs.h>
+#include <sys/sobject.h>
+#include <sys/siginfo.h>
+
+#define	SED_REPLACE(x)	s/#x/x/g
+
+SED_REPLACE(DATAMODEL_ILP32)
+SED_REPLACE(DATAMODEL_LP64)
+
+SED_REPLACE(TP_DAEMON)
+SED_REPLACE(TP_TWAIT)
+SED_REPLACE(TP_PRVSTOP)
+SED_REPLACE(TS_PSTART)
+SED_REPLACE(TS_FREE)
+SED_REPLACE(TS_SLEEP)
+SED_REPLACE(TS_RUN)
+SED_REPLACE(TS_ONPROC)
+SED_REPLACE(TS_ZOMB)
+SED_REPLACE(TS_STOPPED)
+SED_REPLACE(TS_WAIT)
+
+SED_REPLACE(P_PR_FORK)
+SED_REPLACE(P_PR_RUNLCL)
+SED_REPLACE(P_PR_KILLCL)
+SED_REPLACE(P_PR_ASYNC)
+SED_REPLACE(P_PR_BPTADJ)
+SED_REPLACE(P_PR_PTRACE)
+
+SED_REPLACE(SSYS)
+SED_REPLACE(SMSACCT)
+SED_REPLACE(SMSFORK)
+SED_REPLACE(SVFWAIT)
+
+SED_REPLACE(SSLEEP)
+SED_REPLACE(SRUN)
+SED_REPLACE(SZOMB)
+SED_REPLACE(SSTOP)
+SED_REPLACE(SIDL)
+SED_REPLACE(SONPROC)
+SED_REPLACE(SWAIT)
+
+SED_REPLACE(CLDNOSIGCHLD)
+SED_REPLACE(CLDWAITPID)
+
+SED_REPLACE(PR_STOPPED)
+SED_REPLACE(PR_ISTOP)
+SED_REPLACE(PR_DSTOP)
+SED_REPLACE(PR_STEP)
+SED_REPLACE(PR_ASLEEP)
+SED_REPLACE(PR_PCINVAL)
+SED_REPLACE(PR_ASLWP)
+SED_REPLACE(PR_AGENT)
+SED_REPLACE(PR_DETACH)
+SED_REPLACE(PR_DAEMON)
+SED_REPLACE(PR_IDLE)
+SED_REPLACE(PR_ISSYS)
+SED_REPLACE(PR_VFORKP)
+SED_REPLACE(PR_ORPHAN)
+SED_REPLACE(PR_NOSIGCHLD)
+SED_REPLACE(PR_WAITPID)
+SED_REPLACE(PR_FORK)
+SED_REPLACE(PR_RLC)
+SED_REPLACE(PR_KLC)
+SED_REPLACE(PR_ASYNC)
+SED_REPLACE(PR_MSACCT)
+SED_REPLACE(PR_BPTADJ)
+SED_REPLACE(PR_PTRACE)
+SED_REPLACE(PR_MSFORK)
+
+SED_REPLACE(PR_MODEL_ILP32)
+SED_REPLACE(PR_MODEL_LP64)
+
+SED_REPLACE(SOBJ_NONE)
+SED_REPLACE(SOBJ_MUTEX)
+SED_REPLACE(SOBJ_RWLOCK)
+SED_REPLACE(SOBJ_CV)
+SED_REPLACE(SOBJ_SEMA)
+SED_REPLACE(SOBJ_USER)
+SED_REPLACE(SOBJ_USER_PI)
+SED_REPLACE(SOBJ_SHUTTLE)
+
+SED_REPLACE(SI_USER)
+SED_REPLACE(SI_LWP)
+SED_REPLACE(SI_QUEUE)
+SED_REPLACE(SI_TIMER)
+SED_REPLACE(SI_ASYNCIO)
+SED_REPLACE(SI_MESGQ)
+SED_REPLACE(SI_RCTL)
+SED_REPLACE(ILL_ILLOPC)
+SED_REPLACE(ILL_ILLOPN)
+SED_REPLACE(ILL_ILLOPN)
+SED_REPLACE(ILL_ILLADR)
+SED_REPLACE(ILL_ILLTRP)
+SED_REPLACE(ILL_PRVOPC)
+SED_REPLACE(ILL_PRVREG)
+SED_REPLACE(ILL_COPROC)
+SED_REPLACE(ILL_BADSTK)
+SED_REPLACE(FPE_INTDIV)
+SED_REPLACE(FPE_INTOVF)
+SED_REPLACE(FPE_FLTDIV)
+SED_REPLACE(FPE_FLTOVF)
+SED_REPLACE(FPE_FLTUND)
+SED_REPLACE(FPE_FLTRES)
+SED_REPLACE(FPE_FLTINV)
+SED_REPLACE(FPE_FLTSUB)
+SED_REPLACE(SEGV_MAPERR)
+SED_REPLACE(SEGV_ACCERR)
+SED_REPLACE(BUS_ADRALN)
+SED_REPLACE(BUS_ADRERR)
+SED_REPLACE(BUS_OBJERR)
+SED_REPLACE(TRAP_BRKPT)
+SED_REPLACE(TRAP_TRACE)
+SED_REPLACE(CLD_EXITED)
+SED_REPLACE(CLD_KILLED)
+SED_REPLACE(CLD_DUMPED)
+SED_REPLACE(CLD_TRAPPED)
+SED_REPLACE(CLD_STOPPED)
+SED_REPLACE(CLD_CONTINUED)
+SED_REPLACE(POLL_IN)
+SED_REPLACE(POLL_OUT)
+SED_REPLACE(POLL_MSG)
+SED_REPLACE(POLL_ERR)
+SED_REPLACE(POLL_PRI)
+SED_REPLACE(POLL_HUP)

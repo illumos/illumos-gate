@@ -1,0 +1,493 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH MAGIC 3
+.SH NAME
+magic \- magic file interface
+.SH SYNOPSIS
+.EX
+#include <magic.h>
+
+Magic_t
+{
+	unsigned long	flags;
+};
+
+Magic_t*  magicopen(unsigned long \fIflags\fP);
+void      magicclose(Magic_t* \fImagic\fP);
+
+int       magicload(Magic_t* \fImagic\fP, const char* \fIpath\fP, unsigned long \fIflags\fP);
+int       magiclist(Magic_t* \fImagic\fP, Sfio_t* \fIsp\fP);
+
+char*     magictype(Magic_t* \fImagic\fP, const char* \fIpath\fP, struct stat* \fIst\fP);
+.EE
+.SH DESCRIPTION
+These routines provide an interface to the
+.IR file (1)
+command magic file.
+.L magicopen
+returns a magic session handle that is passed to all of the other routines.
+.I flags 
+may be
+.TP
+.L MAGIC_MIME
+Return the MIME type string rather than the magic file description.
+.TP
+.L MAGIC_PHYSICAL
+Don't follow symbolic links.
+.TP
+.L MAGIC_STAT
+The stat structure
+.I st
+passed to
+.I magictype
+will contain valid
+.I stat (2)
+information.
+See
+.L magictype
+below.
+.TP
+.L MAGIC_VERBOSE
+Enable verbose error messages.
+.PP
+.L magicclose
+closes the magic session.
+.PP
+.L magicload
+loads the magic file named by
+.I path
+into the magic session.
+.I flags
+are the same as with 
+.LR magicopen .
+More than one magic file can be loaded into a session;
+the files are searched in load order.
+If
+.I path
+is 
+.L 0
+then the default magic file is loaded.
+.PP
+.L magiclist
+lists the magic file contents on the
+.IR sfio (3)
+stream
+.IR sp .
+This is used for debugging magic entries.
+.PP
+.L magictype
+returns the type string for
+.I path
+with optional
+.IR stat (2)
+information
+.IR st .
+If
+.I "st == 0"
+then
+.L magictype
+calls
+.L stat
+on a private stat buffer,
+else if
+.L magicopen
+was called with the
+.L MAGIC_STAT
+flag then
+.I st
+is assumed to contain valid stat information, otherwise
+.L magictype
+calls 
+.L stat
+on
+.IR st .
+.L magictype
+always returns a non-null string.
+If errors are encounterd on
+.I path
+then the return value will contain information on those errors, e.g.,
+.LR "cannot stat" .
+.SH FORMAT
+The magic file format is a backwards compatible extension of an
+ancient System V file implementation.
+However, with the extended format it is possible to write a single
+magic file that works on all platforms.
+Most of the net magic files floating around work with
+.LR magic ,
+but they usually double up on 
+.I le
+and
+.I be
+entries that are automatically handled by
+.LR magic .
+.PP
+A magic file entry describes a procedure for determining a single file type
+based on the file pathname,
+.I stat (2)
+information, and the file data.
+An entry is a sequence of lines, each line being a record of
+.I space
+separated fields.
+The general record format is:
+.EX
+[op]offset type [mask]expression description [mimetype]
+.EE
+.L #
+in the first column introduces a comment.
+The first record in an entry contains no
+.LR op ;
+the remaining records for an entry contain an
+.LR op .
+Integer constants are as in C:
+.L 0x*
+or
+.L 0X*
+for hexadecimal,
+.L 0*
+for octal and decimal otherwise.
+.PP
+The
+.L op
+field may be one of:
+.TP
+.L +
+The previous records must match but the current record is optional.
+.L >
+is an old-style synonym for
+.LR + .
+.TP
+.L &
+The previous and current records must match.
+.TP
+.L {
+Starts a nesting block that is terminated by
+.LR } .
+A nesting block pushes a new context for the
+.L +
+and
+.L &
+ops.
+The
+.L {
+and
+.L }
+records have no other fields.
+.TP
+\fIid\f5{\fR
+A function declaration and call for the single character identifier
+.IR id .
+The function return is a nesting block end record
+.LR } .
+Function may be redefined.
+Functions have no arguments or return value.
+.TP
+\fIid\f5()\fR
+A call to the function
+.IR id .
+.PP
+The
+.L offset
+field is either the offset into the data upon which the current entry operates
+or a file metadata identifier.
+Offsets are either integer constants or offset expressions.
+An offset expression is contained in (...) and is a combination of
+integral arithmetic operators and the 
+.L @
+indirection operator.
+Indirections take the form
+.LI @ integer
+where integer is the data offset for the indirection value.
+The size of the indirection value is taken either from one of the suffixes
+.LR B (byte, 1 char),
+.LR H (short, 2 chars),
+.LR L (long, 4 chars),
+pr
+.LR Q (quead, 8 chars),
+or from the
+.L type 
+field.
+Valid file metadata identifiers are:
+.TP
+.L atime
+The string representation of
+.LR stat.st_atime .
+.TP
+.L blocks
+.LR stat.st_blocks .
+.TP
+.L ctime
+The string representation of
+.LR stat.st_ctime .
+.TP
+.L fstype
+The string representation of
+.LR stat.st_fstype .
+.TP
+.L gid
+The string representation of
+.LR stat.st_gid .
+.TP
+The
+.L stat.st_mode
+file mode bits in
+.IR modecanon (3)
+canonical representation (i.e., the good old octal values).
+.TP
+.L mtime
+The string representation of
+.LR stat.st_mtime .
+.TP
+.L nlink
+.LR stat.st_nlink .
+.TP
+.L size
+.LR stat.st_size .
+.TP
+.L name
+The file path name sans directory.
+.TP
+.L uid
+The string representation of
+.LR stat.st_uid .
+.PP
+The
+.L type
+field specifies the type of the data at
+.LR offset .
+Integral types may be prefixed by
+.L le
+or
+.L be
+for specifying exact little-endian or big-endian representation,
+but the internal algorithm automatically loops through the
+standard representations to find integral matches,
+so representation prefixes are rarely used.
+However, this looping may cause some magic entry conflicts; use the
+.L le
+or
+.L be
+prefix in these cases.
+Only one representation is used for all the records in an entry.
+Valid types are:
+.TP
+.L byte
+A 1 byte integer.
+.TP
+.L short
+A 2 byte integer.
+.TP
+.L long
+A 4 byte integer.
+.TP
+.L quad
+An 8 byte integer.
+Tests on this type may fail is the local compiler does not support
+an 8 byte integral type and the corresponding value overflows 4 bytes.
+.TP
+.L date
+The data at
+.L offset
+is interpreted as a 4 byte seconds-since-the-epoch date and
+converted to a string.
+.TP
+.L edit
+The
+.L expression
+field is an
+.IR ed (1)
+style substitution expression
+\fIdel old del new del \fP [ \fI flags \fP ]
+where the substituted value is made available to the
+.L description
+field
+.L %s
+format.
+In addition to the
+.I flags
+supported by
+.IR ed (3)
+are
+.L l
+that converts the substituted value to lower case and
+.L u
+that converts the substituted value to upper case.
+If
+.I old
+does not match the string data at
+.L offset
+then the entry record fails.
+.TP
+.L match
+.L expression
+field is a
+.IR strmatch (3)
+pattern that is matched against the string data at
+.LR offset .
+.TP
+.L string
+The
+.L expression
+field is a string that is compared with the string data at
+.LR offset .
+.PP
+The optional
+.L mask
+field takes the form
+.LI & number
+where
+.I number
+is 
+.I anded
+with the integral value at
+.L offset
+before the
+.L expression
+is applied.
+.PP
+The contents of the expression field depends on the
+.LR type .
+String type expression are described in the
+.L type
+field entries above.
+.L *
+means any value and applies to all types.
+Integral
+.L type
+expression take the form [\fIoperator\fP] \fIoperand\P where 
+.I operand
+is compared with the data value at
+.L offset
+using
+.IR operator .
+.I operator 
+may be one of
+.LR < .
+.LR <= ,
+.LR == ,
+.LR >=
+or
+.LR > .
+.I operator
+defaults to
+.L ==
+if omitted.
+.I operand 
+may be an integral constant or one of the following builtin function calls:
+.TP
+.L magic()
+A recursive call to the magic algorithm starting with the data at
+.LR offset .
+.TP
+\f5loop(\fIfunction\fP,\fIoffset\fP,\fIincrement\fP)\fR
+Call 
+.I function
+starting at
+.I offset
+and increment
+.I offset
+by
+.I increment
+after each iteration.
+Iteration continues until the description text does not change.
+.PP
+The
+.L description
+field is the most important because it is this field that is presented
+to the outside world.
+When constructing description
+fields one must be very careful to follow the style layed out in the
+magic file, lest yet another layer of inconsistency creep into the system.
+The description for each matching record in an entry are concatenated
+to form the complete magic type.
+If the previous matching description in the current entry does not end with
+.I space
+and the current description is not empty and does not start with
+.I comma ,
+.I dot
+or
+.I backspace
+then a
+.I space
+is placed between the descriptions
+(most optional descriptions start with
+.IR comma .)
+The data value at 
+.L offset
+can be referenced in the description using
+.L %s
+for the string types and
+.L %ld
+or
+.L %lu
+for the integral types.
+.PP
+The
+.L mimetype
+field specifies the MIME type, usually in the form
+.IR a / b .
+.SH FILES
+.L ../lib/file/magic
+located on
+.L $PATH
+.SH EXAMPLES
+.EX
+0	long		0x020c0108	hp s200 executable, pure
+o{
++36	long		>0		, not stripped
++4	short		>0		, version %ld
+}
+
+0	long		0x020c0107	hp s200 executable
+o()
+
+0	long		0x020c010b	hp s200 executable, demand-load
+o()
+.EE
+The function
+.LR o() ,
+shared by 3 entries,
+determines if the executable is stripped and also extracts the version number.
+.EX
+0	long		0407		bsd 386 executable
+&mode	long		&0111!=0
++16	long		>0		, not stripped
+.EE
+This entry requires that the file also has execute permission.
+.SH "SEE ALSO"
+file(1), mime(4), tw(1), modecanon(3)

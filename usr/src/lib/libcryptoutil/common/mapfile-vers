@@ -1,0 +1,81 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	create_umech;
+	cryptodebug;
+	cryptodebug_init;
+	cryptoerror;
+	cryptoerror_off;
+	cryptoerror_on;
+	free_uentry;
+	free_uentrylist;
+	free_umechlist;
+	getent_uef;
+	get_fullpath;
+	get_metaslot_info;
+	get_pkcs11conf_info;
+	hexstr_to_bytes;
+	open_nointr;
+	pkcs11_close_random;
+	pkcs11_close_urandom;
+	pkcs11_close_urandom_seed;
+	pkcs11_default_token;
+	pkcs11_free_uri;
+	pkcs11_get_nzero_urandom;
+	pkcs11_get_pass;
+	pkcs11_get_random;
+	pkcs11_get_urandom;
+	pkcs11_mech2keytype;
+	pkcs11_mech2keygen;
+	pkcs11_mech2str;
+	pkcs11_parse_uri;
+	pkcs11_read_data;
+	pkcs11_seed_random;
+	pkcs11_seed_urandom;
+	pkcs11_str2mech;
+	pkcs11_strerror;
+	readn_nointr;
+	str2lifetime;
+	tohexstr;
+	writen_nointr;
+    local:
+	*;
+};

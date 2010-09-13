@@ -1,0 +1,177 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 1996, by Sun Microsystems, Inc.
+ * All rights reserved.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include	<locale.h>
+#include	<euc.h>
+#include	<widec.h>
+#define	xfree(a)	{ if (a!=NULL) { yfree(a); a=NULL; } }
+#define	yfree free
+#ifdef	DEBUG
+#define	dprintf	if (dbg) printf
+#else
+#	define	dprintf(x1, x2, x3, x4)
+#endif
+#define	WC_VERY_SMALL ((wchar_t) 0x0001)
+#define	WC_VERY_LARGE ((wchar_t) ~0x0000)
+typedef double	awkfloat;
+
+extern wchar_t	**FS;
+extern wchar_t	**RS;
+extern wchar_t	**ORS;
+extern wchar_t	**OFS;
+extern wchar_t	**OFMT;
+extern awkfloat *NR;
+extern awkfloat *NF;
+extern wchar_t	**FILENAME;
+
+extern wchar_t	record[];
+extern wchar_t	L_NULL[];
+extern int	dbg;
+extern long long lineno;
+extern int	errorflag;
+extern int	donefld; /* 1 if record broken into fields */
+extern int	donerec; /* 1 if record is valid (no fld has changed */
+
+/* CELL:  all information about a variable or constant */
+
+typedef struct val {
+	char	ctype;		/* CELL, BOOL, JUMP, etc. */
+	char	csub;		/* subtype of ctype */
+	wchar_t *nval;   /* name, for variables only */
+	wchar_t *sval;   /* string value */
+	awkfloat fval;		/* value as number */
+	unsigned tval;		/* type info */
+	struct val *nextval;	/* ptr to next if chained */
+} CELL;
+
+extern CELL	*symtab[];
+extern CELL	*setsymtab(), *lookup(), **makesymtab();
+
+extern CELL	*recloc;	/* location of input record */
+extern CELL	*nrloc;		/* NR */
+extern CELL	*nfloc;		/* NF */
+extern CELL	*maxmfld;	/* pointer to CELL for maximum field assigned to */
+
+/* CELL.tval values: */
+#define	STR	01	/* string value is valid */
+#define	NUM	02	/* number value is valid */
+#define	FLD	04	/* FLD means don't free string space */
+#define	CON	010	/* this is a constant */
+#define	ARR	020	/* this is an array */
+
+awkfloat	setfval(), getfval();
+wchar_t  *setsval(), *getsval();
+wchar_t  *tostring(), *tokname();
+char	*toeuccode();
+double	log(), sqrt(), exp(), atof();
+
+/* function types */
+#define	FLENGTH	1
+#define	FSQRT	2
+#define	FEXP	3
+#define	FLOG	4
+#define	FINT	5
+
+#define	BOTCH	1
+typedef struct nd {
+	char	ntype;
+	char	subtype;
+	struct nd *nnext;
+	int	nobj;
+	struct nd *narg[BOTCH];	/* C won't take a zero length array */
+} NODE;
+
+extern NODE	*winner;
+
+/* ctypes */
+#define	OCELL	1
+#define	OBOOL	2
+#define	OJUMP	3
+
+/* CELL subtypes */
+#define	CCON	5
+#define	CTEMP	4
+#define	CNAME	3
+#define	CVAR	2
+#define	CFLD	1
+
+/* bool subtypes */
+#define	BTRUE	1
+#define	BFALSE	2
+
+/* jump subtypes */
+#define	JEXIT	1
+#define	JNEXT	2
+#define	JBREAK	3
+#define	JCONT	4
+
+/* node types */
+#define	NVALUE	1
+#define	NSTAT	2
+#define	NEXPR	3
+
+extern CELL	*(*proctab[])();
+extern int	pairstack[], paircnt;
+
+#define	cantexec(n)	(n->ntype == NVALUE)
+#define	notlegal(n)	(n <= FIRSTTOKEN || n >= LASTTOKEN || \
+				proctab[n-FIRSTTOKEN]== nullproc)
+#define	isexpr(n)	(n->ntype == NEXPR)
+#define	isjump(n)	(n->ctype == OJUMP)
+#define	isexit(n)	(n->ctype == OJUMP && n->csub == JEXIT)
+#define	isbreak(n)	(n->ctype == OJUMP && n->csub == JBREAK)
+#define	iscont(n)	(n->ctype == OJUMP && n->csub == JCONT)
+#define	isnext(n)	(n->ctype == OJUMP && n->csub == JNEXT)
+#define	isstr(n)	(n->tval & STR)
+#define	isnum(n)	(n->tval & NUM)
+#define	istrue(n)	(n->ctype == OBOOL && n->csub == BTRUE)
+#define	istemp(n)	(n->ctype == OCELL && n->csub == CTEMP)
+#define	isfld(n)	(!donefld && n->csub==CFLD && n->ctype==OCELL && \
+				n->nval==0)
+#define	isrec(n)	(donefld && n->csub==CFLD && n->ctype==OCELL && \
+				n->nval!=0)
+extern CELL	*nullproc();
+extern CELL	*relop();
+
+#define	MAXSYM	50
+#define	HAT	0177	/* matches ^ in regular expr */
+			/* watch out for mach dep */
+/*
+ * The code set number can be knew from actual character, but "b.c"
+ * will use some pseudo codes.  And that psedo code will not confirm
+ * to rule of real code set.
+ */
+typedef struct  ccl_chars {
+	unsigned short  cc_ns;   /* Code set Number */
+	wchar_t  cc_cs;   /* Actual character */
+	unsigned short  cc_ne;
+	wchar_t  cc_ce;
+} ccl_chars_t;
+
+ccl_chars_t	*cclenter();
+
+extern void error();

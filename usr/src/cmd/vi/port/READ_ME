@@ -1,0 +1,43 @@
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+This is version SVR3.1 of the editor.
+The version variable is set in ex.c.
+
+The header file local/uparm.h should be installed, as ex_tune.h needs it.
+The contents of this header file can be modified if you wish to place
+the editor in a nonstandard location.
+
+Conditional compilation flags:
+
+	-DTRACE		for debugging (the original command line syntax
+			 was "[-T [suffix]]"; this has been changed to be:
+			 "[-T] [-S suffix]" in order to standardize
+			 command line syntax.  For the moment, BOTH
+			 forms are acceptable; in the future, the original
+			 form will be dropped to eliminate the optional
+			 argument to the option T.
+	-DVFORK		for UCB Vax/Unix with the vfork system call.
+	-DCHDIR		compile in undocumented chdir (cd) command
+	-DLISP		compile in lisp hacks
+	-DUCVISUAL	compile in code to handle \ escapes for visual on
+			 upper case only terminals.

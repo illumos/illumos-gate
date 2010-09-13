@@ -1,0 +1,10 @@
+passwd passwd.byname
+group group.byname
+project project.byname
+networks networks.byaddr
+hosts hosts.byname
+ipnodes ipnodes.byname
+protocols protocols.bynumber
+services services.byname
+aliases mail.aliases
+ethers ethers.byname

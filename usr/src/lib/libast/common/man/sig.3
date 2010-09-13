@@ -1,0 +1,75 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH SIG 3
+.SH NAME
+sig \- signal interface routines
+.SH SYNOPSIS
+.L "#include <ast.h>"
+.L "#include <sig.h>"
+.sp
+.L "int sigunblock(int sig);"
+.L "int sigcritical(int op);"
+.SH DESCRIPTION
+.L sigunblock
+is called to
+unblocks the signal
+.L sig
+from within a handler currently servicing
+.LR sig .
+.PP
+.L sigcritical
+controls a critical region for the
+.LR SIGINT ,
+.L SIGQUIT
+and
+.L SIGHUP
+signals.
+.L "op > 0"
+pushes the region,
+.L "op == 0"
+pops the region, and
+.L "op < 0"
+returns non-zero if any signals are being held in the current
+critical region.
+Signal critical regions may be nested.
+The current critical region level is returned,
+.L \-1
+on error.
+.SH "SEE ALSO"
+signal(2)

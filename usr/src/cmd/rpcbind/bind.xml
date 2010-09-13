@@ -1,0 +1,225 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+    CDDL HEADER START
+   
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+   
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+   
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+   
+    CDDL HEADER END
+   
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+    Service manifest for rpcbind
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:rpcbind'>
+
+<service
+    name='network/rpc/bind'
+    type='service'
+    version='1'>
+
+    	<create_default_instance enabled='true' />
+
+	<single_instance />
+
+	<dependency
+		name='fs'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<!--
+		rpcbind(1M) has a strong dependency on the hostname.
+	-->
+	<dependency
+		name='identity'
+		grouping='require_all'
+		restart_on='refresh'
+		type='service'>
+		<service_fmri
+			value='svc:/system/identity:node' />
+	</dependency>
+
+	<dependency
+		name='sysidtool'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri
+			value='svc:/system/sysidtool:net' />
+	</dependency>
+
+	<!--
+		rpcbind(1M) depends on multicast routes installed by the
+		routing-setup service, and should be started after any IPsec
+		policy is configured and TCP ndd tunables are set (both
+		currently carried out by network/initial).
+	-->
+	<dependency
+		name='network_initial'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/routing-setup:default' />
+		<service_fmri value='svc:/network/initial:default' />
+	</dependency>
+
+	<dependency
+		name='network_ipfilter'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/ipfilter:default' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/rpc-bind %m'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+				user='root'
+				group='root'
+				privileges='basic,file_chown,file_chown_self,file_owner,net_privaddr,proc_setid,sys_nfs,net_bindmlp'
+				/>
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/rpc-bind %m %{restarter/contract}'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+				user='root'
+				group='root'
+				privileges='basic,proc_owner'
+				/>
+		</method_context>
+	</exec_method>
+
+	<property_group name='config' type='application' >
+		<!-- default property settings for rpcbind(1M). -->
+
+		<!-- enable_tcpwrappers affects the wrapping of rpcbind,
+		     see rpcbind(1M) and tcpd(1M) for details.
+		     The default value is 'false'.
+		     A values of 'true' results in wrapping all UDP/TCP
+		     calls to the portmapper with libwrap. Note that
+		     rpcbind(1M) will not resolve or lookup names while
+		     doing tcp wrapper processing.
+		-->
+		<propval
+			name='enable_tcpwrappers'
+			type='boolean'
+			value='false' />
+
+		<!-- verbose_logging affects the amount of information
+		     which is logged by the tcpwrapper code.
+		     The default is 'false'.
+		     This property has no effect when tcp wrappers are not
+		     enabled.
+		-->
+		<propval
+			name='verbose_logging'
+			type='boolean'
+			value='false' />
+
+		<!-- allow_indirect affects the forwarding of RPC calls
+		     indirect rpcbind calls using rpcb_rmtcall(3NSL).
+		     The default value is 'true'. By default this is allowed
+		     for all services except for a handful.
+		     A value of 'false' stops all indirect calls. This will
+		     also disable broadcast rpc. NIS broadcast clients rely
+		     on this functionality to exist on NIS servers.
+		-->
+		<propval
+			name='allow_indirect'
+			type='boolean'
+			value='true' />
+
+		<!-- local_only specifies whether rpcbind should allow
+		     calls from hosts other than the localhost.
+		     Setting local_only to true will make rpcbind serve
+		     only those requests that come in from the local machine.
+		     Setting local_only to false will allow access from
+		     other hosts.
+		-->
+		<propval
+			name='local_only'
+			type='boolean'
+			value='true' />
+
+		<!-- to configure rpc/bind -->
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.rpc.bind' />
+	</property_group>
+
+	<!-- Authorization -->
+	<property_group name='general' type='framework'>
+		<!-- to operate rpc/bind -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.rpc.bind' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='name' type='astring' value='sunrpc' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				RPC bindings
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='rpcbind' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

@@ -1,0 +1,119 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<!--Entity Definitions-->
+
+<!ENTITY % dynamic_doc "INCLUDE">
+
+<!ENTITY % static_doc "IGNORE">
+
+<![ %dynamic_doc; [
+<!ENTITY % core		"comment	CDATA #IMPLIED
+			ref_id		ID #REQUIRED">
+]]>
+
+<![ %static_doc; [
+<!ENTITY % core   	"comment	CDATA #IMPLIED
+                    	ref_id		ID #REQUIRED">
+]]>
+
+<!ENTITY % min_max 	"min		CDATA #REQUIRED
+                    	max		CDATA #REQUIRED">
+
+<!--Element Definitions-->
+
+<!-- res_comp describes a component resource, this may contain components -->
+<!ELEMENT res_comp	(comp | property)*>
+
+<!ATTLIST res_comp	%core;
+			%min_max;
+		        name		CDATA #REQUIRED
+			default		(true | false) 'false'
+			units		CDATA #REQUIRED
+			sys_id		CDATA #REQUIRED
+			type		CDATA #REQUIRED
+			a-dtype		NMTOKENS	'min uint
+							max uint
+							default boolean 
+							units string
+							sys_id int
+							type string'>
+<!-- res_agg describes an aggregate resource -->
+<!ELEMENT res_agg	(property)*>
+
+<!ATTLIST res_agg	%core;
+		        name		CDATA #REQUIRED
+			default		(true | false) 'false'
+			units		CDATA #REQUIRED
+			sys_id		CDATA #REQUIRED
+			type		CDATA #REQUIRED
+			a-dtype		NMTOKENS	'default boolean
+							units string
+							sys_id int
+							type string'>
+
+<!-- comp describes a resource component -->
+<!ELEMENT comp		(#PCDATA | property)*>
+
+<!ATTLIST comp		%core;
+			type		CDATA #REQUIRED
+			sys_id		NMTOKEN #REQUIRED
+			a-dtype		NMTOKENS	'type string
+							sys_id int'>
+
+<!-- pool describes a resource pool -->
+<!ELEMENT pool		(#PCDATA | property)*>
+
+<!ATTLIST pool		%core;
+			name		CDATA #REQUIRED
+			importance	CDATA #REQUIRED
+			active		(true | false) 'true'
+			default		(true | false) 'false'
+			res		IDREFS #REQUIRED
+			a-dtype		NMTOKENS	'importance int
+							default boolean
+							active boolean' >
+
+<!-- property describes a resource property -->
+<!ELEMENT property	(#PCDATA)>
+
+<!ATTLIST property	name		NMTOKEN #REQUIRED
+			type		NMTOKEN #REQUIRED
+			a-dtype		NMTOKENS	'name string
+							type string'>
+
+<!-- system describes a resource system -->
+<!ELEMENT system  	(property | res_comp | res_agg | pool)*>
+
+<!ATTLIST system	%core;
+			name		CDATA #REQUIRED
+			bind-default	(true | false) 'false'
+			version		NMTOKEN #FIXED '1'
+			a-dtype		NMTOKENS	'bind-default   boolean
+                                      			version  int'>

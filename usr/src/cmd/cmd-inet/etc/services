@@ -1,0 +1,153 @@
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Network services, Internet style
+#
+tcpmux		1/tcp
+echo		7/tcp
+echo		7/udp
+discard		9/tcp		sink null
+discard		9/udp		sink null
+systat		11/tcp		users
+daytime		13/tcp
+daytime		13/udp
+netstat		15/tcp
+chargen		19/tcp		ttytst source
+chargen		19/udp		ttytst source
+ftp-data	20/tcp
+ftp		21/tcp
+ssh		22/tcp				# Secure Shell
+telnet		23/tcp
+smtp		25/tcp		mail
+time		37/tcp		timserver
+time		37/udp		timserver
+name		42/udp		nameserver
+whois		43/tcp		nicname		# usually to sri-nic
+domain		53/udp
+domain		53/tcp
+bootps		67/udp				# BOOTP/DHCP server
+bootpc		68/udp				# BOOTP/DHCP client
+kerberos	88/udp		kdc		# Kerberos V5 KDC
+kerberos	88/tcp		kdc		# Kerberos V5 KDC
+hostnames	101/tcp		hostname	# usually to sri-nic
+pop2		109/tcp		pop-2		# Post Office Protocol - V2
+pop3		110/tcp				# Post Office Protocol - Version 3
+sunrpc		111/udp		rpcbind
+sunrpc		111/tcp		rpcbind
+imap		143/tcp		imap2		# Internet Mail Access Protocol v2
+ldap		389/tcp				# Lightweight Directory Access Protocol	
+ldap		389/udp				# Lightweight Directory Access Protocol
+dhcpv6-client	546/udp		dhcpv6c		# DHCPv6 Client (RFC 3315)
+dhcpv6-server	547/udp		dhcpv6s		# DHCPv6 Server (RFC 3315)
+submission	587/tcp				# Mail Message Submission
+submission	587/udp				#    see RFC 2476
+ldaps		636/tcp				# LDAP protocol over TLS/SSL (was sldap)
+ldaps		636/udp				# LDAP protocol over TLS/SSL (was sldap)
+icap		1344/tcp			# Internet Content Adaptation Protocol
+#
+# Host specific functions
+#
+tftp		69/udp
+rje		77/tcp
+finger		79/tcp
+link		87/tcp		ttylink
+supdup		95/tcp
+iso-tsap	102/tcp
+x400		103/tcp				# ISO Mail
+x400-snd	104/tcp
+csnet-ns	105/tcp
+pop-2		109/tcp				# Post Office
+uucp-path	117/tcp
+nntp            119/tcp         usenet		# Network News Transfer
+ntp		123/tcp				# Network Time Protocol
+ntp		123/udp				# Network Time Protocol
+netbios-ns	137/tcp				# NETBIOS Name Service
+netbios-ns	137/udp				# NETBIOS Name Service
+netbios-dgm	138/tcp				# NETBIOS Datagram Service
+netbios-dgm	138/udp				# NETBIOS Datagram Service
+netbios-ssn	139/tcp				# NETBIOS Session Service
+netbios-ssn	139/udp				# NETBIOS Session Service
+NeWS		144/tcp		news		# Window System
+snmpd		161/udp		snmp		# Net-SNMP snmp daemon
+slp		427/tcp		slp		# Service Location Protocol, V2
+slp             427/udp         slp             # Service Location Protocol, V2
+mobile-ip	434/udp		mobile-ip	# Mobile-IP
+cvc_hostd	442/tcp				# Network Console
+microsoft-ds	445/tcp				# Microsoft Directory Services
+microsoft-ds	445/udp				# Microsoft Directory Services
+ike		500/udp		ike		# Internet Key Exchange
+uuidgen		697/tcp				# UUID Generator
+uuidgen		697/udp				# UUID Generator
+#
+# UNIX specific services
+#
+# these are NOT officially assigned
+#
+rdc		121/tcp				# SNDR server daemon
+exec		512/tcp
+login		513/tcp
+shell		514/tcp		cmd		# no passwords used
+printer		515/tcp		spooler		# line printer spooler
+courier		530/tcp		rpc		# experimental
+uucp		540/tcp		uucpd		# uucp daemon
+biff		512/udp		comsat
+who		513/udp		whod
+syslog		514/udp
+talk		517/udp
+route		520/udp		router routed
+ripng		521/udp
+klogin		543/tcp				# Kerberos authenticated rlogin
+kshell		544/tcp		cmd		# Kerberos authenticated remote shell
+new-rwho	550/udp		new-who		# experimental
+rmonitor	560/udp		rmonitord	# experimental
+monitor		561/udp				# experimental
+pcserver	600/tcp				# ECD Integrated PC board srvr
+sun-dr		665/tcp				# Remote Dynamic Reconfiguration
+kerberos-adm	749/tcp				# Kerberos V5 Administration
+kerberos-adm	749/udp				# Kerberos V5 Administration
+kerberos-iv	750/udp         		# Kerberos V4 key server
+krb5_prop	754/tcp				# Kerberos V5 KDC propogation
+swat		901/tcp				# Samba Web Adm.Tool
+ufsd		1008/tcp	ufsd		# UFS-aware server
+ufsd		1008/udp	ufsd
+cvc		1495/tcp			# Network Console
+ingreslock      1524/tcp
+www-ldap-gw	1760/tcp			# HTTP to LDAP gateway
+www-ldap-gw	1760/udp			# HTTP to LDAP gateway
+listen          2766/tcp                        # System V listener port
+nfsd		2049/udp	nfs		# NFS server daemon (clts)
+nfsd		2049/tcp	nfs		# NFS server daemon (cots)
+eklogin		2105/tcp			# Kerberos encrypted rlogin
+lockd		4045/udp			# NFS lock daemon/manager
+lockd		4045/tcp
+ipsec-nat-t	4500/udp			# IPsec NAT-Traversal
+mdns		5353/udp			# Multicast DNS
+mdns		5353/tcp
+vnc-server	5900/tcp			# VNC Server
+dtspc		6112/tcp			# CDE subprocess control
+servicetag	6481/udp
+servicetag	6481/tcp
+fs		7100/tcp			# Font server
+solaris-audit	16162/tcp			# Secure remote audit logging
+wnn6		22273/tcp			# Wnn6 jserver
+wnn6		22273/udp			# Wnn6 jserver

@@ -1,0 +1,202 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	_siguhandler;
+} SUNW_1.2;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.2 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+# SUNW_1.1 inherits SUNW_0.7 on all platforms, encapsulating the same
+# set of symbols. However, the assignment of symbol to version varies
+# between platforms:
+#    amd64:  SUNW_1.1 is empty, and SUNW_0.7 contains everything.
+#    i386, sparc: SUNW_1.1 contains 5 largefile API routines, and everything
+#        else in in SUNW_0.7.
+#    sparcv9: Everything is in SUNW_1.1, and SUNW_0.7 is empty
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+$if _ELF32		# largefile APIs
+	alphasort64;
+	fopen64;
+	freopen64;
+	readdir64;
+	scandir64;
+$endif
+$if _x86 && _ELF64
+	SUNW_1.1;
+$endif
+$if !(_sparc && _ELF64)
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+$endif
+    global:
+	alphasort;
+	bcmp;
+	bcopy;
+	bzero;
+	flock;
+	fopen;
+	fprintf;
+	freopen;
+	fstatfs;
+	ftime;
+	getdtablesize;
+	gethostid;
+	gethostname;
+	getpagesize;
+	getrusage		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	gettimeofday;
+	getwd;
+	index;
+	killpg;
+	mctl;
+	nice;
+	nlist;
+	printf;
+	psignal;
+	rand;
+	readdir;
+	reboot;
+	re_comp;
+	re_exec;
+	rindex;
+	scandir;
+	setbuffer;
+	sethostname;
+	setlinebuf;
+	setpgrp;
+	settimeofday;
+	sigblock;
+	siginterrupt;
+	signal;
+	sigpause;
+	sigsetmask;
+	sigstack;
+	sigvec;
+	sigvechandler;
+	sleep			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	sprintf;
+	srand;
+	statfs;
+	sys_siglist;
+	times;
+	ualarm			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	usignal;
+	usigpause;
+	usleep			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	vfprintf;
+	vprintf;
+	vsprintf;
+	wait3;
+	wait4;
+
+	# The longjmp/setjmp story is complex:
+	# - On sparc, they are supplied by the library
+	# - On 32-bit x86, they are filters on libc
+	# - On amd64, they are not present in this library
+$if _sparc
+	longjmp;
+	setjmp;
+$elif _x86 && _ELF32
+	longjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	setjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+$endif
+
+$if _sparc && _ELF64
+} SUNW_0.7;
+
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	SUNW_0.7;
+$endif
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_doprnt;
+	_getarg;
+	_mkarglst;
+	_sigblock;
+	_siginterrupt;
+	_sigsetmask;
+	_sigstack;
+	_sigvec;
+	_sigvechandler;
+	ucbsigblock;
+	ucbsiginterrupt;
+	ucbsigpause;
+	ucbsigsetmask;
+	ucbsigvec;
+
+
+	# Handle per-platform variations
+$if _sparc
+	_longjmp;
+	_setjmp;
+	__sigcleanup;
+$if _ELF32
+	syscall			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+$endif
+$endif
+
+$if _x86 && _ELF32
+	_longjmp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_setjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_syscall		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_times			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+$endif
+
+
+    local:
+	*;
+};
+
+

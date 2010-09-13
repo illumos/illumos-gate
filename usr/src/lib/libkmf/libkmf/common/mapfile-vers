@@ -1,0 +1,413 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	KMFOID_AliasedEntryName;
+	KMFOID_AuthorityInfoAccess;
+	KMFOID_AuthorityKeyID;
+	KMFOID_AuthorityKeyIdentifier;
+	KMFOID_AuthorityRevocationList;
+	KMFOID_BasicConstraints;
+	KMFOID_BusinessCategory;
+	KMFOID_CACertificate;
+	KMFOID_CertificatePolicies;
+	KMFOID_CertificateRevocationList;
+	KMFOID_ChallengePassword;
+	KMFOID_CollectiveFacsimileTelephoneNumber;
+	KMFOID_CollectiveInternationalISDNNumber;
+	KMFOID_CollectiveOrganizationName;
+	KMFOID_CollectiveOrganizationalUnitName;
+	KMFOID_CollectivePhysicalDeliveryOfficeName;
+	KMFOID_CollectivePostOfficeBox;
+	KMFOID_CollectivePostalAddress;
+	KMFOID_CollectivePostalCode;
+	KMFOID_CollectiveStateProvinceName;
+	KMFOID_CollectiveStreetAddress;
+	KMFOID_CollectiveTelephoneNumber;
+	KMFOID_CollectiveTelexNumber;
+	KMFOID_CollectiveTelexTerminalIdentifier;
+	KMFOID_CommonName;
+	KMFOID_ContentType;
+	KMFOID_CounterSignature;
+	KMFOID_CountryName;
+	KMFOID_CrlDistributionPoints;
+	KMFOID_CrlNumber;
+	KMFOID_CrlReason;
+	KMFOID_CrossCertificatePair;
+	KMFOID_DNQualifier;
+	KMFOID_DSA;
+	KMFOID_DeltaCrlIndicator;
+	KMFOID_Description;
+	KMFOID_DestinationIndicator;
+	KMFOID_DistinguishedName;
+	KMFOID_EC_PUBLIC_KEY;
+	KMFOID_ECC_c2pnb163v1;
+	KMFOID_ECC_c2pnb163v2;
+	KMFOID_ECC_c2pnb163v3;
+	KMFOID_ECC_c2pnb176v1;
+	KMFOID_ECC_c2pnb208w1;
+	KMFOID_ECC_c2pnb272w1;
+	KMFOID_ECC_c2pnb304w1;
+	KMFOID_ECC_c2pnb368w1;
+	KMFOID_ECC_c2tnb191v1;
+	KMFOID_ECC_c2tnb191v2;
+	KMFOID_ECC_c2tnb191v3;
+	KMFOID_ECC_c2tnb239v1;
+	KMFOID_ECC_c2tnb239v2;
+	KMFOID_ECC_c2tnb239v3;
+	KMFOID_ECC_c2tnb359v1;
+	KMFOID_ECC_c2tnb431r1;
+	KMFOID_ECC_prime192v2;
+	KMFOID_ECC_prime192v3;
+	KMFOID_ECC_secp112r1;
+	KMFOID_ECC_secp112r2;
+	KMFOID_ECC_secp128r1;
+	KMFOID_ECC_secp128r2;
+	KMFOID_ECC_secp160k1;
+	KMFOID_ECC_secp160r1;
+	KMFOID_ECC_secp160r2;
+	KMFOID_ECC_secp192k1;
+	KMFOID_ECC_secp224k1;
+	KMFOID_ECC_secp224r1;
+	KMFOID_ECC_secp256k1;
+	KMFOID_ECC_secp384r1;
+	KMFOID_ECC_secp521r1;
+	KMFOID_ECC_sect113r1;
+	KMFOID_ECC_sect113r2;
+	KMFOID_ECC_sect131r1;
+	KMFOID_ECC_sect131r2;
+	KMFOID_ECC_sect163k1;
+	KMFOID_ECC_sect163r1;
+	KMFOID_ECC_sect163r2;
+	KMFOID_ECC_sect193r1;
+	KMFOID_ECC_sect193r2;
+	KMFOID_ECC_sect233k1;
+	KMFOID_ECC_sect233r1;
+	KMFOID_ECC_sect239k1;
+	KMFOID_ECC_sect283k1;
+	KMFOID_ECC_sect283r1;
+	KMFOID_ECC_sect409k1;
+	KMFOID_ECC_sect409r1;
+	KMFOID_ECC_sect571k1;
+	KMFOID_ECC_sect571r1;
+	KMFOID_ECC_secp192r1;
+	KMFOID_ECC_secp256r1;
+	KMFOID_EmailAddress;
+	KMFOID_EnhancedSearchGuide;
+	KMFOID_ExtendedCertificateAttributes;
+	KMFOID_ExtendedKeyUsage;
+	KMFOID_ExtensionRequest;
+	KMFOID_FacsimileTelephoneNumber;
+	KMFOID_GenerationQualifier;
+	KMFOID_GivenName;
+	KMFOID_HoldInstructionCode;
+	KMFOID_HouseIdentifier;
+	KMFOID_Initials;
+	KMFOID_InternationalISDNNumber;
+	KMFOID_InvalidityDate;
+	KMFOID_IssuerAltName;
+	KMFOID_IssuingDistributionPoints;
+	KMFOID_KeyUsage;
+	KMFOID_KeyUsageRestriction;
+	KMFOID_KnowledgeInformation;
+	KMFOID_LocalityName;
+	KMFOID_MD2WithRSA;
+	KMFOID_MD5;
+	KMFOID_MD5WithRSA;
+	KMFOID_Member;
+	KMFOID_MessageDigest;
+	KMFOID_MS_KP_SCLogon;
+	KMFOID_MS_KP_SCLogon_UPN;
+	KMFOID_Name;
+	KMFOID_NameConstraints;
+	KMFOID_ObjectClass;
+	KMFOID_OrganizationName;
+	KMFOID_OrganizationalUnitName;
+	KMFOID_Owner;
+	KMFOID_PKINIT_ClientAuth;
+	KMFOID_PKINIT_Kdc;
+	KMFOID_PKINIT_san;
+	KMFOID_PKIX_KP_ClientAuth;
+	KMFOID_PKIX_KP_CodeSigning;
+	KMFOID_PKIX_KP_EmailProtection;
+	KMFOID_PKIX_KP_IPSecEndSystem;
+	KMFOID_PKIX_KP_IPSecTunnel;
+	KMFOID_PKIX_KP_IPSecUser;
+	KMFOID_PKIX_KP_OCSPSigning;
+	KMFOID_PKIX_KP_ServerAuth;
+	KMFOID_PKIX_KP_TimeStamping;
+	KMFOID_PKIX_PQ_CPSuri;
+	KMFOID_PKIX_PQ_Unotice;
+	KMFOID_PhysicalDeliveryOfficeName;
+	KMFOID_PkixAdCaIssuers;
+	KMFOID_PkixAdOcsp;
+	KMFOID_PolicyConstraints;
+	KMFOID_PolicyMappings;
+	KMFOID_PostOfficeBox;
+	KMFOID_PostalAddress;
+	KMFOID_PostalCode;
+	KMFOID_PreferredDeliveryMethod;
+	KMFOID_PresentationAddress;
+	KMFOID_PrivateKeyUsagePeriod;
+	KMFOID_ProtocolInformation;
+	KMFOID_RFC822mailbox;
+	KMFOID_RSA;
+	KMFOID_RegisteredAddress;
+	KMFOID_RoleOccupant;
+	KMFOID_SHA1;
+	KMFOID_SHA1WithDSA;
+	KMFOID_SHA1WithECDSA;
+	KMFOID_SHA1WithRSA;
+	KMFOID_SHA224;
+	KMFOID_SHA256;
+	KMFOID_SHA384;
+	KMFOID_SHA512;
+	KMFOID_SHA224WithDSA;
+	KMFOID_SHA256WithDSA;
+	KMFOID_SHA224WithECDSA;
+	KMFOID_SHA256WithECDSA;
+	KMFOID_SHA256WithRSA;
+	KMFOID_SHA384WithECDSA;
+	KMFOID_SHA384WithRSA;
+	KMFOID_SHA512WithECDSA;
+	KMFOID_SHA512WithRSA;
+	KMFOID_SearchGuide;
+	KMFOID_SeeAlso;
+	KMFOID_SerialNumber;
+	KMFOID_SigningTime;
+	KMFOID_StateProvinceName;
+	KMFOID_StreetAddress;
+	KMFOID_SubjectAltName;
+	KMFOID_SubjectDirectoryAttributes;
+	KMFOID_SubjectKeyIdentifier;
+	KMFOID_SupportedApplicationContext;
+	KMFOID_Surname;
+	KMFOID_TelephoneNumber;
+	KMFOID_TelexNumber;
+	KMFOID_TelexTerminalIdentifier;
+	KMFOID_Title;
+	KMFOID_UniqueIdentifier;
+	KMFOID_UniqueMember;
+	KMFOID_UnstructuredAddress;
+	KMFOID_UnstructuredName;
+	KMFOID_UserCertificate;
+	KMFOID_UserPassword;
+	KMFOID_VerisignCertificatePolicy;
+	KMFOID_X9CM_DSA;
+	KMFOID_X9CM_DSAWithSHA1;
+	KMFOID_X_121Address;
+	KMFOID_domainComponent;
+	KMFOID_userid;
+	kmf_add_cert_eku;
+	kmf_add_csr_eku;
+	kmf_add_policy_to_db;
+	kmf_build_pk12;
+	kmf_cert_to_name_mapping_initialize;
+	kmf_cert_to_name_mapping_finalize;
+	kmf_check_cert_date;
+	kmf_check_crl_date;
+	kmf_compare_rdns;
+	kmf_configure_keystore;
+	kmf_create_cert_file;
+	kmf_create_csr_file;
+	kmf_create_keypair;
+	kmf_create_ocsp_request;
+	kmf_create_sym_key;
+	kmf_decode_csr;
+	kmf_decrypt;
+	kmf_delete_cert_from_keystore;
+	kmf_delete_crl;
+	kmf_delete_key_from_keystore;
+	kmf_delete_policy_from_db;
+	kmf_der_to_pem;
+	kmf_dn_parser;
+	kmf_download_cert;
+	kmf_download_crl;
+	kmf_ekuname_to_oid;
+	kmf_encode_cert_record;
+	kmf_encrypt;
+	kmf_export_pk12;
+	kmf_finalize;
+	kmf_find_attr;
+	kmf_find_cert;
+	kmf_find_cert_in_crl;
+	kmf_find_crl;
+	kmf_find_key;
+	kmf_find_prikey_by_cert;
+	kmf_free_algoid;
+	kmf_free_bigint;
+	kmf_free_crl_dist_pts;
+	kmf_free_data;
+	kmf_free_dn;
+	kmf_free_eku;
+	kmf_free_eku_policy;
+	kmf_free_extn;
+	kmf_free_kmf_cert;
+	kmf_free_kmf_key;
+	kmf_free_policy_record;
+	kmf_free_raw_key;
+	kmf_free_raw_sym_key;
+	kmf_free_signed_cert;
+	kmf_free_signed_csr;
+	kmf_free_spki;
+	kmf_free_str;
+	kmf_free_tbs_cert;
+	kmf_free_tbs_csr;
+	kmf_get_attr;
+	kmf_get_attr_ptr;
+	kmf_get_cert_auth_info_access;
+	kmf_get_cert_basic_constraint;
+	kmf_get_cert_crl_dist_pts;
+	kmf_get_cert_eku;
+	kmf_get_cert_email_str;
+	kmf_get_cert_end_date_str;
+	kmf_get_cert_extn;
+	kmf_get_cert_extn_str;
+	kmf_get_cert_extns;
+	kmf_get_cert_id_data;
+	kmf_get_cert_id_str;
+	kmf_get_cert_issuer_str;
+	kmf_get_cert_ku;
+	kmf_get_cert_policies;
+	kmf_get_cert_pubkey_alg_str;
+	kmf_get_cert_pubkey_str;
+	kmf_get_cert_serial_str;
+	kmf_get_cert_sig_alg_str;
+	kmf_get_cert_start_date_str;
+	kmf_get_cert_subject_str;
+	kmf_get_cert_validity;
+	kmf_get_cert_version_str;
+	kmf_get_data_format;
+	kmf_get_encoded_ocsp_response;
+	kmf_get_file_format;
+	kmf_get_kmf_error_str;
+	kmf_get_mapper_error_str;
+	kmf_get_mapper_lasterror;
+	kmf_get_mapper_options;
+	kmf_get_ocsp_for_cert;
+	kmf_get_ocsp_status_for_cert;
+	kmf_get_pk11_handle;
+	kmf_get_plugin_error_str;
+	kmf_get_plugin_info;
+	kmf_get_policy;
+	kmf_get_string_attr;
+	kmf_get_sym_key_value;
+	kmf_hexstr_to_bytes;
+	kmf_import_crl;
+	kmf_import_cert;
+	kmf_import_objects;
+	kmf_initialize;
+	kmf_is_cert_data;
+	kmf_is_cert_file;
+	kmf_is_crl_file;
+	kmf_ku_to_string;
+	kmf_list_crl;
+	kmf_map_cert_to_name;
+	kmf_match_cert_to_name;
+	kmf_oid_to_ekuname;
+	kmf_oid_to_string;
+	kmf_pem_to_der;
+	kmf_pk11_token_lookup;
+	kmf_pk11_init_token;
+	kmf_read_input_file;
+	kmf_set_attr;
+	kmf_set_attr_at_index;
+	kmf_set_cert_basic_constraint;
+	kmf_set_cert_extn;
+	kmf_set_cert_issuer;
+	kmf_set_cert_issuer_altname;
+	kmf_set_cert_ku;
+	kmf_set_cert_pubkey;
+	kmf_set_cert_serial;
+	kmf_set_cert_sig_alg;
+	kmf_set_cert_subject;
+	kmf_set_cert_subject_altname;
+	kmf_set_cert_validity;
+	kmf_set_cert_version;
+	kmf_set_csr_extn;
+	kmf_set_csr_ku;
+	kmf_set_csr_pubkey;
+	kmf_set_csr_sig_alg;
+	kmf_set_csr_subject;
+	kmf_set_csr_subject_altname;
+	kmf_set_csr_version;
+	kmf_set_mapper_lasterror;
+	kmf_set_mapper_options;
+	kmf_set_policy;
+	kmf_set_token_pin;
+	kmf_sign_cert;
+	kmf_sign_csr;
+	kmf_sign_data;
+	kmf_store_cert;
+	kmf_store_key;
+	kmf_string_to_ku;
+	kmf_string_to_oid;
+	kmf_validate_cert;
+	kmf_verify_cert;
+	kmf_verify_crl_file;
+	kmf_verify_csr;
+	kmf_verify_data;
+	kmf_verify_policy;
+    local:
+	*;
+};
+
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	copy_extension_data;
+	dup_entry;
+	free_entry;
+	free_entrylist;
+	get_entrylist;
+	get_mapper_pathname;
+	get_pk11_data;
+	GetIDFromSPKI;
+	IsEqualOid;
+	kmf_create_pk11_session;
+	kmf_select_token;
+	parsePolicyElement;
+	PKCS_DigestData;
+	PKCS_EncryptData;
+	PKCS_VerifyData;
+	x509_algid_to_algoid;
+	x509_algoid_to_algid;
+    local:
+	*;
+};

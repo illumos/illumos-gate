@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for the in.comsat service.
+-->
+
+<service_bundle type='manifest' name='SUNWrcmdr:comsat'>
+
+<service
+	name='network/comsat'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<restarter>
+		<service_fmri value='svc:/network/inetd:default' />
+	</restarter>
+
+	<exec_method
+		type='method'
+		name='inetd_start'
+		exec='/usr/sbin/in.comsat'
+		timeout_seconds='0'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='inetd_offline'
+		exec=':kill_process'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='inetd_disable'
+		exec=':kill'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<property_group name='inetd' type='framework'>
+		<stability value='Evolving' />
+		<propval name='name' type='astring' value='comsat' />
+		<propval name='endpoint_type' type='astring' value='dgram' />
+		<propval name='proto' type='astring' value='udp' />
+		<propval name='wait' type='boolean' value='true' />
+		<propval name='isrpc' type='boolean' value='false' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>comsat</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+comsat listens for reports of incoming mail and notifies users who have
+requested to be told when mail arrives.
+			</loctext>
+		</description>
+		<documentation>
+			<manpage title='in.comsat' section='1M'
+			    manpath='/usr/share/man' />
+			<manpage title='comsat' section='1M'
+			    manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

@@ -1,0 +1,75 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# The following 3 settings produce the familiar Solaris behavior.
+set appenddeadletter
+unset pipeignore
+unset replyall
+set append dot showname
+if t
+	# mailx-only defaults here
+	#
+	# automatically incorporate new messages as they arrive.
+	# would be nice if mailtool supported this as well.
+	set autoinc
+else
+	# mailtool-only defaults here
+	#
+	# this should probably not be mailtool-only, but for
+	# compatibility we only put it here.
+	set hold
+	# following so hierarchical menu is the default
+	set LISTER="ls -LF"
+	# default is to allow editing of message windows
+	set editmessagewindow
+	# have to allow ~ escapes even though not using tty
+	set escapeok
+endif
+
+# most mail headers are uninteresting to most people.  here we ignore all
+# the uninteresting headers that are at all common.  a better approach
+# might've been to retain only the interesting headers...
+
+# ignore uninteresting headers
+ignore apparently-to default-options errors-to in-reply-to precedence priority
+ignore received reply-to return-path return-receipt-to sender status via
+
+# ignore headers from news
+ignore approved company confirmed-by distribution expires followup-to keywords
+ignore lines message-id newsgroups organization path posted-date posting-number
+ignore references submitted-by summary
+
+# ignore strange headers from other mail systems
+ignore auto-forward-count auto-forwarded-from email-version
+ignore end-of-header end-of-protocol message-protocol message-service
+ignore message-type message-version mts-message-id report-version sent-by
+ignore transport-options ua-content-id ua-message-id
+
+# ignore content headers, but they'll still be saved
+ignore content-length content-type content-charset
+
+# ignore common non-standard headers
+ignore x-lines x-mailer x-postmark x-sequence x-zippy
+ignore x-sun-charset

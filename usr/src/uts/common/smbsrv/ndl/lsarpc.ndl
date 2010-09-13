@@ -1,0 +1,1037 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+#ifndef _MLSVC_LSA_NDL_
+#define _MLSVC_LSA_NDL_
+
+/*
+ * Local Security Authority RPC (LSARPC) interface definition.
+ *
+ * Names containing a backslash ('\') are known as qualified or composite
+ * names.  The string preceding the backslash is assumed to be the domain
+ * name and the string following the slash is assumed to be name to be
+ * resolved within that domain.
+ *
+ * Names that do not contain a backslash are known as isolated names.
+ * An isolated name may be a single label, such as john, or may be in
+ * user principal name (UPN) form, such as john@example.com.
+ */
+
+#include "ndrtypes.ndl"
+
+
+#define	LSARPC_OPNUM_CloseHandle			0x00
+#define	LSARPC_OPNUM_Delete				0x01
+#define	LSARPC_OPNUM_EnumPrivileges			0x02
+#define	LSARPC_OPNUM_QuerySecurityObject		0x03
+#define	LSARPC_OPNUM_SetSecurityObject			0x04
+#define	LSARPC_OPNUM_ChangePassword			0x05
+#define	LSARPC_OPNUM_OpenPolicy				0x06
+#define	LSARPC_OPNUM_QueryInfoPolicy			0x07
+#define	LSARPC_OPNUM_SetInfoPolicy			0x08
+#define	LSARPC_OPNUM_ClearAuditLog			0x09
+#define	LSARPC_OPNUM_CreateAccount			0x0a
+#define	LSARPC_OPNUM_EnumerateAccounts			0x0b
+#define	LSARPC_OPNUM_CreateTrustedDomain		0x0c
+#define	LSARPC_OPNUM_EnumTrustedDomain			0x0d
+#define	LSARPC_OPNUM_LookupNames			0x0e
+#define	LSARPC_OPNUM_LookupSids				0x0f
+#define	LSARPC_OPNUM_CreateSecret			0x10
+#define	LSARPC_OPNUM_OpenAccount			0x11
+#define	LSARPC_OPNUM_EnumPrivsAccount			0x12
+#define	LSARPC_OPNUM_AddAccountPrivs			0x13
+#define	LSARPC_OPNUM_RemoveAccountPrivs			0x14
+#define	LSARPC_OPNUM_GetAccountQuota			0x15
+#define	LSARPC_OPNUM_SetAccountQuota			0x16
+#define	LSARPC_OPNUM_GetSystemAccessAccount		0x17
+#define	LSARPC_OPNUM_SetSystemAccessAccount		0x18
+#define	LSARPC_OPNUM_OpenTrustedDomain			0x19
+#define	LSARPC_OPNUM_QueryInfoTrustedDomain		0x1a
+#define	LSARPC_OPNUM_SetinfoTrustedDomain		0x1b
+#define	LSARPC_OPNUM_OpenSecret				0x1c
+#define	LSARPC_OPNUM_SetSecret				0x1d
+#define	LSARPC_OPNUM_QuerySecret			0x1e
+#define	LSARPC_OPNUM_LookupPrivValue			0x1f
+#define	LSARPC_OPNUM_LookupPrivName			0x20
+#define	LSARPC_OPNUM_LookupPrivDisplayName		0x21
+#define	LSARPC_OPNUM_DeleteObject			0x22
+#define	LSARPC_OPNUM_EnumAccountsWithUserRight		0x23
+#define	LSARPC_OPNUM_EnumAccountRights			0x24
+#define	LSARPC_OPNUM_AddAccountRights			0x25
+#define	LSARPC_OPNUM_RemoveAccountRights		0x26
+#define	LSARPC_OPNUM_QueryTrustedDomainInfo		0x27
+#define	LSARPC_OPNUM_SetTrustedDomainInfo		0x28
+
+/* Windows 2000 */
+#define	LSARPC_OPNUM_DeleteTrustedDomain		0x29
+#define	LSARPC_OPNUM_StorePrivateData			0x2a
+#define	LSARPC_OPNUM_RetrievePrivateData		0x2b
+#define	LSARPC_OPNUM_OpenPolicy2			0x2c
+#define	LSARPC_OPNUM_GetConnectedUser			0x2d
+#define	LSARPC_OPNUM_QueryInfoPolicy2			0x2e
+#define	LSARPC_OPNUM_SetInfoPolicy2			0x2f
+#define	LSARPC_OPNUM_QueryTrustedDomainInfoByName	0x30
+#define	LSARPC_OPNUM_SetTrustedDomainInfoByName		0x31
+#define	LSARPC_OPNUM_EnumTrustedDomainsEx		0x32
+#define	LSARPC_OPNUM_CreateTrustedDomainEx		0x33
+#define	LSARPC_OPNUM_CloseTrustedDomainEx		0x34
+#define	LSARPC_OPNUM_QueryDomainInfoPolicy		0x35
+#define	LSARPC_OPNUM_SetDomainInfoPolicy		0x36
+#define	LSARPC_OPNUM_OpenTrustedDomainByName		0x37
+#define	LSARPC_OPNUM_TestCall				0x38
+#define	LSARPC_OPNUM_LookupSids2			0x39
+#define	LSARPC_OPNUM_LookupNames2			0x3a
+#define	LSARPC_OPNUM_CreateTrustedDomainEx2		0x3b
+
+/* Windows 2000 SP3 */
+#define	LSARPC_OPNUM_CredWrite				0x3c
+#define	LSARPC_OPNUM_CredRead				0x3d
+#define	LSARPC_OPNUM_CredEnumerate			0x3e
+#define	LSARPC_OPNUM_CredWriteDomainCreds		0x3f
+#define	LSARPC_OPNUM_CredReadDomainCreds		0x40
+#define	LSARPC_OPNUM_CredDelete				0x41
+#define	LSARPC_OPNUM_CredGetTargetInfo			0x42
+#define	LSARPC_OPNUM_CredProfileLoaded			0x43
+#define	LSARPC_OPNUM_LookupNames3			0x44
+#define	LSARPC_OPNUM_CredGetSessionTypes		0x45
+#define	LSARPC_OPNUM_RegisterAuditEvent			0x46
+#define	LSARPC_OPNUM_GenAuditEvent			0x47
+#define	LSARPC_OPNUM_UnregisterAuditEvent		0x48
+#define	LSARPC_OPNUM_QueryForestTrustInfo		0x49
+#define	LSARPC_OPNUM_SetForestTrustInfo			0x4a
+#define	LSARPC_OPNUM_CredRename				0x4b
+#define	LSARPC_OPNUM_LookupSids3			0x4c
+#define	LSARPC_OPNUM_LookupNames4			0x4d
+#define	LSARPC_OPNUM_OpenPolicySce			0x4e
+
+/* Windows Server 2003 */
+#define	LSARPC_OPNUM_AdtRegisterSecurityEventSource	0x4f
+#define	LSARPC_OPNUM_AdtUnregisterSecurityEventSource	0x50
+#define	LSARPC_OPNUM_AdtReportSecurityEvent		0x51
+
+/* Windows Vista */
+#define	LSARPC_OPNUM_CredFindBestCredential		0x52
+#define	LSARPC_OPNUM_SetAuditPolicy			0x53
+#define	LSARPC_OPNUM_QueryAuditPolicy			0x54
+#define	LSARPC_OPNUM_EnumerateAuditPolicy		0x55
+#define	LSARPC_OPNUM_EnumerateAuditCategories		0x56
+#define	LSARPC_OPNUM_EnumerateAuditSubCategories	0x57
+#define	LSARPC_OPNUM_LookupAuditCategoryName		0x58
+#define	LSARPC_OPNUM_LookupAuditSubCategoryName		0x59
+#define	LSARPC_OPNUM_SetAuditSecurity			0x5a
+#define	LSARPC_OPNUM_QueryAuditSecurity			0x5b
+#define	LSARPC_OPNUM_CredReadByTokenHandle		0x5c
+#define	LSARPC_OPNUM_CredRestoreCredentials		0x5d
+#define	LSARPC_OPNUM_CredBackupCredentials		0x5e
+
+/*
+ * Lookup levels.  Level 1 appears to mean only look on the local host and
+ * level 2 means forward the request to the PDC.  On the PDC it probably
+ * doesn't matter which level you use but on a BDC a level 1 lookup will
+ * fail if the BDC doesn't have the info whereas a level 2 lookup will also
+ * check with the PDC.
+ */
+#define	LSA_LOOKUP_WKSTA			1	/* Windows NT 3.1 */
+#define	LSA_LOOKUP_PDC				2
+#define	LSA_LOOKUP_TDL				3
+#define	LSA_LOOKUP_GC				4	/* Windows 2000 */
+#define	LSA_LOOKUP_XFORESTREFERRAL		5	/* Windows XP */
+#define	LSA_LOOKUP_XFORESTRESOLVE		6
+#define	LSA_LOOKUP_RODCREFERRALTOFULLDC		7	/* Windows Vista */
+
+/*
+ * Name/SID lookup flags
+ */
+#define	LSA_LOOKUP_NAME_NOT_SPN			0x00000001
+#define	LSA_LOOKUP_NAME_MAYBE_XFOREST		0x00000002
+#define	LSA_LOOKUP_NAME_IN_DBVIEW		0x00000004
+
+/*
+ * Name/SID lookup options
+ *
+ * 0x00000000	Lookup isolated names both locally and in domains/forests.
+ * 0x80000000	Lookup isolated names (except for UPNs) only in the local
+ *		account database.  Do not lookup UPNs.
+ */
+#define	LSA_LOOKUP_OPT_ALL			0x00000000
+#define	LSA_LOOKUP_OPT_LOCAL			0x80000000
+
+/*
+ * Client revision
+ *
+ * 0x00000001	Client does not understand DNS names or forests.
+ * 0x00000002	Client understands DNS names and forests.
+ *
+ * Notes:
+ *	0 means the same as 1
+ *	Anything greater than 2 means the same as 2
+ */
+#define	LSA_CLIENT_REVISION_NT			0x00000001
+#define	LSA_CLIENT_REVISION_AD			0x00000002
+
+/*
+ * Definition for a SID. The ndl compiler won't allow a typedef of
+ * a structure containing variable size members.
+ */
+struct mslsa_sid {
+	BYTE		Revision;
+	BYTE		SubAuthCount;
+	BYTE		Authority[6];
+  SIZE_IS(SubAuthCount)
+	DWORD		SubAuthority[ANY_SIZE_ARRAY];
+};
+
+struct mslsa_string_desc {
+	WORD		length;
+	WORD		allosize;
+	LPTSTR		str;
+};
+typedef struct mslsa_string_desc mslsa_string_t;
+
+CONTEXT_HANDLE(mslsa_handle) mslsa_handle_t;
+
+struct mslsa_luid {
+	DWORD low_part;
+	DWORD high_part;
+};
+typedef struct mslsa_luid mslsa_luid_t;
+
+struct mslsa_guid {
+	DWORD	data1;
+	WORD	data2;
+	WORD	data3;
+	BYTE	data4[8];
+};
+typedef struct mslsa_guid mslsa_guid_t;
+
+/*
+ ***********************************************************************
+ * OpenPolicy2 obtains a handle for a remote LSA. This handle is
+ * required for all subsequent LSA requests.
+ *
+ * The server name should be the name of the target PDC or BDC, with
+ * the double backslash prefix.
+ *
+ * As far as I can tell, the mslsa_object_attributes structure can be
+ * all zero except for the length, which should be set to sizeof(struct
+ * mslsa_object_attributes).
+ *
+ * For read access, the desired access mask should contain the
+ * READ_CONTROL standard right and whatever policy rights are required.
+ * I haven't tried any update operations but if you get the access mask
+ * wrong you can crash the domain controller.
+ ***********************************************************************
+ */
+
+
+/*
+ * From netmon:
+ *	length = 12
+ *	impersonation_level = 2
+ *	context_tracking_mode = 1
+ *	effective_only = 0
+ */
+struct mslsa_quality_of_service {
+	DWORD length;
+	WORD impersonation_level;
+	BYTE context_tracking_mode;
+	BYTE effective_only;
+};
+
+
+struct mslsa_object_attributes {
+	DWORD length;
+	DWORD rootDirectory;
+	DWORD objectName;
+	DWORD attributes;
+	DWORD securityDescriptor;
+	struct mslsa_quality_of_service *qualityOfService;
+};
+
+
+OPERATION(LSARPC_OPNUM_OpenPolicy)
+struct mslsa_OpenPolicy {
+	IN	DWORD	*servername;
+	IN	struct mslsa_object_attributes attributes;
+	IN	DWORD desiredAccess;
+	OUT	mslsa_handle_t domain_handle;
+	OUT	DWORD status;
+};
+
+OPERATION(LSARPC_OPNUM_OpenPolicy2)
+struct mslsa_OpenPolicy2 {
+	IN	LPTSTR servername;
+	IN	struct mslsa_object_attributes attributes;
+	IN	DWORD desiredAccess;
+	OUT	mslsa_handle_t domain_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * CloseHandle closes an association with the LSA. The returned handle
+ * will be all zero.
+ ***********************************************************************
+ */
+OPERATION(LSARPC_OPNUM_CloseHandle)
+struct mslsa_CloseHandle {
+	IN	mslsa_handle_t handle;
+	OUT	mslsa_handle_t result_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * EnumPrivileges
+ *
+ * Obtain a list of privilege names. This interface is not implemented
+ * yet The definition below has not been tested. This is a guess based
+ * on data available from netmon.
+ ***********************************************************************
+ */
+struct mslsa_PrivDef {
+	mslsa_string_t name;
+	mslsa_luid_t luid;
+};
+
+
+struct mslsa_PrivEnumBuf {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslsa_PrivDef *def;
+};
+
+
+OPERATION(LSARPC_OPNUM_EnumPrivileges)
+struct mslsa_EnumPrivileges {
+	IN	mslsa_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN	DWORD max_length;
+	OUT	REFERENCE struct mslsa_PrivEnumBuf *enum_buf;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QuerySecurityObject. I'm not entirely sure how to set this up yet.
+ * I used the discovery RPC to scope it out. The structures are set up
+ * according to netmon and the assumption that a security descriptor
+ * on the wire looks like the regular user level security descriptor.
+ ***********************************************************************
+ */
+struct mslsa_SecurityDescriptor {
+	BYTE revision;
+	BYTE sbz1;
+	WORD control;
+	DWORD owner;
+	DWORD group;
+	DWORD sacl;
+	DWORD dacl;
+};
+
+
+struct mslsa_SecurityDescInfo {
+	DWORD length;
+  SIZE_IS(length)
+  	BYTE *desc; /* temporary */
+	/* struct mslsa_SecurityDescriptor *desc; */
+};
+
+
+OPERATION(LSARPC_OPNUM_QuerySecurityObject)
+struct mslsa_QuerySecurityObject {
+	IN	mslsa_handle_t handle;
+	IN	DWORD security_info;
+	OUT	struct mslsa_SecurityDescInfo *desc_info;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * EnumerateAccounts and EnumerateTrustedDomain.
+ ***********************************************************************
+ */
+struct mslsa_AccountInfo {
+	struct mslsa_sid *sid;
+};
+
+
+struct mslsa_EnumAccountBuf {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslsa_AccountInfo *info;
+};
+
+
+OPERATION(LSARPC_OPNUM_EnumerateAccounts)
+struct mslsa_EnumerateAccounts {
+	IN	mslsa_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN	DWORD max_length;
+	OUT	REFERENCE struct mslsa_EnumAccountBuf *enum_buf;
+	OUT	DWORD status;
+};
+
+
+struct mslsa_TrustedDomainInfo {
+	mslsa_string_t name;
+	struct mslsa_sid *sid;
+};
+
+
+struct mslsa_EnumTrustedDomainBuf {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslsa_TrustedDomainInfo *info;
+};
+
+
+OPERATION(LSARPC_OPNUM_EnumTrustedDomain)
+struct mslsa_EnumTrustedDomain {
+	IN	mslsa_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN	DWORD max_length;
+	OUT REFERENCE	struct mslsa_EnumTrustedDomainBuf *enum_buf;
+	OUT	DWORD status;
+};
+
+struct mslsa_TrustedDomainInfoEx {
+	mslsa_string_t		dns_name;
+	mslsa_string_t		nb_name;
+	struct mslsa_sid	*sid;
+	DWORD			trust_direction;
+	DWORD			trust_type;
+	DWORD			trust_attrs;
+};
+
+struct mslsa_EnumTrustedDomainBufEx {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslsa_TrustedDomainInfoEx *info;
+};
+
+OPERATION(LSARPC_OPNUM_EnumTrustedDomainsEx)
+struct mslsa_EnumTrustedDomainEx {
+	IN	mslsa_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN	DWORD max_length;
+	OUT REFERENCE	struct mslsa_EnumTrustedDomainBufEx *enum_buf;
+	OUT	DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * Definitions common to both LookupSids and LookupNames. Both return
+ * an mslsa_domain_table[]. Each interface also returns a specific
+ * table with entries which index the mslsa_domain_table[].
+ ***********************************************************************
+ */
+struct mslsa_domain_entry {
+	mslsa_string_t domain_name;
+	struct mslsa_sid *domain_sid;
+};
+typedef struct mslsa_domain_entry mslsa_domain_entry_t;
+
+
+struct mslsa_domain_table {
+	DWORD		n_entry;
+  SIZE_IS(n_entry)
+  	mslsa_domain_entry_t *entries;
+	DWORD		max_n_entry;
+};
+
+
+/*
+ ***********************************************************************
+ * Definitions for LookupSids.
+ *
+ * The input parameters are:
+ *
+ *	A valid LSA handle obtained from an LsarOpenPolicy.
+ *	The table of SIDs to be looked up.
+ *	A table of names (probably empty).
+ *	The lookup level (local=1 or PDC=2).
+ *	An enumeration counter (used for continuation operations).
+ *
+ * The output results are:
+ *
+ *	A table of referenced domains.
+ *	A table of usernames.
+ *	The updated value of the enumeration counter.
+ *	The result status.
+ ***********************************************************************
+ */
+
+struct mslsa_lup_sid_entry {
+	struct mslsa_sid *psid;
+};
+
+struct mslsa_lup_sid_table {
+	DWORD		n_entry;
+    SIZE_IS(n_entry)
+	struct mslsa_lup_sid_entry *entries;
+};
+
+struct mslsa_name_entry {
+	WORD		sid_name_use;
+	WORD		unknown_flags;
+	mslsa_string_t	name;
+	DWORD		domain_ix;		/* -1 means none */
+};
+
+struct mslsa_name_table {
+	DWORD		n_entry;
+    SIZE_IS(n_entry)
+	struct mslsa_name_entry *entries;
+};
+
+OPERATION(LSARPC_OPNUM_LookupSids)
+struct mslsa_LookupSids {
+	IN	mslsa_handle_t	handle;
+	IN	struct mslsa_lup_sid_table lup_sid_table;
+
+	OUT	struct mslsa_domain_table *domain_table;
+	INOUT	struct mslsa_name_table name_table;
+
+	IN	WORD lookup_level;
+	INOUT	DWORD mapped_count;
+ 	OUT	DWORD status;
+};
+
+OPERATION(LSARPC_OPNUM_CreateSecret)
+struct mslsa_CreateSecret {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	IN	DWORD access_mask;
+	OUT	mslsa_handle_t secret_handle;
+	OUT	DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * Definitions for LookupNames.
+ *
+ * LookupNames requires the following input parameters.
+ *
+ *	A valid LSA handle obtained from an LsarOpenPolicy.
+ *	The table of names to be looked up.
+ *	A table of translated sids (probably empty).
+ *	The lookup level (local=1 or PDC=2).
+ *	An enumeration counter (used for continuation operations).
+ *
+ * The outputs are as follows.
+ *
+ *	A table of referenced domains.
+ *	A table of translated sids (actually rids).
+ *	The updated value of the enumeration counter.
+ *	The result status.
+ ***********************************************************************
+ */
+struct mslsa_lup_name_table {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	mslsa_string_t names[ANY_SIZE_ARRAY];
+};
+
+
+struct mslsa_rid_entry {
+	WORD sid_name_use;
+	WORD pad;
+	DWORD rid;
+	DWORD domain_index;
+};
+
+
+struct mslsa_rid_table {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	struct mslsa_rid_entry *rids;
+};
+
+
+OPERATION(LSARPC_OPNUM_LookupNames)
+struct mslsa_LookupNames {
+	IN	mslsa_handle_t handle;
+	IN	REFERENCE	struct mslsa_lup_name_table *name_table;
+
+	OUT	struct mslsa_domain_table *domain_table;
+	INOUT	struct mslsa_rid_table translated_sids;
+
+	IN	WORD lookup_level;
+	INOUT	DWORD mapped_count;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryInfoPolicy returns various pieces of policy information. The
+ * desired information is specified using a class value, as defined
+ * below.
+ ***********************************************************************
+ */
+#define MSLSA_POLICY_AUDIT_LOG_INFO		1
+#define MSLSA_POLICY_AUDIT_EVENTS_INFO		2
+#define MSLSA_POLICY_PRIMARY_DOMAIN_INFO	3
+#define MSLSA_POLICY_UNKNOWN_4_INFO		4
+#define MSLSA_POLICY_ACCOUNT_DOMAIN_INFO	5
+#define MSLSA_POLICY_SERVER_ROLE_INFO		6
+#define MSLSA_POLICY_REPLICA_SOURCE_INFO	7
+#define MSLSA_POLICY_DEFAULT_QUOTA_INFO		8
+#define MSLSA_POLICY_DB_INFO			9
+#define MSLSA_POLICY_AUDIT_SET_INFO		10
+#define MSLSA_POLICY_AUDIT_QUERY_INFO		11
+#define MSLSA_POLICY_DNS_DOMAIN_INFO		12
+
+#define	LSA_ROLE_STANDALONE_WORKSTATION		0
+#define	LSA_ROLE_MEMBER_WORKSTATION		1
+#define	LSA_ROLE_STANDALONE_SERVER		2
+#define	LSA_ROLE_MEMBER_SERVER			3
+#define	LSA_ROLE_BACKUP_DC			4
+#define	LSA_ROLE_PRIMARY_DC			5
+
+/*
+ * MSLSA_POLICY_AUDIT_EVENTS_INFO
+ */
+struct mslsa_AuditEventsInfo {
+	DWORD enabled;
+    SIZE_IS (count)
+	DWORD *settings;
+	DWORD count;
+};
+
+/*
+ * MSLSA_POLICY_PRIMARY_DOMAIN_INFO
+ */
+struct mslsa_PrimaryDomainInfo {
+	struct mslsa_string_desc name;
+	struct mslsa_sid *sid;
+};
+
+/*
+ * MSLSA_POLICY_ACCOUNT_DOMAIN_INFO
+ */
+struct mslsa_AccountDomainInfo {
+	struct mslsa_string_desc name;
+	struct mslsa_sid *sid;
+};
+
+/*
+ * MSLSA_POLICY_SERVER_ROLE_INFO
+ */
+struct mslsa_ServerRoleInfo {
+	DWORD role;
+	DWORD pad;
+};
+
+struct mslsa_DnsDomainInfo {
+	struct mslsa_string_desc nb_domain;
+	struct mslsa_string_desc dns_domain;
+	struct mslsa_string_desc forest;
+	struct mslsa_guid guid;
+	struct mslsa_sid *sid;
+};
+
+union mslsa_PolicyInfoResUnion {
+	CASE(2) struct mslsa_AuditEventsInfo audit_events;
+	CASE(3) struct mslsa_PrimaryDomainInfo pd_info;
+	CASE(5) struct mslsa_AccountDomainInfo ad_info;
+	CASE(6) struct mslsa_ServerRoleInfo server_role;
+	CASE(12) struct mslsa_DnsDomainInfo dns_info;
+	DEFAULT	char *nullptr;
+};
+
+/*
+ * This structure needs to be declared, even though it can't be used in
+ * mslsa_QueryInfoPolicy, in order to get the appropriate size to calculate
+ * the correct fixup offsets.  If ndrgen did the right thing,
+ * mslsa_PolicyInfoRes would be one of the out parameters.  However, if
+ * we do it that way, the switch_value isn't known early enough to do
+ * the fixup calculation.  So it all has to go in mslsa_QueryInfoPolicy.
+ */
+struct mslsa_PolicyInfoRes {
+	DWORD address;
+	WORD switch_value;
+    SWITCH(switch_value)
+	union mslsa_PolicyInfoResUnion ru;
+};
+
+OPERATION(LSARPC_OPNUM_QueryInfoPolicy)
+struct mslsa_QueryInfoPolicy {
+	IN	mslsa_handle_t handle;
+	IN	WORD info_class;
+	/*
+	 * Can't use this form because we need to include members explicitly.
+	 * OUT	struct mslsa_PolicyInfoRes result;
+	 */
+	OUT	DWORD address;
+	OUT	WORD switch_value;
+    SWITCH(switch_value)
+	OUT	union mslsa_PolicyInfoResUnion ru;
+	OUT	DWORD status;
+};
+
+
+
+/*
+ ***********************************************************************
+ * OpenAccount.
+ * 
+ * Returns a handle that can be used to access the account specified
+ * by a SID. This handle can be used to enumerate account privileges.
+ ***********************************************************************
+ */
+OPERATION(LSARPC_OPNUM_OpenAccount)
+struct mslsa_OpenAccount {
+	IN  mslsa_handle_t handle;
+	IN REFERENCE	struct mslsa_sid *sid;
+	IN	DWORD access_mask;
+	OUT mslsa_handle_t account_handle;
+	OUT DWORD status;
+};
+
+
+
+ /*
+ ***********************************************************************
+ * EnumPrivilegesAccount.
+ *
+ * Enumerate the list of privileges held by the specified account. The
+ * handle must be a valid account handle obtained via OpenAccount. The
+ * luid values returned will be probably only be relevant on the domain
+ * controller so we'll need to find a way to convert them to the
+ * actual privilege names.
+ ***********************************************************************
+ */
+struct mslsa_LuidAndAttributes {
+	struct mslsa_luid luid;
+	DWORD attributes;
+};
+
+
+struct mslsa_PrivilegeSet {
+	DWORD privilege_count;
+	DWORD control;
+  SIZE_IS(privilege_count)
+	struct mslsa_LuidAndAttributes privilege[ANY_SIZE_ARRAY];
+};
+
+
+OPERATION(LSARPC_OPNUM_EnumPrivsAccount)
+	struct mslsa_EnumPrivsAccount {
+	IN	mslsa_handle_t account_handle;
+	OUT	struct mslsa_PrivilegeSet *privileges;
+	OUT	DWORD status;
+};
+
+OPERATION(LSARPC_OPNUM_OpenSecret)
+struct mslsa_OpenSecret {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	IN	DWORD access_mask;
+	OUT	mslsa_handle_t secret_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LookupPrivValue
+ *
+ * Map a privilege name to a local unique id (LUID). Privilege names
+ * are consistent across the network. LUIDs are machine specific.
+ * The privilege list is provided as a set of LUIDs so the privilege
+ * lookup functions must be used to identify which the privilege to
+ * which each LUID refers. The handle here is a policy handle.
+ ***********************************************************************
+ */
+OPERATION(LSARPC_OPNUM_LookupPrivValue)
+struct mslsa_LookupPrivValue {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	OUT	struct mslsa_luid luid;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LookupPrivName
+ *
+ * Map a privilege value (LUID) to a privilege name. Privilege names
+ * are consistent across the network. LUIDs are machine specific.
+ * The privilege list is provided as a set of LUIDs so the privilege
+ * lookup functions must be used to identify which the privilege to
+ * which each LUID refers. The handle here is a policy handle.
+ ***********************************************************************
+ */
+OPERATION(LSARPC_OPNUM_LookupPrivName)
+struct mslsa_LookupPrivName {
+	IN	mslsa_handle_t handle;
+	IN	struct mslsa_luid luid;
+	OUT	mslsa_string_t *name;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LookupPrivDisplayName
+ *
+ * Map a privilege name to a local unique id (LUID). Privilege names
+ * are consistent across the network. LUIDs are machine specific.
+ * The privilege list is provided as a set of LUIDs so the privilege
+ * lookup functions must be used to identify which the privilege to
+ * which each LUID refers. The handle here is a policy handle.
+ ***********************************************************************
+ */
+OPERATION(LSARPC_OPNUM_LookupPrivDisplayName)
+struct mslsa_LookupPrivDisplayName {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	IN	WORD client_language;
+	IN	WORD default_language;
+	OUT	mslsa_string_t *display_name;
+	OUT	WORD language_ret;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * GetConnectedUser
+ *
+ * Return the account name and NetBIOS domain name for the user making
+ * the request.  All input fields should be ignored by the server.
+ ***********************************************************************
+ */
+struct mslsa_DomainName {
+	struct mslsa_string_desc *name;
+};
+
+
+OPERATION(LSARPC_OPNUM_GetConnectedUser)
+struct mslsa_GetConnectedUser {
+	IN	LPTSTR hostname;
+	IN	BYTE *owner_in;
+	IN	BYTE *domain_in;
+	OUT	struct mslsa_string_desc *owner;
+	OUT	struct mslsa_DomainName *domain;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LSARPC_OPNUM_LookupSids2
+ *
+ * SID lookup function that appeared in Windows 2000. It appears to be
+ * very similar to the original SID lookup RPC. There are two extra IN 
+ * parameters, which we don't care about. The OUT name structure has
+ * an extra field, in which zero seems to be okay.
+ ***********************************************************************
+ */
+struct lsar_name_entry2 {
+	WORD sid_name_use;
+	WORD padding;
+	mslsa_string_t name;
+	DWORD domain_ix;	/* -1 means none */
+	DWORD flags;
+};
+typedef struct lsar_name_entry2 lsar_translated_name_ex_t;
+
+struct lsar_name_table2 {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	struct lsar_name_entry2 *entries;
+};
+typedef struct lsar_name_table2 lsar_translated_names_ex_t;
+
+OPERATION(LSARPC_OPNUM_LookupSids2)
+struct lsar_lookup_sids2 {
+	IN		mslsa_handle_t policy_handle;
+	IN		struct mslsa_lup_sid_table lup_sid_table;
+	OUT		struct mslsa_domain_table *domain_table;
+	INOUT	struct lsar_name_table2 name_table;
+	IN		WORD lookup_level;
+	INOUT	DWORD mapped_count;
+	IN		DWORD lookup_options;
+	IN		DWORD client_revision;
+ 	OUT		DWORD status;
+};
+
+OPERATION(LSARPC_OPNUM_LookupSids3)
+struct lsar_lookup_sids3 {
+	IN		struct mslsa_lup_sid_table	lup_sid_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		lsar_translated_names_ex_t	name_table;
+	IN		WORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+ 	OUT		DWORD				status;
+};
+
+/*
+ ***********************************************************************
+ * LSARPC_OPNUM_LookupNames2
+ *
+ * Name lookup function that appeared in Windows 2000. It appears to be
+ * very similar to the original name lookup RPC. There are two extra IN 
+ * parameters, which we don't care about. The lsar_rid_entry2 structure
+ * has an extra field, in which zero seems to be okay.
+ ***********************************************************************
+ */
+struct lsar_rid_entry2 {
+	WORD sid_name_use;
+	WORD pad;
+	DWORD rid;
+	DWORD domain_index;	/* -1 means none */
+	DWORD flags;
+};
+
+
+struct lsar_rid_table2 {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	struct lsar_rid_entry2 *rids;
+};
+
+
+OPERATION(LSARPC_OPNUM_LookupNames2)
+struct lsar_LookupNames2 {
+	IN		mslsa_handle_t policy_handle;
+	IN	REFERENCE	struct mslsa_lup_name_table *name_table;
+	OUT		struct mslsa_domain_table *domain_table;
+	INOUT	struct lsar_rid_table2 translated_sids;
+	IN		WORD lookup_level;
+	INOUT	DWORD mapped_count;
+	IN		DWORD lookup_options;
+	IN		DWORD client_revision;
+	OUT		DWORD status;
+};
+
+struct lsar_translated_sid_ex2 {
+	WORD			sid_name_use;
+	WORD			pad;
+	struct mslsa_sid	*sid;
+	DWORD			domain_index;	/* -1 means none */
+	DWORD			flags;
+};
+typedef struct lsar_translated_sid_ex2 lsar_translated_sid_ex2_t;
+
+struct lsar_sid_ex2_table {
+	DWORD			n_entry;
+  SIZE_IS(n_entry)
+	struct lsar_translated_sid_ex2	*sids;
+};
+typedef struct lsar_sid_ex2_table lsar_sid_ex2_table_t;
+
+OPERATION(LSARPC_OPNUM_LookupNames3)
+struct lsar_LookupNames3 {
+	IN		mslsa_handle_t			policy_handle;
+	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		struct lsar_sid_ex2_table	translated_sids;
+	IN		WORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+	OUT		DWORD				status;
+};
+
+OPERATION(LSARPC_OPNUM_LookupNames4)
+struct lsar_LookupNames4 {
+	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		struct lsar_sid_ex2_table	translated_sids;
+	IN		WORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+	OUT		DWORD				status;
+};
+
+/*
+ ***********************************************************************
+ * The LSARPC interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union lsarpc_interface {
+	CASE(LSARPC_OPNUM_CloseHandle)
+		struct mslsa_CloseHandle		CloseHandle;
+	CASE(LSARPC_OPNUM_QuerySecurityObject)
+		struct mslsa_QuerySecurityObject	QuerySecurityObj;
+	CASE(LSARPC_OPNUM_EnumerateAccounts)
+		struct mslsa_EnumerateAccounts		EnumAccounts;
+	CASE(LSARPC_OPNUM_EnumTrustedDomainsEx)
+		struct mslsa_EnumTrustedDomainEx	EnumTrustedDomainEx;
+	CASE(LSARPC_OPNUM_EnumTrustedDomain)
+		struct mslsa_EnumTrustedDomain		EnumTrustedDomain;
+	CASE(LSARPC_OPNUM_OpenAccount)
+		struct mslsa_OpenAccount		OpenAccount;
+	CASE(LSARPC_OPNUM_EnumPrivsAccount)
+		struct mslsa_EnumPrivsAccount		EnumPrivsAccount;
+	CASE(LSARPC_OPNUM_LookupPrivValue)
+		struct mslsa_LookupPrivValue		LookupPrivValue;
+	CASE(LSARPC_OPNUM_LookupPrivName)
+		struct mslsa_LookupPrivName		LookupPrivName;
+	CASE(LSARPC_OPNUM_LookupPrivDisplayName)
+		struct mslsa_LookupPrivDisplayName	LookupPrivDisplayName;
+	CASE(LSARPC_OPNUM_CreateSecret)
+		struct mslsa_CreateSecret		CreateSecret;
+	CASE(LSARPC_OPNUM_OpenSecret)
+		struct mslsa_OpenSecret			OpenSecret;
+	CASE(LSARPC_OPNUM_QueryInfoPolicy)
+		struct mslsa_QueryInfoPolicy		QueryInfoPolicy;
+	CASE(LSARPC_OPNUM_OpenPolicy)
+		struct mslsa_OpenPolicy			OpenPolicy;
+	CASE(LSARPC_OPNUM_OpenPolicy2)
+		struct mslsa_OpenPolicy2		OpenPolicy2;
+	CASE(LSARPC_OPNUM_LookupSids)
+		struct mslsa_LookupSids			LookupSids;
+	CASE(LSARPC_OPNUM_LookupNames)
+		struct mslsa_LookupNames		LookupNames;
+	CASE(LSARPC_OPNUM_GetConnectedUser)
+		struct mslsa_GetConnectedUser		GetConnectedUser;
+	CASE(LSARPC_OPNUM_LookupSids2)
+		struct lsar_lookup_sids2		LookupSids2;
+	CASE(LSARPC_OPNUM_LookupSids3)
+		struct lsar_lookup_sids3		LookupSids3;
+	CASE(LSARPC_OPNUM_LookupNames2)
+		struct lsar_LookupNames2		LookupNames2;
+	CASE(LSARPC_OPNUM_LookupNames3)
+		struct lsar_LookupNames3		LookupNames3;
+	CASE(LSARPC_OPNUM_LookupNames4)
+		struct lsar_LookupNames4		LookupNames4;
+};
+typedef union lsarpc_interface	lsarpc_interface_t;
+EXTERNTYPEINFO(lsarpc_interface)
+
+#endif /* _MLSVC_LSA_NDL_ */

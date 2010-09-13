@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Specification-Title: Java DTrace API
+Specification-Version: 1.0
+Implementation-Title: org.opensolaris.os.dtrace
+Implementation-Vendor: Sun Microsystems, Inc.
+
+Name: org/opensolaris/os/dtrace/
+Sealed: true
+
+Name: org/opensolaris/os/support/
+Sealed: true

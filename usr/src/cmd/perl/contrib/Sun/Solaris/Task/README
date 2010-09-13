@@ -1,0 +1,33 @@
+#
+# Copyright (c) 2003, Oracle and/or its affiliates. All rights reserved.
+#
+
+Licensing
+---------
+This module is released under the Perl Artistic License.
+
+Availability
+------------
+This module is only available for Solaris 9 onwards.
+
+Description
+-----------
+This module provided access to the Solaris Task subsystem, which is part of
+the Solaris resource management infrastructure.
+
+For more information on Solaris Tasks, see the project(4) manpage and the
+following on-line documentation:
+
+System Administration Guide: Resource Management and Network Services
+Chapter 6 - Projects and Tasks
+http://docs.sun.com/db/doc/816-7125
+
+Installation
+------------
+
+1. Uncompress and untar the archive
+2. cd to the module directory
+3. perl Makefile.PL; make install
+
+If you are using gcc and wish to build this module against the perl shipped as
+part of Solaris, see the Solaris-PerlGcc module, also available from CPAN.
