@@ -47,7 +47,6 @@
 #include <note.h>
 #include "runetype.h"
 #include "mblocal.h"
-#include "../i18n/_locale.h"
 
 static size_t	_none_mbrtowc(wchar_t *_RESTRICT_KYWD,
     const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
@@ -64,27 +63,10 @@ static size_t	_none_wcsnrtombs(char *_RESTRICT_KYWD,
 
 /* setup defaults */
 
-extern unsigned char __ctype_C[];
-
 int
 _none_init(_RuneLocale *rl)
 {
-	/*
-	 * We need to populate the ctype stuff.  This means the
-	 * tolower table, the type masks, etc.
-	 * There are 257 entries for the type array, 257 entries for the
-	 * tolower/toupper array, and 7 bytes for CSWIDTH array.
-	 *
-	 * We have to set this stuff up because for POSIX/C we short
-	 * circuit most of the logic in setrunelocale that would handle it.
-	 */
-	(void) memcpy(__ctype, __ctype_C, SZ_TOTAL);
-
 	charset_is_ascii = 1;
-
-	__ctype_mask = rl->__runetype;
-	__trans_upper = rl->__mapupper;
-	__trans_lower = rl->__maplower;
 
 	__mbrtowc = _none_mbrtowc;
 	__mbsinit = _none_mbsinit;
