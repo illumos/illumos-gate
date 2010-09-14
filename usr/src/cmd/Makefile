@@ -109,7 +109,6 @@ COMMON_SUBDIRS=		\
 	dc		\
 	dd		\
 	deroff		\
-	des		\
 	devfsadm	\
 	syseventd	\
 	devctl		\

@@ -332,10 +332,6 @@ usr/include/inet/kssl/ksslimpl.h
 usr/include/inet/kssl/ksslproto.h
 usr/include/inet/nca
 #
-# other contents (packages removed in source product)
-#
-usr/bin/des
-#
 # these are "removed" from the source product build because the only
 # packages that currently deliver them are removed.
 # they really should't be in here.
