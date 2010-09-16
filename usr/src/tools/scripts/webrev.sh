@@ -516,6 +516,16 @@ html_quote()
 	$SED -e "s/&/\&amp;/g" -e "s/</\&lt;/g" -e "s/>/\&gt;/g" "$@" | expand
 }
 
+# 
+# Trim a digest-style revision to a conventionally readable yet useful length
+#
+trim_digest()
+{
+	typeset digest=$1
+
+	echo $digest | $SED -e 's/\([0-9a-f]\{12\}\).*/\1/'
+}
+
 #
 # input_cmd | its2url | output_cmd
 #
@@ -1780,6 +1790,81 @@ function flist_from_mercurial
 }
 
 #
+# Transform a specified 'git log' output format into a wx-like active list.
+#
+function git_wxfile
+{
+	typeset child="$1"
+	typeset parent="$2"
+
+	TMPFLIST=/tmp/$$.active
+	$PERL -e 'my (%files, %realfiles, $msg);
+	my $branch = $ARGV[0];
+	 
+	open(F, "git diff -M --name-status $branch |");
+	while (<F>) {
+	    chomp;
+	    if (/^R(\d+)\s+([^ ]+)\s+([^ ]+)/) { # rename
+		if ($1 >= 75) {			 # Probably worth treating as a rename
+		    $realfiles{$3} = $2
+		} else {
+		    $realfiles{$3} = $3;
+		    $realfiles{$2} = $2;
+		}
+	    } else {
+		my $f = (split /\s+/, $_)[1];
+		$realfiles{$f} = $f;
+	    }
+	}
+	close(F);
+	 
+	my $state = 1;		    # 0|comments, 1|files
+	open(F, "git whatchanged --pretty=format:%B $branch.. |");
+	while (<F>) {
+	    chomp;
+	    if (/^:[0-9]{6}/) {
+		my $fname = (split /\t/, $_)[1];
+		next if !defined($realfiles{$fname}); # No real change
+		$state = 1;
+		$files{$fname} = $msg;
+	    } else {
+		if ($state == 1) {
+		    $state = 0;
+		    $msg = /^\n/ ? "" : "\n";
+		}
+		$msg .= "$_\n" if ($_);
+	    }
+	}
+	close(F);
+	 
+	for (sort keys %files) {
+	    if ($realfiles{$_} ne $_) {
+		print "$_ $realfiles{$_}\n$files{$_}\n";
+	    } else {
+		print "$_\n$files{$_}\n"
+	    }
+	}' ${parent} > $TMPFLIST
+
+	wxfile=$TMPFLIST
+}
+
+#
+# flist_from_git
+# Build a wx-style active list, and hand it off to flist_from_wx
+#
+function flist_from_git
+{
+	typeset child=$1
+	typeset parent=$2
+
+	print " File list from: git ...\c"
+	git_wxfile "$child" "$parent";
+
+	# flist_from_wx prints the Done, so we don't have to.
+	flist_from_wx $TMPFLIST
+}
+
+#
 # flist_from_subversion
 #
 # Generate the file list by extracting file names from svn status.
@@ -1999,6 +2084,64 @@ function build_old_new_mercurial
 	fi
 }
 
+function build_old_new_git
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+	typeset o_mode=
+	typeset n_mode=
+	typeset o_object=
+	typeset n_object=
+	typeset OWD=$PWD
+	typeset file
+	typeset type
+
+	cd $CWS
+
+	#
+	# Get old file and its mode from the git object tree
+	#
+	if [[ "$PDIR" == "." ]]; then
+		file="$PF"
+	else
+	       file="$PDIR/$PF"
+	fi
+
+	if [[ -n $parent_webrev && -e $PWS/$PDIR/$PF ]]; then
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
+	else
+                $GIT ls-tree $GIT_PARENT $file | read o_mode type o_object junk
+                $GIT cat-file $type $o_object > $olddir/$file 2>/dev/null
+                 
+                if (( $? != 0 )); then
+                        rm -f $olddir/$file
+                elif [[ -n $o_mode ]]; then
+                        # Strip the first 3 digits, to get a regular octal mode
+                        o_mode=${o_mode/???/}
+                        chmod $o_mode $olddir/$file
+                else
+                        # should never happen
+                        print -u2 "ERROR: set mode of $olddir/$file"
+                fi
+	fi
+
+	#
+	# new version of the file.
+	#
+	if [[ "$DIR" == "." ]]; then
+		file="$F"
+	else
+		file="$DIR/$F"
+	fi
+	rm -rf $newdir/$file
+
+        if [[ -e $CWS/$DIR/$F ]]; then
+            cp $CWS/$DIR/$F $newdir/$DIR/$F
+            chmod $(get_file_mode $CWS/$DIR/$F) $newdir/$DIR/$F
+        fi
+	cd $OWD
+}
+
 function build_old_new_subversion
 {
 	typeset olddir="$1"
@@ -2059,6 +2202,8 @@ function build_old_new
 		build_old_new_teamware "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "mercurial" ]]; then
 		build_old_new_mercurial "$olddir" "$newdir"
+	elif [[ $SCM_MODE == "git" ]]; then
+		build_old_new_git "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "subversion" ]]; then
 		build_old_new_subversion "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "unknown" ]]; then
@@ -2120,11 +2265,12 @@ trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
 
 set +o noclobber
 
-PATH=$(dirname $(whence $0)):$PATH
+PATH=$(/bin/dirname "$(whence $0)"):$PATH
 
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
 [[ -z $HG_ACTIVE ]] && HG_ACTIVE=`look_for_prog hg-active`
+[[ -z $GIT ]] && GIT=`look_for_prog git`
 [[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
 [[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
@@ -2307,6 +2453,24 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	    codemgr_ws=$(hg root -R $testparent 2>/dev/null)
 	[[ -z $codemgr_ws ]] && codemgr_ws=$(hg root 2>/dev/null)
 	CWS=$codemgr_ws
+elif [[ $SCM_MODE == "git" ]]; then
+	#
+	# Git priorities:
+	# 1. git rev-parse --git-dir from CODEMGR_WS environment variable
+	# 2. git rev-parse --git-dir from directory of invocation
+	#
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
+	    codemgr_ws=$($GIT --git-dir=$CODEMGR_WS/.git rev-parse --git-dir \
+                2>/dev/null)
+	[[ -z $codemgr_ws ]] && \
+	    codemgr_ws=$($GIT rev-parse --git-dir 2>/dev/null)
+
+	if [[ "$codemgr_ws" == ".git" ]]; then
+		codemgr_ws="${PWD}/${codemgr_ws}"
+	fi
+
+	codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
+	CWS="$codemgr_ws"
 elif [[ $SCM_MODE == "subversion" ]]; then
 	#
 	# Subversion priorities:
@@ -2358,8 +2522,8 @@ fi
 # then note that fact and set the parent to the raw_files/new subdirectory.
 #
 if [[ -n $pflag && -d $codemgr_parent/raw_files/new ]]; then
-	parent_webrev="$codemgr_parent"
-	codemgr_parent="$codemgr_parent/raw_files/new"
+	parent_webrev=$(readlink -f "$codemgr_parent")
+	codemgr_parent=$(readlink -f "$codemgr_parent/raw_files/new")
 fi
 
 if [[ -z $wflag && -z $lflag ]]; then
@@ -2390,7 +2554,7 @@ fi
 # is in use.
 #
 case "$SCM_MODE" in
-teamware|mercurial|subversion)
+teamware|mercurial|git|subversion)
 	;;
 unknown)
 	if [[ $flist_mode == "auto" ]]; then
@@ -2552,7 +2716,6 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		codemgr_parent=`hg path -R $codemgr_ws default 2>/dev/null`
 	fi
 
-	CWS_REV=`hg parent -R $codemgr_ws --template '{node|short}' 2>/dev/null`
 	PWS=$codemgr_parent
 
 	#
@@ -2616,6 +2779,96 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
 	fi
+
+	pnode=$(trim_digest $HG_PARENT)
+	PRETTY_PWS="${PWS} (at ${pnode})"
+	cnode=$(hg parent -R $codemgr_ws --template '{node|short}' \
+	    2>/dev/null)
+	PRETTY_CWS="${CWS} (at ${cnode})"}
+elif [[ $SCM_MODE == "git" ]]; then
+	#
+	# Parent can either be specified with -p, or specified with
+	# CODEMGR_PARENT in the environment.
+	#
+
+	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
+		codemgr_parent=$CODEMGR_PARENT
+	fi
+
+	# Try to figure out the parent based on the branch the current
+	# branch is tracking, if we fail, use origin/master
+	this_branch=$($GIT branch | nawk '$1 == "*" { print $2 }')
+	par_branch="origin/master"
+
+        # If we're not on a branch there's nothing we can do
+        if [[ $this_branch != "(no branch)" ]]; then
+                $GIT for-each-ref                                                 \
+                    --format='%(refname:short) %(upstream:short)' refs/heads/ |   \
+                    while read local remote; do                                   \
+                	[[ "$local" == "$this_branch" ]] && par_branch="$remote"; \
+                    done
+	fi
+
+	if [[ -z $codemgr_parent ]]; then
+		codemgr_parent=$par_branch
+	fi
+	PWS=$codemgr_parent
+
+	#
+	# If the parent is a webrev, we want to do some things against
+	# the natural workspace parent (file list, comments, etc)
+	#
+	if [[ -n $parent_webrev ]]; then
+		real_parent=$par_branch
+	else
+		real_parent=$PWS
+	fi
+
+	if [[ -z $flist_done ]]; then
+		flist_from_git "$CWS" "$real_parent"
+		flist_done=1
+	fi
+
+	#
+	# If we have a file list now, pull out any variables set
+	# therein.
+	#
+	if [[ -n $flist_done ]]; then
+		env_from_flist
+	fi
+
+	#
+	# If we don't have a wx-format file list, build one we can pull change
+	# comments from.
+	#
+	if [[ -z $wxfile ]]; then
+		print "  Comments from: git...\c"
+		git_wxfile "$CWS" "$real_parent"
+		print " Done."
+	fi
+
+	if [[ -z $GIT_PARENT ]]; then
+		GIT_PARENT=$($GIT merge-base "$real_parent" HEAD)
+	fi
+	if [[ -z $GIT_PARENT ]]; then
+		print -u2 "Error: Cannot discover parent revision"
+		exit 1
+	fi
+
+	pnode=$(trim_digest $GIT_PARENT)
+
+	if [[ $real_parent == */* ]]; then
+		origin=$(echo $real_parent | cut -d/ -f1)
+		origin=$($GIT remote -v | \
+		    $AWK '$1 == "'$origin'" { print $2; exit }')
+		PRETTY_PWS="${PWS} (${origin} at ${pnode})"
+	else
+		PRETTY_PWS="${PWS} (at ${pnode})"
+	fi
+
+	cnode=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
+	    2>/dev/null)
+	PRETTY_CWS="${CWS} (at ${cnode})"
 elif [[ $SCM_MODE == "subversion" ]]; then
 
 	#
@@ -2682,7 +2935,7 @@ typeset -A itsinfo
 typeset -r its_sed_script=/tmp/$$.its_sed
 valid_prefixes=
 if [[ -z $nflag ]]; then
-	DEFREGFILE="$(dirname $(whence $0))/../etc/its.reg"
+	DEFREGFILE="$(/bin/dirname "$(whence $0)")/../etc/its.reg"
 	if [[ -n $Iflag ]]; then
 		REGFILE=$ITSREG
 	elif [[ -r $HOME/.its.reg ]]; then
@@ -2711,7 +2964,7 @@ if [[ -z $nflag ]]; then
 	done
 
 
-	DEFCONFFILE="$(dirname $(whence $0))/../etc/its.conf"
+	DEFCONFFILE="$(/bin/dirname "$(whence $0)")/../etc/its.conf"
 	CONFFILES=$DEFCONFFILE
 	if [[ -r $HOME/.its.conf ]]; then
 		CONFFILES="${CONFFILES} $HOME/.its.conf"
@@ -2895,21 +3148,11 @@ fi
 #
 # Summarize what we're going to do.
 #
-if [[ -n $CWS_REV ]]; then
-	print "      Workspace: $CWS (at $CWS_REV)"
-else
-	print "      Workspace: $CWS"
-fi
+print "      Workspace: ${PRETTY_CWS:-$CWS}"
 if [[ -n $parent_webrev ]]; then
 	print "Compare against: webrev at $parent_webrev"
 else
-	if [[ -n $HG_PARENT ]]; then
-		hg_parent_short=`echo $HG_PARENT \
-			| $SED -e 's/\([0-9a-f]\{12\}\).*/\1/'`
-		print "Compare against: $PWS (at $hg_parent_short)"
-	else
-		print "Compare against: $PWS"
-	fi
+	print "Compare against: ${PRETTY_PWS:-$PWS}"
 fi
 
 [[ -n $INCLUDE_FILE ]] && print "      Including: $INCLUDE_FILE"
@@ -3260,19 +3503,13 @@ fi
 
 PREPDATE=$(LC_ALL=C /usr/bin/date +%Y-%b-%d\ %R\ %z\ %Z)
 print "<tr><th>Prepared by:</th><td>$preparer on $PREPDATE</td></tr>"
-print "<tr><th>Workspace:</th><td>$CWS"
-if [[ -n $CWS_REV ]]; then
-	print "(at $CWS_REV)"
-fi
+print "<tr><th>Workspace:</th><td>${PRETTY_CWS:-$CWS}"
 print "</td></tr>"
 print "<tr><th>Compare against:</th><td>"
 if [[ -n $parent_webrev ]]; then
 	print "webrev at $parent_webrev"
 else
-	print "$PWS"
-	if [[ -n $hg_parent_short ]]; then
-		print "(at $hg_parent_short)"
-	fi
+	print "${PRETTY_PWS:-$PWS}"
 fi
 print "</td></tr>"
 print "<tr><th>Summary of changes:</th><td>"
