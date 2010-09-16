@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # which_scm outputs two strings: one identifying the SCM in use, and
@@ -59,6 +57,7 @@ function primary_type
 	[ -d "$1/.hg" ] && scmid="$scmid mercurial"
 	[ -d "$1/CVS" ] && scmid="$scmid cvs"
 	[ -d "$1/.svn" ] && scmid="$scmid subversion"
+	[ -d "$1/.git" ] && scmid="$scmid git"
 	echo $scmid
 }
 
@@ -99,8 +98,8 @@ while [[ "$DIR" != / ]]; do
 	SCM_TYPE="$1"
 	# We're done searching if we hit either a change in type or the top
 	# of a "third type" control system.
-	if [[ "$SCM_TYPE" != "$CWD_TYPE" || "$SCM_TYPE" == mercurial || \
-	    "$SCM_TYPE" == teamware ]]; then
+	if [[ "$SCM_TYPE" != "$CWD_TYPE" || "$SCM_TYPE" == git || \
+	    "$SCM_TYPE" == mercurial || "$SCM_TYPE" == teamware ]]; then
 		break
 	fi
 	PREVDIR="$DIR"
