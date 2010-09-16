@@ -68,9 +68,9 @@
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
 
-static int smbfs_getattr_cache(vnode_t *, struct smbfattr *);
-static int smbfattr_to_vattr(vnode_t *, struct smbfattr *,
-	struct vattr *);
+static int smbfs_getattr_cache(vnode_t *, smbfattr_t *);
+static void smbfattr_to_vattr(vnode_t *, smbfattr_t *, vattr_t *);
+static void smbfattr_to_xvattr(smbfattr_t *, vattr_t *);
 
 /*
  * The following code provide zone support in order to perform an action
@@ -441,16 +441,17 @@ smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
 		error = smbfs_getattr_otw(vp, &fa, cr);
 	if (error)
 		return (error);
+	vap->va_mask |= mask;
 
 	/*
 	 * Re. client's view of the file size, see:
 	 * smbfs_attrcache_fa, smbfs_getattr_otw
 	 */
+	smbfattr_to_vattr(vp, &fa, vap);
+	if (vap->va_mask & AT_XVATTR)
+		smbfattr_to_xvattr(&fa, vap);
 
-	error = smbfattr_to_vattr(vp, &fa, vap);
-	vap->va_mask = mask;
-
-	return (error);
+	return (0);
 }
 
 
@@ -459,12 +460,10 @@ smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
  * Returns 0 for success, error if failed (overflow, etc).
  * From NFS: nattr_to_vattr()
  */
-int
+void
 smbfattr_to_vattr(vnode_t *vp, struct smbfattr *fa, struct vattr *vap)
 {
 	struct smbnode *np = VTOSMB(vp);
-
-	/* Set va_mask in caller */
 
 	/*
 	 * Take type, mode, uid, gid from the smbfs node,
@@ -506,10 +505,50 @@ smbfattr_to_vattr(vnode_t *vp, struct smbfattr *fa, struct vattr *vap)
 	vap->va_blksize = MAXBSIZE;
 	vap->va_nblocks = (fsblkcnt64_t)btod(np->r_attr.fa_allocsz);
 	vap->va_seq = 0;
-
-	return (0);
 }
 
+/*
+ * smbfattr_to_xvattr: like smbfattr_to_vattr but for
+ * Extensible system attributes (PSARC 2007/315)
+ */
+static void
+smbfattr_to_xvattr(struct smbfattr *fa, struct vattr *vap)
+{
+	xvattr_t *xvap = (xvattr_t *)vap;	/* *vap may be xvattr_t */
+	xoptattr_t *xoap = NULL;
+
+	if ((xoap = xva_getxoptattr(xvap)) == NULL)
+		return;
+
+	if (XVA_ISSET_REQ(xvap, XAT_CREATETIME)) {
+		xoap->xoa_createtime = fa->fa_createtime;
+		XVA_SET_RTN(xvap, XAT_CREATETIME);
+	}
+
+	if (XVA_ISSET_REQ(xvap, XAT_ARCHIVE)) {
+		xoap->xoa_archive =
+		    ((fa->fa_attr & SMB_FA_ARCHIVE) != 0);
+		XVA_SET_RTN(xvap, XAT_ARCHIVE);
+	}
+
+	if (XVA_ISSET_REQ(xvap, XAT_SYSTEM)) {
+		xoap->xoa_system =
+		    ((fa->fa_attr & SMB_FA_SYSTEM) != 0);
+		XVA_SET_RTN(xvap, XAT_SYSTEM);
+	}
+
+	if (XVA_ISSET_REQ(xvap, XAT_READONLY)) {
+		xoap->xoa_readonly =
+		    ((fa->fa_attr & SMB_FA_RDONLY) != 0);
+		XVA_SET_RTN(xvap, XAT_READONLY);
+	}
+
+	if (XVA_ISSET_REQ(xvap, XAT_HIDDEN)) {
+		xoap->xoa_hidden =
+		    ((fa->fa_attr & SMB_FA_HIDDEN) != 0);
+		XVA_SET_RTN(xvap, XAT_HIDDEN);
+	}
+}
 
 /*
  * SMB Client initialization and cleanup.
