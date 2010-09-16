@@ -2148,7 +2148,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 
 	# Remove all .make.state* files, just in case we are restarting
 	# the build after having interrupted a previous 'make clobber'.
-	find . \( -name SCCS -o -name .hg -o -name .svn -o name .git \
+	find . \( -name SCCS -o -name .hg -o -name .svn -o -name .git \
 		-o -name 'interfaces.*' \) -prune \
 		-o -name '.make.*' -print | xargs rm -f
 
@@ -2183,8 +2183,8 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	# under source code control, so leave them alone.
 	# We should probably blow away temporary directories too.
 	cd $SRC
-	find $relsrcdirs \( -name SCCS -o -name .hg -o -name .svn -o name .git\
-	    -o -name 'interfaces.*' \) -prune -o \
+	find $relsrcdirs \( -name SCCS -o -name .hg -o -name .svn \
+	    -o -name .git -o -name 'interfaces.*' \) -prune -o \
 	    \( -name '.make.*' -o -name 'lib*.a' -o -name 'lib*.so*' -o \
 	       -name '*.o' \) -print | \
 	    grep -v 'tools/ctf/dwarf/.*/libdwarf' | xargs rm -f

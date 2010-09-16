@@ -2265,7 +2265,7 @@ trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
 
 set +o noclobber
 
-PATH=$(dirname "$(whence $0)"):$PATH
+PATH=$(/bin/dirname "$(whence $0)"):$PATH
 
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
@@ -2800,11 +2800,14 @@ elif [[ $SCM_MODE == "git" ]]; then
 	this_branch=$($GIT branch | nawk '$1 == "*" { print $2 }')
 	par_branch="origin/master"
 
-	$GIT for-each-ref                                                 \
-	    --format='%(refname:short) %(upstream:short)' refs/heads/ |   \
-	    while read local remote; do                                   \
-		[[ "$local" == "$this_branch" ]] && par_branch="$remote"; \
-	    done
+        # If we're not on a branch there's nothing we can do
+        if [[ $this_branch != "(no branch)" ]]; then
+                $GIT for-each-ref                                                 \
+                    --format='%(refname:short) %(upstream:short)' refs/heads/ |   \
+                    while read local remote; do                                   \
+                	[[ "$local" == "$this_branch" ]] && par_branch="$remote"; \
+                    done
+	fi
 
 	if [[ -z $codemgr_parent ]]; then
 		codemgr_parent=$par_branch
@@ -2932,7 +2935,7 @@ typeset -A itsinfo
 typeset -r its_sed_script=/tmp/$$.its_sed
 valid_prefixes=
 if [[ -z $nflag ]]; then
-	DEFREGFILE="$(dirname "$(whence $0)")/../etc/its.reg"
+	DEFREGFILE="$(/bin/dirname "$(whence $0)")/../etc/its.reg"
 	if [[ -n $Iflag ]]; then
 		REGFILE=$ITSREG
 	elif [[ -r $HOME/.its.reg ]]; then
@@ -2961,7 +2964,7 @@ if [[ -z $nflag ]]; then
 	done
 
 
-	DEFCONFFILE="$(dirname "$(whence $0)")/../etc/its.conf"
+	DEFCONFFILE="$(/bin/dirname "$(whence $0)")/../etc/its.conf"
 	CONFFILES=$DEFCONFFILE
 	if [[ -r $HOME/.its.conf ]]; then
 		CONFFILES="${CONFFILES} $HOME/.its.conf"
