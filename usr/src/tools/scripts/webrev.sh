@@ -2743,7 +2743,8 @@ elif [[ $SCM_MODE == "git" ]]; then
 		    remote.origin.url 2>/dev/null)
 	fi
 
-	CWS_REV=$(git --git-dir=$codemgr_ws rev-parse HEAD 2>/dev/null)
+	CWS_REV=$(git --git-dir=$codemgr_ws rev-parse --short=12 HEAD \
+		    2>/dev/null)
 	PWS=$codemgr_parent
 
 	#
@@ -3095,10 +3096,11 @@ fi
 if [[ -n $parent_webrev ]]; then
 	print "Compare against: webrev at $parent_webrev"
 else
-	if [[ -n $HG_PARENT ]]; then
-		hg_parent_short=`echo $HG_PARENT \
-			| $SED -e 's/\([0-9a-f]\{12\}\).*/\1/'`
-		print "Compare against: $PWS (at $hg_parent_short)"
+	parent_node=${HG_PARENT:-$GIT_PARENT}
+	if [[ -n $parent_node ]]; then
+		parent_short=$(echo $parent_node | \
+		    $SED -e 's/\([0-9a-f]\{12\}\).*/\1/')
+		print "Compare against: $PWS (at $parent_short)"
 	else
 		print "Compare against: $PWS"
 	fi
@@ -3462,8 +3464,8 @@ if [[ -n $parent_webrev ]]; then
 	print "webrev at $parent_webrev"
 else
 	print "$PWS"
-	if [[ -n $hg_parent_short ]]; then
-		print "(at $hg_parent_short)"
+	if [[ -n $parent_short ]]; then
+		print "(at $parent_short)"
 	fi
 fi
 print "</td></tr>"
