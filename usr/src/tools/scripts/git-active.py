@@ -69,7 +69,7 @@ def main(argv):
         fh = sys.stdout
 
     cmd = ["git", "--git-dir=%s" % options.wspath, "log", "--name-only",
-        "--parents", "--reverse", "--pretty=short", "master.."]
+        "--parents", "--reverse", "--pretty=short", "origin/master.."]
     (rc, out, err) = execCmd(cmd)
 
     if "commit" in out[0]:
