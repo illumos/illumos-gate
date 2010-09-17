@@ -72,9 +72,6 @@ def main(argv):
         "--parents", "--reverse", "--pretty=short", "origin/master.."]
     (rc, out, err) = execCmd(cmd)
 
-    if "commit" in out[0]:
-        parent = out[0].split()[2]
-
     files = {}
     comment = None
     for i in out:
@@ -91,7 +88,8 @@ def main(argv):
                 files[i] = []
             files[i].append(comment)
 
-    fh.write("GIT_PARENT=%s\n" % parent)
+    (rc, out, err) = execCmd("git merge-base origin/master HEAD".split())
+    fh.write("GIT_PARENT=%s\n" % out[0].strip())
 
     for file in sorted(files.iterkeys()):
         #if entry.is_renamed():
