@@ -72,32 +72,28 @@ def main(argv):
         "--parents", "--reverse", "--pretty=short", "origin/master.."]
     (rc, out, err) = execCmd(cmd)
 
-    files = {}
-    comment = None
+    comments = {}
+    thiscomment = None
     for i in out:
         if "commit" in i:
-            comment = None
+            thiscomment = None
             continue
         if i == "" or i.startswith("Author"):
             continue
         if i.startswith("    "):
-            comment = i.strip()
+            thiscomment = i.strip()
             continue
-        if comment:
-            if i not in files:
-                files[i] = []
-            files[i].append(comment)
+        if thiscomment:
+            if i not in comments:
+                comments[i] = []
+            comments[i].append(thiscomment)
 
     (rc, out, err) = execCmd("git merge-base origin/master HEAD".split())
     fh.write("GIT_PARENT=%s\n" % out[0].strip())
 
-    for file in sorted(files.iterkeys()):
-        #if entry.is_renamed():
-        #    fh.write("%s %s\n" % (entry.name, entry.parentname))
-        #else:
-        #    fh.write("%s\n" % entry.name)
-        fh.write("%s\n\n" % file)
-        fh.write("%s\n\n" % '\n'.join(files[file]))
+    for fname in sorted(comments.iterkeys()):
+        fh.write("%s\n\n" % fname)
+        fh.write("%s\n\n" % '\n'.join(comments[fname]))
 
 if __name__ == '__main__':
     try:
