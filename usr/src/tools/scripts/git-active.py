@@ -45,9 +45,8 @@ def execCmd(cmd):
 
 def main(argv):
 
-    usage = "usage: %prog [-p parent] -w workspace"
+    usage = "usage: %prog -w workspace"
     parser = optparse.OptionParser(version="%prog 1.0", usage=usage)
-    parser.add_option("-p", dest="parentpath", default="", help="parent repo")
     parser.add_option("-w", dest="wspath", default="", help="workspace")
     parser.add_option("-o", dest="outputfile", help="output file")
     parser.disable_interspersed_args()
@@ -68,17 +67,17 @@ def main(argv):
     else:
         fh = sys.stdout
 
-    cmd = ["git", "--git-dir=%s" % options.wspath, "log", "--name-only",
-        "--parents", "--reverse", "--pretty=short", "origin/master.."]
+    cmd = ["git", "--git-dir=%s/.git" % options.wspath, "log", "--name-only",
+           "--reverse", "--pretty=short", "origin/master.."]
     (rc, out, err) = execCmd(cmd)
 
     comments = {}
     thiscomment = None
     for i in out:
-        if "commit" in i:
+        if i.startswith("commit "):
             thiscomment = None
             continue
-        if i == "" or i.startswith("Author"):
+        if not i or i.startswith("Author"):
             continue
         if i.startswith("    "):
             thiscomment = i.strip()

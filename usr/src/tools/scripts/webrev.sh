@@ -1785,10 +1785,9 @@ function flist_from_mercurial
 function git_active_wxfile
 {
 	typeset child=$1
-	typeset parent=$2
 
 	TMPFLIST=/tmp/$$.active
-	$GIT_ACTIVE -w $child -p $parent -o $TMPFLIST
+	$GIT_ACTIVE -w $child -o $TMPFLIST
 	wxfile=$TMPFLIST
 }
 
@@ -1802,14 +1801,14 @@ function flist_from_git
 	typeset child=$1
 	typeset parent=$2
 
-	print " File list from: git-active -p $parent ...\c"
+	print " File list from: git-active ...\c"
 
 	if [[ ! -x $GIT_ACTIVE ]]; then
 		print		# Blank line for the \c above
 		print -u2 "Error: git-active tool not found.  Exiting"
 		exit 1
 	fi
-	git_active_wxfile $child $parent
+	git_active_wxfile $child
 
 	# flist_from_wx prints the Done, so we don't have to.
 	flist_from_wx $TMPFLIST
@@ -2417,6 +2416,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 		codemgr_ws="$PWD"/"$codemgr_ws"
 	fi
 
+	codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
 	CWS="$codemgr_ws"
 elif [[ $SCM_MODE == "subversion" ]]; then
 	#
@@ -2739,11 +2739,11 @@ elif [[ $SCM_MODE == "git" ]]; then
 	fi
 
 	if [[ -z $codemgr_parent ]]; then
-		codemgr_parent=$(git --git-dir=$codemgr_ws config \
+		codemgr_parent=$(git --git-dir=${codemgr_ws}/.git config \
 		    remote.origin.url 2>/dev/null)
 	fi
 
-	CWS_REV=$(git --git-dir=$codemgr_ws rev-parse --short=12 HEAD \
+	CWS_REV=$(git --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
 		    2>/dev/null)
 	PWS=$codemgr_parent
 
@@ -2752,7 +2752,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# the natural workspace parent (file list, comments, etc)
 	#
 	if [[ -n $parent_webrev ]]; then
-		real_parent=$(git --git-dir $codemgr_ws config \
+		real_parent=$(git --git-dir ${codemgr_ws}/.git config \
 	            remote.origin.url 2>/dev/null)
 	else
 		real_parent=$PWS
@@ -2783,7 +2783,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# Only call git-active if we don't have a wx formatted file already
 	#
 	if [[ -x $GIT_ACTIVE && -z $wxfile ]]; then
-		print "  Comments from: git-active -p $real_parent ...\c"
+		print "  Comments from: git-active...\c"
 		git_active_wxfile $CWS $real_parent
 		print " Done."
 	fi
@@ -2803,7 +2803,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# git-active and pull an GIT_PARENT out of it, ignore the rest.
 	#
 	if [[ -z $GIT_PARENT && -x $GIT_ACTIVE ]]; then
-		$GIT_ACTIVE -w $codemgr_ws -p $real_parent | \
+		$GIT_ACTIVE -w $codemgr_ws | \
 		    eval `$SED -e "s/#.*$//" | $GREP GIT_PARENT=`
 	elif [[ -z $GIT_PARENT ]]; then
 		print -u2 "Error: Cannot discover parent revision"
