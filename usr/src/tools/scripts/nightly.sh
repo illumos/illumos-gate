@@ -57,7 +57,6 @@ unset CDPATH
 # Get the absolute path of the nightly script that the user invoked.  This
 # may be a relative path, and we need to do this before changing directory.
 nightly_path=`whence $0`
-nightly_ls="`ls -l $nightly_path`"
 
 #
 # Keep track of where we found nightly so we can invoke the matching
@@ -2498,20 +2497,6 @@ echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
 # System
 whence uname | tee -a $build_environ_file >> $LOGFILE
 uname -a 2>&1 | tee -a $build_environ_file >> $LOGFILE
-echo | tee -a $build_environ_file >> $LOGFILE
-
-# nightly
-echo "$0 $@" | tee -a $build_environ_file >> $LOGFILE
-if [[ $nightly_path = "/opt/onbld/bin/nightly" ]]; then
-	# We assume that if you have /opt/onbld/bin/nightly, then
-	# you have some form of the onbld package installed. If this
-	# is not true then your nightly is almost definitely out of
-	# date and should not be used.
-	/usr/bin/pkg info \*onbld\* | \
-	    egrep "Name:|Publisher:|Version:|Packaging:|FMRI:"
-else
-	echo "$nightly_ls"
-fi | tee -a $build_environ_file >> $LOGFILE
 echo | tee -a $build_environ_file >> $LOGFILE
 
 # make
