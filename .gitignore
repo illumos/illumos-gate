@@ -1,0 +1,7 @@
+*.o
+.make.state
+*.po
+*.so
+*.so.1
+*.a
+*.pyc
