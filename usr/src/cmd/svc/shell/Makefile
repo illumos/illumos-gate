@@ -36,17 +36,13 @@ SRCS = \
 
 SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
 
-PROG = netservices
-$(ROOTUSRSBINPROG) := FILEMODE= 0555
-
-install: all $(SCRIPTS) $(ROOTUSRSBINPROG)
+install: all $(SCRIPTS)
 
 $(ROOT)/lib/svc/share/%: %
 	$(INS.file)
 
-all: $(PROG)
+all:
 
 lint _msg:
 
 clobber clean:
-	$(RM) $(PROG)
