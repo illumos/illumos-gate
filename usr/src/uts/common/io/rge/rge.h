@@ -348,6 +348,7 @@ typedef struct {
 	uint8_t			clsize;		/* cache-line-size	*/
 	uint8_t			latency;	/* latency-timer	*/
 	boolean_t		is_pcie;
+	boolean_t		enable_mac_first;
 	uint32_t		mac_ver;
 	uint32_t		phy_ver;
 	uint32_t		rxconfig;
