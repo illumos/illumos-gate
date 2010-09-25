@@ -19,7 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -42,12 +41,7 @@ FILES =				\
 		draw.ps		\
 		fatcourier.ps	\
 		forms.ps	\
-		postdaisy.ps	\
-		postdmd.ps	\
-		postmd.ps	\
-		postplot.ps	\
 		postprint.ps	\
-		posttek.ps	\
 		ps.requests	\
 		tsol_banner.ps	\
 		tsol_separator.ps	\

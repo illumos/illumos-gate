@@ -20,7 +20,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -35,15 +34,10 @@ ROOTETCLPFD=	$(ROOTETCLP)/fd
 FILES=		catv.fd		\
 		download.fd	\
 		dpost.fd	\
-		postdaisy.fd	\
-		postdmd.fd	\
 		postio.fd	\
 		postior.fd	\
-		postmd.fd	\
-		postplot.fd	\
 		postprint.fd	\
 		postreverse.fd	\
-		posttek.fd \
 		postpages.fd \
 		pr.fd
 
