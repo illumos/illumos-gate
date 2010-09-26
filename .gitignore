@@ -1,0 +1,17 @@
+*.o
+.make.state
+*.po
+*.so
+*.so.1
+*.a
+*.pyc
+/closed
+/illumos.sh
+/log
+/nightly
+/on-closed-bins-nd.i386.tar.bz2
+/on-closed-bins.i386.tar.bz2
+/packages
+/proto
+.make.state
+.build.tstamp
