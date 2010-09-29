@@ -18,20 +18,19 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
-#
+default: all
+
+include Makefile.joyent
+
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg joyent labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+SUBDIRS =	zone
+MSGSUBDIRS =	zone
 
 all :=		TARGET= all
 install :=	TARGET= install

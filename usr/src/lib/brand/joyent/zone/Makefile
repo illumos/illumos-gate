@@ -18,35 +18,37 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
 #
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg joyent labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+PROGS =		jinstall
+XMLDOCS=	config.xml platform.xml
+USERFILES=
+TEMPLATES =	Joyent.xml
+CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+include $(SRC)/cmd/Makefile.cmd
+include ../Makefile.joyent
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all:	$(PROGS)
 
-_msg: $(MSGSUBDIRS)
+POFILES =	$(PROGS:%=%.po) common.po
+POFILE =	joyent.po
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(POFILE): $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
-FRC:
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ETCUSER)
+
+lint:
+
+clean:
+	-$(RM) $(PROGS) $(POFILES) $(POFILE)
+
+include $(SRC)/cmd/Makefile.targ

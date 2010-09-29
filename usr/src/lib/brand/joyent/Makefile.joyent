@@ -18,35 +18,12 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# lib/brand/Makefile
+# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # include global definitions
-include ../../Makefile.master
 
-#
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+BRAND =	joyent
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg joyent labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+include $(SRC)/lib/brand/Makefile.brand
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
-
-.KEEP_STATE:
-
-all install clean clobber lint: $(SUBDIRS)
-
-_msg: $(MSGSUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
