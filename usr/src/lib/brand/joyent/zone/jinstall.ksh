@@ -31,12 +31,15 @@ export PATH
 
 ZONENAME=""
 ZONEPATH=""
+# Default to 10GB diskset quota
+ZQUOTA=10
 
-while getopts "R:t:z:" opt
+while getopts "R:t:q:z:" opt
 do
 	case "$opt" in
 		R)	ZONEPATH="$OPTARG";;
 		t)	TMPLZONE="$OPTARG";;
+		q)	ZQUOTA="$OPTARG";;
 		z)	ZONENAME="$OPTARG";;
 		*)	printf "$m_usage\n"
 			exit $ZONE_SUBPROC_USAGE;;
@@ -55,6 +58,12 @@ if [[ -z $TMPLZONE ]]; then
 	exit $ZONE_SUBPROC_USAGE
 fi
 
+# The dataset quota must be a number.
+case $ZQUOTA in *[!0-9]*)
+	print -u2 "Brand error: The quota $ZQUOTA is not a number"
+	exit $ZONE_SUBPROC_USAGE;;
+esac
+
 ZROOT=$ZONEPATH/root
 
 # Get the dataset of the parent directory of the zonepath.
@@ -69,8 +78,8 @@ zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
 zfs destroy $PDS_NAME/$ZONENAME
 
 zfs snapshot $PDS_NAME/${TMPLZONE}@${ZONENAME}
-zfs clone $PDS_NAME/${TMPLZONE}@${ZONENAME} $PDS_NAME/$ZONENAME
-zfs set quota=10g $PDS_NAME/$ZONENAME
+zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${ZONENAME} \
+    $PDS_NAME/$ZONENAME
 
 chmod 700 $ZONEPATH
 
