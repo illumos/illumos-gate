@@ -393,6 +393,7 @@ COMMON_SUBDIRS=		\
 	syseventadm	\
 	syslogd		\
 	tabs		\
+	tail		\
 	tar		\
 	tbl		\
 	tcopy		\
@@ -473,8 +474,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/pax	\
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail
+	$(CLOSED)/cmd/sed_xpg4
 
 i386_SUBDIRS=		\
 	acpihpd		\
@@ -757,8 +757,7 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/pax	\
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail
+	$(CLOSED)/cmd/sed_xpg4
 
 sparc_MSGSUBDIRS=	\
 	fruadm		\
