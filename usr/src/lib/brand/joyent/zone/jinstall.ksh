@@ -34,11 +34,13 @@ ZONEPATH=""
 # Default to 10GB diskset quota
 ZQUOTA=10
 
-while getopts "R:t:q:z:" opt
+while getopts "R:t:U:q:z:" opt
 do
 	case "$opt" in
 		R)	ZONEPATH="$OPTARG";;
 		t)	TMPLZONE="$OPTARG";;
+			# UUID is only used in the postinstall script
+		U)	UUID="$OPTARG";;
 		q)	ZQUOTA="$OPTARG";;
 		z)	ZONENAME="$OPTARG";;
 		*)	printf "$m_usage\n"

@@ -39,5 +39,6 @@ dir path=usr/lib/brand/joyent group=sys
 file path=etc/zones/Joyent.xml mode=0444
 file path=usr/lib/brand/joyent/config.xml mode=0444
 file path=usr/lib/brand/joyent/jinstall mode=0755
+file path=usr/lib/brand/joyent/pinstall mode=0755
 file path=usr/lib/brand/joyent/platform.xml mode=0444
 license lic_CDDL license=lic_CDDL

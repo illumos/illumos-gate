@@ -38,13 +38,13 @@
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
 	<install>/usr/lib/brand/joyent/jinstall -z %z -R %R</install>
-	<installopts>R:t:q:z:</installopts>
+	<installopts>R:t:U:q:z:</installopts>
 	<boot></boot>
 	<halt></halt>
 	<verify_cfg></verify_cfg>
 	<verify_adm></verify_adm>
 	<postclone></postclone>
-	<postinstall></postinstall>
+	<postinstall>/usr/lib/brand/joyent/pinstall -z %z -R %R</postinstall>
 	<attach></attach>
 	<detach></detach>
 	<clone></clone>

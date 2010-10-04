@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROGS =		jinstall
+PROGS =		jinstall pinstall
 XMLDOCS=	config.xml platform.xml
 USERFILES=
 TEMPLATES =	Joyent.xml
