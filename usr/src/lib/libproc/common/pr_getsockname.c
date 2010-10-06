@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -33,6 +31,9 @@
 #include <sys/stream.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <procfs.h>
+#include <ucred.h>
+#include <sys/ucred.h>
 #include "libproc.h"
 
 static int
@@ -165,5 +166,60 @@ pr_getsockopt(struct ps_prochandle *Pr,
 		errno = (error > 0)? error : ENOSYS;
 		return (-1);
 	}
+	return (0);
+}
+
+/*
+ * getpeerucred() system call -- executed by subject process
+ */
+int
+pr_getpeerucred(struct ps_prochandle *Pr, int fd, ucred_t **ucp)
+{
+	sysret_t rval;		/* return value from getpeerucred() */
+	argdes_t argd[3];	/* arg descriptors for getpeerucred() */
+	argdes_t *adp;
+	int error;
+	ucred_t *uc = *ucp;
+
+	if (Pr == NULL)		/* no subject process */
+		return (getpeerucred(fd, ucp));
+
+	if (uc == NULL) {
+		uc = _ucred_alloc();
+		if (uc == NULL)
+			return (-1);
+	}
+
+	adp = &argd[0];		/* code argument */
+	adp->arg_value = UCREDSYS_GETPEERUCRED;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* fd argument */
+	adp->arg_value = fd;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* ucred argument */
+	adp->arg_value = 0;
+	adp->arg_object = uc;
+	adp->arg_type = AT_BYREF;
+	adp->arg_inout = AI_OUTPUT;
+	adp->arg_size = ucred_size();
+
+	error = Psyscall(Pr, &rval, SYS_ucredsys, 3, &argd[0]);
+
+	if (error) {
+		errno = (error > 0)? error : ENOSYS;
+		if (*ucp == NULL)
+			ucred_free(uc);
+
+		return (-1);
+	}
+	*ucp = uc;
 	return (0);
 }

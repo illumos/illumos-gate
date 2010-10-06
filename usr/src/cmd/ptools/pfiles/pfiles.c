@@ -44,6 +44,8 @@
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
+#include <ucred.h>
+#include <zone.h>
 
 #define	copyflock(dst, src) \
 	(dst).l_type = (src).l_type;		\
@@ -61,6 +63,7 @@ static boolean_t nflag = B_FALSE;
 static	void	intr(int);
 static	void	dofcntl(struct ps_prochandle *, int, int, int);
 static	void	dosocket(struct ps_prochandle *, int);
+static	void	dofifo(struct ps_prochandle *, int);
 static	void	dotli(struct ps_prochandle *, int);
 static	void	show_files(struct ps_prochandle *);
 static	void	show_fileflags(int);
@@ -301,6 +304,8 @@ show_files(struct ps_prochandle *Pr)
 
 			if ((statb.st_mode & S_IFMT) == S_IFSOCK)
 				dosocket(Pr, fd);
+			else if ((statb.st_mode & S_IFMT) == S_IFIFO)
+				dofifo(Pr, fd);
 
 			(void) sprintf(pname, "/proc/%d/path/%d", (int)pid, fd);
 
@@ -470,25 +475,29 @@ show_fileflags(int flags)
 	(void) printf("%s", str);
 }
 
+/* show process on the other end of a door, socket or fifo */
+static void
+show_peer_process(pid_t ppid)
+{
+	psinfo_t psinfo;
+
+	if (proc_get_psinfo(ppid, &psinfo) == 0)
+		(void) printf(" %s[%d]", psinfo.pr_fname, (int)ppid);
+	else
+		(void) printf(" pid %d", (int)ppid);
+}
+
 /* show door info */
 static void
 show_door(struct ps_prochandle *Pr, int fd)
 {
 	door_info_t door_info;
-	psinfo_t psinfo;
 
 	if (pr_door_info(Pr, fd, &door_info) != 0)
 		return;
 
-	if (proc_get_psinfo(door_info.di_target, &psinfo) != 0)
-		psinfo.pr_fname[0] = '\0';
-
-	(void) printf("  door to ");
-	if (psinfo.pr_fname[0] != '\0')
-		(void) printf("%s[%d]", psinfo.pr_fname,
-		    (int)door_info.di_target);
-	else
-		(void) printf("pid %d", (int)door_info.di_target);
+	(void) printf("  door to");
+	show_peer_process(door_info.di_target);
 }
 
 /*
@@ -553,6 +562,35 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 	}
 
 	(void) printf("\t%s: %s\n", str, p);
+}
+
+/*
+ * Print out the process information for the other end of local sockets
+ * and fifos
+ */
+static void
+show_ucred(const char *str, ucred_t *cred)
+{
+	pid_t upid = ucred_getpid(cred);
+	zoneid_t uzid = ucred_getzoneid(cred);
+	char zonename[ZONENAME_MAX];
+
+	if ((upid != -1) || (uzid != -1)) {
+		(void) printf("\t%s:", str);
+		if (upid != -1) {
+			show_peer_process(upid);
+		}
+		if (uzid != -1) {
+			if (getzonenamebyid(uzid, zonename, sizeof (zonename))
+			    != -1) {
+				(void) printf(" zone: %s[%d]", zonename,
+				    (int)uzid);
+			} else {
+				(void) printf(" zoneid: %d", (int)uzid);
+			}
+		}
+		(void) printf("\n");
+	}
 }
 
 static void
@@ -709,6 +747,18 @@ show_sockfilters(struct ps_prochandle *Pr, int fd)
 	free(fi);
 }
 
+/* print peer credentials for sockets and named pipes */
+static void
+dopeerucred(struct ps_prochandle *Pr, int fd)
+{
+	ucred_t *peercred = NULL;	/* allocated by getpeerucred */
+
+	if (pr_getpeerucred(Pr, fd, &peercred) == 0) {
+		show_ucred("peer", peercred);
+		ucred_free(peercred);
+	}
+}
+
 /* the file is a socket */
 static void
 dosocket(struct ps_prochandle *Pr, int fd)
@@ -734,6 +784,15 @@ dosocket(struct ps_prochandle *Pr, int fd)
 	len = sizeof (buf);
 	if (pr_getpeername(Pr, fd, sa, &len) == 0)
 		show_sockaddr("peername", sa, len);
+
+	dopeerucred(Pr, fd);
+}
+
+/* the file is a fifo (aka "named pipe") */
+static void
+dofifo(struct ps_prochandle *Pr, int fd)
+{
+	dopeerucred(Pr, fd);
 }
 
 /* the file is a TLI endpoint */
