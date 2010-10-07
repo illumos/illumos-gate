@@ -106,6 +106,7 @@ file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
 file path=opt/onbld/bin/get_depend_info mode=0555
+file path=opt/onbld/bin/git-active mode=0555
 file path=opt/onbld/bin/hdrchk mode=0555
 file path=opt/onbld/bin/hg-active mode=0555
 file path=opt/onbld/bin/hgsetup mode=0555

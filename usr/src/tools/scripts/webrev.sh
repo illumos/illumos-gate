@@ -1780,6 +1780,42 @@ function flist_from_mercurial
 }
 
 #
+# Call git-active to get the active list output in the wx active list format
+#
+function git_active_wxfile
+{
+	typeset child=$1
+	typeset parent=$2
+
+	TMPFLIST=/tmp/$$.active
+	$GIT_ACTIVE -w $child -p $parent -o $TMPFLIST
+	wxfile=$TMPFLIST
+}
+
+#
+# flist_from_git
+# Call git-active to get a wx-style active list, and hand it off to
+# flist_from_wx
+#
+function flist_from_git
+{
+	typeset child=$1
+	typeset parent=$2
+
+	print " File list from: git-active -p $parent ...\c"
+
+	if [[ ! -x $GIT_ACTIVE ]]; then
+		print		# Blank line for the \c above
+		print -u2 "Error: git-active tool not found.  Exiting"
+		exit 1
+	fi
+	git_active_wxfile $child $parent
+
+	# flist_from_wx prints the Done, so we don't have to.
+	flist_from_wx $TMPFLIST
+}
+
+#
 # flist_from_subversion
 #
 # Generate the file list by extracting file names from svn status.
@@ -1999,6 +2035,63 @@ function build_old_new_mercurial
 	fi
 }
 
+function build_old_new_git
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+	typeset ws_top_dir=$(dirname $3)
+	typeset o_mode=
+	typeset n_mode=
+	typeset o_object=
+	typeset n_object=
+	typeset file
+	typeset type
+
+	#
+	# Get old file and its mode from the git object tree
+	#
+	if [[ "$PDIR" == "." ]]; then
+		file="$PF"
+	else
+		file="$PDIR/$PF"
+	fi
+
+	curr_dir=$(pwd)
+ 	cd $ws_top_dir
+
+	git ls-tree $GIT_PARENT $file | read o_mode type o_object junk
+	git cat-file $type $o_object > $olddir/$file 2>/dev/null
+
+	if (( $? != 0 )); then
+		rm -f $olddir/$file
+	elif [[ -n $o_mode ]]; then
+		chmod $o_mode $olddir/$file
+	else
+		# should never happen
+		print -u2 "ERROR: set mode of $olddir/$file"
+	fi
+
+	#
+	# new version of the file.
+	#
+	if [[ "$DIR" == "." ]]; then
+		file="$F"
+	else
+		file="$DIR/$F"
+	fi
+	rm -rf $newdir/$file
+	git ls-tree HEAD $file | read n_mode type n_object junk
+	git cat-file $type $n_object > $newdir/$file 2>/dev/null
+
+	cd $curr_dir
+	if [[ -n $n_mode ]]; then
+		chmod $n_mode $newdir/$file
+	else
+		# should never happen
+		print -u2 "ERROR: set mode of $newdir/$file"
+	fi
+}
+
 function build_old_new_subversion
 {
 	typeset olddir="$1"
@@ -2059,6 +2152,8 @@ function build_old_new
 		build_old_new_teamware "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "mercurial" ]]; then
 		build_old_new_mercurial "$olddir" "$newdir"
+	elif [[ $SCM_MODE == "git" ]]; then
+		build_old_new_git "$olddir" "$newdir" "$CWS"
 	elif [[ $SCM_MODE == "subversion" ]]; then
 		build_old_new_subversion "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "unknown" ]]; then
@@ -2125,6 +2220,7 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
 [[ -z $HG_ACTIVE ]] && HG_ACTIVE=`look_for_prog hg-active`
+[[ -z $GIT_ACTIVE ]] && GIT_ACTIVE=`look_for_prog git-active`
 [[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
 [[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
@@ -2307,6 +2403,23 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	    codemgr_ws=$(hg root -R $testparent 2>/dev/null)
 	[[ -z $codemgr_ws ]] && codemgr_ws=$(hg root 2>/dev/null)
 	CWS=$codemgr_ws
+elif [[ $SCM_MODE == "git" ]]; then
+	#
+	# Git priorities:
+	# 1. git rev-parse --git-dir from CODEMGR_WS environment variable
+	# 2. git rev-parse --git-dir from directory of invocation
+	#
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
+		codemgr_ws=$(git --git-dir=$CODEMGR_WS rev-parse --git-dir \
+		    2>/dev/null)
+	[[ -z $codemgr_ws ]] && \
+		codemgr_ws=$(git rev-parse --git-dir 2>/dev/null)
+
+	if [[ "$codemgr_ws" == ".git" ]]; then
+		codemgr_ws="$PWD/.git"
+	fi
+
+	CWS="$codemgr_ws"
 elif [[ $SCM_MODE == "subversion" ]]; then
 	#
 	# Subversion priorities:
@@ -2390,7 +2503,7 @@ fi
 # is in use.
 #
 case "$SCM_MODE" in
-teamware|mercurial|subversion)
+teamware|mercurial|git|subversion)
 	;;
 unknown)
 	if [[ $flist_mode == "auto" ]]; then
@@ -2616,6 +2729,87 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
 	fi
+elif [[ $SCM_MODE == "git" ]]; then
+	#
+	# Parent can either be specified with -p
+	# Specified with CODEMGR_PARENT in the environment
+	# or taken from git config.
+	#
+
+	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
+		codemgr_parent=$CODEMGR_PARENT
+	fi
+
+	if [[ -z $codemgr_parent ]]; then
+		codemgr_parent=$(git --git-dir=$codemgr_ws config \
+		    remote.origin.url 2>/dev/null)
+	fi
+
+	CWS_REV=$(git --git-dir=$codemgr_ws rev-parse HEAD 2>/dev/null)
+	PWS=$codemgr_parent
+
+	#
+	# If the parent is a webrev, we want to do some things against
+	# the natural workspace parent (file list, comments, etc)
+	#
+	if [[ -n $parent_webrev ]]; then
+		real_parent=$(git --git-dir $codemgr_ws config \
+		    remote.origin.url 2>/dev/null)
+	else
+		real_parent=$PWS
+	fi
+
+	#
+	# If git-active exists, then we run it.  In the case of no explicit
+	# flist given, we'll use it for our comments.  In the case of an
+	# explicit flist given we'll try to use it for comments for any
+	# files mentioned in the flist.
+	#
+	if [[ -z $flist_done ]]; then
+		flist_from_git $CWS $real_parent
+		flist_done=1
+	fi
+
+	#
+	# If we have a file list now, pull out any variables set
+	# therein.  We do this now (rather than when we possibly use
+	# git-active to find comments) to avoid stomping specifications
+	# in the user-specified flist.
+	#
+	if [[ -n $flist_done ]]; then
+		env_from_flist
+	fi
+
+	#
+	# Only call git-active if we don't have a wx formatted file already
+	#
+	if [[ -x $GIT_ACTIVE && -z $wxfile ]]; then
+		print "  Comments from: git-active -p $real_parent ...\c"
+		git_active_wxfile $CWS $real_parent
+		print " Done."
+	fi
+
+	#
+	# At this point we must have a wx flist either from git-active,
+	# or in general.  Use it to try and find our parent revision,
+	# if we don't have one.
+	#
+	if [[ -z $GIT_PARENT ]]; then
+		eval `$SED -e "s/#.*$//" $wxfile | $GREP GIT_PARENT=`
+	fi
+
+	#
+	# If we still don't have a parent, we must have been given a
+	# wx-style active list with no GIT_PARENT specification, run
+	# git-active and pull an GIT_PARENT out of it, ignore the rest.
+	#
+	if [[ -z $GIT_PARENT && -x $GIT_ACTIVE ]]; then
+		$GIT_ACTIVE -w $codemgr_ws -p $real_parent | \
+		    eval `$SED -e "s/#.*$//" | $GREP GIT_PARENT=`
+	elif [[ -z $GIT_PARENT ]]; then
+		print -u2 "Error: Cannot discover parent revision"
+		exit 1
+	fi
 elif [[ $SCM_MODE == "subversion" ]]; then
 
 	#
@@ -2802,7 +2996,12 @@ done
 #
 # Output directory.
 #
-WDIR=${WDIR:-$CWS/webrev}
+if [[ $SCM_MODE == "git" ]]; then
+	ws_top_dir=$(dirname $CWS)
+	WDIR=${WDIR:-$ws_top_dir/webrev}
+else
+	WDIR=${WDIR:-$CWS/webrev}
+fi
 
 #
 # Name of the webrev, derived from the workspace name or output directory;
@@ -3446,6 +3645,7 @@ do
 
 	if [[ $SCM_MODE == "teamware" ||
 	    $SCM_MODE == "mercurial" ||
+	    $SCM_MODE == "git" ||
 	    $SCM_MODE == "unknown" ]]; then
 
 		# Include warnings for important file mode situations:
