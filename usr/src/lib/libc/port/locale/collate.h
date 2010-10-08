@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systmes, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -31,31 +32,73 @@
 #include <sys/types.h>
 #include <limits.h>
 
-#define	STR_LEN 10
-#define	TABLE_SIZE 100
-#define	COLLATE_VERSION    "1.0\n"
-#define	COLLATE_VERSION1_2 "1.2\n"
+#define	COLLATE_STR_LEN		24		/* should be 64-bit multiple */
+#define	COLLATE_VERSION		"I1.0\n"
 
-struct __collate_st_char_pri {
-	int prim, sec;
-};
-struct __collate_st_chain_pri {
-	char str[STR_LEN];
-	int prim, sec;
-};
+#define	COLLATE_MAX_PRIORITY	(0x7fffffff)	/* max signed value */
+#define	COLLATE_SUBST_PRIORITY	(0x40000000)	/* bit indicates subst table */
 
-extern int __collate_load_error;
-extern int __collate_substitute_nontrivial;
+#define	DIRECTIVE_UNDEF		0x00
+#define	DIRECTIVE_FORWARD	0x01
+#define	DIRECTIVE_BACKWARD	0x02
+#define	DIRECTIVE_POSITION	0x04
+#define	DIRECTIVE_UNDEFINED	0x08	/* special last weight for UNDEFINED */
 
-#define	__collate_substitute_table (*__collate_substitute_table_ptr)
-extern char __collate_substitute_table[UCHAR_MAX + 1][STR_LEN];
-#define	__collate_char_pri_table (*__collate_char_pri_table_ptr)
-extern struct __collate_st_char_pri __collate_char_pri_table[UCHAR_MAX + 1];
-extern struct __collate_st_chain_pri *__collate_chain_pri_table;
+#define	DIRECTIVE_DIRECTION_MASK (DIRECTIVE_FORWARD | DIRECTIVE_BACKWARD)
 
-char	*__collate_substitute(const char *);
-int	__collate_load_tables(const char *);
-void	__collate_lookup(const char *, int *, int *, int *);
-int	__collate_range_cmp(int, int);
+/*
+ * The collate file format is as follows:
+ *
+ * char		version[COLLATE_STR_LEN];	// must be COLLATE_VERSION
+ * collate_info_t	info;			// see below, includes padding
+ * collate_char_pri_t	char_data[256];		// 8 bit char values
+ * collate_subst_t	subst[*];		// 0 or more substitutions
+ * collate_chain_pri_t	chains[*];		// 0 or more chains
+ * collate_large_pri_t	large[*];		// extended char priorities
+ *
+ * Note that all structures must be 32-bit aligned, as each structure
+ * contains 32-bit member fields.  The entire file is mmap'd, so its
+ * critical that alignment be observed.  It is not generally safe to
+ * use any 64-bit values in the structures.
+ */
+
+typedef struct collate_info {
+	uint8_t directive_count;
+	uint8_t directive[COLL_WEIGHTS_MAX];
+	int32_t flags;
+	int32_t chain_count;
+	int32_t large_pri_count;
+	int32_t subst_count[COLL_WEIGHTS_MAX];
+	int32_t undef_pri[COLL_WEIGHTS_MAX];
+} collate_info_t;
+
+typedef struct collate_char_pri {
+	int32_t pri[COLL_WEIGHTS_MAX];
+} collate_char_pri_t;
+
+typedef struct collate_chain_pri {
+	wchar_t str[COLLATE_STR_LEN];
+	int32_t pri[COLL_WEIGHTS_MAX];
+} collate_chain_pri_t;
+
+typedef struct collate_large_pri {
+	int32_t val;
+	collate_char_pri_t pri;
+} collate_large_pri_t;
+
+typedef struct collate_subst {
+	int32_t key;
+	int32_t pri[COLLATE_STR_LEN];
+} collate_subst_t;
+
+int	_collate_load_tables(const char *);
+void	_collate_lookup(const wchar_t *, int *, int *, int, int **);
+size_t	_collate_wxfrm(const wchar_t *, wchar_t *, size_t);
+size_t	_collate_sxfrm(const wchar_t *, char *, size_t);
+int	_collate_range_cmp(wchar_t, wchar_t);
+
+extern int _collate_load_error;
+extern int _collate_substitute_nontrivial;
+extern collate_info_t *_collate_info;
 
 #endif /* !_COLLATE_H_ */

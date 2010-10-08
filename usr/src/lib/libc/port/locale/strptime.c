@@ -20,6 +20,7 @@
  * Powerdog Industries, Inc.
  */
 /*
+ * Copyright 2010, Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,11 +50,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/*
- * Copyright 2010, Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 #include "lint.h"
 #include <time.h>

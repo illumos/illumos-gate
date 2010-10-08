@@ -1,0 +1,1360 @@
+comment_char *
+escape_char /
+
+*************************************************************************************************
+* POSIX Locale                                                                                  *
+* Generated automatically from the Unicode Character Database and Common Locale Data Repository *
+* see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
+* Locale Name : th_TH   Codeset : UTF-8
+*************************************************************************************************
+* Copyright 1991-2010 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* http://www.unicode.org/copyright.html.                                                        *
+*                                                                                               *
+* Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
+* data files and any associated documentation (the "Data Files") or Unicode software and any    *
+* associated documentation (the "Software") to deal in the Data Files or Software without       *
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,    *
+* distribute, and/or sell copies of the Data Files or Software, and to permit persons to whom   *
+* the Data Files or Software are furnished to do so, provided that (a) the above copyright      *
+* notice(s) and this permission notice appear with all copies of the Data Files or Software,    *
+* (b) both the above copyright notice(s) and this permission notice appear in associated        *
+* documentation, and (c) there is clear notice in each modified Data File or in the Software as *
+* well as in the documentation associated with the Data File(s) or Software that the data or    *
+* software has been modified.                                                                   *
+*                                                                                               *
+* THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR    *
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A        *
+* PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT *
+* HOLDER OR HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR *
+* CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, *
+* WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN   *
+* CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR SOFTWARE.                         *
+*************************************************************************************************
+
+*************
+LC_CTYPE
+*************
+
+upper	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>
+
+lower	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>
+
+alpha	<THAI_CHARACTER_KO_KAI>;/
+	<THAI_CHARACTER_KHO_KHAI>;/
+	<THAI_CHARACTER_KHO_KHUAT>;/
+	<THAI_CHARACTER_KHO_KHWAI>;/
+	<THAI_CHARACTER_KHO_KHON>;/
+	<THAI_CHARACTER_KHO_RAKHANG>;/
+	<THAI_CHARACTER_NGO_NGU>;/
+	<THAI_CHARACTER_CHO_CHAN>;/
+	<THAI_CHARACTER_CHO_CHING>;/
+	<THAI_CHARACTER_CHO_CHANG>;/
+	<THAI_CHARACTER_SO_SO>;/
+	<THAI_CHARACTER_CHO_CHOE>;/
+	<THAI_CHARACTER_YO_YING>;/
+	<THAI_CHARACTER_DO_CHADA>;/
+	<THAI_CHARACTER_TO_PATAK>;/
+	<THAI_CHARACTER_THO_THAN>;/
+	<THAI_CHARACTER_THO_NANGMONTHO>;/
+	<THAI_CHARACTER_THO_PHUTHAO>;/
+	<THAI_CHARACTER_NO_NEN>;/
+	<THAI_CHARACTER_DO_DEK>;/
+	<THAI_CHARACTER_TO_TAO>;/
+	<THAI_CHARACTER_THO_THUNG>;/
+	<THAI_CHARACTER_THO_THAHAN>;/
+	<THAI_CHARACTER_THO_THONG>;/
+	<THAI_CHARACTER_NO_NU>;/
+	<THAI_CHARACTER_BO_BAIMAI>;/
+	<THAI_CHARACTER_PO_PLA>;/
+	<THAI_CHARACTER_PHO_PHUNG>;/
+	<THAI_CHARACTER_FO_FA>;/
+	<THAI_CHARACTER_PHO_PHAN>;/
+	<THAI_CHARACTER_FO_FAN>;/
+	<THAI_CHARACTER_PHO_SAMPHAO>;/
+	<THAI_CHARACTER_MO_MA>;/
+	<THAI_CHARACTER_YO_YAK>;/
+	<THAI_CHARACTER_RO_RUA>;/
+	<THAI_CHARACTER_RU>;/
+	<THAI_CHARACTER_LO_LING>;/
+	<THAI_CHARACTER_LU>;/
+	<THAI_CHARACTER_WO_WAEN>;/
+	<THAI_CHARACTER_SO_SALA>;/
+	<THAI_CHARACTER_SO_RUSI>;/
+	<THAI_CHARACTER_SO_SUA>;/
+	<THAI_CHARACTER_HO_HIP>;/
+	<THAI_CHARACTER_LO_CHULA>;/
+	<THAI_CHARACTER_O_ANG>;/
+	<THAI_CHARACTER_HO_NOKHUK>;/
+	<THAI_CHARACTER_PAIYANNOI>;/
+	<THAI_CHARACTER_SARA_A>;/
+	<THAI_CHARACTER_MAI_HAN-AKAT>;/
+	<THAI_CHARACTER_SARA_AA>;/
+	<THAI_CHARACTER_SARA_AM>;/
+	<THAI_CHARACTER_SARA_I>;/
+	<THAI_CHARACTER_SARA_II>;/
+	<THAI_CHARACTER_SARA_UE>;/
+	<THAI_CHARACTER_SARA_UEE>;/
+	<THAI_CHARACTER_SARA_U>;/
+	<THAI_CHARACTER_SARA_UU>;/
+	<THAI_CHARACTER_PHINTHU>;/
+	<THAI_CHARACTER_SARA_E>;/
+	<THAI_CHARACTER_SARA_AE>;/
+	<THAI_CHARACTER_SARA_O>;/
+	<THAI_CHARACTER_SARA_AI_MAIMUAN>;/
+	<THAI_CHARACTER_SARA_AI_MAIMALAI>;/
+	<THAI_CHARACTER_LAKKHANGYAO>;/
+	<THAI_CHARACTER_MAIYAMOK>;/
+	<THAI_CHARACTER_NIKHAHIT>
+
+space	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<space>
+
+cntrl	<NULL>;/
+	<START_OF_HEADING>;/
+	<START_OF_TEXT>;/
+	<END_OF_TEXT>;/
+	<END_OF_TRANSMISSION>;/
+	<ENQUIRY>;/
+	<ACKNOWLEDGE>;/
+	<BELL>;/
+	<BACKSPACE>;/
+	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<SHIFT_OUT>;/
+	<SHIFT_IN>;/
+	<DATA_LINK_ESCAPE>;/
+	<DEVICE_CONTROL_ONE>;/
+	<DEVICE_CONTROL_TWO>;/
+	<DEVICE_CONTROL_THREE>;/
+	<DEVICE_CONTROL_FOUR>;/
+	<NEGATIVE_ACKNOWLEDGE>;/
+	<SYNCHRONOUS_IDLE>;/
+	<END_OF_TRANSMISSION_BLOCK>;/
+	<CANCEL>;/
+	<END_OF_MEDIUM>;/
+	<SUBSTITUTE>;/
+	<ESCAPE>;/
+	<INFORMATION_SEPARATOR_FOUR>;/
+	<INFORMATION_SEPARATOR_THREE>;/
+	<INFORMATION_SEPARATOR_TWO>;/
+	<INFORMATION_SEPARATOR_ONE>;/
+	<DELETE>
+
+graph	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<THAI_CHARACTER_KO_KAI>;/
+	<THAI_CHARACTER_KHO_KHAI>;/
+	<THAI_CHARACTER_KHO_KHUAT>;/
+	<THAI_CHARACTER_KHO_KHWAI>;/
+	<THAI_CHARACTER_KHO_KHON>;/
+	<THAI_CHARACTER_KHO_RAKHANG>;/
+	<THAI_CHARACTER_NGO_NGU>;/
+	<THAI_CHARACTER_CHO_CHAN>;/
+	<THAI_CHARACTER_CHO_CHING>;/
+	<THAI_CHARACTER_CHO_CHANG>;/
+	<THAI_CHARACTER_SO_SO>;/
+	<THAI_CHARACTER_CHO_CHOE>;/
+	<THAI_CHARACTER_YO_YING>;/
+	<THAI_CHARACTER_DO_CHADA>;/
+	<THAI_CHARACTER_TO_PATAK>;/
+	<THAI_CHARACTER_THO_THAN>;/
+	<THAI_CHARACTER_THO_NANGMONTHO>;/
+	<THAI_CHARACTER_THO_PHUTHAO>;/
+	<THAI_CHARACTER_NO_NEN>;/
+	<THAI_CHARACTER_DO_DEK>;/
+	<THAI_CHARACTER_TO_TAO>;/
+	<THAI_CHARACTER_THO_THUNG>;/
+	<THAI_CHARACTER_THO_THAHAN>;/
+	<THAI_CHARACTER_THO_THONG>;/
+	<THAI_CHARACTER_NO_NU>;/
+	<THAI_CHARACTER_BO_BAIMAI>;/
+	<THAI_CHARACTER_PO_PLA>;/
+	<THAI_CHARACTER_PHO_PHUNG>;/
+	<THAI_CHARACTER_FO_FA>;/
+	<THAI_CHARACTER_PHO_PHAN>;/
+	<THAI_CHARACTER_FO_FAN>;/
+	<THAI_CHARACTER_PHO_SAMPHAO>;/
+	<THAI_CHARACTER_MO_MA>;/
+	<THAI_CHARACTER_YO_YAK>;/
+	<THAI_CHARACTER_RO_RUA>;/
+	<THAI_CHARACTER_RU>;/
+	<THAI_CHARACTER_LO_LING>;/
+	<THAI_CHARACTER_LU>;/
+	<THAI_CHARACTER_WO_WAEN>;/
+	<THAI_CHARACTER_SO_SALA>;/
+	<THAI_CHARACTER_SO_RUSI>;/
+	<THAI_CHARACTER_SO_SUA>;/
+	<THAI_CHARACTER_HO_HIP>;/
+	<THAI_CHARACTER_LO_CHULA>;/
+	<THAI_CHARACTER_O_ANG>;/
+	<THAI_CHARACTER_HO_NOKHUK>;/
+	<THAI_CHARACTER_PAIYANNOI>;/
+	<THAI_CHARACTER_SARA_A>;/
+	<THAI_CHARACTER_MAI_HAN-AKAT>;/
+	<THAI_CHARACTER_SARA_AA>;/
+	<THAI_CHARACTER_SARA_AM>;/
+	<THAI_CHARACTER_SARA_I>;/
+	<THAI_CHARACTER_SARA_II>;/
+	<THAI_CHARACTER_SARA_UE>;/
+	<THAI_CHARACTER_SARA_UEE>;/
+	<THAI_CHARACTER_SARA_U>;/
+	<THAI_CHARACTER_SARA_UU>;/
+	<THAI_CHARACTER_PHINTHU>;/
+	<THAI_CHARACTER_SARA_E>;/
+	<THAI_CHARACTER_SARA_AE>;/
+	<THAI_CHARACTER_SARA_O>;/
+	<THAI_CHARACTER_SARA_AI_MAIMUAN>;/
+	<THAI_CHARACTER_SARA_AI_MAIMALAI>;/
+	<THAI_CHARACTER_LAKKHANGYAO>;/
+	<THAI_CHARACTER_MAIYAMOK>;/
+	<THAI_CHARACTER_MAITAIKHU>;/
+	<THAI_CHARACTER_MAI_EK>;/
+	<THAI_CHARACTER_MAI_THO>;/
+	<THAI_CHARACTER_MAI_TRI>;/
+	<THAI_CHARACTER_MAI_CHATTAWA>;/
+	<THAI_CHARACTER_THANTHAKHAT>;/
+	<THAI_CHARACTER_NIKHAHIT>;/
+	<THAI_CHARACTER_YAMAKKAN>;/
+	<THAI_CHARACTER_FONGMAN>;/
+	<THAI_DIGIT_ZERO>;/
+	<THAI_DIGIT_ONE>;/
+	<THAI_DIGIT_TWO>;/
+	<THAI_DIGIT_THREE>;/
+	<THAI_DIGIT_FOUR>;/
+	<THAI_DIGIT_FIVE>;/
+	<THAI_DIGIT_SIX>;/
+	<THAI_DIGIT_SEVEN>;/
+	<THAI_DIGIT_EIGHT>;/
+	<THAI_DIGIT_NINE>;/
+	<THAI_CHARACTER_ANGKHANKHU>;/
+	<THAI_CHARACTER_KHOMUT>
+
+print	<space>;/
+	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<THAI_CHARACTER_KO_KAI>;/
+	<THAI_CHARACTER_KHO_KHAI>;/
+	<THAI_CHARACTER_KHO_KHUAT>;/
+	<THAI_CHARACTER_KHO_KHWAI>;/
+	<THAI_CHARACTER_KHO_KHON>;/
+	<THAI_CHARACTER_KHO_RAKHANG>;/
+	<THAI_CHARACTER_NGO_NGU>;/
+	<THAI_CHARACTER_CHO_CHAN>;/
+	<THAI_CHARACTER_CHO_CHING>;/
+	<THAI_CHARACTER_CHO_CHANG>;/
+	<THAI_CHARACTER_SO_SO>;/
+	<THAI_CHARACTER_CHO_CHOE>;/
+	<THAI_CHARACTER_YO_YING>;/
+	<THAI_CHARACTER_DO_CHADA>;/
+	<THAI_CHARACTER_TO_PATAK>;/
+	<THAI_CHARACTER_THO_THAN>;/
+	<THAI_CHARACTER_THO_NANGMONTHO>;/
+	<THAI_CHARACTER_THO_PHUTHAO>;/
+	<THAI_CHARACTER_NO_NEN>;/
+	<THAI_CHARACTER_DO_DEK>;/
+	<THAI_CHARACTER_TO_TAO>;/
+	<THAI_CHARACTER_THO_THUNG>;/
+	<THAI_CHARACTER_THO_THAHAN>;/
+	<THAI_CHARACTER_THO_THONG>;/
+	<THAI_CHARACTER_NO_NU>;/
+	<THAI_CHARACTER_BO_BAIMAI>;/
+	<THAI_CHARACTER_PO_PLA>;/
+	<THAI_CHARACTER_PHO_PHUNG>;/
+	<THAI_CHARACTER_FO_FA>;/
+	<THAI_CHARACTER_PHO_PHAN>;/
+	<THAI_CHARACTER_FO_FAN>;/
+	<THAI_CHARACTER_PHO_SAMPHAO>;/
+	<THAI_CHARACTER_MO_MA>;/
+	<THAI_CHARACTER_YO_YAK>;/
+	<THAI_CHARACTER_RO_RUA>;/
+	<THAI_CHARACTER_RU>;/
+	<THAI_CHARACTER_LO_LING>;/
+	<THAI_CHARACTER_LU>;/
+	<THAI_CHARACTER_WO_WAEN>;/
+	<THAI_CHARACTER_SO_SALA>;/
+	<THAI_CHARACTER_SO_RUSI>;/
+	<THAI_CHARACTER_SO_SUA>;/
+	<THAI_CHARACTER_HO_HIP>;/
+	<THAI_CHARACTER_LO_CHULA>;/
+	<THAI_CHARACTER_O_ANG>;/
+	<THAI_CHARACTER_HO_NOKHUK>;/
+	<THAI_CHARACTER_PAIYANNOI>;/
+	<THAI_CHARACTER_SARA_A>;/
+	<THAI_CHARACTER_MAI_HAN-AKAT>;/
+	<THAI_CHARACTER_SARA_AA>;/
+	<THAI_CHARACTER_SARA_AM>;/
+	<THAI_CHARACTER_SARA_I>;/
+	<THAI_CHARACTER_SARA_II>;/
+	<THAI_CHARACTER_SARA_UE>;/
+	<THAI_CHARACTER_SARA_UEE>;/
+	<THAI_CHARACTER_SARA_U>;/
+	<THAI_CHARACTER_SARA_UU>;/
+	<THAI_CHARACTER_PHINTHU>;/
+	<THAI_CHARACTER_SARA_E>;/
+	<THAI_CHARACTER_SARA_AE>;/
+	<THAI_CHARACTER_SARA_O>;/
+	<THAI_CHARACTER_SARA_AI_MAIMUAN>;/
+	<THAI_CHARACTER_SARA_AI_MAIMALAI>;/
+	<THAI_CHARACTER_LAKKHANGYAO>;/
+	<THAI_CHARACTER_MAIYAMOK>;/
+	<THAI_CHARACTER_MAITAIKHU>;/
+	<THAI_CHARACTER_MAI_EK>;/
+	<THAI_CHARACTER_MAI_THO>;/
+	<THAI_CHARACTER_MAI_TRI>;/
+	<THAI_CHARACTER_MAI_CHATTAWA>;/
+	<THAI_CHARACTER_THANTHAKHAT>;/
+	<THAI_CHARACTER_NIKHAHIT>;/
+	<THAI_CHARACTER_YAMAKKAN>;/
+	<THAI_CHARACTER_FONGMAN>;/
+	<THAI_DIGIT_ZERO>;/
+	<THAI_DIGIT_ONE>;/
+	<THAI_DIGIT_TWO>;/
+	<THAI_DIGIT_THREE>;/
+	<THAI_DIGIT_FOUR>;/
+	<THAI_DIGIT_FIVE>;/
+	<THAI_DIGIT_SIX>;/
+	<THAI_DIGIT_SEVEN>;/
+	<THAI_DIGIT_EIGHT>;/
+	<THAI_DIGIT_NINE>;/
+	<THAI_CHARACTER_ANGKHANKHU>;/
+	<THAI_CHARACTER_KHOMUT>
+
+punct	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<LOW_LINE>;/
+	<LEFT_CURLY_BRACKET>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<THAI_CHARACTER_FONGMAN>;/
+	<THAI_CHARACTER_ANGKHANKHU>;/
+	<THAI_CHARACTER_KHOMUT>
+
+digit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>
+
+xdigit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>
+
+blank	<tab>;/
+	<space>
+
+toupper	(<a>,<A>);/
+	(<b>,<B>);/
+	(<c>,<C>);/
+	(<d>,<D>);/
+	(<e>,<E>);/
+	(<f>,<F>);/
+	(<g>,<G>);/
+	(<h>,<H>);/
+	(<i>,<I>);/
+	(<j>,<J>);/
+	(<k>,<K>);/
+	(<l>,<L>);/
+	(<m>,<M>);/
+	(<n>,<N>);/
+	(<o>,<O>);/
+	(<p>,<P>);/
+	(<q>,<Q>);/
+	(<r>,<R>);/
+	(<s>,<S>);/
+	(<t>,<T>);/
+	(<u>,<U>);/
+	(<v>,<V>);/
+	(<w>,<W>);/
+	(<x>,<X>);/
+	(<y>,<Y>);/
+	(<z>,<Z>)
+
+tolower	(<A>,<a>);/
+	(<B>,<b>);/
+	(<C>,<c>);/
+	(<D>,<d>);/
+	(<E>,<e>);/
+	(<F>,<f>);/
+	(<G>,<g>);/
+	(<H>,<h>);/
+	(<I>,<i>);/
+	(<J>,<j>);/
+	(<K>,<k>);/
+	(<L>,<l>);/
+	(<M>,<m>);/
+	(<N>,<n>);/
+	(<O>,<o>);/
+	(<P>,<p>);/
+	(<Q>,<q>);/
+	(<R>,<r>);/
+	(<S>,<s>);/
+	(<T>,<t>);/
+	(<U>,<u>);/
+	(<V>,<v>);/
+	(<W>,<w>);/
+	(<X>,<x>);/
+	(<Y>,<y>);/
+	(<Z>,<z>)
+
+END LC_CTYPE
+
+
+*************
+LC_COLLATE
+*************
+
+collating-element <FULL_STOP-REVERSE_SOLIDUS-FULL_STOP> from "<FULL_STOP><REVERSE_SOLIDUS><FULL_STOP>"
+collating-element <THAI_CHARACTER_RU-THAI_CHARACTER_LAKKHANGYAO> from "<THAI_CHARACTER_RU><THAI_CHARACTER_LAKKHANGYAO>"
+collating-element <THAI_CHARACTER_LU-THAI_CHARACTER_LAKKHANGYAO> from "<THAI_CHARACTER_LU><THAI_CHARACTER_LAKKHANGYAO>"
+
+
+* Define collation weights as symbols
+
+collating-symbol <X01>
+collating-symbol <X05>
+collating-symbol <X19>
+collating-symbol <X3F>
+collating-symbol <X5C>
+collating-symbol <X5D>
+collating-symbol <X6D>
+collating-symbol <X7D>
+collating-symbol <X8D>
+collating-symbol <X8F>
+collating-symbol <X9D>
+collating-symbol <X9E>
+collating-symbol <X9F>
+collating-symbol <XC0>
+collating-symbol <XC4>
+collating-symbol <XC5>
+collating-symbol <XC6>
+collating-symbol <XC7>
+collating-symbol <XC8>
+collating-symbol <XC9>
+collating-symbol <XCA>
+collating-symbol <XCB>
+collating-symbol <XCC>
+collating-symbol <XDE>
+collating-symbol <XE0>
+collating-symbol <XE7>
+collating-symbol <X0507>
+collating-symbol <X0509>
+collating-symbol <X050B>
+collating-symbol <X050D>
+collating-symbol <X050F>
+collating-symbol <X0766>
+collating-symbol <X076C>
+collating-symbol <X0784>
+collating-symbol <X07B0>
+collating-symbol <X07CA>
+collating-symbol <X07D0>
+collating-symbol <X07FC>
+collating-symbol <X080B>
+collating-symbol <X08BF>
+collating-symbol <X08CD>
+collating-symbol <X08E1>
+collating-symbol <X08E3>
+collating-symbol <X08E5>
+collating-symbol <X08E7>
+collating-symbol <X08E9>
+collating-symbol <X08EB>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X09A1>
+collating-symbol <X09A5>
+collating-symbol <X09A7>
+collating-symbol <X09AD>
+collating-symbol <X09AF>
+collating-symbol <X0D67>
+collating-symbol <X0D6F>
+collating-symbol <X0D71>
+collating-symbol <X0D73>
+collating-symbol <X0D77>
+collating-symbol <X0D7D>
+collating-symbol <X293E>
+collating-symbol <X297C>
+collating-symbol <X297E>
+collating-symbol <X2980>
+collating-symbol <X2982>
+collating-symbol <X2984>
+collating-symbol <X2986>
+collating-symbol <X2988>
+collating-symbol <X298A>
+collating-symbol <X298C>
+collating-symbol <X298E>
+collating-symbol <X2C00>
+collating-symbol <X2E00>
+collating-symbol <X3000>
+collating-symbol <X3200>
+collating-symbol <X3400>
+collating-symbol <X3600>
+collating-symbol <X3800>
+collating-symbol <X3A00>
+collating-symbol <X3C00>
+collating-symbol <X3E00>
+collating-symbol <X4000>
+collating-symbol <X4200>
+collating-symbol <X4400>
+collating-symbol <X4600>
+collating-symbol <X4800>
+collating-symbol <X4A00>
+collating-symbol <X4C00>
+collating-symbol <X4E00>
+collating-symbol <X5000>
+collating-symbol <X5200>
+collating-symbol <X5400>
+collating-symbol <X5600>
+collating-symbol <X5800>
+collating-symbol <X5A00>
+collating-symbol <X5C00>
+collating-symbol <X5E00>
+collating-symbol <X7F20>
+collating-symbol <X7F22>
+collating-symbol <X7F24>
+collating-symbol <X7F26>
+collating-symbol <X7F28>
+collating-symbol <X7F2A>
+collating-symbol <X7F2C>
+collating-symbol <X7F2E>
+collating-symbol <X7F30>
+collating-symbol <X7F32>
+collating-symbol <X7F34>
+collating-symbol <X7F36>
+collating-symbol <X7F38>
+collating-symbol <X7F3A>
+collating-symbol <X7F3C>
+collating-symbol <X7F3E>
+collating-symbol <X7F40>
+collating-symbol <X7F42>
+collating-symbol <X7F44>
+collating-symbol <X7F46>
+collating-symbol <X7F48>
+collating-symbol <X7F4A>
+collating-symbol <X7F4C>
+collating-symbol <X7F4E>
+collating-symbol <X7F50>
+collating-symbol <X7F52>
+collating-symbol <X7F54>
+collating-symbol <X7F56>
+collating-symbol <X7F58>
+collating-symbol <X7F5A>
+collating-symbol <X7F5C>
+collating-symbol <X7F5E>
+collating-symbol <X7F60>
+collating-symbol <X7F62>
+collating-symbol <X7F64>
+collating-symbol <X7F66>
+collating-symbol <X7F67>
+collating-symbol <X7F68>
+collating-symbol <X7F6A>
+collating-symbol <X7F6B>
+collating-symbol <X7F6C>
+collating-symbol <X7F6E>
+collating-symbol <X7F70>
+collating-symbol <X7F72>
+collating-symbol <X7F74>
+collating-symbol <X7F76>
+collating-symbol <X7F78>
+collating-symbol <X7F7A>
+collating-symbol <X7F7E>
+collating-symbol <X7F80>
+collating-symbol <X7F82>
+collating-symbol <X7F84>
+collating-symbol <X7F86>
+collating-symbol <X7F88>
+collating-symbol <X7F8A>
+collating-symbol <X7F8C>
+collating-symbol <X7F8E>
+collating-symbol <X7F90>
+collating-symbol <X7F92>
+collating-symbol <X7F94>
+collating-symbol <X7F96>
+collating-symbol <X7F98>
+collating-symbol <X7F9A>
+collating-symbol <X7F9C>
+collating-symbol <X7F9D>
+
+order_start forward;forward;forward;forward
+
+
+* collation weights in order
+
+<X01>
+<X05>
+<X19>
+<X3F>
+<X5C>
+<X5D>
+<X6D>
+<X7D>
+<X8D>
+<X8F>
+<X9D>
+<X9E>
+<X9F>
+<XC0>
+<XC4>
+<XC5>
+<XC6>
+<XC7>
+<XC8>
+<XC9>
+<XCA>
+<XCB>
+<XCC>
+<XDE>
+<XE0>
+<XE7>
+<X0507>
+<X0509>
+<X050B>
+<X050D>
+<X050F>
+<X0766>
+<X076C>
+<X0784>
+<X07B0>
+<X07CA>
+<X07D0>
+<X07FC>
+<X080B>
+<X08BF>
+<X08CD>
+<X08E1>
+<X08E3>
+<X08E5>
+<X08E7>
+<X08E9>
+<X08EB>
+<X0995>
+<X0997>
+<X09A1>
+<X09A5>
+<X09A7>
+<X09AD>
+<X09AF>
+<X0D67>
+<X0D6F>
+<X0D71>
+<X0D73>
+<X0D77>
+<X0D7D>
+<X293E>
+<X297C>
+<X297E>
+<X2980>
+<X2982>
+<X2984>
+<X2986>
+<X2988>
+<X298A>
+<X298C>
+<X298E>
+<X2C00>
+<X2E00>
+<X3000>
+<X3200>
+<X3400>
+<X3600>
+<X3800>
+<X3A00>
+<X3C00>
+<X3E00>
+<X4000>
+<X4200>
+<X4400>
+<X4600>
+<X4800>
+<X4A00>
+<X4C00>
+<X4E00>
+<X5000>
+<X5200>
+<X5400>
+<X5600>
+<X5800>
+<X5A00>
+<X5C00>
+<X5E00>
+<X7F20>
+<X7F22>
+<X7F24>
+<X7F26>
+<X7F28>
+<X7F2A>
+<X7F2C>
+<X7F2E>
+<X7F30>
+<X7F32>
+<X7F34>
+<X7F36>
+<X7F38>
+<X7F3A>
+<X7F3C>
+<X7F3E>
+<X7F40>
+<X7F42>
+<X7F44>
+<X7F46>
+<X7F48>
+<X7F4A>
+<X7F4C>
+<X7F4E>
+<X7F50>
+<X7F52>
+<X7F54>
+<X7F56>
+<X7F58>
+<X7F5A>
+<X7F5C>
+<X7F5E>
+<X7F60>
+<X7F62>
+<X7F64>
+<X7F66>
+<X7F67>
+<X7F68>
+<X7F6A>
+<X7F6B>
+<X7F6C>
+<X7F6E>
+<X7F70>
+<X7F72>
+<X7F74>
+<X7F76>
+<X7F78>
+<X7F7A>
+<X7F7E>
+<X7F80>
+<X7F82>
+<X7F84>
+<X7F86>
+<X7F88>
+<X7F8A>
+<X7F8C>
+<X7F8E>
+<X7F90>
+<X7F92>
+<X7F94>
+<X7F96>
+<X7F98>
+<X7F9A>
+<X7F9C>
+<X7F9D>
+
+* assignment of characters to weights
+
+<NULL>                            IGNORE;IGNORE;IGNORE;<NULL>
+<START_OF_HEADING>                IGNORE;IGNORE;IGNORE;<START_OF_HEADING>
+<START_OF_TEXT>                   IGNORE;IGNORE;IGNORE;<START_OF_TEXT>
+<END_OF_TEXT>                     IGNORE;IGNORE;IGNORE;<END_OF_TEXT>
+<END_OF_TRANSMISSION>             IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
+<ENQUIRY>                         IGNORE;IGNORE;IGNORE;<ENQUIRY>
+<ACKNOWLEDGE>                     IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
+<BELL>                            IGNORE;IGNORE;IGNORE;<BELL>
+<BACKSPACE>                       IGNORE;IGNORE;IGNORE;<BACKSPACE>
+<SHIFT_OUT>                       IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
+<SHIFT_IN>                        IGNORE;IGNORE;IGNORE;<SHIFT_IN>
+<DATA_LINK_ESCAPE>                IGNORE;IGNORE;IGNORE;<DATA_LINK_ESCAPE>
+<DEVICE_CONTROL_ONE>              IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_ONE>
+<DEVICE_CONTROL_TWO>              IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_TWO>
+<DEVICE_CONTROL_THREE>            IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_THREE>
+<DEVICE_CONTROL_FOUR>             IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_FOUR>
+<NEGATIVE_ACKNOWLEDGE>            IGNORE;IGNORE;IGNORE;<NEGATIVE_ACKNOWLEDGE>
+<SYNCHRONOUS_IDLE>                IGNORE;IGNORE;IGNORE;<SYNCHRONOUS_IDLE>
+<END_OF_TRANSMISSION_BLOCK>       IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION_BLOCK>
+<CANCEL>                          IGNORE;IGNORE;IGNORE;<CANCEL>
+<END_OF_MEDIUM>                   IGNORE;IGNORE;IGNORE;<END_OF_MEDIUM>
+<SUBSTITUTE>                      IGNORE;IGNORE;IGNORE;<SUBSTITUTE>
+<ESCAPE>                          IGNORE;IGNORE;IGNORE;<ESCAPE>
+<INFORMATION_SEPARATOR_FOUR>      IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_FOUR>
+<INFORMATION_SEPARATOR_THREE>     IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_THREE>
+<INFORMATION_SEPARATOR_TWO>       IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
+<INFORMATION_SEPARATOR_ONE>       IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
+<DELETE>                          IGNORE;IGNORE;IGNORE;<DELETE>
+<space>                           IGNORE;IGNORE;"<X3F><XC4>";IGNORE
+<HYPHEN-MINUS>                    IGNORE;IGNORE;"<X3F><XC5>";IGNORE
+<FULL_STOP>                       IGNORE;IGNORE;"<X3F><XC6>";IGNORE
+<FULL_STOP-REVERSE_SOLIDUS-FULL_STOP> IGNORE;IGNORE;"<X3F><XC7>";IGNORE
+<THAI_CHARACTER_PAIYANNOI>        IGNORE;IGNORE;"<X3F><XC8>";IGNORE
+<THAI_CHARACTER_MAIYAMOK>         IGNORE;IGNORE;"<X3F><XC9>";IGNORE
+<THAI_CHARACTER_FONGMAN>          IGNORE;IGNORE;"<X3F><XCA>";IGNORE
+<THAI_CHARACTER_ANGKHANKHU>       IGNORE;IGNORE;"<X3F><XCB>";IGNORE
+<THAI_CHARACTER_KHOMUT>           IGNORE;IGNORE;"<X3F><XCC>";IGNORE
+<THAI_CHARACTER_YAMAKKAN>         IGNORE;"<XDE><X5C>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_MAITAIKHU>        IGNORE;"<XE0><X5D>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_MAI_EK>           IGNORE;"<XE0><X6D>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_MAI_THO>          IGNORE;"<XE0><X7D>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_MAI_TRI>          IGNORE;"<XE0><X8D>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_MAI_CHATTAWA>     IGNORE;"<XE0><X9D>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_THANTHAKHAT>      IGNORE;"<XE0><X9E>";"<X05><XC0>";IGNORE
+<THAI_CHARACTER_NIKHAHIT>         IGNORE;"<XE0><X9F>";"<X05><XC0>";IGNORE
+<tab>                             <X0507>;<X05>;<X05>;IGNORE
+<newline>                         <X0509>;<X05>;<X05>;IGNORE
+<vertical-tab>                    <X050B>;<X05>;<X05>;IGNORE
+<form-feed>                       <X050D>;<X05>;<X05>;IGNORE
+<carriage-return>                 <X050F>;<X05>;<X05>;IGNORE
+<GRAVE_ACCENT>                    <X0766>;<X05>;<X05>;IGNORE
+<CIRCUMFLEX_ACCENT>               <X076C>;<X05>;<X05>;IGNORE
+<LOW_LINE>                        <X0784>;<X05>;<X05>;IGNORE
+<COMMA>                           <X07B0>;<X05>;<X05>;IGNORE
+<SEMICOLON>                       <X07CA>;<X05>;<X05>;IGNORE
+<COLON>                           <X07D0>;<X05>;<X05>;IGNORE
+<EXCLAMATION_MARK>                <X07FC>;<X05>;<X05>;IGNORE
+<QUESTION_MARK>                   <X080B>;<X05>;<X05>;IGNORE
+<APOSTROPHE>                      <X08BF>;<X05>;<X05>;IGNORE
+<QUOTATION_MARK>                  <X08CD>;<X05>;<X05>;IGNORE
+<LEFT_PARENTHESIS>                <X08E1>;<X05>;<X05>;IGNORE
+<RIGHT_PARENTHESIS>               <X08E3>;<X05>;<X05>;IGNORE
+<LEFT_SQUARE_BRACKET>             <X08E5>;<X05>;<X05>;IGNORE
+<RIGHT_SQUARE_BRACKET>            <X08E7>;<X05>;<X05>;IGNORE
+<LEFT_CURLY_BRACKET>              <X08E9>;<X05>;<X05>;IGNORE
+<RIGHT_CURLY_BRACKET>             <X08EB>;<X05>;<X05>;IGNORE
+<COMMERCIAL_AT>                   <X0995>;<X05>;<X05>;IGNORE
+<ASTERISK>                        <X0997>;<X05>;<X05>;IGNORE
+<SOLIDUS>                         <X09A1>;<X05>;<X05>;IGNORE
+<REVERSE_SOLIDUS>                 <X09A5>;<X05>;<X05>;IGNORE
+<AMPERSAND>                       <X09A7>;<X05>;<X05>;IGNORE
+<NUMBER_SIGN>                     <X09AD>;<X05>;<X05>;IGNORE
+<PERCENT_SIGN>                    <X09AF>;<X05>;<X05>;IGNORE
+<PLUS_SIGN>                       <X0D67>;<X05>;<X05>;IGNORE
+<LESS-THAN_SIGN>                  <X0D6F>;<X05>;<X05>;IGNORE
+<EQUALS_SIGN>                     <X0D71>;<X05>;<X05>;IGNORE
+<GREATER-THAN_SIGN>               <X0D73>;<X05>;<X05>;IGNORE
+<VERTICAL_LINE>                   <X0D77>;<X05>;<X05>;IGNORE
+<TILDE>                           <X0D7D>;<X05>;<X05>;IGNORE
+<DOLLAR_SIGN>                     <X293E>;<X05>;<X05>;IGNORE
+<zero>                            <X297C>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_ZERO>                 <X297C>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<one>                             <X297E>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_ONE>                  <X297E>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<two>                             <X2980>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_TWO>                  <X2980>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<three>                           <X2982>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_THREE>                <X2982>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<four>                            <X2984>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_FOUR>                 <X2984>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<five>                            <X2986>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_FIVE>                 <X2986>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<six>                             <X2988>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_SIX>                  <X2988>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<seven>                           <X298A>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_SEVEN>                <X298A>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<eight>                           <X298C>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_EIGHT>                <X298C>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<nine>                            <X298E>;<X05>;<X05>;IGNORE
+<THAI_DIGIT_NINE>                 <X298E>;"<X05><XE7><X19>";"<X05><X05><XC0>";IGNORE
+<a>                               <X2C00>;<X05>;<X05>;IGNORE
+<A>                               <X2C00>;<X05>;<X8F>;IGNORE
+<b>                               <X2E00>;<X05>;<X05>;IGNORE
+<B>                               <X2E00>;<X05>;<X8F>;IGNORE
+<c>                               <X3000>;<X05>;<X05>;IGNORE
+<C>                               <X3000>;<X05>;<X8F>;IGNORE
+<d>                               <X3200>;<X05>;<X05>;IGNORE
+<D>                               <X3200>;<X05>;<X8F>;IGNORE
+<e>                               <X3400>;<X05>;<X05>;IGNORE
+<E>                               <X3400>;<X05>;<X8F>;IGNORE
+<f>                               <X3600>;<X05>;<X05>;IGNORE
+<F>                               <X3600>;<X05>;<X8F>;IGNORE
+<g>                               <X3800>;<X05>;<X05>;IGNORE
+<G>                               <X3800>;<X05>;<X8F>;IGNORE
+<h>                               <X3A00>;<X05>;<X05>;IGNORE
+<H>                               <X3A00>;<X05>;<X8F>;IGNORE
+<i>                               <X3C00>;<X05>;<X05>;IGNORE
+<I>                               <X3C00>;<X05>;<X8F>;IGNORE
+<j>                               <X3E00>;<X05>;<X05>;IGNORE
+<J>                               <X3E00>;<X05>;<X8F>;IGNORE
+<k>                               <X4000>;<X05>;<X05>;IGNORE
+<K>                               <X4000>;<X05>;<X8F>;IGNORE
+<l>                               <X4200>;<X05>;<X05>;IGNORE
+<L>                               <X4200>;<X05>;<X8F>;IGNORE
+<m>                               <X4400>;<X05>;<X05>;IGNORE
+<M>                               <X4400>;<X05>;<X8F>;IGNORE
+<n>                               <X4600>;<X05>;<X05>;IGNORE
+<N>                               <X4600>;<X05>;<X8F>;IGNORE
+<o>                               <X4800>;<X05>;<X05>;IGNORE
+<O>                               <X4800>;<X05>;<X8F>;IGNORE
+<p>                               <X4A00>;<X05>;<X05>;IGNORE
+<P>                               <X4A00>;<X05>;<X8F>;IGNORE
+<q>                               <X4C00>;<X05>;<X05>;IGNORE
+<Q>                               <X4C00>;<X05>;<X8F>;IGNORE
+<r>                               <X4E00>;<X05>;<X05>;IGNORE
+<R>                               <X4E00>;<X05>;<X8F>;IGNORE
+<s>                               <X5000>;<X05>;<X05>;IGNORE
+<S>                               <X5000>;<X05>;<X8F>;IGNORE
+<t>                               <X5200>;<X05>;<X05>;IGNORE
+<T>                               <X5200>;<X05>;<X8F>;IGNORE
+<u>                               <X5400>;<X05>;<X05>;IGNORE
+<U>                               <X5400>;<X05>;<X8F>;IGNORE
+<v>                               <X5600>;<X05>;<X05>;IGNORE
+<V>                               <X5600>;<X05>;<X8F>;IGNORE
+<w>                               <X5800>;<X05>;<X05>;IGNORE
+<W>                               <X5800>;<X05>;<X8F>;IGNORE
+<x>                               <X5A00>;<X05>;<X05>;IGNORE
+<X>                               <X5A00>;<X05>;<X8F>;IGNORE
+<y>                               <X5C00>;<X05>;<X05>;IGNORE
+<Y>                               <X5C00>;<X05>;<X8F>;IGNORE
+<z>                               <X5E00>;<X05>;<X05>;IGNORE
+<Z>                               <X5E00>;<X05>;<X8F>;IGNORE
+<THAI_CHARACTER_KO_KAI>           <X7F20>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_KHO_KHAI>         <X7F22>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_KHO_KHUAT>        <X7F24>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_KHO_KHWAI>        <X7F26>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_KHO_KHON>         <X7F28>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_KHO_RAKHANG>      <X7F2A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_NGO_NGU>          <X7F2C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_CHO_CHAN>         <X7F2E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_CHO_CHING>        <X7F30>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_CHO_CHANG>        <X7F32>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SO_SO>            <X7F34>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_CHO_CHOE>         <X7F36>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_YO_YING>          <X7F38>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_DO_CHADA>         <X7F3A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_TO_PATAK>         <X7F3C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_THAN>         <X7F3E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_NANGMONTHO>   <X7F40>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_PHUTHAO>      <X7F42>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_NO_NEN>           <X7F44>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_DO_DEK>           <X7F46>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_TO_TAO>           <X7F48>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_THUNG>        <X7F4A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_THAHAN>       <X7F4C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_THO_THONG>        <X7F4E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_NO_NU>            <X7F50>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_BO_BAIMAI>        <X7F52>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_PO_PLA>           <X7F54>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_PHO_PHUNG>        <X7F56>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_FO_FA>            <X7F58>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_PHO_PHAN>         <X7F5A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_FO_FAN>           <X7F5C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_PHO_SAMPHAO>      <X7F5E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_MO_MA>            <X7F60>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_YO_YAK>           <X7F62>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_RO_RUA>           <X7F64>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_RU>               <X7F66>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_RU-THAI_CHARACTER_LAKKHANGYAO> <X7F67>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_LO_LING>          <X7F68>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_LU>               <X7F6A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_LU-THAI_CHARACTER_LAKKHANGYAO> <X7F6B>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_WO_WAEN>          <X7F6C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SO_SALA>          <X7F6E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SO_RUSI>          <X7F70>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SO_SUA>           <X7F72>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_HO_HIP>           <X7F74>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_LO_CHULA>         <X7F76>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_O_ANG>            <X7F78>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_HO_NOKHUK>        <X7F7A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_A>           <X7F7E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_MAI_HAN-AKAT>     <X7F80>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_AA>          <X7F82>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_AM>          <X7F84>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_I>           <X7F86>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_II>          <X7F88>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_UE>          <X7F8A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_UEE>         <X7F8C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_U>           <X7F8E>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_UU>          <X7F90>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_PHINTHU>          <X7F92>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_E>           <X7F94>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_AE>          <X7F96>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_O>           <X7F98>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_AI_MAIMUAN>  <X7F9A>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_SARA_AI_MAIMALAI> <X7F9C>;<X05>;<X05>;IGNORE
+<THAI_CHARACTER_LAKKHANGYAO>      <X7F9D>;<X05>;<X05>;IGNORE
+UNDEFINED                         IGNORE;IGNORE;IGNORE;...
+
+order_end
+
+END LC_COLLATE
+*************
+LC_NUMERIC
+*************
+
+decimal_point     "<FULL_STOP>"
+thousands_sep     "<COMMA>"
+grouping          3
+
+END LC_NUMERIC
+
+
+*************
+LC_MONETARY
+*************
+
+int_curr_symbol       "<T><H><B><space>"
+currency_symbol       "<THAI_CURRENCY_SYMBOL_BAHT>"
+mon_decimal_point     "<FULL_STOP>"
+mon_thousands_sep     "<COMMA>"
+mon_grouping          3
+positive_sign         ""
+negative_sign         "<HYPHEN-MINUS>"
+int_frac_digits       2
+frac_digits           2
+p_cs_precedes         1
+p_sep_by_space        0
+n_cs_precedes         1
+n_sep_by_space        0
+p_sign_posn           1
+n_sign_posn           4
+int_p_cs_precedes     1
+int_p_sep_by_space    0
+int_n_cs_precedes     1
+int_n_sep_by_space    0
+int_p_sign_posn       1
+int_n_sign_posn       4
+
+END LC_MONETARY
+
+
+*************
+LC_TIME
+*************
+
+abday   "<THAI_CHARACTER_O_ANG><THAI_CHARACTER_SARA_AA><FULL_STOP>";/
+        "<THAI_CHARACTER_CHO_CHAN><FULL_STOP>";/
+        "<THAI_CHARACTER_O_ANG><FULL_STOP>";/
+        "<THAI_CHARACTER_PHO_PHAN><FULL_STOP>";/
+        "<THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_RU><FULL_STOP>";/
+        "<THAI_CHARACTER_SO_SALA><FULL_STOP>";/
+        "<THAI_CHARACTER_SO_SUA><FULL_STOP>"
+
+day     "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_O_ANG><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_SARA_I><THAI_CHARACTER_TO_TAO><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_THANTHAKHAT>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_CHO_CHAN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_RO_RUA><THAI_CHARACTER_THANTHAKHAT>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_O_ANG><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NGO_NGU><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_RO_RUA>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_SARA_U><THAI_CHARACTER_THO_THONG>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_RU><THAI_CHARACTER_HO_HIP><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_SO_SUA><THAI_CHARACTER_BO_BAIMAI><THAI_CHARACTER_DO_DEK><THAI_CHARACTER_SARA_II>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SO_SALA><THAI_CHARACTER_SARA_U><THAI_CHARACTER_KO_KAI><THAI_CHARACTER_RO_RUA><THAI_CHARACTER_THANTHAKHAT>";/
+        "<THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_E><THAI_CHARACTER_SO_SUA><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_RO_RUA><THAI_CHARACTER_THANTHAKHAT>"
+
+abmon   "<THAI_CHARACTER_MO_MA><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_KO_KAI><FULL_STOP><THAI_CHARACTER_PHO_PHAN><FULL_STOP>";/
+        "<THAI_CHARACTER_MO_MA><THAI_CHARACTER_SARA_II><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_SARA_E><THAI_CHARACTER_MO_MA><FULL_STOP><THAI_CHARACTER_YO_YAK><FULL_STOP>";/
+        "<THAI_CHARACTER_PHO_PHAN><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_MO_MA><THAI_CHARACTER_SARA_I><FULL_STOP><THAI_CHARACTER_YO_YAK><FULL_STOP>";/
+        "<THAI_CHARACTER_KO_KAI><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_SO_SUA><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_KO_KAI><FULL_STOP><THAI_CHARACTER_YO_YAK><FULL_STOP>";/
+        "<THAI_CHARACTER_TO_TAO><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>";/
+        "<THAI_CHARACTER_PHO_PHAN><FULL_STOP><THAI_CHARACTER_YO_YAK><FULL_STOP>";/
+        "<THAI_CHARACTER_THO_THONG><FULL_STOP><THAI_CHARACTER_KHO_KHWAI><FULL_STOP>"
+
+mon     "<THAI_CHARACTER_MO_MA><THAI_CHARACTER_KO_KAI><THAI_CHARACTER_RO_RUA><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_KO_KAI><THAI_CHARACTER_SARA_U><THAI_CHARACTER_MO_MA><THAI_CHARACTER_PHO_SAMPHAO><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_THO_THONG><THAI_CHARACTER_THANTHAKHAT>";/
+        "<THAI_CHARACTER_MO_MA><THAI_CHARACTER_SARA_II><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_SARA_E><THAI_CHARACTER_MO_MA><THAI_CHARACTER_SO_RUSI><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NO_NU>";/
+        "<THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_RU><THAI_CHARACTER_SO_RUSI><THAI_CHARACTER_PHO_SAMPHAO><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_MO_MA><THAI_CHARACTER_SARA_I><THAI_CHARACTER_THO_THUNG><THAI_CHARACTER_SARA_U><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NO_NU>";/
+        "<THAI_CHARACTER_KO_KAI><THAI_CHARACTER_RO_RUA><THAI_CHARACTER_KO_KAI><THAI_CHARACTER_DO_CHADA><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_SO_SUA><THAI_CHARACTER_SARA_I><THAI_CHARACTER_NGO_NGU><THAI_CHARACTER_HO_HIP><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_KO_KAI><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NO_NU>";/
+        "<THAI_CHARACTER_TO_TAO><THAI_CHARACTER_SARA_U><THAI_CHARACTER_LO_LING><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>";/
+        "<THAI_CHARACTER_PHO_PHAN><THAI_CHARACTER_RU><THAI_CHARACTER_SO_SALA><THAI_CHARACTER_CHO_CHAN><THAI_CHARACTER_SARA_I><THAI_CHARACTER_KO_KAI><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NO_NU>";/
+        "<THAI_CHARACTER_THO_THONG><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NO_NU><THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_KHO_KHWAI><THAI_CHARACTER_MO_MA>"
+
+d_fmt    "%e<SOLIDUS>%m<SOLIDUS>%Y"
+
+t_fmt    "%H:%M:%S"
+
+d_t_fmt  "%e %B %Y, %H <THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_LO_CHULA><THAI_CHARACTER_SARA_I><THAI_CHARACTER_KO_KAI><THAI_CHARACTER_SARA_AA> %M <THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_SARA_II> %S <THAI_CHARACTER_WO_WAEN><THAI_CHARACTER_SARA_I><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_AA><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_SARA_II> %Z"
+
+am_pm    "<THAI_CHARACTER_KO_KAI><THAI_CHARACTER_MAI_EK><THAI_CHARACTER_O_ANG><THAI_CHARACTER_NO_NU><THAI_CHARACTER_SARA_E><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_SARA_II><THAI_CHARACTER_MAI_EK><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NGO_NGU>";"<THAI_CHARACTER_HO_HIP><THAI_CHARACTER_LO_LING><THAI_CHARACTER_MAI_HAN-AKAT><THAI_CHARACTER_NGO_NGU><THAI_CHARACTER_SARA_E><THAI_CHARACTER_THO_THAHAN><THAI_CHARACTER_SARA_II><THAI_CHARACTER_MAI_EK><THAI_CHARACTER_YO_YAK><THAI_CHARACTER_NGO_NGU>"
+
+t_fmt_ampm  "%I:%M:%S %p"
+
+END LC_TIME
+*************
+LC_MESSAGES
+*************
+
+yesstr   "<THAI_CHARACTER_SARA_AI_MAIMUAN><THAI_CHARACTER_CHO_CHANG><THAI_CHARACTER_MAI_EK>:yes:y:YES:Y"
+
+nostr    "<THAI_CHARACTER_SARA_AI_MAIMALAI><THAI_CHARACTER_MO_MA><THAI_CHARACTER_MAI_EK><THAI_CHARACTER_SARA_AI_MAIMUAN><THAI_CHARACTER_CHO_CHANG><THAI_CHARACTER_MAI_EK>:no:n:NO:N"
+
+yesexpr  "^((<THAI_CHARACTER_SARA_AI_MAIMUAN><THAI_CHARACTER_CHO_CHANG><THAI_CHARACTER_MAI_EK>)|([yY]([eE][sS])?))"
+
+noexpr   "^((<THAI_CHARACTER_SARA_AI_MAIMALAI><THAI_CHARACTER_MO_MA><THAI_CHARACTER_MAI_EK><THAI_CHARACTER_SARA_AI_MAIMUAN><THAI_CHARACTER_CHO_CHANG><THAI_CHARACTER_MAI_EK>)|([nN]([oO])?))"
+
+
+END LC_MESSAGES

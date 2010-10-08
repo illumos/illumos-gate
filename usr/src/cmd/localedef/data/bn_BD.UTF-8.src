@@ -1,0 +1,1330 @@
+comment_char *
+escape_char /
+
+*************************************************************************************************
+* POSIX Locale                                                                                  *
+* Generated automatically from the Unicode Character Database and Common Locale Data Repository *
+* see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
+* Locale Name : bn_BD   Codeset : UTF-8
+*************************************************************************************************
+* Copyright 1991-2010 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* http://www.unicode.org/copyright.html.                                                        *
+*                                                                                               *
+* Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
+* data files and any associated documentation (the "Data Files") or Unicode software and any    *
+* associated documentation (the "Software") to deal in the Data Files or Software without       *
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,    *
+* distribute, and/or sell copies of the Data Files or Software, and to permit persons to whom   *
+* the Data Files or Software are furnished to do so, provided that (a) the above copyright      *
+* notice(s) and this permission notice appear with all copies of the Data Files or Software,    *
+* (b) both the above copyright notice(s) and this permission notice appear in associated        *
+* documentation, and (c) there is clear notice in each modified Data File or in the Software as *
+* well as in the documentation associated with the Data File(s) or Software that the data or    *
+* software has been modified.                                                                   *
+*                                                                                               *
+* THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR    *
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A        *
+* PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT *
+* HOLDER OR HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR *
+* CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, *
+* WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN   *
+* CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR SOFTWARE.                         *
+*************************************************************************************************
+
+*************
+LC_CTYPE
+*************
+
+upper	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>
+
+lower	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>
+
+alpha	<BENGALI_SIGN_CANDRABINDU>;/
+	<BENGALI_SIGN_ANUSVARA>;/
+	<BENGALI_SIGN_VISARGA>;/
+	<BENGALI_LETTER_A>;/
+	<BENGALI_LETTER_AA>;/
+	<BENGALI_LETTER_I>;/
+	<BENGALI_LETTER_II>;/
+	<BENGALI_LETTER_U>;/
+	<BENGALI_LETTER_UU>;/
+	<BENGALI_LETTER_VOCALIC_R>;/
+	<BENGALI_LETTER_VOCALIC_L>;/
+	<BENGALI_LETTER_E>;/
+	<BENGALI_LETTER_AI>;/
+	<BENGALI_LETTER_O>;/
+	<BENGALI_LETTER_AU>;/
+	<BENGALI_LETTER_KA>;/
+	<BENGALI_LETTER_KHA>;/
+	<BENGALI_LETTER_GA>;/
+	<BENGALI_LETTER_GHA>;/
+	<BENGALI_LETTER_NGA>;/
+	<BENGALI_LETTER_CA>;/
+	<BENGALI_LETTER_CHA>;/
+	<BENGALI_LETTER_JA>;/
+	<BENGALI_LETTER_JHA>;/
+	<BENGALI_LETTER_NYA>;/
+	<BENGALI_LETTER_TTA>;/
+	<BENGALI_LETTER_TTHA>;/
+	<BENGALI_LETTER_DDA>;/
+	<BENGALI_LETTER_DDHA>;/
+	<BENGALI_LETTER_NNA>;/
+	<BENGALI_LETTER_TA>;/
+	<BENGALI_LETTER_THA>;/
+	<BENGALI_LETTER_DA>;/
+	<BENGALI_LETTER_DHA>;/
+	<BENGALI_LETTER_NA>;/
+	<BENGALI_LETTER_PA>;/
+	<BENGALI_LETTER_PHA>;/
+	<BENGALI_LETTER_BA>;/
+	<BENGALI_LETTER_BHA>;/
+	<BENGALI_LETTER_MA>;/
+	<BENGALI_LETTER_YA>;/
+	<BENGALI_LETTER_RA>;/
+	<BENGALI_LETTER_LA>;/
+	<BENGALI_LETTER_SHA>;/
+	<BENGALI_LETTER_SSA>;/
+	<BENGALI_LETTER_SA>;/
+	<BENGALI_LETTER_HA>;/
+	<BENGALI_SIGN_AVAGRAHA>;/
+	<BENGALI_VOWEL_SIGN_AA>;/
+	<BENGALI_VOWEL_SIGN_I>;/
+	<BENGALI_VOWEL_SIGN_II>;/
+	<BENGALI_VOWEL_SIGN_U>;/
+	<BENGALI_VOWEL_SIGN_UU>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_R>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_RR>;/
+	<BENGALI_VOWEL_SIGN_E>;/
+	<BENGALI_VOWEL_SIGN_AI>;/
+	<BENGALI_VOWEL_SIGN_O>;/
+	<BENGALI_VOWEL_SIGN_AU>;/
+	<BENGALI_LETTER_KHANDA_TA>;/
+	<BENGALI_AU_LENGTH_MARK>;/
+	<BENGALI_LETTER_RRA>;/
+	<BENGALI_LETTER_RHA>;/
+	<BENGALI_LETTER_YYA>;/
+	<BENGALI_LETTER_VOCALIC_RR>;/
+	<BENGALI_LETTER_VOCALIC_LL>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_L>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_LL>;/
+	<BENGALI_LETTER_RA_WITH_MIDDLE_DIAGONAL>;/
+	<BENGALI_LETTER_RA_WITH_LOWER_DIAGONAL>
+
+space	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<space>
+
+cntrl	<NULL>;/
+	<START_OF_HEADING>;/
+	<START_OF_TEXT>;/
+	<END_OF_TEXT>;/
+	<END_OF_TRANSMISSION>;/
+	<ENQUIRY>;/
+	<ACKNOWLEDGE>;/
+	<BELL>;/
+	<BACKSPACE>;/
+	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<SHIFT_OUT>;/
+	<SHIFT_IN>;/
+	<DATA_LINK_ESCAPE>;/
+	<DEVICE_CONTROL_ONE>;/
+	<DEVICE_CONTROL_TWO>;/
+	<DEVICE_CONTROL_THREE>;/
+	<DEVICE_CONTROL_FOUR>;/
+	<NEGATIVE_ACKNOWLEDGE>;/
+	<SYNCHRONOUS_IDLE>;/
+	<END_OF_TRANSMISSION_BLOCK>;/
+	<CANCEL>;/
+	<END_OF_MEDIUM>;/
+	<SUBSTITUTE>;/
+	<ESCAPE>;/
+	<INFORMATION_SEPARATOR_FOUR>;/
+	<INFORMATION_SEPARATOR_THREE>;/
+	<INFORMATION_SEPARATOR_TWO>;/
+	<INFORMATION_SEPARATOR_ONE>;/
+	<DELETE>
+
+graph	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<BENGALI_SIGN_CANDRABINDU>;/
+	<BENGALI_SIGN_ANUSVARA>;/
+	<BENGALI_SIGN_VISARGA>;/
+	<BENGALI_LETTER_A>;/
+	<BENGALI_LETTER_AA>;/
+	<BENGALI_LETTER_I>;/
+	<BENGALI_LETTER_II>;/
+	<BENGALI_LETTER_U>;/
+	<BENGALI_LETTER_UU>;/
+	<BENGALI_LETTER_VOCALIC_R>;/
+	<BENGALI_LETTER_VOCALIC_L>;/
+	<BENGALI_LETTER_E>;/
+	<BENGALI_LETTER_AI>;/
+	<BENGALI_LETTER_O>;/
+	<BENGALI_LETTER_AU>;/
+	<BENGALI_LETTER_KA>;/
+	<BENGALI_LETTER_KHA>;/
+	<BENGALI_LETTER_GA>;/
+	<BENGALI_LETTER_GHA>;/
+	<BENGALI_LETTER_NGA>;/
+	<BENGALI_LETTER_CA>;/
+	<BENGALI_LETTER_CHA>;/
+	<BENGALI_LETTER_JA>;/
+	<BENGALI_LETTER_JHA>;/
+	<BENGALI_LETTER_NYA>;/
+	<BENGALI_LETTER_TTA>;/
+	<BENGALI_LETTER_TTHA>;/
+	<BENGALI_LETTER_DDA>;/
+	<BENGALI_LETTER_DDHA>;/
+	<BENGALI_LETTER_NNA>;/
+	<BENGALI_LETTER_TA>;/
+	<BENGALI_LETTER_THA>;/
+	<BENGALI_LETTER_DA>;/
+	<BENGALI_LETTER_DHA>;/
+	<BENGALI_LETTER_NA>;/
+	<BENGALI_LETTER_PA>;/
+	<BENGALI_LETTER_PHA>;/
+	<BENGALI_LETTER_BA>;/
+	<BENGALI_LETTER_BHA>;/
+	<BENGALI_LETTER_MA>;/
+	<BENGALI_LETTER_YA>;/
+	<BENGALI_LETTER_RA>;/
+	<BENGALI_LETTER_LA>;/
+	<BENGALI_LETTER_SHA>;/
+	<BENGALI_LETTER_SSA>;/
+	<BENGALI_LETTER_SA>;/
+	<BENGALI_LETTER_HA>;/
+	<BENGALI_SIGN_NUKTA>;/
+	<BENGALI_SIGN_AVAGRAHA>;/
+	<BENGALI_VOWEL_SIGN_AA>;/
+	<BENGALI_VOWEL_SIGN_I>;/
+	<BENGALI_VOWEL_SIGN_II>;/
+	<BENGALI_VOWEL_SIGN_U>;/
+	<BENGALI_VOWEL_SIGN_UU>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_R>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_RR>;/
+	<BENGALI_VOWEL_SIGN_E>;/
+	<BENGALI_VOWEL_SIGN_AI>;/
+	<BENGALI_VOWEL_SIGN_O>;/
+	<BENGALI_VOWEL_SIGN_AU>;/
+	<BENGALI_SIGN_VIRAMA>;/
+	<BENGALI_LETTER_KHANDA_TA>;/
+	<BENGALI_AU_LENGTH_MARK>;/
+	<BENGALI_LETTER_RRA>;/
+	<BENGALI_LETTER_RHA>;/
+	<BENGALI_LETTER_YYA>;/
+	<BENGALI_LETTER_VOCALIC_RR>;/
+	<BENGALI_LETTER_VOCALIC_LL>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_L>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_LL>;/
+	<BENGALI_DIGIT_ZERO>;/
+	<BENGALI_DIGIT_ONE>;/
+	<BENGALI_DIGIT_TWO>;/
+	<BENGALI_DIGIT_THREE>;/
+	<BENGALI_DIGIT_FOUR>;/
+	<BENGALI_DIGIT_FIVE>;/
+	<BENGALI_DIGIT_SIX>;/
+	<BENGALI_DIGIT_SEVEN>;/
+	<BENGALI_DIGIT_EIGHT>;/
+	<BENGALI_DIGIT_NINE>;/
+	<BENGALI_LETTER_RA_WITH_MIDDLE_DIAGONAL>;/
+	<BENGALI_LETTER_RA_WITH_LOWER_DIAGONAL>;/
+	<BENGALI_RUPEE_MARK>;/
+	<BENGALI_RUPEE_SIGN>;/
+	<BENGALI_CURRENCY_NUMERATOR_ONE>;/
+	<BENGALI_CURRENCY_NUMERATOR_TWO>;/
+	<BENGALI_CURRENCY_NUMERATOR_THREE>;/
+	<BENGALI_CURRENCY_NUMERATOR_FOUR>;/
+	<BENGALI_CURRENCY_NUMERATOR_ONE_LESS_THAN_THE_DENOMINATOR>;/
+	<BENGALI_CURRENCY_DENOMINATOR_SIXTEEN>;/
+	<BENGALI_ISSHAR>
+
+print	<space>;/
+	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<BENGALI_SIGN_CANDRABINDU>;/
+	<BENGALI_SIGN_ANUSVARA>;/
+	<BENGALI_SIGN_VISARGA>;/
+	<BENGALI_LETTER_A>;/
+	<BENGALI_LETTER_AA>;/
+	<BENGALI_LETTER_I>;/
+	<BENGALI_LETTER_II>;/
+	<BENGALI_LETTER_U>;/
+	<BENGALI_LETTER_UU>;/
+	<BENGALI_LETTER_VOCALIC_R>;/
+	<BENGALI_LETTER_VOCALIC_L>;/
+	<BENGALI_LETTER_E>;/
+	<BENGALI_LETTER_AI>;/
+	<BENGALI_LETTER_O>;/
+	<BENGALI_LETTER_AU>;/
+	<BENGALI_LETTER_KA>;/
+	<BENGALI_LETTER_KHA>;/
+	<BENGALI_LETTER_GA>;/
+	<BENGALI_LETTER_GHA>;/
+	<BENGALI_LETTER_NGA>;/
+	<BENGALI_LETTER_CA>;/
+	<BENGALI_LETTER_CHA>;/
+	<BENGALI_LETTER_JA>;/
+	<BENGALI_LETTER_JHA>;/
+	<BENGALI_LETTER_NYA>;/
+	<BENGALI_LETTER_TTA>;/
+	<BENGALI_LETTER_TTHA>;/
+	<BENGALI_LETTER_DDA>;/
+	<BENGALI_LETTER_DDHA>;/
+	<BENGALI_LETTER_NNA>;/
+	<BENGALI_LETTER_TA>;/
+	<BENGALI_LETTER_THA>;/
+	<BENGALI_LETTER_DA>;/
+	<BENGALI_LETTER_DHA>;/
+	<BENGALI_LETTER_NA>;/
+	<BENGALI_LETTER_PA>;/
+	<BENGALI_LETTER_PHA>;/
+	<BENGALI_LETTER_BA>;/
+	<BENGALI_LETTER_BHA>;/
+	<BENGALI_LETTER_MA>;/
+	<BENGALI_LETTER_YA>;/
+	<BENGALI_LETTER_RA>;/
+	<BENGALI_LETTER_LA>;/
+	<BENGALI_LETTER_SHA>;/
+	<BENGALI_LETTER_SSA>;/
+	<BENGALI_LETTER_SA>;/
+	<BENGALI_LETTER_HA>;/
+	<BENGALI_SIGN_NUKTA>;/
+	<BENGALI_SIGN_AVAGRAHA>;/
+	<BENGALI_VOWEL_SIGN_AA>;/
+	<BENGALI_VOWEL_SIGN_I>;/
+	<BENGALI_VOWEL_SIGN_II>;/
+	<BENGALI_VOWEL_SIGN_U>;/
+	<BENGALI_VOWEL_SIGN_UU>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_R>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_RR>;/
+	<BENGALI_VOWEL_SIGN_E>;/
+	<BENGALI_VOWEL_SIGN_AI>;/
+	<BENGALI_VOWEL_SIGN_O>;/
+	<BENGALI_VOWEL_SIGN_AU>;/
+	<BENGALI_SIGN_VIRAMA>;/
+	<BENGALI_LETTER_KHANDA_TA>;/
+	<BENGALI_AU_LENGTH_MARK>;/
+	<BENGALI_LETTER_RRA>;/
+	<BENGALI_LETTER_RHA>;/
+	<BENGALI_LETTER_YYA>;/
+	<BENGALI_LETTER_VOCALIC_RR>;/
+	<BENGALI_LETTER_VOCALIC_LL>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_L>;/
+	<BENGALI_VOWEL_SIGN_VOCALIC_LL>;/
+	<BENGALI_DIGIT_ZERO>;/
+	<BENGALI_DIGIT_ONE>;/
+	<BENGALI_DIGIT_TWO>;/
+	<BENGALI_DIGIT_THREE>;/
+	<BENGALI_DIGIT_FOUR>;/
+	<BENGALI_DIGIT_FIVE>;/
+	<BENGALI_DIGIT_SIX>;/
+	<BENGALI_DIGIT_SEVEN>;/
+	<BENGALI_DIGIT_EIGHT>;/
+	<BENGALI_DIGIT_NINE>;/
+	<BENGALI_LETTER_RA_WITH_MIDDLE_DIAGONAL>;/
+	<BENGALI_LETTER_RA_WITH_LOWER_DIAGONAL>;/
+	<BENGALI_RUPEE_MARK>;/
+	<BENGALI_RUPEE_SIGN>;/
+	<BENGALI_CURRENCY_NUMERATOR_ONE>;/
+	<BENGALI_CURRENCY_NUMERATOR_TWO>;/
+	<BENGALI_CURRENCY_NUMERATOR_THREE>;/
+	<BENGALI_CURRENCY_NUMERATOR_FOUR>;/
+	<BENGALI_CURRENCY_NUMERATOR_ONE_LESS_THAN_THE_DENOMINATOR>;/
+	<BENGALI_CURRENCY_DENOMINATOR_SIXTEEN>;/
+	<BENGALI_ISSHAR>
+
+punct	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<LOW_LINE>;/
+	<LEFT_CURLY_BRACKET>;/
+	<RIGHT_CURLY_BRACKET>
+
+digit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>
+
+xdigit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>
+
+blank	<tab>;/
+	<space>
+
+toupper	(<a>,<A>);/
+	(<b>,<B>);/
+	(<c>,<C>);/
+	(<d>,<D>);/
+	(<e>,<E>);/
+	(<f>,<F>);/
+	(<g>,<G>);/
+	(<h>,<H>);/
+	(<i>,<I>);/
+	(<j>,<J>);/
+	(<k>,<K>);/
+	(<l>,<L>);/
+	(<m>,<M>);/
+	(<n>,<N>);/
+	(<o>,<O>);/
+	(<p>,<P>);/
+	(<q>,<Q>);/
+	(<r>,<R>);/
+	(<s>,<S>);/
+	(<t>,<T>);/
+	(<u>,<U>);/
+	(<v>,<V>);/
+	(<w>,<W>);/
+	(<x>,<X>);/
+	(<y>,<Y>);/
+	(<z>,<Z>)
+
+tolower	(<A>,<a>);/
+	(<B>,<b>);/
+	(<C>,<c>);/
+	(<D>,<d>);/
+	(<E>,<e>);/
+	(<F>,<f>);/
+	(<G>,<g>);/
+	(<H>,<h>);/
+	(<I>,<i>);/
+	(<J>,<j>);/
+	(<K>,<k>);/
+	(<L>,<l>);/
+	(<M>,<m>);/
+	(<N>,<n>);/
+	(<O>,<o>);/
+	(<P>,<p>);/
+	(<Q>,<q>);/
+	(<R>,<r>);/
+	(<S>,<s>);/
+	(<T>,<t>);/
+	(<U>,<u>);/
+	(<V>,<v>);/
+	(<W>,<w>);/
+	(<X>,<x>);/
+	(<Y>,<y>);/
+	(<Z>,<z>)
+
+END LC_CTYPE
+
+
+*************
+LC_COLLATE
+*************
+
+collating-element <BENGALI_LETTER_DDA-BENGALI_SIGN_NUKTA> from "<BENGALI_LETTER_DDA><BENGALI_SIGN_NUKTA>"
+collating-element <BENGALI_LETTER_DDHA-BENGALI_SIGN_NUKTA> from "<BENGALI_LETTER_DDHA><BENGALI_SIGN_NUKTA>"
+collating-element <BENGALI_LETTER_YA-BENGALI_SIGN_NUKTA> from "<BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA>"
+
+
+* Define collation weights as symbols
+
+collating-symbol <X01>
+collating-symbol <X05>
+collating-symbol <X65>
+collating-symbol <X8F>
+collating-symbol <XC0>
+collating-symbol <XE6>
+collating-symbol <X0400>
+collating-symbol <X0500>
+collating-symbol <X0507>
+collating-symbol <X0509>
+collating-symbol <X050B>
+collating-symbol <X050D>
+collating-symbol <X050F>
+collating-symbol <X0600>
+collating-symbol <X0700>
+collating-symbol <X0766>
+collating-symbol <X076C>
+collating-symbol <X0784>
+collating-symbol <X0790>
+collating-symbol <X07B0>
+collating-symbol <X07CA>
+collating-symbol <X07D0>
+collating-symbol <X07FC>
+collating-symbol <X0800>
+collating-symbol <X080B>
+collating-symbol <X0825>
+collating-symbol <X08BF>
+collating-symbol <X08CD>
+collating-symbol <X08E1>
+collating-symbol <X08E3>
+collating-symbol <X08E5>
+collating-symbol <X08E7>
+collating-symbol <X08E9>
+collating-symbol <X08EB>
+collating-symbol <X0900>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X09A1>
+collating-symbol <X09A5>
+collating-symbol <X09A7>
+collating-symbol <X09AD>
+collating-symbol <X09AF>
+collating-symbol <X0A00>
+collating-symbol <X0B00>
+collating-symbol <X0B6F>
+collating-symbol <X0B70>
+collating-symbol <X0C00>
+collating-symbol <X0D00>
+collating-symbol <X0D67>
+collating-symbol <X0D6F>
+collating-symbol <X0D71>
+collating-symbol <X0D73>
+collating-symbol <X0D77>
+collating-symbol <X0D7D>
+collating-symbol <X0E00>
+collating-symbol <X0F00>
+collating-symbol <X1000>
+collating-symbol <X1100>
+collating-symbol <X1200>
+collating-symbol <X1300>
+collating-symbol <X1400>
+collating-symbol <X1500>
+collating-symbol <X1600>
+collating-symbol <X1700>
+collating-symbol <X1800>
+collating-symbol <X1900>
+collating-symbol <X1A00>
+collating-symbol <X1B00>
+collating-symbol <X1C00>
+collating-symbol <X1D00>
+collating-symbol <X1E00>
+collating-symbol <X1F00>
+collating-symbol <X2000>
+collating-symbol <X2100>
+collating-symbol <X2200>
+collating-symbol <X2300>
+collating-symbol <X2400>
+collating-symbol <X2500>
+collating-symbol <X2600>
+collating-symbol <X2700>
+collating-symbol <X2800>
+collating-symbol <X2900>
+collating-symbol <X293E>
+collating-symbol <X297C>
+collating-symbol <X297E>
+collating-symbol <X2980>
+collating-symbol <X2982>
+collating-symbol <X2984>
+collating-symbol <X2986>
+collating-symbol <X2988>
+collating-symbol <X298A>
+collating-symbol <X298C>
+collating-symbol <X298E>
+collating-symbol <X2A00>
+collating-symbol <X2B00>
+collating-symbol <X2C00>
+collating-symbol <X2D00>
+collating-symbol <X2E00>
+collating-symbol <X2F00>
+collating-symbol <X3000>
+collating-symbol <X3100>
+collating-symbol <X3200>
+collating-symbol <X3300>
+collating-symbol <X3400>
+collating-symbol <X3500>
+collating-symbol <X3600>
+collating-symbol <X3700>
+collating-symbol <X3800>
+collating-symbol <X3900>
+collating-symbol <X3A00>
+collating-symbol <X3B00>
+collating-symbol <X3C00>
+collating-symbol <X3D00>
+collating-symbol <X3E00>
+collating-symbol <X3F00>
+collating-symbol <X4000>
+collating-symbol <X4100>
+collating-symbol <X4200>
+collating-symbol <X4300>
+collating-symbol <X4400>
+collating-symbol <X4500>
+collating-symbol <X4600>
+collating-symbol <X4700>
+collating-symbol <X4800>
+collating-symbol <X4900>
+collating-symbol <X4A00>
+collating-symbol <X4B00>
+collating-symbol <X4C00>
+collating-symbol <X4D00>
+collating-symbol <X4E00>
+collating-symbol <X4F00>
+collating-symbol <X5000>
+collating-symbol <X5200>
+collating-symbol <X5400>
+collating-symbol <X5600>
+collating-symbol <X5800>
+collating-symbol <X5A00>
+collating-symbol <X5C00>
+collating-symbol <X5E00>
+
+order_start forward;forward;forward;forward
+
+
+* collation weights in order
+
+<X01>
+<X05>
+<X65>
+<X8F>
+<XC0>
+<XE6>
+<X0400>
+<X0500>
+<X0507>
+<X0509>
+<X050B>
+<X050D>
+<X050F>
+<X0600>
+<X0700>
+<X0766>
+<X076C>
+<X0784>
+<X0790>
+<X07B0>
+<X07CA>
+<X07D0>
+<X07FC>
+<X0800>
+<X080B>
+<X0825>
+<X08BF>
+<X08CD>
+<X08E1>
+<X08E3>
+<X08E5>
+<X08E7>
+<X08E9>
+<X08EB>
+<X0900>
+<X0995>
+<X0997>
+<X09A1>
+<X09A5>
+<X09A7>
+<X09AD>
+<X09AF>
+<X0A00>
+<X0B00>
+<X0B6F>
+<X0B70>
+<X0C00>
+<X0D00>
+<X0D67>
+<X0D6F>
+<X0D71>
+<X0D73>
+<X0D77>
+<X0D7D>
+<X0E00>
+<X0F00>
+<X1000>
+<X1100>
+<X1200>
+<X1300>
+<X1400>
+<X1500>
+<X1600>
+<X1700>
+<X1800>
+<X1900>
+<X1A00>
+<X1B00>
+<X1C00>
+<X1D00>
+<X1E00>
+<X1F00>
+<X2000>
+<X2100>
+<X2200>
+<X2300>
+<X2400>
+<X2500>
+<X2600>
+<X2700>
+<X2800>
+<X2900>
+<X293E>
+<X297C>
+<X297E>
+<X2980>
+<X2982>
+<X2984>
+<X2986>
+<X2988>
+<X298A>
+<X298C>
+<X298E>
+<X2A00>
+<X2B00>
+<X2C00>
+<X2D00>
+<X2E00>
+<X2F00>
+<X3000>
+<X3100>
+<X3200>
+<X3300>
+<X3400>
+<X3500>
+<X3600>
+<X3700>
+<X3800>
+<X3900>
+<X3A00>
+<X3B00>
+<X3C00>
+<X3D00>
+<X3E00>
+<X3F00>
+<X4000>
+<X4100>
+<X4200>
+<X4300>
+<X4400>
+<X4500>
+<X4600>
+<X4700>
+<X4800>
+<X4900>
+<X4A00>
+<X4B00>
+<X4C00>
+<X4D00>
+<X4E00>
+<X4F00>
+<X5000>
+<X5200>
+<X5400>
+<X5600>
+<X5800>
+<X5A00>
+<X5C00>
+<X5E00>
+
+* assignment of characters to weights
+
+<NULL>                                                     IGNORE;IGNORE;IGNORE;<NULL>
+<START_OF_HEADING>                                         IGNORE;IGNORE;IGNORE;<START_OF_HEADING>
+<START_OF_TEXT>                                            IGNORE;IGNORE;IGNORE;<START_OF_TEXT>
+<END_OF_TEXT>                                              IGNORE;IGNORE;IGNORE;<END_OF_TEXT>
+<END_OF_TRANSMISSION>                                      IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
+<ENQUIRY>                                                  IGNORE;IGNORE;IGNORE;<ENQUIRY>
+<ACKNOWLEDGE>                                              IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
+<BELL>                                                     IGNORE;IGNORE;IGNORE;<BELL>
+<BACKSPACE>                                                IGNORE;IGNORE;IGNORE;<BACKSPACE>
+<SHIFT_OUT>                                                IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
+<SHIFT_IN>                                                 IGNORE;IGNORE;IGNORE;<SHIFT_IN>
+<DATA_LINK_ESCAPE>                                         IGNORE;IGNORE;IGNORE;<DATA_LINK_ESCAPE>
+<DEVICE_CONTROL_ONE>                                       IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_ONE>
+<DEVICE_CONTROL_TWO>                                       IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_TWO>
+<DEVICE_CONTROL_THREE>                                     IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_THREE>
+<DEVICE_CONTROL_FOUR>                                      IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_FOUR>
+<NEGATIVE_ACKNOWLEDGE>                                     IGNORE;IGNORE;IGNORE;<NEGATIVE_ACKNOWLEDGE>
+<SYNCHRONOUS_IDLE>                                         IGNORE;IGNORE;IGNORE;<SYNCHRONOUS_IDLE>
+<END_OF_TRANSMISSION_BLOCK>                                IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION_BLOCK>
+<CANCEL>                                                   IGNORE;IGNORE;IGNORE;<CANCEL>
+<END_OF_MEDIUM>                                            IGNORE;IGNORE;IGNORE;<END_OF_MEDIUM>
+<SUBSTITUTE>                                               IGNORE;IGNORE;IGNORE;<SUBSTITUTE>
+<ESCAPE>                                                   IGNORE;IGNORE;IGNORE;<ESCAPE>
+<INFORMATION_SEPARATOR_FOUR>                               IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_FOUR>
+<INFORMATION_SEPARATOR_THREE>                              IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_THREE>
+<INFORMATION_SEPARATOR_TWO>                                IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
+<INFORMATION_SEPARATOR_ONE>                                IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
+<DELETE>                                                   IGNORE;IGNORE;IGNORE;<DELETE>
+<tab>                                                      <X0507>;<X05>;<X05>;IGNORE
+<newline>                                                  <X0509>;<X05>;<X05>;IGNORE
+<vertical-tab>                                             <X050B>;<X05>;<X05>;IGNORE
+<form-feed>                                                <X050D>;<X05>;<X05>;IGNORE
+<carriage-return>                                          <X050F>;<X05>;<X05>;IGNORE
+<space>                                                    <X0600>;<X05>;<X05>;IGNORE
+<GRAVE_ACCENT>                                             <X0766>;<X05>;<X05>;IGNORE
+<CIRCUMFLEX_ACCENT>                                        <X076C>;<X05>;<X05>;IGNORE
+<LOW_LINE>                                                 <X0784>;<X05>;<X05>;IGNORE
+<HYPHEN-MINUS>                                             <X0790>;<X05>;<X05>;IGNORE
+<COMMA>                                                    <X07B0>;<X05>;<X05>;IGNORE
+<SEMICOLON>                                                <X07CA>;<X05>;<X05>;IGNORE
+<COLON>                                                    <X07D0>;<X05>;<X05>;IGNORE
+<EXCLAMATION_MARK>                                         <X07FC>;<X05>;<X05>;IGNORE
+<QUESTION_MARK>                                            <X080B>;<X05>;<X05>;IGNORE
+<FULL_STOP>                                                <X0825>;<X05>;<X05>;IGNORE
+<APOSTROPHE>                                               <X08BF>;<X05>;<X05>;IGNORE
+<QUOTATION_MARK>                                           <X08CD>;<X05>;<X05>;IGNORE
+<LEFT_PARENTHESIS>                                         <X08E1>;<X05>;<X05>;IGNORE
+<RIGHT_PARENTHESIS>                                        <X08E3>;<X05>;<X05>;IGNORE
+<LEFT_SQUARE_BRACKET>                                      <X08E5>;<X05>;<X05>;IGNORE
+<RIGHT_SQUARE_BRACKET>                                     <X08E7>;<X05>;<X05>;IGNORE
+<LEFT_CURLY_BRACKET>                                       <X08E9>;<X05>;<X05>;IGNORE
+<RIGHT_CURLY_BRACKET>                                      <X08EB>;<X05>;<X05>;IGNORE
+<COMMERCIAL_AT>                                            <X0995>;<X05>;<X05>;IGNORE
+<ASTERISK>                                                 <X0997>;<X05>;<X05>;IGNORE
+<SOLIDUS>                                                  <X09A1>;<X05>;<X05>;IGNORE
+<REVERSE_SOLIDUS>                                          <X09A5>;<X05>;<X05>;IGNORE
+<AMPERSAND>                                                <X09A7>;<X05>;<X05>;IGNORE
+<NUMBER_SIGN>                                              <X09AD>;<X05>;<X05>;IGNORE
+<PERCENT_SIGN>                                             <X09AF>;<X05>;<X05>;IGNORE
+<BENGALI_ISSHAR>                                           <X0B6F>;<X05>;<X05>;IGNORE
+<BENGALI_CURRENCY_NUMERATOR_ONE_LESS_THAN_THE_DENOMINATOR> "<X0B70><X0400>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_CURRENCY_DENOMINATOR_SIXTEEN>                     "<X0B70><X0500>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_RUPEE_MARK>                                       "<X0B70><X0600>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_RUPEE_SIGN>                                       "<X0B70><X0700>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_A>                                         "<X0B70><X0800>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_AA>                                        "<X0B70><X0900>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_I>                                         "<X0B70><X0A00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_II>                                        "<X0B70><X0B00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_U>                                         "<X0B70><X0C00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_UU>                                        "<X0B70><X0D00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_VOCALIC_R>                                 "<X0B70><X0E00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_VOCALIC_RR>                                "<X0B70><X0F00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_VOCALIC_L>                                 "<X0B70><X1000>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_VOCALIC_LL>                                "<X0B70><X1100>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_E>                                         "<X0B70><X1200>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_AI>                                        "<X0B70><X1300>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_O>                                         "<X0B70><X1400>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_AU>                                        "<X0B70><X1500>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_NUKTA>                                       "<X0B70><X1600>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_ANUSVARA>                                    "<X0B70><X1700>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_VISARGA>                                     "<X0B70><X1800>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_CANDRABINDU>                                 "<X0B70><X1900>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_KA>                                        "<X0B70><X1A00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_KHA>                                       "<X0B70><X1B00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_GA>                                        "<X0B70><X1C00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_GHA>                                       "<X0B70><X1D00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_NGA>                                       "<X0B70><X1E00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_CA>                                        "<X0B70><X1F00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_CHA>                                       "<X0B70><X2000>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_JA>                                        "<X0B70><X2100>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_JHA>                                       "<X0B70><X2200>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_NYA>                                       "<X0B70><X2300>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_TTA>                                       "<X0B70><X2400>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_TTHA>                                      "<X0B70><X2500>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_DDA>                                       "<X0B70><X2600>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_RRA>                                       "<X0B70><X2700>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_DDA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_DDA-BENGALI_SIGN_NUKTA>                    "<X0B70><X2700>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_DDA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_DDHA>                                      "<X0B70><X2800>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_RHA>                                       "<X0B70><X2900>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_DDHA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_DDHA-BENGALI_SIGN_NUKTA>                   "<X0B70><X2900>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_DDHA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_NNA>                                       "<X0B70><X2A00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_KHANDA_TA>                                 "<X0B70><X2B00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_TA>                                        "<X0B70><X2C00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_THA>                                       "<X0B70><X2D00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_DA>                                        "<X0B70><X2E00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_DHA>                                       "<X0B70><X2F00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_NA>                                        "<X0B70><X3000>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_PA>                                        "<X0B70><X3100>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_PHA>                                       "<X0B70><X3200>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_BA>                                        "<X0B70><X3300>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_BHA>                                       "<X0B70><X3400>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_MA>                                        "<X0B70><X3500>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_YA>                                        "<X0B70><X3600>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_YA-BENGALI_SIGN_NUKTA>                     "<X0B70><X3700>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_YYA>                                       "<X0B70><X3700>";<X05>;"<X05><XC0>";"<BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA>"
+<BENGALI_LETTER_RA>                                        "<X0B70><X3800>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_RA_WITH_MIDDLE_DIAGONAL>                   "<X0B70><X3900>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_LA>                                        "<X0B70><X3A00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_RA_WITH_LOWER_DIAGONAL>                    "<X0B70><X3B00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_SHA>                                       "<X0B70><X3C00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_SSA>                                       "<X0B70><X3D00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_SA>                                        "<X0B70><X3E00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_LETTER_HA>                                        "<X0B70><X3F00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_AVAGRAHA>                                    "<X0B70><X4000>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_AA>                                    "<X0B70><X4100>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_I>                                     "<X0B70><X4200>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_II>                                    "<X0B70><X4300>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_U>                                     "<X0B70><X4400>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_UU>                                    "<X0B70><X4500>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_VOCALIC_R>                             "<X0B70><X4600>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_VOCALIC_RR>                            "<X0B70><X4700>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_VOCALIC_L>                             "<X0B70><X4800>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_VOCALIC_LL>                            "<X0B70><X4900>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_E>                                     "<X0B70><X4A00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_AI>                                    "<X0B70><X4B00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_O>                                     "<X0B70><X4C00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_VOWEL_SIGN_AU>                                    "<X0B70><X4D00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_SIGN_VIRAMA>                                      "<X0B70><X4E00>";<X05>;"<X05><XC0>";IGNORE
+<BENGALI_AU_LENGTH_MARK>                                   "<X0B70><X4F00>";<X05>;"<X05><XC0>";IGNORE
+<PLUS_SIGN>                                                <X0D67>;<X05>;<X05>;IGNORE
+<LESS-THAN_SIGN>                                           <X0D6F>;<X05>;<X05>;IGNORE
+<EQUALS_SIGN>                                              <X0D71>;<X05>;<X05>;IGNORE
+<GREATER-THAN_SIGN>                                        <X0D73>;<X05>;<X05>;IGNORE
+<VERTICAL_LINE>                                            <X0D77>;<X05>;<X05>;IGNORE
+<TILDE>                                                    <X0D7D>;<X05>;<X05>;IGNORE
+<DOLLAR_SIGN>                                              <X293E>;<X05>;<X05>;IGNORE
+<zero>                                                     <X297C>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_ZERO>                                       <X297C>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<one>                                                      <X297E>;<X05>;<X05>;IGNORE
+<BENGALI_CURRENCY_NUMERATOR_ONE>                           <X297E>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_CURRENCY_NUMERATOR_ONE>
+<BENGALI_DIGIT_ONE>                                        <X297E>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_DIGIT_ONE>
+<two>                                                      <X2980>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_TWO>                                        <X2980>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_DIGIT_TWO>
+<BENGALI_CURRENCY_NUMERATOR_TWO>                           <X2980>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_CURRENCY_NUMERATOR_TWO>
+<three>                                                    <X2982>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_THREE>                                      <X2982>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_DIGIT_THREE>
+<BENGALI_CURRENCY_NUMERATOR_THREE>                         <X2982>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_CURRENCY_NUMERATOR_THREE>
+<four>                                                     <X2984>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_FOUR>                                       <X2984>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_DIGIT_FOUR>
+<BENGALI_CURRENCY_NUMERATOR_FOUR>                          <X2984>;"<X05><XE6><X65>";"<X05><X05><XC0>";<BENGALI_CURRENCY_NUMERATOR_FOUR>
+<five>                                                     <X2986>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_FIVE>                                       <X2986>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<six>                                                      <X2988>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_SIX>                                        <X2988>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<seven>                                                    <X298A>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_SEVEN>                                      <X298A>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<eight>                                                    <X298C>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_EIGHT>                                      <X298C>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<nine>                                                     <X298E>;<X05>;<X05>;IGNORE
+<BENGALI_DIGIT_NINE>                                       <X298E>;"<X05><XE6><X65>";"<X05><X05><XC0>";IGNORE
+<a>                                                        <X2C00>;<X05>;<X05>;IGNORE
+<A>                                                        <X2C00>;<X05>;<X8F>;IGNORE
+<b>                                                        <X2E00>;<X05>;<X05>;IGNORE
+<B>                                                        <X2E00>;<X05>;<X8F>;IGNORE
+<c>                                                        <X3000>;<X05>;<X05>;IGNORE
+<C>                                                        <X3000>;<X05>;<X8F>;IGNORE
+<d>                                                        <X3200>;<X05>;<X05>;IGNORE
+<D>                                                        <X3200>;<X05>;<X8F>;IGNORE
+<e>                                                        <X3400>;<X05>;<X05>;IGNORE
+<E>                                                        <X3400>;<X05>;<X8F>;IGNORE
+<f>                                                        <X3600>;<X05>;<X05>;IGNORE
+<F>                                                        <X3600>;<X05>;<X8F>;IGNORE
+<g>                                                        <X3800>;<X05>;<X05>;IGNORE
+<G>                                                        <X3800>;<X05>;<X8F>;IGNORE
+<h>                                                        <X3A00>;<X05>;<X05>;IGNORE
+<H>                                                        <X3A00>;<X05>;<X8F>;IGNORE
+<i>                                                        <X3C00>;<X05>;<X05>;IGNORE
+<I>                                                        <X3C00>;<X05>;<X8F>;IGNORE
+<j>                                                        <X3E00>;<X05>;<X05>;IGNORE
+<J>                                                        <X3E00>;<X05>;<X8F>;IGNORE
+<k>                                                        <X4000>;<X05>;<X05>;IGNORE
+<K>                                                        <X4000>;<X05>;<X8F>;IGNORE
+<l>                                                        <X4200>;<X05>;<X05>;IGNORE
+<L>                                                        <X4200>;<X05>;<X8F>;IGNORE
+<m>                                                        <X4400>;<X05>;<X05>;IGNORE
+<M>                                                        <X4400>;<X05>;<X8F>;IGNORE
+<n>                                                        <X4600>;<X05>;<X05>;IGNORE
+<N>                                                        <X4600>;<X05>;<X8F>;IGNORE
+<o>                                                        <X4800>;<X05>;<X05>;IGNORE
+<O>                                                        <X4800>;<X05>;<X8F>;IGNORE
+<p>                                                        <X4A00>;<X05>;<X05>;IGNORE
+<P>                                                        <X4A00>;<X05>;<X8F>;IGNORE
+<q>                                                        <X4C00>;<X05>;<X05>;IGNORE
+<Q>                                                        <X4C00>;<X05>;<X8F>;IGNORE
+<r>                                                        <X4E00>;<X05>;<X05>;IGNORE
+<R>                                                        <X4E00>;<X05>;<X8F>;IGNORE
+<s>                                                        <X5000>;<X05>;<X05>;IGNORE
+<S>                                                        <X5000>;<X05>;<X8F>;IGNORE
+<t>                                                        <X5200>;<X05>;<X05>;IGNORE
+<T>                                                        <X5200>;<X05>;<X8F>;IGNORE
+<u>                                                        <X5400>;<X05>;<X05>;IGNORE
+<U>                                                        <X5400>;<X05>;<X8F>;IGNORE
+<v>                                                        <X5600>;<X05>;<X05>;IGNORE
+<V>                                                        <X5600>;<X05>;<X8F>;IGNORE
+<w>                                                        <X5800>;<X05>;<X05>;IGNORE
+<W>                                                        <X5800>;<X05>;<X8F>;IGNORE
+<x>                                                        <X5A00>;<X05>;<X05>;IGNORE
+<X>                                                        <X5A00>;<X05>;<X8F>;IGNORE
+<y>                                                        <X5C00>;<X05>;<X05>;IGNORE
+<Y>                                                        <X5C00>;<X05>;<X8F>;IGNORE
+<z>                                                        <X5E00>;<X05>;<X05>;IGNORE
+<Z>                                                        <X5E00>;<X05>;<X8F>;IGNORE
+UNDEFINED                                                  IGNORE;IGNORE;IGNORE;...
+
+order_end
+
+END LC_COLLATE
+*************
+LC_NUMERIC
+*************
+
+decimal_point     "<FULL_STOP>"
+thousands_sep     "<COMMA>"
+grouping          3;2
+
+END LC_NUMERIC
+
+
+*************
+LC_MONETARY
+*************
+
+int_curr_symbol       "<B><D><T><space>"
+currency_symbol       "<BENGALI_RUPEE_SIGN>"
+mon_decimal_point     "<FULL_STOP>"
+mon_thousands_sep     "<COMMA>"
+mon_grouping          3;2
+positive_sign         ""
+negative_sign         "<HYPHEN-MINUS>"
+int_frac_digits       2
+frac_digits           2
+p_cs_precedes         0
+p_sep_by_space        0
+n_cs_precedes         0
+n_sep_by_space        0
+p_sign_posn           1
+n_sign_posn           1
+int_p_cs_precedes     0
+int_p_sep_by_space    0
+int_n_cs_precedes     0
+int_n_sep_by_space    0
+int_p_sign_posn       1
+int_n_sign_posn       1
+
+END LC_MONETARY
+
+
+*************
+LC_TIME
+*************
+
+abday   "<BENGALI_LETTER_RA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_I>";/
+        "<BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_O><BENGALI_LETTER_MA>";/
+        "<BENGALI_LETTER_MA><BENGALI_LETTER_NGA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_GA><BENGALI_LETTER_LA>";/
+        "<BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_DHA>";/
+        "<BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_VOCALIC_R><BENGALI_LETTER_HA><BENGALI_LETTER_SA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_PA><BENGALI_LETTER_TA><BENGALI_VOWEL_SIGN_I>";/
+        "<BENGALI_LETTER_SHA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_KA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_SHA><BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_I>"
+
+day     "<BENGALI_LETTER_RA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_O><BENGALI_LETTER_MA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_MA><BENGALI_LETTER_NGA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_GA><BENGALI_LETTER_LA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_DHA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_VOCALIC_R><BENGALI_LETTER_HA><BENGALI_LETTER_SSA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_PA><BENGALI_LETTER_TA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_SHA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_KA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_SHA><BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA>"
+
+abmon   "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_II>";/
+        "<BENGALI_LETTER_PHA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_BA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_II>";/
+        "<BENGALI_LETTER_MA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_CA>";/
+        "<BENGALI_LETTER_E><BENGALI_LETTER_PA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_LA>";/
+        "<BENGALI_LETTER_MA><BENGALI_VOWEL_SIGN_E>";/
+        "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_NA>";/
+        "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_LA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_I>";/
+        "<BENGALI_LETTER_AA><BENGALI_LETTER_GA><BENGALI_LETTER_SA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA>";/
+        "<BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_PA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_A><BENGALI_LETTER_KA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA><BENGALI_VOWEL_SIGN_O><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_NA><BENGALI_LETTER_BHA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_DDA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>"
+
+mon     "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_II>";/
+        "<BENGALI_LETTER_PHA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_BA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_YA><BENGALI_SIGN_NUKTA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_II>";/
+        "<BENGALI_LETTER_MA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_RA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_CA>";/
+        "<BENGALI_LETTER_E><BENGALI_LETTER_PA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_LA>";/
+        "<BENGALI_LETTER_MA><BENGALI_VOWEL_SIGN_E>";/
+        "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_NA>";/
+        "<BENGALI_LETTER_JA><BENGALI_VOWEL_SIGN_U><BENGALI_LETTER_LA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_I>";/
+        "<BENGALI_LETTER_AA><BENGALI_LETTER_GA><BENGALI_LETTER_SA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA>";/
+        "<BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_PA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_A><BENGALI_LETTER_KA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_TTA><BENGALI_VOWEL_SIGN_O><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_NA><BENGALI_LETTER_BHA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>";/
+        "<BENGALI_LETTER_DDA><BENGALI_VOWEL_SIGN_I><BENGALI_LETTER_SA><BENGALI_VOWEL_SIGN_E><BENGALI_LETTER_MA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_LETTER_RA>"
+
+d_fmt    "%e<SOLIDUS>%m<SOLIDUS>%y"
+
+t_fmt    "%I:%M:%S %p"
+
+d_t_fmt  "%e %B, %Y %I:%M:%S %p %Z"
+
+am_pm    "<BENGALI_LETTER_PA><BENGALI_VOWEL_SIGN_UU><BENGALI_LETTER_RA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_BA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_HA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_NNA>";"<BENGALI_LETTER_A><BENGALI_LETTER_PA><BENGALI_LETTER_RA><BENGALI_VOWEL_SIGN_AA><BENGALI_LETTER_HA><BENGALI_SIGN_VIRAMA><BENGALI_LETTER_NNA>"
+
+t_fmt_ampm  "%I:%M:%S %p"
+
+END LC_TIME
+*************
+LC_MESSAGES
+*************
+
+yesstr   "<BENGALI_LETTER_HA><BENGALI_VOWEL_SIGN_AA><BENGALI_SIGN_CANDRABINDU>:yes:y:YES:Y"
+
+nostr    "<BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_AA>:no:n:NO:N"
+
+yesexpr  "^((<BENGALI_LETTER_HA><BENGALI_VOWEL_SIGN_AA><BENGALI_SIGN_CANDRABINDU>)|([yY]([eE][sS])?))"
+
+noexpr   "^((<BENGALI_LETTER_NA><BENGALI_VOWEL_SIGN_AA>)|([nN]([oO])?))"
+
+
+END LC_MESSAGES

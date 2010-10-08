@@ -232,6 +232,7 @@ COMMON_SUBDIRS=		\
 	listen		\
 	loadkeys	\
 	locale		\
+	localedef	\
 	lockstat	\
 	locator		\
 	lofiadm		\
@@ -253,7 +254,6 @@ COMMON_SUBDIRS=		\
 	mkdir		\
 	mkfifo		\
 	mkfile		\
-	mklocale	\
 	mkmsgs		\
 	mknod		\
 	mkpwdict	\

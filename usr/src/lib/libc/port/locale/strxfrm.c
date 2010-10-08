@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -25,58 +26,62 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "lint.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <wchar.h>
+#include <assert.h>
 #include "collate.h"
 
 size_t
-strxfrm(char *_RESTRICT_KYWD dest, const char *_RESTRICT_KYWD src, size_t len)
+strxfrm(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src, size_t dlen)
 {
-	int prim, sec, l;
 	size_t slen;
-	char *s, *ss;
+	size_t xlen;
+	wchar_t *wcs = NULL;
 
 	if (!*src) {
-		if (len > 0)
-			*dest = '\0';
+		if (dlen > 0)
+			*xf = '\0';
 		return (0);
 	}
 
-	if (__collate_load_error)
-		return (strlcpy(dest, src, len));
+	/*
+	 * The conversion from multibyte to wide character strings is
+	 * strictly reducing (one byte of an mbs cannot expand to more
+	 * than one wide character.)
+	 */
+	slen = strlen(src);
 
-	slen = 0;
-	prim = sec = 0;
-	ss = s = __collate_substitute(src);
-	if (s == NULL) {
-		/* Best effort, caller must check errno per spec. */
-		errno = ENOMEM;
-		return (strlcpy(dest, src, len));
+	if (_collate_load_error)
+		goto error;
+
+	if ((wcs = malloc((slen + 1) * sizeof (wchar_t))) == NULL)
+		goto error;
+
+	if (mbstowcs(wcs, src, slen + 1) == (size_t)-1)
+		goto error;
+
+	if ((xlen = _collate_sxfrm(wcs, xf, dlen)) == (size_t)-1)
+		goto error;
+
+	if (wcs)
+		free(wcs);
+
+	if (dlen > xlen) {
+		xf[xlen] = 0;
+	} else if (dlen) {
+		xf[dlen-1] = 0;
 	}
-	while (*s) {
-		while (*s && !prim) {
-			__collate_lookup(s, &l, &prim, &sec);
-			s += l;
-		}
-		if (prim) {
-			if (len > 1) {
-				*dest++ = (char)prim;
-				len--;
-			}
-			slen++;
-			prim = 0;
-		}
-	}
-	free(ss);
-	if (len > 0)
-		*dest = '\0';
+
+	return (xlen);
+
+error:
+	/* errno should be set to ENOMEM if malloc failed */
+	if (wcs)
+		free(wcs);
+	(void) strlcpy(xf, src, dlen);
 
 	return (slen);
 }

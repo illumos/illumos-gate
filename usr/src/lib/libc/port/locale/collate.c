@@ -1,4 +1,5 @@
 /*
+ * Copright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -25,52 +26,61 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
-
 #include "lint.h"
 #include "file64.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
+#include <wchar.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sysexits.h>
-#include <netinet/in.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #include "collate.h"
 #include "setlocale.h"
 #include "ldpart.h"
 
-int __collate_load_error = 1;
-int __collate_substitute_nontrivial;
+static collate_subst_t			*subst_table[COLL_WEIGHTS_MAX];
+static collate_char_pri_t		*char_pri_table;
+static collate_large_pri_t		*large_pri_table;
+static collate_chain_pri_t		*chain_pri_table;
+static char				*cache = NULL;
+static size_t				cachesz;
+static char				collate_encoding[ENCODING_LEN + 1];
 
-char __collate_substitute_table[UCHAR_MAX + 1][STR_LEN];
-struct __collate_st_char_pri __collate_char_pri_table[UCHAR_MAX + 1];
-struct __collate_st_chain_pri *__collate_chain_pri_table;
+/* Exposed externally to other parts of libc. */
+collate_info_t				*_collate_info;
+int _collate_load_error = 1;
+
 
 int
-__collate_load_tables(const char *encoding)
+_collate_load_tables(const char *encoding)
 {
-	FILE *fp;
-	int i, saverr, chains;
-	uint32_t u32;
-	char strbuf[STR_LEN], buf[PATH_MAX];
-	void *TMP_substitute_table, *TMP_char_pri_table, *TMP_chain_pri_table;
-	static char collate_encoding[ENCODING_LEN + 1];
+	int i, chains, z;
+	char buf[PATH_MAX];
+	char *TMP;
+	char *map;
+	collate_info_t *info;
+	struct stat sbuf;
+	int fd;
 
 	/* 'encoding' must be already checked. */
 	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0) {
-		__collate_load_error = 1;
+		_collate_load_error = 1;
 		return (_LDP_CACHE);
 	}
 
 	/*
 	 * If the locale name is the same as our cache, use the cache.
 	 */
-	if (strcmp(encoding, collate_encoding) == 0) {
-		__collate_load_error = 0;
+	if (cache && (strncmp(encoding, collate_encoding, ENCODING_LEN) == 0)) {
+		_collate_load_error = 0;
 		return (_LDP_CACHE);
 	}
 
@@ -81,171 +91,533 @@ __collate_load_tables(const char *encoding)
 	(void) snprintf(buf, sizeof (buf), "%s/%s/LC_COLLATE/LCL_DATA",
 	    _PathLocale, encoding);
 
-	if ((fp = fopen(buf, "r")) == NULL)
+	if ((fd = open(buf, O_RDONLY)) < 0)
 		return (_LDP_ERROR);
-
-	if (fread(strbuf, sizeof (strbuf), 1, fp) != 1) {
-		saverr = errno;
-		(void) fclose(fp);
-		errno = saverr;
+	if (fstat(fd, &sbuf) < 0) {
+		(void) close(fd);
 		return (_LDP_ERROR);
 	}
-	chains = -1;
-	if (strcmp(strbuf, COLLATE_VERSION) == 0)
-		chains = 0;
-	else if (strcmp(strbuf, COLLATE_VERSION1_2) == 0)
-		chains = 1;
-	if (chains < 0) {
-		(void) fclose(fp);
+	if (sbuf.st_size < (COLLATE_STR_LEN + sizeof (info))) {
+		(void) close(fd);
 		errno = EINVAL;
 		return (_LDP_ERROR);
 	}
-	if (chains) {
-		if (fread(&u32, sizeof (u32), 1, fp) != 1) {
-			saverr = errno;
-			(void) fclose(fp);
-			errno = saverr;
-			return (_LDP_ERROR);
+	map = mmap(NULL, sbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	(void) close(fd);
+	if ((TMP = map) == NULL) {
+		return (_LDP_ERROR);
+	}
+
+	if (strncmp(TMP, COLLATE_VERSION, COLLATE_STR_LEN) != 0) {
+		(void) munmap(map, sbuf.st_size);
+		errno = EINVAL;
+		return (_LDP_ERROR);
+	}
+	TMP += COLLATE_STR_LEN;
+
+	info = (void *)TMP;
+	TMP += sizeof (*info);
+
+	if ((info->directive_count < 1) ||
+	    (info->directive_count >= COLL_WEIGHTS_MAX) ||
+	    ((chains = info->chain_count) < 0)) {
+		(void) munmap(map, sbuf.st_size);
+		errno = EINVAL;
+		return (_LDP_ERROR);
+	}
+
+	i = (sizeof (collate_char_pri_t) * (UCHAR_MAX + 1)) +
+	    (sizeof (collate_chain_pri_t) * chains) +
+	    (sizeof (collate_large_pri_t) * info->large_pri_count);
+	for (z = 0; z < (info->directive_count); z++) {
+		i += sizeof (collate_subst_t) * info->subst_count[z];
+	}
+	if (i != (sbuf.st_size - (TMP - map))) {
+		(void) munmap(map, sbuf.st_size);
+		errno = EINVAL;
+		return (_LDP_ERROR);
+	}
+
+	char_pri_table = (void *)TMP;
+	TMP += sizeof (collate_char_pri_t) * (UCHAR_MAX + 1);
+
+	for (z = 0; z < info->directive_count; z++) {
+		if (info->subst_count[z] > 0) {
+			subst_table[z] = (void *)TMP;
+			TMP += info->subst_count[z] * sizeof (collate_subst_t);
+		} else {
+			subst_table[z] = NULL;
 		}
-		if ((chains = (int)ntohl(u32)) < 1) {
-			(void) fclose(fp);
-			errno = EINVAL;
-			return (_LDP_ERROR);
-		}
+	}
+
+	if (chains > 0) {
+		chain_pri_table = (void *)TMP;
+		TMP += chains * sizeof (collate_chain_pri_t);
 	} else
-		chains = TABLE_SIZE;
+		chain_pri_table = NULL;
+	if (info->large_pri_count > 0)
+		large_pri_table = (void *)TMP;
+	else
+		large_pri_table = NULL;
 
-	if ((TMP_substitute_table =
-	    malloc(sizeof (__collate_substitute_table))) == NULL) {
-		saverr = errno;
-		(void) fclose(fp);
-		errno = saverr;
-		return (_LDP_ERROR);
-	}
-	if ((TMP_char_pri_table =
-	    malloc(sizeof (__collate_char_pri_table))) == NULL) {
-		saverr = errno;
-		free(TMP_substitute_table);
-		(void) fclose(fp);
-		errno = saverr;
-		return (_LDP_ERROR);
-	}
-	if ((TMP_chain_pri_table =
-	    malloc(sizeof (*__collate_chain_pri_table) * chains)) == NULL) {
-		saverr = errno;
-		free(TMP_substitute_table);
-		free(TMP_char_pri_table);
-		(void) fclose(fp);
-		errno = saverr;
-		return (_LDP_ERROR);
-	}
+	(void) strlcpy(collate_encoding, encoding, ENCODING_LEN);
+	_collate_info = info;
 
-#define	FREAD(a, b, c, d) \
-{ \
-	if (fread(a, b, c, d) != c) { \
-		saverr = errno; \
-		free(TMP_substitute_table); \
-		free(TMP_char_pri_table); \
-		free(TMP_chain_pri_table); \
-		(void) fclose(d); \
-		errno = saverr; \
-		return (_LDP_ERROR); \
-	} \
-}
+	if (cache)
+		(void) munmap(cache, cachesz);
 
-	FREAD(TMP_substitute_table, sizeof (__collate_substitute_table), 1, fp);
-	FREAD(TMP_char_pri_table, sizeof (__collate_char_pri_table), 1, fp);
-	FREAD(TMP_chain_pri_table,
-	    sizeof (*__collate_chain_pri_table), chains, fp);
-	(void) fclose(fp);
-
-	(void) strcpy(collate_encoding, encoding);
-	if (__collate_substitute_table_ptr != NULL)
-		free(__collate_substitute_table_ptr);
-	__collate_substitute_table_ptr = TMP_substitute_table;
-	if (__collate_char_pri_table_ptr != NULL)
-		free(__collate_char_pri_table_ptr);
-	__collate_char_pri_table_ptr = TMP_char_pri_table;
-	for (i = 0; i < UCHAR_MAX + 1; i++) {
-		__collate_char_pri_table[i].prim =
-		    ntohl(__collate_char_pri_table[i].prim);
-		__collate_char_pri_table[i].sec =
-		    ntohl(__collate_char_pri_table[i].sec);
-	}
-	if (__collate_chain_pri_table != NULL)
-		free(__collate_chain_pri_table);
-	__collate_chain_pri_table = TMP_chain_pri_table;
-	for (i = 0; i < chains; i++) {
-		__collate_chain_pri_table[i].prim =
-		    ntohl(__collate_chain_pri_table[i].prim);
-		__collate_chain_pri_table[i].sec =
-		    ntohl(__collate_chain_pri_table[i].sec);
-	}
-	__collate_substitute_nontrivial = 0;
-	for (i = 0; i < UCHAR_MAX + 1; i++) {
-		if (__collate_substitute_table[i][0] != i ||
-		    __collate_substitute_table[i][1] != 0) {
-			__collate_substitute_nontrivial = 1;
-			break;
-		}
-	}
-	__collate_load_error = 0;
+	cache = map;
+	cachesz = sbuf.st_size;
+	_collate_load_error = 0;
 
 	return (_LDP_LOADED);
 }
 
-char *
-__collate_substitute(const char *str)
+/*
+ * Note: for performance reasons, we have expanded bsearch here.  This avoids
+ * function call overhead with each comparison.
+ */
+
+static int32_t *
+substsearch(const wchar_t key, int pass)
 {
-	int dest_len, len, nlen;
-	int delta;
-	char *dest_str = NULL;
-	uchar_t *s = (uchar_t *)str;
+	int low;
+	int high;
+	int next, compar;
+	collate_subst_t *p;
+	collate_subst_t *tab;
+	int n = _collate_info->subst_count[pass];
 
-	if (s == NULL || *s == '\0') {
-		return (strdup(""));
-	}
-
-	delta = strlen(str);
-	delta += delta / 8;
-	dest_str = malloc(dest_len = delta);
-	if (dest_str == NULL)
+	if (n == 0)
 		return (NULL);
-	len = 0;
-	while (*s) {
-		nlen = len + strlen(__collate_substitute_table[*s]);
-		if (dest_len <= nlen) {
-			char *new_str;
-			new_str = realloc(dest_str, dest_len = nlen + delta);
-			if (new_str == NULL) {
-				free(dest_str);
-				return (NULL);
-			}
-			dest_str = new_str;
-		}
-		(void) strcpy(dest_str + len,
-		    (char *)__collate_substitute_table[*s++]);
-		len = nlen;
+
+	tab = subst_table[pass];
+	low = 0;
+	high = n - 1;
+	while (low <= high) {
+		next = (low + high) / 2;
+		p = tab + next;
+		compar = key - p->key;
+		if (compar == 0)
+			return (p->pri);
+		if (compar > 0)
+			low = next + 1;
+		else
+			high = next - 1;
 	}
-	return (dest_str);
+	return (NULL);
+}
+
+static collate_chain_pri_t *
+chainsearch(const wchar_t *key, int *len)
+{
+	int low;
+	int high;
+	int next, compar, l;
+	collate_chain_pri_t *p;
+	collate_chain_pri_t *tab;
+
+	if (_collate_info->chain_count == 0)
+		return (NULL);
+
+	low = 0;
+	high = _collate_info->chain_count - 1;
+	tab = chain_pri_table;
+
+	while (low <= high) {
+		next = (low + high) / 2;
+		p = tab + next;
+		compar = *key - *p->str;
+		if (compar == 0) {
+			l = wcsnlen(p->str, COLLATE_STR_LEN);
+			compar = wcsncmp(key, p->str, l);
+			if (compar == 0) {
+				*len = l;
+				return (p);
+			}
+		}
+		if (compar > 0)
+			low = next + 1;
+		else
+			high = next - 1;
+	}
+	return (NULL);
+}
+
+static collate_large_pri_t *
+largesearch(const wchar_t key)
+{
+	int low = 0;
+	int high = _collate_info->large_pri_count - 1;
+	int next, compar;
+	collate_large_pri_t *p;
+	collate_large_pri_t *tab = large_pri_table;
+
+	if (_collate_info->large_pri_count == 0)
+		return (NULL);
+
+	while (low <= high) {
+		next = (low + high) / 2;
+		p = tab + next;
+		compar = key - p->val;
+		if (compar == 0)
+			return (p);
+		if (compar > 0)
+			low = next + 1;
+		else
+			high = next - 1;
+	}
+	return (NULL);
 }
 
 void
-__collate_lookup(const char *t, int *len, int *prim, int *sec)
+_collate_lookup(const wchar_t *t, int *len, int *pri, int which,
+    int **state)
 {
-	struct __collate_st_chain_pri *p2;
+	collate_chain_pri_t *p2;
+	collate_large_pri_t *match;
+	int p, l;
+	int *sptr;
 
+	/*
+	 * If we have remaining substitution data from a previous
+	 * call, consume it first.
+	 */
+	if ((sptr = *state) != NULL) {
+		*pri = *sptr;
+		sptr++;
+		*state = *sptr ? sptr : NULL;
+		*len = 0;
+		return;
+	}
+
+	/* No active substitutions */
 	*len = 1;
-	*prim = *sec = 0;
-	for (p2 = __collate_chain_pri_table; p2->str[0] != '\0'; p2++) {
-		if (*t == p2->str[0] &&
-		    strncmp(t, (char *)p2->str, strlen((char *)p2->str)) == 0) {
-			*len = strlen((char *)p2->str);
-			*prim = p2->prim;
-			*sec = p2->sec;
-			return;
+
+	/*
+	 * Check for composites such as dipthongs that collate as a
+	 * single element (aka chains or collating-elements).
+	 */
+	if (((p2 = chainsearch(t, &l)) != NULL) &&
+	    ((p = p2->pri[which]) >= 0)) {
+
+		*len = l;
+		*pri = p;
+
+	} else if (*t <= UCHAR_MAX) {
+
+		/*
+		 * Character is a small (8-bit) character.
+		 * We just look these up directly for speed.
+		 */
+		*pri = char_pri_table[*t].pri[which];
+
+	} else if ((_collate_info->large_pri_count > 0) &&
+	    ((match = largesearch(*t)) != NULL)) {
+
+		/*
+		 * Character was found in the extended table.
+		 */
+		*pri = match->pri.pri[which];
+
+	} else {
+		/*
+		 * Character lacks a specific definition.
+		 */
+		if (_collate_info->directive[which] & DIRECTIVE_UNDEFINED) {
+			/* Mask off sign bit to prevent ordering confusion. */
+			*pri = (*t & COLLATE_MAX_PRIORITY);
+		} else {
+			*pri = _collate_info->undef_pri[which];
+		}
+		/* No substitutions for undefined characters! */
+		return;
+	}
+
+	/*
+	 * Try substituting (expanding) the character.  We are
+	 * currently doing this *after* the chain compression.  I
+	 * think it should not matter, but this way might be slightly
+	 * faster.
+	 *
+	 * We do this after the priority search, as this will help us
+	 * to identify a single key value.  In order for this to work,
+	 * its important that the priority assigned to a given element
+	 * to be substituted be unique for that level.  The localedef
+	 * code ensures this for us.
+	 */
+	if ((*pri & COLLATE_SUBST_PRIORITY) &&
+	    (sptr = substsearch(*pri, which)) != NULL) {
+		if ((*pri = *sptr) != 0) {
+			sptr++;
+			*state = *sptr ? sptr : NULL;
 		}
 	}
-	*prim = __collate_char_pri_table[(uchar_t)*t].prim;
-	*sec = __collate_char_pri_table[(uchar_t)*t].sec;
+
+}
+
+/*
+ * This is the meaty part of wcsxfrm & strxfrm.  Note that it does
+ * NOT NULL terminate.  That is left to the caller.
+ */
+size_t
+_collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
+{
+	int		pri;
+	int		len;
+	const wchar_t	*t;
+	wchar_t		*tr = NULL;
+	int		direc;
+	int		pass;
+	int32_t 	*state;
+	size_t		want = 0;
+	size_t		need = 0;
+
+	assert(src);
+
+	for (pass = 0; pass <= _collate_info->directive_count; pass++) {
+
+		state = NULL;
+
+		if (pass != 0) {
+			/* insert level separator from the previous pass */
+			if (room) {
+				*xf++ = 1;
+				room--;
+			}
+			want++;
+		}
+
+		/* special pass for undefined */
+		if (pass == _collate_info->directive_count) {
+			direc = DIRECTIVE_FORWARD | DIRECTIVE_UNDEFINED;
+		} else {
+			direc = _collate_info->directive[pass];
+		}
+
+		t = src;
+
+		if (direc & DIRECTIVE_BACKWARD) {
+			wchar_t *bp, *fp, c;
+			if (tr)
+				free(tr);
+			if ((tr = wcsdup(t)) == NULL) {
+				errno = ENOMEM;
+				goto fail;
+			}
+			bp = tr;
+			fp = tr + wcslen(tr) - 1;
+			while (bp < fp) {
+				c = *bp;
+				*bp++ = *fp;
+				*fp-- = c;
+			}
+			t = (const wchar_t *)tr;
+		}
+
+		if (direc & DIRECTIVE_POSITION) {
+			while (*t || state) {
+				_collate_lookup(t, &len, &pri, pass, &state);
+				t += len;
+				if (pri <= 0) {
+					if (pri < 0) {
+						errno = EINVAL;
+						goto fail;
+					}
+					pri = COLLATE_MAX_PRIORITY;
+				}
+				if (room) {
+					*xf++ = pri;
+					room--;
+				}
+				want++;
+				need = want;
+			}
+		} else {
+			while (*t || state) {
+				_collate_lookup(t, &len, &pri, pass, &state);
+				t += len;
+				if (pri <= 0) {
+					if (pri < 0) {
+						errno = EINVAL;
+						goto fail;
+					}
+					continue;
+				}
+				if (room) {
+					*xf++ = pri;
+					room--;
+				}
+				want++;
+				need = want;
+			}
+		}
+	}
+
+end:
+	if (tr)
+		free(tr);
+	return (need);
+
+fail:
+	if (tr)
+		free(tr);
+	return ((size_t)(-1));
+}
+
+/*
+ * In the non-POSIX case, we transform each character into a string of
+ * characters representing the character's priority.  Since char is usually
+ * signed, we are limited by 7 bits per byte.  To avoid zero, we need to add
+ * XFRM_OFFSET, so we can't use a full 7 bits.  For simplicity, we choose 6
+ * bits per byte.
+ *
+ * It turns out that we sometimes have real priorities that are
+ * 31-bits wide.  (But: be careful using priorities where the high
+ * order bit is set -- i.e. the priority is negative.  The sort order
+ * may be surprising!)
+ *
+ * TODO: This would be a good area to optimize somewhat.  It turns out
+ * that real prioririties *except for the last UNDEFINED pass* are generally
+ * very small.  We need the localedef code to precalculate the max
+ * priority for us, and ideally also give us a mask, and then we could
+ * severely limit what we expand to.
+ */
+#define	XFRM_BYTES	6
+#define	XFRM_OFFSET	('0')	/* make all printable characters */
+#define	XFRM_SHIFT	6
+#define	XFRM_MASK	((1 << XFRM_SHIFT) - 1)
+#define	XFRM_SEP	('.')	/* chosen to be less than XFRM_OFFSET */
+
+static void
+xfrm(unsigned char *p, int pri)
+{
+	int i;
+	for (i = 0; i < XFRM_BYTES; i++) {
+		p[i] = (pri & XFRM_MASK) + XFRM_OFFSET;
+		pri >>= XFRM_SHIFT;
+	}
+}
+
+size_t
+_collate_sxfrm(const wchar_t *src, char *xf, size_t room)
+{
+	int		pri;
+	int		len;
+	const wchar_t	*t;
+	wchar_t		*tr = NULL;
+	int		direc;
+	int		pass;
+	int32_t 	*state;
+	size_t		want = 0;
+	size_t		need = 0;
+	int		b;
+	uint8_t		buf[XFRM_BYTES];
+
+	assert(src);
+
+	for (pass = 0; pass <= _collate_info->directive_count; pass++) {
+
+		state = NULL;
+
+		if (pass != 0) {
+			/* insert level separator from the previous pass */
+			if (room) {
+				*xf++ = XFRM_SEP;
+				room--;
+			}
+			want++;
+		}
+
+		/* special pass for undefined */
+		if (pass == _collate_info->directive_count) {
+			direc = DIRECTIVE_FORWARD | DIRECTIVE_UNDEFINED;
+		} else {
+			direc = _collate_info->directive[pass];
+		}
+
+		t = src;
+
+		if (direc & DIRECTIVE_BACKWARD) {
+			wchar_t *bp, *fp, c;
+			if (tr)
+				free(tr);
+			if ((tr = wcsdup(t)) == NULL) {
+				errno = ENOMEM;
+				goto fail;
+			}
+			bp = tr;
+			fp = tr + wcslen(tr) - 1;
+			while (bp < fp) {
+				c = *bp;
+				*bp++ = *fp;
+				*fp-- = c;
+			}
+			t = (const wchar_t *)tr;
+		}
+
+		if (direc & DIRECTIVE_POSITION) {
+			while (*t || state) {
+
+				_collate_lookup(t, &len, &pri, pass, &state);
+				t += len;
+				if (pri <= 0) {
+					if (pri < 0) {
+						errno = EINVAL;
+						goto fail;
+					}
+					pri = COLLATE_MAX_PRIORITY;
+				}
+
+				if (room) {
+					b = XFRM_BYTES;
+					xfrm(buf, pri);
+
+					while (b) {
+						b--;
+						if (room)
+							*xf++ = buf[b];
+						room--;
+					}
+				}
+				want += XFRM_BYTES;
+				need = want;
+			}
+		} else {
+			while (*t || state) {
+				_collate_lookup(t, &len, &pri, pass, &state);
+				t += len;
+				if (pri <= 0) {
+					if (pri < 0) {
+						errno = EINVAL;
+						goto fail;
+					}
+					continue;
+				}
+				if (room) {
+					b = XFRM_BYTES;
+					xfrm(buf, pri);
+
+					while (b) {
+						b--;
+						if (room)
+							*xf++ = buf[b];
+						room--;
+					}
+				}
+				want += XFRM_BYTES;
+				need = want;
+			}
+		}
+	}
+
+end:
+	if (tr)
+		free(tr);
+	return (need);
+
+fail:
+	if (tr)
+		free(tr);
+	return ((size_t)(-1));
 }

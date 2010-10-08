@@ -184,6 +184,7 @@ COMMON_SUBDIRS = \
 	cmd/line \
 	cmd/link \
 	cmd/locator \
+	cmd/localedef \
 	cmd/lockstat \
 	cmd/lofiadm \
 	cmd/logadm \
