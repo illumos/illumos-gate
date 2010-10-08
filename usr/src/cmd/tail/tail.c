@@ -314,7 +314,7 @@ obsolete(char *argv[])
 				*p++ = 'n';
 				break;
 			}
-			sprintf(p, "%c10", *argv[0]);
+			(void) snprintf(p, 6, "%c10", *argv[0]);
 			*argv = start;
 
 			continue;
