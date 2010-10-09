@@ -17,6 +17,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2008, 2010, Richard Lowe
+#
 
 '''
 Deal with Mercurial versioning.
@@ -37,6 +39,10 @@ sake of adapting to Mercurial API changes.
 # via ImportError to account for mercurial.demandimport delaying the
 # ImportError exception.
 #
+# This code needs to remain, even though versions prior to 1.2 aren't
+# supported, to allow us to produce the error message which states that they
+# are not supported.
+#
 from mercurial import util
 if hasattr(util, 'version'):
     hg_version = util.version
@@ -52,7 +58,7 @@ class VersionMismatch(Exception):
 #
 # List of versions that are explicitly acceptable to us
 #
-GOOD_VERSIONS = ['1.1.2', '1.3.1']
+GOOD_VERSIONS = ['1.3.1', '1.4.2', '1.5.4', '1.6.2', '1.6.3']
 
 
 def check_version():

@@ -15,24 +15,65 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2008, 2010 Richard Lowe
 #
 
-# Copyright 2008, 2010, Richard Lowe
+'''OpenSolaris extensions to Mercurial
 
-'''OpenSolaris workspace extensions for mercurial
-
-This extension contains a number of commands to help you work within
-the OpenSolaris consolidations.
-
-Common uses:
-
-Show diffs relative to parent workspace			- pdiffs
-Check source style rules				- nits
-Run pre-putback checks					- pbchk
-Collapse all your changes into a single changeset	- recommit'''
+    This extension contains a number of commands to help you work with
+the OpenSolaris consolidations.  It provides commands to check your
+changes against the various style rules used for OpenSolaris, to
+backup and restore your changes, to generate code reviews, and to
+prepare your changes for integration.
 
 
-import atexit, os, re, stat, sys, termios
+The Parent
+
+    To provide a uniform notion of parent workspace regardless of
+filesystem-based access, Cadmium uses the highest numbered changeset
+on the current branch that is also in the parent workspace to
+represent the parent workspace.
+
+    To provide a uniform notion of parent workspace regardless of
+filesystem-based access, Cadmium uses the highest numbered changeset
+on the current branch that is also in the parent workspace to
+represent the parent workspace.
+
+
+The Active List
+
+    Many Cadmium commands operate on the active list, the set of
+files ('active files') you have changed in this workspace in relation
+to its parent workspace, and the metadata (commentary, primarily)
+associated with those changes.
+
+
+NOT Files
+
+    Many of Cadmium's commands to check that your work obeys the
+various stylistic rules of the OpenSolaris consolidations (such as
+those run by 'hg nits') allow files to be excluded from this checking
+by means of NOT files kept in the .hg/cdm/ directory of the Mercurial
+repository for one-time exceptions, and in the exception_lists
+directory at the repository root for permanent exceptions.  (For ON,
+these would mean one in $CODEMGR_WS and one in
+$CODEMGR_WS/usr/closed).
+
+    These files are in the same format as the Mercurial hgignore
+file, a description of which is available in the hgignore(5) manual
+page.
+
+
+Common Tasks
+
+  - Show diffs relative to parent workspace               - pdiffs
+  - Check source style rules                              - nits
+  - Run pre-integration checks                            - pbchk
+  - Collapse all your changes into a single changeset     - recommit
+'''
+
+import atexit, os, re, sys, stat, termios
+
 
 #
 # Adjust the load path based on the location of cdm.py and the version
@@ -63,7 +104,6 @@ try:
 except Version.VersionMismatch, badversion:
     raise util.Abort("Version Mismatch:\n %s\n" % badversion)
 
-import ConfigParser
 from mercurial import cmdutil, ignore, node
 
 from onbld.Scm.WorkSpace import ActiveEntry, WorkSpace
@@ -80,11 +120,12 @@ def yes_no(ui, msg, default):
         prompt = ' [y/N]:'
         defanswer = 'n'
 
-    if Version.at_least("1.3.0"):
-        resp = ui.prompt(msg + prompt, ['&yes', '&no'], default=defanswer)
+    if Version.at_least("1.4"):
+        index = ui.promptchoice(msg + prompt, ['&yes', '&no'],
+                                default=['y', 'n'].index(defanswer))
+        resp = ('y', 'n')[index]
     else:
-        resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
-                         default=defanswer)
+        resp = ui.prompt(msg + prompt, ['&yes', '&no'], default=defanswer)
 
     return resp[0] in ('Y', 'y')
 
@@ -170,12 +211,7 @@ def reposetup(ui, repo):
     if repo.local() and repo not in wslist:
         wslist[repo] = WorkSpace(repo)
 
-        if Version.at_least("1.3"):
-            interactive = ui.interactive()
-        else:
-            interactive = ui.interactive
-
-        if interactive and sys.stdin.isatty():
+        if ui.interactive() and sys.stdin.isatty():
             ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
                          'python:hgext_cdm.pbconfirm')
 
@@ -196,10 +232,15 @@ def pbconfirm(ui, repo, hooktype, source):
 
 
 def cdm_pdiffs(ui, repo, *pats, **opts):
-    '''list workspace diffs relative to parent workspace
+    '''diff workspace against its parent
 
-    The parent tip is taken to be the latest revision shared between
-    us and the parent workspace.'''
+    Show differences between this workspace and its parent workspace
+    in the same manner as 'hg diff'.
+
+    For a description of the changeset used to represent the parent
+    workspace, see The Parent in the extension documentation ('hg help
+    cdm').
+    '''
 
     parent = opts['parent']
 
@@ -209,10 +250,23 @@ def cdm_pdiffs(ui, repo, *pats, **opts):
 
 
 def cdm_list(ui, repo, **opts):
-    '''list files changed relative to parent workspace
+    '''list active files (those changed in this workspace)
 
-    The parent tip is taken to be the latest revision shared between
-    us and the parent workspace.'''
+    Display a list of files changed in this workspace as compared to
+    its parent workspace.
+
+    File names are displayed one-per line, grouped by manner in which
+    they changed (added, modified, removed).  Information about
+    renames or copies is output in parentheses following the file
+    name.
+
+    For a description of the changeset used to represent the parent
+    workspace, see The Parent in the extension documentation ('hg help
+    cdm').
+
+    Output can be filtered by change type with --added, --modified,
+    and --removed.  By default, all files are shown.
+    '''
 
     wanted = []
 
@@ -252,7 +306,8 @@ def cdm_list(ui, repo, **opts):
 
 
 def cdm_bugs(ui, repo, parent=None):
-    'show all bug IDs in checkin comments'
+    '''show all bug IDs referenced in changeset comments'''
+
     act = wslist[repo].active(parent)
 
     for elt in set(filter(Comments.isBug, act.comments())):
@@ -260,7 +315,7 @@ def cdm_bugs(ui, repo, parent=None):
 
 
 def cdm_comments(ui, repo, parent=None):
-    'show checkin comments for active files'
+    '''show changeset commentary for all active changesets'''
     act = wslist[repo].active(parent)
 
     for elt in act.comments():
@@ -270,11 +325,12 @@ def cdm_comments(ui, repo, parent=None):
 def cdm_renamed(ui, repo, parent=None):
     '''show renamed active files
 
-    Renamed files are shown in the format
+    Renamed files are shown in the format::
 
-       newname oldname
+       new-name old-name
 
-    One pair per-line.'''
+    One pair per-line.
+    '''
 
     act = wslist[repo].active(parent)
 
@@ -283,9 +339,13 @@ def cdm_renamed(ui, repo, parent=None):
 
 
 def cdm_comchk(ui, repo, **opts):
-    '''check checkin comments for active files
+    '''check active changeset comment formatting
 
-    Check that checkin comments conform to O/N rules.'''
+    Check that active changeset comments conform to O/N rules.
+
+    Each comment line must contain either one bug or ARC case ID
+    followed by its synopsis, or credit an external contributor.
+    '''
 
     active = wslist[repo].active(opts.get('parent'))
 
@@ -296,10 +356,18 @@ def cdm_comchk(ui, repo, **opts):
 
 
 def cdm_cddlchk(ui, repo, *args, **opts):
-    '''check for a valid CDDL block in active files
+    '''check for a valid CDDL header comment in all active files.
 
-    See http://www.opensolaris.org/os/community/on/devref_toc/devref_7/#7_2_3_nonformatting_considerations
-    for more info.'''
+    Check active files for a valid Common Development and Distribution
+    License (CDDL) block comment.
+
+    Newly added files are checked for a copy of the CDDL header
+    comment.  Modified files are only checked if they contain what
+    appears to be an existing CDDL header comment.
+
+    Files can be excluded from this check using the cddlchk.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'cddlchk')
@@ -326,11 +394,16 @@ def cdm_cddlchk(ui, repo, *args, **opts):
 
 
 def cdm_mapfilechk(ui, repo, *args, **opts):
-    '''check for a valid MAPFILE header block in active files
+    '''check for a valid mapfile header block in active files
 
     Check that all link-editor mapfiles contain the standard mapfile
     header comment directing the reader to the document containing
-    Solaris object versioning rules (README.mapfile).'''
+    Solaris object versioning rules (README.mapfile).
+
+    Files can be excluded from this check using the mapfilechk.NOT
+    file.  See NOT Files in the extension documentation ('hg help
+    cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'mapfilechk')
@@ -346,7 +419,7 @@ def cdm_mapfilechk(ui, repo, *args, **opts):
     # We also ignore files with suffixes that tell us that the files
     # are not mapfiles.
     MapfileRE = re.compile(r'.*((mapfile[^/]*)|(/map\.+[^/]*)|(\.map))$',
-    	re.IGNORECASE)
+        re.IGNORECASE)
     NotMapSuffixRE = re.compile(r'.*\.[ch]$', re.IGNORECASE)
 
     ui.write('Mapfile comment check:\n')
@@ -367,12 +440,19 @@ def cdm_mapfilechk(ui, repo, *args, **opts):
 
 
 def cdm_copyright(ui, repo, *args, **opts):
-    '''check active files for valid copyrights
+    '''check each active file for a current and correct copyright notice
 
-    Check that all active files have a valid copyright containing the
-    current year (and *only* the current year).
-    See http://www.opensolaris.org/os/project/muskoka/on_dev/golden_rules.txt
-    for more info.'''
+    Check that all active files have a correctly formed copyright
+    notice containing the current year.
+
+    See the Non-Formatting Considerations section of the OpenSolaris
+    Developer's Reference for more info on the correct form of
+    copyright notice.
+    (http://hub.opensolaris.org/bin/view/Community+Group+on/devref_7#H723NonFormattingConsiderations)
+
+    Files can be excluded from this check using the copyright.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'copyright')
@@ -394,7 +474,17 @@ def cdm_copyright(ui, repo, *args, **opts):
 
 
 def cdm_hdrchk(ui, repo, *args, **opts):
-    '''check active header files conform to O/N rules'''
+    '''check active C header files conform to the O/N header rules
+
+    Check that any added or modified C header files conform to the O/N
+    header rules.
+
+    See the section 'HEADER STANDARDS' in the hdrchk(1) manual page
+    for more information on the rules for O/N header file formatting.
+
+    Files can be excluded from this check using the hdrchk.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'hdrchk')
@@ -420,7 +510,16 @@ def cdm_hdrchk(ui, repo, *args, **opts):
 def cdm_cstyle(ui, repo, *args, **opts):
     '''check active C source files conform to the C Style Guide
 
-    See http://opensolaris.org/os/community/documentation/getting_started_docs/cstyle.ms.pdf'''
+    Check that any added or modified C source file conform to the C
+    Style Guide.
+
+    See the C Style Guide for more information about correct C source
+    formatting.
+    (http://hub.opensolaris.org/bin/download/Community+Group+on/WebHome/cstyle.ms.pdf)
+
+    Files can be excluded from this check using the cstyle.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'cstyle')
@@ -446,7 +545,11 @@ def cdm_cstyle(ui, repo, *args, **opts):
 
 
 def cdm_jstyle(ui, repo, *args, **opts):
-    'check active Java source files for common stylistic errors'
+    '''check active Java source files for common stylistic errors
+
+    Files can be excluded from this check using the jstyle.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'jstyle')
@@ -470,7 +573,14 @@ def cdm_jstyle(ui, repo, *args, **opts):
 
 
 def cdm_permchk(ui, repo, *args, **opts):
-    '''check active files permission - warn +x (execute) mode'''
+    '''check the permissions of each active file
+
+    Check that the file permissions of each added or modified file do not
+    contain the executable bit.
+
+    Files can be excluded from this check using the permchk.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'permchk')
@@ -499,9 +609,13 @@ def cdm_permchk(ui, repo, *args, **opts):
 
 
 def cdm_tagchk(ui, repo, **opts):
-    '''check if .hgtags is active and issue warning
+    '''check modification of workspace tags
 
-    Tag sharing among repositories is restricted to gatekeepers'''
+    Check for any modification of the repository's .hgtags file.
+
+    With the exception of the gatekeepers, nobody should introduce or
+    modify a repository's tags.
+    '''
 
     active = wslist[repo].active(opts.get('parent'))
 
@@ -525,8 +639,12 @@ def cdm_tagchk(ui, repo, **opts):
 
 
 def cdm_branchchk(ui, repo, **opts):
-    '''check if multiple heads (or branches) are present, or if
-    branch changes are made'''
+    '''check for changes in number or name of branches
+
+    Check that the workspace contains only a single head, that it is
+    on the branch 'default', and that no new branches have been
+    introduced.
+    '''
 
     ui.write('Checking for multiple heads (or branches):\n')
 
@@ -578,7 +696,14 @@ def cdm_branchchk(ui, repo, **opts):
 
 
 def cdm_keywords(ui, repo, *args, **opts):
-    '''check source files do not contain SCCS keywords'''
+    '''check active files for SCCS keywords
+
+    Check that any added or modified files do not contain SCCS keywords
+    (#ident lines, etc.).
+
+    Files can be excluded from this check using the keywords.NOT file.
+    See NOT Files in the extension documentation ('hg help cdm').
+    '''
 
     filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
     exclude = not_check(repo, 'keywords')
@@ -663,8 +788,22 @@ def run_checks(ws, cmds, *args, **opts):
 def cdm_nits(ui, repo, *args, **opts):
     '''check for stylistic nits in active files
 
-    Run copyright, cstyle, hdrchk, jstyle, mapfilechk,
-    permchk, and keywords checks.'''
+    Check each active file for basic stylistic errors.
+
+    The following checks are run over each active file (see 'hg help
+    <check>' for more information about each):
+
+      - copyright  (copyright statements)
+      - cstyle     (C source style)
+      - hdrchk     (C header style)
+      - jstyle     (java source style)
+      - mapfilechk (link-editor mapfiles)
+      - permchk    (file permissions)
+      - keywords   (SCCS keywords)
+
+    With the global -q/--quiet option, only provide output for those
+    checks which fail.
+    '''
 
     cmds = [cdm_copyright,
         cdm_cstyle,
@@ -678,16 +817,35 @@ def cdm_nits(ui, repo, *args, **opts):
 
 
 def cdm_pbchk(ui, repo, **opts):
-    '''pre-putback check all active files
+    '''run pre-integration checks on this workspace
 
-    Run comchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
-    permchk, tagchk, branchchk and keywords checks.  Additionally,
-    warn about uncommitted changes.'''
+    Check this workspace for common errors prior to integration.
+
+    The following checks are run over the active list (see 'hg help
+    <check>' for more information about each):
+
+      - branchchk  (addition/modification of branches)
+      - comchk     (changeset descriptions)
+      - copyright  (copyright statements)
+      - cstyle     (C source style)
+      - hdrchk     (C header style)
+      - jstyle     (java source style)
+      - keywords   (SCCS keywords)
+      - mapfilechk (link-editor mapfiles)
+      - permchk    (file permissions)
+      - tagchk     (addition/modification of tags)
+
+    Additionally, the workspace is checked for outgoing merges (which
+    should be removed with 'hg recommit'), and uncommitted changes.
+
+    With the global -q/--quiet option, only provide output for those
+    checks which fail.
+    '''
 
     #
     # The current ordering of these is that the commands from cdm_nits
-    # run first in the same order as they would in cdm_nits.  Then the
-    # pbchk specifics run
+    # run first in the same order as they would in cdm_nits, then the
+    # pbchk specifics are run.
     #
     cmds = [cdm_copyright,
         cdm_cstyle,
@@ -845,16 +1003,23 @@ def do_eval(cmd, files, root, changedir=True):
 
 
 def cdm_eval(ui, repo, *command, **opts):
-    '''run cmd for each active file
+    '''run specified command for each active file
 
-    cmd can refer to:
-      $file      -	active file basename.
-      $dir       -	active file dirname.
-      $filepath  -	path from workspace root to active file.
-      $workspace -	full path to workspace root.
+    Run the command specified on the command line for each active
+    file, with the following variables present in the environment:
 
-    For example "hg eval 'echo $dir; hg log -l3 $file'" will show the last
-    the 3 log entries for each active file, preceded by its directory.'''
+      :$file:      -  active file basename.
+      :$dir:       -  active file dirname.
+      :$filepath:  -  path from workspace root to active file.
+      :$workspace: -  full path to workspace root.
+
+    For example:
+
+      hg eval 'echo $dir; hg log -l3 $file'
+
+    will show the last the 3 log entries for each active file,
+    preceded by its directory.
+    '''
 
     act = wslist[repo].active(opts['parent'])
     cmd = ' '.join(command)
@@ -864,9 +1029,14 @@ def cdm_eval(ui, repo, *command, **opts):
 
 
 def cdm_apply(ui, repo, *command, **opts):
-    '''apply cmd to all active files
+    '''apply specified command to all active files
 
-    For example 'hg apply wc -l' outputs a line count of active files.'''
+    Run the command specified on the command line over each active
+    file.
+
+    For example 'hg apply "wc -l"' will output a count of the lines in
+    each active file.
+    '''
 
     act = wslist[repo].active(opts['parent'])
 
@@ -881,37 +1051,14 @@ def cdm_apply(ui, repo, *command, **opts):
     do_eval(cmd, files, repo.root, not opts['remain'])
 
 
-def cdm_reparent_11(ui, repo, parent):
+def cdm_reparent(ui, repo, parent):
     '''reparent your workspace
 
-    Updates the 'default' path.'''
-
-    filename = repo.join('hgrc')
-
-    p = ui.expandpath(parent)
-    cp = util.configparser()
-
-    try:
-        cp.read(filename)
-    except ConfigParser.ParsingError, inst:
-        raise util.Abort('failed to parse %s\n%s' % (filename, inst))
-
-    try:
-        fh = open(filename, 'w')
-    except IOError, e:
-        raise util.Abort('Failed to open workspace configuration: %s' % e)
-
-    if not cp.has_section('paths'):
-        cp.add_section('paths')
-    cp.set('paths', 'default', p)
-    cp.write(fh)
-    fh.close()
-
-
-def cdm_reparent_13(ui, repo, parent):
-    '''reparent your workspace
-
-    Updates the 'default' path in this repository's .hg/hgrc.'''
+    Update the 'default' path alias that is used as the default source
+    for 'hg pull' and the default destination for 'hg push' (unless
+    there is a 'default-push' alias).  This is also the path all
+    Cadmium commands treat as your parent workspace.
+    '''
 
     def append_new_parent(parent):
         fp = None
@@ -982,11 +1129,6 @@ def cdm_reparent_13(ui, repo, parent):
 
         update_parent(path, int(target), parent)
 
-if Version.at_least("1.3"):
-    cdm_reparent = cdm_reparent_13
-else:
-    cdm_reparent = cdm_reparent_11
-
 
 def backup_name(fullpath):
     '''Create a backup directory name based on the specified path.
@@ -1018,9 +1160,31 @@ def backup_name(fullpath):
 
 
 def cdm_backup(ui, repo, if_newer=False):
-    '''make backup copies of all workspace changes
+    '''backup workspace changes and metadata
 
-    Backups will be stored in ~/cdm.backup/<basename of workspace>.'''
+    Create a backup copy of changes made in this workspace as compared
+    to its parent workspace, as well as important metadata of this
+    workspace.
+
+    NOTE: Only changes as compared to the parent workspace are backed
+    up.  If you lose this workspace and its parent, you will not be
+    able to restore a backup into a clone of the grandparent
+    workspace.
+
+    By default, backups are stored in the cdm.backup/ directory in
+    your home directory.  This is configurable using the cdm.backupdir
+    configuration variable, for example:
+
+      hg backup --config cdm.backupdir=/net/foo/backups
+
+    or place the following in an appropriate hgrc file::
+
+      [cdm]
+      backupdir = /net/foo/backups
+
+    Backups have the same name as the workspace in which they were
+    taken, with '-closed' appended in the case of O/N's usr/closed.
+    '''
 
     name = backup_name(repo.root)
     bk = CdmBackup(ui, wslist[repo], name)
@@ -1041,8 +1205,18 @@ def cdm_backup(ui, repo, if_newer=False):
 def cdm_restore(ui, repo, backup, **opts):
     '''restore workspace from backup
 
-    Restores a workspace from the specified backup directory and generation
-    (which defaults to the latest).'''
+    Restore this workspace from a backup (taken by 'hg backup').
+
+    If the specified backup directory does not exist, it is assumed to
+    be relative to the cadmium backup directory (~/cdm.backup/ by
+    default).
+
+    For example::
+
+      % hg restore on-rfe - Restore the latest backup of ~/cdm.backup/on-rfe
+      % hg restore -g3 on-rfe - Restore the 3rd backup of ~/cdm.backup/on-rfe
+      % hg restore /net/foo/backup/on-rfe - Restore from an explicit path
+    '''
 
     if not os.getcwd().startswith(repo.root):
         raise util.Abort('restore is not safe to run with -R')
@@ -1069,9 +1243,11 @@ def cdm_restore(ui, repo, backup, **opts):
 
 
 def cdm_webrev(ui, repo, **opts):
-    '''generate webrev and optionally upload it
+    '''generate web-based code review and optionally upload it
 
-    This command passes all arguments to webrev script'''
+    Generate a web-based code review using webrev(1) and optionally
+    upload it.  All known arguments are passed through to webrev(1).
+    '''
 
     webrev_args = ""
     for key in opts.keys():
@@ -1090,7 +1266,7 @@ def cdm_webrev(ui, repo, **opts):
 
 cmdtable = {
     'apply': (cdm_apply, [('p', 'parent', '', 'parent workspace'),
-                          ('r', 'remain', None, 'do not change directories')],
+                          ('r', 'remain', None, 'do not change directory')],
               'hg apply [-p PARENT] [-r] command...'),
     '^backup|bu': (cdm_backup, [('t', 'if-newer', None,
                              'only backup if workspace files are newer')],
@@ -1112,7 +1288,7 @@ cmdtable = {
     'cstyle': (cdm_cstyle, [('p', 'parent', '', 'parent workspace')],
                'hg cstyle [-p PARENT]'),
     'eval': (cdm_eval, [('p', 'parent', '', 'parent workspace'),
-                        ('r', 'remain', None, 'do not change directories')],
+                        ('r', 'remain', None, 'do not change directory')],
              'hg eval [-p PARENT] [-r] command...'),
     'hdrchk': (cdm_hdrchk, [('p', 'parent', '', 'parent workspace')],
                'hg hdrchk [-p PARENT]'),
@@ -1121,9 +1297,9 @@ cmdtable = {
     'keywords': (cdm_keywords, [('p', 'parent', '', 'parent workspace')],
                  'hg keywords [-p PARENT]'),
     '^list|active': (cdm_list, [('p', 'parent', '', 'parent workspace'),
-                                ('r', 'removed', None, 'show removed files'),
                                 ('a', 'added', None, 'show added files'),
-                                ('m', 'modified', None, 'show modified files')],
+                                ('m', 'modified', None, 'show modified files'),
+                                ('r', 'removed', None, 'show removed files')],
                     'hg list [-amrRu] [-p PARENT]'),
     'mapfilechk': (cdm_mapfilechk, [('p', 'parent', '', 'parent workspace')],
                 'hg mapfilechk [-p PARENT]'),
@@ -1142,7 +1318,7 @@ cmdtable = {
                              ('b', 'ignore-space-change', None,
                               'ignore changes in the amount of white space'),
                              ('B', 'ignore-blank-lines', None,
-                              'ignore changes whos lines are all blank'),
+                              'ignore changes whose lines are all blank'),
                              ('U', 'unified', 3,
                               'number of lines of context to show'),
                              ('I', 'include', [],
@@ -1151,14 +1327,13 @@ cmdtable = {
                               'exclude names matching the given patterns')],
                'hg pdiffs [OPTION...] [-p PARENT] [FILE...]'),
     '^recommit|reci': (cdm_recommit, [('p', 'parent', '', 'parent workspace'),
-                                      ('f', 'force', None, 'force operation'),
                                       ('m', 'message', '',
                                        'use <text> as commit message'),
                                       ('l', 'logfile', '',
                                        'read commit message from file'),
                                       ('u', 'user', '',
                                        'record user as committer')],
-                       'hg recommit [-f] [-p PARENT]'),
+                       'hg recommit [-m TEXT] [-l FILE] [-u USER] [-p PARENT]'),
     'renamed': (cdm_renamed, [('p', 'parent', '', 'parent workspace')],
                 'hg renamed [-p PARENT]'),
     'reparent': (cdm_reparent, [], 'hg reparent PARENT'),
@@ -1170,8 +1345,7 @@ cmdtable = {
                             ('D', 'D', '', 'delete remote webrev'),
                             ('I', 'I', '', 'ITS configuration file'),
                             ('i', 'i', '', 'include file'),
-                            ('l', 'l', '', 'extract file list from putback -n'),
-                            ('N', 'N', None, 'supress comments'),
+                            ('N', 'N', None, 'suppress comments'),
                             ('n', 'n', None, 'do not generate webrev'),
                             ('O', 'O', None, 'OpenSolaris mode'),
                             ('o', 'o', '', 'output directory'),

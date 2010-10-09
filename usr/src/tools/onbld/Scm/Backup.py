@@ -17,6 +17,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2008, 2010, Richard Lowe
+#
 
 '''
 Workspace backup
@@ -58,10 +60,7 @@ dirstate, are optional.
 '''
 
 import os, pwd, shutil, tarfile, time, traceback
-from mercurial import changegroup, node, patch, util
-
-from onbld.Scm.WorkSpace import HgLookupError
-import onbld.Scm.Version as Version
+from mercurial import changegroup, error, node, patch, util
 
 
 class CdmNodeMissing(util.Abort):
@@ -158,7 +157,7 @@ class CdmCommittedBackup(object):
                 except EnvironmentError, e:
                     raise util.Abort("couldn't restore committed changes: %s\n"
                                      "   %s" % (bfile, e))
-                except HgLookupError, e:
+                except error.LookupError, e:
                     raise CdmNodeMissing("couldn't restore committed changes",
                                                      e.name)
             finally:
@@ -290,7 +289,7 @@ class CdmUncommittedBackup(object):
         try:
             n = node.bin(dirstate)
             self.ws.repo.changelog.lookup(n)
-        except HgLookupError, e:
+        except error.LookupError, e:
             raise CdmNodeMissing("couldn't restore uncommitted changes",
                                  e.name)
 
@@ -339,7 +338,7 @@ class CdmUncommittedBackup(object):
             fp = open(self.bu.backupfile('renames'))
             for line in fp:
                 source, dest = line.strip().split()
-                self.ws.repo.copy(source, dest)
+                self.ws.copy(source, dest)
         except EnvironmentError, e:
             raise util.Abort('unable to open renames file: %s' % e)
         except ValueError:
@@ -434,14 +433,14 @@ class CdmMetadataBackup(object):
                 # in question, so we have to do so ourselves.
                 #
                 if isinstance(e, tarfile.TarError):
-                    error = "%s: %s" % (elt, e)
+                    errstr = "%s: %s" % (elt, e)
                 else:
-                    error = str(e)
+                    errstr = str(e)
 
                 raise util.Abort("couldn't backup metadata to %s:\n"
                                  "  %s" %
                                  (self.bu.backupfile('metadata.tar.gz'),
-                                  error))
+                                  errstr))
         finally:
             if tar and not tar.closed:
                 tar.close()
@@ -480,14 +479,14 @@ class CdmMetadataBackup(object):
                 except (EnvironmentError, tarfile.TarError), e:
                     # Make sure the member name is in the exception message.
                     if isinstance(e, tarfile.TarError):
-                        error = "%s: %s" % (elt.name, e)
+                        errstr = "%s: %s" % (elt.name, e)
                     else:
-                        error = str(e)
+                        errstr = str(e)
 
                     raise util.Abort("couldn't restore metadata from %s:\n"
                                      "   %s" %
                                      (self.bu.backupfile('metadata.tar.gz'),
-                                      error))
+                                      errstr))
             finally:
                 if tar and not tar.closed:
                     tar.close()
@@ -694,11 +693,8 @@ class CdmBackup(object):
                 self.ws.ui.warn("Interrupted\n")
             else:
                 self.ws.ui.warn("Error: %s\n" % e)
-                if Version.at_least("1.3.0"):
-                    show_traceback = self.ws.ui.configbool('ui', 'traceback',
-                                                   False)
-                else:
-                    show_traceback = self.ws.ui.traceback
+                show_traceback = self.ws.ui.configbool('ui', 'traceback',
+                                                       False)
 
                 #
                 # If it's not a 'normal' error, we want to print a stack

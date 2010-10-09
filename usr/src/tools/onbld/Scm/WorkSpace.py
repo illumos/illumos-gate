@@ -15,6 +15,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2008, 2010, Richard Lowe
 #
 
 #
@@ -44,23 +45,16 @@
 
 import cStringIO
 import os
-from mercurial import cmdutil, context, hg, node, patch, repair, util
+from mercurial import cmdutil, context, error, hg, node, patch, repair, util
 from hgext import mq
 
 from onbld.Scm import Version
 
 #
-# Mercurial >= 1.2 has its exception types in a mercurial.error
-# module, prior versions had them in their associated modules.
+# Mercurial 1.6 moves findoutgoing into a discover module
 #
-if Version.at_least("1.2"):
-    from mercurial import error
-    HgRepoError = error.RepoError
-    HgLookupError = error.LookupError
-else:
-    from mercurial import repo, revlog
-    HgRepoError = repo.RepoError
-    HgLookupError = revlog.LookupError
+if Version.at_least("1.6"):
+    from mercurial import discovery
 
 
 class ActiveEntry(object):
@@ -200,7 +194,7 @@ class ActiveList(object):
 
                 try:
                     fctx = ctx.filectx(fname)
-                except HgLookupError:
+                except error.LookupError:
                     continue
 
                 #
@@ -373,9 +367,7 @@ class ActiveList(object):
         The fast path compares file metadata, slow path is a
         real comparison of file content.'''
 
-        # Note that we use localtip.manifest() here because of a bug in
-        # Mercurial 1.1.2's workingctx.__contains__
-        if ((path in self.parenttip) != (path in self.localtip.manifest())):
+        if ((path in self.parenttip) != (path in self.localtip)):
             return True
 
         parentfile = self.parenttip.filectx(path)
@@ -515,42 +507,27 @@ class WorkSpace(object):
         '''
 
         def tipmost_shared(head, outnodes):
-            '''Return the tipmost node on the same branch as head that is not
-            in outnodes.
+            '''Return the changeset on the same branch as head that is
+            not in outnodes and is closest to the tip.
 
-            We walk from head to the bottom of the workspace (revision
-            0) collecting nodes not in outnodes during the add phase
-            and return the first node we see in the iter phase that
-            was previously collected.
+            Walk outgoing changesets from head to the bottom of the
+            workspace (revision 0) and return the the first changeset
+            we see that is not in outnodes.
 
-            If no node is found (all revisions >= 0 are outgoing), the
+            If none is found (all revisions >= 0 are outgoing), the
             only possible parenttip is the null node (node.nullid)
             which is returned explicitly.
+            '''
+            for ctx in self._walkctxs(head, self.repo.changectx(0),
+                                      follow=True,
+                                      pick=lambda c: c.node() not in outnodes):
+                return ctx
 
-            See the docstring of mercurial.cmdutil.walkchangerevs()
-            for the phased approach to the iterator returned.  The
-            important part to note is that the 'add' phase gathers
-            nodes, which the 'iter' phase then iterates through.'''
-
-            opts = {'rev': ['%s:0' % head.rev()],
-                    'follow': True}
-            get = util.cachefunc(lambda r: self.repo.changectx(r).changeset())
-            changeiter = cmdutil.walkchangerevs(self.repo.ui, self.repo, [],
-                                                get, opts)[0]
-            seen = []
-            for st, rev, fns in changeiter:
-                n = self.repo.changelog.node(rev)
-                if st == 'add':
-                    if n not in outnodes:
-                        seen.append(n)
-                elif st == 'iter':
-                    if n in seen:
-                        return rev
-            return self.repo.changelog.rev(node.nullid)
+            return self.repo.changectx(node.nullid)
 
         nodes = set(outgoing)
         ptips = map(lambda x: tipmost_shared(x, nodes), heads)
-        return self.repo.changectx(sorted(ptips)[-1])
+        return sorted(ptips, key=lambda x: x.rev(), reverse=True)[0]
 
     def status(self, base='.', head=None):
         '''Translate from the hg 6-tuple status format to a hash keyed
@@ -576,8 +553,11 @@ class WorkSpace(object):
                 if hasattr(cmdutil, 'remoteui'):
                     ui = cmdutil.remoteui(ui, {})
                 pws = hg.repository(ui, parent)
-                return self.repo.findoutgoing(pws)
-            except HgRepoError:
+                if Version.at_least("1.6"):
+                    return discovery.findoutgoing(self.repo, pws)
+                else:
+                    return self.repo.findoutgoing(pws)
+            except error.RepoError:
                 self.ui.warn("Warning: Parent workspace '%s' is not "
                              "accessible\n"
                              "active list will be incomplete\n\n" % parent)
@@ -607,8 +587,8 @@ class WorkSpace(object):
     def active(self, parent=None):
         '''Return an ActiveList describing changes between workspace
         and parent workspace (including uncommitted changes).
-        If workspace has no parent ActiveList will still describe any
-        uncommitted changes'''
+        If workspace has no parent, ActiveList will still describe any
+        uncommitted changes.'''
 
         parent = self.parent(parent)
         if parent in self.activecache:
@@ -825,3 +805,78 @@ class WorkSpace(object):
                 self.repo.dirstate.invalidate()
 
         return ret.getvalue()
+
+    if Version.at_least("1.6"):
+        def copy(self, src, dest):
+            '''Copy a file from src to dest
+            '''
+
+            self.workingctx().copy(src, dest)
+    else:
+        def copy(self, src, dest):
+            '''Copy a file from src to dest
+            '''
+
+            self.repo.copy(src, dest)
+
+
+    if Version.at_least("1.4"):
+
+        def _walkctxs(self, base, head, follow=False, pick=None):
+            '''Generate changectxs between BASE and HEAD.
+
+            Walk changesets between BASE and HEAD (in the order implied by
+            their relation), following a given branch if FOLLOW is a true
+            value, yielding changectxs where PICK (if specified) returns a
+            true value.
+
+            PICK is a function of one argument, a changectx.'''
+
+            chosen = {}
+
+            def prep(ctx, fns):
+                chosen[ctx.rev()] = not pick or pick(ctx)
+
+            opts = {'rev': ['%s:%s' % (base.rev(), head.rev())],
+                    'follow': follow}
+            matcher = cmdutil.matchall(self.repo)
+
+            for ctx in cmdutil.walkchangerevs(self.repo, matcher, opts, prep):
+                if chosen[ctx.rev()]:
+                    yield ctx
+    else:
+
+        def _walkctxs(self, base, head, follow=False, pick=None):
+            '''Generate changectxs between BASE and HEAD.
+
+            Walk changesets between BASE and HEAD (in the order implied by
+            their relation), following a given branch if FOLLOW is a true
+            value, yielding changectxs where PICK (if specified) returns a
+            true value.
+
+            PICK is a function of one argument, a changectx.'''
+
+            opts = {'rev': ['%s:%s' % (base.rev(), head.rev())],
+                    'follow': follow}
+
+            changectx = self.repo.changectx
+            getcset = util.cachefunc(lambda r: changectx(r).changeset())
+
+            #
+            # See the docstring of mercurial.cmdutil.walkchangerevs() for
+            # the phased approach to the iterator returned.  The important
+            # part to note is that the 'add' phase gathers nodes, which
+            # the 'iter' phase then iterates through.
+            #
+            changeiter = cmdutil.walkchangerevs(self.ui, self.repo,
+                                                [], getcset, opts)[0]
+
+            matched = {}
+            for st, rev, fns in changeiter:
+                if st == 'add':
+                    ctx = changectx(rev)
+                    if not pick or pick(ctx):
+                        matched[rev] = ctx
+                elif st == 'iter':
+                    if rev in matched:
+                        yield matched[rev]
