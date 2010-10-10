@@ -84,8 +84,7 @@ static void	usb_as_cleanup(dev_info_t *, usb_as_state_t *);
 
 static int	usb_as_handle_descriptors(usb_as_state_t *);
 static void	usb_as_prepare_registration_data(usb_as_state_t *);
-static int	usb_as_valid_format(usb_as_state_t *, uint_t,
-				uint_t *, uint_t);
+static int	usb_as_valid_format(usb_as_state_t *, uint_t);
 static void	usb_as_free_alts(usb_as_state_t *);
 
 static void	usb_as_create_pm_components(dev_info_t *, usb_as_state_t *);
@@ -121,8 +120,7 @@ static void	usb_as_play_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 static void	usb_as_record_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 static void	usb_as_play_exc_cb(usb_pipe_handle_t, usb_isoc_req_t  *);
 static void	usb_as_record_exc_cb(usb_pipe_handle_t, usb_isoc_req_t	*);
-static int	usb_as_get_pktsize(usb_as_state_t *, usb_audio_formats_t *,
-			usb_frame_number_t);
+static int	usb_as_get_pktsize(usb_as_state_t *, usb_frame_number_t);
 static void	usb_as_handle_shutdown(usb_as_state_t *);
 static int	usb_as_play_isoc_data(usb_as_state_t *,
 			usb_audio_play_req_t *);
@@ -198,12 +196,6 @@ static usb_event_t usb_as_events = {
  * Mixer registration Management
  *	use defaults as much as possible
  */
-
-/* default sample rates that must be supported */
-static uint_t usb_as_default_srs[] = {
-	8000,	9600, 11025, 16000, 18900, 22050,
-	32000,	33075, 37800, 44100, 48000, 0
-};
 
 _NOTE(SCHEME_PROTECTS_DATA("unique per call", mblk_t))
 _NOTE(SCHEME_PROTECTS_DATA("unique per call", usb_isoc_req_t))
@@ -712,6 +704,8 @@ usb_as_set_sample_freq(usb_as_state_t *uasp, int freq)
 
 	alt = uasp->usb_as_alternate;
 
+	uasp->usb_as_curr_sr = freq;
+
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_set_sample_freq: inst=%d cont_sr=%d freq=%d",
 	    ddi_get_instance(uasp->usb_as_dip),
@@ -788,6 +782,23 @@ usb_as_set_format(usb_as_state_t *uasp, usb_audio_formats_t *format)
 		    (format->fmt_precision == reg->reg_formats[n].
 		    fmt_precision) && (format->fmt_encoding ==
 		    reg->reg_formats[n].fmt_encoding)) {
+			int i;
+			int n_srs = reg->reg_formats[n].fmt_n_srs;
+			uint_t *srs = reg->reg_formats[n].fmt_srs;
+
+			/* match sample rate */
+			for (i = 0; i < n_srs; i++) {
+				if (format->fmt_srs[0] == srs[i]) {
+
+					break;
+				}
+			}
+
+			if (i == n_srs) {
+
+				continue;
+			}
+
 			/*
 			 * Found the alternate
 			 */
@@ -1079,16 +1090,7 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
-	/* we only support two precisions */
-	if ((format->fmt_precision != USB_AUDIO_PRECISION_8) &&
-	    (format->fmt_precision != USB_AUDIO_PRECISION_16)) {
-
-		rval = USB_FAILURE;
-
-		goto done;
-	}
-
-	precision = (format->fmt_precision == USB_AUDIO_PRECISION_8) ? 1 : 2;
+	precision = format->fmt_precision >> 3;
 
 	frame = uasp->usb_as_pkt_count;
 
@@ -1097,7 +1099,7 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 	 * each frame
 	 */
 	for (bufsize = pkt = 0; pkt < USB_AS_N_FRAMES; pkt++) {
-		pkt_len[pkt] = usb_as_get_pktsize(uasp, format, frame++);
+		pkt_len[pkt] = usb_as_get_pktsize(uasp, frame++);
 		bufsize += pkt_len[pkt];
 	}
 
@@ -1555,7 +1557,7 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	mutex_enter(&uasp->usb_as_mutex);
 	ahdl = uasp->usb_as_ahdl;
 	sz = uasp->usb_as_record_pkt_size;
-	precision = (format->fmt_precision == USB_AUDIO_PRECISION_8) ? 1 : 2;
+	precision = format->fmt_precision >> 3;
 
 	if (uasp->usb_as_audio_state != USB_AS_IDLE) {
 		for (offset = i = 0; i < isoc_req->isoc_pkts_count; i++) {
@@ -1592,21 +1594,7 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	usb_free_isoc_req(isoc_req);
 }
 
-
 /*
- * Support for sample rates that are not multiple of 1K. We have 3 such
- * sample rates: 11025, 22050 and 44100.
- */
-typedef struct usb_as_pktsize_table {
-	uint_t		sr;
-	ushort_t	pkt;
-	ushort_t	cycle;
-	int		extra;
-} usb_as_pktsize_table_t;
-
-/*
- * usb_as_pktsize_info is the table that calculates the pktsize
- * corresponding to the current frame and the current format.
  * Since the int_rate is 1000, we have to do special arithmetic for
  * sample rates not multiple of 1K. For example,
  * if the sample rate is 48000(i.e multiple of 1K), we can send 48000/1000
@@ -1625,46 +1613,45 @@ typedef struct usb_as_pktsize_table {
  * pkt_size =  ((frameno %  cycle) ?  pkt : (pkt + extra));
  *
  */
-static usb_as_pktsize_table_t usb_as_pktsize_info[] = {
-	{8000,	8,	1000,	0},
-	{9600,	10,	5,	-2},
-	{11025,	11,	40,	1},
-	{16000,	16,	1000,	0},
-	{18900, 19,	10,	-1},
-	{22050,	22,	20,	1},
-	{32000,	32,	1000,	0},
-	{33075, 33,	12,	1},
-	{37800, 38,	5,	-1},
-	{44100,	44,	10,	1},
-	{48000, 48,	1000,	0},
-	{ 0 }
-};
-
 
 static int
-usb_as_get_pktsize(usb_as_state_t *uasp, usb_audio_formats_t *format,
-	usb_frame_number_t frameno)
+usb_as_get_pktsize(usb_as_state_t *uasp, usb_frame_number_t frameno)
 {
-	int	n;
+	static uint_t	sr = 0;
+	static ushort_t	pkt, cycle;
+	static int	extra;
 	int	pkt_size = 0;
-	ushort_t pkt, cycle;
-	int	extra;
-	int	n_srs =
-	    sizeof (usb_as_pktsize_info) / sizeof (usb_as_pktsize_table_t);
+	usb_audio_formats_t *format = &uasp->usb_as_curr_format;
 
-	for (n = 0; n < n_srs; n++) {
-		if (usb_as_pktsize_info[n].sr == format->fmt_sr) {
-			cycle	= usb_as_pktsize_info[n].cycle;
-			pkt	= usb_as_pktsize_info[n].pkt;
-			extra	= usb_as_pktsize_info[n].extra;
-			pkt_size = (((frameno + 1) % cycle) ?
-			    pkt : (pkt + extra));
-			pkt_size *= ((format->fmt_precision ==
-			    USB_AUDIO_PRECISION_16) ? 2 : 1)
-			    * format->fmt_chns;
-			break;
+	if (sr != uasp->usb_as_curr_sr) {
+		/* calculate once */
+		sr = uasp->usb_as_curr_sr;
+		pkt = (sr + 500) / 1000;
+		extra = sr % 1000;
+
+		if (extra == 0) {
+			/* sample rate is a multiple of 1000 */
+			cycle = 1000;
+		} else {
+			/* find a common divisor of 1000 and extra */
+			int m = 1000;
+			int n = extra;
+
+			while (m != n) {
+				if (m > n) {
+					m = m - n;
+				} else {
+					n = n - m;
+				}
+			}
+			cycle = (1000 / n);
+			extra = ((extra >= 500) ? (extra - 1000) : extra) / n;
 		}
 	}
+	pkt_size = (((frameno + 1) % cycle) ?
+	    pkt : (pkt + extra));
+	pkt_size *= (format->fmt_precision >> 3)
+	    * format->fmt_chns;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_get_pktsize: %d", pkt_size);
@@ -1946,11 +1933,12 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 	int				interface = dev_data->dev_curr_if;
 	uint_t				alternate;
 	uint_t				n_alternates;
-	int				len, i, n, n_srs, sr, index;
+	int				len, i, j, n, n_srs, sr, index;
 	int				rval = USB_SUCCESS;
 	usb_if_descr_t			*if_descr;
 	usb_audio_as_if_descr_t 	*general;
 	usb_audio_type1_format_descr_t	*format;
+	uint_t				*sample_rates;
 	usb_ep_descr_t			*ep;
 	usb_audio_as_isoc_ep_descr_t	*cs_ep;
 	usb_if_data_t			*if_data;
@@ -2045,8 +2033,6 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 		format = kmem_zalloc(len, KM_SLEEP);
 		bcopy(altif_data->altif_cvs[index].cvs_buf, format, len);
 
-		uasp->usb_as_alts[alternate].alt_format_len = (uchar_t)len;
-
 		/* is this a sane format descriptor */
 		if (!((format->blength >= AUDIO_TYPE1_FORMAT_SIZE) &&
 		    format->bDescriptorSubType == USB_AUDIO_AS_FORMAT_TYPE)) {
@@ -2058,8 +2044,6 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 
 			continue;
 		}
-
-		uasp->usb_as_alts[alternate].alt_format = format;
 
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 		    "format (%d.%d): len = %d "
@@ -2083,25 +2067,43 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 			n_srs = format->bSamFreqType;
 		}
 
+		sample_rates =
+		    kmem_zalloc(n_srs * (sizeof (uint_t)), KM_SLEEP);
+
+		/* go thru all sample rates (3 bytes) each */
+		for (i = 0, j = 0, n = 0; n < n_srs; i += 3, n++) {
+			sr = (format->bSamFreqs[i+2] << 16) |
+			    (format->bSamFreqs[i+1] << 8) |
+			    format->bSamFreqs[i];
+			USB_DPRINTF_L3(PRINT_MASK_ATTA,
+			    uasp->usb_as_log_handle,
+			    "sr = %d", sr);
+			sample_rates[n] = sr;
+			if (sr != 0) {
+				j++;
+			}
+		}
+
+		if (j == 0) {
+			USB_DPRINTF_L2(PRINT_MASK_ATTA,
+			    uasp->usb_as_log_handle,
+			    "format cs interface descr has no valid rates");
+
+			kmem_free(format, len);
+			kmem_free(sample_rates, n_srs * (sizeof (uint_t)));
+
+			continue;
+		}
+
+		uasp->usb_as_alts[alternate].alt_format_len = (uchar_t)len;
+
+		uasp->usb_as_alts[alternate].alt_format = format;
+
 		uasp->usb_as_alts[alternate].alt_n_sample_rates =
 		    (uchar_t)n_srs;
 
 		uasp->usb_as_alts[alternate].alt_sample_rates =
-		    kmem_zalloc(n_srs * (sizeof (uint_t)), KM_SLEEP);
-
-		/* go thru all sample rates (3 bytes) each */
-		for (i = 0, n = 0; n < n_srs; i += 3, n++) {
-			sr = ((format->bSamFreqs[i+2] << 16) & 0xff0000) |
-			    ((format->bSamFreqs[i+1] << 8) & 0xff00) |
-			    (format->bSamFreqs[i] & 0xff);
-
-			USB_DPRINTF_L3(PRINT_MASK_ATTA,
-			    uasp->usb_as_log_handle,
-			    "sr = %d", sr);
-
-			uasp->usb_as_alts[alternate].
-			    alt_sample_rates[n] = sr;
-		}
+		    sample_rates;
 
 		if ((ep_data = usb_lookup_ep_data(uasp->usb_as_dip,
 		    dev_data, interface, alternate, 0,
@@ -2239,7 +2241,6 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 	usb_as_registration_t *reg = &uasp->usb_as_reg;
 	usb_audio_type1_format_descr_t	*format;
 	uchar_t n_alternates = uasp->usb_as_n_alternates;
-	uchar_t channels[3];
 	int alt, n;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
@@ -2254,27 +2255,21 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 	}
 
 	reg->reg_ifno = uasp->usb_as_ifno;
-	reg->reg_mode = uasp->usb_as_alts[1].alt_mode;
 
 	/* all endpoints need to have the same direction */
-	for (alt = 2; alt < n_alternates; alt++) {
+	for (alt = 1; alt < n_alternates; alt++) {
 		if (!uasp->usb_as_alts[alt].alt_valid) {
 			continue;
 		}
-		if (uasp->usb_as_alts[alt].alt_mode !=
+		if (reg->reg_mode && uasp->usb_as_alts[alt].alt_mode !=
 		    reg->reg_mode) {
 			USB_DPRINTF_L2(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 			    "alternates have different direction");
 
 			return;
 		}
+		reg->reg_mode = uasp->usb_as_alts[alt].alt_mode;
 	}
-
-	/* copy over sample rate table	but zero it first */
-	bzero(reg->reg_srs, sizeof (reg->reg_srs));
-	bcopy(usb_as_default_srs, reg->reg_srs, sizeof (usb_as_default_srs));
-
-	channels[1] = channels[2] = 0;
 
 	/*
 	 * we assume that alternate 0 is not interesting (no bandwidth),
@@ -2288,10 +2283,7 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 		format = uasp->usb_as_alts[alt].alt_format;
 		if (uasp->usb_as_alts[alt].alt_valid &&
 		    (n < USB_AS_N_FORMATS) &&
-		    (usb_as_valid_format(uasp, alt,
-		    reg->reg_srs,
-		    (sizeof (reg->reg_srs)/
-		    sizeof (uint_t)) - 1)) == USB_SUCCESS) {
+		    (usb_as_valid_format(uasp, alt) == USB_SUCCESS)) {
 			reg->reg_formats[n].fmt_termlink =
 			    uasp->usb_as_alts[alt].alt_general->
 			    bTerminalLink;
@@ -2300,10 +2292,12 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 			    format->bNrChannels;
 			reg->reg_formats[n].fmt_precision =
 			    format->bBitResolution;
-			reg->reg_formats[n++].fmt_encoding =
+			reg->reg_formats[n].fmt_encoding =
 			    format->bFormatType;
-			/* count how many mono and stereo we have */
-			channels[format->bNrChannels]++;
+			reg->reg_formats[n].fmt_n_srs =
+			    uasp->usb_as_alts[alt].alt_n_sample_rates;
+			reg->reg_formats[n++].fmt_srs =
+			    uasp->usb_as_alts[alt].alt_sample_rates;
 		}
 	}
 
@@ -2329,24 +2323,6 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 		    reg->reg_formats[n].fmt_encoding);
 	}
 
-	/*
-	 * Fill out channels
-	 * Note that we assumed all alternates have the same number
-	 * of channels.
-	 */
-	n = 0;
-	if (channels[1]) {
-		reg->reg_channels[n++] = 1;
-	}
-	if (channels[2]) {
-		reg->reg_channels[n] = 2;
-	}
-
-	USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
-	    "channels %d %d", reg->reg_channels[0], reg->reg_channels[1]);
-
-
-
 	reg->reg_valid++;
 }
 
@@ -2356,10 +2332,8 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
  *	check if this format can be supported
  */
 static int
-usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
-	uint_t *srs, uint_t n_srs)
+usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate)
 {
-	int n, i, j;
 	usb_as_alt_descr_t *alt_descr = &uasp->usb_as_alts[alternate];
 	usb_audio_type1_format_descr_t	*format = alt_descr->alt_format;
 
@@ -2369,15 +2343,15 @@ usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
 	    format->bBitResolution, format->bSamFreqType,
 	    format->bFormatType);
 	USB_DPRINTF_L4(PRINT_MASK_PM, uasp->usb_as_log_handle,
-	    "alt=%d n_srs=%d", alternate, n_srs);
+	    "alt=%d", alternate);
 
 	switch (format->bNrChannels) {
-	case 1:
-	case 2:
-		break;
-	default:
+	case 0:
 
 		return (USB_FAILURE);
+	default:
+
+		break;
 	}
 
 	switch (format->bSubFrameSize) {
@@ -2390,8 +2364,10 @@ usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
 	}
 
 	switch (format->bBitResolution) {
-	case 8:
-	case 16:
+	case USB_AUDIO_PRECISION_8:
+	case USB_AUDIO_PRECISION_16:
+	case USB_AUDIO_PRECISION_24:
+	case USB_AUDIO_PRECISION_32:
 		break;
 	default:
 
@@ -2406,81 +2382,6 @@ usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
 		return (USB_FAILURE);
 	}
 
-	switch (format->bSamFreqType) {
-	case 0:
-		/* continuous */
-
-		break;
-	default:
-		/* count the number of sample rates we still have */
-		for (j = n = 0; j < n_srs; n++) {
-			if (srs[n] == 0) {
-
-				break;
-			} else {
-				j++;
-			}
-		}
-
-		/* check if our preferred sample rates are supported */
-		for (n = 0; n < n_srs; n++) {
-			uint_t sr = srs[n];
-
-			if (sr == 0) {
-				break;
-			}
-
-			USB_DPRINTF_L3(PRINT_MASK_PM, uasp->usb_as_log_handle,
-			    "checking sr=%d", sr);
-			for (i = 0; i < alt_descr->alt_n_sample_rates; i++) {
-				if (sr == alt_descr->alt_sample_rates[i]) {
-					break;
-				}
-			}
-
-			if (i == alt_descr->alt_n_sample_rates) {
-				/*
-				 * remove this sample rate except if it is
-				 * the last one
-				 */
-				if (j > 1) {
-					srs[n] = 0;
-				} else {
-
-					return (USB_FAILURE);
-				}
-			}
-		}
-
-		USB_DPRINTF_L3(PRINT_MASK_PM, uasp->usb_as_log_handle,
-		    "before srs (%d): %d %d %d %d %d %d %d %d %d %d %d %d",
-		    n_srs,
-		    srs[0], srs[1], srs[2], srs[3], srs[4], srs[5], srs[6],
-		    srs[7], srs[8], srs[9], srs[10], srs[11]);
-
-
-		/* now compact srs table, eliminating zero entries */
-		for (i = n = 0; n < n_srs; n++) {
-			if (srs[n]) {
-				/* move up & remove from the list */
-				srs[i] = srs[n];
-				if (i++ != n) {
-					srs[n] = 0;
-				}
-			}
-		}
-
-		/* last entry must always be zero */
-		srs[i] = 0;
-
-		USB_DPRINTF_L3(PRINT_MASK_PM, uasp->usb_as_log_handle,
-		    "before srs (%d): %d %d %d %d %d %d %d %d %d %d %d %d",
-		    n_srs,
-		    srs[0], srs[1], srs[2], srs[3], srs[4], srs[5], srs[6],
-		    srs[7], srs[8], srs[9], srs[10], srs[11]);
-
-		break;
-	}
 	return (USB_SUCCESS);
 }
 
