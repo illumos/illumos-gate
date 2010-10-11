@@ -33,7 +33,7 @@
 #include <limits.h>
 
 #define	COLLATE_STR_LEN		24		/* should be 64-bit multiple */
-#define	COLLATE_VERSION		"I1.0\n"
+#define	COLLATE_VERSION		"IllumosCollate2\n"
 
 #define	COLLATE_MAX_PRIORITY	(0x7fffffff)	/* max signed value */
 #define	COLLATE_SUBST_PRIORITY	(0x40000000)	/* bit indicates subst table */
@@ -65,26 +65,27 @@
 typedef struct collate_info {
 	uint8_t directive_count;
 	uint8_t directive[COLL_WEIGHTS_MAX];
+	int32_t pri_count[COLL_WEIGHTS_MAX];
 	int32_t flags;
 	int32_t chain_count;
-	int32_t large_pri_count;
+	int32_t large_count;
 	int32_t subst_count[COLL_WEIGHTS_MAX];
 	int32_t undef_pri[COLL_WEIGHTS_MAX];
 } collate_info_t;
 
-typedef struct collate_char_pri {
+typedef struct collate_char {
 	int32_t pri[COLL_WEIGHTS_MAX];
-} collate_char_pri_t;
+} collate_char_t;
 
-typedef struct collate_chain_pri {
+typedef struct collate_chain {
 	wchar_t str[COLLATE_STR_LEN];
 	int32_t pri[COLL_WEIGHTS_MAX];
-} collate_chain_pri_t;
+} collate_chain_t;
 
-typedef struct collate_large_pri {
+typedef struct collate_large {
 	int32_t val;
-	collate_char_pri_t pri;
-} collate_large_pri_t;
+	collate_char_t pri;
+} collate_large_t;
 
 typedef struct collate_subst {
 	int32_t key;

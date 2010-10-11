@@ -134,6 +134,7 @@ int to_mbs(char *, wchar_t);
 char *to_mb_string(const wchar_t *);
 void set_wide_encoding(const char *);
 const char *get_wide_encoding(void);
+int max_wide(void);
 
 #define	_(x)	gettext(x)
 #define	INTERR	errf(_("internal fault (%s:%d)"), __FILE__, __LINE__)

@@ -44,6 +44,7 @@ static int tomb_mbs(char *, wchar_t);
 static int (*_towide)(wchar_t *, const char *, int) = towide_none;
 static int (*_tomb)(char *, wchar_t) = tomb_none;
 static const char *_encoding = "NONE";
+static int _nbits = 7;
 
 /*
  * Table of supported encodings.  We only bother to list the multibyte
@@ -53,45 +54,71 @@ static struct {
 	const char *name;
 	/* the name that the underlying libc implemenation uses */
 	const char *cname;
+	/* the maximum number of bits required for priorities */
+	int nbits;
 	int (*towide)(wchar_t *, const char *, int);
 	int (*tomb)(char *, wchar_t);
 } mb_encodings[] = {
-	{ "UTF-8",	"UTF-8",	 towide_utf8,	tomb_utf8 },
-	{ "UTF8",	"UTF-8",	 towide_utf8,	tomb_utf8 },
-	{ "utf8",	"UTF-8",	 towide_utf8,	tomb_utf8 },
-	{ "utf-8",	"UTF-8",	towide_utf8,	tomb_utf8 },
+	/*
+	 * UTF8 values max out at 0x1fffff (although in theory there could
+	 * be later extensions, but it won't happen.)  This means we only need
+	 * 21 bits to be able to encode the entire range of priorities.
+	 */
+	{ "UTF-8",	"UTF-8",	21, towide_utf8, tomb_utf8 },
+	{ "UTF8",	"UTF-8",	21, towide_utf8, tomb_utf8 },
+	{ "utf8",	"UTF-8",	21, towide_utf8, tomb_utf8 },
+	{ "utf-8",	"UTF-8",	21, towide_utf8, tomb_utf8 },
 
-	{ "EUC-CN",	"EUC-CN",	towide_euccn,	tomb_mbs },
-	{ "eucCN",	"EUC-CN",	towide_euccn,	tomb_mbs },
+	{ "EUC-CN",	"EUC-CN",	16, towide_euccn, tomb_mbs },
+	{ "eucCN",	"EUC-CN",	16, towide_euccn, tomb_mbs },
+	/*
+	 * Becuase the 3-byte form of EUC-JP use the same leading byte,
+	 * only 17 bits required to provide unique priorities.  (The low
+	 * bit of that first byte is set.)  By setting this value low,
+	 * we can get by with only 3 bytes in the strxfrm expansion.
+	 */
+	{ "EUC-JP",	"EUC-JP",	17, towide_eucjp, tomb_mbs },
+	{ "eucJP",	"EUC-JP",	17, towide_eucjp, tomb_mbs },
 
-	{ "EUC-JP",	"EUC-JP",	towide_eucjp,	tomb_mbs },
-	{ "eucJP",	"EUC-JP",	towide_eucjp,	tomb_mbs },
+	{ "EUC-KR",	"EUC-KR",	16, towide_euckr, tomb_mbs },
+	{ "eucKR",	"EUC-KR",	16, towide_euckr, tomb_mbs },
+	/*
+	 * EUC-TW uses 2 bytes most of the time, but 4 bytes if the
+	 * high order byte is 0x8E.  However, with 4 byte encodings,
+	 * the third byte will be A0-B0.  So we only need to consider
+	 * the lower order 24 bits for collation.
+	 */
+	{ "EUC-TW",	"EUC-TW",	24, towide_euctw, tomb_mbs },
+	{ "eucTW",	"EUC-TW",	24, towide_euctw, tomb_mbs },
 
-	{ "EUC-KR",	"EUC-KR",	towide_euckr,	tomb_mbs },
-	{ "eucKR",	"EUC-KR",	towide_euckr,	tomb_mbs },
+	{ "MS_Kanji",	"MSKanji",	16, towide_mskanji, tomb_mbs },
+	{ "MSKanji",	"MSKanji",	16, towide_mskanji, tomb_mbs },
+	{ "PCK",	"MSKanji",	16, towide_mskanji, tomb_mbs },
+	{ "SJIS",	"MSKanji",	16, towide_mskanji, tomb_mbs },
+	{ "Shift_JIS",	"MSKanji",	16, towide_mskanji, tomb_mbs },
 
-	{ "EUC-TW",	"EUC-TW",	towide_euctw,	tomb_mbs },
-	{ "eucTW",	"EUC-TW",	towide_euctw,	tomb_mbs },
+	{ "BIG5",	"BIG5",		16, towide_big5, tomb_mbs },
+	{ "big5",	"BIG5",		16, towide_big5, tomb_mbs },
+	{ "Big5",	"BIG5",		16, towide_big5, tomb_mbs },
 
-	{ "MS_Kanji",	"MSKanji",	towide_mskanji,	tomb_mbs },
-	{ "MSKanji",	"MSKanji",	towide_mskanji,	tomb_mbs },
-	{ "PCK",	"MSKanji",	towide_mskanji,	tomb_mbs },
-	{ "SJIS",	"MSKanji",	towide_mskanji,	tomb_mbs },
-	{ "Shift_JIS",	"MSKanji",	towide_mskanji,	tomb_mbs },
+	{ "GBK",	"GBK",		16, towide_gbk,	tomb_mbs },
 
-	{ "BIG5",	"BIG5",		towide_big5,	tomb_mbs },
-	{ "big5",	"BIG5",		towide_big5,	tomb_mbs },
-	{ "Big5",	"BIG5",		towide_big5,	tomb_mbs },
+	/*
+	 * GB18030 can get away with just 31 bits.  This is because the
+	 * high order bit is always set for 4 byte values, and the
+	 * at least one of the other bits in that 4 byte value will
+	 * be non-zero.
+	 */
+	{ "GB18030",	"GB18030",	31, towide_gb18030, tomb_mbs },
 
-	{ "GBK",	"GBK",		towide_gbk,	tomb_mbs },
+	/*
+	 * This should probably be an aliase for euc-cn, or vice versa.
+	 */
+	{ "GB2312",	"GB2312",	16, towide_gb2312, tomb_mbs },
 
-	{ "GB18030",	"GB18030",	towide_gb18030,	tomb_mbs },
-
-	{ "GB2312",	"GB2312",	towide_gb2312,	tomb_mbs },
-
-	{ "ASCII",	"ASCII",	towide_none,	tomb_none },
-	{ "US-ASCII",	"ASCII",	towide_none,	tomb_none },
-	{ "646",	"ASCII",	towide_none,	tomb_none },
+	{ "ASCII",	"ASCII",	7, towide_none,	tomb_none },
+	{ "US-ASCII",	"ASCII",	7, towide_none,	tomb_none },
+	{ "646",	"ASCII",	7, towide_none,	tomb_none },
 
 	{ NULL, NULL },
 };
@@ -511,7 +538,7 @@ towide_euc_impl(wchar_t *wc, const char *mb, int n,
  *
  * Code set 0 (ASCII):				0x21-0x7E
  * Code set 1 (CNS 11643-1992 Plane 1):		0xA1A1-0xFEFE
- * Code set 2 (CNS 11643-1992 Planes 1-16):	0x8EA1A1A1-0x8EB0FEFE
+ * Code set 2:					unused
  * Code set 3:					unused
  */
 int
@@ -620,12 +647,15 @@ set_wide_encoding(const char *encoding)
 	_towide = towide_none;
 	_tomb = tomb_none;
 	_encoding = "NONE";
+	_nbits = 8;
 
 	for (i = 0; mb_encodings[i].name; i++) {
 		if (strcasecmp(encoding, mb_encodings[i].name) == 0) {
 			_towide = mb_encodings[i].towide;
 			_tomb = mb_encodings[i].tomb;
 			_encoding = mb_encodings[i].cname;
+			_nbits = mb_encodings[i].nbits;
+			break;
 		}
 	}
 }
@@ -634,4 +664,10 @@ const char *
 get_wide_encoding(void)
 {
 	return (_encoding);
+}
+
+int
+max_wide(void)
+{
+	return ((int)((1U << _nbits) - 1));
 }

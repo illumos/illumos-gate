@@ -33,6 +33,67 @@
 #include "collate.h"
 
 /*
+ * Design notes.
+ *
+ * It will be extremely helpful to the reader if they have access to
+ * the localedef and locale file format specifications available.
+ * Latest versions of these are available from www.opengroup.org.
+ *
+ * The design for the collation code is a bit complex.  The goal is a
+ * single collation database as described in collate.h (in
+ * libc/port/locale).  However, there are some other tidbits:
+ *
+ * a) The substitution entries are now a directly indexable array.  A
+ * priority elsewhere in the table is taken as an index into the
+ * substitution table if it has a high bit (COLLATE_SUBST_PRIORITY)
+ * set.  (The bit is cleared and the result is the index into the
+ * table.
+ *
+ * b) We eliminate duplicate entries into the substitution table.
+ * This saves a lot of space.
+ *
+ * c) The priorities for each level are "compressed", so that each
+ * sorting level has consecutively numbered priorities starting at 1.
+ * (O is reserved for the ignore priority.)  This means sort levels
+ * which only have a few distinct priorities can represent the
+ * priority level in fewer bits, which makes the strxfrm output
+ * smaller.
+ *
+ * d) We record the total number of priorities so that strxfrm can
+ * figure out how many bytes to expand a numeric priority into.
+ *
+ * e) For the UNDEFINED pass (the last pass), we record the maximum
+ * number of bits needed to uniquely prioritize these entries, so that
+ * the last pass can also use smaller strxfrm output when possible.
+ *
+ * f) Priorities with the sign bit set are verboten.  This works out
+ * because no active character set needs that bit to carry significant
+ * information once the character is in wide form.
+ *
+ * To process the entire data to make the database, we actually run
+ * multiple passes over the data.
+ *
+ * The first pass, which is done at parse time, identifies elements,
+ * substitutions, and such, and records them in priority order.  As
+ * some priorities can refer to other priorities, using forward
+ * references, we use a table of references indicating whether the
+ * priority's value has been resolved, or whether it is still a
+ * reference.
+ *
+ * The second pass walks over all the items in priority order, noting
+ * that they are used directly, and not just an indirect reference.
+ * This is done by creating a "weight" structure for the item.  The
+ * weights are stashed in an AVL tree sorted by relative "priority".
+ *
+ * The third pass walks over all the weight structures, in priority
+ * order, and assigns a new monotonically increasing (per sort level)
+ * weight value to them.  These are the values that will actually be
+ * written to the file.
+ *
+ * The fourth pass just writes the data out.
+ */
+
+/*
  * In order to resolve the priorities, we create a table of priorities.
  * Entries in the table can be in one of three states.
  *
@@ -48,8 +109,6 @@
  * this is used for forward references.  A collating-symbol can never
  * have this value.
  *
- * The "self" field is a reference to or own index in the pri list.
- *
  * The "pass" field is used during final resolution to aid in detection
  * of referencing loops.  (For example <A> depends on <B>, but <B> has its
  * priority dependent on <A>.)
@@ -60,14 +119,18 @@ typedef enum {
 	REFER		/* priority is a reference (index) */
 } res_t;
 
+typedef struct weight {
+	int32_t		pri;
+	int		opt;
+	avl_node_t	avl;
+} weight_t;
+
 typedef struct priority {
 	res_t		res;
 	int32_t		pri;
-	int32_t		self;
 	int		pass;
 	int		lineno;
 } collpri_t;
-
 
 #define	NUM_WT	collinfo.directive_count
 
@@ -110,7 +173,7 @@ struct collelem {
  */
 typedef struct collchar {
 	wchar_t		wc;
-	wchar_t		ref[COLL_WEIGHTS_MAX];
+	int32_t		ref[COLL_WEIGHTS_MAX];
 	avl_node_t	avl;
 } collchar_t;
 
@@ -124,6 +187,7 @@ typedef struct {
 	int32_t		key;
 	int32_t		ref[COLLATE_STR_LEN];
 	avl_node_t	avl;
+	avl_node_t	avl_ref;
 } subst_t;
 
 static avl_tree_t	collsyms;
@@ -132,6 +196,9 @@ static avl_tree_t	elem_by_symbol;
 static avl_tree_t	elem_by_expand;
 static avl_tree_t	collchars;
 static avl_tree_t	substs[COLL_WEIGHTS_MAX];
+static avl_tree_t	substs_ref[COLL_WEIGHTS_MAX];
+static avl_tree_t	weights[COLL_WEIGHTS_MAX];
+static int32_t		nweight[COLL_WEIGHTS_MAX];
 
 /*
  * This is state tracking for the ellipsis token.  Note that we start
@@ -152,6 +219,7 @@ static int32_t ellipsis_weights[COLL_WEIGHTS_MAX];
  * We keep a running tally of weights.
  */
 static int nextpri = 1;
+static int nextsubst[COLL_WEIGHTS_MAX] = { 0 };
 
 /*
  * This array collects up the weights for each level.
@@ -191,7 +259,6 @@ new_pri(void)
 			prilist[i].res = UNKNOWN;
 			prilist[i].pri = 0;
 			prilist[i].pass = 0;
-			prilist[i].self = i;
 		}
 	}
 	return (numpri++);
@@ -267,6 +334,15 @@ resolve_pri(int32_t ref)
 }
 
 static int
+weight_compare(const void *n1, const void *n2)
+{
+	int32_t	k1 = ((const weight_t *)n1)->pri;
+	int32_t	k2 = ((const weight_t *)n2)->pri;
+
+	return (k1 < k2 ? -1 : k1 > k2 ? 1 : 0);
+}
+
+static int
 collsym_compare(const void *n1, const void *n2)
 {
 	const collsym_t *c1 = n1;
@@ -328,6 +404,17 @@ subst_compare(const void *n1, const void *n2)
 	return (k1 < k2 ? -1 : k1 > k2 ? 1 : 0);
 }
 
+static int
+subst_compare_ref(const void *n1, const void *n2)
+{
+	int32_t *c1 = ((subst_t *)n1)->ref;
+	int32_t *c2 = ((subst_t *)n2)->ref;
+	int rv;
+
+	rv = wcscmp((wchar_t *)c1, (wchar_t *)c2);
+	return ((rv < 0) ? -1 : (rv > 0) ? 1 : 0);
+}
+
 void
 init_collate(void)
 {
@@ -347,9 +434,15 @@ init_collate(void)
 	avl_create(&collchars, collchar_compare, sizeof (collchar_t),
 	    offsetof(collchar_t, avl));
 
-	for (i = 0; i < COLL_WEIGHTS_MAX; i++)
+	for (i = 0; i < COLL_WEIGHTS_MAX; i++) {
 		avl_create(&substs[i], subst_compare, sizeof (subst_t),
 		    offsetof(subst_t, avl));
+		avl_create(&substs_ref[i], subst_compare_ref,
+		    sizeof (subst_t), offsetof(subst_t, avl_ref));
+		avl_create(&weights[i], weight_compare, sizeof (weight_t),
+		    offsetof(weight_t, avl));
+		nweight[i] = 1;
+	}
 
 	(void) memset(&collinfo, 0, sizeof (collinfo));
 
@@ -796,37 +889,52 @@ add_order_ellipsis(void)
 void
 add_order_subst(void)
 {
+	subst_t srch;
 	subst_t	*s;
 	avl_index_t where;
 	int i;
 
-	if ((s = calloc(sizeof (*s), 1)) == NULL) {
-		errf(_("out of memory"));
-		return;
-	}
-	s->key = new_pri();
-
-	/*
-	 * We use a self reference for our key, but we set a high bit
-	 * to indicate that this is a substitution reference.  This
-	 * will expedite table lookups later, and prevent table
-	 * lookups for situations that don't require it.  (In short,
-	 * its a big win, because we can skip a lot of binary
-	 * searching.)
-	 */
-	set_pri(s->key, (nextpri | COLLATE_SUBST_PRIORITY), RESOLVED);
-
+	(void) memset(&srch, 0, sizeof (srch));
 	for (i = 0; i < curr_subst; i++) {
-		s->ref[i] = subst_weights[i];
+		srch.ref[i] = subst_weights[i];
 		subst_weights[i] = 0;
+	}
+	s = avl_find(&substs_ref[curr_weight], &srch, &where);
+
+	if (s == NULL) {
+		if ((s = calloc(sizeof (*s), 1)) == NULL) {
+			errf(_("out of memory"));
+			return;
+		}
+		s->key = new_pri();
+
+		/*
+		 * We use a self reference for our key, but we set a
+		 * high bit to indicate that this is a substitution
+		 * reference.  This will expedite table lookups later,
+		 * and prevent table lookups for situations that don't
+		 * require it.  (In short, its a big win, because we
+		 * can skip a lot of binary searching.)
+		 */
+		set_pri(s->key,
+		    (nextsubst[curr_weight] | COLLATE_SUBST_PRIORITY),
+		    RESOLVED);
+		nextsubst[curr_weight] += 1;
+
+		for (i = 0; i < curr_subst; i++) {
+			s->ref[i] = srch.ref[i];
+		}
+
+		avl_insert(&substs_ref[curr_weight], s, where);
+
+		if (avl_find(&substs[curr_weight], s, &where) != NULL) {
+			INTERR;
+			return;
+		}
+		avl_insert(&substs[curr_weight], s, where);
 	}
 	curr_subst = 0;
 
-	if (avl_find(&substs[curr_weight], s, &where) != NULL) {
-		INTERR;
-		return;
-	}
-	avl_insert(&substs[curr_weight], s, where);
 
 	/*
 	 * We are using the current (unique) priority as a search key
@@ -884,6 +992,65 @@ add_subst_symbol(char *ptr)
 }
 
 void
+add_weight(int32_t ref, int pass)
+{
+	weight_t srch;
+	weight_t *w;
+	avl_index_t where;
+
+	srch.pri = resolve_pri(ref);
+
+	/* No translation of ignores */
+	if (srch.pri == 0)
+		return;
+
+	/* Substitution priorities are not weights */
+	if (srch.pri & COLLATE_SUBST_PRIORITY)
+		return;
+
+	if (avl_find(&weights[pass], &srch, &where) != NULL)
+		return;
+
+	if ((w = calloc(sizeof (*w), 1)) == NULL) {
+		errf(_("out of memory"));
+		return;
+	}
+	w->pri = srch.pri;
+	avl_insert(&weights[pass], w, where);
+}
+
+void
+add_weights(int32_t *refs)
+{
+	int i;
+	for (i = 0; i < NUM_WT; i++) {
+		add_weight(refs[i], i);
+	}
+}
+
+int32_t
+get_weight(int32_t ref, int pass)
+{
+	weight_t	srch;
+	weight_t	*w;
+	int32_t		pri;
+
+	pri = resolve_pri(ref);
+	if (pri & COLLATE_SUBST_PRIORITY) {
+		return (pri);
+	}
+	if (pri <= 0) {
+		return (pri);
+	}
+	srch.pri = pri;
+	if ((w = avl_find(&weights[pass], &srch, NULL)) == NULL) {
+		INTERR;
+		return (-1);
+	}
+	return (w->opt);
+}
+
+void
 dump_collate(void)
 {
 	FILE			*f;
@@ -894,18 +1061,56 @@ dump_collate(void)
 	collchar_t		*cc;
 	subst_t			*sb;
 	char			vers[COLLATE_STR_LEN];
-	collate_char_pri_t	char_pri[UCHAR_MAX + 1];
-	collate_large_pri_t	*large;
+	collate_char_t		chars[UCHAR_MAX + 1];
+	collate_large_t		*large;
 	collate_subst_t		*subst[COLL_WEIGHTS_MAX];
-	collate_chain_pri_t	*chain;
+	collate_chain_t		*chain;
 
-	(void) memset(&char_pri, 0, sizeof (char_pri));
+	/*
+	 * We have to run throught a preliminary pass to identify all the
+	 * weights that we use for each sorting level.
+	 */
+	for (i = 0; i < NUM_WT; i++) {
+		add_weight(pri_ignore, i);
+	}
+	for (i = 0; i < NUM_WT; i++) {
+		for (sb = avl_first(&substs[i]); sb;
+		    sb = AVL_NEXT(&substs[i], sb)) {
+			for (j = 0; sb->ref[j]; j++) {
+				add_weight(sb->ref[j], i);
+			}
+		}
+	}
+	for (ce = avl_first(&elem_by_expand);
+	    ce != NULL;
+	    ce = AVL_NEXT(&elem_by_expand, ce)) {
+		add_weights(ce->ref);
+	}
+	for (cc = avl_first(&collchars); cc; cc = AVL_NEXT(&collchars, cc)) {
+		add_weights(cc->ref);
+	}
+
+	/*
+	 * Now we walk the entire set of weights, removing the gaps
+	 * in the weights.  This gives us optimum usage.  The walk
+	 * occurs in priority.
+	 */
+	for (i = 0; i < NUM_WT; i++) {
+		weight_t *w;
+		for (w = avl_first(&weights[i]); w;
+		    w = AVL_NEXT(&weights[i], w)) {
+			w->opt = nweight[i];
+			nweight[i] += 1;
+		}
+	}
+
+	(void) memset(&chars, 0, sizeof (chars));
 	(void) memset(vers, 0, COLLATE_STR_LEN);
-	(void) snprintf(vers, sizeof (vers), COLLATE_VERSION);
+	(void) strlcpy(vers, COLLATE_VERSION, sizeof (vers));
 
 	/*
 	 * We need to make sure we arrange for the UNDEFINED field
-	 * to show up.
+	 * to show up.  Also, set the total weight counts.
 	 */
 	for (i = 0; i < NUM_WT; i++) {
 		if (resolve_pri(pri_undefined[i]) == -1) {
@@ -913,8 +1118,10 @@ dump_collate(void)
 			/* they collate at the end of everything else */
 			collinfo.undef_pri[i] = COLLATE_MAX_PRIORITY;
 		}
+		collinfo.pri_count[i] = nweight[i];
 	}
 
+	collinfo.pri_count[NUM_WT] = max_wide();
 	collinfo.undef_pri[NUM_WT] = COLLATE_MAX_PRIORITY;
 	collinfo.directive[NUM_WT] = DIRECTIVE_UNDEFINED;
 
@@ -924,26 +1131,26 @@ dump_collate(void)
 	for (i = 0; i <= UCHAR_MAX; i++) {
 		if ((cc = get_collchar(i, 0)) != NULL) {
 			for (j = 0; j < NUM_WT; j++) {
-				char_pri[i].pri[j] = resolve_pri(cc->ref[j]);
+				chars[i].pri[j] = get_weight(cc->ref[j], j);
 			}
 		} else {
 			for (j = 0; j < NUM_WT; j++) {
-				char_pri[i].pri[j] =
-				    resolve_pri(pri_undefined[j]);
+				chars[i].pri[j] =
+				    get_weight(pri_undefined[j], j);
 			}
 			/*
 			 * Per POSIX, for undefined characters, we
 			 * also have to add a last item, which is the
 			 * character code.
 			 */
-			char_pri[i].pri[NUM_WT] = i;
+			chars[i].pri[NUM_WT] = i;
 		}
 	}
 
 	/*
 	 * Substitution tables
 	 */
-	for (i = 0; i < collinfo.directive_count; i++) {
+	for (i = 0; i < NUM_WT; i++) {
 		collate_subst_t *st = NULL;
 		n = collinfo.subst_count[i] = avl_numnodes(&substs[i]);
 		if ((st = calloc(sizeof (collate_subst_t) * n, 1)) == NULL) {
@@ -957,8 +1164,11 @@ dump_collate(void)
 				/* by definition these resolve! */
 				INTERR;
 			}
+			if (st[n].key != (n | COLLATE_SUBST_PRIORITY)) {
+				INTERR;
+			}
 			for (j = 0; sb->ref[j]; j++) {
-				st[n].pri[j] = resolve_pri(sb->ref[j]);
+				st[n].pri[j] = get_weight(sb->ref[j], i);
 			}
 			n++;
 		}
@@ -967,11 +1177,12 @@ dump_collate(void)
 		subst[i] = st;
 	}
 
+
 	/*
 	 * Chains, i.e. collating elements
 	 */
 	collinfo.chain_count = avl_numnodes(&elem_by_expand);
-	chain = calloc(sizeof (collate_chain_pri_t), collinfo.chain_count);
+	chain = calloc(sizeof (collate_chain_t), collinfo.chain_count);
 	if (chain == NULL) {
 		errf(_("out of memory"));
 		return;
@@ -981,7 +1192,7 @@ dump_collate(void)
 	    ce = AVL_NEXT(&elem_by_expand, ce), n++) {
 		(void) wsncpy(chain[n].str, ce->expand, COLLATE_STR_LEN);
 		for (i = 0; i < NUM_WT; i++) {
-			chain[n].pri[i] = resolve_pri(ce->ref[i]);
+			chain[n].pri[i] = get_weight(ce->ref[i], i);
 		}
 	}
 	if (n != collinfo.chain_count)
@@ -990,8 +1201,7 @@ dump_collate(void)
 	/*
 	 * Large (> UCHAR_MAX) character priorities
 	 */
-	large = calloc(sizeof (collate_large_pri_t) * avl_numnodes(&collchars),
-	    1);
+	large = calloc(sizeof (collate_large_t) * avl_numnodes(&collchars), 1);
 	if (large == NULL) {
 		errf(_("out of memory"));
 		return;
@@ -1004,7 +1214,7 @@ dump_collate(void)
 		if (cc->wc <= UCHAR_MAX)
 			continue;
 		for (j = 0; j < NUM_WT; j++) {
-			if ((pri = resolve_pri(cc->ref[j])) < 0) {
+			if ((pri = get_weight(cc->ref[j], j)) < 0) {
 				undef = 1;
 			}
 			if (undef && (pri >= 0)) {
@@ -1016,7 +1226,7 @@ dump_collate(void)
 		}
 		if (!undef) {
 			large[i].val = cc->wc;
-			collinfo.large_pri_count = i++;
+			collinfo.large_count = i++;
 		}
 	}
 
@@ -1028,7 +1238,7 @@ dump_collate(void)
 
 	if ((wr_category(vers, COLLATE_STR_LEN, f) < 0) ||
 	    (wr_category(&collinfo, sizeof (collinfo), f) < 0) ||
-	    (wr_category(&char_pri, sizeof (char_pri), f) < 0)) {
+	    (wr_category(&chars, sizeof (chars), f) < 0)) {
 		return;
 	}
 
@@ -1038,11 +1248,11 @@ dump_collate(void)
 			return;
 		}
 	}
-	sz = sizeof (collate_chain_pri_t) * collinfo.chain_count;
+	sz = sizeof (collate_chain_t) * collinfo.chain_count;
 	if (wr_category(chain, sz, f) < 0) {
 		return;
 	}
-	sz = sizeof (collate_large_pri_t) * collinfo.large_pri_count;
+	sz = sizeof (collate_large_t) * collinfo.large_count;
 	if (wr_category(large, sz, f) < 0) {
 		return;
 	}
