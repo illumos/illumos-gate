@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel TLI-like function to initialize a transport
  * endpoint using the protocol specified.
@@ -94,7 +92,7 @@ t_kopen(file_t *fp, dev_t rdev, int flags, TIUSER **tiptr, cred_t *cr)
 	error = 0;
 	retval = 0;
 	if (fp == NULL) {
-		if (rdev == 0 || rdev == NODEV) {
+		if (rdev == NODEV) {
 			KTLILOG(1, "t_kopen: null device\n", 0);
 			return (EINVAL);
 		}

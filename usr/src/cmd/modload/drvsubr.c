@@ -2316,8 +2316,15 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 			return (ERROR);
 	}
 
-	/* find first free major number */
-	for (i = 0; i < max_dev; i++) {
+	/*
+	 * Find the first free major number.
+	 *
+	 * Note that we begin searching from 1, as drivers have developer the
+	 * erroneous assumption that a dev_t of 0 is invalid, and since we no
+	 * longer include system devices in the base files, a major number of
+	 * 0 may now be given to arbitrary devices.
+	 */
+	for (i = 1; i < max_dev; i++) {
 		if (num_list[i] != 1) {
 			new_maj = i;
 			break;
