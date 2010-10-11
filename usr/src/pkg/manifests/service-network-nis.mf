@@ -77,3 +77,4 @@ legacy pkg=SUNWypu desc="NIS Server for Solaris 2.6 and up" \
     name="NIS Server for Solaris (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+depend fmri=pkg:/developer/build/make type=require

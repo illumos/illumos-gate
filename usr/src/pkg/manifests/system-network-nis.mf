@@ -88,3 +88,4 @@ legacy pkg=SUNWnisu desc="utilities for the Network Information System (NIS)" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libnisdb.so target=./libnisdb.so.2
+depend fmri=pkg:/developer/build/make type=require
