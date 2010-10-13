@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * sunpm.c builds sunpm.o	"power management framework"
@@ -5196,7 +5199,6 @@ static int
 pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 {
 	PMD_FUNC(pmf, "set_keeping")
-	pm_info_t *kept_info;
 	int j, up = 0, circ;
 	void prdeps(char *);
 
@@ -5215,8 +5217,15 @@ pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 		    "power managed\n", pmf, PM_DEVICE(keeper)))
 		return (0);
 	}
-	kept_info = PM_GET_PM_INFO(kept);
-	ASSERT(kept_info);
+	if (PM_GET_PM_INFO(kept) == NULL) {
+		cmn_err(CE_CONT, "!device %s@%s(%s#%d) keeps up device "
+		    "%s@%s(%s#%d), but the latter is not power managed",
+		    PM_DEVICE(keeper), PM_DEVICE(kept));
+		PMD((PMD_FAIL | PMD_KEEPS), ("%s: kept %s@%s(%s#%d) is not"
+		    "power managed\n", pmf, PM_DEVICE(kept)))
+		return (0);
+	}
+
 	PM_LOCK_POWER(keeper, &circ);
 	for (j = 0; j < PM_NUMCMPTS(keeper); j++) {
 		if (PM_CURPOWER(keeper, j)) {
