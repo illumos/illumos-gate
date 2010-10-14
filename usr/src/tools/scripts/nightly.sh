@@ -3053,7 +3053,8 @@ if [ "$i_CMD_LINE_FLAG" = "n" -a "$C_FLAG" = "y" ]; then
 
 	rm -f $SRC/check-${MACH}.out
 	cd $SRC
-	$MAKE -ek check 2>&1 | tee -a $SRC/check-${MACH}.out >> $LOGFILE
+	$MAKE -ek check ROOT="$checkroot" 2>&1 | tee -a $SRC/check-${MACH}.out \
+	    >> $LOGFILE
 	echo "\n==== cstyle/hdrchk errors ====\n" >> $mail_msg_file
 
 	grep ":" $SRC/check-${MACH}.out |

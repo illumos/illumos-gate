@@ -22,8 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+ROOTTERMINFO = $(ROOTSHLIB)/terminfo
 
 $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
 	$(LD) -r $(BREDUCE) $(ZNOVERSION) $(ZDEFS) -M$(MAPFILE) -o $@ $(OBJS) \
@@ -54,8 +54,10 @@ dmods:
 # Specialized object construction
 #
 kmdb_terminfo.c: 	../../../common/mdb/mdb_termio.c \
-			../../../common/kmdb/kmdb_terminfo_skel.c
-	$(TIGEN) -s ../../../common/kmdb/kmdb_terminfo_skel.c \
+			../../../common/kmdb/kmdb_terminfo_skel.c \
+			$(ROOTTERMINFO)
+	TERMINFO=$(ROOTTERMINFO) $(TIGEN) -s \
+	    ../../../common/kmdb/kmdb_terminfo_skel.c \
 	    -t ../../../common/mdb/mdb_termio.c \
 	    $(SUPPORTED_TERMS) > $@
 

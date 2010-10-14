@@ -852,6 +852,7 @@ _dc: $(DCSUBDIRS)
 #
 fs.d: fstyp
 ksh:	shcomp isaexec
+mdb:	terminfo
 print:	lp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
