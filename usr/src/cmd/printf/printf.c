@@ -106,7 +106,7 @@ main(int argc, char *argv[])
 	 * but that do accept operands, shall recognize "--" as a
 	 * first argument to be discarded.
 	 */
-	if (strcmp(argv[0], "--") == 0) {
+	if (argc && strcmp(argv[0], "--") == 0) {
 		argc--;
 		argv++;
 	}
