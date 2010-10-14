@@ -37,6 +37,7 @@
 ./usr/lib/localedef/src/iso_8859_1/extension.src
 ./usr/lib/localedef/src/iso_8859_1/localedef.src
 ./usr/bin/localedef
+./usr/bin/printf
 ./usr/bin/tr
 ./usr/bin/tail
 ./usr/xpg4/bin/tail

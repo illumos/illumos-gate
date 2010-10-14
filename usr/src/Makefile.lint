@@ -233,6 +233,7 @@ COMMON_SUBDIRS = \
 	cmd/pools \
 	cmd/power \
 	cmd/powertop \
+	cmd/printf \
 	cmd/latencytop \
 	cmd/ppgsz \
 	cmd/praudit \

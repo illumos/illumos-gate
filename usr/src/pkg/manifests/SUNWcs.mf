@@ -844,6 +844,7 @@ file path=usr/bin/pgrep mode=0555
 file path=usr/bin/pkg2du mode=0555
 file path=usr/bin/pktool mode=0555
 file path=usr/bin/pr mode=0555
+file path=usr/bin/printf mode=0555
 file path=usr/bin/priocntl mode=0555
 file path=usr/bin/profiles mode=0555
 file path=usr/bin/projects mode=0555

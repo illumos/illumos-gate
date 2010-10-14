@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 
 include ../Makefile.master
 
@@ -308,6 +309,7 @@ COMMON_SUBDIRS=		\
 	pr		\
 	prctl		\
 	print		\
+	printf		\
 	priocntl	\
 	profiles	\
 	projadd		\

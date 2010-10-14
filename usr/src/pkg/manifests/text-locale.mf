@@ -47,7 +47,6 @@ file path=usr/bin/locale mode=0555
 file path=usr/bin/localedef mode=0555
 file path=usr/bin/mkmsgs group=root mode=0555
 file path=usr/bin/msgfmt mode=0555
-file path=usr/bin/printf mode=0555
 file path=usr/bin/srchtxt mode=0555
 file path=usr/bin/xgettext mode=0555
 file path=usr/lib/gmsgfmt mode=0555
