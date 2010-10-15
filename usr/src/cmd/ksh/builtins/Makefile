@@ -24,7 +24,9 @@
 # Use is subject to license terms.
 #
 
-SHELL=/usr/bin/ksh93
+#
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
 
 PROG= alias
 ALIASPROG= \
@@ -59,10 +61,28 @@ ALIASPROG= \
 	wait \
 	wc
 
+XPG4ALIASPROG= \
+	bg \
+	cd \
+	command \
+	fc \
+	fg \
+	getopts \
+	hash \
+	jobs \
+	kill \
+	read \
+	test \
+	type \
+	ulimit \
+	umask \
+	unalias \
+	wait
+
 include ../../Makefile.cmd
 $(SPARC_BLD)include ../../Makefile.cmd.64
 
-ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
+ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%) $(XPG4ALIASPROG:%=$(ROOTXPG4BIN)/%)
 
 FILEMODE= 555
 
@@ -71,6 +91,9 @@ FILEMODE= 555
 all: $(PROG)
 
 $(ROOTBIN)/%: $(ROOTBIN)/alias
+	$(INS.link)
+
+$(ROOTXPG4BIN)/%: $(ROOTBIN)/alias
 	$(INS.link)
 
 .KEEP_STATE:
