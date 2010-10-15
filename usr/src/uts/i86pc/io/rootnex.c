@@ -2208,14 +2208,19 @@ fast:
 	 * Clean up and return an error.
 	 */
 
+#if defined(__amd64) && !defined(__xpv)
+
 	if (dma->dp_dvma_used) {
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
 		e = DDI_DMA_NOMAPPING;
 	} else {
+#endif
 		e = rootnex_bind_slowpath(hp, dmareq, dma, attr, &dma->dp_dma,
 		    kmflag);
+#if defined(__amd64) && !defined(__xpv)
 	}
+#endif
 	if ((e != DDI_DMA_MAPPED) && (e != DDI_DMA_PARTIAL_MAP)) {
 		if (dma->dp_need_to_free_cookie) {
 			kmem_free(dma->dp_cookies, dma->dp_cookie_size);
@@ -2328,9 +2333,11 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	rootnex_teardown_copybuf(dma);
 	rootnex_teardown_windows(dma);
 
+#if defined(__amd64) && !defined(__xpv)
 	if (IOMMU_USED(rdip))
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
+#endif
 
 	/*
 	 * If we had to allocate space to for the worse case sgl (it didn't
