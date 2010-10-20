@@ -834,13 +834,22 @@ rnd_alloc_magazines()
 	}
 }
 
+static void
+rnd_mechid(void *notused)
+{
+	_NOTE(ARGUNUSED(notused));
+	rngmech_type = crypto_mech2id(SUN_RANDOM);
+}
+
 void
 kcf_rnd_schedule_timeout(boolean_t do_mech2id)
 {
 	clock_t ut;	/* time in microseconds */
 
-	if (do_mech2id)
-		rngmech_type = crypto_mech2id(SUN_RANDOM);
+	if (do_mech2id) {
+		/* This should never fail due to TQ_SLEEP. */
+		(void) taskq_dispatch(system_taskq, rnd_mechid, NULL, TQ_SLEEP);
+	}
 
 	/*
 	 * The new timeout value is taken from the buffer of random bytes.
