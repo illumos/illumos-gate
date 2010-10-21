@@ -1,43 +1,18 @@
 /*
- * Powerdog Industries kindly requests feedback from anyone modifying
- * this function:
- *
- * Date: Thu, 05 Jun 1997 23:17:17 -0400
- * From: Kevin Ruddy <kevin.ruddy@powerdog.com>
- * To: James FitzGibbon <james@nexis.net>
- * Subject: Re: Use of your strptime(3) code (fwd)
- *
- * The reason for the "no mod" clause was so that modifications would
- * come back and we could integrate them and reissue so that a wider
- * audience could use it (thereby spreading the wealth).  This has
- * made it possible to get strptime to work on many operating systems.
- * I'm not sure why that's "plain unacceptable" to the FreeBSD team.
- *
- * Anyway, you can change it to "with or without modification" as
- * you see fit.  Enjoy.
- *
- * Kevin Ruddy
- * Powerdog Industries, Inc.
- */
-/*
  * Copyright 2010, Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgement:
- *      This product includes software developed by Powerdog Industries.
- * 4. The name of Powerdog Industries may not be used to endorse or
- *    promote products derived from this software without specific prior
- *    written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY POWERDOG INDUSTRIES ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -50,7 +25,12 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of Powerdog Industries.
  */
+
 #include "lint.h"
 #include <time.h>
 #include <ctype.h>
