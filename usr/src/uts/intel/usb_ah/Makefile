@@ -66,7 +66,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS += -dy -Nmisc/usba -Nhidparser -Ndrv/usb_ac
+LDFLAGS += -dy -Nmisc/usba -Nmisc/hidparser -Ndrv/usb_ac
 
 #
 # For now, disable these lint checks; maintainers should endeavor
