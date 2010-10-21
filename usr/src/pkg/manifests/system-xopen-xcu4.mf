@@ -63,7 +63,6 @@ file path=usr/xpg4/bin/nice mode=0555
 file path=usr/xpg4/bin/nl mode=0555
 file path=usr/xpg4/bin/nm mode=0555
 file path=usr/xpg4/bin/nohup mode=0555
-file path=usr/xpg4/bin/od mode=0555
 file path=usr/xpg4/bin/pr mode=0555
 file path=usr/xpg4/bin/rm mode=0555
 file path=usr/xpg4/bin/sed mode=0555
@@ -87,5 +86,6 @@ license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
 link path=usr/xpg4/bin/ipcs target=../../bin/ipcs
+link path=usr/xpg4/bin/od target=../../bin/od
 link path=usr/xpg4/bin/tail target=../../bin/tail
 link path=usr/xpg4/bin/tr target=../../bin/tr

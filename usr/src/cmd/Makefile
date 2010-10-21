@@ -284,6 +284,7 @@ COMMON_SUBDIRS=		\
 	nscd		\
 	oamuser		\
 	oawk		\
+	od		\
 	pack		\
 	pagesize	\
 	passmgmt	\

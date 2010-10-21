@@ -219,6 +219,7 @@ COMMON_SUBDIRS = \
 	cmd/nl \
 	cmd/nohup \
 	cmd/nscd \
+	cmd/od \
 	cmd/pagesize \
 	cmd/passwd \
 	cmd/pathchk \
