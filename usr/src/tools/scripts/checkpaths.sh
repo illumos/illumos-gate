@@ -91,11 +91,6 @@ do
 		# from the repository-wide exception_lists/ directory.
 		#
 		e="$CODEMGR_WS/exception_lists/packaging"
-		if [ "$CLOSED_IS_PRESENT" = "yes" ]; then
-			e="$e $CODEMGR_WS/exception_lists/packaging.closed"
-		else
-			e="$e $CODEMGR_WS/exception_lists/packaging.open"
-		fi
 		for f in $e; do
 			if [ -f $f ]; then
 				nawk 'NF == 1 || /[ 	]\+'$arch'$/ { print; }' \

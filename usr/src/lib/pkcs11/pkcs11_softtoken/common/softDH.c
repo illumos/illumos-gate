@@ -167,7 +167,7 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	 * string PV of length k, the public value.
 	 */
 	if ((rv = soft_genDHkey_set_attribute(pubkey, CKA_VALUE, public_y,
-	    CRYPTO_BITS2BYTES(k.value_bits), B_TRUE)) != CKR_OK) {
+	    prime_len, B_TRUE)) != CKR_OK) {
 		goto ret;
 	}
 
@@ -237,7 +237,7 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 	k.rfunc = NULL;
 
 	/* keylen may be modified if it was 0 or conflicts with key type */
-	rv = dh_key_derive(&k, secretkey->key_type, key, &keylen);
+	rv = dh_key_derive(&k, secretkey->key_type, key, &keylen, 0);
 
 	if (rv != CKR_OK) {
 		goto ret;

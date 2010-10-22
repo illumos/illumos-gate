@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,11 +31,6 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "lint.h"
 #include "file64.h"
 #include <errno.h>
@@ -43,7 +39,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <netinet/in.h>
 
 #include "runetype.h"
 #include "runefile.h"
@@ -105,17 +100,6 @@ _Read_RuneMagi(FILE *fp)
 		return (NULL);
 	}
 
-	frl->variable_len = ntohl(frl->variable_len);
-	frl->runetype_ext_nranges = ntohl(frl->runetype_ext_nranges);
-	frl->maplower_ext_nranges = ntohl(frl->maplower_ext_nranges);
-	frl->mapupper_ext_nranges = ntohl(frl->mapupper_ext_nranges);
-
-	for (x = 0; x < _CACHED_RUNES; ++x) {
-		frl->runetype[x] = ntohl(frl->runetype[x]);
-		frl->maplower[x] = ntohl(frl->maplower[x]);
-		frl->mapupper[x] = ntohl(frl->mapupper[x]);
-	}
-
 	runetype_ext_ranges = (_FileRuneEntry *)variable;
 	variable = runetype_ext_ranges + frl->runetype_ext_nranges;
 	if (variable > lastp) {
@@ -144,9 +128,6 @@ _Read_RuneMagi(FILE *fp)
 	for (x = 0; x < frl->runetype_ext_nranges; ++x) {
 		uint32_t *types;
 
-		frr[x].min = ntohl(frr[x].min);
-		frr[x].max = ntohl(frr[x].max);
-		frr[x].map = ntohl(frr[x].map);
 		if (frr[x].map == 0) {
 			int len = frr[x].max - frr[x].min + 1;
 			types = variable;
@@ -157,24 +138,9 @@ _Read_RuneMagi(FILE *fp)
 				errno = EINVAL;
 				return (NULL);
 			}
-			while (len-- > 0)
-				types[len] = ntohl(types[len]);
 		}
 	}
 
-	frr = maplower_ext_ranges;
-	for (x = 0; x < frl->maplower_ext_nranges; ++x) {
-		frr[x].min = ntohl(frr[x].min);
-		frr[x].max = ntohl(frr[x].max);
-		frr[x].map = ntohl(frr[x].map);
-	}
-
-	frr = mapupper_ext_ranges;
-	for (x = 0; x < frl->mapupper_ext_nranges; ++x) {
-		frr[x].min = ntohl(frr[x].min);
-		frr[x].max = ntohl(frr[x].max);
-		frr[x].map = ntohl(frr[x].map);
-	}
 	if ((char *)variable + frl->variable_len > (char *)lastp) {
 		free(fdata);
 		errno = EINVAL;

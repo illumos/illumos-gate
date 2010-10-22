@@ -90,7 +90,7 @@ class FileInfo(object):
         self.hardkey = None
         self.hardpaths = set()
         self.editable = False
-        
+
     def name(self):
         """Return the IPS action name of a FileInfo object.
         """
@@ -279,7 +279,7 @@ class FileInfo(object):
             (ftype, self.path, target, mode, owner, group, 0, 1)
 
         return out
-            
+
 
 class ActionInfo(FileInfo):
     """Object to track information about manifest actions.
@@ -498,7 +498,7 @@ class ProtoTree(DirectoryTree):
     def addprotolist(self, protolist, exceptions):
         """Read in the specified file, assumed to be the
         output of protolist.
-        
+
         This has been tested minimally, and is potentially useful for
         comparing across the transition period, but should ultimately
         go away.
@@ -631,11 +631,20 @@ class ManifestTree(DirectoryTree):
                 continue
 
             #
-            # As with the manifest itself, if an action has specified 
+            # As with the manifest itself, if an action has specified
             # variant.arch, we look for the target architecture
             # therein.
             #
-            var = action.get_variants()
+            var = None
+
+            #
+            # The name of this method changed in pkg(5) build 150, we need to
+            # work with both sets.
+            #
+            if hasattr(action, 'get_variants'):
+                var = action.get_variants()
+            else:
+                var = action.get_variant_template()
             if "variant.arch" in var and arch not in var["variant.arch"]:
                 return
 
@@ -824,7 +833,7 @@ def main(argv):
 
     if len(modechecks) == 0:
         modechecks = None
-        
+
     if not arch:
         usage("must specify architecture")
 
@@ -842,7 +851,7 @@ def main(argv):
         if modechecks is not None:
             sys.exit(0)
         trees.append(manifesttree)
-        
+
     if len(protodirs) > 0:
         for pdir in protodirs:
             prototree.adddir(pdir, exceptions)

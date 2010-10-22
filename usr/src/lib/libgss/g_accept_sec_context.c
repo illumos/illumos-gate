@@ -223,6 +223,8 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 		 * First call the mechanism specific display_name()
 		 * then call gss_import_name() to create
 		 * the union name struct cast to src_name
+		 * NB: __gss_convert_name_to_union_name will
+		 * "consume" (free) the name.
 		 */
 		if (internal_name != NULL) {
 			temp_status = __gss_convert_name_to_union_name(
@@ -235,11 +237,6 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 					(void) gss_release_buffer(
 						&t_minstat,
 						output_token);
-				if (internal_name != GSS_C_NO_NAME)
-					mech->gss_release_name(
-						mech->context,
-						&t_minstat,
-						&internal_name);
 				return (temp_status);
 			}
 			if (src_name != NULL) {

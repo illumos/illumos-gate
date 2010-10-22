@@ -127,7 +127,11 @@ $(ROOTVARIANTDIR64)/$(VAR1_DYNLIB64)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
-all:	lib32 $(BUILD64) .WAIT lib64 .WAIT etc
+all:	lib32 $(BUILD64) .WAIT lib64 .WAIT etc THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: extract-copyright
+	$(RM) $@
+	./extract-copyright . > $@
 
 etc:	$($(MACH)_ETC)
 

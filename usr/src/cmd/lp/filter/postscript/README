@@ -228,33 +228,6 @@ postbgi
 
 		postbgi -P"/prism true" file >file.ps
 
-postdaisy
-	Translates Diablo 630 files into PostScript.
-
-	EXAMPLE:
-
-		postdaisy file >file.ps
-
-postdmd
-	Translates DMD bitmap files into PostScript. The original program (ie. abm)
-	was written by Guy Riddle. The Ninth Edition bitfile format is supported,
-	although unless you use the -u option they will be unpacked and completely
-	reformatted before being sent to the printer.
-
-	EXAMPLE:
-
-		postdmd file >file.ps
-
-postmd
-	A program that can be used to display large matrices as gray scale images
-	on PostScript printers. May help if you're looking for patterns in large
-	matrices. Input files are matrix elements, written as a series of floating
-	point numbers in row major order. Check the man page for more details.
-
-	EXAMPLE:
-
-		postmd file >file.ps
-
 postprint
 	Translates ASCII files into PostScript.
 
@@ -271,32 +244,6 @@ postreverse
 	EXAMPLE:
 
 	    postprint file | postreverse >file.ps
-
-posttek
-	Translates tektronix 4014 files into PostScript. Most of the code was
-	borrowed from the DMD tektronix emulator. The default line width is one
-	pixel, which gives the good results on 300dpi write-black engines, but one
-	pixel wide lines hardly show up on write-white engines like the ones used
-	in the PS-2400 or Dataproducts 2665. The -w option can be used to set a
-	new line width. The argument is in points, where one point is about 1/72
-	of an inch. For a different default change the definition of linewidth
-	in postscript/posttek.ps.
-
-	EXAMPLE:
-
-		posttek -w.5 file >file.ps
-
-picpack
-	A simple picture packing pre-processor that works in combination with the
-	troff, dpost, and the picture inclusion macros. It's not a replacement
-	for the original picture inclusion mechanism (in dpost) but may help if
-	you have an application that needs everything together in a single file
-	before dpost runs. The original picture inclusion mechanism is still the
-	preferred approach!!
-
-	EXAMPLE:
-
-		picpack file | troff -mm -Tpost >file.t
 
 buildtables
 	A collection of programs and data files that can be used if you want to

@@ -3002,8 +3002,9 @@ usb_ac_set_format(usb_ac_state_t *uacp, usb_audio_eng_t *engine)
 	bzero(&format, sizeof (usb_audio_formats_t));
 
 	/* save format info */
-	format.fmt_sr		= (uint_t)engine->fmt.sr;
-	format.fmt_chns	= (uchar_t)engine->fmt.ch;
+	format.fmt_n_srs	= 1;
+	format.fmt_srs		= (uint_t *)&(engine->fmt.sr);
+	format.fmt_chns		= (uchar_t)engine->fmt.ch;
 	format.fmt_precision	= (uchar_t)engine->fmt.prec;
 	format.fmt_encoding	= (uchar_t)engine->fmt.enc;
 
@@ -4373,11 +4374,6 @@ usb_ac_print_reg_data(usb_ac_state_t *uacp,
 		    (void *)&reg->reg_formats[n]);
 	}
 
-	for (n = 0; n < USB_AS_N_CHANNELS; n++) {
-		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "reg_channels[%d]=%d", n, reg->reg_channels[n]);
-	}
-
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_print_reg_data: End");
 }
@@ -4534,40 +4530,52 @@ usb_ac_max_fmt(usb_as_registration_t *reg_data,
     usb_audio_format_t *fmtp)
 {
 
-	uint_t *srs, *chs;
-	uint_t sr, ch, prec, enc, val;
+	uint_t ch = 0, sr = 0, prec = 0, enc = 0;
 	int i;
 
 	usb_audio_formats_t *reg_formats = reg_data->reg_formats;
-	srs = reg_data->reg_srs;
-	chs = reg_data->reg_channels;
 
-	for (i = 0, sr = 0; srs[i]; i++) {
-		val = srs[i];
-		if (val > sr)
-			sr = val;
-	}
+	/* format priority: channels, sample rate, precision, encoding */
+	for (i = 0; i < reg_data->reg_n_formats; i++) {
+		uint_t val, fmt_sr;
+		int n, keep;
 
-	for (i = 0, ch = 0; chs[i]; i++) {
-		val = chs[i];
+		val = reg_formats[i].fmt_chns;
+		if (val < ch)
+			continue;
 		if (val > ch)
-			ch = val;
-	}
+			keep = 1;
 
-	for (i = 0, prec = 0, enc = 0; i < reg_data->reg_n_formats; i++) {
+		for (n = 0, fmt_sr = 0; n < reg_formats[i].fmt_n_srs; n++) {
+			if (fmt_sr < reg_formats[i].fmt_srs[n]) {
+				fmt_sr = reg_formats[i].fmt_srs[n];
+			}
+		}
+		if (!keep && fmt_sr < sr)
+			continue;
+		if (fmt_sr > sr)
+			keep = 1;
+
 		val = reg_formats[i].fmt_precision;
+		if (!keep && (val < prec))
+			continue;
 		if (val > prec)
-			prec = val;
+			keep = 1;
 
 		val = reg_formats[i].fmt_encoding;
-		if (val > enc)
-			enc = val;
+		if (!keep && (val < enc))
+			continue;
+
+		ch   = reg_formats[i].fmt_chns;
+		sr   = fmt_sr;
+		prec = reg_formats[i].fmt_precision;
+		enc  = reg_formats[i].fmt_encoding;
 	}
 
-	fmtp->sr = sr;
-	fmtp->ch =  ch;
+	fmtp->ch   = ch;
+	fmtp->sr   = sr;
 	fmtp->prec = prec;
-	fmtp->enc =  enc;
+	fmtp->enc  = enc;
 }
 
 
@@ -5453,19 +5461,6 @@ usb_engine_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 	engp->sampsz = engp->fmt.prec / 8;
 	engp->framesz = engp->sampsz * engp->fmt.ch;
 
-	if (engp->fmt.ch > 2) {
-		USB_DPRINTF_L2(PRINT_MASK_ATTA, statep->usb_ac_log_handle,
-		    "unsupported channel count: %u", engp->fmt.ch);
-		mutex_exit(&engp->lock);
-		goto OUT;
-	}
-	if (engp->fmt.prec > 16) {
-		USB_DPRINTF_L2(PRINT_MASK_ATTA, statep->usb_ac_log_handle,
-		    "unsupported precision: %u", engp->fmt.prec);
-		mutex_exit(&engp->lock);
-		goto OUT;
-	}
-
 	engp->frsmshift = engp->fmt.ch / 2;
 	engp->smszshift = engp->sampsz / 2;
 
@@ -5638,13 +5633,13 @@ usb_engine_format(void *arg)
 	}
 
 	switch (engp->fmt.prec) {
-		case 8:
+		case USB_AUDIO_PRECISION_8:
 			return (AUDIO_FORMAT_S8);
-		case 16:
+		case USB_AUDIO_PRECISION_16:
 			return (AUDIO_FORMAT_S16_LE);
-		case 24:
+		case USB_AUDIO_PRECISION_24:
 			return (AUDIO_FORMAT_S24_LE);
-		case 32:
+		case USB_AUDIO_PRECISION_32:
 			return (AUDIO_FORMAT_S32_LE);
 		default:
 			break;

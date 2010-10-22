@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -25,30 +26,20 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "lint.h"
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <assert.h>
 #include "collate.h"
 
-static char *__mbsdup(const wchar_t *);
+#define	WCS_XFRM_OFFSET	1
 
-/*
- * Placeholder wcsxfrm() implementation. See wcscoll.c for a description of
- * the logic used.
- */
 size_t
 wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
     const wchar_t *_RESTRICT_KYWD src, size_t len)
 {
-	int prim, sec, l;
 	size_t slen;
-	char *mbsrc, *s, *ss;
 
 	if (*src == L'\0') {
 		if (len != 0)
@@ -56,62 +47,27 @@ wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
 		return (0);
 	}
 
-	if (__collate_load_error || MB_CUR_MAX > 1) {
-		slen = wcslen(src);
-		if (len > 0) {
-			if (slen < len)
-				(void) wcscpy(dest, src);
-			else {
-				(void) wcsncpy(dest, src, len - 1);
-				dest[len - 1] = L'\0';
-			}
-		}
-		return (slen);
+	if ((_collate_load_error) ||
+	    ((slen = _collate_wxfrm(src, dest, len)) == (size_t)-1)) {
+		goto error;
 	}
 
-	mbsrc = __mbsdup(src);
-	slen = 0;
-	prim = sec = 0;
-	ss = s = __collate_substitute(mbsrc);
-	while (*s != '\0') {
-		while (*s != '\0' && prim == 0) {
-			__collate_lookup(s, &l, &prim, &sec);
-			s += l;
-		}
-		if (prim != 0) {
-			if (len > 1) {
-				*dest++ = (wchar_t)prim;
-				len--;
-			}
-			slen++;
-			prim = 0;
-		}
+	/* Add null termination at the correct location. */
+	if (len > slen) {
+		dest[slen] = 0;
+	} else if (len) {
+		dest[len-1] = 0;
 	}
-	free(ss);
-	free(mbsrc);
-	if (len != 0)
-		*dest = L'\0';
 
 	return (slen);
-}
 
-static char *
-__mbsdup(const wchar_t *ws)
-{
-	static const mbstate_t initial = { 0 };
-	mbstate_t st;
-	const wchar_t *wcp;
-	size_t len;
-	char *mbs;
-
-	wcp = ws;
-	st = initial;
-	if ((len = wcsrtombs(NULL, &wcp, 0, &st)) == (size_t)-1)
-		return (NULL);
-	if ((mbs = malloc(len + 1)) == NULL)
-		return (NULL);
-	st = initial;
-	(void) wcsrtombs(mbs, &ws, len + 1, &st);
-
-	return (mbs);
+error:
+	slen = wcslen(src);
+	if (slen < len)
+		(void) wcscpy(dest, src);
+	else {
+		(void) wcsncpy(dest, src, len - 1);
+		dest[len - 1] = L'\0';
+	}
+	return (slen);
 }

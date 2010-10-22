@@ -16,9 +16,7 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_realm.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_services.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_util.h
 usr/src/cmd/krb5/slave/kprop.h
-usr/src/cmd/mklocale/collate/common.h
-usr/src/cmd/mklocale/ctype/extern.h
-usr/src/cmd/mklocale/ctype/ldef.h
+usr/src/cmd/localedef/localedef.h
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
 usr/src/lib/gss_mechs/mech_krb5/et/error_table.h
 usr/src/lib/gss_mechs/mech_krb5/et/internal.h
@@ -120,6 +118,7 @@ usr/src/lib/krb5/ss/copyright.h
 usr/src/lib/krb5/ss/mit-sipb-copyright.h
 usr/src/lib/krb5/ss/ss_internal.h
 usr/src/lib/krb5/ss/ss.h
+usr/src/lib/libc/port/locale/utils.h
 usr/src/lib/librstp/common/base.h
 usr/src/lib/librstp/common/choose.h
 usr/src/lib/librstp/common/edge.h

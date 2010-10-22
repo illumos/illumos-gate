@@ -118,6 +118,7 @@ typedef struct usb_as_state {
 
 	uint_t			usb_as_request_count;
 	uint_t			usb_as_request_samples;
+	uint_t			usb_as_curr_sr;
 	usb_audio_formats_t	usb_as_curr_format;
 
 	uint_t			usb_as_pkt_count;

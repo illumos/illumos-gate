@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1996 - 2002 FreeBSD Project
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,10 +32,6 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
-
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -59,7 +56,7 @@
  * Category names for getenv()  Note that this was modified
  * for Solaris.  See <iso/locale_iso.h>.
  */
-#define NUM_CATS	7
+#define	NUM_CATS	7
 static char *categories[7] = {
 	"LC_CTYPE",
 	"LC_NUMERIC",
@@ -278,7 +275,7 @@ loadlocale(int category)
 		func = __wrap_setrunelocale;
 		break;
 	case LC_COLLATE:
-		func = __collate_load_tables;
+		func = _collate_load_tables;
 		break;
 	case LC_TIME:
 		func = __time_load_locale;

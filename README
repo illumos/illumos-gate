@@ -1,32 +1,33 @@
-Illumos Gate README - July 29, 2010.
+illumos gate README - Sept 12, 2010.
 
-This is the Illumos gate.  It contains the following subdirectories:
+This is the illumos gate.  This is the illumos source tree.  It contains
+the following subdirectories:
 
-        - usr/src -- this is a clone (with changes) of the Oracle ONNV gate.
-          We should avoid making too many disruptive changes here.  It
-          will be periodically synced with ONNV.
+	usr/src	- 		The actual source code
 
-        - usr/illumos -- this is the set of bits that we deliver, which are not
-          yet integrated into the onnv tree.  This may include various
-          testing bits, etc.  These bits (for whatever reason), are things
-          that we think are inappropriate for inclusion in the upstream and
-	  really are specific to illumos.
+	exception_lists	-	These are lists of exceptional cases
+				used to limit noise during builds.
+				Ideally this directory would consist of
+				only empty files.
 
 Integration Rules:
 
-        All changes must have been reviewed, and (for the interim only!)
-        approved by the gatekeeper (below).  A code review may be performed
-        by someone other than the gatekeeper, but the final integration should
-        still be approved by the gatekeeper.  (Think CRT advocate for now.)
-        The gatekeeper will want to see your webrev and hg outgoing -v.
+        All changes must have been reviewed, and approved by and advocate
+	(below).  A code review may be performed by someone other than the
+	advocate, but the final integration should still be approved by the
+	advocate. 
+
+        The advocate will want to see your webrev and hg outgoing -v.  The
+	advocate will also ask about your testing, and may ask to see your
+	build logs.
 
         All changes must adhere to typical ON style and quality rules.
         For example, pass full cstyle, applicable lint rules, etc.
 
-        All commits must include either a CDDL or BSD/MIT license, unless
-        approved otherwise by the gatekeeper.  CDDL licensed changes must
-        be backed by a Sun Contributor Agreement, so that the changes can
-        be contributed to the upstream OpenSolaris consolidation.
+        All commits must include either a CDDL license, unless
+        approved otherwise by the gatekeeper, or the modified code
+	already carries a different license.  Exceptions shall require
+	the approval of the gatekeeper.
 
         Hg commits should have comments of the following form:
 
@@ -34,6 +35,9 @@ Integration Rules:
         4567 If you have a second bug synopsis...
         Reviewed by: codereviewer@somewhere.net
         Approved by: gatekeeper@somewhere.else.com
+
+	Each commit must have at least one bug id that is listed in the
+	illumos-gate project at www.illumos.org.
 
 Branches:
 

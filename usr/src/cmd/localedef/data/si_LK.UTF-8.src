@@ -1,0 +1,1336 @@
+comment_char *
+escape_char /
+
+*************************************************************************************************
+* POSIX Locale                                                                                  *
+* Generated automatically from the Unicode Character Database and Common Locale Data Repository *
+* see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
+* Locale Name : si_LK   Codeset : UTF-8
+*************************************************************************************************
+* Copyright 1991-2010 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* http://www.unicode.org/copyright.html.                                                        *
+*                                                                                               *
+* Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
+* data files and any associated documentation (the "Data Files") or Unicode software and any    *
+* associated documentation (the "Software") to deal in the Data Files or Software without       *
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,    *
+* distribute, and/or sell copies of the Data Files or Software, and to permit persons to whom   *
+* the Data Files or Software are furnished to do so, provided that (a) the above copyright      *
+* notice(s) and this permission notice appear with all copies of the Data Files or Software,    *
+* (b) both the above copyright notice(s) and this permission notice appear in associated        *
+* documentation, and (c) there is clear notice in each modified Data File or in the Software as *
+* well as in the documentation associated with the Data File(s) or Software that the data or    *
+* software has been modified.                                                                   *
+*                                                                                               *
+* THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR    *
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A        *
+* PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT *
+* HOLDER OR HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR *
+* CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, *
+* WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN   *
+* CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR SOFTWARE.                         *
+*************************************************************************************************
+
+*************
+LC_CTYPE
+*************
+
+upper	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>
+
+lower	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>
+
+alpha	<SINHALA_SIGN_ANUSVARAYA>;/
+	<SINHALA_SIGN_VISARGAYA>;/
+	<SINHALA_LETTER_AYANNA>;/
+	<SINHALA_LETTER_AAYANNA>;/
+	<SINHALA_LETTER_AEYANNA>;/
+	<SINHALA_LETTER_AEEYANNA>;/
+	<SINHALA_LETTER_IYANNA>;/
+	<SINHALA_LETTER_IIYANNA>;/
+	<SINHALA_LETTER_UYANNA>;/
+	<SINHALA_LETTER_UUYANNA>;/
+	<SINHALA_LETTER_IRUYANNA>;/
+	<SINHALA_LETTER_IRUUYANNA>;/
+	<SINHALA_LETTER_ILUYANNA>;/
+	<SINHALA_LETTER_ILUUYANNA>;/
+	<SINHALA_LETTER_EYANNA>;/
+	<SINHALA_LETTER_EEYANNA>;/
+	<SINHALA_LETTER_AIYANNA>;/
+	<SINHALA_LETTER_OYANNA>;/
+	<SINHALA_LETTER_OOYANNA>;/
+	<SINHALA_LETTER_AUYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_KANTAJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_GAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_TAALUJA_SANYOOGA_NAAKSIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_JAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DDAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAYANNA>;/
+	<SINHALA_LETTER_AMBA_BAYANNA>;/
+	<SINHALA_LETTER_YAYANNA>;/
+	<SINHALA_LETTER_RAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_LAYANNA>;/
+	<SINHALA_LETTER_VAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_SAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_SAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_SAYANNA>;/
+	<SINHALA_LETTER_HAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_LAYANNA>;/
+	<SINHALA_LETTER_FAYANNA>;/
+	<SINHALA_VOWEL_SIGN_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_KOMBU_DEKA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAYANUKITTA>
+
+space	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<space>
+
+cntrl	<NULL>;/
+	<START_OF_HEADING>;/
+	<START_OF_TEXT>;/
+	<END_OF_TEXT>;/
+	<END_OF_TRANSMISSION>;/
+	<ENQUIRY>;/
+	<ACKNOWLEDGE>;/
+	<BELL>;/
+	<BACKSPACE>;/
+	<tab>;/
+	<newline>;/
+	<vertical-tab>;/
+	<form-feed>;/
+	<carriage-return>;/
+	<SHIFT_OUT>;/
+	<SHIFT_IN>;/
+	<DATA_LINK_ESCAPE>;/
+	<DEVICE_CONTROL_ONE>;/
+	<DEVICE_CONTROL_TWO>;/
+	<DEVICE_CONTROL_THREE>;/
+	<DEVICE_CONTROL_FOUR>;/
+	<NEGATIVE_ACKNOWLEDGE>;/
+	<SYNCHRONOUS_IDLE>;/
+	<END_OF_TRANSMISSION_BLOCK>;/
+	<CANCEL>;/
+	<END_OF_MEDIUM>;/
+	<SUBSTITUTE>;/
+	<ESCAPE>;/
+	<INFORMATION_SEPARATOR_FOUR>;/
+	<INFORMATION_SEPARATOR_THREE>;/
+	<INFORMATION_SEPARATOR_TWO>;/
+	<INFORMATION_SEPARATOR_ONE>;/
+	<DELETE>
+
+graph	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<SINHALA_SIGN_ANUSVARAYA>;/
+	<SINHALA_SIGN_VISARGAYA>;/
+	<SINHALA_LETTER_AYANNA>;/
+	<SINHALA_LETTER_AAYANNA>;/
+	<SINHALA_LETTER_AEYANNA>;/
+	<SINHALA_LETTER_AEEYANNA>;/
+	<SINHALA_LETTER_IYANNA>;/
+	<SINHALA_LETTER_IIYANNA>;/
+	<SINHALA_LETTER_UYANNA>;/
+	<SINHALA_LETTER_UUYANNA>;/
+	<SINHALA_LETTER_IRUYANNA>;/
+	<SINHALA_LETTER_IRUUYANNA>;/
+	<SINHALA_LETTER_ILUYANNA>;/
+	<SINHALA_LETTER_ILUUYANNA>;/
+	<SINHALA_LETTER_EYANNA>;/
+	<SINHALA_LETTER_EEYANNA>;/
+	<SINHALA_LETTER_AIYANNA>;/
+	<SINHALA_LETTER_OYANNA>;/
+	<SINHALA_LETTER_OOYANNA>;/
+	<SINHALA_LETTER_AUYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_KANTAJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_GAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_TAALUJA_SANYOOGA_NAAKSIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_JAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DDAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAYANNA>;/
+	<SINHALA_LETTER_AMBA_BAYANNA>;/
+	<SINHALA_LETTER_YAYANNA>;/
+	<SINHALA_LETTER_RAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_LAYANNA>;/
+	<SINHALA_LETTER_VAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_SAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_SAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_SAYANNA>;/
+	<SINHALA_LETTER_HAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_LAYANNA>;/
+	<SINHALA_LETTER_FAYANNA>;/
+	<SINHALA_SIGN_AL-LAKUNA>;/
+	<SINHALA_VOWEL_SIGN_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_KOMBU_DEKA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAYANUKITTA>;/
+	<SINHALA_PUNCTUATION_KUNDDALIYA>
+
+print	<space>;/
+	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<DOLLAR_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<PLUS_SIGN>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<LESS-THAN_SIGN>;/
+	<EQUALS_SIGN>;/
+	<GREATER-THAN_SIGN>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<G>;/
+	<H>;/
+	<I>;/
+	<J>;/
+	<K>;/
+	<L>;/
+	<M>;/
+	<N>;/
+	<O>;/
+	<P>;/
+	<Q>;/
+	<R>;/
+	<S>;/
+	<T>;/
+	<U>;/
+	<V>;/
+	<W>;/
+	<X>;/
+	<Y>;/
+	<Z>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<CIRCUMFLEX_ACCENT>;/
+	<LOW_LINE>;/
+	<GRAVE_ACCENT>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>;/
+	<g>;/
+	<h>;/
+	<i>;/
+	<j>;/
+	<k>;/
+	<l>;/
+	<m>;/
+	<n>;/
+	<o>;/
+	<p>;/
+	<q>;/
+	<r>;/
+	<s>;/
+	<t>;/
+	<u>;/
+	<v>;/
+	<w>;/
+	<x>;/
+	<y>;/
+	<z>;/
+	<LEFT_CURLY_BRACKET>;/
+	<VERTICAL_LINE>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<TILDE>;/
+	<SINHALA_SIGN_ANUSVARAYA>;/
+	<SINHALA_SIGN_VISARGAYA>;/
+	<SINHALA_LETTER_AYANNA>;/
+	<SINHALA_LETTER_AAYANNA>;/
+	<SINHALA_LETTER_AEYANNA>;/
+	<SINHALA_LETTER_AEEYANNA>;/
+	<SINHALA_LETTER_IYANNA>;/
+	<SINHALA_LETTER_IIYANNA>;/
+	<SINHALA_LETTER_UYANNA>;/
+	<SINHALA_LETTER_UUYANNA>;/
+	<SINHALA_LETTER_IRUYANNA>;/
+	<SINHALA_LETTER_IRUUYANNA>;/
+	<SINHALA_LETTER_ILUYANNA>;/
+	<SINHALA_LETTER_ILUUYANNA>;/
+	<SINHALA_LETTER_EYANNA>;/
+	<SINHALA_LETTER_EEYANNA>;/
+	<SINHALA_LETTER_AIYANNA>;/
+	<SINHALA_LETTER_OYANNA>;/
+	<SINHALA_LETTER_OOYANNA>;/
+	<SINHALA_LETTER_AUYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_KAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_GAYANNA>;/
+	<SINHALA_LETTER_KANTAJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_GAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_CAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_JAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_NAASIKYAYA>;/
+	<SINHALA_LETTER_TAALUJA_SANYOOGA_NAAKSIKYAYA>;/
+	<SINHALA_LETTER_SANYAKA_JAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TTAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DDAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DDAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_TAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_DAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_NAYANNA>;/
+	<SINHALA_LETTER_SANYAKA_DAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_PAYANNA>;/
+	<SINHALA_LETTER_ALPAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAHAAPRAANA_BAYANNA>;/
+	<SINHALA_LETTER_MAYANNA>;/
+	<SINHALA_LETTER_AMBA_BAYANNA>;/
+	<SINHALA_LETTER_YAYANNA>;/
+	<SINHALA_LETTER_RAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_LAYANNA>;/
+	<SINHALA_LETTER_VAYANNA>;/
+	<SINHALA_LETTER_TAALUJA_SAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_SAYANNA>;/
+	<SINHALA_LETTER_DANTAJA_SAYANNA>;/
+	<SINHALA_LETTER_HAYANNA>;/
+	<SINHALA_LETTER_MUURDHAJA_LAYANNA>;/
+	<SINHALA_LETTER_FAYANNA>;/
+	<SINHALA_SIGN_AL-LAKUNA>;/
+	<SINHALA_VOWEL_SIGN_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_AEDA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_IS-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_KOMBUVA>;/
+	<SINHALA_VOWEL_SIGN_KOMBU_DEKA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_GAYANUKITTA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAETTA-PILLA>;/
+	<SINHALA_VOWEL_SIGN_DIGA_GAYANUKITTA>;/
+	<SINHALA_PUNCTUATION_KUNDDALIYA>
+
+punct	<EXCLAMATION_MARK>;/
+	<QUOTATION_MARK>;/
+	<NUMBER_SIGN>;/
+	<PERCENT_SIGN>;/
+	<AMPERSAND>;/
+	<APOSTROPHE>;/
+	<LEFT_PARENTHESIS>;/
+	<RIGHT_PARENTHESIS>;/
+	<ASTERISK>;/
+	<COMMA>;/
+	<HYPHEN-MINUS>;/
+	<FULL_STOP>;/
+	<SOLIDUS>;/
+	<COLON>;/
+	<SEMICOLON>;/
+	<QUESTION_MARK>;/
+	<COMMERCIAL_AT>;/
+	<LEFT_SQUARE_BRACKET>;/
+	<REVERSE_SOLIDUS>;/
+	<RIGHT_SQUARE_BRACKET>;/
+	<LOW_LINE>;/
+	<LEFT_CURLY_BRACKET>;/
+	<RIGHT_CURLY_BRACKET>;/
+	<SINHALA_PUNCTUATION_KUNDDALIYA>
+
+digit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>
+
+xdigit	<zero>;/
+	<one>;/
+	<two>;/
+	<three>;/
+	<four>;/
+	<five>;/
+	<six>;/
+	<seven>;/
+	<eight>;/
+	<nine>;/
+	<A>;/
+	<B>;/
+	<C>;/
+	<D>;/
+	<E>;/
+	<F>;/
+	<a>;/
+	<b>;/
+	<c>;/
+	<d>;/
+	<e>;/
+	<f>
+
+blank	<tab>;/
+	<space>
+
+toupper	(<a>,<A>);/
+	(<b>,<B>);/
+	(<c>,<C>);/
+	(<d>,<D>);/
+	(<e>,<E>);/
+	(<f>,<F>);/
+	(<g>,<G>);/
+	(<h>,<H>);/
+	(<i>,<I>);/
+	(<j>,<J>);/
+	(<k>,<K>);/
+	(<l>,<L>);/
+	(<m>,<M>);/
+	(<n>,<N>);/
+	(<o>,<O>);/
+	(<p>,<P>);/
+	(<q>,<Q>);/
+	(<r>,<R>);/
+	(<s>,<S>);/
+	(<t>,<T>);/
+	(<u>,<U>);/
+	(<v>,<V>);/
+	(<w>,<W>);/
+	(<x>,<X>);/
+	(<y>,<Y>);/
+	(<z>,<Z>)
+
+tolower	(<A>,<a>);/
+	(<B>,<b>);/
+	(<C>,<c>);/
+	(<D>,<d>);/
+	(<E>,<e>);/
+	(<F>,<f>);/
+	(<G>,<g>);/
+	(<H>,<h>);/
+	(<I>,<i>);/
+	(<J>,<j>);/
+	(<K>,<k>);/
+	(<L>,<l>);/
+	(<M>,<m>);/
+	(<N>,<n>);/
+	(<O>,<o>);/
+	(<P>,<p>);/
+	(<Q>,<q>);/
+	(<R>,<r>);/
+	(<S>,<s>);/
+	(<T>,<t>);/
+	(<U>,<u>);/
+	(<V>,<v>);/
+	(<W>,<w>);/
+	(<X>,<x>);/
+	(<Y>,<y>);/
+	(<Z>,<z>)
+
+END LC_CTYPE
+
+
+*************
+LC_COLLATE
+*************
+
+
+
+* Define collation weights as symbols
+
+collating-symbol <X01>
+collating-symbol <X05>
+collating-symbol <X8F>
+collating-symbol <XC0>
+collating-symbol <X0400>
+collating-symbol <X0500>
+collating-symbol <X0507>
+collating-symbol <X0509>
+collating-symbol <X050B>
+collating-symbol <X050D>
+collating-symbol <X050F>
+collating-symbol <X0600>
+collating-symbol <X0766>
+collating-symbol <X076C>
+collating-symbol <X0784>
+collating-symbol <X0790>
+collating-symbol <X07B0>
+collating-symbol <X07CA>
+collating-symbol <X07D0>
+collating-symbol <X07FC>
+collating-symbol <X080B>
+collating-symbol <X0825>
+collating-symbol <X08BF>
+collating-symbol <X08CD>
+collating-symbol <X08E1>
+collating-symbol <X08E3>
+collating-symbol <X08E5>
+collating-symbol <X08E7>
+collating-symbol <X08E9>
+collating-symbol <X08EB>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X09A1>
+collating-symbol <X09A5>
+collating-symbol <X09A7>
+collating-symbol <X09AD>
+collating-symbol <X09AF>
+collating-symbol <X0A33>
+collating-symbol <X0A34>
+collating-symbol <X0D67>
+collating-symbol <X0D6F>
+collating-symbol <X0D71>
+collating-symbol <X0D73>
+collating-symbol <X0D77>
+collating-symbol <X0D7D>
+collating-symbol <X293E>
+collating-symbol <X297C>
+collating-symbol <X297E>
+collating-symbol <X2980>
+collating-symbol <X2982>
+collating-symbol <X2984>
+collating-symbol <X2986>
+collating-symbol <X2988>
+collating-symbol <X298A>
+collating-symbol <X298C>
+collating-symbol <X298E>
+collating-symbol <X2C00>
+collating-symbol <X2E00>
+collating-symbol <X3000>
+collating-symbol <X3200>
+collating-symbol <X3400>
+collating-symbol <X3600>
+collating-symbol <X3800>
+collating-symbol <X3A00>
+collating-symbol <X3C00>
+collating-symbol <X3E00>
+collating-symbol <X4000>
+collating-symbol <X4200>
+collating-symbol <X4400>
+collating-symbol <X4600>
+collating-symbol <X4800>
+collating-symbol <X4A00>
+collating-symbol <X4C00>
+collating-symbol <X4E00>
+collating-symbol <X5000>
+collating-symbol <X5200>
+collating-symbol <X5400>
+collating-symbol <X5600>
+collating-symbol <X5800>
+collating-symbol <X5A00>
+collating-symbol <X5C00>
+collating-symbol <X5E00>
+collating-symbol <X7B22>
+collating-symbol <X7B24>
+collating-symbol <X7B26>
+collating-symbol <X7B28>
+collating-symbol <X7B2A>
+collating-symbol <X7B2C>
+collating-symbol <X7B2E>
+collating-symbol <X7B30>
+collating-symbol <X7B32>
+collating-symbol <X7B34>
+collating-symbol <X7B36>
+collating-symbol <X7B38>
+collating-symbol <X7B3A>
+collating-symbol <X7B3C>
+collating-symbol <X7B3E>
+collating-symbol <X7B40>
+collating-symbol <X7B42>
+collating-symbol <X7B43>
+collating-symbol <X7B44>
+collating-symbol <X7B46>
+collating-symbol <X7B48>
+collating-symbol <X7B4A>
+collating-symbol <X7B4C>
+collating-symbol <X7B4E>
+collating-symbol <X7B50>
+collating-symbol <X7B52>
+collating-symbol <X7B54>
+collating-symbol <X7B56>
+collating-symbol <X7B5A>
+collating-symbol <X7B5B>
+collating-symbol <X7B5C>
+collating-symbol <X7B5E>
+collating-symbol <X7B60>
+collating-symbol <X7B62>
+collating-symbol <X7B64>
+collating-symbol <X7B66>
+collating-symbol <X7B68>
+collating-symbol <X7B6A>
+collating-symbol <X7B6C>
+collating-symbol <X7B6E>
+collating-symbol <X7B70>
+collating-symbol <X7B72>
+collating-symbol <X7B74>
+collating-symbol <X7B76>
+collating-symbol <X7B78>
+collating-symbol <X7B7A>
+collating-symbol <X7B7C>
+collating-symbol <X7B7E>
+collating-symbol <X7B80>
+collating-symbol <X7B82>
+collating-symbol <X7B84>
+collating-symbol <X7B86>
+collating-symbol <X7B88>
+collating-symbol <X7B8A>
+collating-symbol <X7B8C>
+collating-symbol <X7B8E>
+collating-symbol <X7B90>
+collating-symbol <X7B92>
+collating-symbol <X7B94>
+collating-symbol <X7B98>
+collating-symbol <X7B9A>
+collating-symbol <X7B9C>
+collating-symbol <X7B9E>
+collating-symbol <X7BA0>
+collating-symbol <X7BA2>
+collating-symbol <X7BA4>
+collating-symbol <X7BA6>
+collating-symbol <X7BA7>
+collating-symbol <X7BA8>
+collating-symbol <X7BAA>
+collating-symbol <X7BAC>
+collating-symbol <X7BAE>
+collating-symbol <X7BB0>
+collating-symbol <X7BB2>
+collating-symbol <X7BB9>
+
+order_start forward;forward;forward;forward
+
+
+* collation weights in order
+
+<X01>
+<X05>
+<X8F>
+<XC0>
+<X0400>
+<X0500>
+<X0507>
+<X0509>
+<X050B>
+<X050D>
+<X050F>
+<X0600>
+<X0766>
+<X076C>
+<X0784>
+<X0790>
+<X07B0>
+<X07CA>
+<X07D0>
+<X07FC>
+<X080B>
+<X0825>
+<X08BF>
+<X08CD>
+<X08E1>
+<X08E3>
+<X08E5>
+<X08E7>
+<X08E9>
+<X08EB>
+<X0995>
+<X0997>
+<X09A1>
+<X09A5>
+<X09A7>
+<X09AD>
+<X09AF>
+<X0A33>
+<X0A34>
+<X0D67>
+<X0D6F>
+<X0D71>
+<X0D73>
+<X0D77>
+<X0D7D>
+<X293E>
+<X297C>
+<X297E>
+<X2980>
+<X2982>
+<X2984>
+<X2986>
+<X2988>
+<X298A>
+<X298C>
+<X298E>
+<X2C00>
+<X2E00>
+<X3000>
+<X3200>
+<X3400>
+<X3600>
+<X3800>
+<X3A00>
+<X3C00>
+<X3E00>
+<X4000>
+<X4200>
+<X4400>
+<X4600>
+<X4800>
+<X4A00>
+<X4C00>
+<X4E00>
+<X5000>
+<X5200>
+<X5400>
+<X5600>
+<X5800>
+<X5A00>
+<X5C00>
+<X5E00>
+<X7B22>
+<X7B24>
+<X7B26>
+<X7B28>
+<X7B2A>
+<X7B2C>
+<X7B2E>
+<X7B30>
+<X7B32>
+<X7B34>
+<X7B36>
+<X7B38>
+<X7B3A>
+<X7B3C>
+<X7B3E>
+<X7B40>
+<X7B42>
+<X7B43>
+<X7B44>
+<X7B46>
+<X7B48>
+<X7B4A>
+<X7B4C>
+<X7B4E>
+<X7B50>
+<X7B52>
+<X7B54>
+<X7B56>
+<X7B5A>
+<X7B5B>
+<X7B5C>
+<X7B5E>
+<X7B60>
+<X7B62>
+<X7B64>
+<X7B66>
+<X7B68>
+<X7B6A>
+<X7B6C>
+<X7B6E>
+<X7B70>
+<X7B72>
+<X7B74>
+<X7B76>
+<X7B78>
+<X7B7A>
+<X7B7C>
+<X7B7E>
+<X7B80>
+<X7B82>
+<X7B84>
+<X7B86>
+<X7B88>
+<X7B8A>
+<X7B8C>
+<X7B8E>
+<X7B90>
+<X7B92>
+<X7B94>
+<X7B98>
+<X7B9A>
+<X7B9C>
+<X7B9E>
+<X7BA0>
+<X7BA2>
+<X7BA4>
+<X7BA6>
+<X7BA7>
+<X7BA8>
+<X7BAA>
+<X7BAC>
+<X7BAE>
+<X7BB0>
+<X7BB2>
+<X7BB9>
+
+* assignment of characters to weights
+
+<NULL>                                           IGNORE;IGNORE;IGNORE;<NULL>
+<START_OF_HEADING>                               IGNORE;IGNORE;IGNORE;<START_OF_HEADING>
+<START_OF_TEXT>                                  IGNORE;IGNORE;IGNORE;<START_OF_TEXT>
+<END_OF_TEXT>                                    IGNORE;IGNORE;IGNORE;<END_OF_TEXT>
+<END_OF_TRANSMISSION>                            IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
+<ENQUIRY>                                        IGNORE;IGNORE;IGNORE;<ENQUIRY>
+<ACKNOWLEDGE>                                    IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
+<BELL>                                           IGNORE;IGNORE;IGNORE;<BELL>
+<BACKSPACE>                                      IGNORE;IGNORE;IGNORE;<BACKSPACE>
+<SHIFT_OUT>                                      IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
+<SHIFT_IN>                                       IGNORE;IGNORE;IGNORE;<SHIFT_IN>
+<DATA_LINK_ESCAPE>                               IGNORE;IGNORE;IGNORE;<DATA_LINK_ESCAPE>
+<DEVICE_CONTROL_ONE>                             IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_ONE>
+<DEVICE_CONTROL_TWO>                             IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_TWO>
+<DEVICE_CONTROL_THREE>                           IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_THREE>
+<DEVICE_CONTROL_FOUR>                            IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_FOUR>
+<NEGATIVE_ACKNOWLEDGE>                           IGNORE;IGNORE;IGNORE;<NEGATIVE_ACKNOWLEDGE>
+<SYNCHRONOUS_IDLE>                               IGNORE;IGNORE;IGNORE;<SYNCHRONOUS_IDLE>
+<END_OF_TRANSMISSION_BLOCK>                      IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION_BLOCK>
+<CANCEL>                                         IGNORE;IGNORE;IGNORE;<CANCEL>
+<END_OF_MEDIUM>                                  IGNORE;IGNORE;IGNORE;<END_OF_MEDIUM>
+<SUBSTITUTE>                                     IGNORE;IGNORE;IGNORE;<SUBSTITUTE>
+<ESCAPE>                                         IGNORE;IGNORE;IGNORE;<ESCAPE>
+<INFORMATION_SEPARATOR_FOUR>                     IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_FOUR>
+<INFORMATION_SEPARATOR_THREE>                    IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_THREE>
+<INFORMATION_SEPARATOR_TWO>                      IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
+<INFORMATION_SEPARATOR_ONE>                      IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
+<DELETE>                                         IGNORE;IGNORE;IGNORE;<DELETE>
+<tab>                                            <X0507>;<X05>;<X05>;IGNORE
+<newline>                                        <X0509>;<X05>;<X05>;IGNORE
+<vertical-tab>                                   <X050B>;<X05>;<X05>;IGNORE
+<form-feed>                                      <X050D>;<X05>;<X05>;IGNORE
+<carriage-return>                                <X050F>;<X05>;<X05>;IGNORE
+<space>                                          <X0600>;<X05>;<X05>;IGNORE
+<GRAVE_ACCENT>                                   <X0766>;<X05>;<X05>;IGNORE
+<CIRCUMFLEX_ACCENT>                              <X076C>;<X05>;<X05>;IGNORE
+<LOW_LINE>                                       <X0784>;<X05>;<X05>;IGNORE
+<HYPHEN-MINUS>                                   <X0790>;<X05>;<X05>;IGNORE
+<COMMA>                                          <X07B0>;<X05>;<X05>;IGNORE
+<SEMICOLON>                                      <X07CA>;<X05>;<X05>;IGNORE
+<COLON>                                          <X07D0>;<X05>;<X05>;IGNORE
+<EXCLAMATION_MARK>                               <X07FC>;<X05>;<X05>;IGNORE
+<QUESTION_MARK>                                  <X080B>;<X05>;<X05>;IGNORE
+<FULL_STOP>                                      <X0825>;<X05>;<X05>;IGNORE
+<APOSTROPHE>                                     <X08BF>;<X05>;<X05>;IGNORE
+<QUOTATION_MARK>                                 <X08CD>;<X05>;<X05>;IGNORE
+<LEFT_PARENTHESIS>                               <X08E1>;<X05>;<X05>;IGNORE
+<RIGHT_PARENTHESIS>                              <X08E3>;<X05>;<X05>;IGNORE
+<LEFT_SQUARE_BRACKET>                            <X08E5>;<X05>;<X05>;IGNORE
+<RIGHT_SQUARE_BRACKET>                           <X08E7>;<X05>;<X05>;IGNORE
+<LEFT_CURLY_BRACKET>                             <X08E9>;<X05>;<X05>;IGNORE
+<RIGHT_CURLY_BRACKET>                            <X08EB>;<X05>;<X05>;IGNORE
+<COMMERCIAL_AT>                                  <X0995>;<X05>;<X05>;IGNORE
+<ASTERISK>                                       <X0997>;<X05>;<X05>;IGNORE
+<SOLIDUS>                                        <X09A1>;<X05>;<X05>;IGNORE
+<REVERSE_SOLIDUS>                                <X09A5>;<X05>;<X05>;IGNORE
+<AMPERSAND>                                      <X09A7>;<X05>;<X05>;IGNORE
+<NUMBER_SIGN>                                    <X09AD>;<X05>;<X05>;IGNORE
+<PERCENT_SIGN>                                   <X09AF>;<X05>;<X05>;IGNORE
+<SINHALA_PUNCTUATION_KUNDDALIYA>                 <X0A33>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AYANNA>                          <X0A34>;<X05>;<X05>;IGNORE
+<PLUS_SIGN>                                      <X0D67>;<X05>;<X05>;IGNORE
+<LESS-THAN_SIGN>                                 <X0D6F>;<X05>;<X05>;IGNORE
+<EQUALS_SIGN>                                    <X0D71>;<X05>;<X05>;IGNORE
+<GREATER-THAN_SIGN>                              <X0D73>;<X05>;<X05>;IGNORE
+<VERTICAL_LINE>                                  <X0D77>;<X05>;<X05>;IGNORE
+<TILDE>                                          <X0D7D>;<X05>;<X05>;IGNORE
+<DOLLAR_SIGN>                                    <X293E>;<X05>;<X05>;IGNORE
+<zero>                                           <X297C>;<X05>;<X05>;IGNORE
+<one>                                            <X297E>;<X05>;<X05>;IGNORE
+<two>                                            <X2980>;<X05>;<X05>;IGNORE
+<three>                                          <X2982>;<X05>;<X05>;IGNORE
+<four>                                           <X2984>;<X05>;<X05>;IGNORE
+<five>                                           <X2986>;<X05>;<X05>;IGNORE
+<six>                                            <X2988>;<X05>;<X05>;IGNORE
+<seven>                                          <X298A>;<X05>;<X05>;IGNORE
+<eight>                                          <X298C>;<X05>;<X05>;IGNORE
+<nine>                                           <X298E>;<X05>;<X05>;IGNORE
+<a>                                              <X2C00>;<X05>;<X05>;IGNORE
+<A>                                              <X2C00>;<X05>;<X8F>;IGNORE
+<b>                                              <X2E00>;<X05>;<X05>;IGNORE
+<B>                                              <X2E00>;<X05>;<X8F>;IGNORE
+<c>                                              <X3000>;<X05>;<X05>;IGNORE
+<C>                                              <X3000>;<X05>;<X8F>;IGNORE
+<d>                                              <X3200>;<X05>;<X05>;IGNORE
+<D>                                              <X3200>;<X05>;<X8F>;IGNORE
+<e>                                              <X3400>;<X05>;<X05>;IGNORE
+<E>                                              <X3400>;<X05>;<X8F>;IGNORE
+<f>                                              <X3600>;<X05>;<X05>;IGNORE
+<F>                                              <X3600>;<X05>;<X8F>;IGNORE
+<g>                                              <X3800>;<X05>;<X05>;IGNORE
+<G>                                              <X3800>;<X05>;<X8F>;IGNORE
+<h>                                              <X3A00>;<X05>;<X05>;IGNORE
+<H>                                              <X3A00>;<X05>;<X8F>;IGNORE
+<i>                                              <X3C00>;<X05>;<X05>;IGNORE
+<I>                                              <X3C00>;<X05>;<X8F>;IGNORE
+<j>                                              <X3E00>;<X05>;<X05>;IGNORE
+<J>                                              <X3E00>;<X05>;<X8F>;IGNORE
+<k>                                              <X4000>;<X05>;<X05>;IGNORE
+<K>                                              <X4000>;<X05>;<X8F>;IGNORE
+<l>                                              <X4200>;<X05>;<X05>;IGNORE
+<L>                                              <X4200>;<X05>;<X8F>;IGNORE
+<m>                                              <X4400>;<X05>;<X05>;IGNORE
+<M>                                              <X4400>;<X05>;<X8F>;IGNORE
+<n>                                              <X4600>;<X05>;<X05>;IGNORE
+<N>                                              <X4600>;<X05>;<X8F>;IGNORE
+<o>                                              <X4800>;<X05>;<X05>;IGNORE
+<O>                                              <X4800>;<X05>;<X8F>;IGNORE
+<p>                                              <X4A00>;<X05>;<X05>;IGNORE
+<P>                                              <X4A00>;<X05>;<X8F>;IGNORE
+<q>                                              <X4C00>;<X05>;<X05>;IGNORE
+<Q>                                              <X4C00>;<X05>;<X8F>;IGNORE
+<r>                                              <X4E00>;<X05>;<X05>;IGNORE
+<R>                                              <X4E00>;<X05>;<X8F>;IGNORE
+<s>                                              <X5000>;<X05>;<X05>;IGNORE
+<S>                                              <X5000>;<X05>;<X8F>;IGNORE
+<t>                                              <X5200>;<X05>;<X05>;IGNORE
+<T>                                              <X5200>;<X05>;<X8F>;IGNORE
+<u>                                              <X5400>;<X05>;<X05>;IGNORE
+<U>                                              <X5400>;<X05>;<X8F>;IGNORE
+<v>                                              <X5600>;<X05>;<X05>;IGNORE
+<V>                                              <X5600>;<X05>;<X8F>;IGNORE
+<w>                                              <X5800>;<X05>;<X05>;IGNORE
+<W>                                              <X5800>;<X05>;<X8F>;IGNORE
+<x>                                              <X5A00>;<X05>;<X05>;IGNORE
+<X>                                              <X5A00>;<X05>;<X8F>;IGNORE
+<y>                                              <X5C00>;<X05>;<X05>;IGNORE
+<Y>                                              <X5C00>;<X05>;<X8F>;IGNORE
+<z>                                              <X5E00>;<X05>;<X05>;IGNORE
+<Z>                                              <X5E00>;<X05>;<X8F>;IGNORE
+<SINHALA_LETTER_AAYANNA>                         <X7B22>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AEYANNA>                         <X7B24>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AEEYANNA>                        <X7B26>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_IYANNA>                          <X7B28>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_IIYANNA>                         <X7B2A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_UYANNA>                          <X7B2C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_UUYANNA>                         <X7B2E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_IRUYANNA>                        <X7B30>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_IRUUYANNA>                       <X7B32>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ILUYANNA>                        <X7B34>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ILUUYANNA>                       <X7B36>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_EYANNA>                          <X7B38>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_EEYANNA>                         <X7B3A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AIYANNA>                         <X7B3C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_OYANNA>                          <X7B3E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_OOYANNA>                         <X7B40>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AUYANNA>                         <X7B42>;<X05>;<X05>;IGNORE
+<SINHALA_SIGN_ANUSVARAYA>                        "<X7B43><X0400>";<X05>;"<X05><XC0>";IGNORE
+<SINHALA_SIGN_VISARGAYA>                         "<X7B43><X0500>";<X05>;"<X05><XC0>";IGNORE
+<SINHALA_LETTER_ALPAPRAANA_KAYANNA>              <X7B44>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_KAYANNA>             <X7B46>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_GAYANNA>              <X7B48>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_GAYANNA>             <X7B4A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_KANTAJA_NAASIKYAYA>              <X7B4C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_SANYAKA_GAYANNA>                 <X7B4E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_CAYANNA>              <X7B50>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_CAYANNA>             <X7B52>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_JAYANNA>              <X7B54>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_JAYANNA>             <X7B56>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_TAALUJA_SANYOOGA_NAAKSIKYAYA>    <X7B5A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_TAALUJA_NAASIKYAYA>              <X7B5B>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_SANYAKA_JAYANNA>                 <X7B5C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_TTAYANNA>             <X7B5E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_TTAYANNA>            <X7B60>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_DDAYANNA>             <X7B62>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_DDAYANNA>            <X7B64>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MUURDHAJA_NAYANNA>               <X7B66>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_SANYAKA_DDAYANNA>                <X7B68>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_TAYANNA>              <X7B6A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_TAYANNA>             <X7B6C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_DAYANNA>              <X7B6E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_DAYANNA>             <X7B70>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_DANTAJA_NAYANNA>                 <X7B72>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_SANYAKA_DAYANNA>                 <X7B74>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_PAYANNA>              <X7B76>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_PAYANNA>             <X7B78>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_ALPAPRAANA_BAYANNA>              <X7B7A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAHAAPRAANA_BAYANNA>             <X7B7C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MAYANNA>                         <X7B7E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_AMBA_BAYANNA>                    <X7B80>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_YAYANNA>                         <X7B82>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_RAYANNA>                         <X7B84>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_DANTAJA_LAYANNA>                 <X7B86>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_VAYANNA>                         <X7B88>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_TAALUJA_SAYANNA>                 <X7B8A>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MUURDHAJA_SAYANNA>               <X7B8C>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_DANTAJA_SAYANNA>                 <X7B8E>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_HAYANNA>                         <X7B90>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_MUURDHAJA_LAYANNA>               <X7B92>;<X05>;<X05>;IGNORE
+<SINHALA_LETTER_FAYANNA>                         <X7B94>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_AELA-PILLA>                  <X7B98>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>            <X7B9A>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_AEDA-PILLA>             <X7B9C>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>              <X7B9E>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_IS-PILLA>               <X7BA0>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>             <X7BA2>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA>              <X7BA4>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_GAETTA-PILLA>                <X7BA6>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_GAETTA-PILLA>           "<X7BA7><X0400>";<X05>;"<X05><XC0>";IGNORE
+<SINHALA_VOWEL_SIGN_GAYANUKITTA>                 "<X7BA7><X0500>";<X05>;"<X05><XC0>";IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_GAYANUKITTA>            "<X7BA7><X0600>";<X05>;"<X05><XC0>";IGNORE
+<SINHALA_VOWEL_SIGN_KOMBUVA>                     <X7BA8>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_DIGA_KOMBUVA>                <X7BAA>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KOMBU_DEKA>                  <X7BAC>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA>      <X7BAE>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA> <X7BB0>;<X05>;<X05>;IGNORE
+<SINHALA_VOWEL_SIGN_KOMBUVA_HAA_GAYANUKITTA>     <X7BB2>;<X05>;<X05>;IGNORE
+<SINHALA_SIGN_AL-LAKUNA>                         <X7BB9>;<X05>;<X05>;IGNORE
+UNDEFINED                                        IGNORE;IGNORE;IGNORE;...
+
+order_end
+
+END LC_COLLATE
+*************
+LC_NUMERIC
+*************
+
+decimal_point     "<FULL_STOP>"
+thousands_sep     "<COMMA>"
+grouping          3;2
+
+END LC_NUMERIC
+
+
+*************
+LC_MONETARY
+*************
+
+int_curr_symbol       "<L><K><R><space>"
+currency_symbol       "<S><L><space><R><e>"
+mon_decimal_point     "<FULL_STOP>"
+mon_thousands_sep     "<COMMA>"
+mon_grouping          3;2
+positive_sign         ""
+negative_sign         "<HYPHEN-MINUS>"
+int_frac_digits       2
+frac_digits           2
+p_cs_precedes         1
+p_sep_by_space        0
+n_cs_precedes         1
+n_sep_by_space        0
+p_sign_posn           1
+n_sign_posn           1
+int_p_cs_precedes     1
+int_p_sep_by_space    0
+int_n_cs_precedes     1
+int_n_sep_by_space    0
+int_p_sign_posn       1
+int_n_sign_posn       1
+
+END LC_MONETARY
+
+
+*************
+LC_TIME
+*************
+
+abday   "<SINHALA_LETTER_IYANNA><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_LETTER_SANYAKA_DAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_SANYAKA_GAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_SIGN_AL-LAKUNA><ZERO_WIDTH_JOINER><SINHALA_LETTER_RAYANNA><SINHALA_LETTER_HAYANNA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA><SINHALA_LETTER_ALPAPRAANA_KAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_DANTAJA_NAYANNA>"
+
+day     "<SINHALA_LETTER_IYANNA><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_LETTER_SANYAKA_DAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_SANYAKA_GAYANNA><SINHALA_LETTER_HAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA><SINHALA_LETTER_VAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_SIGN_AL-LAKUNA><ZERO_WIDTH_JOINER><SINHALA_LETTER_RAYANNA><SINHALA_LETTER_HAYANNA><SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA><SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA><SINHALA_LETTER_ALPAPRAANA_KAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA>"
+
+abmon   "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_LETTER_DANTAJA_NAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_ALPAPRAANA_BAYANNA>";/
+        "<SINHALA_LETTER_MAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_SIGN_AL-LAKUNA><ZERO_WIDTH_JOINER><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_DIGA_KOMBUVA><SINHALA_LETTER_DANTAJA_LAYANNA>";/
+        "<SINHALA_LETTER_MAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_YAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA><SINHALA_LETTER_DANTAJA_NAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA><SINHALA_LETTER_DANTAJA_LAYANNA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_ALPAPRAANA_GAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_ALPAPRAANA_PAYANNA>";/
+        "<SINHALA_LETTER_OYANNA><SINHALA_LETTER_ALPAPRAANA_KAYANNA>";/
+        "<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA><SINHALA_LETTER_VAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>"
+
+mon     "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_LETTER_VAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_RAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_LETTER_VAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_RAYANNA>";/
+        "<SINHALA_LETTER_MAYANNA><SINHALA_VOWEL_SIGN_AELA-PILLA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_SIGN_AL-LAKUNA><ZERO_WIDTH_JOINER><SINHALA_LETTER_RAYANNA><SINHALA_VOWEL_SIGN_DIGA_KOMBUVA><SINHALA_LETTER_DANTAJA_LAYANNA><SINHALA_SIGN_AL-LAKUNA>";/
+        "<SINHALA_LETTER_MAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_YAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA><SINHALA_LETTER_DANTAJA_NAYANNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_JAYANNA><SINHALA_VOWEL_SIGN_DIGA_PAA-PILLA><SINHALA_LETTER_DANTAJA_LAYANNA><SINHALA_VOWEL_SIGN_KETTI_IS-PILLA>";/
+        "<SINHALA_LETTER_AYANNA><SINHALA_LETTER_ALPAPRAANA_GAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA><SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA><SINHALA_VOWEL_SIGN_KETTI_PAA-PILLA>";/
+        "<SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_MAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA>";/
+        "<SINHALA_LETTER_OYANNA><SINHALA_LETTER_ALPAPRAANA_KAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_TAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA_HAA_DIGA_AELA-PILLA><SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA>";/
+        "<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA_HAA_AELA-PILLA><SINHALA_LETTER_VAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_MAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA>";/
+        "<SINHALA_LETTER_ALPAPRAANA_DAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><SINHALA_LETTER_DANTAJA_SAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_MAYANNA><SINHALA_SIGN_AL-LAKUNA><SINHALA_LETTER_ALPAPRAANA_BAYANNA><SINHALA_LETTER_RAYANNA><SINHALA_SIGN_AL-LAKUNA>"
+
+d_fmt    "%Y<SOLIDUS>%m<SOLIDUS>%d"
+
+t_fmt    "%I:%M:%S %p"
+
+d_t_fmt  "%Y %B %e %I:%M:%S %p %Z"
+
+am_pm    "<SINHALA_LETTER_ALPAPRAANA_PAYANNA><SINHALA_VOWEL_SIGN_KOMBUVA><FULL_STOP><SINHALA_LETTER_VAYANNA><FULL_STOP>";"<SINHALA_LETTER_ALPAPRAANA_PAYANNA><FULL_STOP><SINHALA_LETTER_VAYANNA><FULL_STOP>"
+
+t_fmt_ampm  "%I:%M:%S %p"
+
+END LC_TIME
+*************
+LC_MESSAGES
+*************
+
+yesstr   "<SINHALA_LETTER_OYANNA><SINHALA_LETTER_VAYANNA><SINHALA_SIGN_AL-LAKUNA>:<SINHALA_LETTER_OYANNA>:yes:y:YES:Y"
+
+nostr    "<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_ALPAPRAANA_TAYANNA>:<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>:no:n:NO:N"
+
+yesexpr  "^((<SINHALA_LETTER_OYANNA><SINHALA_LETTER_VAYANNA><SINHALA_SIGN_AL-LAKUNA>)|([yY]([eE][sS])?))"
+
+noexpr   "^((<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA><SINHALA_LETTER_ALPAPRAANA_TAYANNA>)|(<SINHALA_LETTER_DANTAJA_NAYANNA><SINHALA_VOWEL_SIGN_KETTI_AEDA-PILLA>)|([nN]([oO])?))"
+
+
+END LC_MESSAGES

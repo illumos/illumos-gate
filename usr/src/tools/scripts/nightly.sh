@@ -57,7 +57,6 @@ unset CDPATH
 # Get the absolute path of the nightly script that the user invoked.  This
 # may be a relative path, and we need to do this before changing directory.
 nightly_path=`whence $0`
-nightly_ls="`ls -l $nightly_path`"
 
 #
 # Keep track of where we found nightly so we can invoke the matching
@@ -2500,20 +2499,6 @@ whence uname | tee -a $build_environ_file >> $LOGFILE
 uname -a 2>&1 | tee -a $build_environ_file >> $LOGFILE
 echo | tee -a $build_environ_file >> $LOGFILE
 
-# nightly
-echo "$0 $@" | tee -a $build_environ_file >> $LOGFILE
-if [[ $nightly_path = "/opt/onbld/bin/nightly" ]]; then
-	# We assume that if you have /opt/onbld/bin/nightly, then
-	# you have some form of the onbld package installed. If this
-	# is not true then your nightly is almost definitely out of
-	# date and should not be used.
-	/usr/bin/pkg info \*onbld\* | \
-	    egrep "Name:|Publisher:|Version:|Packaging:|FMRI:"
-else
-	echo "$nightly_ls"
-fi | tee -a $build_environ_file >> $LOGFILE
-echo | tee -a $build_environ_file >> $LOGFILE
-
 # make
 whence $MAKE | tee -a $build_environ_file >> $LOGFILE
 $MAKE -v | tee -a $build_environ_file >> $LOGFILE
@@ -2774,11 +2759,6 @@ if [ "$build_ok" = "y" ]; then
 		f2=
 		if [ -d "$SRC/pkg" ]; then
 			f2="$f2 exceptions/packaging"
-			if [ "$CLOSED_IS_PRESENT" = "no" ]; then
-				f2="$f2 exceptions/packaging.open"
-			else
-				f2="$f2 exceptions/packaging.closed"
-			fi
 		fi
 
 		for f in $f2; do
@@ -3073,7 +3053,8 @@ if [ "$i_CMD_LINE_FLAG" = "n" -a "$C_FLAG" = "y" ]; then
 
 	rm -f $SRC/check-${MACH}.out
 	cd $SRC
-	$MAKE -ek check 2>&1 | tee -a $SRC/check-${MACH}.out >> $LOGFILE
+	$MAKE -ek check ROOT="$checkroot" 2>&1 | tee -a $SRC/check-${MACH}.out \
+	    >> $LOGFILE
 	echo "\n==== cstyle/hdrchk errors ====\n" >> $mail_msg_file
 
 	grep ":" $SRC/check-${MACH}.out |

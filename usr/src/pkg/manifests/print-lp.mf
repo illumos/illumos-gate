@@ -76,16 +76,11 @@ dir path=var/spool/print group=lp
 file path=etc/lp/fd/catv.fd group=lp
 file path=etc/lp/fd/download.fd group=lp
 file path=etc/lp/fd/dpost.fd group=lp
-file path=etc/lp/fd/postdaisy.fd group=lp
-file path=etc/lp/fd/postdmd.fd group=lp
 file path=etc/lp/fd/postio.fd group=lp
 file path=etc/lp/fd/postior.fd group=lp
-file path=etc/lp/fd/postmd.fd group=lp
 file path=etc/lp/fd/postpages.fd group=lp
-file path=etc/lp/fd/postplot.fd group=lp
 file path=etc/lp/fd/postprint.fd group=lp
 file path=etc/lp/fd/postreverse.fd group=lp
-file path=etc/lp/fd/posttek.fd group=lp
 file path=etc/lp/fd/pr.fd group=lp
 file path=etc/printers.conf group=sys original_name=SUNWpc:etc/printers.conf \
     preserve=true

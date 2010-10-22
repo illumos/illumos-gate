@@ -73,7 +73,6 @@ extern "C" {
 #define	REM_NAM_TO_MAJ	"/etc/rem_name_to_major"
 
 #define	ADD_REM_LOCK	"/var/run/AdDrEm.lck"
-#define	TMPHOLD		"/etc/TmPhOlD"
 
 #if defined(__x86)
 #define	DRVDIR64	"amd64"

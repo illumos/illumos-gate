@@ -19,6 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -75,6 +79,7 @@ extern "C" {
 #define	ERR_NO_UPDATE	"Cannot update (%s)\n"
 #define	ERR_CANT_RM	"Cannot remove temporary file (%s); remove by hand.\n"
 #define	ERR_BAD_LINK	"(%s) exists as (%s); Please rename by hand.\n"
+#define	ERR_FILE_EXISTS	"Temporary file (%s) exists; Please remove by hand.\n"
 #define	ERR_NO_MEM		"Not enough memory\n"
 #define	ERR_DEL_ENTRY	"Cannot delete entry for driver (%s) from file (%s).\n"
 #define	ERR_NO_ENTRY	"No entry found for driver (%s) in file (%s).\n"

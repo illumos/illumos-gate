@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -25,77 +26,80 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "lint.h"
+#include "file64.h"
+#include <alloca.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <wchar.h>
 #include "collate.h"
 
+#define	ALLOCA_LIMIT	16
+
+/*
+ * In order to properly handle multibyte locales, its easiet to just
+ * convert to wide characters and then use wcscoll.  However if an
+ * error occurs, we gracefully fall back to simple strcmp.  Caller
+ * should check errno.
+ */
 int
-strcoll(const char *s, const char *s2)
+strcoll(const char *s1, const char *s2)
 {
-	int len, len2, prim, prim2, sec, sec2, ret, ret2;
-	const char *t, *t2;
-	char *tt, *tt2;
+	int ret;
+	wchar_t *t1 = NULL, *t2 = NULL;
+	wchar_t *w1 = NULL, *w2 = NULL;
+	size_t sz1, sz2;
 
-	if (__collate_load_error)
-		return (strcmp(s, s2));
+	if (_collate_load_error)
+		goto error;
 
-	len = len2 = 1;
-	ret = ret2 = 0;
-	if (__collate_substitute_nontrivial) {
-		t = tt = __collate_substitute(s);
-		t2 = tt2 = __collate_substitute(s2);
-		if ((tt == NULL) || (tt2 == NULL)) {
-			errno = ENOMEM;
-			if (tt)
-				free(tt);
-			if (tt2)
-				free(tt2);
-			/*
-			 * All we can do here is set errno, the application
-			 * is obliged to check it.
-			 */
-			return (strcmp(s, s2));
-		}
+	sz1 = strlen(s1) + 1;
+	sz2 = strlen(s2) + 1;
+
+	/*
+	 * Simple assumption: conversion to wide format is strictly
+	 * reducing, i.e. a single byte (or multibyte character)
+	 * cannot result in multiple wide characters.
+	 *
+	 * We gain a bit of performance by giving preference to alloca
+	 * for small string allocations.
+	 */
+	if (sz1 > ALLOCA_LIMIT) {
+		if ((t1 = malloc(sz1 * sizeof (wchar_t))) == NULL)
+			goto error;
+		w1 = t1;
 	} else {
-		tt = tt2 = NULL;
-		t = s;
-		t2 = s2;
+		if ((w1 = alloca(sz1 * sizeof (wchar_t))) == NULL)
+			goto error;
 	}
-	while (*t && *t2) {
-		prim = prim2 = 0;
-		while (*t && !prim) {
-			__collate_lookup(t, &len, &prim, &sec);
-			t += len;
-		}
-		while (*t2 && !prim2) {
-			__collate_lookup(t2, &len2, &prim2, &sec2);
-			t2 += len2;
-		}
-		if (!prim || !prim2)
-			break;
-		if (prim != prim2) {
-			ret = prim - prim2;
-			goto end;
-		}
-		if (!ret2)
-			ret2 = sec - sec2;
+	if (sz2 > ALLOCA_LIMIT) {
+		if ((t2 = malloc(sz2 * sizeof (wchar_t))) == NULL)
+			goto error;
+		w2 = t2;
+	} else {
+		if ((w2 = alloca(sz2 * sizeof (wchar_t))) == NULL)
+			goto error;
 	}
-	if (!*t && *t2)
-		ret = -(int)((uchar_t)*t2);
-	else if (*t && !*t2)
-		ret = (uchar_t)*t;
-	else if (!*t && !*t2)
-		ret = ret2;
-end:
-	free(tt);
-	free(tt2);
+
+	if ((mbstowcs(w1, s1, sz1)) == (size_t)-1)
+		goto error;
+
+	if ((mbstowcs(w2, s2, sz2)) == (size_t)-1)
+		goto error;
+
+	ret = wcscoll(w1, w2);
+	if (t1)
+		free(t1);
+	if (t2)
+		free(t2);
 
 	return (ret);
+
+error:
+	if (t1)
+		free(t1);
+	if (t2)
+		free(t2);
+	return (strcmp(s1, s2));
 }

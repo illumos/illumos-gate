@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,10 +31,6 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
-
 #include "lint.h"
 #include "file64.h"
 #include <errno.h>
@@ -48,8 +45,10 @@
 #include "mblocal.h"
 #include "setlocale.h"
 #include "_ctype.h"
+#include "../i18n/_locale.h"
 
 extern _RuneLocale	*_Read_RuneMagi(FILE *);
+extern unsigned char	__ctype_C[];
 
 static int		__setrunelocale(const char *);
 
@@ -89,6 +88,16 @@ __setrunelocale(const char *encoding)
 	 * The "C" and "POSIX" locale are always here.
 	 */
 	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0) {
+		int i;
+
+		(void) memcpy(__ctype, __ctype_C, SZ_TOTAL);
+
+		for (i = 0; i < _CACHED_RUNES; i++) {
+			__ctype_mask[i] = _DefaultRuneLocale.__runetype[i];
+			__trans_upper[i] = _DefaultRuneLocale.__mapupper[i];
+			__trans_lower[i] = _DefaultRuneLocale.__maplower[i];
+		}
+
 		(void) _none_init(&_DefaultRuneLocale);
 		return (0);
 	}

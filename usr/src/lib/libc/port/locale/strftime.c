@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989 The Regents of the University of California.
  * All rights reserved.
  *
@@ -13,11 +14,6 @@
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- */
-
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"

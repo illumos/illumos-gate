@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,11 +36,6 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "lint.h"
 #include <wctype.h>
 #include "runefile.h"
@@ -47,7 +43,7 @@
 #include "_ctype.h"
 
 /*
- * We removed: iswascii, iswrune, iswhexnumber, and iswnumber, as
+ * We removed: iswascii, iswhexnumber, and iswnumber, as
  * these are not present on Solaris.  Note that the standard requires
  * iswascii to be a macro, so it is defined in our headers.
  *

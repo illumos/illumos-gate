@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -29,11 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -760,18 +756,16 @@ p_b_term(struct parse *p, cset *cs)
 		if (start == finish)
 			CHadd(p, cs, start);
 		else {
-			if (__collate_load_error) {
+			if (_collate_load_error) {
 				(void) REQUIRE((uch)start <= (uch)finish,
 				    REG_ERANGE);
 				CHaddrange(p, cs, start, finish);
 			} else {
-				(void) REQUIRE(__collate_range_cmp(start,
+				(void) REQUIRE(_collate_range_cmp(start,
 				    finish) <= 0, REG_ERANGE);
 				for (i = 0; i <= UCHAR_MAX; i++) {
-					if (__collate_range_cmp(start, i) <=
-					    0 &&
-					    __collate_range_cmp(i, finish) <=
-					    0)
+					if (_collate_range_cmp(start, i) <= 0 &&
+					    _collate_range_cmp(i, finish) <= 0)
 						CHadd(p, cs, i);
 				}
 			}

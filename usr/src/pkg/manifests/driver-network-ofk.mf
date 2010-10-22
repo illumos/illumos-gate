@@ -34,7 +34,7 @@ set name=pkg.description \
     value="The Solaris Open Fabrics kernel components package provides support of the OFED defined kernel RDMA KPI, as well as providing kernel modules to facilitate OFED userland libraries."
 set name=pkg.summary value="Solaris Open Fabrics kernel components"
 set name=info.classification \
-    value=org.opensolaris.category.2010:System/Hardware
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys

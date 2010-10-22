@@ -36,7 +36,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sys/mman.h>
-#include <libscf.h>
 
 #include <sys/crypto/elfsign.h>
 #include <cryptoutil.h>

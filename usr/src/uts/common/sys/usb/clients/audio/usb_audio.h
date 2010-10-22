@@ -472,6 +472,8 @@ typedef struct usb_audio_type1_format_descr {
 
 #define	USB_AUDIO_PRECISION_8	8
 #define	USB_AUDIO_PRECISION_16	16
+#define	USB_AUDIO_PRECISION_24	24
+#define	USB_AUDIO_PRECISION_32	32
 
 #define	USB_AUDIO_PLAY		0x0001
 #define	USB_AUDIO_RECORD	0x0002

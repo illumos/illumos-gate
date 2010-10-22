@@ -37,11 +37,12 @@ extern "C" {
 /* Valid for the current alternate */
 typedef struct usb_audio_formats {
 	uchar_t		fmt_alt;	/* current alternate */
-	uchar_t		fmt_chns;	/* MONO or STEREO */
-	uchar_t		fmt_precision;	/* 8 or 16 */
+	uchar_t		fmt_chns;	/* 1-255 */
+	uchar_t		fmt_precision;	/* 8, 16, 24, or 32 */
 	uchar_t		fmt_encoding;	/* AUDIO_ENCODING_LINEAR, etc. */
 	uchar_t		fmt_termlink;	/* for feature unit */
-	uint_t		fmt_sr;		/* current sample rate */
+	uchar_t		fmt_n_srs;	/* number of sample rates */
+	uint_t		*fmt_srs;	/* same as alt_sample_rates */
 } usb_audio_formats_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("unshared", usb_audio_formats))
@@ -52,18 +53,14 @@ typedef struct usb_audio_play_req {
 	void		*up_handle;
 } usb_audio_play_req_t;
 
-#define	USB_AS_N_SRS		20
 #define	USB_AS_N_FORMATS	20
-#define	USB_AS_N_CHANNELS	3
 
 typedef struct usb_as_registration {
 	uchar_t			reg_valid;
 	uchar_t			reg_mode;	/* play or record */
 	uchar_t			reg_n_formats;
 	int			reg_ifno;
-	uint_t			reg_srs[USB_AS_N_SRS];
 	usb_audio_formats_t	reg_formats[USB_AS_N_FORMATS];
-	uint_t			reg_channels[USB_AS_N_CHANNELS];
 } usb_as_registration_t;
 
 /* MCTLs between usb_ac and usb_as */

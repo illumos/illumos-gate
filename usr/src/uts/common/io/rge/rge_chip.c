@@ -710,6 +710,7 @@ rge_chip_ident(rge_t *rgep)
 	/*
 	 * Workaround for 8101E_C
 	 */
+	chip->enable_mac_first = !chip->is_pcie;
 	if (chip->mac_ver == MAC_VER_8101E_C) {
 		chip->is_pcie = B_FALSE;
 	}
@@ -938,7 +939,7 @@ rge_chip_init(rge_t *rgep)
 	/*
 	 * Start transmit/receive before set tx/rx configuration register
 	 */
-	if (!chip->is_pcie)
+	if (chip->enable_mac_first)
 		rge_reg_set8(rgep, RT_COMMAND_REG,
 		    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
 

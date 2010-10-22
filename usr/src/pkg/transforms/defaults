@@ -87,7 +87,7 @@
 #
 # Default values for legacy actions
 #
-<transform legacy -> default vendor "Oracle Corporation">
+<transform legacy -> default vendor "Illumos">
 <transform legacy -> default hotline "Please contact your local service provider">
 <transform legacy -> default category system>
 <transform legacy -> default version "11.11,REV=2009.11.11">

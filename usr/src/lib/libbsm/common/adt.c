@@ -204,11 +204,12 @@ adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
 			free(pwd_buff);
 			return (-1);
 		}
-		free(pwd_buff);
 		if (au_user_mask(pwd.pw_name, mask)) {
+			free(pwd_buff);
 			errno = EFAULT; /* undetermined failure */
 			return (-1);
 		}
+		free(pwd_buff);
 	} else if (auditon(A_GETKMASK, (caddr_t)mask, sizeof (*mask)) == -1) {
 			return (-1);
 	}

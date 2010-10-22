@@ -184,6 +184,7 @@ COMMON_SUBDIRS = \
 	cmd/line \
 	cmd/link \
 	cmd/locator \
+	cmd/localedef \
 	cmd/lockstat \
 	cmd/lofiadm \
 	cmd/logadm \
@@ -218,6 +219,7 @@ COMMON_SUBDIRS = \
 	cmd/nl \
 	cmd/nohup \
 	cmd/nscd \
+	cmd/od \
 	cmd/pagesize \
 	cmd/passwd \
 	cmd/pathchk \
@@ -232,6 +234,7 @@ COMMON_SUBDIRS = \
 	cmd/pools \
 	cmd/power \
 	cmd/powertop \
+	cmd/printf \
 	cmd/latencytop \
 	cmd/ppgsz \
 	cmd/praudit \
@@ -291,6 +294,7 @@ COMMON_SUBDIRS = \
 	cmd/syseventd \
 	cmd/syslogd \
 	cmd/tabs \
+	cmd/tail \
 	cmd/th_tools \
 	cmd/tip \
 	cmd/touch \
@@ -476,7 +480,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
 	$(CLOSED)/cmd/pax \
 	$(CLOSED)/cmd/sed_xpg4 \
-	$(CLOSED)/cmd/tail \
 	$(CLOSED)/lib/libc_i18n
 
 i386_SUBDIRS= \
