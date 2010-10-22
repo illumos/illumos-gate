@@ -273,8 +273,6 @@ dir path=usr/share/lib/zoneinfo/US
 dir path=usr/share/lib/zoneinfo/src
 dir path=usr/share/lib/zoneinfo/tab
 dir path=usr/share/src group=sys
-dir path=usr/xpg4
-dir path=usr/xpg4/bin
 dir path=var group=sys
 dir path=var/adm group=sys mode=0775
 dir path=var/adm/exacct group=adm owner=adm
@@ -2533,25 +2531,6 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
     target=../../../../usr/share/lib/zoneinfo/Europe/Moscow
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
-hardlink path=usr/xpg4/bin/alias target=../../bin/alias
-hardlink path=usr/xpg4/bin/bg target=../../bin/alias
-hardlink path=usr/xpg4/bin/cd target=../../bin/alias
-hardlink path=usr/xpg4/bin/command target=../../bin/alias
-hardlink path=usr/xpg4/bin/fc target=../../bin/alias
-hardlink path=usr/xpg4/bin/fg target=../../bin/alias
-hardlink path=usr/xpg4/bin/getopts target=../../bin/alias
-hardlink path=usr/xpg4/bin/hash target=../../bin/alias
-hardlink path=usr/xpg4/bin/jobs target=../../bin/alias
-hardlink path=usr/xpg4/bin/kill target=../../bin/alias
-hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
-hardlink path=usr/xpg4/bin/read target=../../bin/alias
-hardlink path=usr/xpg4/bin/sh target=../../bin/ksh93
-hardlink path=usr/xpg4/bin/test target=../../bin/alias
-hardlink path=usr/xpg4/bin/type target=../../bin/alias
-hardlink path=usr/xpg4/bin/ulimit target=../../bin/alias
-hardlink path=usr/xpg4/bin/umask target=../../bin/alias
-hardlink path=usr/xpg4/bin/unalias target=../../bin/alias
-hardlink path=usr/xpg4/bin/wait target=../../bin/alias
 legacy pkg=SUNWcsr \
     desc="core software for a specific instruction-set architecture" \
     name="Core Solaris, (Root)"
