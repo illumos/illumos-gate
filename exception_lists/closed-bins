@@ -9,6 +9,7 @@
 ./lib/libc_i18n.a
 ./lib/amd64/libc_i18n.a
 ./lib/sparcv9/libc_i18n.a
+./usr/has/bin/patch
 ./usr/kernel/drv/amd64/llc2
 ./usr/kernel/drv/sparcv9/llc2
 ./usr/kernel/drv/llc2.conf
