@@ -1,0 +1,105 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
+
+. /lib/svc/share/smf_include.sh
+
+ZPOOL=`svcprop -p config/zpool $SMF_FMRI 2>/dev/null`
+ZPOOL=${ZPOOL:-zones}
+
+CONFDIR=/$ZPOOL/config
+SHRDIR=/$ZPOOL/zonefs
+
+#
+# If we're running off of a live-image, setup the root file system
+# to store the zone configuration data on the zpool.
+#
+setup_rootfs()
+{
+	if [ ! -d $CONFDIR ]; then
+		echo "Initializing config dir for zones." >/dev/console
+		mkdir -m755 $CONFDIR
+
+		if [ ! -L /etc/zones ]; then
+			cp -p /etc/zones/index $CONFDIR
+			cp -p /etc/zones/SUNWdefault.xml $CONFDIR
+		else
+			echo "global:installed:/" >$CONFDIR/index
+			chmod 644 $CONFDIR/index
+		fi
+	fi
+
+	if [ ! -L /etc/zones ]; then
+		cd /
+		rm -rf /etc/zones
+		ln -s $CONFDIR /etc/zones
+	fi
+}
+
+# Make sure working directory is / to prevent unmounting problems.
+cd /
+PATH=/usr/sbin:/usr/bin; export PATH
+
+case "$1" in
+'start')
+	zpool list -H $ZPOOL >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		# Pool is not imported yet, import now.
+		zpool import $ZPOOL
+		if [ $? -ne 0 ]; then
+			# Exit OK since this may be the first time the system
+			# is booting and the zpool may not be set up yet.
+			echo "The zpool \"$ZPOOL\" did not import." \
+			   >/dev/console
+			exit $SMF_EXIT_OK
+		fi
+	fi
+
+	# If running on a live image, make sure root fs is setup.
+	mount -p | nawk '{if ($3 == "/") exit (index($1, "ramdisk"))}'
+	[ $? -ne 0 ] && setup_rootfs
+
+	# XXX put vers in dir and regen if obs
+	if [ ! -d $SHRDIR ]; then
+		# Create a sparse zone shared directory.
+		echo "Initializing shared dir for zones." >/dev/console
+
+		zfs create $ZPOOL/zonefs
+		cd /
+
+		cpio -pdm </usr/lib/brand/joyent/zonefs.lst $SHRDIR
+	fi
+	;;
+
+'stop')
+	# We don't export the zpool since there is no shutdown dependency and
+	# the zones might not have finished shutting down yet.
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
+esac
+exit $SMF_EXIT_OK

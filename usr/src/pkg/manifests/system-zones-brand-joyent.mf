@@ -32,13 +32,22 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/zones group=sys
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/brand
 dir path=usr/lib/brand/joyent group=sys
 file path=etc/zones/Joyent.xml mode=0444
+file path=lib/svc/manifest/system/joyinit.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-joyinit mode=0555 variant.opensolaris.zone=global
 file path=usr/lib/brand/joyent/config.xml mode=0444
 file path=usr/lib/brand/joyent/jinstall mode=0755
 file path=usr/lib/brand/joyent/pinstall mode=0755
 file path=usr/lib/brand/joyent/platform.xml mode=0444
+file path=usr/lib/brand/joyent/zonefs.lst mode=0444
 license lic_CDDL license=lic_CDDL
