@@ -40,7 +40,7 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
+	<create_default_instance enabled='true' />
 
 	<single_instance />
 

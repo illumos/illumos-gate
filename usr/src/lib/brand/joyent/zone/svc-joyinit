@@ -66,7 +66,8 @@ case "$1" in
 	zpool list -H $ZPOOL >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		# Pool is not imported yet, import now.
-		zpool import $ZPOOL
+		# hostid changes on each net boot, so we have to force import.
+		zpool import -f $ZPOOL
 		if [ $? -ne 0 ]; then
 			# Exit OK since this may be the first time the system
 			# is booting and the zpool may not be set up yet.
