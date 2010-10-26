@@ -25,13 +25,17 @@
 #
 
 PROGS =		jinstall pinstall
-XMLDOCS=	config.xml platform.xml
+XMLDOCS=	config.xml platform.xml zonefs.lst
 USERFILES=
+MANIFEST=	joyinit.xml
+SVCMETHOD=	svc-joyinit
 TEMPLATES =	Joyent.xml
 CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.joyent
+
+ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
 
 .KEEP_STATE:
 
@@ -44,7 +48,8 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ETCUSER)
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
+	$(ROOTTEMPLATES) $(ETCUSER)
 
 lint:
 
