@@ -25,7 +25,7 @@
 #
 
 PROGS =		jinstall pinstall
-XMLDOCS=	config.xml platform.xml zonefs.lst
+XMLDOCS=	config.xml platform.xml
 USERFILES=
 MANIFEST=	joyinit.xml
 SVCMETHOD=	svc-joyinit

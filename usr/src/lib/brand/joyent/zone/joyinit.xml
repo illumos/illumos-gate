@@ -44,6 +44,15 @@
 
 	<single_instance />
 
+	<!--
+	Ideally we would define the system/zones svc to be dependent on this
+	svc so that we run before system/zones.  However, we cannot create
+	that dependency since the system/zones svc already exists in the
+	template repo and we'll get an error during early manifest import when
+	this svc is imported.  Thus, we'll just use the zone autoboot logic
+	directly in our start method and have a dependency on the zones svc so
+	that there is no race condition booting the zones.
+	-->
 	<dependency
 		name='zones'
 		type='service'
@@ -56,7 +65,7 @@
 		type='method'
 		name='start'
 		exec='/lib/svc/method/svc-joyinit %m'
-		timeout_seconds='120'>
+		timeout_seconds='180'>
 	</exec_method>
 
 	<exec_method

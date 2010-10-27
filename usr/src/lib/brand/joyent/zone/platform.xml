@@ -35,11 +35,11 @@
 	<global_mount special="/dev" directory="/dev" type="dev"
 	    opt="attrdir=%R/root/dev"/>
 
-	<global_mount special="/zones/zonefs/lib" directory="/lib"
+	<global_mount special="/lib" directory="/lib"
 	    opt="ro,nodevices" type="lofs" />
-	<global_mount special="/zones/zonefs/sbin" directory="/sbin"
+	<global_mount special="/sbin" directory="/sbin"
 	    opt="ro,nodevices" type="lofs" />
-	<global_mount special="/zones/zonefs/usr" directory="/usr"
+	<global_mount special="/usr" directory="/usr"
 	    opt="ro,nodevices" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->

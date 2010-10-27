@@ -29,11 +29,12 @@ ZPOOL=`svcprop -p config/zpool $SMF_FMRI 2>/dev/null`
 ZPOOL=${ZPOOL:-zones}
 
 CONFDIR=/$ZPOOL/config
-SHRDIR=/$ZPOOL/zonefs
+OPTDIR=/$ZPOOL/opt
 
 #
 # If we're running off of a live-image, setup the root file system
-# to store the zone configuration data on the zpool.
+# to store the zone configuration data on the zpool.  Also set up
+# a persistent /opt directory on the zpool.
 #
 setup_rootfs()
 {
@@ -55,6 +56,12 @@ setup_rootfs()
 		rm -rf /etc/zones
 		ln -s $CONFDIR /etc/zones
 	fi
+
+	if [ ! -d $OPTDIR ]; then
+		echo "Initializing opt dir." >/dev/console
+		mkdir -m755 $OPTDIR
+	fi
+	[ ! -d /opt ] && ln -s $OPTDIR /opt
 }
 
 # Make sure working directory is / to prevent unmounting problems.
@@ -67,11 +74,11 @@ case "$1" in
 	if [ $? -ne 0 ]; then
 		# Pool is not imported yet, import now.
 		# hostid changes on each net boot, so we have to force import.
-		zpool import -f $ZPOOL
+		zpool import -f $ZPOOL 2>&1
 		if [ $? -ne 0 ]; then
 			# Exit OK since this may be the first time the system
 			# is booting and the zpool may not be set up yet.
-			echo "The zpool \"$ZPOOL\" did not import." \
+			echo "The zpool \"$ZPOOL\" does not exist." \
 			   >/dev/console
 			exit $SMF_EXIT_OK
 		fi
@@ -81,16 +88,9 @@ case "$1" in
 	mount -p | nawk '{if ($3 == "/") exit (index($1, "ramdisk"))}'
 	[ $? -ne 0 ] && setup_rootfs
 
-	# XXX put vers in dir and regen if obs
-	if [ ! -d $SHRDIR ]; then
-		# Create a sparse zone shared directory.
-		echo "Initializing shared dir for zones." >/dev/console
-
-		zfs create $ZPOOL/zonefs
-		cd /
-
-		cpio -pdm </usr/lib/brand/joyent/zonefs.lst $SHRDIR
-	fi
+	# See the comment in the svc manifest on why we invoke the system/zones
+	# svc start method directly.
+	/lib/svc/method/svc-zones start
 	;;
 
 'stop')
