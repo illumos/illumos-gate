@@ -230,10 +230,6 @@ file path=lib/nss_files.so.1
 file path=lib/nss_nis.so.1
 file path=lib/nss_user.so.1
 file path=usr/lib/$(ARCH64)/0@0.so.1
-file path=usr/lib/$(ARCH64)/lib300.so.1
-file path=usr/lib/$(ARCH64)/lib300s.so.1
-file path=usr/lib/$(ARCH64)/lib4014.so.1
-file path=usr/lib/$(ARCH64)/lib450.so.1
 file path=usr/lib/$(ARCH64)/libadutils.so.1
 file path=usr/lib/$(ARCH64)/libast.so.1
 file path=usr/lib/$(ARCH64)/libbsdmalloc.so.1
@@ -266,7 +262,6 @@ file path=usr/lib/$(ARCH64)/libmtmalloc.so.1
 file path=usr/lib/$(ARCH64)/libnls.so.1
 file path=usr/lib/$(ARCH64)/libpanel.so.1
 file path=usr/lib/$(ARCH64)/libpkcs11.so.1
-file path=usr/lib/$(ARCH64)/libplot.so.1
 file path=usr/lib/$(ARCH64)/libproject.so.1
 file path=usr/lib/$(ARCH64)/libraidcfg.so.1
 file path=usr/lib/$(ARCH64)/libreparse.so.1
@@ -302,10 +297,6 @@ file path=usr/lib/cfgadm/shp.so.1
 file path=usr/lib/cfgadm/usb.so.1
 file path=usr/lib/extendedFILE.so.1
 file path=usr/lib/lib.b mode=0444
-file path=usr/lib/lib300.so.1
-file path=usr/lib/lib300s.so.1
-file path=usr/lib/lib4014.so.1
-file path=usr/lib/lib450.so.1
 file path=usr/lib/libadutils.so.1
 file path=usr/lib/libast.so.1
 file path=usr/lib/libbsdmalloc.so.1
@@ -343,7 +334,6 @@ file path=usr/lib/libmtmalloc.so.1
 file path=usr/lib/libnls.so.1
 file path=usr/lib/libpanel.so.1
 file path=usr/lib/libpkcs11.so.1
-file path=usr/lib/libplot.so.1
 file path=usr/lib/libproject.so.1
 file path=usr/lib/libraidcfg.so.1
 file path=usr/lib/libreparse.so.1
@@ -663,10 +653,6 @@ link path=usr/ccs/lib/libpanel.so target=../../lib/libpanel.so.1
 link path=usr/ccs/lib/libtermcap.so target=../../../lib/libcurses.so.1
 link path=usr/ccs/lib/libtermlib.so target=../../../lib/libcurses.so.1
 link path=usr/ccs/lib/liby.so target=../../lib/liby.so.1
-link path=usr/lib/$(ARCH64)/lib300.so target=./lib300.so.1
-link path=usr/lib/$(ARCH64)/lib300s.so target=./lib300s.so.1
-link path=usr/lib/$(ARCH64)/lib4014.so target=./lib4014.so.1
-link path=usr/lib/$(ARCH64)/lib450.so target=./lib450.so.1
 link path=usr/lib/$(ARCH64)/libadm.so \
     target=../../../lib/$(ARCH64)/libadm.so.1
 link path=usr/lib/$(ARCH64)/libadm.so.1 \
@@ -804,7 +790,6 @@ link path=usr/lib/$(ARCH64)/libpam.so.1 \
     target=../../../lib/$(ARCH64)/libpam.so.1
 link path=usr/lib/$(ARCH64)/libpanel.so target=libpanel.so.1
 link path=usr/lib/$(ARCH64)/libpkcs11.so target=libpkcs11.so.1
-link path=usr/lib/$(ARCH64)/libplot.so target=./libplot.so.1
 link path=usr/lib/$(ARCH64)/libposix4.so \
     target=../../../lib/$(ARCH64)/librt.so.1
 link path=usr/lib/$(ARCH64)/libposix4.so.1 \
@@ -945,10 +930,6 @@ $(i386_ONLY)link path=usr/lib/cfgadm/sata.so target=./sata.so.1
 link path=usr/lib/cfgadm/scsi.so target=./scsi.so.1
 link path=usr/lib/cfgadm/shp.so target=./shp.so.1
 link path=usr/lib/cfgadm/usb.so target=./usb.so.1
-link path=usr/lib/lib300.so target=./lib300.so.1
-link path=usr/lib/lib300s.so target=./lib300s.so.1
-link path=usr/lib/lib4014.so target=./lib4014.so.1
-link path=usr/lib/lib450.so target=./lib450.so.1
 link path=usr/lib/libadm.so target=../../lib/libadm.so.1
 link path=usr/lib/libadm.so.1 target=../../lib/libadm.so.1
 link path=usr/lib/libadutils.so target=./libadutils.so.1
@@ -1039,7 +1020,6 @@ link path=usr/lib/libpam.so target=../../lib/libpam.so.1
 link path=usr/lib/libpam.so.1 target=../../lib/libpam.so.1
 link path=usr/lib/libpanel.so target=./libpanel.so.1
 link path=usr/lib/libpkcs11.so target=./libpkcs11.so.1
-link path=usr/lib/libplot.so target=./libplot.so.1
 link path=usr/lib/libposix4.so target=../../lib/librt.so.1
 link path=usr/lib/libposix4.so.1 target=../../lib/librt.so.1
 link path=usr/lib/libproc.so target=../../lib/libproc.so.1

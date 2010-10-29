@@ -614,7 +614,6 @@ file path=usr/include/pkginfo.h
 file path=usr/include/pkglocs.h
 file path=usr/include/pkgstrct.h
 file path=usr/include/pkgtrans.h
-file path=usr/include/plot.h
 file path=usr/include/poll.h
 file path=usr/include/port.h
 file path=usr/include/priv.h
