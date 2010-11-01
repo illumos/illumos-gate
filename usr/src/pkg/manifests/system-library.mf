@@ -275,7 +275,6 @@ file path=usr/lib/$(ARCH64)/libsoftcrypto.so.1
 file path=usr/lib/$(ARCH64)/libsum.so.1
 $(sparc_ONLY)file path=usr/lib/$(ARCH64)/libv12n.so.1
 file path=usr/lib/$(ARCH64)/libvolmgt.so.1
-file path=usr/lib/$(ARCH64)/libvt0.so.1
 file path=usr/lib/$(ARCH64)/liby.so.1
 file path=usr/lib/$(ARCH64)/nss_ad.so.1
 file path=usr/lib/$(ARCH64)/nss_ldap.so.1
@@ -348,7 +347,6 @@ file path=usr/lib/libsum.so.1
 file path=usr/lib/libsys.so.1
 $(sparc_ONLY)file path=usr/lib/libv12n.so.1
 file path=usr/lib/libvolmgt.so.1
-file path=usr/lib/libvt0.so.1
 file path=usr/lib/libwrap.so.1.0
 file path=usr/lib/liby.so.1
 file path=usr/lib/libzoneinfo.so.1
@@ -897,7 +895,6 @@ link path=usr/lib/$(ARCH64)/libuutil.so.1 \
     target=../../../lib/$(ARCH64)/libuutil.so.1
 $(sparc_ONLY)link path=usr/lib/$(ARCH64)/libv12n.so target=./libv12n.so.1
 link path=usr/lib/$(ARCH64)/libvolmgt.so target=libvolmgt.so.1
-link path=usr/lib/$(ARCH64)/libvt0.so target=./libvt0.so.1
 link path=usr/lib/$(ARCH64)/libw.so target=../../../lib/$(ARCH64)/libw.so.1
 link path=usr/lib/$(ARCH64)/libw.so.1 target=../../../lib/$(ARCH64)/libw.so.1
 link path=usr/lib/$(ARCH64)/libxnet.so \
@@ -1079,7 +1076,6 @@ link path=usr/lib/libuuid.so.1 target=../../lib/libuuid.so.1
 link path=usr/lib/libuutil.so.1 target=../../lib/libuutil.so.1
 $(sparc_ONLY)link path=usr/lib/libv12n.so target=./libv12n.so.1
 link path=usr/lib/libvolmgt.so target=./libvolmgt.so.1
-link path=usr/lib/libvt0.so target=./libvt0.so.1
 link path=usr/lib/libw.so target=../../lib/libw.so.1
 link path=usr/lib/libw.so.1 target=../../lib/libw.so.1
 link path=usr/lib/libwrap.so target=libwrap.so.1.0
