@@ -44,6 +44,22 @@ if [ "$fstype" = zfs ] ; then
 	be=$special
 fi
 
+# Joyent additions
+
+# Need to run syseventd now because it talks to devfs to create /dev/dsk
+# so that we can try to import the zpool.
+/usr/lib/sysevent/syseventd
+
+# If the zpool doesn't exist, then there's nothing to mount.
+zpool import -f zones
+if [ $? -eq 0 ]; then
+        mount -F zfs zones/var /var
+        mount -F zfs zones/config /etc/zones
+        mount -F zfs zones/opt /opt
+fi
+
+# End Joyent additions
+
 for fs in /var /var/adm /tmp; do
 	readvfstab $fs < $vfstab
 	if [ -n "$mountp" ]; then

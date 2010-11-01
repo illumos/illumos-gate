@@ -95,14 +95,13 @@ egrep -s "netadm:" $ZROOT/etc/group
 (( $? != 0 )) && echo "netadm::65:" >> $ZROOT/etc/group
 
 # /etc/svc/profile was a symlink on some builds but now it needs to be
-# a directory with some contents which we can get from the global zone
-# if the template doesn't have it already.
+# a directory with some contents which we can get from the global zone,
+# replacing what the template had (which is dangling symlinks).
 [ -h $ZROOT/etc/svc/profile ] && rm -f $ZROOT/etc/svc/profile
-if [ ! -d $ZROOT/etc/svc/profile ]; then
-	mkdir $ZROOT/etc/svc/profile
-	cd /etc/svc/profile
-	find . -print | cpio -pdm $ZROOT/etc/svc/profile 2>/dev/null
-fi
+[ ! -d $ZROOT/etc/svc/profile ] && mkdir $ZROOT/etc/svc/profile
+rm -f $ZROOT/etc/svc/profile/*
+cd /etc/svc/profile
+find . -print | cpio -pdm $ZROOT/etc/svc/profile 2>/dev/null
 
 touch $ZROOT/var/log/courier.log
 
