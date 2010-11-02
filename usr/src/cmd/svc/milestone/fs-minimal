@@ -56,6 +56,7 @@ if [ $? -eq 0 ]; then
         mount -F zfs zones/var /var
         mount -F zfs zones/config /etc/zones
         mount -F zfs zones/opt /opt
+	dumpadm -y -d /dev/zvol/dsk/zones/dump
 fi
 
 # End Joyent additions
