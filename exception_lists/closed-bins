@@ -37,6 +37,7 @@
 ./usr/lib/localedef/src/iso_8859_1/charmap.src
 ./usr/lib/localedef/src/iso_8859_1/extension.src
 ./usr/lib/localedef/src/iso_8859_1/localedef.src
+./usr/bin/kbdcomp
 ./usr/bin/localedef
 ./usr/bin/od
 ./usr/bin/printf
