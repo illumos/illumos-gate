@@ -94,14 +94,19 @@ fi
 egrep -s "netadm:" $ZROOT/etc/group
 (( $? != 0 )) && echo "netadm::65:" >> $ZROOT/etc/group
 
-# /etc/svc/profile was a symlink on some builds but now it needs to be
-# a directory with some contents which we can get from the global zone,
-# replacing what the template had (which is dangling symlinks).
-[ -h $ZROOT/etc/svc/profile ] && rm -f $ZROOT/etc/svc/profile
-[ ! -d $ZROOT/etc/svc/profile ] && mkdir $ZROOT/etc/svc/profile
-rm -f $ZROOT/etc/svc/profile/*
-cd /etc/svc/profile
-find . -print | cpio -pdm $ZROOT/etc/svc/profile 2>/dev/null
+# /etc/svc/profile needs to be a directory with some contents which we can
+# get from the template.  The early manifest import svc
+# (lib/svc/method/manifest-import) copies some symlinks from the template's
+# var/svc/profile dir and we need to make sure those are pointing at the
+# right files and not left dangling.
+ZPROFILE=$ZROOT/etc/svc/profile
+if [ ! -d $ZPROFILE ]; then
+	mkdir $ZPROFILE
+	cp -p $ZROOT/var/svc/profile/generic_limited_net.xml $ZPROFILE
+	cp -p $ZROOT/var/svc/profile/inetd_generic.xml $ZPROFILE
+	cp -p $ZROOT/var/svc/profile/ns_dns.xml $ZPROFILE
+	cp -p $ZROOT/var/svc/profile/platform_none.xml $ZPROFILE
+fi
 
 touch $ZROOT/var/log/courier.log
 
