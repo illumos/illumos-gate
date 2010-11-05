@@ -407,7 +407,6 @@ COMMON_SUBDIRS = \
 	lib/libpctx \
 	lib/libpicl \
 	lib/libpicltree \
-	lib/libplot \
 	lib/libpool \
 	lib/libproc \
 	lib/libpthread \
