@@ -70,7 +70,6 @@ static char		*idsName = (char *)NULL;
 static char		*zoneTempDir = (char *)NULL;
 static ckreturnFunc_t	*ckreturnFunc = (ckreturnFunc_t *)NULL;
 static int		trapEntered = 0;
-static intfRelocFunc_t	*intfRelocFunc = (intfRelocFunc_t *)NULL;
 static void		trap(int signo);
 static zoneList_t	zoneList = (zoneList_t)NULL;
 
@@ -124,23 +123,6 @@ void
 quitSetIdsName(char *a_idsName)
 {
 	idsName = a_idsName;
-}
-
-/*
- * Name:	quitSetIntfReloc
- * Description:	set the "intf_reloc" interface to run when quit() is called
- * Arguments:	a_intfReloc - pointer to function to call when quit() is called
- * Returns:	void
- * NOTE:	When quit() is called, if an "intf_reloc" function is set, quit
- *		will call that function to perform whatever operations it needs
- *		to perform - typically this is needed to run "intf_reloc" when
- *		pre-SVR4 packages have been installed
- */
-
-void
-quitSetIntfReloc(intfRelocFunc_t *a_intfReloc)
-{
-	intfRelocFunc = a_intfReloc;
 }
 
 /*
@@ -348,12 +330,6 @@ quit(int a_retcode)
 		echo(MSG_1_PKG_NOT_PROCESSED);
 	} else if (npkgs) {
 		echo(MSG_N_PKGS_NOT_PROCESSED, npkgs);
-	}
-
-	/* call intf_reloc function if registered */
-
-	if (intfRelocFunc != (intfRelocFunc_t *)NULL) {
-		(intfRelocFunc)();
 	}
 
 	/* if a zone list exists, unlock all zones */

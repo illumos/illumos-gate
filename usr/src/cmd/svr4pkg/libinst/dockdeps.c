@@ -154,8 +154,7 @@ dockdeps(char *a_depfile, int a_removeFlag, boolean_t a_preinstallCheck)
 			inst = fpkginst(wabbrev, alist[i], vlist[i]);
 			if (inst && (pkginfo(&info, inst, NULL, NULL) == 0)) {
 				pkgexist++;
-				if ((info.status == PI_INSTALLED) ||
-				    (info.status == PI_PRESVR4))
+				if (info.status == PI_INSTALLED)
 					pkgokay++;
 			}
 		} while (++i < nlist);

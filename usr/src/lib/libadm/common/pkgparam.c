@@ -26,7 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1 */
 /*LINTLIBRARY*/
 
 /*   5-20-92   newroot support added  */
@@ -55,7 +54,6 @@ static char *pkg_inst_root = NULL;
 char *pkgdir = NULL;
 char *pkgfile = NULL;
 
-static char Adm_pkgold[PATH_MAX] = { 0 }; /* added for newroot */
 static char Adm_pkgloc[PATH_MAX] = { 0 }; /* added for newroot */
 static char Adm_pkgadm[PATH_MAX] = { 0 }; /* added for newroot */
 
@@ -393,16 +391,13 @@ set_PKGpaths(char *path)
 {
 	if (path && *path) {
 		(void) sprintf(Adm_pkgloc, "%s%s", path, PKGLOC);
-		(void) sprintf(Adm_pkgold, "%s%s", path, PKGOLD);
 		(void) sprintf(Adm_pkgadm, "%s%s", path, PKGADM);
 		set_install_root(path);
 	} else {
 		(void) sprintf(Adm_pkgloc, "%s", PKGLOC);
-		(void) sprintf(Adm_pkgold, "%s", PKGOLD);
 		(void) sprintf(Adm_pkgadm, "%s", PKGADM);
 	}
 	canonize_name(Adm_pkgloc);
-	canonize_name(Adm_pkgold);
 	canonize_name(Adm_pkgadm);
 	pkgdir = Adm_pkgloc;
 }
@@ -414,15 +409,6 @@ get_PKGLOC(void)
 		return (PKGLOC);
 	else
 		return (Adm_pkgloc);
-}
-
-char *
-get_PKGOLD(void)
-{
-	if (Adm_pkgold[0] == NULL)
-		return (PKGOLD);
-	else
-		return (Adm_pkgold);
 }
 
 char *

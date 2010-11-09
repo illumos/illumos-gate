@@ -29,7 +29,6 @@ PROG=		pkgremove
 OBJS=		check.o		\
 		delmap.o	\
 		main.o		\
-		predepend.o	\
 		quit.o		\
 		special.o	\
 		wsreg_pkgrm.o

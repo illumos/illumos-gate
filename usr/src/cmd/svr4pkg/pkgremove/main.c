@@ -71,9 +71,6 @@ extern int	rckpriv(void);
 extern int	rckdepend(void);
 extern int	rckrunlevel(void);
 
-/* predepend.c */
-extern void	predepend(char *oldpkg);
-
 /* delmap.c */
 extern int delmap(int flag, char *pkginst, PKGserver *server, VFP_T **tfp);
 
@@ -1098,8 +1095,6 @@ main(int argc, char *argv[])
 	}
 
 	if (!warnflag && !failflag) {
-		if (pt = getenv("PREDEPEND"))
-			predepend(pt);
 		(void) chdir("/");
 		if (rrmdir(pkgloc))
 			warnflag++;

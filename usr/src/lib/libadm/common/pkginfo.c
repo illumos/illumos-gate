@@ -28,7 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 /*LINTLIBRARY*/
 
 /*  5-20-92   added newroot functions  */
@@ -50,9 +49,7 @@
 #include "libadm.h"
 
 static void	initpkg(struct pkginfo *);
-static char	*svr4inst(char *);
 static int	rdconfig(struct pkginfo *, char *, char *);
-static int	svr4info(struct pkginfo *, char *, char *);
 static int	ckinfo(char *, char *, char *);
 static int	ckinst(char *, char *, char *, char *, char *);
 static int	verscmp(char *, char *);
@@ -199,9 +196,6 @@ rdconfig(struct pkginfo *info, char *pkginst, char *ckvers)
 	int	count;
 
 	if ((fp = pkginfopen(pkgdir, pkginst)) == NULL) {
-		if ((errno == ENOENT) && strcmp(pkgdir, get_PKGLOC()) == 0)
-			return (svr4info(info, pkginst, ckvers));
-
 		errno = EACCES;
 		return (-1);
 	}
@@ -271,74 +265,6 @@ rdconfig(struct pkginfo *info, char *pkginst, char *ckvers)
 }
 
 static int
-svr4info(struct pkginfo *info, char *pkginst, char *ckvers)
-{
-	static DIR *pdirfp;
-	struct stat64 status;
-	FILE *fp;
-	char *pt, path[128], line[128];
-	char	temp[PKGSIZ+1];
-
-	if (strcmp(pkginst, "all")) {
-		if (pdirfp) {
-			(void) closedir(pdirfp);
-			pdirfp = NULL;
-		}
-		/* determine pkginst - remove '.*' extension, if any */
-		(void) strncpy(temp, pkginst, PKGSIZ);
-		if (((pt = strchr(temp, '.')) != NULL) && strcmp(pt, ".*") == 0)
-			*pt = '\0';
-	}
-
-	/* look in /usr/options direcotry for 'name' file */
-	(void) sprintf(path, "%s/%s.name", get_PKGOLD(), temp);
-	if (lstat64(path, &status)) {
-		errno = (errno == ENOENT) ? ESRCH : EACCES;
-		return (-1);
-	}
-	if ((status.st_mode & S_IFMT) != S_IFREG) {
-		errno = ESRCH;
-		return (-1);
-	}
-	if ((fp = fopen(path, "r")) == NULL) {
-		errno = (errno == ENOENT) ? ESRCH : EACCES;
-		return (-1);
-	}
-
-	/* /usr/options/xxx.name exists */
-	(void) fgets(line, 128, fp);
-	(void) fclose(fp);
-	if (pt = strchr(line, '\n'))
-		*pt = '\0'; /* remove trailing newline */
-	if (pt = strchr(line, ':'))
-		*pt++ = '\0'; /* assumed version specification */
-
-	if (info) {
-		info->name = strdup(line);
-		info->pkginst = strdup(temp);
-		if (!info->name || !info->pkginst) {
-			errno = ENOMEM;
-			return (-1);
-		}
-		info->status = PI_PRESVR4;
-		info->version = NULL;
-	}
-
-	if (pt) {
-		/* eat leading space off of version spec */
-		while (isspace((unsigned char)*pt))
-			pt++;
-	}
-	if (ckvers && verscmp(ckvers, pt)) {
-		errno = ESRCH;
-		return (-1);
-	}
-	if (info && *pt)
-		info->version = strdup(pt);
-	return (0);
-}
-
-static int
 ckinst(char *pkginst, char *pkgarch, char *pkgvers, char *ckarch, char *ckvers)
 {
 	if (ckarch && archcmp(ckarch, pkgarch))
@@ -372,7 +298,6 @@ fpkginst(char *pkg, ...)
 			(void) closedir(pdirfp);
 			pdirfp = NULL;
 		}
-		(void) svr4inst(NULL); /* close any files used here */
 		return (NULL);
 	}
 
@@ -406,63 +331,8 @@ fpkginst(char *pkg, ...)
 		return (pkginst);
 	}
 
-	/*
-	 * If we are searching the directory which contains info about
-	 * installed packages, check the pre-svr4 directory for an instance
-	 * and be sure it matches any version specification provided to us
-	 */
-	if (strcmp(pkgdir, get_PKGLOC()) == 0 && (ckarch == NULL)) {
-		/* search for pre-SVR4 instance */
-		if (pt = svr4inst(pkg))
-			return (pt);
-	}
 	errno = ESRCH;
 	/* close any file we might have open */
-	(void) closedir(pdirfp);
-	pdirfp = NULL;
-	return (NULL);
-}
-/*ARGSUSED*/
-
-static char *
-svr4inst(char *pkg)
-{
-	static char pkginst[PKGSIZ];
-	static DIR *pdirfp;
-	struct dirent64 *dp;
-	struct stat64	status;	/* file status buffer */
-	char	*pt;
-	char	path[PATH_MAX];
-
-	if (pkg == NULL) {
-		if (pdirfp) {
-			(void) closedir(pdirfp);
-			pdirfp = NULL;
-		}
-		return (NULL);
-	}
-
-	if (!pdirfp && ((pdirfp = opendir(get_PKGOLD())) == NULL))
-		return (NULL);
-
-	while ((dp = readdir64(pdirfp)) != NULL) {
-		if (dp->d_name[0] == '.')
-			continue;
-		pt = strchr(dp->d_name, '.');
-		if (pt && strcmp(pt, ".name") == 0) {
-			/* the pkgnmchk function works on .name extensions */
-			if (pkgnmchk(dp->d_name, pkg, 1))
-				continue;
-			(void) sprintf(path, "%s/%s", get_PKGOLD(), dp->d_name);
-			if (lstat64(path, &status))
-				continue;
-			if ((status.st_mode & S_IFMT) != S_IFREG)
-				continue;
-			*pt = '\0';
-			(void) strcpy(pkginst, dp->d_name);
-			return (pkginst);
-		}
-	}
 	(void) closedir(pdirfp);
 	pdirfp = NULL;
 	return (NULL);

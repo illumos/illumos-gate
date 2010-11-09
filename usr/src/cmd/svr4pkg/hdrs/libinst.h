@@ -318,11 +318,6 @@ extern boolean_t	echoDebugGetFlag __P((void));
 extern boolean_t	echoSetFlag __P((boolean_t a_debugFlag));
 extern boolean_t	echoDebugSetFlag __P((boolean_t a_debugFlag));
 
-/* psvr4ck.c */
-extern void	psvr4cnflct __P((void));
-extern void	psvr4mail __P((char *list, char *msg, int retcode, char *pkg));
-extern void	psvr4pkg __P((char **ppkg));
-
 /* ptext.c */
 /*PRINTFLIKE2*/
 extern void	ptext __P((FILE *fp, char *fmt, ...));

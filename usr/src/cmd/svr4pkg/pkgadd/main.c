@@ -86,9 +86,6 @@
  * imported global variables/functions
  */
 
-/* presvr4.c */
-extern int	presvr4(char **ppkg, int a_nointeract);
-
 /* check.c */
 extern int	preinstall_verify(char **a_pkgList, zoneList_t a_zlst,
 			char *a_zoneTempDir);
@@ -1054,13 +1051,12 @@ main(int argc, char **argv)
 	/*
 	 * This function is in the libadm library; it sets:
 	 * -> get_PKGLOC() = <install_root>/var/sadm/pkg
-	 * -> get_PKGOLD() = <install_root>/usr/options
 	 * -> get_PKGADM() = <install_root>/var/sadm/install
 	 * -> pkgdir = <install_root>/var/sadm/pkg
 	 * -> pkg_install_root = <install_root>
 	 * This controls operations of libadm functions such as:
 	 * -> pkginfofind, pkginfopen, fpkgparam, pkgparam, get_PKGLOC,
-	 * -> get_PKGOLD, get_PKGADM, get_install_root
+	 * -> get_PKGADM, get_install_root
 	 */
 
 	set_PKGpaths(get_inst_root());
@@ -1374,18 +1370,6 @@ main(int argc, char **argv)
 
 			echoDebug(DBG_CANNOT_GET_PKGLIST);
 
-			/* check for existence of pre-SVR4 package */
-			(void) snprintf(path, sizeof (path),
-				"%s/install/INSTALL", pkgdev.dirname);
-			if (access(path, F_OK) == 0) {
-				pkginst = ((optind < argc) ?
-					argv[optind++] : NULL);
-				ckreturn(presvr4(&pkginst, nointeract));
-				if (repeat || (optind < argc)) {
-					continue;
-				}
-				quit(0);
-			}
 			progerr(ERR_NOPKGS, pkgdev.dirname);
 			quit(1);
 			/* NOTREACHED */

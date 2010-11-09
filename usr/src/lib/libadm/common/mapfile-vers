@@ -129,7 +129,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	get_install_root;
 	get_PKGADM;
 	get_PKGLOC;
-	get_PKGOLD;
 	getvol;
 	_getvol;
 	listdev;
