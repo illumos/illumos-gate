@@ -234,10 +234,14 @@ PATH=/usr/sbin:/usr/bin; export PATH
 
 case "$1" in
 'start')
-	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
-
+	#
+	# Generate the manifest, even if no zones, since zones could be
+	# provisioned later.
+	#
 	zfs list -H -o name $ZPOOL >/dev/null 2>&1 
 	[ $? -eq 0 ] && setup_manifests
+
+	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
 
 	#
 	# Boot the installed zones for which the "autoboot" zone property is
