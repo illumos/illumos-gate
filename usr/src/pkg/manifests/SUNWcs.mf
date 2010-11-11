@@ -874,7 +874,6 @@ file path=usr/bin/tail mode=0555
 file path=usr/bin/tic mode=0555
 file path=usr/bin/time mode=0555
 file path=usr/bin/tip mode=4511 owner=uucp
-file path=usr/bin/tplot mode=0555
 file path=usr/bin/tpmadm mode=0555
 file path=usr/bin/tput mode=0555
 file path=usr/bin/tr mode=0555
@@ -891,7 +890,6 @@ file path=usr/bin/write group=tty mode=2555
 file path=usr/bin/xargs mode=0555
 file path=usr/bin/xstr mode=0555
 file path=usr/has/bin/edit mode=0555
-file path=usr/has/bin/patch mode=0555
 file path=usr/has/bin/sh mode=0555
 file path=usr/kernel/drv/$(ARCH64)/dump group=sys
 file path=usr/kernel/drv/$(ARCH64)/fssnap group=sys
@@ -1282,13 +1280,8 @@ file path=usr/lib/sysevent/modules/sysevent_conf_mod.so
 file path=usr/lib/sysevent/modules/sysevent_reg_mod.so
 file path=usr/lib/sysevent/syseventconfd mode=0555
 file path=usr/lib/sysevent/syseventd mode=0555
-file path=usr/lib/t300 mode=0555
-file path=usr/lib/t300s mode=0555
-file path=usr/lib/t4014 mode=0555
-file path=usr/lib/t450 mode=0555
 file path=usr/lib/utmp_update mode=4555
 file path=usr/lib/utmpd mode=0555
-file path=usr/lib/vplot mode=0555
 file path=usr/lib/vtdaemon mode=0555
 file path=usr/lib/vtinfo mode=0555
 file path=usr/lib/vtxlock mode=0555

@@ -42,7 +42,6 @@ dir path=usr/lib/iconv/geniconvtbl/srcs
 file path=usr/bin/gencat mode=0555
 file path=usr/bin/genmsg mode=0555
 file path=usr/bin/gettxt mode=0555
-file path=usr/bin/kbdcomp mode=0555
 file path=usr/bin/locale mode=0555
 file path=usr/bin/localedef mode=0555
 file path=usr/bin/mkmsgs group=root mode=0555

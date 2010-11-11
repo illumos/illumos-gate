@@ -9,6 +9,7 @@
 ./lib/libc_i18n.a
 ./lib/amd64/libc_i18n.a
 ./lib/sparcv9/libc_i18n.a
+./usr/has/bin/patch
 ./usr/kernel/drv/amd64/llc2
 ./usr/kernel/drv/sparcv9/llc2
 ./usr/kernel/drv/llc2.conf
@@ -36,6 +37,7 @@
 ./usr/lib/localedef/src/iso_8859_1/charmap.src
 ./usr/lib/localedef/src/iso_8859_1/extension.src
 ./usr/lib/localedef/src/iso_8859_1/localedef.src
+./usr/bin/kbdcomp
 ./usr/bin/localedef
 ./usr/bin/od
 ./usr/bin/printf

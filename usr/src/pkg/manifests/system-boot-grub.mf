@@ -58,7 +58,6 @@ $(i386_ONLY)file path=boot/grub/minix_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/nbgrub group=sys
 $(i386_ONLY)file path=boot/grub/pxegrub group=sys
 $(i386_ONLY)file path=boot/grub/reiserfs_stage1_5 group=sys
-$(i386_ONLY)file path=boot/grub/solaris.xpm group=sys
 $(i386_ONLY)file path=boot/grub/splash.xpm.gz group=sys
 $(i386_ONLY)file path=boot/grub/stage1 group=sys
 $(i386_ONLY)file path=boot/grub/stage2 group=sys

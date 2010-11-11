@@ -408,7 +408,6 @@ COMMON_SUBDIRS=		\
 	tip		\
 	tnf		\
 	touch		\
-	tplot		\
 	tput		\
 	tr		\
 	trapstat	\
