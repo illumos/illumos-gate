@@ -39,6 +39,8 @@
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="/zones/manifests" directory="/lib/svc/manifest"
 	    opt="ro,nodevices" type="lofs" />
+	<global_mount special="%R/site" directory="/lib/svc/manifest/site"
+	    opt="nodevices" type="lofs" />
 	<global_mount special="/sbin" directory="/sbin"
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="/usr" directory="/usr"

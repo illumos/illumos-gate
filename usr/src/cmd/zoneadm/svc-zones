@@ -206,6 +206,7 @@ setup_manifests()
         do
 		echo $i
         done | cpio -pdm /$MANFDS
+	mkdir -m755 /$MANFDS/site
 }
 
 #
@@ -258,6 +259,14 @@ case "$1" in
 			[ -z "$ZONES" ] && echo "Booting zones:\c"
 			ZONES=yes
 			echo " $zone\c"
+
+			#
+			# Make sure a site dir exists, it wasn't initially
+			# being created.
+			#
+			zonepath=`zonecfg -z $zone info zonepath | cut -d: -f2`
+			[ ! -d $zonepath/site ] && mkdir -m755 $zonepath/site
+
 			#
 			# zoneadmd puts itself into its own contract so
 			# this service will lose sight of it.  We don't
