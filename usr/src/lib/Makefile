@@ -127,7 +127,6 @@ SUBDIRS += \
 	libumem		\
 	libnvpair	.WAIT	\
 	libexacct	\
-	libplot		\
 	libldap4	\
 	libsasl		\
 	libldap5	\
@@ -435,7 +434,6 @@ HDRSUBDIRS=		\
 	libpctx		\
 	libpicl		\
 	libpicltree	\
-	libplot		\
 	libpool		\
 	libpp		\
 	libproc		\

@@ -249,6 +249,7 @@ DRV_KMODS	+= audiop16x
 DRV_KMODS	+= audiopci
 DRV_KMODS	+= audiots
 DRV_KMODS	+= e1000g
+DRV_KMODS	+= efe
 DRV_KMODS	+= hxge
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= pcan
