@@ -26,6 +26,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*LINTLIBRARY*/
 
 /*   5-20-92   newroot support added  */
@@ -390,12 +394,14 @@ void
 set_PKGpaths(char *path)
 {
 	if (path && *path) {
-		(void) sprintf(Adm_pkgloc, "%s%s", path, PKGLOC);
-		(void) sprintf(Adm_pkgadm, "%s%s", path, PKGADM);
+		(void) snprintf(Adm_pkgloc, sizeof (Adm_pkgloc),
+		    "%s%s", path, PKGLOC);
+		(void) snprintf(Adm_pkgadm, sizeof (Adm_pkgadm),
+		    "%s%s", path, PKGADM);
 		set_install_root(path);
 	} else {
-		(void) sprintf(Adm_pkgloc, "%s", PKGLOC);
-		(void) sprintf(Adm_pkgadm, "%s", PKGADM);
+		(void) snprintf(Adm_pkgloc, sizeof (Adm_pkgloc), "%s", PKGLOC);
+		(void) snprintf(Adm_pkgadm, sizeof (Adm_pkgadm), "%s", PKGADM);
 	}
 	canonize_name(Adm_pkgloc);
 	canonize_name(Adm_pkgadm);

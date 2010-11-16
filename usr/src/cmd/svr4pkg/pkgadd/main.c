@@ -165,10 +165,6 @@ static boolean_t	debugFlag = B_FALSE;
 
 static boolean_t	globalZoneOnly = B_FALSE;
 
-/* Set by -O patchPkgRemoval */
-
-static boolean_t	patchPkgRemoval = B_FALSE;
-
 /*
  * Assume the package is ABI and POSIX compliant as regards user
  * interactiion during procedure scripts.
@@ -621,27 +617,6 @@ main(int argc, char **argv)
 
 				if (strcmp(p, "nozones") == 0) {
 					noZones = B_TRUE;
-					continue;
-				}
-
-				/*
-				 * Private interface: package is being
-				 * installed as a patch package.
-				 */
-
-				if (strcmp(p, "patchPkgInstall") == 0) {
-					setPatchUpdate();
-					continue;
-				}
-
-				/*
-				 * If this is a patch removal
-				 * then call setPatchUpdate() and set
-				 * patchPkgRemoval flag.
-				 */
-				if (strcmp(p, "patchPkgRemoval") == 0) {
-					setPatchUpdate();
-					patchPkgRemoval = B_TRUE;
 					continue;
 				}
 
@@ -1661,16 +1636,6 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 	arg[nargs++] = "-O";
 	arg[nargs++] = "addzonename";
 
-	if (isPatchUpdate()) {
-		if (patchPkgRemoval == B_TRUE) {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgRemoval";
-		} else {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgInstall";
-		}
-	}
-
 	/*
 	 * add parent zone info/type
 	 */
@@ -2009,16 +1974,6 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 	arg[nargs++] = "-O";
 	arg[nargs++] = "addzonename";
 
-	if (isPatchUpdate()) {
-		if (patchPkgRemoval == B_TRUE) {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgRemoval";
-		} else {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgInstall";
-		}
-	}
-
 	/*
 	 * add parent zone info/type
 	 */
@@ -2185,18 +2140,6 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir)
 	if (debugFlag == B_TRUE) {
 		arg[nargs++] = "-O";
 		arg[nargs++] = "debug";
-	}
-
-	/* Installation is from a patch package. */
-
-	if (isPatchUpdate()) {
-		if (patchPkgRemoval == B_TRUE) {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgRemoval";
-		} else {
-			arg[nargs++] = "-O";
-			arg[nargs++] = "patchPkgInstall";
-		}
 	}
 
 	arg[nargs++] = "-O";
@@ -2386,7 +2329,7 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir)
 		arg[nargs++] = a_idsName;
 		arg[nargs++] = "-p";
 		ds_close(1);
-		ds_putinfo(buffer);
+		ds_putinfo(buffer, sizeof (buffer));
 		arg[nargs++] = buffer;
 	} else if (pkgdev.mount != NULL) {
 		arg[nargs++] = "-d";

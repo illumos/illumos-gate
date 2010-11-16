@@ -64,6 +64,7 @@ PKG_ERR
 	return (newerr);
 }
 
+/*PRINTFLIKE3*/
 void
 pkgerr_add(PKG_ERR *err, PKG_ERR_CODE code, char *fmt, ...)
 {
@@ -98,17 +99,6 @@ pkgerr_clear(PKG_ERR *err)
 	err->msgs = NULL;
 	err->errs = NULL;
 	err->nerrs = 0;
-}
-
-int
-pkgerr_dump(PKG_ERR *err, FILE *fp)
-{
-	int i;
-
-	for (i = 0; i < err->nerrs; i++) {
-		(void) fprintf(fp, err->msgs[i]);
-	}
-	return (0);
 }
 
 int

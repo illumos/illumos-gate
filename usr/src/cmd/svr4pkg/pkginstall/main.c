@@ -181,14 +181,6 @@ static boolean_t	debugFlag = B_FALSE;
 
 static boolean_t	globalZoneOnly = B_FALSE;
 
-/* Set by -O patchPkgInstall */
-
-static boolean_t patchPkgInstall = B_FALSE;
-
-/* Set by -O patchPkgRemoval */
-
-static boolean_t patchPkgRemoval = B_FALSE;
-
 /* Set by -O preinstallcheck */
 
 static boolean_t	preinstallCheck = B_FALSE;
@@ -629,29 +621,6 @@ main(int argc, char *argv[])
 							zoneName = (char *)NULL;
 						}
 					}
-					continue;
-				}
-
-				/*
-				 * If this is a patch installation
-				 * then call setPatchUpdate().
-				 */
-
-				if (strcmp(p, "patchPkgInstall") == 0) {
-					setPatchUpdate();
-					patchPkgInstall = B_TRUE;
-					continue;
-				}
-
-				/*
-				 * If this is a patch removal
-				 * then call setPatchUpdate() and set
-				 * patchPkgRemoval flag.
-				 */
-
-				if (strcmp(p, "patchPkgRemoval") == 0) {
-					setPatchUpdate();
-					patchPkgRemoval = B_TRUE;
 					continue;
 				}
 
@@ -1438,14 +1407,13 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Need to force UPDATE to be NULL in case a patch has been applied
-	 * before creating a zone. Some pkgs (SUNWcsr) already spooled
-	 * to the zone, check the value of UPDATE in their postinstall script.
-	 * After a pkg has been patched UPDATE exists statically in the
-	 * pkginfo file and this value must be reset when installing a zone.
+	 * Some pkgs (SUNWcsr) already spooled to the zone, check the
+	 * value of UPDATE in their postinstall script.  After a pkg
+	 * has been patched UPDATE exists statically in the pkginfo
+	 * file and this value must be reset when installing a zone.
 	 */
 
-	if (saveSpoolInstall != 0 && !isPatchUpdate() && !isUpdate()) {
+	if (saveSpoolInstall != 0 && !isUpdate()) {
 		putparam("UPDATE", "");
 	}
 
@@ -2147,7 +2115,7 @@ main(int argc, char *argv[])
 	 */
 	rm_icas(pkgbin);
 
-	if ((globalZoneOnly) && (!patchPkgInstall) && (!patchPkgRemoval)) {
+	if (globalZoneOnly) {
 		boolean_t   b;
 		b = pkgAddPackageToGzonlyList(pkginst, get_inst_root());
 		if (b == B_FALSE) {
@@ -2535,13 +2503,12 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 		newValue = getenv(param);
 
 		/*
-		 * If zone attributes of patch packages haven't been verified
-		 * by pdo, if there is no new value, and a zone attribute
+		 * If there is no new value, and a zone attribute
 		 * is being changed, it is the same as setting the zone package
 		 * attribute to 'false' - make sure current setting is 'false'.
 		 */
 
-		if ((patchPkgInstall == B_FALSE) && (newValue == NULL) &&
+		if ((newValue == NULL) &&
 		    (setZoneAttribute == B_TRUE) &&
 		    (strcasecmp(oldValue, "false") != 0)) {
 
@@ -2570,13 +2537,11 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 		}
 
 		/*
-		 * If zone attributes of patch packages haven't been verified
-		 * by pdo, check if old and new values differ.
+		 * Check if old and new values differ.
 		 * Error if zone parameter
 		 */
 
-		if ((patchPkgInstall == B_FALSE) &&
-		    (setZoneAttribute == B_TRUE)) {
+		if (setZoneAttribute == B_TRUE) {
 			/* illegal change to zone attribute */
 
 			progerr(ERR_MERGINFOS_CHANGE_ZONEATTR, pkgName,
@@ -2606,67 +2571,56 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 	}
 
 	/*
-	 * Skip this if() section, if zone attributes of patch packages
-	 * have been verified by pdo.
+	 * verify that no zone attribute has been
+	 * set to an invalid value
 	 */
 
-	if (patchPkgInstall == B_FALSE) {
+	/* SUNW_PKG_ALLZONES */
 
-		/*
-		 * verify that no zone attribute has been
-		 * set to an invalid value
-		 */
+	newValue = getenv(PKG_ALLZONES_VARIABLE);
 
-		/* SUNW_PKG_ALLZONES */
-
-		newValue = getenv(PKG_ALLZONES_VARIABLE);
-
-		/*
-		 * complain if setting SUNW_PKG_ALLZONES to other than "false"
-		 */
+	/*
+	 * complain if setting SUNW_PKG_ALLZONES to other than "false"
+	 */
 
 
-		if ((newValue != NULL) && (*SUNW_PKG_ALLZONES == '\0') &&
-		    (strcasecmp(newValue, "false") != 0)) {
-			/* change ALLZONES from "true" to "false" (unset) */
-			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-			    pkgVersion, PKG_ALLZONES_VARIABLE, newValue);
-			return (1);
-		}
-
-		/* SUNW_PKG_THISZONE */
-
-		newValue = getenv(PKG_THISZONE_VARIABLE);
-
-		/*
-		 * complain if setting SUNW_PKG_THISZONE to other than "false"
-		 */
-
-		if ((newValue != NULL) && (*SUNW_PKG_THISZONE == '\0') &&
-		    (strcasecmp(newValue, "false") != 0)) {
-			/* change THISZONE from "true" to "false" (unset) */
-			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-			    pkgVersion, PKG_THISZONE_VARIABLE, newValue);
-			return (1);
-		}
-
-		/* SUNW_PKG_HOLLOW */
-
-		newValue = getenv(PKG_HOLLOW_VARIABLE);
-
-		/* complain if setting SUNW_PKG_HOLLOW to other than "false" */
-
-		if ((newValue != NULL) && (*SUNW_PKG_HOLLOW == '\0') &&
-		    (strcasecmp(newValue, "false") != 0)) {
-			/* change HOLLOW from "true" to 'false" (unset) */
-			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-			    pkgVersion, PKG_HOLLOW_VARIABLE, newValue);
-			return (1);
-		}
-
+	if ((newValue != NULL) && (*SUNW_PKG_ALLZONES == '\0') &&
+	    (strcasecmp(newValue, "false") != 0)) {
+		/* change ALLZONES from "true" to "false" (unset) */
+		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+		    pkgVersion, PKG_ALLZONES_VARIABLE, newValue);
+		return (1);
 	}
 
-	/* return */
+	/* SUNW_PKG_THISZONE */
+
+	newValue = getenv(PKG_THISZONE_VARIABLE);
+
+	/*
+	 * complain if setting SUNW_PKG_THISZONE to other than "false"
+	 */
+
+	if ((newValue != NULL) && (*SUNW_PKG_THISZONE == '\0') &&
+	    (strcasecmp(newValue, "false") != 0)) {
+		/* change THISZONE from "true" to "false" (unset) */
+		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+		    pkgVersion, PKG_THISZONE_VARIABLE, newValue);
+		return (1);
+	}
+
+	/* SUNW_PKG_HOLLOW */
+
+	newValue = getenv(PKG_HOLLOW_VARIABLE);
+
+	/* complain if setting SUNW_PKG_HOLLOW to other than "false" */
+
+	if ((newValue != NULL) && (*SUNW_PKG_HOLLOW == '\0') &&
+	    (strcasecmp(newValue, "false") != 0)) {
+		/* change HOLLOW from "true" to 'false" (unset) */
+		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+		    pkgVersion, PKG_HOLLOW_VARIABLE, newValue);
+		return (1);
+	}
 
 	echoDebug(DBG_MERGINFOS_EXIT, pkginfo_path, 0);
 

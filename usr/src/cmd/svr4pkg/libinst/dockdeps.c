@@ -67,7 +67,6 @@ static int	nlist;
 static int	pkgexist;
 static int	pkgokay;
 static int	is_update;
-static int	is_patch_update;
 
 /*
  * IMPORTANT NOTE: THE SIZE OF 'abbrev' IS HARD CODED INTO THE CHARACTER
@@ -185,18 +184,6 @@ done:
 	}
 
 	return (errflg);
-}
-
-void
-setPatchUpdate(void)
-{
-	is_patch_update = 1;
-}
-
-int
-isPatchUpdate(void)
-{
-	return ((is_patch_update) ? 1 : 0);
 }
 
 void

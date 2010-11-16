@@ -251,11 +251,13 @@ rdconfig(struct pkginfo *info, char *pkginst, char *ckvers)
 	    PI_INSTALLED);
 
 	if (info->status == PI_INSTALLED) {
-		(void) sprintf(temp, "%s/%s/!I-Lock!", pkgdir, pkginst);
+		(void) snprintf(temp, sizeof (temp),
+		    "%s/%s/!I-Lock!", pkgdir, pkginst);
 		if (access(temp, 0) == 0)
 			info->status = PI_PARTIAL;
 		else {
-			(void) sprintf(temp, "%s/%s/!R-Lock!", pkgdir, pkginst);
+			(void) snprintf(temp, sizeof (temp),
+			    "%s/%s/!R-Lock!", pkgdir, pkginst);
 			if (access(temp, 0) == 0)
 				info->status = PI_PARTIAL;
 		}
@@ -287,7 +289,7 @@ fpkginst(char *pkg, ...)
 	static char pkginst[PKGSIZ+1];
 	static DIR *pdirfp;
 	struct dirent64 *dp;
-	char	*pt, *ckarch, *ckvers;
+	char	*ckarch, *ckvers;
 	va_list	ap;
 
 	va_start(ap, pkg);
@@ -376,7 +378,8 @@ compver(char *pkginst, char *version)
 	FILE *fp;
 	char temp[256];
 
-	(void) sprintf(temp, "%s/%s/install/compver", get_PKGLOC(), pkginst);
+	(void) snprintf(temp, sizeof (temp),
+	    "%s/%s/install/compver", get_PKGLOC(), pkginst);
 	if ((fp = fopen(temp, "r")) == NULL)
 		return (-1);
 
@@ -424,7 +427,7 @@ ckinfo(char *inst, char *arch, char *vers)
 	char	*pt, *copy, *value, *myarch, *myvers;
 	int	errflg;
 
-	(void) sprintf(file, "%s/%s/pkginfo", pkgdir, inst);
+	(void) snprintf(file, sizeof (file), "%s/%s/pkginfo", pkgdir, inst);
 	if ((fp = fopen(file, "r")) == NULL)
 		return (1);
 

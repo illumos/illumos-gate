@@ -51,6 +51,7 @@
 #include <openssl/pkcs7.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
+#include <note.h>
 #include "pkginfo.h"
 #include "pkgstrct.h"
 #include "pkgtrans.h"
@@ -114,7 +115,7 @@ static int	ckoverwrite(char *dir, char *inst, int options);
 static int	pkgxfer(char *srcinst, int options);
 static int	wdsheader(struct dm_buf *, char *src, char *device,
     char **pkg, PKCS7 *);
-static struct dm_buf	*genheader(char *, char *, char **);
+static struct dm_buf	*genheader(char *, char **);
 
 static int	dump_hdr_and_pkgs(BIO *, struct dm_buf *, char **);
 
@@ -286,7 +287,7 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 
 		/* initialize PKCS7 object to be filled in later */
 		sec_pkcs7 = PKCS7_new();
-		PKCS7_set_type(sec_pkcs7, NID_pkcs7_signed);
+		(void) PKCS7_set_type(sec_pkcs7, NID_pkcs7_signed);
 		sec_signerinfo = PKCS7_add_signature(sec_pkcs7,
 		    pubcert, privkey, EVP_sha1());
 
@@ -298,7 +299,7 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 		}
 
 		/* add signer cert into signature */
-		PKCS7_add_certificate(sec_pkcs7, pubcert);
+		(void) PKCS7_add_certificate(sec_pkcs7, pubcert);
 
 		/* attempt to resolve cert chain starting at the signer cert */
 		if (get_cert_chain(err, pubcert, clcerts, cacerts,
@@ -314,7 +315,7 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 		 * since it's baked in already, so skip it
 		 */
 		for (i = 1; i < sk_X509_num(sec_chain); i++) {
-			PKCS7_add_certificate(sec_pkcs7,
+			(void) PKCS7_add_certificate(sec_pkcs7,
 			    sk_X509_value(sec_chain, i));
 		}
 
@@ -526,14 +527,14 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 			logerr(pkg_gt(MSG_GETVOL));
 			return (1);
 		}
-		if ((hdr = genheader(src, ods_name, pkg)) == NULL) {
+		if ((hdr = genheader(src, pkg)) == NULL) {
 			cleanup();
 			return (1);
 		}
 		if (making_sig) {
 			/* start up signature data stream */
-			PKCS7_content_new(sec_pkcs7, NID_pkcs7_data);
-			PKCS7_set_detached(sec_pkcs7, 1);
+			(void) PKCS7_content_new(sec_pkcs7, NID_pkcs7_data);
+			(void) PKCS7_set_detached(sec_pkcs7, 1);
 			p7_bio = PKCS7_dataInit(sec_pkcs7, NULL);
 
 			/*
@@ -568,7 +569,7 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 			    return (1);
 			}
 
-			BIO_free(p7_bio);
+			(void) BIO_free(p7_bio);
 		}
 
 		/* write out header to stream, which includes signature */
@@ -767,13 +768,14 @@ cat_and_count(struct dm_buf *buf_ctrl, char *append)
 }
 
 static struct dm_buf *
-genheader(char *src, char *device, char **pkg)
+genheader(char *src, char **pkg)
 {
 
 	FILE	*fp;
 	char	path[MAXPATHLEN], tmp_entry[ENTRY_MAX];
 	int	i, n, nparts, maxpsize;
-	int	partcnt, totsize;
+	int	partcnt;
+	long	totsize;
 	struct stat statbuf;
 
 	if ((hdrbuf.text_buffer = (char *)malloc(BLK_SIZE)) == NULL) {
@@ -841,7 +843,8 @@ genheader(char *src, char *device, char **pkg)
 
 		if (dstdev.capacity && maxpsize > dstdev.capacity) {
 			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_NOSPACE));
+			logerr(pkg_gt(MSG_NOSPACE), (long)maxpsize,
+			    dstdev.capacity);
 			(void) fclose(fp);
 			ecleanup();
 			return (NULL);
@@ -867,15 +870,6 @@ genheader(char *src, char *device, char **pkg)
 		totsize += nparts * maxpsize;
 		if (dstdev.capacity && dstdev.capacity < totsize) {
 			int lastpartcnt = 0;
-#if 0
-			if (i != 0) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOSPACE));
-				(void) fclose(fp);
-				ecleanup();
-				return (NULL);
-			}
-#endif	/* 0 */
 
 			if (totsize)
 				totsize -= nparts * maxpsize;
@@ -969,7 +963,7 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 	 */
 	for (block_cnt = 0; block_cnt < hdr->allocation;
 		block_cnt += BLK_SIZE) {
-		write(ds_fd, (hdr->text_buffer + block_cnt), BLK_SIZE);
+		(void) write(ds_fd, (hdr->text_buffer + block_cnt), BLK_SIZE);
 	}
 
 	/*
@@ -978,9 +972,9 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 	 * for all packages
 	 */
 	(void) tmpnam(tmp_file);	/* temporary file name */
-	if ((list_fd = open(tmp_file, O_RDWR | O_CREAT)) == -1) {
+	if ((list_fd = open(tmp_file, O_RDWR | O_CREAT, 0644)) == -1) {
 		progerr(pkg_gt(ERR_TRANSFER));
-		logerr(pkg_gt(MSG_NOTMPFIL));
+		logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
 		return (1);
 	}
 
@@ -1004,7 +998,7 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 			if (write(list_fd, tmp_entry,
 			    entry_size) != entry_size) {
 				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOTMPFIL));
+				logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
 				(void) close(list_fd);
 				ecleanup();
 				return (1);
@@ -1045,20 +1039,22 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 			cleanup();
 			return (1);
 		}
-		PEM_write_PKCS7(fp, sig);
+		(void) PEM_write_PKCS7(fp, sig);
 		(void) fclose(fp);
 
 		for (i = 0; pkg[i]; i++) {
-			sprintf(path, "%s/%s", tmpsymdir, pkg[i]);
+			(void) snprintf(path, sizeof (path),
+			    "%s/%s", tmpsymdir, pkg[i]);
 			if (mkdir(path, 0755)) {
 				progerr(pkg_gt(ERR_TRANSFER));
 				logerr(pkg_gt(MSG_MKDIR), path);
 				cleanup();
 				return (1);
 			}
-			sprintf(path, "%s/%s/%s", tmpsymdir,
-			    pkg[i], PKGINFO);
-			sprintf(srcpath, "%s/%s/%s", src, pkg[i], PKGINFO);
+			(void) snprintf(path, sizeof (path),
+			    "%s/%s/%s", tmpsymdir, pkg[i], PKGINFO);
+			(void) snprintf(srcpath, sizeof (srcpath),
+			    "%s/%s/%s", src, pkg[i], PKGINFO);
 			if (symlink(srcpath, path) != 0) {
 				progerr(pkg_gt(ERR_TRANSFER));
 				logerr(pkg_gt(MSG_SYMLINK), path, srcpath);
@@ -1066,9 +1062,10 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 				return (1);
 			}
 
-			sprintf(path, "%s/%s/%s", tmpsymdir,
-			    pkg[i], PKGMAP);
-			sprintf(srcpath, "%s/%s/%s", src, pkg[i], PKGMAP);
+			(void) snprintf(path, sizeof (path),
+			    "%s/%s/%s", tmpsymdir, pkg[i], PKGMAP);
+			(void) snprintf(srcpath, sizeof (srcpath),
+			    "%s/%s/%s", src, pkg[i], PKGMAP);
 			if (symlink(srcpath, path) != 0) {
 				progerr(pkg_gt(ERR_TRANSFER));
 				logerr(pkg_gt(MSG_SYMLINK), path, srcpath);
@@ -1081,14 +1078,14 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 			 * temporary string allowing for the first line
 			 * as a special case.
 			 */
-			entry_size = sprintf(tmp_entry,
+			entry_size = snprintf(tmp_entry, sizeof (tmp_entry),
 			    (i == 0) ? "%s/%s\n%s/%s" : "\n%s/%s\n%s/%s",
 			    pkg[i], PKGINFO, pkg[i], PKGMAP);
 
 			if (write(list_fd, tmp_entry,
 			    entry_size) != entry_size) {
 				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOTMPFIL));
+				logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
 				(void) close(list_fd);
 				ecleanup();
 				cleanup();
@@ -1097,7 +1094,8 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 		}
 
 		/* add signature to list of files */
-		entry_size = sprintf(tmp_entry, "\n%s", SIGNATURE_FILENAME);
+		entry_size = snprintf(tmp_entry, sizeof (tmp_entry), "\n%s",
+		    SIGNATURE_FILENAME);
 		if (write(list_fd, tmp_entry, entry_size) != entry_size) {
 			progerr(pkg_gt(ERR_TRANSFER));
 			logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
@@ -1111,26 +1109,16 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 	(void) lseek(list_fd, 0, SEEK_SET);
 
 	if (!making_sig) {
-#ifndef SUNOS41
-		(void) sprintf(tmp_entry, "%s -ocD -C %d",
-		    CPIOPROC, (int)BLK_SIZE);
-#else
-		(void) sprintf(tmp_entry, "%s -oc -C %d",
-		    CPIOPROC, (int)BLK_SIZE);
-#endif
+		(void) snprintf(tmp_entry, sizeof (tmp_entry),
+		    "%s -ocD -C %d", CPIOPROC, (int)BLK_SIZE);
 	} else {
 		/*
 		 * when making a signature, we must make sure to follow
 		 * symlinks during the cpio so that we don't archive
 		 * the links themselves
 		 */
-#ifndef SUNOS41
-		(void) sprintf(tmp_entry, "%s -ocDL -C %d",
-		    CPIOPROC, (int)BLK_SIZE);
-#else
-		(void) sprintf(tmp_entry, "%s -ocL -C %d",
-		    CPIOPROC, (int)BLK_SIZE);
-#endif
+		(void) snprintf(tmp_entry, sizeof (tmp_entry),
+		    "%s -ocDL -C %d", CPIOPROC, (int)BLK_SIZE);
 	}
 
 	if (making_sig) {
@@ -1180,7 +1168,7 @@ ckoverwrite(char *dir, char *inst, int options)
 {
 	char	path[PATH_MAX];
 
-	(void) sprintf(path, "%s/%s", dir, inst);
+	(void) snprintf(path, sizeof (path), "%s/%s", dir, inst);
 	if (access(path, 0) == 0) {
 		if (options & PT_OVERWRITE)
 			return (rrmdir(path));
@@ -1223,11 +1211,12 @@ pkgxfer(char *srcinst, int options)
 
 	if (!(options & PT_SILENT))
 		(void) fprintf(stderr, pkg_gt(MSG_TRANSFER), srcinst);
-	(void) strcpy(dstinst, srcinst);
+	(void) strlcpy(dstinst, srcinst, sizeof (dstinst));
 
 	if (!(options & PT_ODTSTREAM)) {
 		/* destination is a (possibly mounted) directory */
-		(void) sprintf(dstdir, "%s/%s", dst, dstinst);
+		(void) snprintf(dstdir, sizeof (dstdir),
+		    "%s/%s", dst, dstinst);
 
 		/*
 		 * need to check destination directory to assure
@@ -1244,10 +1233,10 @@ pkgxfer(char *srcinst, int options)
 		}
 		pkgdir = dst;
 
-		(void) strcpy(temp, srcinst);
+		(void) strlcpy(temp, srcinst, sizeof (temp));
 		if (pt = strchr(temp, '.'))
 			*pt = '\0';
-		(void) strcat(temp, ".*");
+		(void) strlcat(temp, ".*", sizeof (temp));
 
 		if (pt = fpkginst(temp, info.arch, info.version)) {
 			/*
@@ -1255,8 +1244,9 @@ pkgxfer(char *srcinst, int options)
 			 * its pkgid might be different
 			 */
 			if (options & PT_OVERWRITE) {
-				(void) strcpy(dstinst, pt);
-				(void) sprintf(dstdir, "%s/%s", dst, dstinst);
+				(void) strlcpy(dstinst, pt, sizeof (dstinst));
+				(void) snprintf(dstdir, sizeof (dstdir),
+				    "%s/%s", dst, dstinst);
 			} else {
 				progerr(pkg_gt(ERR_TRANSFER));
 				logerr(pkg_gt(MSG_DUPVERS), srcinst);
@@ -1273,8 +1263,10 @@ pkgxfer(char *srcinst, int options)
 			if (pt = strchr(temp, '.'))
 				*pt = '\0';
 			for (i = 2; (access(dstdir, 0) == 0); i++) {
-				(void) sprintf(dstinst, "%s.%d", temp, i);
-				(void) sprintf(dstdir, "%s/%s", dst, dstinst);
+				(void) snprintf(dstinst, sizeof (dstinst),
+				    "%s.%d", temp, i);
+				(void) snprintf(dstdir, sizeof (dstdir),
+				    "%s/%s", dst, dstinst);
 			}
 		} else if (options & PT_OVERWRITE) {
 			/*
@@ -1300,7 +1292,8 @@ pkgxfer(char *srcinst, int options)
 			return (1);
 		}
 
-		(void) sprintf(srcdir, "%s/%s", src, srcinst);
+		(void) snprintf(srcdir, sizeof (srcdir),
+		    "%s/%s", src, srcinst);
 		if (stat(srcdir, &srcstat) != -1) {
 			if (chmod(dstdir, (srcstat.st_mode & S_IAMB)) == -1) {
 				progerr(pkg_gt(ERR_TRANSFER));
@@ -1317,7 +1310,7 @@ pkgxfer(char *srcinst, int options)
 	if (!(options & PT_SILENT) && strcmp(dstinst, srcinst))
 		(void) fprintf(stderr, pkg_gt(MSG_RENAME), dstinst);
 
-	(void) sprintf(srcdir, "%s/%s", src, srcinst);
+	(void) snprintf(srcdir, sizeof (srcdir), "%s/%s", src, srcinst);
 	if (chdir(srcdir)) {
 		progerr(pkg_gt(ERR_TRANSFER));
 		logerr(pkg_gt(MSG_CHDIR), srcdir);
@@ -1328,7 +1321,8 @@ pkgxfer(char *srcinst, int options)
 		/*
 		 * transfer pkginfo & pkgmap first
 		 */
-		(void) sprintf(cmd, "%s -pudm %s", CPIOPROC, dstdir);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "%s -pudm %s", CPIOPROC, dstdir);
 		if ((pp = epopen(cmd, "w")) == NULL) {
 			rpterr();
 			progerr(pkg_gt(ERR_TRANSFER));
@@ -1337,11 +1331,11 @@ pkgxfer(char *srcinst, int options)
 		}
 		(void) fprintf(pp, "%s\n%s\n", PKGINFO, PKGMAP);
 
-		sighold(SIGINT);
-		sighold(SIGHUP);
+		(void) sighold(SIGINT);
+		(void) sighold(SIGHUP);
 		r = epclose(pp);
-		sigrelse(SIGINT);
-		sigrelse(SIGHUP);
+		(void) sigrelse(SIGINT);
+		(void) sigrelse(SIGHUP);
 
 		if (r != 0) {
 			rpterr();
@@ -1415,11 +1409,11 @@ pkgxfer(char *srcinst, int options)
 					}
 					(void) fprintf(pp, "pkginfo");
 
-					sighold(SIGINT);
-					sighold(SIGHUP);
+					(void) sighold(SIGINT);
+					(void) sighold(SIGHUP);
 					r = epclose(pp);
-					sigrelse(SIGINT);
-					sigrelse(SIGHUP);
+					(void) sigrelse(SIGINT);
+					(void) sigrelse(SIGHUP);
 
 					if (r != 0) {
 						rpterr();
@@ -1467,10 +1461,12 @@ pkgxfer(char *srcinst, int options)
 		char line[128];
 		(void) mgets(line, 128);
 		curpartcnt = -1;
-		if (sscanf(line, "%s %d %d %[ 0-9]", &pkgname, &nparts,
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
+		if (sscanf(line, "%s %d %d %[ 0-9]", pkgname, &nparts,
 		    &maxpartsize, volnos) == 4) {
-			sscanf(volnos, "%d %[ 0-9]", &curpartcnt, tmpvol);
-			strcpy(volnos, tmpvol);
+			(void) sscanf(volnos,
+			    "%d %[ 0-9]", &curpartcnt, tmpvol);
+			(void) strlcpy(volnos, tmpvol, sizeof (volnos));
 		}
 	}
 
@@ -1500,7 +1496,7 @@ pkgxfer(char *srcinst, int options)
 			}
 
 			(void) sscanf(volnos, "%d %[ 0-9]", &index, tmpvol);
-			(void) strcpy(volnos, tmpvol);
+			(void) strlcpy(volnos, tmpvol, sizeof (volnos));
 			curpartcnt += index;
 		}
 
@@ -1508,59 +1504,61 @@ pkgxfer(char *srcinst, int options)
 			nparts = 0;
 
 		if (part == 1) {
-			(void) sprintf(cmd, "find %s %s", PKGINFO, PKGMAP);
+			(void) snprintf(cmd, sizeof (cmd),
+			    "find %s %s", PKGINFO, PKGMAP);
 			if (nparts && (isdir(INSTALL) == 0)) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, INSTALL);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, INSTALL, sizeof (cmd));
 			}
 		} else
-			(void) sprintf(cmd, "find %s", PKGINFO);
+			(void) snprintf(cmd, sizeof (cmd), "find %s", PKGINFO);
 
 		if (nparts > 1) {
-			(void) sprintf(temp, "%s.%d", RELOC, part);
+			(void) snprintf(temp, sizeof (temp),
+			    "%s.%d", RELOC, part);
 			if (iscpio(temp, &iscomp) || isdir(temp) == 0) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, temp);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, temp, sizeof (cmd));
 			}
-			(void) sprintf(temp, "%s.%d", ROOT, part);
+			(void) snprintf(temp, sizeof (temp),
+			    "%s.%d", ROOT, part);
 			if (iscpio(temp, &iscomp) || isdir(temp) == 0) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, temp);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, temp, sizeof (cmd));
 			}
-			(void) sprintf(temp, "%s.%d", ARCHIVE, part);
+			(void) snprintf(temp, sizeof (temp),
+			    "%s.%d", ARCHIVE, part);
 			if (isdir(temp) == 0) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, temp);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, temp, sizeof (cmd));
 			}
 		} else if (nparts) {
 			for (i = 0; reloc_names[i] != NULL; i++) {
 				if (iscpio(reloc_names[i], &iscomp) ||
 				    isdir(reloc_names[i]) == 0) {
-					(void) strcat(cmd, " ");
-					(void) strcat(cmd, reloc_names[i]);
+					(void) strlcat(cmd, " ", sizeof (cmd));
+					(void) strlcat(cmd, reloc_names[i],
+					    sizeof (cmd));
 				}
 			}
 			for (i = 0; root_names[i] != NULL; i++) {
 				if (iscpio(root_names[i], &iscomp) ||
 				    isdir(root_names[i]) == 0) {
-					(void) strcat(cmd, " ");
-					(void) strcat(cmd, root_names[i]);
+					(void) strlcat(cmd, " ", sizeof (cmd));
+					(void) strlcat(cmd, root_names[i],
+					    sizeof (cmd));
 				}
 			}
 			if (isdir(ARCHIVE) == 0) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, ARCHIVE);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, ARCHIVE, sizeof (cmd));
 			}
 		}
 		if (options & PT_ODTSTREAM) {
-#ifndef SUNOS41
-			(void) sprintf(cmd+strlen(cmd),
+			(void) snprintf(cmd + strlen(cmd),
+			    sizeof (cmd) - strlen(cmd),
 			    " -print | %s -ocD -C %d",
-#else
-			(void) sprintf(cmd+strlen(cmd),
-			    " -print | %s -oc -C %d",
-#endif
-				CPIOPROC, (int)BLK_SIZE);
+			    CPIOPROC, (int)BLK_SIZE);
 		} else {
 			if (statvfs64(dstdir, &svfsb) == -1) {
 				progerr(pkg_gt(ERR_TRANSFER));
@@ -1575,11 +1573,16 @@ pkgxfer(char *srcinst, int options)
 			if ((has_comp_size ? compressedsize : maxpartsize) >
 			    free_blocks) {
 				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOSPACE));
+				logerr(pkg_gt(MSG_NOSPACE),
+				    has_comp_size ?
+				    (long)compressedsize : (long)maxpartsize,
+				    free_blocks);
 				return (1);
 			}
-			(void) sprintf(cmd+strlen(cmd), " -print | %s -pdum %s",
-				CPIOPROC, dstdir);
+			(void) snprintf(cmd + strlen(cmd),
+			    sizeof (cmd) - strlen(cmd),
+			    " -print | %s -pdum %s",
+			    CPIOPROC, dstdir);
 		}
 
 		n = esystem(cmd, -1, (options & PT_ODTSTREAM) ? ds_fd : -1);
@@ -1604,14 +1607,14 @@ pkgxfer(char *srcinst, int options)
 					return (n);
 				if (chdir(srcdir)) {
 					progerr(pkg_gt(ERR_TRANSFER));
-					logerr(pkg_gt(MSG_CORRUPT), srcdir);
+					logerr(pkg_gt(MSG_CORRUPT));
 					(void) chdir("/");
-					pkgumount(&srcdev);
+					(void) pkgumount(&srcdev);
 					continue;
 				}
 				if (ckvolseq(srcdir, part, nparts)) {
 					(void) chdir("/");
-					pkgumount(&srcdev);
+					(void) pkgumount(&srcdev);
 					continue;
 				}
 				break;
@@ -1667,7 +1670,7 @@ pkgxfer(char *srcinst, int options)
 
 				(void) sscanf(volnos, "%d %[ 0-9]", &index,
 				    tmpvol);
-				(void) strcpy(volnos, tmpvol);
+				(void) strlcpy(volnos, tmpvol, sizeof (volnos));
 				curpartcnt += index;
 			}
 		}
@@ -1738,8 +1741,8 @@ pkgdump(char *srcinst, BIO *bio)
 			(void) snprintf(cmd, CMDSIZE, "find %s %s",
 			    PKGINFO, PKGMAP);
 			if (nparts && (isdir(INSTALL) == 0)) {
-				(void) strcat(cmd, " ");
-				(void) strcat(cmd, INSTALL);
+				(void) strlcat(cmd, " ", sizeof (cmd));
+				(void) strlcat(cmd, INSTALL, sizeof (cmd));
 			}
 		} else
 			(void) snprintf(cmd, CMDSIZE, "find %s", PKGINFO);
@@ -1784,14 +1787,10 @@ pkgdump(char *srcinst, BIO *bio)
 			}
 		}
 
-#ifndef SUNOS41
-		(void) sprintf(cmd+strlen(cmd),
+		(void) snprintf(cmd + strlen(cmd),
+		    sizeof (cmd) - strlen(cmd),
 		    " -print | %s -ocD -C %d",
-#else
-		    (void) sprintf(cmd+strlen(cmd),
-			" -print | %s -oc -C %d",
-#endif
-			CPIOPROC, (int)BLK_SIZE);
+		    CPIOPROC, (int)BLK_SIZE);
 		/*
 		 * execute the command, dumping all standard output
 		 * to the BIO.
@@ -1812,37 +1811,38 @@ pkgdump(char *srcinst, BIO *bio)
 static void
 sigtrap(int signo)
 {
+	_NOTE(ARGUNUSED(signo));
 	signal_received++;
 }
 
 static void
 cleanup(void)
 {
-	chdir("/");
+	(void) chdir("/");
 	if (tmpdir) {
-		rrmdir(tmpdir);
+		(void) rrmdir(tmpdir);
 		free(tmpdir);
 		tmpdir = NULL;
 	}
 
 	if (tmppath) {
 		/* remove any previous tmppath stuff */
-		rrmdir(tmppath);
+		(void) rrmdir(tmppath);
 		free(tmppath);
 		tmppath = NULL;
 	}
 
 	if (tmpsymdir) {
 		/* remove temp symbolic links made for signed pkg */
-		rrmdir(tmpsymdir);
+		(void) rrmdir(tmpsymdir);
 		free(tmpsymdir);
 		tmpsymdir = NULL;
 	}
 
 	if (srcdev.mount && !ids_name)
-		pkgumount(&srcdev);
+		(void) pkgumount(&srcdev);
 	if (dstdev.mount && !ods_name)
-		pkgumount(&dstdev);
+		(void) pkgumount(&dstdev);
 	(void) ds_close(1);
 }
 
@@ -1871,7 +1871,7 @@ dump_hdr_and_pkgs(BIO *bio, struct dm_buf *hdr, char **pkglist)
 	/* write out the header to the signature stream */
 	for (block_cnt = 0; block_cnt < hdr->allocation;
 		block_cnt += BLK_SIZE) {
-		BIO_write(bio, (hdr->text_buffer + block_cnt), BLK_SIZE);
+		(void) BIO_write(bio, (hdr->text_buffer + block_cnt), BLK_SIZE);
 	}
 
 	/* save current directory */
@@ -1941,11 +1941,11 @@ BIO_dump_cmd(char *cmd, BIO *bio)
 	/* read output in chunks, transfer to BIO */
 	while (fread(buf, BLK_SIZE, 1, fp) == 1) {
 		if (BIO_write(bio, buf, BLK_SIZE) != BLK_SIZE) {
-			sighold(SIGINT);
-			sighold(SIGHUP);
+			(void) sighold(SIGINT);
+			(void) sighold(SIGHUP);
 			(void) epclose(fp);
-			sigrelse(SIGINT);
-			sigrelse(SIGHUP);
+			(void) sigrelse(SIGINT);
+			(void) sigrelse(SIGHUP);
 			rpterr();
 			return (1);
 		}
@@ -1959,11 +1959,11 @@ BIO_dump_cmd(char *cmd, BIO *bio)
 	}
 
 	/* done, close stream, report any errors */
-	sighold(SIGINT);
-	sighold(SIGHUP);
+	(void) sighold(SIGINT);
+	(void) sighold(SIGHUP);
 	rc = epclose(fp);
-	sigrelse(SIGINT);
-	sigrelse(SIGHUP);
+	(void) sigrelse(SIGINT);
+	(void) sigrelse(SIGHUP);
 	if (rc != 0) {
 		rpterr();
 		return (1);

@@ -67,7 +67,6 @@ extern char	pkgloc_sav[];
 extern char	*msgtext;
 extern char	*pkginst;
 extern char	*pkgname;
-extern char	saveSpoolInstallDir[]; /* pkginstall/main.c */
 
 /*
  * exported functions
@@ -238,9 +237,6 @@ quitSetSilentExit(boolean_t a_silentExit)
 void
 quit(int retcode)
 {
-	char		orig_pkginfo_path[PATH_MAX];
-	char		pkginfo_path[PATH_MAX];
-
 	/* disable interrupts */
 
 	(void) signal(SIGINT, SIG_IGN);
@@ -357,34 +353,6 @@ quit(int retcode)
 			if (pkgloc_sav[0] && !access(pkgloc_sav, F_OK)) {
 				echoDebug(DBG_QUIT_REMOVING_PKGSAV, pkgloc_sav);
 				(void) rrmdir(pkgloc_sav);
-			}
-		}
-
-		if (isPatchUpdate()) {
-			if (pkgloc[0] && !access(pkgloc, F_OK) &&
-				!access(saveSpoolInstallDir, F_OK)) {
-				/*
-				 * Copy the pkginfo file to the pspool
-				 * directory. This propagates patch
-				 * info to the patched pkg in the local
-				 * zone.
-				 */
-				(void) snprintf(orig_pkginfo_path,
-					sizeof (orig_pkginfo_path),
-					"%s/%s/%s", get_PKGLOC(),
-					pkginst, PKGINFO);
-
-				(void) snprintf(pkginfo_path,
-					sizeof (pkginfo_path), "%s/%s",
-					saveSpoolInstallDir, PKGINFO);
-
-				if (cppath(MODE_SET|DIR_DISPLAY,
-					orig_pkginfo_path, pkginfo_path,
-					0644)) {
-					progerr(ERR_PKGINFO_COPY,
-							orig_pkginfo_path,
-							pkginfo_path);
-				}
 			}
 		}
 	}

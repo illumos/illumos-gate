@@ -149,27 +149,6 @@ rckrunlevel(void)
 }
 
 int
-rckpatchpkg(char *p, char *pt)
-{
-	int n;
-	char ans[MAX_INPUT];
-
-	ptext(stderr, WRN_PKGREMOVE_PATCHES, p, p, p, pt);
-
-	n = ckyorn(ans, NULL, NULL, NULL, ASK_PKGREMOVE_CONTINUE);
-
-	if (n != 0) {
-		return (n);
-	}
-
-	if (strchr("yY", *ans) == NULL) {
-		return (3);
-	}
-
-	return (0);
-}
-
-int
 rckdepend(void)
 {
 	int	n;

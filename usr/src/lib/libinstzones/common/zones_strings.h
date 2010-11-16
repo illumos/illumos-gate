@@ -93,7 +93,6 @@ extern "C" {
 #define	DBG_ZONES_LCK_ZONES_EXIST	ILIBSTR("locking all non-global zones defined")
 #define	DBG_ZONES_LCK_ZONES_NOZONES	ILIBSTR("no zones locked: no non-global zones exist")
 #define	DBG_ZONES_LCK_ZONES_UNIMP	ILIBSTR("no zones locked: zones are not implemented")
-#define	DBG_ZONES_LCK_ZONE_PATCHADM	ILIBSTR("locking patch administration: zone <%s> object <%s>")
 #define	DBG_ZONES_LCK_ZONE_PKGADM	ILIBSTR("locking package administration: zone <%s> object <%s>")
 #define	DBG_ZONES_LCK_ZONE_ZONEADM	ILIBSTR("locking zone administration: zone <%s> object <%s>")
 #define	DBG_ZONES_MOUNT_IN_LZ_ENTRY	ILIBSTR("mount in non-global zone: zone <%s> global-zone path <%s>")
@@ -112,7 +111,6 @@ extern "C" {
 #define	DBG_ZONES_ULK_ZONES_EXIST	ILIBSTR("unlocking all non-global zones defined")
 #define	DBG_ZONES_ULK_ZONES_NOZONES	ILIBSTR("no zones unlocked: no non-global zones exist")
 #define	DBG_ZONES_ULK_ZONES_UNIMP	ILIBSTR("no zones unlocked: zones are not implemented")
-#define	DBG_ZONES_ULK_ZONE_PATCHADM	ILIBSTR("unlocking patch administration: zone <%s> object <%s>")
 #define	DBG_ZONES_ULK_ZONE_PKGADM	ILIBSTR("unlocking package administration: zone <%s> object <%s>")
 #define	DBG_ZONES_ULK_ZONE_ZONEADM	ILIBSTR("unlocking zone administration: zone <%s> object <%s>")
 #define	DBG_ZONES_UNMOUNT_FROM_LZ_ENTRY	ILIBSTR("unmount non-global zone: mount point <%s>")
@@ -171,16 +169,13 @@ extern "C" {
 #define	ERR_ZONEREADY_DIDNT_READY	ILIBSTR("unable to ready zone <%s>: zone failed to transition to ready state")
 #define	ERR_ZONEREADY_EXEC		ILIBSTR("unable to ready zone: could not execute zone administration command <%s>: %s")
 #define	ERR_ZONEROOT_NOTDIR		ILIBSTR("unable to use temporary mount point <%s> in zone <%s>: %s")
-#define	ERR_ZONES_LCK_THIS_PATCHADM	ILIBSTR("Unable to acquire patch administration lock for this system; try again later")
 #define	ERR_ZONES_LCK_THIS_PKGADM	ILIBSTR("Unable to acquire package administration lock for this system; try again later")
 #define	ERR_ZONES_LCK_THIS_ZONEADM	ILIBSTR("Unable to acquire zone administration lock for this system; please try again later")
 #define	ERR_ZONES_LCK_ZONES_FAILED	ILIBSTR("Unable to acquire lock on non-global zone <%s>: releasing all locks")
-#define	ERR_ZONES_LCK_ZONE_PATCHADM	ILIBSTR("Unable to acquire patch administration lock for zone <%s>; please try again later")
 #define	ERR_ZONES_LCK_ZONE_PKGADM	ILIBSTR("Unable to acquire package administration lock for zone <%s>; please try again later")
 #define	ERR_ZONES_LCK_ZONE_ZONEADM	ILIBSTR("Unable to acquire zone administration lock for zone <%s>; please try again later")
 #define	ERR_ZONES_NOT_IMPLEMENTED	ILIBSTR("error: zones not implemented")
 #define	ERR_ZONES_ULK_THIS_PACKAGE	ILIBSTR("Unable to release package administration lock for this system; try again later")
-#define	ERR_ZONES_ULK_THIS_PATCH	ILIBSTR("Unable to release patch administration lock for this system; try again later")
 #define	ERR_ZONES_ULK_THIS_ZONES	ILIBSTR("Unable to release zone administration lock for this system; please try again later")
 #define	ERR_ZONE_LIST_EMPTY		ILIBSTR("empty zone list specified")
 #define	ERR_ZONE_NAME_ILLEGAL		ILIBSTR("illegal zone name %.*s")
@@ -197,10 +192,8 @@ extern "C" {
  */
 
 #define	MSG_PROG_ERR			ILIBSTR("ERROR: %s")
-#define	MSG_ZONES_LCK_THIS_PATCHADM	ILIBSTR("## Waiting for up to <%ld> seconds for patch administration commands to become available (another user is administering patches)")
 #define	MSG_ZONES_LCK_THIS_PKGADM	ILIBSTR("## Waiting for up to <%ld> seconds for package administration commands to become available (another user is administering packages)")
 #define	MSG_ZONES_LCK_THIS_ZONEADM	ILIBSTR("## Waiting for up to <%ld> seconds for zone administration commands to become available (another user is administering zones)")
-#define	MSG_ZONES_LCK_ZONE_PATCHADM	ILIBSTR("## Waiting for up to <%ld> seconds for patch administration commands to become available (another user is administering patches on zone <%s>)")
 #define	MSG_ZONES_LCK_ZONE_PKGADM	ILIBSTR("## Waiting for up to <%ld> seconds for package administration commands to become available (another user is administering packages on zone <%s>)")
 #define	MSG_ZONES_LCK_ZONE_ZONEADM	ILIBSTR("## Waiting for up to <%ld> seconds for zone administration commands to become available (another user is administering zones on zone <%s>)")
 
@@ -209,7 +202,6 @@ extern "C" {
  * during the normal usage of the products
  */
 
-#define	WRN_ZONES_ULK_ZONE_PATCHADM	ILIBSTR("WARNING: Unable to release patch administration lock for zone <%s>")
 #define	WRN_ZONES_ULK_ZONE_PKGADM	ILIBSTR("WARNING: Unable to release package administration lock for zone <%s>")
 #define	WRN_ZONES_ULK_ZONE_ZONEADM	ILIBSTR("WARNING: Unable to release zone administration lock for zone <%s>")
 

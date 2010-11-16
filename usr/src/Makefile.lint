@@ -340,6 +340,7 @@ COMMON_SUBDIRS = \
 	lib/brand/solaris10 \
 	lib/crypt_modules \
 	lib/extendedFILE \
+	lib/libadm \
 	lib/libadutils \
 	lib/libadt_jni \
 	lib/libaio \
@@ -407,6 +408,7 @@ COMMON_SUBDIRS = \
 	lib/libpctx \
 	lib/libpicl \
 	lib/libpicltree \
+	lib/libpkg \
 	lib/libpool \
 	lib/libproc \
 	lib/libpthread \
@@ -475,12 +477,6 @@ COMMON_SUBDIRS = \
 	ucbcmd/users \
 	ucbcmd/whoami
 
-$(CLOSED_BUILD)COMMON_SUBDIRS += \
-	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
-	$(CLOSED)/cmd/pax \
-	$(CLOSED)/cmd/sed_xpg4 \
-	$(CLOSED)/lib/libc_i18n
-
 i386_SUBDIRS= \
 	cmd/acpihpd \
 	cmd/biosdev \
@@ -510,8 +506,6 @@ sparc_SUBDIRS= \
 	lib/libv12n \
 	lib/storage \
 	stand
-
-$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/mtst
 
 LINTSUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

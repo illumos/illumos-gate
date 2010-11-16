@@ -537,7 +537,6 @@ extern "C" {
 #define	ERR_OPRESVR4			gettext("unable to unlink options file <%s>")
 #define	ERR_OUTPUT_WRITING		gettext("error while writing file <%s>: (%d) %s")
 #define	ERR_PACKAGEBINREN		gettext("unable to rename <%s>\n\tto <%s>")
-#define	ERR_PATCHPKG			gettext("unable to update patch_table with patches that have been pre installed")
 #define	ERR_PATH			gettext("the path <%s> is invalid!")
 #define	ERR_PKGABRV			gettext("illegal package abbreviation <%s> in dependency file")
 #define	ERR_PKGADDCHK_CNFFAILED		gettext("Conflicting file dependency checking failed.")
@@ -670,7 +669,6 @@ extern "C" {
 #define	ERR_WTMPFILE			gettext("unable to write temporary file <%s>")
 #define	ERR_ZONETEMPDIR			gettext("unable to make temporary directory for non-global zone operations in directory <%s>: %s")
 #define	ERR_Z_USED_IN_NONGLOBAL_ZONE	gettext("the zonelist option may not be used in a non-global zone")
-#define	ERR_PKGINFO_COPY 		gettext("unable to copy %s to %s")
 #define	ERR_CANNOT_ENABLE_LOCAL_FS	gettext("Failed to enable the filesystem/local service.\n")
 #define	ERR_CANNOT_RESTORE_LOCAL_FS	gettext("Failed to bring the filesystem/local service back to its original state.\n")
 
@@ -838,7 +836,6 @@ extern "C" {
 #define	WRN_INSTVOL_NOTDIR		gettext("WARNING: %s may not overwrite a populated directory.")
 #define	WRN_INSTVOL_NOVERIFY		gettext("WARNING: %s <cannot install to or verify on %s>")
 #define	WRN_NOMAIL			gettext("WARNING: unable to send e-mail notification")
-#define	WRN_PKGREMOVE_PATCHES		gettext("\\nWARNING: The following patch(es) are installed to <%s>. If <%s> is removed, the patches applied to it will be removed as well leaving the patch partially installed. It is recommended that the patch(es) be removed before removing <%s>.\\n\\t%s")
 #define	WRN_RELATIVE			gettext("attempting to rename a relative file <%s>")
 #define	WRN_RSCRIPTALT_BAD		gettext("WARNING: the admin parameter <%s> is set to <%s> which is not recognized; the parameter may only be set to <%s> or <%s>")
 #define	WRN_RSCRIPTALT_USING		gettext("WARNING: the admin parameter <%s> is assumed to be set to <%s>")

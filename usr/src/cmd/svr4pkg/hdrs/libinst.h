@@ -239,8 +239,6 @@ extern int	finalck __P((struct cfent *ept, int attrchg, int contchg,
 /* dockdeps.c */
 extern void setUpdate __P((void));
 extern int  isUpdate __P((void));
-extern void setPatchUpdate __P((void));
-extern int  isPatchUpdate __P((void));
 
 /* mntinfo.c */
 extern int	get_mntinfo __P((int map_client, char *vfstab_file));
