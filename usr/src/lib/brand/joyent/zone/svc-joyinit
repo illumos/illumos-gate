@@ -31,7 +31,17 @@ PATH=/usr/sbin:/usr/bin; export PATH
 
 case "$1" in
 'start')
-	# XXX invoke Ur here
+
+    # Grab AMQP vars from kernel cmdline
+    /usr/bin/bootparams | grep "^rabbitmq=" | cut -d'=' -f2 \
+      | awk -F':' '{ print $1,$2,$3,$4 }' | { read user pass host port junk
+        export AMQP_HOST="${host}"
+        export AMQP_PORT="${port}"
+        export AMQP_LOGIN="${user}"
+        export AMQP_PASSWORD="${pass}"
+    }
+
+    /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
 	;;
 
 'stop')
