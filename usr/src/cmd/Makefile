@@ -45,7 +45,6 @@ FIRST_SUBDIRS=		\
 	platexec
 
 COMMON_SUBDIRS=		\
-	agents		\
 	allocate	\
 	availdevs	\
 	lp		\
