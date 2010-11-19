@@ -197,11 +197,6 @@ static char		*parentZoneType = (char *)NULL;
 #define	MALSIZ	4	/* best guess at likely maximum value of MAXINST */
 #define	LSIZE	256	/* maximum line size supported in copyright file */
 
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-#define	SCRIPT	0	/* which exception_pkg() pkg list to use (SCRIPTS) */
-#define	LINK	1	/* which exception_pkg() pkg list to use (SYMLINKS) */
-#endif
-
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
@@ -1246,43 +1241,11 @@ main(int argc, char *argv[])
 		non_abi_scripts = 1;
 	}
 
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
-
-	else if (exception_pkg(srcinst, SCRIPT)) {
-		/*
-		 * Until on1095, set it from exception package names as
-		 * well.
-		 */
-		putparam("NONABI_SCRIPTS", "TRUE");
-		script_in = PROC_XSTDIN;
-		non_abi_scripts = 1;
-	}
-#endif
-
 	/* Set symlinks to be processed the old way */
 	if (abi_sym_ptr && strncasecmp(abi_sym_ptr, "TRUE", 4) == 0) {
 		set_nonABI_symlinks();
 	}
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
 
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-	else if (exception_pkg(srcinst, LINK)) {
-		/* Until 2.9, set it from the execption list */
-		putparam("PKG_NONABI_SYMLINKS", "TRUE");
-		set_nonABI_symlinks();
-	}
-#endif
 	/*
 	 * At this point, script_in, non_abi_scripts & the environment are
 	 * all set correctly for the ABI status of the package.
