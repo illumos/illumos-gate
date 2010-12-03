@@ -13,6 +13,8 @@
 ./etc/snmp/conf
 ./etc/snmp/conf/mibiisa.reg
 ./etc/snmp/conf/snmp.conf
+./kernel/drv/iprb
+./kernel/drv/amd64/iprb
 ./lib/crypto
 ./lib/crypto/kcfd
 ./lib/libc_i18n.a
