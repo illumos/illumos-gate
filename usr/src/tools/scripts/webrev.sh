@@ -2079,10 +2079,12 @@ function build_old_new_git
 	rm -rf $newdir/$file
 	$GIT ls-tree HEAD $file | read n_mode type n_object junk
 	$GIT cat-file $type $n_object > $newdir/$file 2>/dev/null
-	# Strip the first 3 digits, to get a regular octal mode
-	n_mode=${n_mode/???/}
 
-	if [[ -n $n_mode ]]; then
+	if (( $? != 0 )); then
+		rm -f $newdir/$file
+	elif [[ -n $n_mode ]]; then
+		# Strip the first 3 digits, to get a regular octal mode
+		n_mode=${n_mode/???/}
 		chmod $n_mode $newdir/$file
 	else
 		# should never happen
