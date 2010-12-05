@@ -2407,13 +2407,13 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# 2. git rev-parse --git-dir from directory of invocation
 	#
 	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
-	    codemgr_ws=$(git --git-dir=$CODEMGR_WS rev-parse --git-dir \
-	        2>/dev/null)
+	    codemgr_ws=$(git --git-dir=$CODEMGR_WS/.git rev-parse --git-dir \
+                2>/dev/null)
 	[[ -z $codemgr_ws ]] && \
 	    codemgr_ws=$(git rev-parse --git-dir 2>/dev/null)
 
 	if [[ "$codemgr_ws" == ".git" ]]; then
-		codemgr_ws="$PWD"/"$codemgr_ws"
+		codemgr_ws="${PWD}/${codemgr_ws}"
 	fi
 
 	codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
