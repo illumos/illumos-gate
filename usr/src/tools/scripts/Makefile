@@ -69,7 +69,6 @@ PERLMODULES= \
 PYFILES= \
 	cddlchk \
 	copyrightchk \
-	git-active \
 	hdrchk \
 	hg-active \
 	mapfilechk \

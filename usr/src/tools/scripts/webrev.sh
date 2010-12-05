@@ -1780,35 +1780,36 @@ function flist_from_mercurial
 }
 
 #
-# Call git-active to get the active list output in the wx active list format
-#
-function git_active_wxfile
-{
-	typeset child=$1
-
-	TMPFLIST=/tmp/$$.active
-	$GIT_ACTIVE -w $child -o $TMPFLIST
-	wxfile=$TMPFLIST
-}
-
-#
 # flist_from_git
-# Call git-active to get a wx-style active list, and hand it off to
-# flist_from_wx
+# Build a wx-style active list, and hand it off to flist_from_wx
 #
 function flist_from_git
 {
 	typeset child=$1
 	typeset parent=$2
 
-	print " File list from: git-active ...\c"
+	print " File list from: git ...\c"
 
-	if [[ ! -x $GIT_ACTIVE ]]; then
-		print		# Blank line for the \c above
-		print -u2 "Error: git-active tool not found.  Exiting"
-		exit 1
-	fi
-	git_active_wxfile $child
+	TMPFLIST=/tmp/$$.active
+	$GIT log --name-only --reverse --pretty=format:'%s' origin/master.. | \
+	    $AWK '
+		{
+		    msg = $0;
+		    sub(/\n$/, "", msg);
+		    getline;
+		    while (NF > 0) {
+			files[$0] = files[$0] ? files[$0] "\n" msg : msg;
+			getline;
+		    }
+		}
+		 
+		END {
+		    for (file in files) {
+			printf "%s\n\n%s\n\n", file, files[file]
+		    }
+		}' > $TMPFLIST
+
+	wxfile=$TMPFLIST
 
 	# flist_from_wx prints the Done, so we don't have to.
 	flist_from_wx $TMPFLIST
@@ -2053,8 +2054,8 @@ function build_old_new_git
 	else
 		file="$PDIR/$PF"
 	fi
-	git ls-tree $GIT_PARENT $file | read o_mode type o_object junk
-	git cat-file $type $o_object > $olddir/$file 2>/dev/null
+	$GIT ls-tree $GIT_PARENT $file | read o_mode type o_object junk
+	$GIT cat-file $type $o_object > $olddir/$file 2>/dev/null
 
 	if (( $? != 0 )); then
 		rm -f $olddir/$file
@@ -2076,8 +2077,8 @@ function build_old_new_git
 		file="$DIR/$F"
 	fi
 	rm -rf $newdir/$file
-	git ls-tree HEAD $file | read n_mode type n_object junk
-	git cat-file $type $n_object > $newdir/$file 2>/dev/null
+	$GIT ls-tree HEAD $file | read n_mode type n_object junk
+	$GIT cat-file $type $n_object > $newdir/$file 2>/dev/null
 	# Strip the first 3 digits, to get a regular octal mode
 	n_mode=${n_mode/???/}
 
@@ -2217,7 +2218,7 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
 [[ -z $HG_ACTIVE ]] && HG_ACTIVE=`look_for_prog hg-active`
-[[ -z $GIT_ACTIVE ]] && GIT_ACTIVE=`look_for_prog git-active`
+[[ -z $GIT ]] && GIT=`look_for_prog git`
 [[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
 [[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
@@ -2407,10 +2408,10 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# 2. git rev-parse --git-dir from directory of invocation
 	#
 	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
-	    codemgr_ws=$(git --git-dir=$CODEMGR_WS/.git rev-parse --git-dir \
+	    codemgr_ws=$($GIT --git-dir=$CODEMGR_WS/.git rev-parse --git-dir \
                 2>/dev/null)
 	[[ -z $codemgr_ws ]] && \
-	    codemgr_ws=$(git rev-parse --git-dir 2>/dev/null)
+	    codemgr_ws=$($GIT rev-parse --git-dir 2>/dev/null)
 
 	if [[ "$codemgr_ws" == ".git" ]]; then
 		codemgr_ws="${PWD}/${codemgr_ws}"
@@ -2739,11 +2740,11 @@ elif [[ $SCM_MODE == "git" ]]; then
 	fi
 
 	if [[ -z $codemgr_parent ]]; then
-		codemgr_parent=$(git --git-dir=${codemgr_ws}/.git config \
+		codemgr_parent=$($GIT --git-dir=${codemgr_ws}/.git config \
 		    remote.origin.url 2>/dev/null)
 	fi
 
-	CWS_REV=$(git --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
+	CWS_REV=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
 		    2>/dev/null)
 	PWS=$codemgr_parent
 
@@ -2752,7 +2753,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# the natural workspace parent (file list, comments, etc)
 	#
 	if [[ -n $parent_webrev ]]; then
-		real_parent=$(git --git-dir ${codemgr_ws}/.git config \
+		real_parent=$($GIT --git-dir ${codemgr_ws}/.git config \
 	            remote.origin.url 2>/dev/null)
 	else
 		real_parent=$PWS
@@ -2794,18 +2795,9 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# if we don't have one.
 	#
 	if [[ -z $GIT_PARENT ]]; then
-		eval `$SED -e "s/#.*$//" $wxfile | $GREP GIT_PARENT=`
+		GIT_PARENT=$($GIT merge-base origin/master HEAD)
 	fi
-
-	#
-	# If we still don't have a parent, we must have been given a
-	# wx-style active list with no GIT_PARENT specification, run
-	# git-active and pull an GIT_PARENT out of it, ignore the rest.
-	#
-	if [[ -z $GIT_PARENT && -x $GIT_ACTIVE ]]; then
-		$GIT_ACTIVE -w $codemgr_ws | \
-		    eval `$SED -e "s/#.*$//" | $GREP GIT_PARENT=`
-	elif [[ -z $GIT_PARENT ]]; then
+	if [[ -z $GIT_PARENT ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
 	fi
