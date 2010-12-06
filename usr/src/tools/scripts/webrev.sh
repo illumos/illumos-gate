@@ -516,6 +516,16 @@ html_quote()
 	$SED -e "s/&/\&amp;/g" -e "s/</\&lt;/g" -e "s/>/\&gt;/g" "$@" | expand
 }
 
+# 
+# Trim a digest-style revision to a conventionally readable yet useful length
+#
+trim_digest()
+{
+	typeset digest=$1
+
+	echo $digest | $SED -e 's/\([0-9a-f]\{12\}\).*/\1/'
+}
+
 #
 # input_cmd | its2url | output_cmd
 #
@@ -2676,7 +2686,6 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		codemgr_parent=`hg path -R $codemgr_ws default 2>/dev/null`
 	fi
 
-	CWS_REV=`hg parent -R $codemgr_ws --template '{node|short}' 2>/dev/null`
 	PWS=$codemgr_parent
 
 	#
@@ -2740,6 +2749,12 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
 	fi
+
+	pnode=$(trim_digest $HG_PARENT)
+	PRETTY_PWS="${PWS} (at ${pnode})"
+	cnode=$(hg parent -R $codemgr_ws --template '{node|short}' \
+	    2>/dev/null)
+	PRETTY_CWS="${CWS} (at ${cnode})"}
 elif [[ $SCM_MODE == "git" ]]; then
 	#
 	# Parent can either be specified with -p, or specified with
@@ -2752,10 +2767,8 @@ elif [[ $SCM_MODE == "git" ]]; then
 
 	if [[ -z $codemgr_parent ]]; then
 		codemgr_parent=origin/master
-	fi
 
-	CWS_REV=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
-		    2>/dev/null)
+	fi
 	PWS=$codemgr_parent
 
 	#
@@ -2798,6 +2811,13 @@ elif [[ $SCM_MODE == "git" ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
 	fi
+
+	pnode=$(trim_digest $GIT_PARENT)
+	PRETTY_PWS="${PWS} (at ${pnode})"
+
+	cnode=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
+	    2>/dev/null)
+	PRETTY_CWS="${CWS} (at ${cnode})"
 elif [[ $SCM_MODE == "subversion" ]]; then
 
 	#
@@ -3077,22 +3097,11 @@ fi
 #
 # Summarize what we're going to do.
 #
-if [[ -n $CWS_REV ]]; then
-	print "      Workspace: $CWS (at $CWS_REV)"
-else
-	print "      Workspace: $CWS"
-fi
+print "      Workspace: ${PRETTY_CWS:-$CWS}"
 if [[ -n $parent_webrev ]]; then
 	print "Compare against: webrev at $parent_webrev"
 else
-	parent_node=${HG_PARENT:-$GIT_PARENT}
-	if [[ -n $parent_node ]]; then
-		parent_short=$(echo $parent_node | \
-		    $SED -e 's/\([0-9a-f]\{12\}\).*/\1/')
-		print "Compare against: $PWS (at $parent_short)"
-	else
-		print "Compare against: $PWS"
-	fi
+	print "Compare against: ${PRETTY_PWS:-$PWS}"
 fi
 
 [[ -n $INCLUDE_FILE ]] && print "      Including: $INCLUDE_FILE"
@@ -3443,19 +3452,13 @@ fi
 
 PREPDATE=$(LC_ALL=C /usr/bin/date +%Y-%b-%d\ %R\ %z\ %Z)
 print "<tr><th>Prepared by:</th><td>$preparer on $PREPDATE</td></tr>"
-print "<tr><th>Workspace:</th><td>$CWS"
-if [[ -n $CWS_REV ]]; then
-	print "(at $CWS_REV)"
-fi
+print "<tr><th>Workspace:</th><td>${PRETTY_CWS:-$CWS}"
 print "</td></tr>"
 print "<tr><th>Compare against:</th><td>"
 if [[ -n $parent_webrev ]]; then
 	print "webrev at $parent_webrev"
 else
-	print "$PWS"
-	if [[ -n $parent_short ]]; then
-		print "(at $parent_short)"
-	fi
+	print "${PRETTY_PWS:-$PWS}"
 fi
 print "</td></tr>"
 print "<tr><th>Summary of changes:</th><td>"
