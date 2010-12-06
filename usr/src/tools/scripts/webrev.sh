@@ -2813,7 +2813,15 @@ elif [[ $SCM_MODE == "git" ]]; then
 	fi
 
 	pnode=$(trim_digest $GIT_PARENT)
-	PRETTY_PWS="${PWS} (at ${pnode})"
+
+	if [[ $real_parent == */* ]]; then
+		origin=$(echo $real_parent | cut -d/ -f1)
+		origin=$($GIT remote -v | \
+		    $AWK '$1 == "'$origin'" { print $2; exit }')
+		PRETTY_PWS="${PWS} (${origin} at ${pnode})"
+	else
+		PRETTY_PWS="${PWS} (at ${pnode})"
+	fi
 
 	cnode=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
 	    2>/dev/null)
