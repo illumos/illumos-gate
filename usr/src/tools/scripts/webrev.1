@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1 "22 Feb 2010"
+.TH webrev 1 "6 Dec 2010"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -60,7 +60,7 @@ Note that the -l option is only applicable to TeamWare workspaces.
 .B webrev
 builds a set of HTML files suitable for performing code review of
 source changes in a web browser.
-It supports Mercurial, Subversion and Teamware repositories.
+It supports Mercurial, Git, Subversion and Teamware repositories.
 At its most basic, usage is:
 .nf
         $ webrev
@@ -174,8 +174,14 @@ or to reference a teamware flp (file list program).
 In the case of Mercurial \fBwebrev\fR will attempt to use the output
 from the
 .BR hg (1)
-"hg root" to identify the workspace root, and the
+"hg root" command to identify the workspace root, and the
 "hg path default" command to identify the parent workspace.
+
+.SS Git
+In the case of Git \fBwebrev\fR will attempt to use the output from the
+.BR git (1)
+"git rev-parse --git-dir" command to identify the workspace root, and will
+treat 'origin/master' as the workspace parent.
 
 .SS Subversion
 In the case of Subversion \fBwebrev\fR will attempt to use the output
@@ -458,6 +464,7 @@ This will remove just the \fIbugfix.onnv\fR directory.
 .BR putback "(1),"
 .BR workspace "(1),"
 .BR hg "(1),"
+.BR git "(1),"
 .BR ssh_config "(4),"
 .BR svn "(1),"
 .BR which_scm "(1)"
