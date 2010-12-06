@@ -1780,15 +1780,11 @@ function flist_from_mercurial
 }
 
 #
-# flist_from_git
-# Build a wx-style active list, and hand it off to flist_from_wx
+# Transform a specified 'git log' output format into a wx-like active list.
 #
-function flist_from_git
+function git_wxfile
 {
 	typeset child=$1
-	typeset parent=$2
-
-	print " File list from: git ...\c"
 
 	TMPFLIST=/tmp/$$.active
 	$GIT log --name-only --reverse --pretty=format:'%s' origin/master.. | \
@@ -1810,6 +1806,19 @@ function flist_from_git
 		}' > $TMPFLIST
 
 	wxfile=$TMPFLIST
+}
+
+#
+# flist_from_git
+# Build a wx-style active list, and hand it off to flist_from_wx
+#
+function flist_from_git
+{
+	typeset child=$1
+	typeset parent=$2
+
+	print " File list from: git ...\c"
+        git_wxfile $child;
 
 	# flist_from_wx prints the Done, so we don't have to.
 	flist_from_wx $TMPFLIST
@@ -2761,12 +2770,6 @@ elif [[ $SCM_MODE == "git" ]]; then
 		real_parent=$PWS
 	fi
 
-	#
-	# If git-active exists, then we run it.  In the case of no explicit
-	# flist given, we'll use it for our comments.  In the case of an
-	# explicit flist given we'll try to use it for comments for any
-	# files mentioned in the flist.
-	#
 	if [[ -z $flist_done ]]; then
 		flist_from_git $CWS $real_parent
 		flist_done=1
@@ -2774,28 +2777,22 @@ elif [[ $SCM_MODE == "git" ]]; then
 
 	#
 	# If we have a file list now, pull out any variables set
-	# therein.  We do this now (rather than when we possibly use
-	# git-active to find comments) to avoid stomping specifications
-	# in the user-specified flist.
+	# therein.
 	#
 	if [[ -n $flist_done ]]; then
 		env_from_flist
 	fi
 
 	#
-	# Only call git-active if we don't have a wx formatted file already
+	# If we don't have a wx-format file list, build one we can pull change
+	# comments from.
 	#
-	if [[ -x $GIT_ACTIVE && -z $wxfile ]]; then
-		print "  Comments from: git-active...\c"
-		git_active_wxfile $CWS $real_parent
+	if [[ -z $wxfile ]]; then
+		print "  Comments from: git...\c"
+		git_wxfile $CWS $real_parent
 		print " Done."
 	fi
 
-	#
-	# At this point we must have a wx flist either from git-active,
-	# or in general.  Use it to try and find our parent revision,
-	# if we don't have one.
-	#
 	if [[ -z $GIT_PARENT ]]; then
 		GIT_PARENT=$($GIT merge-base origin/master HEAD)
 	fi
