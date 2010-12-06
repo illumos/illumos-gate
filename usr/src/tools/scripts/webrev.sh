@@ -1784,10 +1784,11 @@ function flist_from_mercurial
 #
 function git_wxfile
 {
-	typeset child=$1
+	typeset child="$1"
+	typeset parent="$2"
 
 	TMPFLIST=/tmp/$$.active
-	$GIT log --name-only --reverse --pretty=format:'%s' origin/master.. | \
+	$GIT log --name-only --reverse --pretty=format:'%s' "${parent}".. | \
 	    $AWK '
 		{
 		    msg = $0;
@@ -1818,7 +1819,7 @@ function flist_from_git
 	typeset parent=$2
 
 	print " File list from: git ...\c"
-        git_wxfile $child;
+	git_wxfile "$child" "$parent";
 
 	# flist_from_wx prints the Done, so we don't have to.
 	flist_from_wx $TMPFLIST
@@ -2741,9 +2742,8 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	fi
 elif [[ $SCM_MODE == "git" ]]; then
 	#
-	# Parent can either be specified with -p
-	# Specified with CODEMGR_PARENT in the environment
-	# or taken from git config.
+	# Parent can either be specified with -p, or specified with
+	# CODEMGR_PARENT in the environment.
 	#
 
 	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
@@ -2751,8 +2751,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	fi
 
 	if [[ -z $codemgr_parent ]]; then
-		codemgr_parent=$($GIT --git-dir=${codemgr_ws}/.git config \
-		    remote.origin.url 2>/dev/null)
+		codemgr_parent=origin/master
 	fi
 
 	CWS_REV=$($GIT --git-dir=${codemgr_ws}/.git rev-parse --short=12 HEAD \
@@ -2764,14 +2763,13 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# the natural workspace parent (file list, comments, etc)
 	#
 	if [[ -n $parent_webrev ]]; then
-		real_parent=$($GIT --git-dir ${codemgr_ws}/.git config \
-	            remote.origin.url 2>/dev/null)
+		real_parent=origin/master
 	else
 		real_parent=$PWS
 	fi
 
 	if [[ -z $flist_done ]]; then
-		flist_from_git $CWS $real_parent
+		flist_from_git "$CWS" "$real_parent"
 		flist_done=1
 	fi
 
@@ -2789,12 +2787,12 @@ elif [[ $SCM_MODE == "git" ]]; then
 	#
 	if [[ -z $wxfile ]]; then
 		print "  Comments from: git...\c"
-		git_wxfile $CWS $real_parent
+		git_wxfile "$CWS" "$real_parent"
 		print " Done."
 	fi
 
 	if [[ -z $GIT_PARENT ]]; then
-		GIT_PARENT=$($GIT merge-base origin/master HEAD)
+		GIT_PARENT=$($GIT merge-base "$real_parent" HEAD)
 	fi
 	if [[ -z $GIT_PARENT ]]; then
 		print -u2 "Error: Cannot discover parent revision"
