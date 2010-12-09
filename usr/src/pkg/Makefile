@@ -227,6 +227,12 @@ DEP_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.dep)
 PROC_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.mog)
 
 #
+# Root of pkg image to use for dependency resolution
+# Normally / on the machine used to build the binaries
+#
+PKGDEP_RESOLVE_IMAGE = /
+
+#
 # For each package, we determine the target repository based on
 # manifest-embedded metadata.  Because we make that determination on
 # the fly, the publication target cannot be expressed as a
@@ -364,7 +370,8 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 		done; \
 	else \
 		print "Resolving dependencies"; \
-		pkgdepend resolve -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
+		pkgdepend -R $(PKGDEP_RESOLVE_IMAGE) resolve \
+		    -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
 		for p in $(DEP_SYNTH_PKGS:%.dep=%) $(DEP_PKGS:%.dep=%); do \
 			if [ "$$(print $$p.metadata.*)" = \
 			     "$$(print $$p.metadata.noincorp.*)" ]; \

@@ -1267,15 +1267,9 @@ assym.h := CFLAGS64 += -g
 
 GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
 
-# XXX	A hack.  Perhaps this should be 'CPPFLAGS.native' and
-#	live in Makefile.master
-
-CPPFLAGS.genassym = \
-	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) -I.
-
 genassym: $(GENASSYM_C)
 	$(NATIVECC) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc \
-		$(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
+		$(CPPFLAGS.native) -o $@ $(GENASSYM_C)
 
 OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 
