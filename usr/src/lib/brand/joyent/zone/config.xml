@@ -48,7 +48,8 @@
 	<attach></attach>
 	<detach></detach>
 	<clone></clone>
-	<uninstall></uninstall>
+	<uninstall>/usr/lib/brand/joyent/juninstall -z %z -R %R</uninstall>
+	<prestatechange>/usr/lib/brand/joyent/prestate %z %R</prestatechange>
 
 	<privilege set="default" name="contract_event" />
 	<privilege set="default" name="contract_identity" />

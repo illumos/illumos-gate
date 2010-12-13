@@ -110,6 +110,4 @@ fi
 
 touch $ZROOT/var/log/courier.log
 
-mkdir -m755 $ZONEPATH/site
-
 exit $ZONE_SUBPROC_OK
