@@ -45,6 +45,7 @@ if [ "$fstype" = zfs ] ; then
 fi
 
 # Joyent additions
+JOYSWAP=/dev/zvol/dsk/zones/swap
 
 # Need to run syseventd now because it talks to devfs to create /dev/dsk
 # so that we can try to import the zpool.
@@ -57,6 +58,7 @@ if [ $? -eq 0 ]; then
         mount -F zfs zones/config /etc/zones
         mount -F zfs zones/opt /opt
 	dumpadm -y -d /dev/zvol/dsk/zones/dump
+	[ -b $JOYSWAP ] && swap -a $JOYSWAP
 fi
 
 # End Joyent additions
