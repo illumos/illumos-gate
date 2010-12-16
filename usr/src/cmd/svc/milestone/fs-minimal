@@ -57,8 +57,10 @@ if [ $? -eq 0 ]; then
         mount -F zfs zones/var /var
         mount -F zfs zones/config /etc/zones
         mount -F zfs zones/opt /opt
-	dumpadm -y -d /dev/zvol/dsk/zones/dump
-	[ -b $JOYSWAP ] && swap -a $JOYSWAP
+        mkdir -p /opt/agents/smf
+        mount -O -F lofs /var/svc/manifest/site /opt/agents/smf
+        dumpadm -y -d /dev/zvol/dsk/zones/dump
+        [ -b $JOYSWAP ] && swap -a $JOYSWAP
 fi
 
 # End Joyent additions
