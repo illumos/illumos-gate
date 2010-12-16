@@ -336,6 +336,8 @@ mf_fgets(SPACE *sp, enum e_spflag spflag)
 		if (infile != NULL) {
 			(void) fclose(infile);
 			if (*oldfname != '\0') {
+				/* if there was a backup file, remove it */
+				(void) unlink(oldfname);
 				if (link(fname, oldfname) != 0) {
 					warn("link()");
 					(void) unlink(tmpfname);
