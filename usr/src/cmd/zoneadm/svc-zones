@@ -164,6 +164,7 @@ MANFLIST="\
 	system/early-manifest-import.xml \
 	system/extended-accounting.xml \
 	system/filesystem/autofs.xml \
+	system/filesystem/joyent-fs.xml \
 	system/filesystem/local-fs.xml \
 	system/filesystem/minimal-fs.xml \
 	system/filesystem/root-fs.xml \
