@@ -271,7 +271,6 @@ set_events(file_info_t *files)
 	int i;
 	file_info_t *file;
 
-	action = USE_PORT;
 	for (i = 0, file = files; i < no_files; i++, file++) {
 		if (! file->fp)
 			continue;
