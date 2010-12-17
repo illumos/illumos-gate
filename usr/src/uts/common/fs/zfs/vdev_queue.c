@@ -27,6 +27,7 @@
 #include <sys/vdev_impl.h>
 #include <sys/zio.h>
 #include <sys/avl.h>
+#include <sys/zfs_zone.h>
 
 /*
  * These tunables are for performance analysis.
@@ -120,6 +121,8 @@ vdev_queue_init(vdev_t *vd)
 
 	avl_create(&vq->vq_pending_tree, vdev_queue_offset_compare,
 	    sizeof (zio_t), offsetof(struct zio, io_offset_node));
+
+	vq->vq_last_zone_id = 0;
 }
 
 void
@@ -387,6 +390,8 @@ vdev_queue_io_done(zio_t *zio)
 	mutex_enter(&vq->vq_lock);
 
 	avl_remove(&vq->vq_pending_tree, zio);
+
+	zfs_zone_zio_done(zio);
 
 	for (int i = 0; i < zfs_vdev_ramp_rate; i++) {
 		zio_t *nio = vdev_queue_io_to_issue(vq, zfs_vdev_max_pending);

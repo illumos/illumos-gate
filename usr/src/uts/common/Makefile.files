@@ -1379,6 +1379,7 @@ ZFS_COMMON_OBJS +=		\
 	zfs_fuid.o		\
 	zfs_sa.o		\
 	zfs_znode.o		\
+	zfs_zone.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\

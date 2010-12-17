@@ -371,6 +371,7 @@ rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_max_swap;
 rctl_hndl_t rc_zone_max_lofi;
 rctl_hndl_t rc_zone_cpu_cap;
+rctl_hndl_t rc_zone_zfs_io_share;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_nprocs;
 rctl_hndl_t rc_zone_shmmax;
@@ -1378,6 +1379,44 @@ static rctl_ops_t zone_cpu_cap_ops = {
 	rcop_no_test
 };
 
+/*
+ * zone.zfs-io-share resource control support (similar to the FSS).
+ */
+/*ARGSUSED*/
+static rctl_qty_t
+zone_zfs_io_share_get(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_zone->zone_zfs_io_share);
+}
+
+/*ARGSUSED*/
+static int
+zone_zfs_io_share_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	zone_t *zone = e->rcep_p.zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+
+	if (zone == NULL)
+		return (0);
+
+	/*
+	 * set share to the new value.
+	 */
+	zone->zone_zfs_io_share = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_zfs_io_share_ops = {
+	rcop_no_action,
+	zone_zfs_io_share_get,
+	zone_zfs_io_share_set,
+	rcop_no_test
+};
+
 /*ARGSUSED*/
 static rctl_qty_t
 zone_lwps_usage(rctl_t *r, proc_t *p)
@@ -1794,8 +1833,58 @@ zone_swapresv_kstat_update(kstat_t *ksp, int rw)
 	return (0);
 }
 
+static int
+zone_perf_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_perf_kstat_t *zk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zk->zk_read_iops.value.ui64 = zone->zone_iops_read;
+	zk->zk_write_iops.value.ui64 = zone->zone_iops_write;
+	zk->zk_lwrite_iops.value.ui64 = zone->zone_iops_lwrite;
+	return (0);
+}
+
 static kstat_t *
-zone_kstat_create_common(zone_t *zone, char *name,
+zone_perf_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
+{
+	kstat_t *ksp;
+	zone_perf_kstat_t *zk;
+	char nm[KSTAT_STRLEN];
+
+	(void) snprintf(nm, KSTAT_STRLEN, "zone_%d", zone->zone_id);
+
+	/* module, instance, name, class, type, ndata, flags, zoneid */
+	ksp = kstat_create_zone("zones", zone->zone_id, nm, "zone_stats",
+	    KSTAT_TYPE_NAMED,
+	    sizeof (zone_perf_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zk = ksp->ks_data = kmem_alloc(sizeof (zone_perf_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
+	kstat_named_init(&zk->zk_read_iops, "read_iops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_write_iops, "write_iops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_lwrite_iops, "logical_write_iops",
+	    KSTAT_DATA_UINT64);
+	ksp->ks_update = updatefunc;
+	ksp->ks_private = zone;
+	kstat_install(ksp);
+	return (ksp);
+}
+
+static kstat_t *
+zone_rctl_kstat_create_common(zone_t *zone, char *name,
     int (*updatefunc) (kstat_t *, int))
 {
 	kstat_t *ksp;
@@ -1823,12 +1912,28 @@ zone_kstat_create_common(zone_t *zone, char *name,
 static void
 zone_kstat_create(zone_t *zone)
 {
-	zone->zone_lockedmem_kstat = zone_kstat_create_common(zone,
+	zone->zone_lockedmem_kstat = zone_rctl_kstat_create_common(zone,
 	    "lockedmem", zone_lockedmem_kstat_update);
-	zone->zone_swapresv_kstat = zone_kstat_create_common(zone,
+	zone->zone_swapresv_kstat = zone_rctl_kstat_create_common(zone,
 	    "swapresv", zone_swapresv_kstat_update);
-	zone->zone_nprocs_kstat = zone_kstat_create_common(zone,
+	zone->zone_nprocs_kstat = zone_rctl_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
+
+	zone->zone_perf_kstat = zone_perf_kstat_create(zone,
+	    zone_perf_kstat_update);
+}
+
+static void
+zone_perf_kstat_delete(kstat_t **pkstat)
+{
+	void *data;
+
+	if (*pkstat != NULL) {
+		data = (*pkstat)->ks_data;
+		kstat_delete(*pkstat);
+		kmem_free(data, sizeof (zone_perf_kstat_t));
+		*pkstat = NULL;
+	}
 }
 
 static void
@@ -1850,6 +1955,8 @@ zone_kstat_delete(zone_t *zone)
 	zone_kstat_delete_common(&zone->zone_lockedmem_kstat);
 	zone_kstat_delete_common(&zone->zone_swapresv_kstat);
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat);
+
+	zone_perf_kstat_delete(&zone->zone_perf_kstat);
 }
 
 /*
@@ -1907,6 +2014,11 @@ zone_zsd_init(void)
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
+	zone0.zone_zfs_io_share = 1;
+	zone0.zone_iops_read = 0;
+	zone0.zone_iops_write = 0;
+	zone0.zone_iops_lwrite = 0;
+	zone0.zone_perf_kstat = NULL;
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
@@ -2012,6 +2124,12 @@ zone_init(void)
 	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER |
 	    RCTL_GLOBAL_INFINITE,
 	    MAXCAP, MAXCAP, &zone_cpu_cap_ops);
+
+	rc_zone_zfs_io_share = rctl_register("zone.zfs-io-share",
+	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_ALWAYS |
+	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER |
+	    RCTL_GLOBAL_INFINITE,
+	    UINT_MAX, UINT_MAX, &zone_zfs_io_share_ops);
 
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
@@ -4174,8 +4292,12 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_max_swap_ctl = UINT64_MAX;
 	zone->zone_max_lofi = 0;
 	zone->zone_max_lofi_ctl = UINT64_MAX;
-	zone0.zone_lockedmem_kstat = NULL;
-	zone0.zone_swapresv_kstat = NULL;
+	zone->zone_lockedmem_kstat = NULL;
+	zone->zone_swapresv_kstat = NULL;
+	zone->zone_zfs_io_share= 1;
+	zone->zone_iops_read = 0;
+	zone->zone_iops_write = 0;
+	zone->zone_iops_lwrite = 0;
 
 	/*
 	 * Zsched initializes the rctls.

@@ -417,6 +417,10 @@ struct zio {
 	/* FMA state */
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
+
+	/* Zone which originated this IO */
+	zoneid_t	io_zoneid;
+	hrtime_t	io_start;          /* time IO was dispatched */
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,

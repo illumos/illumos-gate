@@ -34,6 +34,7 @@
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
 #include <sys/ddt.h>
+#include <sys/zfs_zone.h>
 
 /*
  * ==========================================================================
@@ -543,11 +544,14 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 		zio->io_bookmark = *zb;
 
 	if (pio != NULL) {
+		zio->io_zoneid = pio->io_zoneid;
 		if (zio->io_logical == NULL)
 			zio->io_logical = pio->io_logical;
 		if (zio->io_child_type == ZIO_CHILD_GANG)
 			zio->io_gang_leader = pio->io_gang_leader;
 		zio_add_child(pio, zio);
+	} else {
+		zfs_zone_zio_init(zio);
 	}
 
 	return (zio);
@@ -2326,6 +2330,8 @@ zio_vdev_io_start(zio_t *zio)
 			return (ZIO_PIPELINE_STOP);
 		}
 	}
+
+	zfs_zone_zio_start(zio);
 
 	return (vd->vdev_ops->vdev_op_io_start(zio));
 }

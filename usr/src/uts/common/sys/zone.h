@@ -367,7 +367,7 @@ typedef struct zone_dataset {
 } zone_dataset_t;
 
 /*
- * structure for zone kstats
+ * structure for rctl zone kstats
  */
 typedef struct zone_kstat {
 	kstat_named_t zk_zonename;
@@ -375,7 +375,23 @@ typedef struct zone_kstat {
 	kstat_named_t zk_value;
 } zone_kstat_t;
 
+/*
+ * structure for zone performance kstats
+ */
+typedef struct zone_perf_kstat {
+	kstat_named_t zk_zonename;
+	kstat_named_t zk_read_iops;
+	kstat_named_t zk_write_iops;
+	kstat_named_t zk_lwrite_iops;
+} zone_perf_kstat_t;
+
 struct cpucap;
+
+typedef struct {
+	hrtime_t	cycle_start;
+	uint_t		cycle_cnt;
+	hrtime_t	zone_avg_cnt;
+} sys_zio_cntr_t;
 
 typedef struct zone {
 	/*
@@ -517,6 +533,21 @@ typedef struct zone {
 	list_t		zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
+	/*
+	 * Data and kstats used for zfs storage fair-share IO.
+	 */
+	rctl_qty_t	zone_zfs_io_share;	/* ZFS IO share */
+	uint64_t	zone_iops_read;		/* kstat ZFS read IOPS */
+	uint64_t	zone_iops_write;	/* kstat ZFS write IOPS */
+	uint64_t	zone_iops_lwrite;	/* kstat logical write IOPS */
+	uint64_t	zone_io_util;		/* IO utilization metric */
+	uint16_t	zone_io_delay;		/* IO delay on writes */
+	kstat_t		*zone_perf_kstat;
+	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
+	sys_zio_cntr_t	rd_ops;			/* Counters for ZFS reads, */
+	sys_zio_cntr_t	wr_ops;			/* writes and logical writes. */
+	sys_zio_cntr_t	lwr_ops;
+
 	/*
 	 * Solaris Auditing per-zone audit context
 	 */

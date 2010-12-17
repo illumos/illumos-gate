@@ -102,6 +102,7 @@ struct vdev_queue {
 	avl_tree_t	vq_read_tree;
 	avl_tree_t	vq_write_tree;
 	avl_tree_t	vq_pending_tree;
+	zoneid_t	vq_last_zone_id;
 	kmutex_t	vq_lock;
 };
 
