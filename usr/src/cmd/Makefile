@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 
 include ../Makefile.master
 
@@ -44,7 +45,6 @@ FIRST_SUBDIRS=		\
 	platexec
 
 COMMON_SUBDIRS=		\
-	agents		\
 	allocate	\
 	availdevs	\
 	lp		\
@@ -232,6 +232,7 @@ COMMON_SUBDIRS=		\
 	listen		\
 	loadkeys	\
 	locale		\
+	localedef	\
 	lockstat	\
 	locator		\
 	lofiadm		\
@@ -253,7 +254,6 @@ COMMON_SUBDIRS=		\
 	mkdir		\
 	mkfifo		\
 	mkfile		\
-	mklocale	\
 	mkmsgs		\
 	mknod		\
 	mkpwdict	\
@@ -283,6 +283,7 @@ COMMON_SUBDIRS=		\
 	nscd		\
 	oamuser		\
 	oawk		\
+	od		\
 	pack		\
 	pagesize	\
 	passmgmt	\
@@ -308,6 +309,7 @@ COMMON_SUBDIRS=		\
 	pr		\
 	prctl		\
 	print		\
+	printf		\
 	priocntl	\
 	profiles	\
 	projadd		\
@@ -393,6 +395,7 @@ COMMON_SUBDIRS=		\
 	syseventadm	\
 	syslogd		\
 	tabs		\
+	tail		\
 	tar		\
 	tbl		\
 	tcopy		\
@@ -404,7 +407,6 @@ COMMON_SUBDIRS=		\
 	tip		\
 	tnf		\
 	touch		\
-	tplot		\
 	tput		\
 	tr		\
 	trapstat	\
@@ -473,8 +475,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/pax	\
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail
+	$(CLOSED)/cmd/sed_xpg4
 
 i386_SUBDIRS=		\
 	acpihpd		\
@@ -757,8 +758,7 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/pax	\
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail
+	$(CLOSED)/cmd/sed_xpg4
 
 sparc_MSGSUBDIRS=	\
 	fruadm		\
@@ -851,6 +851,7 @@ _dc: $(DCSUBDIRS)
 #
 fs.d: fstyp
 ksh:	shcomp isaexec
+mdb:	terminfo
 print:	lp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC

@@ -23,6 +23,7 @@
 #
 
 syntax: glob
+exception_lists/closed-bins
 exception_lists/cstyle
 exception_lists/hdrchk
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c

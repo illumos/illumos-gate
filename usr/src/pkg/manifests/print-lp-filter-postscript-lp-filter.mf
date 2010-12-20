@@ -44,22 +44,11 @@ file path=usr/lib/lp/postscript/dpost.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/draw.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/fatcourier.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/forms.ps group=lp mode=0555
-file path=usr/lib/lp/postscript/picpack group=lp mode=0555
 file path=usr/lib/lp/postscript/postcomm group=lp mode=0555
-file path=usr/lib/lp/postscript/postdaisy group=lp mode=0555
-file path=usr/lib/lp/postscript/postdaisy.ps group=lp mode=0555
-file path=usr/lib/lp/postscript/postdmd group=lp mode=0555
-file path=usr/lib/lp/postscript/postdmd.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/postio group=lp mode=0555
-file path=usr/lib/lp/postscript/postmd group=lp mode=0555
-file path=usr/lib/lp/postscript/postmd.ps group=lp mode=0555
-file path=usr/lib/lp/postscript/postplot group=lp mode=0555
-file path=usr/lib/lp/postscript/postplot.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/postprint group=lp mode=0555
 file path=usr/lib/lp/postscript/postprint.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/postreverse group=lp mode=0555
-file path=usr/lib/lp/postscript/posttek group=lp mode=0555
-file path=usr/lib/lp/postscript/posttek.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/ps.requests group=lp mode=0555
 legacy pkg=SUNWpsf \
     desc="client configuration files and utilities for the print service" \

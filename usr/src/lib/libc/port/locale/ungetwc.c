@@ -29,7 +29,6 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 /*	This module is created for NLS on Sep.03.86		*/

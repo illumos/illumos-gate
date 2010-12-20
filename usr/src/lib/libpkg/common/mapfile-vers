@@ -132,14 +132,12 @@ SYMBOL_VERSION SUNWprivate {
 	open_keystore;
 	path_valid;
 	pkg_passphrase_cb;
-	pkgalias;
 	pkgclosefilter;
 	pkgcloseserver;
 	pkgcmd;
 	pkgerr;
 	pkgerr_add;
 	pkgerr_clear;
-	pkgerr_dump;
 	pkgerr_free;
 	pkgerr_get;
 	pkgerr_new;

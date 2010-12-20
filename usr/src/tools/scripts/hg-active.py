@@ -44,8 +44,8 @@ except Version.VersionMismatch, versionerror:
 
 
 import getopt, binascii
-from mercurial import hg, ui, util
-from onbld.Scm.WorkSpace import WorkSpace, HgRepoError
+from mercurial import error, hg, ui, util
+from onbld.Scm.WorkSpace import WorkSpace
 
 
 def usage():
@@ -78,7 +78,7 @@ def main(argv):
 
     try:
         repository = hg.repository(ui.ui(), wspath)
-    except HgRepoError, e:
+    except error.RepoError, e:
         sys.stderr.write("failed to open repository: %s\n" % e)
         sys.exit(1)
 

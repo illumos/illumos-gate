@@ -24,12 +24,6 @@
 #
 
 #
-# All nonredistributable packages go to extra, for the purposes of the
-# osnet build.
-#
-<transform set name=org.opensolaris.redist value=nonredist|internal -> print REPO=extra>
-
-#
 # Pull out the license paths for staging in the proto area.  Ignore
 # those with no path separators, as that indicates a file kept in
 # $SRC/pkg/license_files, rather than alongside the associated source.

@@ -24,7 +24,9 @@
 # Use is subject to license terms.
 #
 
-SHELL=/usr/bin/ksh93
+#
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
 
 PROG= alias
 ALIASPROG= \
@@ -59,10 +61,35 @@ ALIASPROG= \
 	wait \
 	wc
 
+XPG4ALIASPROG= \
+	alias \
+	bg \
+	cd \
+	command \
+	fc \
+	fg \
+	getopts \
+	hash \
+	jobs \
+	kill \
+	read \
+	test \
+	type \
+	ulimit \
+	umask \
+	unalias \
+	wait
+
+XPG4SH= \
+	sh
+
+ROOTXPG4ALIAS= \
+	$(XPG4SH:%=$(ROOTXPG4BIN)/%) $(XPG4ALIASPROG:%=$(ROOTXPG4BIN)/%)
+ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
+
 include ../../Makefile.cmd
 $(SPARC_BLD)include ../../Makefile.cmd.64
 
-ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
 
 FILEMODE= 555
 
@@ -70,8 +97,14 @@ FILEMODE= 555
 
 all: $(PROG)
 
-$(ROOTBIN)/%: $(ROOTBIN)/alias
-	$(INS.link)
+$(XPG4ALIASPROG:%=$(ROOTXPG4BIN)/%):
+	$(RM) $@; $(SYMLINK) ../../bin/alias $@
+
+$(XPG4SH:%=$(ROOTXPG4BIN)/%):
+	$(RM) $@; $(SYMLINK) ../../bin/ksh93 $@
+
+$(ALIASPROG:%=$(ROOTBIN)/%): $(ROOTPROG)
+	$(RM) $@; $(LN) $(ROOTPROG) $@
 
 .KEEP_STATE:
 
@@ -103,8 +136,7 @@ CFLAGS64 += \
 
 ROOTCMDDIR=$(ROOT)/usr/bin
 
-# .WAIT is needed to get the hardlinks properly done
-install: all $(ROOTCMD) .WAIT $(ROOTALIASPROG)
+install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTALIASPROG) $(ROOTXPG4ALIAS)
 
 $(PROG):	$(OBJECTS)
 	$(RM) alias

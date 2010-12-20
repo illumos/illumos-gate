@@ -44,13 +44,11 @@ install: all $(ROOTBINPFEXEC)
 		$(LN) $(ROOTBIN)/pfexec $(ROOTBIN)/pf$$s; \
 	done
 	$(RM) $(ROOTXPG4BIN)/pfsh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTXPG4BIN)/pfsh
+	$(SYMLINK) ../../bin/pfexec $(ROOTXPG4BIN)/pfsh
 	$(RM) $(ROOTSBIN)/pfsh
 	$(SYMLINK) ../usr/bin/pfexec $(ROOTSBIN)/pfsh
 	$(RM) $(ROOTHASBIN)/pfsh
 	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfsh
-	$(RM) $(ROOTHASBIN)/pfksh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfksh
 
 clean:
 

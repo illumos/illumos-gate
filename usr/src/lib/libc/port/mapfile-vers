@@ -88,6 +88,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.1 {	# Illumos additions
+    protected:
+        timegm;
+} SUNW_1.23;
+
 SYMBOL_VERSION SUNW_1.23 {	# SunOS 5.11 (Solaris 11)
     global:
 	_nl_domain_bindings;

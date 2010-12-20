@@ -21,6 +21,8 @@
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+
 set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
 set name=pkg.description \
     value="core software for a specific instruction-set architecture"
@@ -271,8 +273,6 @@ dir path=usr/share/lib/zoneinfo/US
 dir path=usr/share/lib/zoneinfo/src
 dir path=usr/share/lib/zoneinfo/tab
 dir path=usr/share/src group=sys
-dir path=usr/xpg4
-dir path=usr/xpg4/bin
 dir path=var group=sys
 dir path=var/adm group=sys mode=0775
 dir path=var/adm/exacct group=adm owner=adm
@@ -844,6 +844,7 @@ file path=usr/bin/pgrep mode=0555
 file path=usr/bin/pkg2du mode=0555
 file path=usr/bin/pktool mode=0555
 file path=usr/bin/pr mode=0555
+file path=usr/bin/printf mode=0555
 file path=usr/bin/priocntl mode=0555
 file path=usr/bin/profiles mode=0555
 file path=usr/bin/projects mode=0555
@@ -873,7 +874,6 @@ file path=usr/bin/tail mode=0555
 file path=usr/bin/tic mode=0555
 file path=usr/bin/time mode=0555
 file path=usr/bin/tip mode=4511 owner=uucp
-file path=usr/bin/tplot mode=0555
 file path=usr/bin/tpmadm mode=0555
 file path=usr/bin/tput mode=0555
 file path=usr/bin/tr mode=0555
@@ -890,7 +890,6 @@ file path=usr/bin/write group=tty mode=2555
 file path=usr/bin/xargs mode=0555
 file path=usr/bin/xstr mode=0555
 file path=usr/has/bin/edit mode=0555
-file path=usr/has/bin/patch mode=0555
 file path=usr/has/bin/sh mode=0555
 file path=usr/kernel/drv/$(ARCH64)/dump group=sys
 file path=usr/kernel/drv/$(ARCH64)/fssnap group=sys
@@ -1281,13 +1280,8 @@ file path=usr/lib/sysevent/modules/sysevent_conf_mod.so
 file path=usr/lib/sysevent/modules/sysevent_reg_mod.so
 file path=usr/lib/sysevent/syseventconfd mode=0555
 file path=usr/lib/sysevent/syseventd mode=0555
-file path=usr/lib/t300 mode=0555
-file path=usr/lib/t300s mode=0555
-file path=usr/lib/t4014 mode=0555
-file path=usr/lib/t450 mode=0555
 file path=usr/lib/utmp_update mode=4555
 file path=usr/lib/utmpd mode=0555
-file path=usr/lib/vplot mode=0555
 file path=usr/lib/vtdaemon mode=0555
 file path=usr/lib/vtinfo mode=0555
 file path=usr/lib/vtxlock mode=0555
@@ -2004,7 +1998,6 @@ file path=usr/share/lib/zoneinfo/src/systemv
 file path=usr/share/lib/zoneinfo/tab/continent.tab
 file path=usr/share/lib/zoneinfo/tab/country.tab
 file path=usr/share/lib/zoneinfo/tab/zone_sun.tab
-file path=usr/xpg4/bin/sh mode=0555
 file path=var/adm/aculog mode=0600 owner=uucp preserve=true
 file path=var/adm/spellhist mode=0666 preserve=true
 file path=var/adm/utmpx preserve=true
@@ -2531,7 +2524,6 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
     target=../../../../usr/share/lib/zoneinfo/Europe/Moscow
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
-hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
 legacy pkg=SUNWcsr \
     desc="core software for a specific instruction-set architecture" \
     name="Core Solaris, (Root)"
@@ -2570,6 +2562,8 @@ license usr/src/cmd/script/THIRDPARTYLICENSE \
     license=usr/src/cmd/script/THIRDPARTYLICENSE
 license usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE \
     license=usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE
+license usr/src/cmd/tail/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tail/THIRDPARTYLICENSE
 license usr/src/cmd/tip/THIRDPARTYLICENSE \
     license=usr/src/cmd/tip/THIRDPARTYLICENSE
 license usr/src/cmd/tr/THIRDPARTYLICENSE \

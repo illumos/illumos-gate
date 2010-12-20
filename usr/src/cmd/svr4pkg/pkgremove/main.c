@@ -71,18 +71,10 @@ extern int	rckpriv(void);
 extern int	rckdepend(void);
 extern int	rckrunlevel(void);
 
-/* predepend.c */
-extern void	predepend(char *oldpkg);
-
 /* delmap.c */
 extern int delmap(int flag, char *pkginst, PKGserver *server, VFP_T **tfp);
 
 #define	DEFPATH		"/sbin:/usr/sbin:/usr/bin"
-
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-#define	SCRIPT	0	/* Tells exception_pkg() which pkg list to use */
-#define	LINK	1
-#endif
 
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"
@@ -731,38 +723,10 @@ main(int argc, char *argv[])
 
 	/*
 	 * If pkginfo says it's not compliant then set non_abi_scripts.
-	 * Oh, for two releases, set it from exception package names as
-	 * well.
 	 */
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
-
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-	if (exception_pkg(pkginst, SCRIPT) ||
-	    (abi_comp_ptr && strncmp(abi_comp_ptr, "TRUE", 4) == 0))
-		script_in = PROC_XSTDIN;
-#else
 	if (abi_comp_ptr && strncmp(abi_comp_ptr, "TRUE", 4) == 0) {
 		script_in = PROC_XSTDIN;
 	}
-#endif
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
-
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-	/* Until 2.9, set it from the execption list */
-	if (exception_pkg(pkginst, LINK)) {
-		set_nonABI_symlinks();
-	}
-#endif
 
 	/*
 	 * Since this is a removal, we can tell whether it's absolute or
@@ -1098,8 +1062,6 @@ main(int argc, char *argv[])
 	}
 
 	if (!warnflag && !failflag) {
-		if (pt = getenv("PREDEPEND"))
-			predepend(pt);
 		(void) chdir("/");
 		if (rrmdir(pkgloc))
 			warnflag++;

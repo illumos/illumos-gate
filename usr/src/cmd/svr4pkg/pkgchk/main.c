@@ -449,18 +449,6 @@ main(int argc, char *argv[])
 		for (n = 0; pkg[n]; n++) {
 			char locenv[PATH_MAX];
 
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-			/* Until 2.9, set it from the execption list */
-			if (exception_pkg(pkg[n], LINK))
-				set_nonABI_symlinks();
-#endif
-
 			if (pkgfmt)
 				(void) printf(
 					gettext(MSG_CHK_DIR), pkg[n], device);

@@ -1248,7 +1248,7 @@ make_NegHints(OM_uint32 *minor_status,
 					&hintNameBuf,
 					&hintNameType);
 	if (major_status != GSS_S_COMPLETE) {
-		gss_release_name(&minor, &hintName);
+		gss_release_name(&minor, &hintKerberosName);
 		return (major_status);
 	}
 	gss_release_name(&minor, &hintKerberosName);

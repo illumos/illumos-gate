@@ -29,7 +29,7 @@ set name=pkg.description \
 set name=pkg.summary \
     value="System X.509 Certifiate Trust Anchors for Public Certificate Authorities"
 set name=info.classification \
-    value=org.opensolaris.category.2010:System/Security
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys

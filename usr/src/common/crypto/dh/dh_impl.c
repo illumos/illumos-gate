@@ -111,6 +111,13 @@ DH_key_finish(DHkey *key)
 /*
  * Generate DH key pair x and y, given prime p and base g.
  * Can optionally provided bit length of x, not to exceed bit length of p.
+ *
+ * For those not familiar with DH keys, there are 4 components:
+ * p - a known prime
+ * g - the base 0 < g < p
+ * x - a random number 0 < x < p-1, or if a smaller value is desired,
+ *     2^(len-1) <= x < 2^(len)
+ * y = g^x mod p, this implies 0 < y < p.  That is important!
  */
 CK_RV
 dh_genkey_pair(DHbytekey *bkey)
@@ -186,7 +193,7 @@ dh_genkey_pair(DHbytekey *bkey)
 	}
 
 	/* Generate DH key pair private and public values. */
-	if ((brv = big_extend(&(dhkey.x), CHARLEN2BIGNUMLEN(prime_bytes)))
+	if ((brv = big_extend(&(dhkey.x), BITLEN2BIGNUMLEN(bkey->value_bits)))
 	    != BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret;
@@ -226,7 +233,8 @@ dh_genkey_pair(DHbytekey *bkey)
 		goto ret;
 	}
 
-	bignum2bytestring(bkey->private_x, &(dhkey.x), prime_bytes);
+	bignum2bytestring(bkey->private_x, &(dhkey.x),
+	    CRYPTO_BITS2BYTES(bkey->value_bits));
 	bignum2bytestring(bkey->public_y, &(dhkey.y), prime_bytes);
 
 ret:
@@ -236,11 +244,12 @@ ret:
 }
 
 /*
- * DH key derive operation
+ * DH key derive operation, flag is ignored in userland
  */
 CK_RV
 dh_key_derive(DHbytekey *bkey, uint32_t key_type,	/* = CKK_KEY_TYPE */
-    uchar_t *secretkey, uint32_t *secretkey_len)	/* derived secret */
+    uchar_t *secretkey, uint32_t *secretkey_len,	/* derived secret */
+    int flag)
 {
 	CK_RV		rv = CKR_OK;
 	BIG_ERR_CODE	brv;
@@ -249,6 +258,7 @@ dh_key_derive(DHbytekey *bkey, uint32_t key_type,	/* = CKK_KEY_TYPE */
 	uint32_t	s_bytes = 0;
 	uint32_t	prime_bytes;
 	uint32_t	value_bytes;
+	size_t		s_alloc;
 
 	if (bkey == NULL)
 		return (CKR_ARGUMENTS_BAD);
@@ -292,12 +302,12 @@ dh_key_derive(DHbytekey *bkey, uint32_t key_type,	/* = CKK_KEY_TYPE */
 	bytestring2bignum(&(dhkey.x), bkey->private_x, value_bytes);
 
 	/* Convert public-value y to bignum. */
-	if ((brv = big_extend(&(dhkey.y), CHARLEN2BIGNUMLEN(value_bytes))) !=
+	if ((brv = big_extend(&(dhkey.y), CHARLEN2BIGNUMLEN(prime_bytes))) !=
 	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret;
 	}
-	bytestring2bignum(&(dhkey.y), bkey->public_y, value_bytes);
+	bytestring2bignum(&(dhkey.y), bkey->public_y, prime_bytes);
 
 	/*
 	 * Recycle base g as a temporary variable to compute the derived
@@ -315,16 +325,19 @@ dh_key_derive(DHbytekey *bkey, uint32_t key_type,	/* = CKK_KEY_TYPE */
 		goto ret;
 	}
 
+	s_alloc = P2ROUNDUP_TYPED(prime_bytes, sizeof (BIG_CHUNK_TYPE), size_t);
+
 #ifdef _KERNEL
-	if ((s = kmem_alloc(P2ROUNDUP_TYPED(prime_bytes,
-	    sizeof (BIG_CHUNK_SIZE), size_t))) == NULL) {
-#else
-	if ((s = malloc(P2ROUNDUP_TYPED(prime_bytes,
-	    sizeof (BIG_CHUNK_SIZE), size_t))) == NULL) {
-#endif
+	if ((s = kmem_alloc(s_alloc, flag)) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto ret;
 	}
+#else
+	if ((s = malloc(s_alloc)) == NULL) {
+		rv = CKR_HOST_MEMORY;
+		goto ret;
+	}
+#endif
 	s_bytes = dhkey.g.len * (int)sizeof (BIG_CHUNK_TYPE);
 	bignum2bytestring(s, &(dhkey.g), s_bytes);
 
@@ -369,7 +382,7 @@ dh_key_derive(DHbytekey *bkey, uint32_t key_type,	/* = CKK_KEY_TYPE */
 ret:
 	if (s != NULL)
 #ifdef _KERNEL
-		kmem_free(s, sizeof (BIG_CHUNK_SIZE));
+		kmem_free(s, s_alloc);
 #else
 		free(s);
 #endif

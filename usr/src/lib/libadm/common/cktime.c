@@ -27,8 +27,10 @@
  * Copyright (c) 1997,1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -58,11 +60,11 @@ static int	fmtcheck(char *);
 #define	TAB '	'
 
 static void
-setmsg(char *msg, char *fmt)
+setmsg(char *msg, char *fmt, size_t sz)
 {
 	if (fmt == NULL)
 		fmt = DEFAULT;
-	(void) sprintf(msg, "%s <%s>.", ERRMSG, fmt);
+	(void) snprintf(msg, sz, "%s <%s>.", ERRMSG, fmt);
 }
 
 static char *
@@ -281,7 +283,7 @@ cktime_err(char *fmt, char *error)
 
 	if ((fmt != NULL) && (fmtcheck(fmt) == 1))
 		return (4);
-	setmsg(defmesg, fmt);
+	setmsg(defmesg, fmt, sizeof (defmesg));
 	puterror(stdout, defmesg, error);
 	return (0);
 }
@@ -293,7 +295,7 @@ cktime_hlp(char *fmt, char *help)
 
 	if ((fmt != NULL) && (fmtcheck(fmt) == 1))
 		return (4);
-	setmsg(defmesg, fmt);
+	setmsg(defmesg, fmt, sizeof (defmesg));
 	puthelp(stdout, defmesg, help);
 	return (0);
 }
@@ -355,7 +357,7 @@ cktime(char *tod, char *fmt, char *defstr, char *error, char *help,
 
 	if (fmt == NULL)
 		fmt = DEFAULT;
-	setmsg(defmesg, fmt);
+	setmsg(defmesg, fmt, sizeof (defmesg));
 	if (!prompt)
 		prompt = "Enter a time of day";
 

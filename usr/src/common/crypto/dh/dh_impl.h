@@ -90,7 +90,7 @@ typedef struct {
 CK_RV dh_genkey_pair(DHbytekey *bkey);
 
 CK_RV dh_key_derive(DHbytekey *bkey, uint32_t key_type,
-    uchar_t *secretkey, uint32_t *secretkey_len);
+    uchar_t *secretkey, uint32_t *secretkey_len, int flag);
 
 #ifdef	__cplusplus
 }

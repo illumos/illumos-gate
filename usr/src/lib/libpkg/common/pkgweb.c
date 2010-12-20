@@ -617,6 +617,7 @@ cleanup:
  *
  * Returns :	none
  */
+/*PRINTFLIKE2*/
 void
 echo_out(int nointeract, char *fmt, ...)
 {
@@ -941,6 +942,7 @@ validate_signature(PKG_ERR *err, char *name, BIO *indata, PKCS7 *p7,
 				/* some other error.  print them all. */
 				while ((errcode = ERR_get_error_line_data(NULL,
 				    NULL, &err_data, &err_flags)) != 0) {
+					size_t errsz;
 					err_reason =
 					    ERR_reason_error_string(errcode);
 					if (err_reason == NULL) {
@@ -952,11 +954,11 @@ validate_signature(PKG_ERR *err, char *name, BIO *indata, PKCS7 *p7,
 						err_data =
 						    gettext(ERR_SIG_INT);
 					}
-					err_string =
-					    xmalloc(strlen(err_reason) +
-						strlen(err_data) + 3);
-					(void) sprintf(err_string, "%s: %s",
-					    err_reason, err_data);
+					errsz = strlen(err_reason) +
+					    strlen(err_data) + 3;
+					err_string = xmalloc(errsz);
+					(void) snprintf(err_string, errsz,
+					    "%s: %s", err_reason, err_data);
 					pkgerr_add(err, PKGERR_VERIFY,
 					    gettext(ERR_VERIFY_SIG),
 					    signer_sname, signer_iname,
@@ -1263,7 +1265,7 @@ ocsp_verify(PKG_ERR *err, X509 *cert, X509 *issuer,
 	}
 
 	/* add nonce */
-	OCSP_request_add1_nonce(req, NULL, -1);
+	(void) OCSP_request_add1_nonce(req, NULL, -1);
 
 	/* connect to host, or proxy */
 	if (proxy != NULL) {
@@ -2823,7 +2825,7 @@ dequote(char *str)
 	}
 
 	/* remove first quote */
-	memmove(str, str + 1, strlen(str) - 1);
+	(void) memmove(str, str + 1, strlen(str) - 1);
 
 	/*
 	 * scan string looking for ending quote.
@@ -3022,7 +3024,7 @@ backoff()
 		initted = B_TRUE;
 	}
 
-	backoff = drand48() * (double)cur_backoff;
+	backoff = (int)(drand48() * (double)cur_backoff);
 	(void) sleep(backoff);
 	if (cur_backoff < MAX_BACKOFF) {
 		/*
@@ -3157,7 +3159,7 @@ pkg_passphrase_cb(char *buf, int size, int rw, void *data)
 			 */
 
 			/* make a copy (getpassphrase overwrites) */
-			strlcpy(passphrase_copy, passphrase,
+			(void) strlcpy(passphrase_copy, passphrase,
 			    MAX_PHRASELEN + 1);
 
 			if (((passlen = snprintf(prompt_copy,
@@ -3233,6 +3235,6 @@ pkg_passphrase_cb(char *buf, int size, int rw, void *data)
 		return (-1);
 	}
 
-	strlcpy(buf, passphrase, size);
+	(void) strlcpy(buf, passphrase, size);
 	return (strlen(buf));
 }

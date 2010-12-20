@@ -19,6 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -61,7 +65,6 @@
 
 
 static char *add_rem_lock;	/* lock file */
-static char *tmphold;		/* temporary file for updating */
 static int  add_rem_lock_fd = -1;
 
 static int get_cached_n_to_m_file(char *filename, char ***cache);
@@ -345,11 +348,13 @@ delete_entry(
 	int		status = NOERR;
 	int		drvr_found = 0;
 	boolean_t 	nomatch = B_TRUE;
-	char		*newfile, *tptr, *cp;
+	char		newfile[MAXPATHLEN];
+	char		*cp;
 	char		line[MAX_DBFILE_ENTRY];
 	char		drv[FILENAME_MAX + 1];
 	FILE		*fp, *newfp;
 	struct group	*sysgrp;
+	int		newfd;
 	char		*copy;		/* same size as line */
 	char		*match2 = NULL;	/* match with quotes cleaned up */
 
@@ -389,18 +394,14 @@ delete_entry(
 	}
 
 	/* Space for defensive copy of input line */
-	copy = calloc(sizeof (line), 1);
-
-	/* Build filename for temporary file */
-	tptr = calloc(strlen(oldfile) + strlen(XEND) + 1, 1);
-	if (tptr == NULL || copy == NULL) {
+	if ((copy = calloc(sizeof (line), 1)) == NULL) {
 		perror(NULL);
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		return (ERROR);
 	}
 
-	(void) strcpy(tptr, oldfile);
-	(void) strcat(tptr, XEND);
+	/* Build filename for temporary file */
+	(void) snprintf(newfile, sizeof (newfile), "%s%s", oldfile, ".hold");
 
 	/*
 	 * Set gid so we preserve group attribute.  Ideally we wouldn't
@@ -411,12 +412,23 @@ delete_entry(
 		(void) setgid(sysgrp->gr_gid);
 	}
 
-	newfile = mktemp(tptr);
+	if ((newfd = open(newfile, O_WRONLY | O_CREAT | O_EXCL, 0644)) < 0) {
+		if (errno == EEXIST) {
+			(void) fprintf(stderr, gettext(ERR_FILE_EXISTS),
+			    newfile);
+			return (ERROR);
+		} else {
+			(void) fprintf(stderr, gettext(ERR_CREAT_LOCK),
+			    newfile);
+			return (ERROR);
+		}
+	}
 
-	if ((newfp = fopen(newfile, "w")) == NULL) {
+	if ((newfp = fdopen(newfd, "w")) == NULL) {
 		perror(NULL);
 		(void) fprintf(stderr, gettext(ERR_CANT_ACCESS_FILE),
 		    newfile);
+		(void) close(newfd);
 		return (ERROR);
 	}
 
@@ -495,7 +507,6 @@ delete_entry(
 	} /* end of while */
 
 	(void) fclose(fp);
-	free(tptr);
 	free(copy);
 	if (match2)
 		free(match2);
@@ -521,24 +532,12 @@ delete_entry(
 	 */
 
 	if (status == NOERR) {
-		if (rename(oldfile, tmphold) == -1) {
+		if (rename(newfile, oldfile) == -1) {
 			perror(NULL);
 			(void) fprintf(stderr, gettext(ERR_UPDATE), oldfile);
 			(void) unlink(newfile);
-			return (ERROR);
-		} else if (rename(newfile, oldfile) == -1) {
-			perror(NULL);
-			(void) fprintf(stderr, gettext(ERR_UPDATE), oldfile);
-			(void) unlink(oldfile);
-			(void) unlink(newfile);
-			if (link(tmphold, oldfile) == -1) {
-				perror(NULL);
-				(void) fprintf(stderr, gettext(ERR_BAD_LINK),
-				    oldfile, tmphold);
-			}
 			return (ERROR);
 		}
-		(void) unlink(tmphold);
 	} else {
 		/*
 		 * since there's an error, leave file alone; remove
@@ -1092,7 +1091,6 @@ build_filenames(char *basedir)
 	int	name_to_major_len;
 	int	rem_name_to_major_len;
 	int	add_rem_lock_len;
-	int	tmphold_len;
 	int	devfs_root_len;
 	int	device_policy_len;
 	int	extra_privs_len;
@@ -1104,7 +1102,6 @@ build_filenames(char *basedir)
 		name_to_major = NAM_TO_MAJ;
 		rem_name_to_major = REM_NAM_TO_MAJ;
 		add_rem_lock = ADD_REM_LOCK;
-		tmphold = TMPHOLD;
 		devfs_root = DEVFS_ROOT;
 		device_policy = DEV_POLICY;
 		extra_privs = EXTRA_PRIVS;
@@ -1118,7 +1115,6 @@ build_filenames(char *basedir)
 		name_to_major_len = len + sizeof (NAM_TO_MAJ);
 		rem_name_to_major_len = len + sizeof (REM_NAM_TO_MAJ);
 		add_rem_lock_len = len + sizeof (ADD_REM_LOCK);
-		tmphold_len = len + sizeof (TMPHOLD);
 		devfs_root_len = len + sizeof (DEVFS_ROOT);
 		device_policy_len = len + sizeof (DEV_POLICY);
 		extra_privs_len = len + sizeof (EXTRA_PRIVS);
@@ -1129,7 +1125,6 @@ build_filenames(char *basedir)
 		name_to_major = malloc(name_to_major_len);
 		rem_name_to_major = malloc(rem_name_to_major_len);
 		add_rem_lock = malloc(add_rem_lock_len);
-		tmphold = malloc(tmphold_len);
 		devfs_root = malloc(devfs_root_len);
 		device_policy = malloc(device_policy_len);
 		extra_privs = malloc(extra_privs_len);
@@ -1140,7 +1135,6 @@ build_filenames(char *basedir)
 		    (name_to_major == NULL) ||
 		    (rem_name_to_major == NULL) ||
 		    (add_rem_lock == NULL) ||
-		    (tmphold == NULL) ||
 		    (devfs_root == NULL) ||
 		    (device_policy == NULL) ||
 		    (extra_privs == NULL)) {
@@ -1160,8 +1154,6 @@ build_filenames(char *basedir)
 		    "%s%s", basedir, REM_NAM_TO_MAJ);
 		(void) snprintf(add_rem_lock, add_rem_lock_len,
 		    "%s%s", basedir, ADD_REM_LOCK);
-		(void) snprintf(tmphold, tmphold_len,
-		    "%s%s", basedir, TMPHOLD);
 		(void) snprintf(devfs_root, devfs_root_len,
 		    "%s%s", basedir, DEVFS_ROOT);
 		(void) snprintf(device_policy, device_policy_len,
@@ -1413,9 +1405,10 @@ update_minor_entry(char *driver_name, char *perm_list)
 	char	own[OPT_LEN + 1];
 	char	grp[OPT_LEN + 1];
 	int	status = NOERR, i;
-	char	*newfile, *tptr;
+	char	newfile[MAXPATHLEN];
 	char	*cp, *dup, *drv_minor;
-	struct group *sysgrp;
+	struct group	*sysgrp;
+	int		newfd;
 
 	if ((fp = fopen(minor_perm, "r")) == NULL) {
 		perror(NULL);
@@ -1425,15 +1418,8 @@ update_minor_entry(char *driver_name, char *perm_list)
 		return (ERROR);
 	}
 
-	/*
-	 * Build filename for temporary file
-	 */
-	if ((tptr = calloc(strlen(minor_perm) + strlen(XEND) + 1, 1)) == NULL) {
-		perror(NULL);
-		(void) fprintf(stderr, gettext(ERR_NO_MEM));
-	}
-	(void) strcpy(tptr, minor_perm);
-	(void) strcat(tptr, XEND);
+	/* Build filename for temporary file */
+	(void) snprintf(newfile, sizeof (newfile), "%s%s", minor_perm, ".hold");
 
 	/*
 	 * Set gid so we preserve group attribute.  Ideally we wouldn't
@@ -1444,11 +1430,23 @@ update_minor_entry(char *driver_name, char *perm_list)
 		(void) setgid(sysgrp->gr_gid);
 	}
 
-	newfile = mktemp(tptr);
-	if ((newfp = fopen(newfile, "w")) == NULL) {
+	if ((newfd = open(newfile, O_WRONLY | O_CREAT | O_EXCL, 0644)) < 0) {
+		if (errno == EEXIST) {
+			(void) fprintf(stderr, gettext(ERR_FILE_EXISTS),
+			    newfile);
+			return (ERROR);
+		} else {
+			(void) fprintf(stderr, gettext(ERR_CREAT_LOCK),
+			    newfile);
+			return (ERROR);
+		}
+	}
+
+	if ((newfp = fdopen(newfd, "w")) == NULL) {
 		perror(NULL);
 		(void) fprintf(stderr, gettext(ERR_CANT_ACCESS_FILE),
 		    newfile);
+		(void) close(newfd);
 		return (ERROR);
 	}
 
@@ -1564,24 +1562,12 @@ update_minor_entry(char *driver_name, char *perm_list)
 	 * if noerr, replace original file with new file
 	 */
 	if (status == NOERR) {
-		if (rename(minor_perm, tmphold) == -1) {
+		if (rename(newfile, minor_perm) == -1) {
 			perror(NULL);
 			(void) fprintf(stderr, gettext(ERR_UPDATE), minor_perm);
 			(void) unlink(newfile);
-			return (ERROR);
-		} else if (rename(newfile, minor_perm) == -1) {
-			perror(NULL);
-			(void) fprintf(stderr, gettext(ERR_UPDATE), minor_perm);
-			(void) unlink(minor_perm);
-			(void) unlink(newfile);
-			if (link(tmphold, minor_perm) == -1) {
-				perror(NULL);
-				(void) fprintf(stderr, gettext(ERR_BAD_LINK),
-				    minor_perm, tmphold);
-			}
 			return (ERROR);
 		}
-		(void) unlink(tmphold);
 	} else {
 		/*
 		 * since there's an error, leave file alone; remove
@@ -2330,8 +2316,15 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 			return (ERROR);
 	}
 
-	/* find first free major number */
-	for (i = 0; i < max_dev; i++) {
+	/*
+	 * Find the first free major number.
+	 *
+	 * Note that we begin searching from 1, as drivers have developer the
+	 * erroneous assumption that a dev_t of 0 is invalid, and since we no
+	 * longer include system devices in the base files, a major number of
+	 * 0 may now be given to arbitrary devices.
+	 */
+	for (i = 1; i < max_dev; i++) {
 		if (num_list[i] != 1) {
 			new_maj = i;
 			break;

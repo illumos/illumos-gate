@@ -377,14 +377,7 @@ report(void)
 			continue;
 		}
 
-		if (Nflag && (info.status == PI_PRESVR4)) {
-			/* don't include preSVR4 packages */
-			choice->installed = (-1);
-			continue;
-		}
-
-		if (!iflag && ((info.status == PI_INSTALLED) ||
-		    (info.status == PI_PRESVR4))) {
+		if (!iflag && (info.status == PI_INSTALLED)) {
 			/* don't include completely installed packages */
 			choice->installed = (-1);
 			continue;
@@ -461,8 +454,6 @@ dumpinfo(struct cfstat *dp, int pkgLngth)
 	} else if (!lflag) {
 		if (info.catg) {
 			(void) sscanf(info.catg, "%[^, \t\n]", category);
-		} else if (info.status == PI_PRESVR4) {
-			(void) strcpy(category, "preSVR4");
 		} else {
 			(void) strcpy(category, "(unknown)");
 		}
@@ -485,25 +476,21 @@ dumpinfo(struct cfstat *dp, int pkgLngth)
 	if (info.vendor)
 		(void) printf(FMT, "VENDOR", info.vendor);
 
-	if (info.status == PI_PRESVR4)
-		(void) printf(FMT, "STATUS", "preSVR4");
-	else {
-		for (i = 0; parmlst[i]; ++i) {
-			if ((pt = pkgparam(info.pkginst, parmlst[i])) != NULL &&
-			    *pt)
-				(void) printf(FMT, parmlst[i], pt);
-		}
-		if (info.status == PI_SPOOLED)
-			(void) printf(FMT, "STATUS", gettext("spooled"));
-		else if (info.status == PI_PARTIAL)
-			(void) printf(FMT, "STATUS",
-			    gettext("partially installed"));
-		else if (info.status == PI_INSTALLED)
-			(void) printf(FMT, "STATUS",
-			    gettext("completely installed"));
-		else
-			(void) printf(FMT, "STATUS", gettext("(unknown)"));
+	for (i = 0; parmlst[i]; ++i) {
+		if ((pt = pkgparam(info.pkginst, parmlst[i])) != NULL && *pt)
+			(void) printf(FMT, parmlst[i], pt);
 	}
+	if (info.status == PI_SPOOLED)
+		(void) printf(FMT, "STATUS", gettext("spooled"));
+	else if (info.status == PI_PARTIAL)
+		(void) printf(FMT, "STATUS",
+		    gettext("partially installed"));
+	else if (info.status == PI_INSTALLED)
+		(void) printf(FMT, "STATUS",
+		    gettext("completely installed"));
+	else
+		(void) printf(FMT, "STATUS", gettext("(unknown)"));
+
 	(void) pkgparam(NULL, NULL);
 
 	if (!lflag) {
@@ -511,44 +498,37 @@ dumpinfo(struct cfstat *dp, int pkgLngth)
 		return;
 	}
 
-	if (info.status != PI_PRESVR4) {
-		if (strcmp(pkgdir, get_PKGLOC()))
-			getinfo(dp);
+	if (strcmp(pkgdir, get_PKGLOC()))
+		getinfo(dp);
 
-		if (dp->spooled)
-			(void) printf(
-			    gettext("%10s:  %7ld spooled pathnames\n"),
-			    "FILES", dp->spooled);
-		if (dp->installed)
-			(void) printf(
-			    gettext("%10s:  %7ld installed pathnames\n"),
-			    "FILES", dp->installed);
-		if (dp->partial)
-			(void) printf(
-			    gettext("%20d partially installed pathnames\n"),
-			    dp->partial);
-		if (dp->shared)
-			(void) printf(gettext("%20d shared pathnames\n"),
-				dp->shared);
-		if (dp->link)
-			(void) printf(gettext("%20d linked files\n"), dp->link);
-		if (dp->dirs)
-			(void) printf(gettext("%20d directories\n"), dp->dirs);
-		if (dp->exec)
-			(void) printf(gettext("%20d executables\n"), dp->exec);
-		if (dp->setuid)
-			(void) printf(
-			    gettext("%20d setuid/setgid executables\n"),
-			    dp->setuid);
-		if (dp->info)
-			(void) printf(
-			    gettext("%20d package information files\n"),
-			    dp->info+1); /* pkgmap counts! */
+	if (dp->spooled)
+		(void) printf(gettext("%10s:  %7ld spooled pathnames\n"),
+		    "FILES", dp->spooled);
+	if (dp->installed)
+		(void) printf(gettext("%10s:  %7ld installed pathnames\n"),
+		    "FILES", dp->installed);
+	if (dp->partial)
+		(void) printf(gettext("%20d partially installed pathnames\n"),
+		    dp->partial);
+	if (dp->shared)
+		(void) printf(gettext("%20d shared pathnames\n"), dp->shared);
+	if (dp->link)
+		(void) printf(gettext("%20d linked files\n"), dp->link);
+	if (dp->dirs)
+		(void) printf(gettext("%20d directories\n"), dp->dirs);
+	if (dp->exec)
+		(void) printf(gettext("%20d executables\n"), dp->exec);
+	if (dp->setuid)
+		(void) printf(gettext("%20d setuid/setgid executables\n"),
+		    dp->setuid);
+	if (dp->info)
+		(void) printf(gettext("%20d package information files\n"),
+		    dp->info+1); /* pkgmap counts! */
 
-		if (dp->tblks)
-			(void) printf(gettext("%20ld blocks used (approx)\n"),
-				dp->tblks);
-	}
+	if (dp->tblks)
+		(void) printf(gettext("%20ld blocks used (approx)\n"),
+		    dp->tblks);
+
 	(void) putchar('\n');
 }
 
@@ -589,13 +569,7 @@ iscatg(char *list)
 
 	if (!ckcatg[0])
 		return (0); /* no specification implies all packages */
-	if (info.status == PI_PRESVR4) {
-		for (i = 0; ckcatg[i]; /* void */) {
-			if (strcmp(ckcatg[i++], "preSVR4") == NULL)
-				return (0);
-		}
-		return (1);
-	}
+
 	if (!list)
 		return (1); /* no category specified in pkginfo is a bug */
 
@@ -628,29 +602,6 @@ look_for_installed(void)
 	struct stat	status;
 	DIR	*dirfp;
 	char	path[PATH_MAX];
-	int	n;
-
-	if (strcmp(pkgdir, get_PKGLOC()) == NULL &&
-	    (dirfp = opendir(get_PKGOLD()))) {
-		while (drp = readdir(dirfp)) {
-			if (drp->d_name[0] == '.')
-				continue;
-			n = strlen(drp->d_name);
-			if ((n > 5) &&
-			    strcmp(&drp->d_name[n-5], ".name") == NULL) {
-				(void) snprintf(path, sizeof (path),
-				    "%s/%s", get_PKGOLD(), drp->d_name);
-				if (lstat(path, &status))
-					continue;
-				if ((status.st_mode & S_IFMT) != S_IFREG)
-					continue;
-				drp->d_name[n-5] = '\0';
-				if (!pkgcnt || (selectp(drp->d_name) >= 0))
-					(void) fpkg(drp->d_name);
-			}
-		}
-		(void) closedir(dirfp);
-	}
 
 	if ((dirfp = opendir(pkgdir)) == NULL)
 		return;

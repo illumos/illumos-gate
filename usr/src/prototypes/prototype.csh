@@ -7,8 +7,8 @@
 # 1.0 of the CDDL.
 #
 # A full copy of the text of the CDDL should have accompanied this
-# source.  A copy is of the CDDL is also available via the Internet
-# at http://www.illumos.org/license/CDDL.
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
 
 #

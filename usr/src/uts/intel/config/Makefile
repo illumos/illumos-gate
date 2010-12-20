@@ -48,6 +48,7 @@ CONFIGFILES	= name_to_major minor_perm driver_aliases name_to_sysnum \
 		  driver_classes dacf.conf $(PATH2INST) mach
 SECCONFIG	= device_policy priv_names
 BOOTIMAGE	= splashimage.xpm
+ALTBOOTIMAGE	= solaris.xpm	# Temporary, for compatibility
 BOOTENVRC	= bootenv.rc
 DEVMASTER	= master
 FILEMODE	= 644
@@ -65,6 +66,7 @@ ROOTCONFIGFILES	= $(CONFIGFILES:%=$(ROOTETC)/%) $(SECCONFIG:%=$(ROOTETCSEC)/%)
 ROOTCONFIGFILES	+= $(BOOTIMAGE:%=$(ROOTBOOT)/%)
 ROOTCONFIGFILES	+= $(BOOTENVRC:%=$(BOOTSOLARIS)/%)
 ROOTCONFIGFILES	+= $(DEVMASTER:%=$(BOOTDEVICEDB)/%)
+ROOTALTBOOTIMAGE = $(ALTBOOTIMAGE:%=$(ROOTBOOT)/%)
 
 #
 #	Default build targets.
@@ -73,7 +75,7 @@ ROOTCONFIGFILES	+= $(DEVMASTER:%=$(BOOTDEVICEDB)/%)
 
 def all: $(SRCFILES)
 
-install: all $(ROOTCONFIGFILES)
+install: all $(ROOTCONFIGFILES) $(ROOTALTBOOTIMAGE)
 
 #
 #	The ROOTETC directory is made by ../../../Targetdirs
@@ -94,6 +96,10 @@ $(ROOTBOOT):
 
 $(ROOTBOOT)/%: $(ROOTBOOT) $(SRCDIR)/%
 	$(INS.file)
+
+$(ROOTBOOT)/solaris.xpm: $(ROOTBOOT)/splashimage.xpm
+	$(RM) $@; $(LN) $(ROOTBOOT)/splashimage.xpm $@
+
 
 $(BOOTSOLARIS):
 	$(INS) -s -d -m $(DIRMODE) $@

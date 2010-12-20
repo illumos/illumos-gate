@@ -29,15 +29,13 @@ PROG=		pkgremove
 OBJS=		check.o		\
 		delmap.o	\
 		main.o		\
-		predepend.o	\
 		quit.o		\
-		special.o	\
-		wsreg_pkgrm.o
+		special.o
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg
 
 LDLIBS	+=	-lpkg -linstzones -ladm
-LDLIBS	+=	-lnsl -lsocket -lwsreg
+LDLIBS	+=	-lnsl -lsocket
 
 
 .KEEP_STATE:

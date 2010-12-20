@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989 The Regents of the University of California.
  * All rights reserved.
  *
@@ -13,11 +14,6 @@
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- */
-
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -237,12 +233,16 @@ label:
 				    pt, ptlim);
 				continue;
 
-			/*
-			 * Note: 's' for seconds since epoch was removed.
-			 * While FreeBSD and Linux appear to support this,
-			 * Sun Solaris does not.  Furthermore, the FreeBSD
-			 * implementation was not correct for _LP64.
-			 */
+			case 's':
+			{
+				struct tm tm;
+				char *buf;
+
+				tm = *t;
+				(void) asprintf(&buf, "%ld", mktime(&tm));
+				pt = _add(buf, pt, ptlim);
+				continue;
+			}
 
 			case 'T':
 				pt = _fmt("%H:%M:%S", t, pt, ptlim);

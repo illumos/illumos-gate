@@ -28,11 +28,6 @@
 #define	_PKGADM_H
 
 
-/*
- * Module:	patchutil.h
- * Description:	This module contains the interfaces for patchadd
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -69,6 +70,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_destroy_snaps;
 	zfs_expand_proplist;
 	zfs_get_handle;
+	zfs_get_holds;
 	zfs_get_name;
 	zfs_get_pool_handle;
 	zfs_get_user_props;
@@ -146,6 +148,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_unshareall_nfs;
 	zfs_unshareall_smb;
 	zfs_userspace;
+	zfs_get_fsacl;
+	zfs_set_fsacl;
 	zfs_userquota_prop_prefixes;
 	zfs_zpl_version_map;
 	zpool_add;

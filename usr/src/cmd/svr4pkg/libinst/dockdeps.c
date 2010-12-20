@@ -67,7 +67,6 @@ static int	nlist;
 static int	pkgexist;
 static int	pkgokay;
 static int	is_update;
-static int	is_patch_update;
 
 /*
  * IMPORTANT NOTE: THE SIZE OF 'abbrev' IS HARD CODED INTO THE CHARACTER
@@ -154,8 +153,7 @@ dockdeps(char *a_depfile, int a_removeFlag, boolean_t a_preinstallCheck)
 			inst = fpkginst(wabbrev, alist[i], vlist[i]);
 			if (inst && (pkginfo(&info, inst, NULL, NULL) == 0)) {
 				pkgexist++;
-				if ((info.status == PI_INSTALLED) ||
-				    (info.status == PI_PRESVR4))
+				if (info.status == PI_INSTALLED)
 					pkgokay++;
 			}
 		} while (++i < nlist);
@@ -186,18 +184,6 @@ done:
 	}
 
 	return (errflg);
-}
-
-void
-setPatchUpdate(void)
-{
-	is_patch_update = 1;
-}
-
-int
-isPatchUpdate(void)
-{
-	return ((is_patch_update) ? 1 : 0);
 }
 
 void

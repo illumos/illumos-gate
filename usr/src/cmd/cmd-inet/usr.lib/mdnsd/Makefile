@@ -21,7 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG=		mdnsd
 MANIFEST=	multicast.xml
@@ -41,9 +40,9 @@ OBJS=	 	$(LOCAL_OBJS) $(CMN_OBJS)
 
 
 MDNSFLAGS=	-DNOT_HAVE_DAEMON -DNOT_HAVE_SA_LEN \
-		-DLOG_PERROR=0 -DHAVE_SOLARIS -DHAVE_SOLARIS_ZONES \
+		-DLOG_PERROR=0 -DHAVE_SOLARIS \
 		-D_XPG4_2 -D__EXTENSIONS__ -DHAVE_BROKEN_RECVIF_NAME \
-   		-DHAVE_IPV6=1 -Dasm=__asm -DMDNSD_NOROOT \
+		-DHAVE_IPV6=1 -Dasm=__asm -DMDNSD_NOROOT \
 		-DPID_FILE=\"\" -DMDNSD_USER=\"noaccess\" \
 		-DMDNS_VERSIONSTR_NODTS
 

@@ -170,6 +170,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	pr_fstatvfs;
 	pr_getitimer;
 	pr_getpeername;
+	pr_getpeerucred;
 	pr_getprojid;
 	pr_getrctl;
 	pr_getrlimit;

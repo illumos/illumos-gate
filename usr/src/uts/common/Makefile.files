@@ -1763,6 +1763,8 @@ BGE_OBJS += bge_main2.o bge_chip2.o bge_kstats.o bge_log.o bge_ndd.o \
 
 DMFE_OBJS += dmfe_log.o dmfe_main.o dmfe_mii.o
 
+EFE_OBJS += efe.o
+
 ELXL_OBJS += elxl.o
 
 HME_OBJS += hme.o
@@ -1896,6 +1898,11 @@ IGB_OBJS =	igb_82575.o igb_api.o igb_mac.o igb_manage.o \
 		igb_nvm.o igb_osdep.o igb_phy.o igb_buf.o \
 		igb_debug.o igb_gld.o igb_log.o igb_main.o \
 		igb_rx.o igb_stat.o igb_tx.o
+
+#
+#	Intel Pro/100 NIC driver module
+#
+IPRB_OBJS =	iprb.o
 
 #
 #       Intel 10GbE PCIE NIC driver module

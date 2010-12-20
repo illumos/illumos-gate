@@ -53,6 +53,7 @@
 #include <proc_service.h>
 #include <rtld_db.h>
 #include <procfs.h>
+#include <ucred.h>
 #include <rctl.h>
 #include <libctf.h>
 #include <sys/stat.h>
@@ -347,6 +348,7 @@ extern	offset_t pr_llseek(struct ps_prochandle *, int, offset_t, int);
 extern	int	pr_rename(struct ps_prochandle *, const char *, const char *);
 extern	int	pr_link(struct ps_prochandle *, const char *, const char *);
 extern	int	pr_unlink(struct ps_prochandle *, const char *);
+extern	int	pr_getpeerucred(struct ps_prochandle *, int, ucred_t **);
 extern	int	pr_getpeername(struct ps_prochandle *,
 			int, struct sockaddr *, socklen_t *);
 extern	int	pr_getsockname(struct ps_prochandle *,

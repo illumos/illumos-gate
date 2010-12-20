@@ -403,8 +403,6 @@ struct dstr {
 #define	streq(a, b)		(strcmp((a), (b)) == 0)
 #define	strneq(a, b, c)		(strncmp((a), (b), (c)) == 0)
 
-#ifdef	__STDC__
-
 extern FILE	*epopen(char *cmd, char *mode);
 extern char	**gpkglist(char *dir, char **pkg, char **catg);
 extern int	is_not_valid_length(char **category);
@@ -496,7 +494,7 @@ extern void	checksum_off(void);
 extern void	checksum_on(void);
 extern void	cvtpath(char *path, char *copy);
 extern void	ds_order(char *list[]);
-extern void	ds_putinfo(char *buf);
+extern void	ds_putinfo(char *buf, size_t);
 extern void	ds_skiptoend(char *device);
 extern void	ecleanup(void);
 /*PRINTFLIKE1*/
@@ -586,104 +584,6 @@ extern void		pkgserversetmode(start_mode_t);
 extern start_mode_t	pkgservergetmode(void);
 extern start_mode_t	pkgparsemode(const char *);
 extern char 		*pkgmodeargument(start_mode_t);
-
-
-#else	/* __STDC__ */
-
-extern FILE	*epopen();
-extern void	pkglist_cont();
-extern char	**gpkglist();
-extern char	**pkgalias();
-extern char	*get_prog_name();
-extern char 	*set_prog_name();
-extern int	averify();
-extern int	ckparam();
-extern int	ckvolseq();
-extern int	cverify();
-extern unsigned long	compute_checksum();
-extern int	fverify();
-extern char	*getErrbufAddr();
-extern int	getErrbufSize();
-extern char	*getErrstr();
-extern void	setErrstr();
-extern int	devtype();
-extern int	ds_close();
-extern int	ds_findpkg();
-extern int	ds_getinfo();
-extern int	ds_getpkg();
-extern int	ds_ginit();
-extern boolean_t	ds_fd_open();
-extern int	ds_init();
-extern int	ds_next();
-extern int	ds_readbuf();
-extern int	epclose();
-extern int	esystem();
-extern int	e_ExecCmdArray();
-extern int	e_ExecCmdList();
-extern int	gpkgmap();
-extern int	isFdRemote();
-extern int	isFstypeRemote();
-extern int	isPathRemote();
-extern int	iscpio();
-extern int	isdir();
-extern int	isfile();
-extern int	pkgexecl();
-extern int	pkgexecv();
-extern int	pkghead();
-extern int	pkgmount();
-extern int	pkgtrans();
-extern int	pkgumount();
-extern int	ppkgmap();
-extern int	putcfile();
-extern int	putcvfpfile();
-extern int	rrmdir();
-extern int	srchcfile();
-extern struct	group *cgrgid();
-extern struct	group *cgrnam();
-extern struct	passwd *cpwnam();
-extern struct	passwd *cpwuid();
-extern void	basepath();
-extern void	canonize();
-extern void	canonize_slashes();
-extern void	checksum_off();
-extern void	checksum_on();
-extern void	cvtpath();
-extern void	ds_order();
-extern void	ds_putinfo();
-extern void	ds_skiptoend();
-extern void	ecleanup();
-extern void	logerr();
-extern int	mappath();
-extern int	mapvar();
-extern void	progerr();
-extern void	rpterr();
-extern void	tputcfent();
-extern void	set_nonABI_symlinks();
-extern int	nonABI_symlinks();
-extern void	disable_attribute_check();
-extern int	get_disable_attribute_check();
-/* vfpops.c */
-extern int	vfpCheckpointFile();
-extern int	vfpCheckpointOpen();
-extern int	vfpClearModified();
-extern int	vfpClose();
-extern int	vfpGetModified();
-extern int	vfpOpen();
-extern void	vfpRewind();
-extern int	vfpSetFlags();
-extern int	vfpSetModified();
-extern int	vfpSetSize();
-extern void	vfpTruncate();
-extern int	vfpWriteToFile();
-
-/* handlelocalfs.c */
-boolean_t	enable_local_fs();
-boolean_t	restore_local_fs();
-
-/* gpkgmap.c */
-int		getmapmode(void);
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

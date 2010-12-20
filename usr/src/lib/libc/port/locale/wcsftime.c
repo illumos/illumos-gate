@@ -1,4 +1,5 @@
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002 Tim J. Robbins
  * All rights reserved.
  *
@@ -22,10 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -127,12 +124,16 @@ wcsftime(wchar_t *wcs, size_t maxsize, const char *format,
 {
 	int	len;
 	wchar_t	*wfmt;
+	size_t rv;
 
 	/* Convert the format (mb string) to wide char array */
 	len = strlen(format) + 1;
-	wfmt = alloca(sizeof (wchar_t) * len);
+	wfmt = malloc(sizeof (wchar_t) * len);
 	if (mbstowcs(wfmt, format, len) == (size_t)-1) {
+		free(wfmt);
 		return (0);
 	}
-	return (__wcsftime_xpg5(wcs, maxsize, wfmt, timeptr));
+	rv = __wcsftime_xpg5(wcs, maxsize, wfmt, timeptr);
+	free(wfmt);
+	return (rv);
 }

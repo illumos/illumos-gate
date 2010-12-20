@@ -693,20 +693,6 @@ z_lock_this_zone(ZLOCKS_T a_lflags)
 		}
 	}
 
-	/* lock patch administration always */
-
-	if (a_lflags & ZLOCKS_PATCH_ADMIN) {
-		b = _z_lock_zone_object(&_z_global_data._z_ObjectLocks,
-		    zoneName, LOBJ_PATCHADMIN, pid,
-		    MSG_ZONES_LCK_THIS_PATCHADM,
-		    ERR_ZONES_LCK_THIS_PATCHADM);
-		if (!b) {
-			(void) z_unlock_this_zone(a_lflags);
-			(void) free(zoneName);
-			return (B_FALSE);
-		}
-	}
-
 	(void) free(zoneName);
 
 	return (B_TRUE);
@@ -908,9 +894,6 @@ z_mount_in_lz(char **r_lzMountPoint, char **r_lzRootPath, char *a_zoneName,
 	/*
 	 * lofs resolve the non-global zone's root path first in case
 	 * its in a path that's been lofs mounted read-only.
-	 * (e.g. This happens when we're tyring to patch a zone in an ABE
-	 * that lives on a filesystem that the ABE shares with the currently
-	 * running BE.)
 	 */
 	z_resolve_lofs(lzRootPath, sizeof (lzRootPath));
 
@@ -1390,16 +1373,6 @@ z_unlock_this_zone(ZLOCKS_T a_lflags)
 
 	zoneName = z_get_zonename();
 
-	/* unlock patch administration */
-
-	if (a_lflags & ZLOCKS_PATCH_ADMIN) {
-		b = _z_unlock_zone_object(&_z_global_data._z_ObjectLocks,
-		    zoneName, LOBJ_PATCHADMIN, ERR_ZONES_ULK_THIS_PATCH);
-		if (!b) {
-			errors = B_TRUE;
-		}
-	}
-
 	/* unlock package administration */
 
 	if (a_lflags & ZLOCKS_PKG_ADMIN) {
@@ -1670,7 +1643,7 @@ z_is_zone_branded(char *zoneName)
 	/*
 	 * Both "native" and "cluster" are native brands
 	 * that use the standard facilities in the areas
-	 * of packaging/installation/patching/update.
+	 * of packaging/installation/update.
 	 */
 	if (streq(brandname, NATIVE_BRAND_NAME) ||
 	    streq(brandname, CLUSTER_BRAND_NAME)) {
