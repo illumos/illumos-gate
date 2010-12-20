@@ -53,6 +53,7 @@ JOYSWAP=/dev/zvol/dsk/zones/swap
 
 # If the zpool doesn't exist, then there's nothing to mount.
 zpool import -f zones
+zpool list -H -o name| grep "zones"
 if [ $? -eq 0 ]; then
         mount -F zfs zones/var /var
         mount -F zfs zones/config /etc/zones
