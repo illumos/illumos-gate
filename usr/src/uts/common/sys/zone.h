@@ -378,12 +378,17 @@ typedef struct zone_kstat {
 /*
  * structure for zone performance kstats
  */
-typedef struct zone_perf_kstat {
+typedef struct zone_io_kstat {
 	kstat_named_t zk_zonename;
-	kstat_named_t zk_read_iops;
-	kstat_named_t zk_write_iops;
-	kstat_named_t zk_lwrite_iops;
-} zone_perf_kstat_t;
+	kstat_named_t zk_phyread_ops;
+	kstat_named_t zk_logread_ops;
+	kstat_named_t zk_phywrite_ops;
+	kstat_named_t zk_logwrite_ops;
+	kstat_named_t zk_phyread_bytes;
+	kstat_named_t zk_logread_bytes;
+	kstat_named_t zk_phywrite_bytes;
+	kstat_named_t zk_logwrite_bytes;
+} zone_io_kstat_t;
 
 struct cpucap;
 
@@ -533,20 +538,29 @@ typedef struct zone {
 	list_t		zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
+
 	/*
-	 * Data and kstats used for zfs storage fair-share IO.
+	 * Data and counters used for fair-share disk IO.
 	 */
 	rctl_qty_t	zone_zfs_io_share;	/* ZFS IO share */
-	uint64_t	zone_iops_read;		/* kstat ZFS read IOPS */
-	uint64_t	zone_iops_write;	/* kstat ZFS write IOPS */
-	uint64_t	zone_iops_lwrite;	/* kstat logical write IOPS */
 	uint64_t	zone_io_util;		/* IO utilization metric */
 	uint16_t	zone_io_delay;		/* IO delay on writes */
-	kstat_t		*zone_perf_kstat;
 	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
 	sys_zio_cntr_t	rd_ops;			/* Counters for ZFS reads, */
 	sys_zio_cntr_t	wr_ops;			/* writes and logical writes. */
 	sys_zio_cntr_t	lwr_ops;
+	/*
+	 * kstats and counters for IO ops and bytes.
+	 */
+	kstat_t		*zone_io_kstat;
+	uint64_t	zone_io_phyread_ops;	/* ZFS physical read ops */
+	uint64_t	zone_io_logread_ops;	/* ZFS logical read ops */
+	uint64_t	zone_io_phywrite_ops;	/* ZFS physical write ops */
+	uint64_t	zone_io_logwrite_ops;	/* ZFS logical write ops */
+	uint64_t	zone_io_phyread_bytes;	/* ZFS physical read bytes */
+	uint64_t	zone_io_logread_bytes;	/* ZFS logical read bytes */
+	uint64_t	zone_io_phywrite_bytes;	/* ZFS physical write bytes */
+	uint64_t	zone_io_logwrite_bytes;	/* ZFS logical write bytes */
 
 	/*
 	 * Solaris Auditing per-zone audit context

@@ -1834,25 +1834,31 @@ zone_swapresv_kstat_update(kstat_t *ksp, int rw)
 }
 
 static int
-zone_perf_kstat_update(kstat_t *ksp, int rw)
+zone_io_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
-	zone_perf_kstat_t *zk = ksp->ks_data;
+	zone_io_kstat_t *zk = ksp->ks_data;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	zk->zk_read_iops.value.ui64 = zone->zone_iops_read;
-	zk->zk_write_iops.value.ui64 = zone->zone_iops_write;
-	zk->zk_lwrite_iops.value.ui64 = zone->zone_iops_lwrite;
+	zk->zk_phyread_ops.value.ui64 = zone->zone_io_phyread_ops;
+	zk->zk_logread_ops.value.ui64 = zone->zone_io_logread_ops;
+	zk->zk_phywrite_ops.value.ui64 = zone->zone_io_phywrite_ops;
+	zk->zk_logwrite_ops.value.ui64 = zone->zone_io_logwrite_ops;
+	zk->zk_phyread_bytes.value.ui64 = zone->zone_io_phyread_bytes;
+	zk->zk_logread_bytes.value.ui64 = zone->zone_io_logread_bytes;
+	zk->zk_phywrite_bytes.value.ui64 = zone->zone_io_phywrite_bytes;
+	zk->zk_logwrite_bytes.value.ui64 = zone->zone_io_logwrite_bytes;
+
 	return (0);
 }
 
 static kstat_t *
-zone_perf_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
+zone_io_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
 {
 	kstat_t *ksp;
-	zone_perf_kstat_t *zk;
+	zone_io_kstat_t *zk;
 	char nm[KSTAT_STRLEN];
 
 	(void) snprintf(nm, KSTAT_STRLEN, "zone_%d", zone->zone_id);
@@ -1860,7 +1866,7 @@ zone_perf_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
 	/* module, instance, name, class, type, ndata, flags, zoneid */
 	ksp = kstat_create_zone("zones", zone->zone_id, nm, "zone_stats",
 	    KSTAT_TYPE_NAMED,
-	    sizeof (zone_perf_kstat_t) / sizeof (kstat_named_t),
+	    sizeof (zone_io_kstat_t) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL, zone->zone_id);
 
 	if (ksp == NULL)
@@ -1869,14 +1875,30 @@ zone_perf_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
 	if (zone->zone_id != GLOBAL_ZONEID)
 		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
-	zk = ksp->ks_data = kmem_alloc(sizeof (zone_perf_kstat_t), KM_SLEEP);
+	zk = ksp->ks_data = kmem_alloc(sizeof (zone_io_kstat_t), KM_SLEEP);
+
 	ksp->ks_data_size += strlen(zone->zone_name) + 1;
 	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
 	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
-	kstat_named_init(&zk->zk_read_iops, "read_iops", KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_write_iops, "write_iops", KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_lwrite_iops, "logical_write_iops",
+
+	kstat_named_init(&zk->zk_phyread_ops, "io_physical_read_ops",
 	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_logread_ops, "io_logical_read_ops",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_phywrite_ops, "io_physical_write_ops",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_logwrite_ops, "io_logical_write_ops",
+	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&zk->zk_phyread_bytes, "io_physical_read_bytes",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_logread_bytes, "io_logical_read_bytes",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_phywrite_bytes, "io_physical_write_bytes",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_logwrite_bytes, "io_logical_write_bytes",
+	    KSTAT_DATA_UINT64);
+
 	ksp->ks_update = updatefunc;
 	ksp->ks_private = zone;
 	kstat_install(ksp);
@@ -1919,19 +1941,19 @@ zone_kstat_create(zone_t *zone)
 	zone->zone_nprocs_kstat = zone_rctl_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
-	zone->zone_perf_kstat = zone_perf_kstat_create(zone,
-	    zone_perf_kstat_update);
+	zone->zone_io_kstat = zone_io_kstat_create(zone,
+	    zone_io_kstat_update);
 }
 
 static void
-zone_perf_kstat_delete(kstat_t **pkstat)
+zone_io_kstat_delete(kstat_t **pkstat)
 {
 	void *data;
 
 	if (*pkstat != NULL) {
 		data = (*pkstat)->ks_data;
 		kstat_delete(*pkstat);
-		kmem_free(data, sizeof (zone_perf_kstat_t));
+		kmem_free(data, sizeof (zone_io_kstat_t));
 		*pkstat = NULL;
 	}
 }
@@ -1956,7 +1978,7 @@ zone_kstat_delete(zone_t *zone)
 	zone_kstat_delete_common(&zone->zone_swapresv_kstat);
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat);
 
-	zone_perf_kstat_delete(&zone->zone_perf_kstat);
+	zone_io_kstat_delete(&zone->zone_io_kstat);
 }
 
 /*
@@ -2015,10 +2037,15 @@ zone_zsd_init(void)
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
 	zone0.zone_zfs_io_share = 1;
-	zone0.zone_iops_read = 0;
-	zone0.zone_iops_write = 0;
-	zone0.zone_iops_lwrite = 0;
-	zone0.zone_perf_kstat = NULL;
+	zone0.zone_io_kstat = NULL;
+	zone0.zone_io_phyread_ops = 0;
+	zone0.zone_io_phywrite_ops = 0;
+	zone0.zone_io_logread_ops = 0;
+	zone0.zone_io_logwrite_ops = 0;
+	zone0.zone_io_phyread_bytes = 0;
+	zone0.zone_io_phywrite_bytes = 0;
+	zone0.zone_io_logread_bytes = 0;
+	zone0.zone_io_logwrite_bytes = 0;
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
@@ -4295,9 +4322,14 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
 	zone->zone_zfs_io_share= 1;
-	zone->zone_iops_read = 0;
-	zone->zone_iops_write = 0;
-	zone->zone_iops_lwrite = 0;
+	zone->zone_io_phyread_ops = 0;
+	zone->zone_io_phywrite_ops = 0;
+	zone->zone_io_logread_ops = 0;
+	zone->zone_io_logwrite_ops = 0;
+	zone->zone_io_phyread_bytes = 0;
+	zone->zone_io_phywrite_bytes = 0;
+	zone->zone_io_logread_bytes = 0;
+	zone->zone_io_logwrite_bytes = 0;
 
 	/*
 	 * Zsched initializes the rctls.

@@ -33,7 +33,7 @@
  */
 
 void
-zfs_zone_io_throttle(zfs_zone_iop_type_t type)
+zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 {
 }
 
@@ -561,8 +561,9 @@ zfs_zone_zio_init(zio_t *zp)
 }
 
 /*
- * Called from dmu_tx_count_write when a write op goes into a transaction
- * group (TXG).  Increment our counter for logical zone write ops.
+ * Track IO operations per zone.  Called from dmu_tx_count_write for write ops
+ * and dmu_read_uio for read ops.  For each operation, increment that zone's
+ * counter based on the type of operation.
  *
  * There are three basic ways that we can see write ops:
  * 1) An application does write syscalls.  Those ops go into a TXG which
@@ -591,29 +592,38 @@ zfs_zone_zio_init(zio_t *zp)
  * Without this, it can look like a non-global zone never writes (case 1).
  * Depending on when the TXG is flushed, the counts may be in the same sample
  * bucket or in a different one.
+ *
+ * Tracking read operations is simpler due to their synchronous semantics.  The
+ * zfs_read function -- called as a result of a read(2) syscall -- will always
+ * retrieve the data to be read through dmu_read_uio.
  */
 void
-zfs_zone_io_throttle(zfs_zone_iop_type_t type)
+zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 {
 	hrtime_t now;
 	uint16_t wait;
 	zone_t	*zonep = curzone;
 
-	if (!zfs_zone_delay_enable)
-		return;
-
 	now = GET_USEC_TIME;
 
 	/*
-	 * Only bump the kstat for logical writes here.  The kstats tracking
-	 * reads and physical writes are bumped in zfs_zone_zio_done.
+	 * Only bump the counters for logical operations here.  The counters for
+	 * tracking physical IO operations are handled in zfs_zone_zio_done.
 	 */
 	if (type == ZFS_ZONE_IOP_LOGICAL_WRITE) {
 		mutex_enter(&zonep->zone_stg_io_lock);
-		zonep->zone_iops_lwrite++;
 		add_iop(zonep, now, type, 0);
 		mutex_exit(&zonep->zone_stg_io_lock);
+
+		atomic_add_64(&zonep->zone_io_logwrite_ops, 1);
+		atomic_add_64(&zonep->zone_io_logwrite_bytes, size);
+	} else {
+		atomic_add_64(&zonep->zone_io_logread_ops, 1);
+		atomic_add_64(&zonep->zone_io_logread_bytes, size);
 	}
+
+	if (!zfs_zone_delay_enable)
+		return;
 
 	/*
 	 * XXX There's a potential race here in that more than one thread may
@@ -680,16 +690,17 @@ zfs_zone_zio_done(zio_t *zp)
 	diff = now - zp->io_start;
 
 	mutex_enter(&zonep->zone_stg_io_lock);
+	add_iop(zonep, now, zp->io_type == ZIO_TYPE_READ ?
+	    ZFS_ZONE_IOP_READ : ZFS_ZONE_IOP_WRITE, diff);
+	mutex_exit(&zonep->zone_stg_io_lock);
 
 	if (zp->io_type == ZIO_TYPE_READ) {
-		zonep->zone_iops_read++;
-		add_iop(zonep, now, ZFS_ZONE_IOP_READ, diff);
+		atomic_add_64(&zonep->zone_io_phyread_ops, 1);
+		atomic_add_64(&zonep->zone_io_phyread_bytes, zp->io_size);
 	} else {
-		zonep->zone_iops_write++;
-		add_iop(zonep, now, ZFS_ZONE_IOP_WRITE, diff);
+		atomic_add_64(&zonep->zone_io_phywrite_ops, 1);
+		atomic_add_64(&zonep->zone_io_phywrite_bytes, zp->io_size);
 	}
-
-	mutex_exit(&zonep->zone_stg_io_lock);
 
 	zone_rele(zonep);
 
