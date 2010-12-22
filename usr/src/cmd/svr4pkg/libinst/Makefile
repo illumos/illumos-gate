@@ -30,7 +30,7 @@ OBJS=	copyf.o         dockdeps.o      echo.o          eptstat.o       \
 	finalck.o       findscripts.o   fixpath.o       flex_dev.o      \
 	isreloc.o       lockinst.o      mntinfo.o       nblk.o          \
 	ocfile.o        pathdup.o       pkgdbmerg.o     procmap.o       \
-	pkgobjmap.o     psvr4ck.o       ptext.o         putparam.o      \
+	pkgobjmap.o     ptext.o         putparam.o                      \
 	qreason.o       qstrdup.o       setadmin.o      setlist.o       \
 	srcpath.o       scriptvfy.o     stub.o          doulimit.o      \
 	dryrun.o        listmgr.o       is_local_host.o cvtpath.o       \

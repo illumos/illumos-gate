@@ -28,7 +28,6 @@ PROG=		pkgadd
 
 OBJS=		check.o		\
 		main.o		\
-		presvr4.o	\
 		quit.o
 
 ROOTLINKS=   $(ROOTUSRSBIN)/pkgask

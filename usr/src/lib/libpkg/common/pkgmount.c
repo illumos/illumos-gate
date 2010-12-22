@@ -43,7 +43,6 @@
 #include "pkglibmsgs.h"
 #include "pkglocale.h"
 
-extern void	quit(int retcode); 	/* Expected to be declared by caller! */
 /* libadm.a */
 extern int	getvol(char *device, char *label, int options, char *prompt);
 
@@ -63,16 +62,16 @@ pkgmount(struct pkgdev *devp, char *pkg, int part, int nparts, int getvolflg)
 
 	if (part && nparts) {
 		if (pkg) {
-			(void) sprintf(prompt, pkg_gt(LABEL0), part,
-			    nparts, pkg);
+			(void) snprintf(prompt, sizeof (prompt),
+			    pkg_gt(LABEL0), part, nparts, pkg);
 		} else {
-			(void) sprintf(prompt, pkg_gt(LABEL1), part,
-			    nparts);
+			(void) snprintf(prompt, sizeof (prompt),
+			    pkg_gt(LABEL1), part, nparts);
 		}
 	} else if (pkg)
-		(void) sprintf(prompt, pkg_gt(LABEL2), pkg);
+		(void) snprintf(prompt, sizeof (prompt), pkg_gt(LABEL2), pkg);
 	else
-		(void) sprintf(prompt, pkg_gt(LABEL3));
+		(void) snprintf(prompt, sizeof (prompt), pkg_gt(LABEL3));
 
 	n = 0;
 	for (;;) {
@@ -96,7 +95,8 @@ pkgmount(struct pkgdev *devp, char *pkg, int part, int nparts, int getvolflg)
 		}
 
 		if (devp->fstyp == NULL) {
-			(void) sprintf(cmd, "%s %s", FSTYP, devp->bdevice);
+			(void) snprintf(cmd, sizeof (cmd),
+			    "%s %s", FSTYP, devp->bdevice);
 			if ((pp = epopen(cmd, "r")) == NULL) {
 				rpterr();
 				logerr(pkg_gt(ERR_FSTYP), devp->bdevice);
@@ -158,7 +158,7 @@ pkgumount(struct pkgdev *devp)
 		if (n != 0) {
 			progerr(pkg_gt("retrying umount of %s"),
 			    devp->bdevice);
-			sleep(5);
+			(void) sleep(5);
 		}
 	}
 	if (n == 0)

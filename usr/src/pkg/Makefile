@@ -97,26 +97,6 @@ TOOLSROOT=	$(TOOLSROOT.cmd:sh)
 PKGDEST.cmd=	print $(PKGARCHIVE) | sed -e s:/$(MACH)/:/$(PKGMACH)/:
 PKGDEST=	$(PKGDEST.cmd:sh)
 
-#
-# The publish transforms, EXCEPTIONS list, and some manifests need to
-# know when we're building open-only and when we're using internal
-# crypto bits.
-#
-# We only use internal crypto when we're doing a closed build, the
-# CODESIGN_USER env variable is not set, and ON_CRYPTO_BINS is not set.
-# This matches the conditions under which the internal key and cert
-# are needed for the packaged objects.
-#
-$(CLOSED_BUILD)OPEN_ONLY_BUILD= $(POUND_SIGN)
-
-USE_INTERNAL_CRYPTO= $(POUND_SIGN)
-UI1= $(CODESIGN_USER:%=$(POUND_SIGN))
-$(UI1)UI2= $(ON_CRYPTO_BINS:%=$(POUND_SIGN))
-$(CLOSED_BUILD)USE_INTERNAL_CRYPTO= $(UI1)$(UI2)
-USE_SIGNED_CRYPTO=
-$(USE_INTERNAL_CRYPTO)USE_SIGNED_CRYPTO= $(POUND_SIGN)
-
-
 EXCEPTIONS= packaging
 
 PKGMOGRIFY= pkgmogrify
@@ -131,7 +111,6 @@ PKGMOGRIFY= pkgmogrify
 # tarball.  See usr/src/tools/scripts/bindrop.sh for details.
 #
 REPOS= redist
-$(CLOSED_BUILD)REPOS += extra
 
 #
 # The packages directory will contain the processed manifests as
@@ -150,7 +129,6 @@ PDIR= packages.$(PKGMACH)
 $(PDIR)/developer-build-onbld.dep:= PKGROOT= $(TOOLSROOT)
 
 PKGPUBLISHER= $(PKGPUBLISHER_REDIST)
-$(PKGDEST)/repo.extra:= PKGPUBLISHER= $(PKGPUBLISHER_NONREDIST)
 
 #
 # To get these defaults, manifests should simply refer to $(PKGVERS).
@@ -196,11 +174,7 @@ PKGMOG_DEFINES= \
 	PKGVERS_COMPONENT=$(PKGVERS_COMPONENT) \
 	PKGVERS_BUILTON=$(PKGVERS_BUILTON) \
 	PKGVERS_BRANCH=$(PKGVERS_BRANCH) \
-	PKGVERS=$(PKGVERS) \
-	CLOSED_BUILD=$(CLOSED_BUILD) \
-	OPEN_BUILD=$(OPEN_ONLY_BUILD) \
-	USE_INTERNAL_CRYPTO=$(USE_INTERNAL_CRYPTO) \
-	USE_SIGNED_CRYPTO=$(USE_SIGNED_CRYPTO)
+	PKGVERS=$(PKGVERS)
 
 PKGDEP_TOKENS_i386= \
 	'PLATFORM=i86hvm' \
@@ -220,7 +194,7 @@ PKGDEP_TOKENS= $(PKGDEP_TOKENS_$(PKGMACH))
 # dependency types, so that they can be included by either an
 # incorporation or a group package.
 #
-$(PDIR)/osnet-redist.mog $(PDIR)/osnet-extra.mog:= PKGDEP_TYPE= require
+$(PDIR)/osnet-redist.mog := PKGDEP_TYPE= require
 $(PDIR)/osnet-incorporation.mog:= PKGDEP_TYPE= incorporate
 
 PKGDEP_INCORP= \
@@ -249,9 +223,14 @@ PROC_PKGS= $(PKGS:%=$(PDIR)/%.mog)
 # different sets of transforms and macros for pkgmogrify.
 #
 SYNTH_PKGS= osnet-incorporation osnet-redist
-$(CLOSED_BUILD)SYNTH_PKGS += osnet-extra
 DEP_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.dep)
 PROC_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.mog)
+
+#
+# Root of pkg image to use for dependency resolution
+# Normally / on the machine used to build the binaries
+#
+PKGDEP_RESOLVE_IMAGE = /
 
 #
 # For each package, we determine the target repository based on
@@ -391,7 +370,8 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 		done; \
 	else \
 		print "Resolving dependencies"; \
-		pkgdepend resolve -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
+		pkgdepend -R $(PKGDEP_RESOLVE_IMAGE) resolve \
+		    -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
 		for p in $(DEP_SYNTH_PKGS:%.dep=%) $(DEP_PKGS:%.dep=%); do \
 			if [ "$$(print $$p.metadata.*)" = \
 			     "$$(print $$p.metadata.noincorp.*)" ]; \
@@ -497,12 +477,7 @@ $(REPOS:%=$(PKGDEST)/repo.%):
 #   target file ($@) in place, or make will reprocess the package
 #   every time it encounters it as a dependency.  Hence the "touch"
 #   statement to ensure that the target is created, even when
-#   pkgmogrify encounters an abort in the publish transforms.  This
-#   will not cause publication failures when switching build
-#   environments, because $(CLOSED_BUILD) and $(OPEN_ONLY) are
-#   referenced in $(PKGMOG_DEFINES), and changes will therefore
-#   trigger a rebuild for command dependency failure.  (Command
-#   dependency checking is turned on by .KEEP_STATE: above.)
+#   pkgmogrify encounters an abort in the publish transforms.
 #
 
 .SUFFIXES: .mf .mog .dep .res .pub
@@ -748,11 +723,9 @@ XMOD_PKGS= \
 	BRCMbnx \
 	BRCMbnxe \
 	SUNWadpu320 \
-	SUNWcryptoint \
 	SUNWibsdpib \
 	SUNWkdc \
 	SUNWlsimega \
-	SUNWsvvs \
 	SUNWwbint \
 	SUNWwbsup
 
@@ -763,12 +736,4 @@ EXPORT_SRC: CRYPT_SRC
 		< Makefile > Makefile+
 	$(MV) -f Makefile+ Makefile
 	$(CHMOD) 444 Makefile
-
-CRYPT_SRC:
-	$(RM) manifests/SUNWcryptoint.mf+
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
-		< manifests/SUNWcryptoint.mf > manifests/SUNWcryptoint.mf+
-	$(MV) manifests/SUNWcryptoint.mf+ manifests/SUNWcryptoint.mf
-	$(CHMOD) 444 manifests/SUNWcryptoint.mf
-
 # EXPORT DELETE END

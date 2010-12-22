@@ -74,7 +74,7 @@ get_prog_name(void)
 }
 
 
-/*VARARGS*/
+/*PRINTFLIKE1*/
 void
 progerr(char *fmt, ...)
 {

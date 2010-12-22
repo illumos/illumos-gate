@@ -34,7 +34,7 @@ OBJECTS=	\
 		gpkgmap.o    isdir.o      logerr.o \
 		mappath.o    ncgrpw.o     nhash.o \
 		pkgexecl.o   pkgexecv.o   pkgmount.o \
-		pkgtrans.o   pkgxpand.o   ppkgmap.o \
+		pkgtrans.o   ppkgmap.o \
 		progerr.o    putcfile.o   rrmdir.o \
 		runcmd.o     srchcfile.o  tputcfent.o \
 		verify.o     security.o   pkgweb.o \

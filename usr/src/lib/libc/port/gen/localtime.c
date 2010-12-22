@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -673,8 +677,8 @@ localtime(const time_t *timep)
  * normalized time_t, also inducing documented side-effects in
  * extern global zone state variables.  (See mktime(3C)).
  */
-time_t
-mktime(struct tm *tmptr)
+static time_t
+mktime1(struct tm *tmptr, int usetz)
 {
 	struct tm _tm;
 	long long t;		/* must hold more than 32-bit time_t */
@@ -722,74 +726,93 @@ mktime(struct tm *tmptr)
 	else
 		t += SECSPERDAY * __yday_to_month[tmptr->tm_mon];
 
-	unused = ltzset_u((time_t)t);
 
-	/* Attempt to convert time to GMT based on tm_isdst setting */
-	t += (tmptr->tm_isdst > 0) ? altzone : timezone;
+	if (usetz) {
+		/*
+		 * If called from mktime(), then we need to do the TZ
+		 * related transformations.
+		 */
+
+		unused = ltzset_u((time_t)t);
+
+		/* Attempt to convert time to GMT based on tm_isdst setting */
+		t += (tmptr->tm_isdst > 0) ? altzone : timezone;
 
 #ifdef _ILP32
-	overflow = t > LONG_MAX || t < LONG_MIN ||
-	    tmptr->tm_year < 1 || tmptr->tm_year > 138;
+		overflow = t > LONG_MAX || t < LONG_MIN ||
+		    tmptr->tm_year < 1 || tmptr->tm_year > 138;
 #else
-	overflow = t > LONG_MAX || t < LONG_MIN;
+		overflow = t > LONG_MAX || t < LONG_MIN;
 #endif
-	set_zone_context((time_t)t);
-	if (tmptr->tm_isdst < 0) {
-		long dst_delta = timezone - altzone;
-		switch (curr_zonerules) {
-		case ZONEINFO:
-			if (is_in_dst) {
-				t -= dst_delta;
-				set_zone_context((time_t)t);
+		set_zone_context((time_t)t);
+		if (tmptr->tm_isdst < 0) {
+			long dst_delta = timezone - altzone;
+			switch (curr_zonerules) {
+			case ZONEINFO:
 				if (is_in_dst) {
-					(void) offtime_u((time_t)t,
-					    -altzone, &_tm);
-					_tm.tm_isdst = 1;
-				} else {
-					(void) offtime_u((time_t)t,
-					    -timezone, &_tm);
-				}
-			} else {
-				(void) offtime_u((time_t)t, -timezone, &_tm);
-			}
-			break;
-		case POSIX_USA:
-		case POSIX:
-			if (is_in_dst) {
-				t -= dst_delta;
-				set_zone_context((time_t)t);
-				if (is_in_dst) {
-					(void) offtime_u((time_t)t,
-					    -altzone, &_tm);
-					_tm.tm_isdst = 1;
-				} else {
-					(void) offtime_u((time_t)t,
-					    -timezone, &_tm);
-				}
-			} else { /* check for ambiguous 'fallback' transition */
-				set_zone_context((time_t)t - dst_delta);
-				if (is_in_dst) {  /* In fallback, force DST */
 					t -= dst_delta;
-					(void) offtime_u((time_t)t,
-					    -altzone, &_tm);
-					_tm.tm_isdst = 1;
+					set_zone_context((time_t)t);
+					if (is_in_dst) {
+						(void) offtime_u((time_t)t,
+						    -altzone, &_tm);
+						_tm.tm_isdst = 1;
+					} else {
+						(void) offtime_u((time_t)t,
+						    -timezone, &_tm);
+					}
 				} else {
-					(void) offtime_u((time_t)t,
-					    -timezone, &_tm);
+					(void) offtime_u((time_t)t, -timezone,
+					    &_tm);
 				}
+				break;
+			case POSIX_USA:
+			case POSIX:
+				if (is_in_dst) {
+					t -= dst_delta;
+					set_zone_context((time_t)t);
+					if (is_in_dst) {
+						(void) offtime_u((time_t)t,
+						    -altzone, &_tm);
+						_tm.tm_isdst = 1;
+					} else {
+						(void) offtime_u((time_t)t,
+						    -timezone, &_tm);
+					}
+				} else {
+					/*
+					 * check for ambiguous
+					 * 'fallback' transition
+					 */
+					set_zone_context((time_t)t - dst_delta);
+					if (is_in_dst) {
+						/* In fallback, force DST */
+						t -= dst_delta;
+						(void) offtime_u((time_t)t,
+						    -altzone, &_tm);
+						_tm.tm_isdst = 1;
+					} else {
+						(void) offtime_u((time_t)t,
+						    -timezone, &_tm);
+					}
+				}
+				break;
+
+			case ZONERULES_INVALID:
+				(void) offtime_u((time_t)t, 0L, &_tm);
+				break;
+
 			}
-			break;
-
-		case ZONERULES_INVALID:
-			(void) offtime_u((time_t)t, 0L, &_tm);
-			break;
-
+		} else if (is_in_dst) {
+			(void) offtime_u((time_t)t, -altzone, &_tm);
+			_tm.tm_isdst = 1;
+		} else {
+			(void) offtime_u((time_t)t, -timezone, &_tm);
 		}
-	} else if (is_in_dst) {
-		(void) offtime_u((time_t)t, -altzone, &_tm);
-		_tm.tm_isdst = 1;
-	} else {
-		(void) offtime_u((time_t)t, -timezone, &_tm);
+
+	} else {	/* !usetz, i.e. using UTC */
+		overflow = 0;
+		/* Normalize the TM structure */
+		(void) offtime_u((time_t)t, 0, &_tm);
 	}
 
 	if (overflow || t > LONG_MAX || t < LONG_MIN) {
@@ -806,6 +829,19 @@ mktime(struct tm *tmptr)
 	errno = mketimerrno;
 	return ((time_t)t);
 }
+
+time_t
+mktime(struct tm *tmptr)
+{
+	return (mktime1(tmptr, TRUE));
+}
+
+time_t
+timegm(struct tm *tmptr)
+{
+	return (mktime1(tmptr, FALSE));
+}
+
 
 /*
  * Sets extern global zone state variables based on the current

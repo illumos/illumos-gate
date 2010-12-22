@@ -92,7 +92,6 @@
 #define	DTD_ELEM_PSET		(const xmlChar *) "pset"
 #define	DTD_ELEM_MCAP		(const xmlChar *) "mcap"
 #define	DTD_ELEM_PACKAGE	(const xmlChar *) "package"
-#define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
 #define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
 #define	DTD_ELEM_DEV_PERM	(const xmlChar *) "dev-perm"
 #define	DTD_ELEM_ADMIN		(const xmlChar *) "admin"
@@ -561,8 +560,7 @@ strip_sw_inv(zone_dochandle_t handle)
 		next = child->next;
 		if (child->name == NULL)
 			continue;
-		if (xmlStrcmp(child->name, DTD_ELEM_PACKAGE) == 0 ||
-		    xmlStrcmp(child->name, DTD_ELEM_PATCH) == 0) {
+		if (xmlStrcmp(child->name, DTD_ELEM_PACKAGE) == 0) {
 			next = child->next;
 			xmlUnlinkNode(child);
 			xmlFreeNode(child);
@@ -3493,36 +3491,6 @@ zonecfg_add_pkg(zone_dochandle_t handle, char *name, char *version)
 	if ((err = newprop(newnode, DTD_ATTR_NAME, name)) != Z_OK)
 		return (err);
 	if ((err = newprop(newnode, DTD_ATTR_VERSION, version)) != Z_OK)
-		return (err);
-	return (Z_OK);
-}
-
-int
-zonecfg_add_patch(zone_dochandle_t handle, char *id, void **pnode)
-{
-	xmlNodePtr node = (xmlNodePtr)*pnode;
-	xmlNodePtr cur;
-	int err;
-
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
-
-	cur = handle->zone_dh_cur;
-	node = xmlNewTextChild(cur, NULL, DTD_ELEM_PATCH, NULL);
-	if ((err = newprop(node, DTD_ATTR_ID, id)) != Z_OK)
-		return (err);
-	*pnode = (void *)node;
-	return (Z_OK);
-}
-
-int
-zonecfg_add_patch_obs(char *id, void *cur)
-{
-	xmlNodePtr	node;
-	int err;
-
-	node = xmlNewTextChild((xmlNodePtr)cur, NULL, DTD_ELEM_OBSOLETES, NULL);
-	if ((err = newprop(node, DTD_ATTR_ID, id)) != Z_OK)
 		return (err);
 	return (Z_OK);
 }
@@ -6998,19 +6966,10 @@ zonecfg_getmcapent(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
 }
 
 /*
- * Get the full tree of pkg/patch metadata in a set of nested AVL trees.
- * pkgs_avl is an AVL tree of pkgs.  Each pkg element contains a
- * zpe_patches_avl member which holds an AVL tree of patches for that pkg.
- * The patch elements have the same zpe_patches_avl member, each of which can
- * hold an AVL tree of patches that are obsoleted by the patch.
+ * Get the full tree of pkg metadata in a set of nested AVL trees.
+ * pkgs_avl is an AVL tree of pkgs.
  *
- * The zone xml data contains DTD_ELEM_PACKAGE elements, followed by
- * DTD_ELEM_PATCH elements.  The DTD_ELEM_PATCH patch element applies to the
- * DTD_ELEM_PACKAGE that precedes it.  The DTD_ELEM_PATCH element may have
- * child DTD_ELEM_OBSOLETES nodes associated with it.  The DTD_ELEM_PACKAGE
- * really should have had the DTD_ELEM_PATCH elements as children but it
- * was not defined that way initially so we are stuck with the DTD definition
- * now.  However, we can safely assume the ordering for compatibility.
+ * The zone xml data contains DTD_ELEM_PACKAGE elements.
  */
 int
 zonecfg_getpkgdata(zone_dochandle_t handle, uu_avl_pool_t *pkg_pool,
@@ -7064,8 +7023,6 @@ zonecfg_getpkgdata(zone_dochandle_t handle, uu_avl_pool_t *pkg_pool,
 				goto done;
 			}
 
-			pkg->zpe_patches_avl = NULL;
-
 			uu_avl_node_init(pkg, &pkg->zpe_entry, pkg_pool);
 			if (uu_avl_find(pkgs_avl, pkg, NULL, &where) != NULL) {
 				free(pkg->zpe_name);
@@ -7073,131 +7030,6 @@ zonecfg_getpkgdata(zone_dochandle_t handle, uu_avl_pool_t *pkg_pool,
 				free(pkg);
 			} else {
 				uu_avl_insert(pkgs_avl, pkg, where);
-			}
-
-		} else if (xmlStrcmp(cur->name, DTD_ELEM_PATCH) == 0) {
-			zone_pkg_entry_t *patch;
-			uu_avl_index_t where;
-			char *p;
-			char *dashp = NULL;
-			xmlNodePtr child;
-
-			if ((res = fetchprop(cur, DTD_ATTR_ID, name,
-			    sizeof (name))) != Z_OK)
-				goto done;
-
-			if ((patch = (zone_pkg_entry_t *)
-			    malloc(sizeof (zone_pkg_entry_t))) == NULL) {
-				res = Z_NOMEM;
-				goto done;
-			}
-
-			if ((p = strchr(name, '-')) != NULL) {
-				dashp = p;
-				*p++ = '\0';
-			} else {
-				p = "";
-			}
-
-			if ((patch->zpe_name = strdup(name)) == NULL) {
-				free(patch);
-				res = Z_NOMEM;
-				goto done;
-			}
-
-			if ((patch->zpe_vers = strdup(p)) == NULL) {
-				free(patch->zpe_name);
-				free(patch);
-				res = Z_NOMEM;
-				goto done;
-			}
-
-			if (dashp != NULL)
-				*dashp = '-';
-
-			patch->zpe_patches_avl = NULL;
-
-			if (pkg->zpe_patches_avl == NULL) {
-				pkg->zpe_patches_avl = uu_avl_create(pkg_pool,
-				    NULL, UU_DEFAULT);
-				if (pkg->zpe_patches_avl == NULL) {
-					free(patch->zpe_name);
-					free(patch->zpe_vers);
-					free(patch);
-					res = Z_NOMEM;
-					goto done;
-				}
-			}
-
-			uu_avl_node_init(patch, &patch->zpe_entry, pkg_pool);
-			if (uu_avl_find(pkg->zpe_patches_avl, patch, NULL,
-			    &where) != NULL) {
-				free(patch->zpe_name);
-				free(patch->zpe_vers);
-				free(patch);
-			} else {
-				uu_avl_insert(pkg->zpe_patches_avl, patch,
-				    where);
-			}
-
-			/* Add any patches this patch obsoletes. */
-			for (child = cur->xmlChildrenNode; child != NULL;
-			    child = child->next) {
-				zone_pkg_entry_t *obs;
-
-				if (xmlStrcmp(child->name, DTD_ELEM_OBSOLETES)
-				    != 0)
-					continue;
-
-				if ((res = fetchprop(child, DTD_ATTR_ID,
-				    name, sizeof (name))) != Z_OK)
-					goto done;
-
-				if ((obs = (zone_pkg_entry_t *)malloc(
-				    sizeof (zone_pkg_entry_t))) == NULL) {
-					res = Z_NOMEM;
-					goto done;
-				}
-
-				if ((obs->zpe_name = strdup(name)) == NULL) {
-					free(obs);
-					res = Z_NOMEM;
-					goto done;
-				}
-				/*
-				 * The version doesn't matter for obsoleted
-				 * patches.
-				 */
-				obs->zpe_vers = NULL;
-				obs->zpe_patches_avl = NULL;
-
-				/*
-				 * If this is the first obsolete patch, add an
-				 * AVL tree to the parent patch element.
-				 */
-				if (patch->zpe_patches_avl == NULL) {
-					patch->zpe_patches_avl =
-					    uu_avl_create(pkg_pool, NULL,
-					    UU_DEFAULT);
-					if (patch->zpe_patches_avl == NULL) {
-						free(obs->zpe_name);
-						free(obs);
-						res = Z_NOMEM;
-						goto done;
-					}
-				}
-
-				/* Insert obsolete patch into the AVL tree. */
-				uu_avl_node_init(obs, &obs->zpe_entry,
-				    pkg_pool);
-				if (uu_avl_find(patch->zpe_patches_avl, obs,
-				    NULL, &where) != NULL) {
-					free(obs->zpe_name);
-					free(obs);
-				} else {
-					uu_avl_insert(patch->zpe_patches_avl,
-					    obs, where);
-				}
 			}
 		}
 	}

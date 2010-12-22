@@ -34,36 +34,21 @@ is confusing, you may wish to review the pkg(5) manpage.
 Packaging Overview
 ------------------
 
-usr/src/pkg/ contains the definitions and rules needed to build
-a set of IPS repositories which contain the deliverables from an
-ON build.
+usr/src/pkg/ contains the definitions and rules needed to build an IPS
+repository which contain the deliverables from an ON build.
 
 The manifests directory contains all manifests, and has one file
 per package.  For most packaging changes you only need to add or
 change the packaging manifests themselves.
 
-The build rules create two repositories.  These are both built
-for DEBUG and non-DEBUG, and are thus available at
-    $CODEMGR_WS/packages/$MACH/nightly[-nd]/repo.(extra|redist)
-
-	repo.redist
-	    Contains the bulk of ON, and is what is delivered to the
-	    main OpenSolaris 'dev' and 'release' repositories.  All
-	    components delivered there must be redistributable.
-
-	repo.extra
-	    Is only built for Closed builds, and contains
-	    non-redistributable (without a proper legal agreement) pieces
-	    which may or may not be suitable for inclusion in the
-	    pkg.sun.com/opensolaris/extra repository, including the
-	    internal crypto bits necessary for working crypto in a Closed
-	    build.  Do not distribute any of the bits in repo.extra
-	    without prior agreement from the appropriate lawyers.
+The build rules create a package repository.  Separate DEBUG and
+non-DEBUG versions are built, and are available at:
+    $CODEMGR_WS/packages/$MACH/nightly[-nd]/repo.redist
 
 Building Packages
 -----------------
 
-The -p option to nightly will build the IPS repositories.
+The -p option to nightly will build the IPS repository.
 
 Alternatively, in usr/src/pkg/Makefile there are make targets for:
 
@@ -88,23 +73,6 @@ Alternatively, in usr/src/pkg/Makefile there are make targets for:
 	    Run protocmp and pmodes.
 
 The build behavior may modified by the following variables:
-
-	CLOSED_IS_PRESENT
-	    If CLOSED_IS_PRESENT is set to "yes," repo.extra will be built.
-
-	ON_CRYPTO_BINS or CODESIGN_USER
-	    If ON_CRYPTO_BINS or CODESIGN_USER is set in your build env,
-	    no packages will depend on the internal crypto certificates.
-
-	    If neither is set, your bits depend on the internal crypto
-	    certificates being available and packages will depend on
-	    pkg:/driver/crypto/dprov, which is only available in the
-	    on-extra repository.
-
-	    *** Important *** This means that, if you build using
-	    internal crypto, but you try to do an image-update with
-	    only repo.redist, you will be told that there are no  
-	    updates available.
 
 	SUPPRESSPKGDEP
 	    If SUPPRESSPKGDEP is set to "true" in your environment,
@@ -177,13 +145,13 @@ Incremental Builds
 Testing Packages
 ----------------
 
-To test the generated repositories, you should use the "onu" tool
+To test the generated repository, you should use the "onu" tool
 available from /opt/onbld/bin or usr/src/tools/scripts/ to setup and
 upgrade your system.  A manpage is available in /opt/onbld/man
 or usr/src/tools/scripts/onu.1.
 
 Alternatively, you can manually start a pkg.depot(1M) server to
-serve the generated repositories to multiple test machines.
+serve the generated repository to multiple test machines.
 
 	Start up a depot on your build machine.
 	    cd $CODEMGR_WS/packages/$MACH/nightly[-nd]
@@ -195,19 +163,10 @@ serve the generated repositories to multiple test machines.
 	    The depot can be started across NFS as well if you
 	    have a fast pipe.
 
-	    If you used internal crypto in your builds, then you must
-	    do this step for both repo.redist and repo.extra, picking
-	    different ports for each.  Otherwise, you will be unable to
-	    image-update.
-
 	Configure your test system.
 	    pkg set-publisher -P -g http://<your server host>:<port> on-nightly
 	    pkg set-publisher --non-sticky opensolaris.org
 	    pkg uninstall entire
-
-	    If you used internal crypto in your builds, then you must also:
-	        pkg set-publisher -P \
-		    -g http://<your server host>:<extra-port> on-extra
 
 	pkg image-update your test system.
 	    pkg image-update will upgrade all packages on your test system
@@ -231,12 +190,6 @@ There are various tactics for troubleshooting a failed upgrade.
 	Obsolete and renamed packages can cause trouble.
 	    pkg search -l ::pkg.renamed:true
 	    pkg search -l ::pkg.obsolete:true
-
-	Check to see if you used internal crypto, but failed to provide
-	a server for repo.extra.
-	    Use a web browser to view the system/kernel manifest from
-	    your on-nightly publisher and look for a dependency on the
-	    driver/crypto/dprov package.
 
 
 Making Packaging Changes
@@ -281,8 +234,7 @@ read pkmogrify(1) and the files themselves.
 	publish
 	    This transform is applied to all manifests.  It ensures
 	    that manifest lines which don't apply to the current
-	    architecture are stripped.  It also ensures non-redistributable
-	    packages aren't included in an open-only build.
+	    architecture are stripped.
 
 	restart_fmri
 	    This transform is applied to all manifests.  It modifies
@@ -296,7 +248,7 @@ read pkmogrify(1) and the files themselves.
 	extract_metadata
 	    This transform is applied to all manifests.  It deals with
 	    manipulations required for packaging metadata like
-	    org.opensolaris.redist, pkg.renamed, and pkg.obsolete.
+	    pkg.renamed, and pkg.obsolete.
 
 	hollow_zone_pkg
 	    This transform is available for explicit inclusion in
@@ -438,8 +390,6 @@ follows:
 	    package you are obsoleting.  Note that you must obsolete a
 	    package on all architectures and variants simultaneously.
 
-	Maintain 'set name=org.opensolaris.redist' actions if present.
-
 	Delete everything else.
 
 	If the package is a renamed ancestor, leave a comment behind as
@@ -496,16 +446,6 @@ The following actions are required for all packages in ON.
 	    you're adding items here that are not already included in
 	    usr/src/pkg/license_files, then you will also need to modify 
 	    usr/src/tools/opensolaris/license-list.
-
-The following actions are uncommon but specific to ON.
-
-	set name=org.opensolaris.redist
-	    This may be set to nonredist or internal.  If a package
-	    is redistributable, do not create this action.  "internal"
-	    packages which are legally not allowed to be distributed
-	    at all are strongly discouraged.  If you're adding
-	    content to a package with this action, you should have
-	    modified bindrop.sh, and test open-only builds.
 
 You don't need to set the following.  They're taken care of for all OS/Net
 packages in the transforms/common_actions file.

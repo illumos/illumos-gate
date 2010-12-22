@@ -649,8 +649,8 @@ main(int argc, char *argv[])
 					timelen += 2 + 3;
 					told = malloc(timelen);
 					if (told == NULL) {
-						perror("Out of memory");
-						exit(1);
+						perror("ls");
+						exit(2);
 					}
 
 					(void) memset(told, 0, timelen);
@@ -1919,6 +1919,11 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				}
 				buf[cc] = '\0';
 				rep->flinkto = strdup(buf);
+				if (rep->flinkto == NULL) {
+					perror("ls");
+					nomocore = 1;
+					return (NULL);
+				}
 				break;
 			}
 
@@ -3064,8 +3069,11 @@ ls_color_init()
 	if (termret != 1)
 		return;
 
-	if ((colorstr = getenv("LS_COLORS")) == NULL)
-		colorstr = default_colorstr;
+	if ((p = getenv("LS_COLORS")) == NULL)
+		p = default_colorstr;
+	colorstr = strdup(p);
+	if (colorstr == NULL)
+		return;
 
 	/*
 	 * Determine the size of lsc_colors.  color_sz can be > lsc_ncolors
@@ -3127,6 +3135,8 @@ ls_color_init()
 		for (i = 0; i < lsc_ncolors; ++i)
 			dump_color(&lsc_colors[i]);
 	}
+
+	free(colorstr);
 }
 
 /* Free extended system attribute lists */

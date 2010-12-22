@@ -49,8 +49,6 @@ install: all $(ROOTBINPFEXEC)
 	$(SYMLINK) ../usr/bin/pfexec $(ROOTSBIN)/pfsh
 	$(RM) $(ROOTHASBIN)/pfsh
 	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfsh
-	$(RM) $(ROOTHASBIN)/pfksh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfksh
 
 clean:
 

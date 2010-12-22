@@ -46,14 +46,11 @@ extern "C" {
  * exported (global) functions
  */
 
-typedef void (intfRelocFunc_t)(void);
-
 extern sighdlrFunc_t *quitGetTrapHandler(void);
 extern void	quit(int retcode);
 extern void	quitSetCkreturnFunc(ckreturnFunc_t *a_ckreturnFunc);
 extern void	quitSetDwnldTmpdir(char *z_dwnldTempDir);
 extern void	quitSetIdsName(char *a_idsName);
-extern void	quitSetIntfReloc(intfRelocFunc_t *a_intfReloc);
 extern void	quitSetZoneName(char *a_zoneName);
 extern void	quitSetZoneTmpdir(char *z_zoneTempDir);
 extern void	quitSetZonelist(zoneList_t a_zlst);

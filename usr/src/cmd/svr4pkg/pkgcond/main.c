@@ -148,8 +148,6 @@ struct globalData_t {
 	long	gd_fileSystemConfigLen;
 		/* current zone name */
 	char	*gd_zoneName;
-		/* version of target: PATCH_CLIENT_VERSION */
-	char	*gd_patchClientVersion;
 		/* SUNW_PKGCOND_GLOBAL_DATA:parentZone:zoneName */
 	char	*gd_parentZoneName;
 		/* SUNW_PKGCOND_GLOBAL_DATA:parentZone:zoneType */
@@ -3874,29 +3872,15 @@ parseGlobalData(char *a_envVar, GLOBALDATA_T **r_gdt)
 	}
 
 	/*
-	 * get package install root. If it doesn't exist check for
-	 * patch install root (ROOTDIR)
+	 * get package install root.
 	 */
 
 	a = getenv(ENV_VAR_PKGROOT);
 	if ((a != NULL) && (*a != '\0')) {
 		(*r_gdt)->gd_installRoot = a;
 	} else {
-		a = getenv(ENV_VAR_PATCHROOT);
-		if ((a != NULL) && (*a != '\0')) {
-			(*r_gdt)->gd_installRoot = a;
-		} else {
-			(*r_gdt)->gd_installRoot = "/";
-		}
+		(*r_gdt)->gd_installRoot = "/";
 	}
-
-	/*
-	 * get patch client version: always set if $ROOTDIR != / and
-	 * the $ROOTDIR/var/sadm/softinfo/INST_RELEASE file exists.
-	 */
-
-	a = getenv(ENV_VAR_PATCH_CLIENTVER);
-	(*r_gdt)->gd_patchClientVersion = (a ? a : "");
 
 	/* get the global data environment variable */
 

@@ -1190,14 +1190,9 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 
 GENASSYM_C = genassym.c
 
-# XXX	A hack.  Perhaps this should be 'CPPFLAGS.native' and
-#	live in Makefile.master
-
-CPPFLAGS.genassym = \
-	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
-
 genassym: $(GENASSYM_C)
-	$(NATIVECC) -Iinc -I$(LIBCDIR)/inc $(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
+	$(NATIVECC) -Iinc -I$(LIBCDIR)/inc $(CPPFLAGS.native)	\
+		-o $@ $(GENASSYM_C)
 
 OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 

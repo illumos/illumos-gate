@@ -32,9 +32,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#ifndef SUNOS41
 #include <utmpx.h>
-#endif
 #include <dirent.h>
 #include <sys/types.h>
 #include <pkgstrct.h>
@@ -44,11 +42,9 @@
 #include <pkglib.h>
 #include "libadm.h"
 #include "libinst.h"
-#include "wsreg_pkgrm.h"
 #include "messages.h"
 
 extern struct admin adm;
-/* extern struct cfent **eptlist; */
 
 extern char	pkgloc[], *pkginst, *msgtext;
 
@@ -153,27 +149,6 @@ rckrunlevel(void)
 }
 
 int
-rckpatchpkg(char *p, char *pt)
-{
-	int n;
-	char ans[MAX_INPUT];
-
-	ptext(stderr, WRN_PKGREMOVE_PATCHES, p, p, p, pt);
-
-	n = ckyorn(ans, NULL, NULL, NULL, ASK_PKGREMOVE_CONTINUE);
-
-	if (n != 0) {
-		return (n);
-	}
-
-	if (strchr("yY", *ans) == NULL) {
-		return (3);
-	}
-
-	return (0);
-}
-
-int
 rckdepend(void)
 {
 	int	n;
@@ -188,51 +163,6 @@ rckdepend(void)
 		echo(MSG_CHECKREMOVE_PKG_IN_GZ, pkginst);
 	} else {
 		echo(MSG_CHECKREMOVE_PKG_IN_ZONE, pkginst, zoneName);
-	}
-
-	if (wsreg_pkgrm_check(get_inst_root(), pkginst, &id, &name) > 0) {
-		int i;
-
-		if (ADM(rdepend, "quit")) {
-			return (4);
-		}
-
-		if (echoGetFlag() == B_FALSE) {
-			return (5);
-		}
-
-		msgtext = MSG_PKGREMOVE_WSDEPEND;
-		echo(msgtext);
-
-		(void) printf("%-36s  %s", MSG_PKGREMOVE_ID_STR,
-		    MSG_PKGREMOVE_NAME_STR);
-		(void) printf("\n------------------------------------  "
-		    "--------------------------------------\n");
-
-		for (i = 0; id[i] != NULL; i++) {
-			(void) printf("%-36s  %s\n", id[i],
-			    (name[i])?(name[i]):"");
-			free(id[i]);
-			if (name[i]) {
-				free(name[i]);
-			}
-		}
-
-		free(id);
-		free(name);
-
-		msgtext = NULL;
-
-		n = ckyorn(ans, NULL, NULL, HLP_PKGREMOVE_WSDEPEND,
-		    ASK_PKGREMOVE_CONTINUE);
-
-		if (n != 0) {
-			return (n);
-		}
-
-		if (strchr("yY", *ans) == NULL) {
-			return (3);
-		}
 	}
 
 	if (dockdeps(pkginst, 1, preremoveCheck)) {

@@ -142,8 +142,6 @@ lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 		exit 1; \
 	fi
 
-$(MACHLIBS):	$(MACH_COMP)
-
 lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
 	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
 		$(ECHO) "Error: Invalid reference to environ" ; \
@@ -151,7 +149,8 @@ lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
 		exit 1; \
 	fi
 
-$(MACHLIBS64):	$(MACH_COMP)
+$(MACH)/assym.h $(MACH64)/assym.h:
+	@cd $(@D); $(MAKE) assym.h
 
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
@@ -178,7 +177,9 @@ inslib64:	$(ROOTFS_LIBS64) $(ROOTFS_LINKS64) \
 		$(ROOTFS_LINTLIB64) \
 		$(ROOTVARIANTLIBS64)
 
-install_h: $(ROOTHDRS)
+install_h: all_h $(ROOTHDRS)
+
+all_h:	$(MACH)/assym.h $(MACH64)/assym.h
 
 check:	$(CHECKHDRS)
 
