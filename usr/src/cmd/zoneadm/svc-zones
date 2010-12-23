@@ -28,166 +28,33 @@ ZPOOL=`svcprop -p config/zpool $SMF_FMRI 2>/dev/null`
 ZPOOL=${ZPOOL:-zones}
 
 MANFDS=$ZPOOL/manifests
+GZDIR=/lib/svc/manifest
+DESTDIR=/$MANFDS
+CONFIG=/usr/lib/brand/joyent/manifests
 
-#
-# The following is a list of SMF svcs which could be run in a zone, but
-# which we're not currently installing on our live image.  If we add any
-# of these to the image and we want it to also be available in zones,
-# then we need to move the entry to the MANFLIST.
-#
-# application/cups.xml
-# application/font/fc-cache.xml
-# application/graphical-login/gdm.xml
-# application/management/net-snmp.xml
-# application/management/seaport.xml
-# application/management/snmpdx.xml
-# application/opengl/ogl-select.xml
-# application/print/service-selector.xml
-# application/security/tcsd.xml
-# application/x11/x11-server.xml
-# application/x11/xfs.xml
-# application/x11/xvnc-inetd.xml
-# network/ldap/client.xml
-# network/rpc/keyserv.xml
-# network/socket-filter-kssl.xml
-# network/ssl/kssl-proxy.xml
-# network/nfs/rquota.xml
-# network/smb/server.xml
-# network/dns/server.xml
-# network/ftp.xml
-# network/finger.xml
-# network/comsat.xml
-# network/rpc/rstat.xml
-# network/rpc/rusers.xml
-# network/rpc/spray.xml
-# network/rpc/wall.xml
-# network/talk.xml
-# network/ntp.xml
-# network/sendmail-client.xml
-# network/smtp-sendmail.xml
-# network/telnet.xml
-# network/wpa.xml
-# network/rpc/gss.xml
-# network/security/kadmin.xml
-# network/security/krb5kdc.xml
-# network/security/ktkt_warn.xml
-# network/rpc/smserver.xml
-# network/nfs/cbd.xml
-# network/nfs/mapid.xml
-# network/nfs/status.xml
-# network/smb/client.xml
-# network/ipmievd.xml
-# network/nis/client.xml
-# network/rpc/rex.xml
-# network/http-apache22.xml
-# system/consolekit.xml
-# system/device/devices-audio.xml
-# system/fm/notify-params.xml
-# system/install/system-config.xml
-# system/pkgserv.xml
-# system/sac.xml
-#
-
-#
-# The following is a list of SMF svcs which are installed on our live image and
-# which could be run in a zone, but which we choose not to run in our zones.
-# If we ever do want to run any of these, move the entry to the MANFLIST.
-#
-# network/nfs/client.xml
-# network/nfs/nlockmgr.xml
-# system/boot-archive-update.xml
-# system/boot-archive.xml
-# system/boot-config.xml
-#
-
-#
-# The following is a list of SMF svc manifests under lib/svc/manifest.  These
-# are available on our live image and are runnable in a zone.  Since the zones
-# are sharing the base file system with the global zone, we set up so that
-# these svcs are configured in the zone.
-#
-MANFLIST="\
-	milestone/multi-user-server.xml \
-	milestone/multi-user.xml \
-	milestone/name-services.xml \
-	milestone/network.xml \
-	milestone/single-user.xml \
-	milestone/sysconfig.xml \
-	network/bridge.xml \
-	network/dlmgmt.xml \
-	network/dns/client.xml \
-	network/dns/install.xml \
-	network/dns/multicast.xml \
-	network/forwarding.xml \
-	network/inetd-upgrade.xml \
-	network/inetd.xml \
-	network/ipfilter.xml \
-	network/ipsec/ike.xml \
-	network/ipsec/ipsecalgs.xml \
-	network/ipsec/manual-key.xml \
-	network/ipsec/policy.xml \
-	network/login.xml \
-	network/network-initial.xml \
-	network/network-install.xml \
-	network/network-ipmgmt.xml \
-	network/network-ipqos.xml \
-	network/network-iptun.xml \
-	network/network-location.xml \
-	network/network-loopback.xml \
-	network/network-netcfg.xml \
-	network/network-netmask.xml \
-	network/network-physical.xml \
-	network/network-routing-setup.xml \
-	network/network-service.xml \
-	network/nfs/server.xml \
-	network/rexec.xml \
-	network/routing/legacy-routing.xml \
-	network/routing/ndp.xml \
-	network/routing/rdisc.xml \
-	network/routing/ripng.xml \
-	network/routing/route.xml \
-	network/rpc/bind.xml \
-	network/shares/group.xml \
-	network/shares/reparsed.xml \
-	network/shell.xml \
-	network/slp.xml \
-	network/ssh.xml \
-	system/auditd.xml \
-	system/consadm.xml \
-	system/console-login.xml \
-	system/coreadm.xml \
-	system/cron.xml \
-	system/cryptosvc.xml \
-	system/device/allocate.xml \
-	system/device/devices-local.xml \
-	system/device/mpxio-upgrade.xml \
-	system/early-manifest-import.xml \
-	system/extended-accounting.xml \
-	system/filesystem/autofs.xml \
-	system/filesystem/joyent-fs.xml \
-	system/filesystem/local-fs.xml \
-	system/filesystem/minimal-fs.xml \
-	system/filesystem/root-fs.xml \
-	system/filesystem/usr-fs.xml \
-	system/fmd.xml \
-	system/hostid.xml \
-	system/hotplug.xml \
-	system/identity.xml \
-	system/idmap.xml \
-	system/keymap.xml \
-	system/logadm-upgrade.xml \
-	system/manifest-import.xml \
-	system/name-service-cache.xml \
-	system/pfexecd.xml \
-	system/rbac.xml \
-	system/rcap.xml \
-	system/rmtmpfiles.xml \
-	system/sar.xml \
-	system/svc/global.xml \
-	system/svc/restarter.xml \
-	system/system-log.xml \
-	system/utmp.xml \
-	system/vtdaemon.xml"
+SMFDIRS="\
+	application \
+	milestone \
+	network \
+	network/dns \
+	network/ipsec \
+	network/ldap \
+	network/nfs \
+	network/nis \
+	network/routing \
+	network/rpc \
+	network/security \
+	network/shares \
+	network/smb \
+	network/ssl \
+	site \
+	system \
+	system/device \
+	system/filesystem \
+	system/fm \
+	system/install \
+	system/security \
+	system/svc"
 
 #
 # If we're running off of a live-image, setup a zone-specific manifest
@@ -202,12 +69,61 @@ setup_manifests()
 	zfs list -H -o name $MANFDS >/dev/null 2>&1 
 	[ $? -eq 0 ] && zfs destroy $MANFDS
 	zfs create $MANFDS
-	cd /lib/svc/manifest
-	for i in $MANFLIST
-        do
-		echo $i
-        done | cpio -pdm /$MANFDS
-	mkdir -m755 /$MANFDS/site
+
+	# Create the directory hierarchy under the destination directory.
+	for i in $SMFDIRS
+	do
+		mkdir -m755 $DESTDIR/$i
+	done
+
+	if [[ ! -f $CONFIG ]]; then
+		echo "Missing zone SMF manifest list."
+		return
+	fi
+
+	#
+	# Process the SMF SVC configuration list to setup the zone-specific
+	# SMF svcs.
+	#
+	nawk -v base=$GZDIR -v dest=$DESTDIR '{
+		# Ignore comments and empty lines.
+		if (substr($1, 1, 1) == "#" || length($1) == 0)
+			next
+
+		# entry format is: name status
+		proc_file($1, $2);
+	    }
+
+	    #
+	    # Copy the manifest from the global zone to the zone-specific
+	    # manifest area.  At the same time, update any manifests whose
+	    # status needs to be changed, based on what our configuration
+	    # file indicates.
+	    #
+	    function proc_file(fname, status)
+	    {
+		f = base "/" fname
+		of =  dest "/" fname
+
+		while (getline <f > 0) {
+			if (($1 == "<instance" &&
+			    $2 == "name=\047default\047") ||
+			    $1 == "<create_default_instance") {
+				if (status == "enabled")
+					n=sub("\047false\047", "\047true\047")
+				else
+					n=sub("\047true\047", "\047false\047")
+
+				if (n > 0)
+					printf("update svc state: %s %s\n",
+					    fname, $0)
+			}
+
+			print $0 >of
+		}
+		close(f)
+		close(of)
+	}' $CONFIG
 }
 
 #
