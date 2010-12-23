@@ -27,6 +27,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * IMPORTANT NOTE:
  *
@@ -168,7 +170,7 @@ regcmp(const char *regexp, ...)
 
 	if (arg_strlen == 0)
 		return ((char *)0);
-	compile_startp = (char *)malloc(3 * arg_strlen + 1);
+	compile_startp = (char *)malloc(3 * arg_strlen);
 	if (compile_startp == (char *)0)
 		return ((char *)0);
 
@@ -453,7 +455,7 @@ regcmp(const char *regexp, ...)
 					compilep += expr_length;
 
 				} else if /* (current_char == DASH) && */
-				    (dash_indicates_range == B_FALSE) {
+					(dash_indicates_range == B_FALSE) {
 					/*
 					 * current_char is a DASH, but
 					 * either begins the entire
@@ -475,12 +477,8 @@ regcmp(const char *regexp, ...)
 					dash_indicates_range = B_TRUE;
 					first_char_in_range = current_char;
 
-				} else {
-					/*
-					 * ((current_char == DASH &&/
-					 * (dash_indicates_range == B_TRUE))
-					 */
-
+				} else /* ((current_char == DASH && */
+				/* (dash_indicates_range == B_TRUE)) */ {
 					/*
 					 * the DASH appears after a single
 					 * character that isn't
@@ -498,7 +496,7 @@ regcmp(const char *regexp, ...)
 						    arg_listp, compile_startp);
 
 					} else if (current_char ==
-					    RIGHT_SQUARE_BRACKET) {
+						RIGHT_SQUARE_BRACKET) {
 						/*
 						 * the preceding DASH is
 						 * the last character in the
@@ -511,8 +509,10 @@ regcmp(const char *regexp, ...)
 					} else if (valid_range(
 					    first_char_in_range,
 					    current_char) == B_FALSE) {
+
 						ERROR_EXIT(&regcmp_lock,
-						    arg_listp, compile_startp);
+						arg_listp, compile_startp);
+
 					} else {
 						/*
 						 * the DASH is part of a
@@ -687,10 +687,10 @@ regcmp(const char *regexp, ...)
 				}
 				if (*regex_typep != SIMPLE_GROUP) {
 					group_length = (unsigned int)
-					    (compilep - regex_typep);
+						(compilep - regex_typep);
 					if (group_length >= 1024) {
 						ERROR_EXIT(&regcmp_lock,
-						    arg_listp, compile_startp);
+						arg_listp, compile_startp);
 					}
 					high_bits = group_length >>
 					    TIMES_256_SHIFT;
@@ -699,7 +699,7 @@ regcmp(const char *regexp, ...)
 					*regex_typep =
 					    (unsigned char)
 					    ((unsigned int)
-					    *regex_typep | high_bits);
+						*regex_typep | high_bits);
 					regex_typep++;
 					*regex_typep =
 					    (unsigned char)low_bits;
@@ -733,7 +733,7 @@ regcmp(const char *regexp, ...)
 			} else {
 				can_repeat = B_FALSE;
 				*regex_typep = (unsigned char)
-				    ((unsigned int)*regex_typep | ZERO_OR_MORE);
+				((unsigned int)*regex_typep | ZERO_OR_MORE);
 			}
 			break; /* end case '*' */
 
@@ -751,12 +751,12 @@ regcmp(const char *regexp, ...)
 
 			if (can_repeat == B_FALSE) {
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			} else {
 				can_repeat = B_FALSE;
 				*regex_typep =
-				    (unsigned char)((unsigned int)*
-				    regex_typep | ONE_OR_MORE);
+					(unsigned char)((unsigned int)*
+					regex_typep | ONE_OR_MORE);
 			}
 			break; /* end case '+' */
 
@@ -787,15 +787,15 @@ regcmp(const char *regexp, ...)
 
 			if (can_repeat == B_FALSE) {
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			}
 			can_repeat = B_FALSE;
 			*regex_typep = (unsigned char)((unsigned int)*
-			    regex_typep | COUNT);
+					regex_typep | COUNT);
 			count_length = get_count(&min_count, regexp);
 			if (count_length <= 0) {
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			}
 			regexp += count_length;
 
@@ -810,28 +810,28 @@ regcmp(const char *regexp, ...)
 					max_count = UNLIMITED;
 				} else { /* {min_count,max_count} */
 					count_length = get_count(
-					    &max_count, regexp);
+						&max_count, regexp);
 					if (count_length <= 0) {
 						ERROR_EXIT(&regcmp_lock,
-						    arg_listp, compile_startp);
+						arg_listp, compile_startp);
 					}
 					regexp += count_length;
 					if (*regexp != RIGHT_CURLY_BRACE) {
 						ERROR_EXIT(&regcmp_lock,
-						    arg_listp, compile_startp);
+						arg_listp, compile_startp);
 					}
 					regexp++;
 				}
 			} else { /* invalid expression */
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			}
 
 			if ((min_count > MAX_SINGLE_BYTE_INT) ||
-			    ((max_count != UNLIMITED) &&
-			    (min_count > max_count))) {
+				((max_count != UNLIMITED) &&
+				(min_count > max_count))) {
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			} else {
 				*compilep = (unsigned char)min_count;
 				compilep++;
@@ -850,7 +850,7 @@ regcmp(const char *regexp, ...)
 			can_repeat = B_TRUE;
 			regex_typep = compilep;
 			expr_length = add_single_char_expr(compilep,
-			    current_char);
+					current_char);
 			compilep += expr_length;
 
 		} /* end switch (current_char) */
@@ -868,7 +868,7 @@ regcmp(const char *regexp, ...)
 			char_size = get_wchar(&current_char, regexp);
 			if (char_size <= 0) {
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			} else {
 				regexp += char_size;
 			}
@@ -876,7 +876,7 @@ regcmp(const char *regexp, ...)
 			if (pop_compilep() != (char *)0) {
 				/* unmatched parentheses */
 				ERROR_EXIT(&regcmp_lock, arg_listp,
-				    compile_startp);
+					compile_startp);
 			}
 			*compilep = (unsigned char)END_REGEX;
 			compilep++;

@@ -39,11 +39,6 @@
 
 #define	_(x)	gettext(x)
 
-
-#ifndef TEXT_DOMAIN
-#define	TEXT_DOMAIN	"SYS_TEST"
-#endif
-
 /* address format */
 static char *afmt  =	"%07llo";
 static char *cfmt  =    "       ";
@@ -556,7 +551,6 @@ main(int argc, char **argv)
 	input = stdin;
 
 	(void) setlocale(LC_ALL, "");
-	(void) textdomain(TEXT_DOMAIN);
 
 	while ((c = getopt(argc, argv, "A:bCcdDfFj:N:oOsSxXvt:")) != EOF) {
 		switch (c) {

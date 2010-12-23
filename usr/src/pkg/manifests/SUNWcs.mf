@@ -2560,8 +2560,6 @@ license usr/src/cmd/mt/THIRDPARTYLICENSE \
     license=usr/src/cmd/mt/THIRDPARTYLICENSE
 license usr/src/cmd/script/THIRDPARTYLICENSE \
     license=usr/src/cmd/script/THIRDPARTYLICENSE
-license usr/src/cmd/sed/THIRDPARTYLICENSE \
-    license=usr/src/cmd/sed/THIRDPARTYLICENSE
 license usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE \
     license=usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE
 license usr/src/cmd/tail/THIRDPARTYLICENSE \

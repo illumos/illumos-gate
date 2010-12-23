@@ -454,6 +454,19 @@ main(int argc, char *argv[])
 		quit(1);
 	}
 
+	/*
+	 * *********************************************************************
+	 * this feature is removed starting with Solaris 10 - there is no built
+	 * in list of packages that should be run "the old way"
+	 * *********************************************************************
+	 */
+
+#ifdef	ALLOW_EXCEPTION_PKG_LIST
+	/* Until 2.9, set it from the execption list */
+	if (exception_pkg(pkginst, LINK))
+		set_nonABI_symlinks();
+#endif
+
 	if ((pkgname = getenv("NAME")) == NULL) {
 		progerr(gettext(ERR_NOPARAM), "NAME", svept->path);
 		quit(1);

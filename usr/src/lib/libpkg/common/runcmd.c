@@ -62,6 +62,30 @@
 static char	errfile[L_tmpnam+1];
 
 /*
+ * This is the "argument array" definition that is returned by e_new_args and is
+ * used by e_add_args, e_free_args, etc.
+ */
+
+struct _argArray_t {
+	long	_aaNumArgs;	/* number of arguments set */
+	long	_aaMaxArgs;	/* number of arguments allocated */
+	char	**_aaArgs;	/* actual arguments */
+};
+
+typedef struct _argArray_t argArray_t;
+
+/*
+ * Private Methods
+ */
+static void		e_free_args(argArray_t *a_args);
+static argArray_t	*e_new_args(int initialCount);
+/*PRINTFLIKE2*/
+static boolean_t	e_add_arg(argArray_t *a_args, char *a_format, ...);
+static int		e_get_argc(argArray_t *a_args);
+static char		**e_get_argv(argArray_t *a_args);
+
+
+/*
  * Public Methods
  */
 
@@ -75,7 +99,7 @@ rpterr(void)
 	if (errfile[0]) {
 		if (fp = fopen(errfile, "r")) {
 			while ((c = getc(fp)) != EOF)
-				(void) putc(c, stderr);
+				putc(c, stderr);
 			(void) fclose(fp);
 		}
 		(void) unlink(errfile);
@@ -146,7 +170,7 @@ esystem(char *cmd, int ifd, int ofd)
 
 		i = open(errfile, O_WRONLY|O_CREAT|O_TRUNC, 0666);
 		if (i >= 0) {
-			(void) dup2(i, STDERR_FILENO);
+			dup2(i, STDERR_FILENO);
 		}
 
 		/* Close all open files except standard i/o */
@@ -155,7 +179,7 @@ esystem(char *cmd, int ifd, int ofd)
 
 		/* execute target executable */
 
-		(void) execl("/sbin/sh", "/sbin/sh", "-c", cmd, NULL);
+		execl("/sbin/sh", "/sbin/sh", "-c", cmd, NULL);
 		progerr(pkg_gt("exec of <%s> failed, errno=%d"), cmd, errno);
 		_exit(99);
 	} else if (pid < 0) {
@@ -169,9 +193,9 @@ esystem(char *cmd, int ifd, int ofd)
 	 * this is the parent process
 	 */
 
-	(void) sighold(SIGINT);
+	sighold(SIGINT);
 	pid = waitpid(pid, &status, 0);
-	(void) sigrelse(SIGINT);
+	sigrelse(SIGINT);
 
 	if (pid < 0) {
 		return (-1); /* probably interrupted */
@@ -205,7 +229,7 @@ epopen(char *cmd, char *mode)
 
 	if (errfile[0]) {
 		/* cleanup previous errfile */
-		(void) unlink(errfile);
+		unlink(errfile);
 	}
 
 	perrfile = tmpnam(NULL);
@@ -571,4 +595,214 @@ e_ExecCmdList(int *r_status, char **r_results,
 	va_end(ap);
 	return (e_ExecCmdArray(r_status, r_results, a_inputFile,
 								a_cmd, array));
+}
+
+/*
+ * Name:	e_new_args
+ * Description:	create a new argument array for use in exec() calls
+ * Arguments:	initialCount - [RO, *RO] - (int)
+ *			Initial number of elements to populate the
+ *			argument array with - use best guess
+ * Returns:	argArray_t *
+ *			Pointer to argument array that can be used in other
+ *			functions that accept it as an argument
+ *			== (argArray_t *)NULL - error
+ * NOTE: you must call e_free_args() when the returned argument array is
+ * no longer needed so that all storage used can be freed up.
+ */
+
+argArray_t *
+e_new_args(int initialCount)
+{
+	argArray_t	*aa;
+
+	/* allocate new argument array structure */
+
+	aa = (argArray_t *)calloc(1, sizeof (argArray_t));
+	if (aa == (argArray_t *)NULL) {
+		progerr(ERR_MALLOC, strerror(errno), sizeof (argArray_t),
+			"<argArray_t>");
+		return ((argArray_t *)NULL);
+	}
+
+	/* allocate initial argument array */
+
+	aa->_aaArgs = (char **)calloc(initialCount+1, sizeof (char *));
+	if (aa->_aaArgs == (char **)NULL) {
+		progerr(ERR_MALLOC, strerror(errno),
+			(initialCount+1)*sizeof (char *), "<char **>");
+		return ((argArray_t *)NULL);
+	}
+
+	/* initialize argument indexes */
+
+	aa->_aaNumArgs = 0;
+	aa->_aaMaxArgs = initialCount;
+
+	return (aa);
+}
+
+/*
+ * Name:	e_add_arg
+ * Description:	add new argument to argument array for use in exec() calls
+ * Arguments:	a_args - [RO, *RW] - (argArray_t *)
+ *			Pointer to argument array (previously allocated via
+ *			a call to e_new_args) to add the argument to
+ *		a_format - [RO, *RO] - (char *)
+ *			Pointer to "printf" style format argument
+ *		... - [RO, *RO] - (varies)
+ *			Arguments as appropriate for format statement
+ * Returns:	boolean_t
+ *			B_TRUE - success
+ *			B_FALSE - failure
+ * Examples:
+ * - to add an argument that specifies a file descriptor:
+ *	int fd;
+ *	e_add_arg(aa, "/proc/self/fd/%d", fd);
+ * - to add a flag or other known text:
+ *	e_add_arg(aa, "-s")
+ * - to add random text:
+ *	char *random_text;
+ *	e_add_arg(aa, "%s", random_text);
+ */
+
+/*PRINTFLIKE2*/
+boolean_t
+e_add_arg(argArray_t *a_args, char *a_format, ...)
+{
+	char		*rstr = (char *)NULL;
+	char		bfr[MAX_CANON];
+	size_t		vres = 0;
+	va_list		ap;
+
+	/*
+	 * double argument array if array is full
+	 */
+
+	if (a_args->_aaNumArgs >= a_args->_aaMaxArgs) {
+		int	newMax;
+		char	**newArgs;
+
+		newMax = a_args->_aaMaxArgs * 2;
+		newArgs = (char **)realloc(a_args->_aaArgs,
+			(newMax+1) * sizeof (char *));
+		if (newArgs == (char **)NULL) {
+			progerr(ERR_MALLOC, strerror(errno),
+				((newMax+1) * sizeof (char *)), "<char **>");
+			return (B_FALSE);
+		}
+		a_args->_aaArgs = newArgs;
+		a_args->_aaMaxArgs = newMax;
+	}
+
+	/* determine size of argument to add to list */
+
+	va_start(ap, a_format);
+	vres = vsnprintf(bfr, sizeof (bfr), a_format, ap);
+	va_end(ap);
+
+	/* if it fit in the built in buffer, use that */
+	if (vres < sizeof (bfr)) {
+		/* dup text already generated in bfr */
+		rstr = strdup(bfr);
+		if (rstr == (char *)NULL) {
+			progerr(ERR_MALLOC, strerror(errno), vres+2,
+				"<char *>");
+			return (B_FALSE);
+		}
+	} else {
+		/* allocate space for argument to add */
+
+		rstr = (char *)malloc(vres+2);
+		if (rstr == (char *)NULL) {
+			progerr(ERR_MALLOC, strerror(errno), vres+2,
+				"<char *>");
+			return (B_FALSE);
+		}
+
+		/* generate argument to add */
+
+		va_start(ap, a_format);
+		vres = vsnprintf(rstr, vres+1, a_format, ap);
+		va_end(ap);
+	}
+
+	/* add argument to the end of the argument array */
+
+	a_args->_aaArgs[a_args->_aaNumArgs++] = rstr;
+	a_args->_aaArgs[a_args->_aaNumArgs] = (char *)NULL;
+
+	return (B_TRUE);
+}
+
+/*
+ * Name:	e_get_argv
+ * Description:	return (char **)argv pointer from argument array
+ * Arguments:	a_args - [RO, *RW] - (argArray_t *)
+ *			Pointer to argument array (previously allocated via
+ *			a call to e_new_args) to return argv pointer for
+ * Returns:	char **
+ *			Pointer to (char **)argv pointer suitable for use
+ *			in an exec*() call
+ * NOTE: the actual character array is always terminated with a (char *)NULL
+ */
+
+char **
+e_get_argv(argArray_t *a_args)
+{
+	return (a_args->_aaArgs);
+}
+
+/*
+ * Name:	e_get_argc
+ * Description:	return (int) argc count from argument array
+ * Arguments:	a_args - [RO, *RW] - (argArray_t *)
+ *			Pointer to argument array (previously allocated via
+ *			a call to e_new_args) to return argc count for
+ * Returns:	int
+ *			Count of the number of arguments in the argument array
+ *			suitable for use in an exec*() call
+ */
+
+int
+e_get_argc(argArray_t *a_args)
+{
+	return (a_args->_aaNumArgs);
+}
+
+/*
+ * Name:	e_free_args
+ * Description:	free all storage contained in an argument array previously
+ *		allocated by a call to e_new_args
+ * Arguments:	a_args - [RO, *RW] - (argArray_t *)
+ *			Pointer to argument array (previously allocated via
+ *			a call to e_new_args) to free
+ * Returns:	void
+ * NOTE:	preserves errno (usually called right after e_execCmd*())
+ */
+
+void
+e_free_args(argArray_t *a_args)
+{
+	int	i;
+	int	lerrno = errno;
+
+	/* free all arguments in the argument array */
+
+	for (i = (a_args->_aaNumArgs-1); i >= 0; i--) {
+		(void) free(a_args->_aaArgs[i]);
+		a_args->_aaArgs[i] = (char *)NULL;
+	}
+
+	/* free argument array */
+
+	(void) free(a_args->_aaArgs);
+
+	/* free argument array structure */
+
+	(void) free(a_args);
+
+	/* restore errno */
+
+	errno = lerrno;
 }

@@ -1,0 +1,294 @@
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+
+MTA-MESSAGE-TRACK-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+    OBJECT-TYPE, MODULE-IDENTY, Counter32, Gauge32
+     FROM SNMPv2-SMI
+    DisplayString, TimeInterval, DateAndTime
+     DROM SNMPv2-TC;
+
+
+  ema OBJECT IDENTIFIER ::= { 2 16 840 1 113694 }
+  emaMsgTracking OBJECT IDENTIFIER ::= { ema 1 1 1 2 }
+
+
+  mta-message-track MODULE-IDENTITY
+    LAST-UPDATED "9503200000Z"
+    ORGANISATION "EMA"
+    CONTACT-INFO
+     ""
+    DESCRIPTION
+     "The MIB module describing Message Tracking"
+    ::= { emaMsgTracking 1 }
+
+-- Note that the MODULE-IDENTITY MACRO does not exist in SNMP version 1,
+-- and the above would be replaced by something like
+-- mta-message-track OBJECT IDENTIFIER ::= { emaMsgTracking 1 }
+
+
+  mtaInformationTable						-- should augment applTable ???
+    SYNTAX SEQUENCE OF mtaInformationEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+     "The table holding information about the MTA being queried . A table
+      is used because there may be several MTAs at a single host."
+    ::= { mta-message-track 1 }
+
+  mtaInformationEntry OBJECT-TYPE
+    SYNTAX MtaInformationEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+     "One entry in the table holding information about the MTA being
+      queried."
+    INDEX { mtaIndex }						-- applIndex
+    ::= { mtaInformationTable 1 }
+
+  MtaInformationEntry ::= SEQUENCE {
+    mtaIndex							-- remove ???
+      INTEGER,							-- remove ???
+    mtaName
+      DisplayString,
+    mtaMessagingType
+      DisplayString,
+    startTimeforRecordedInformation
+      DateAndTime,
+    alternativeAgent
+      DisplayString
+  }
+
+  mtaMessageTable OBJECT-TYPE					-- messageTable
+    SYNTAX SEQUENCE OF MessageEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+     "The table holding information about messages that have passed
+      through a specific MTA."
+    ::= { emaMsgTracking 2 }
+
+  messageEntry OBJECT-TYPE
+    SYNTAX MessageEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+     "The entry associated with each message."
+    INDEX { mtaIndex, messageID, Recipient, messageIndex }
+    ::= { mtaMessageTable 1 }					-- messageTable
+
+  MessageEntry ::= SEQUENCE {
+    messageID
+      DisplayString,
+    Originator							-- lowercase for names of variables ???
+      DisplayString,
+    Recipient
+      DisplayString,
+    ArrivalTime
+      DateAndTime,
+    CreationTime
+      DateAndTime,
+    Subject							-- dangerous ???
+      DisplayString,
+    Size
+      INTEGER,
+    Priority
+      DisplayString,
+    MtaSource
+      DisplayString,
+    DispositionTime
+      DateAndTime,
+    DispositionStatus
+      INTEGER,
+    DeliveredTo
+      DisplayString,
+    NonDeliveryReason
+      INTEGER,
+    TransferredTo
+      DisplayString,
+    TransferredToAgent
+      DisplayString,
+    RedirectedTo
+      DisplayString,
+    InQueueState
+      INTEGER,
+    SupplementalInfo
+      DisplayString,
+    messageIndex
+     INTEGER
+  }
+
+  messageID OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only						-- MAX-ACCESS ???
+    STATUS current
+    DESCRIPTION
+     "Message ID of requested message"
+    ::= { messageEntry 1 }
+
+  OriginatorName OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Address of Originator of the sought after message(s)"
+    ::= { messageEntry 2 }
+
+  Recipient OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Address of a Recipient of the sought after message(s)"
+    ::= { messageEntry 3 }
+
+  ArrivalTime OBJECT-TYPE
+    SYNTAX DateAndTime
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Time that the message arrived at this MTA"
+    ::= { messageEntry 4 }
+
+  CreationTime OBJECT-TIME
+    SYNTAX DateAndTime
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Time that the message was created/submitted to the first MTA"
+    ::= { messageEntry 5 }
+
+  Subject OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Subject of the message"
+    ::= { messageEntry 6 }
+
+  Size OBJECT-TYPE
+    SYNTAX INTEGER
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Size in octets of the message upon receipt"
+    ::= { messageEntry 7 }
+
+  Priority OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Priority of the message"
+    ::= { messageEntry 8 }
+
+  MtaSource OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Name of the MTA or Originator from which this MTA received
+      the message"
+    ::= { messageEntry 9 }
+
+  Priority OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Priority of the message"
+    ::= { messageEntry 10 }
+
+  DispositionTime OBJECT-TYPE
+    SYNTAX DateAndTime
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Time at which this MTA disposed of this message for this
+      recipient"
+    ::= { messageEntry 11 }
+
+  DispositionStatus OBJECT-TYPE
+    SYNTAX INTEGER {
+      transferred(1),
+      delivered(2),
+      non-delivered(3),
+      redirected(4),
+      dlist-expanded(5),
+      in-queue(6)
+    }
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Disposition of this message by this MTA for this recipient"
+    ::= { messageEntry 12 }
+
+  NonDeliveryReason OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Reason why this MTA was unable to progress this message"
+    ::= { messageEntry 13 }
+
+  MtaNameTransferredTo OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Name of the MTA that this MTA sent this message to"
+    ::= { messageEntry 14 }
+
+  MtaAgentTransferredTo OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Address of the management agent for the transferred to MTA"
+    ::= { messageEntry 15 }
+
+  RecipientRedirectedTo OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Address to which this recipient's message was redirected"
+    ::= { messageEntry 16 }
+
+  InQueueState OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "Implementation specific information concerning the status of
+      this message in the MTA's queue"
+    ::= { messageEntry 17 }
+
+  SupplementalInfo OBJECT-TYPE				-- was InQueueState
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "This attribute contains information provided by the managed
+      agent that may be use to the management console when
+      tracking this message. No formal structure for this
+      information is specified. Knowlwdge of the contents of this
+      field is by bilateral agreement."
+    ::= { messageEntry 18 }
+
+  messageIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION
+     "The same message may potentially pass through the same MTA
+      several times for any number of reasons. This MTA synthesized
+      datum allows the distinction among the several times that the
+      same MTA acts on the same message for the same reipient."
+    ::= { messageEntry 19 }
+
+
+
+
+
+

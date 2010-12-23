@@ -26,10 +26,13 @@
 #ifndef	_PKGLOCS_H
 #define	_PKGLOCS_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+#define	PKGOLD	"/usr/options"
 #define	PKGLOC	"/var/sadm/pkg"
 #define	PKGADM	"/var/sadm/install"
 #define	PKGBIN	"/usr/sadm/install/bin"

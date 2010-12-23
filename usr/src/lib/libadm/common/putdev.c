@@ -26,10 +26,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 /* LINTLIBRARY */
 
 /*
@@ -80,9 +78,12 @@
  *
  *	TDTABNM		Name of the temporary device table (in the
  *			directory of the existing table)
+ *	TDTABNMLN	Number of characters added to the directory
+ *			name -- the length of the device table temp name
  */
 
 #define	TDTABNM		"%sdevtab.%6.6d"
+#define	TDTABNMLN	13
 
 
 /*
@@ -189,20 +190,21 @@ opennewdevtab(char  **pname)		/* A(ptr to temp filename's path) */
 		*(p+1) = '\0';
 		dirname = oldname;
 	    } else dirname = "./";
-	    if (asprintf(&buf, TDTABNM, dirname, getpid()) >= 0) {
+	    if (buf = malloc(TDTABNMLN + strlen(dirname) + 1)) {
 
-		    /*
-		     * Build the name of the temp device table and
-		     * open the file.  We must reset the owner, group
-		     * and perms to those of the original devtab file.
-		     */
-		    if (fp = fopen(buf, "w")) {
-			    *pname = buf;
-			    (void) fchmod(fileno(fp), sbuf.st_mode & 0777);
-			    (void) fchown(fileno(fp), sbuf.st_uid, sbuf.st_gid);
-		    } else {
-			    free(buf);
-		    }
+		/*
+		 * Build the name of the temp device table and open the
+		 * file.  We must reset the owner, group and perms to those
+		 * of the original devtab file.
+		 */
+		(void) sprintf(buf, TDTABNM, dirname, getpid());
+		if (fp = fopen(buf, "w")) {
+			*pname = buf;
+			(void) fchmod(fileno(fp), sbuf.st_mode & 0777);
+			(void) fchown(fileno(fp), sbuf.st_uid, sbuf.st_gid);
+		} else {
+			free(buf);
+		}
 	    }
 
 	/*

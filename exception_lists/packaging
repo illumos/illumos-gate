@@ -936,3 +936,20 @@ licenses
 # Libbe is private
 #
 usr/include/libbe_priv.h
+#
+# Exception List for packaging during an open-only build -  I'm not
+# sure why we even have dprov given that it isn't packaged.  It looks
+# like it exists to emulate a real hardware provider probably for test.
+#
+kernel/crypto/amd64/dprov	i386
+kernel/crypto/dprov		i386
+kernel/crypto/sparcv9/dprov	sparc
+kernel/drv/amd64/dprov		i386
+kernel/drv/dprov		i386
+kernel/drv/dprov.conf
+kernel/drv/sparcv9/dprov	sparc
+#
+# Probably we should nuke this one, along with any other vestiges of
+# ksh88.
+#
+usr/has/bin/pfksh

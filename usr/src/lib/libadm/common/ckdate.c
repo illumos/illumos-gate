@@ -71,11 +71,11 @@ static char	*p_dlm(char *, char);
 #define	TAB '	'
 
 static void
-setmsg(char *msg, char *fmt, size_t sz)
+setmsg(char *msg, char *fmt)
 {
 	if ((fmt == NULL) || strcmp(fmt, "%D") == 0)
 		fmt = "%m/%d/%y";
-	(void) snprintf(msg, sz, "%s. Format is <%s>.", MESG, fmt);
+	(void) sprintf(msg, "%s. Format is <%s>.", MESG, fmt);
 }
 
 static char *
@@ -234,7 +234,7 @@ ckdate_err(char	*fmt, char *error)
 
 	if ((fmt != NULL) && (fmtcheck(fmt) == 1))
 		return (4);
-	setmsg(defmesg, fmt, MSGSIZ);
+	setmsg(defmesg, fmt);
 	puterror(stdout, defmesg, error);
 	return (0);
 }
@@ -246,7 +246,7 @@ ckdate_hlp(char *fmt, char *help)
 
 	if ((fmt != NULL) && (fmtcheck(fmt) == 1))
 		return (4);
-	setmsg(defmesg, fmt, MSGSIZ);
+	setmsg(defmesg, fmt);
 	puthelp(stdout, defmesg, help);
 	return (0);
 }
@@ -416,7 +416,7 @@ ckdate(char *date, char *fmt, char *defstr, char *error, char *help,
 	if ((fmt != NULL) && (fmtcheck(fmt) == 1))
 		return (4);
 
-	setmsg(defmesg, fmt, MSGSIZ);
+	setmsg(defmesg, fmt);
 	(void) sprintf(ept, "[?,q]");
 
 	if (!prompt)

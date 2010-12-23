@@ -247,6 +247,9 @@ extern "C" {
 #define	MSG_NOT_READABLE	gettext(\
 	"Operation failed: unable to read file %s")
 
+#define	MSG_PATCH_UPGD gettext(\
+	"Operation failed: unable to process patch information\n")
+
 #define	MSG_BUILD_INDEXES gettext(\
 	"Operation failed: unable to build indexes\n")
 

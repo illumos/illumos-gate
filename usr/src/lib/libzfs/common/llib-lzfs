@@ -20,7 +20,6 @@
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,4 +29,3 @@
 #include <libzfs.h>
 #include "../../../common/zfs/zfs_comutil.h"
 #include "../../../common/zfs/zfs_fletcher.h"
-#include "../../../common/zfs/zfs_prop.h"

@@ -233,16 +233,12 @@ label:
 				    pt, ptlim);
 				continue;
 
-			case 's':
-			{
-				struct tm tm;
-				char *buf;
-
-				tm = *t;
-				(void) asprintf(&buf, "%ld", mktime(&tm));
-				pt = _add(buf, pt, ptlim);
-				continue;
-			}
+			/*
+			 * Note: 's' for seconds since epoch was removed.
+			 * While FreeBSD and Linux appear to support this,
+			 * Sun Solaris does not.  Furthermore, the FreeBSD
+			 * implementation was not correct for _LP64.
+			 */
 
 			case 'T':
 				pt = _fmt("%H:%M:%S", t, pt, ptlim);

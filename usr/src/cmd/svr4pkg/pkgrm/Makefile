@@ -28,6 +28,7 @@ PROG=		pkgrm
 
 OBJS=		check.o		\
 		main.o		\
+		presvr4.o	\
 		quit.o
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg

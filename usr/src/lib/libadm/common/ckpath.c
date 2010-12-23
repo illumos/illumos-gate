@@ -27,10 +27,8 @@
  * Copyright (c) 1996-1998, 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3 */
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -246,8 +244,7 @@ ckpath_err(int pflags, char *error, char *input)
 
 	if (input) {
 		if (ckpath_val(input, pflags)) {
-			(void) snprintf(buffer, sizeof (buffer),
-			    "Pathname %s.", errstr);
+			(void) sprintf(buffer, "Pathname %s.", errstr);
 			puterror(stdout, buffer, error);
 			return;
 		}
@@ -314,8 +311,7 @@ start:
 	}
 
 	if (ckpath_val(input, pflags)) {
-		(void) snprintf(buffer, sizeof (buffer),
-		    "Pathname %s.", errstr);
+		(void) sprintf(buffer, "Pathname %s.", errstr);
 		puterror(stderr, buffer, error);
 		goto start;
 	}

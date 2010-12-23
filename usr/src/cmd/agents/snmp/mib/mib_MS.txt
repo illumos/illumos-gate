@@ -1,0 +1,1375 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+   MS-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+       OBJECT-TYPE, Counter32, Gauge32
+         FROM SNMPv2-SMI
+       DisplayString, TimeInterval
+         FROM SNMPv2-TC
+       mib-2
+         FROM RFC1213-MIB
+       applIndex
+         FROM APPLICATION-MIB;
+
+   ms MODULE-IDENTITY
+       LAST-UPDATED "9601290000Z"
+       ORGANIZATION "ICNC, SunSoft"
+       CONTACT-INFO
+         "        Olivier Reisacher
+
+          Postal: ICNC, SunSoft
+                  32, chemin du vieux chene
+                  38 240 Meylan
+                  FRANCE
+
+          Tel: +33 76 41 42 43
+          Fax: +33 76 41 42 41
+
+          E-Mail: oreisache@france.sun.com"
+       DESCRIPTION
+         "The MIB module describing Message Stores (MSs)"
+       ::= { private-mibs 4 }
+
+
+
+--	---------------------
+--	| ADMISTRATOR NEEDS |
+--	---------------------
+--
+--	1. Is the MS running? Is it down? Is it overloaded?
+--	2. Which are the Users that are creating the load?
+--	3. What is the current number of connections compare to
+--	   the maximum number of connections supported?
+--	4. Is the disk full? How much disk space is still available?
+--	5. Does a given User regularly read his mail?
+--
+--
+--	---------
+--	| GOALS |
+--	---------
+--
+--	Here are the 5 major goals we have tried to reach:
+--	- solve the administrator needs.
+--	- build/integrate this MIB on top of the Network Services
+--	  Monitoring MIB (RFC 1565).
+--	- use as much as possible the design/ideas contained in the
+--	  MTA MIB (RFC 1566), the DSA MIB (RFC 1567) and the HTTP MIB.
+--	  All these three MIBs are on the standard track and are also built on
+--	  top of the Network Services Monitoring MIB.
+--	- build a model to hold common variables/counters to monitor all kinds
+--	  of Message Stores. This model should be as hierarchical as possible
+--	  to be efficient.
+--	- test the resulting model against the following scenarios:
+--		the Berkeley Mailboxes that can be accessed by IMAP or POP
+--		the Solstice X.400 Message Store
+--		the Solstice Message Center
+--
+--
+--	---------
+--	| MODEL |
+--	---------
+--	
+--	The proposed model is the following:
+--		a MS is a APPLICATION (see RFC 1565)
+--		a MS serves several USERs
+--		a USER owns several FOLDERs
+--
+--	As we can guess, the number of USERs supported by a single MS will continue
+--	to grow in the future.
+--	Dumping some huge tables using SNMP is slow and resource consuming, so we
+--	decided to introduce a intermediate level between the MS and its USERs:
+--		the notion of GROUP.
+--
+--	We have then the resulting model:
+--		a MS is an APPLICATION (see RFC 1565)
+--		a MS serves several GROUPs
+--		a GROUP is composed of several USERs
+--		a USER owns several FOLDERs
+--
+--
+--	We have also introduced two new types of variables because
+--	a single MS may support several protocols:
+--		MsAccessMethod
+--		MsTransferMethod
+--
+--	These two new types are used in the msAccessTable, msTransferTable,
+--	msUserAccessTable, msUserTransferTable.
+--	The two first tables provide some statistics per Access/Transfer method
+--	for the entire MS and the other two tables provide some statistics
+--	per Access/Transfer Method and per User.
+--
+--	We do not provide statistics per Access/Transfer method per Group
+--      because this implies two extra tables and we think that it will
+--	be easy to sum these statistics on all users contained in that Group
+--      (a Group should not contain thousand of Users).
+--
+--	Comments:
+--
+--	- Variables which name looks like XXXAccessYYY are related to the
+--	  communication between Users and the MS.
+--	- Variables which name looks like XXXTransferYYY are related to the
+--	  communication between the MS and the MTA.
+--
+--
+--	 MS
+--      |---------------------------------------------------------|
+--      |                                                         |
+--      |         global stats of the MS                          |
+--      |                                                         |
+--      |       |----------------------------|                    |
+--      |       | stats per Transfer method  |                    |
+--      |       |----------------------------|                    |
+--      |                                                         |
+--      |       |----------------------------|                    |
+--      |       | stats per Access method    |                    |
+--      |       |----------------------------|                    |
+--      |                                                         |
+--      |   GROUP                                                 |
+--      | |-----------------------------------------------------| |
+--      | |                                                     | |
+--      | |       global stats of the GROUP                     | |
+--      | |                                                     | |
+--      | |   USER                                              | |
+--      | | |-------------------------------------------------| | |
+--      | | |                                                 | | |
+--      | | |     global stats of the USER                    | | |
+--      | | |                                                 | | |
+--      | | |   |----------------------------|                | | |
+--      | | |   | stats per Transfer method  |                | | |
+--      | | |   |----------------------------|                | | |
+--      | | |                                                 | | |
+--      | | |   |----------------------------|                | | |
+--      | | |   | stats per Access method    |                | | |
+--      | | |   |----------------------------|                | | |
+--      | | |                                                 | | |
+--      | | |                                                 | | |
+--      | | |   FOLDER                                        | | |
+--      | | | |---------------------------------------------| | | |
+--      | | | |                                             | | | |
+--      | | | |   global stats of the FOLDER                | | | |
+--      | | | |                                             | | | |
+--      | | | |                                             | | | |
+--      | | | |                                             | | | |
+--      | | | |                                             | | | |
+--      | | | |---------------------------------------------| | | |
+--      | | |                                                 | | |
+--      | | |-------------------------------------------------| | |
+--      | |                                                     | |
+--      | |-----------------------------------------------------| |
+--      |                                                         |
+--      |---------------------------------------------------------|
+--
+--
+--	Assumptions we made:
+--	- a User belongs to an MS (configuration of the MS)
+--	- a Association is always owned by a User
+--	- a Folder is always owned by a User
+--
+--	Example of questions we can answer:
+--	- Which is the Folder currently accessed by a given User?
+--
+--	Known limitation of the model:
+--	- each User can only belong to one Group.
+--	- each Folder is associated with a single User, the owner
+--        of the Folder (see msFolderIsShared).
+--	- we won't be able to provide the history list of Users
+--	  who accessed a given Folder
+
+
+
+   MsAccessMethod ::= TEXTUAL-CONVENTION
+       STATUS current
+       DESCRIPTION
+         "The Access method used by the UA to access the MS.
+
+          This new type is used in both the msAccessTable and the
+          msUserAccessTable.
+
+          pop(1), imap(4), p7(9) should only be used if the protocol
+          version is unknown."
+       SYNTAX INTEGER {
+          pop(1),
+          pop-2(2),
+          pop-3(3),
+          imap(4),
+          imap-2(5),
+          imap-2bis(6),
+          imap-3(7),
+          imap-4(8),
+          p7(9),
+          p7-88(10)
+       }
+      
+   MsTransferMethod ::= TEXTUAL-CONVENTION
+       STATUS current
+       DESCRIPTION
+         "The Transfer method used by the MS to submit a message
+          to the Message Tranfer System (MTS) or the Transfer method used
+          by the Message Transfer System to deliver a message to the MS.
+
+          This new type is used in both the msTransferTable and the
+          msUserTransferTable.
+
+          p3(1) should only be used if the protocol version is unknown."
+       SYNTAX INTEGER {
+          p3(1),
+          p3-88(2)
+       }
+
+
+
+   -- The msTable can be seen as an extension of the applTable
+   -- (see INDEX clause in the msEntry)
+   --
+   -- Comments:
+   -- ---------
+   -- The sum on all the Users of the used volume >= sum of the volume used by the MS
+   -- (some messages may be shared by several Users)
+
+   msTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information specific to an MS."
+       ::= { ms 1 }
+
+   msEntry OBJECT-TYPE
+       SYNTAX MsEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MS."
+       INDEX { applIndex }
+       ::= { msTable 1 }
+
+   MsEntry ::= SEQUENCE {
+       msMessages
+         Gauge32,
+       msVolume
+         Gauge32,
+       msFreeSpace
+         INTEGER,
+       msGroups
+         Gauge32
+   }
+
+   msMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of messages stored in the MS."
+       ::= { msEntry 1 }
+
+   msVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The volume measured in kilo-octet of messages stored
+          in the MS."
+       ::= { msEntry 2 }
+
+   msFreeSpace OBJECT-TYPE
+       SYNTAX INTEGER
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The free space available to store new messages in the MS.
+          This space is measured in kilo-octets.
+          If this value is not available, it should be set to -1."
+       ::= { msEntry 3 }
+
+   msGroups OBJECT-TYPE
+       SYNTAX Gauge
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of Groups of Users in the MS."
+       ::= { msEntry 4 }
+
+
+
+   -- The msAccessTable provide some statitics about the usage
+   -- of the MS per Access method.
+
+   msAccessTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsAccessEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding statistics for an MS per
+          Access method."
+       ::= { ms 2 }
+
+   msAccessEntry OBJECT-TYPE
+       SYNTAX MsAccessEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MS and per Access method."
+       INDEX { applIndex, msAccessIndex }
+       ::= { msAccessTable 1 }
+
+   MsAccessEntry ::= SEQUENCE {
+       msAccessIndex,
+         MsAccessMethod,
+       msAccessListedMessages
+         Counter32,
+       msAccessFetchedMessages
+         Counter32,
+       msAccessDeletedMessages
+         Counter32,
+       msAccessListedVolume
+         Counter32,
+       msAccessFetchedVolume
+         Counter32,
+       msAccessDeletedVolume
+         Counter32,
+       msAccesses
+         Gauge32,
+       msAccumulatedAccesses
+         Counter32,
+       msLastAccess
+         TimeInterval,
+       msAccumulatedAccesseTime
+         TimeInterval,
+       msRejectedAccesses
+         Counter32,
+       msAccessRejectionReason
+         DisplayString
+   }
+
+   msAccessIndex OBJECT-TYPE
+       SYNTAX MsAccessMethod
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index used to group statistics per Access method."
+       ::= { msAccessEntry 1 }
+
+   msAccessListedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages listed since MS initialization,
+          per Access method."
+       ::= { msAccessEntry 2 }
+
+   msAccessFetchedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages fetched since MS initialization,
+          per Access method."
+       ::= { msAccessEntry 3 }
+
+   msAccessDeletedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages deleted since MS initialization,
+          per Access method."
+       ::= { msAccessEntry 4 }
+
+   msAccessListedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages listed since MS initialization,
+          per Access method, measured in kilo-octets."
+       ::= { msAccessEntry 5 }
+
+   msAccessFetchedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages fetched since MS initialization,
+          per Access method, measured in kilo-octets."
+       ::= { msAccessEntry 6 }
+
+   msAccessDeletedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages deleted since MS initialization,
+          per Access method, measured in kilo-octets."
+       ::= { msAccessEntry 7 }
+
+   msAccesses OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current accesses to the MS, per Access method."
+       ::= { msAccessEntry 8 }
+
+   msAccumulatedAccesses OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of accesses to the MS since MS initialization,
+          per Access method."
+       ::= { msAccessEntry 9 }
+
+   msLastAccess OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that the MS was accessed,
+          per Access method."
+       ::= { msAccessEntry 10 }
+
+   msAccumulatedAccessTime OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total time of connection to the MS
+          since MS initialization, per Access method."
+       ::= { msAccessEntry 11 }
+
+   msRejectedAccesses OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of accesses the MS has rejected since MS
+          initialization, per Access method."
+       ::= { msAccessEntry 12 }
+
+   msAccessRejectedReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The failure reason, if any, for the last access this
+         MS refused. An empty string indicates that
+         the last attempt was successful.  If no access attempt
+         has been made since the MS was initialized the value
+         should be 'never'."
+       ::= { msAccessEntry 13 }
+
+
+
+   -- The msTransferTable provide some statitics about the usage
+   -- of the MS per Transfer method.
+   --
+   -- When the MS application does not communicate with the MTA
+   -- (like "Berkeley Mailboxes"), there will no entry in this table.
+
+   msTransferTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsTransferEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding statistics for a entire MS per
+          Transfer method."
+       ::= { ms 3 }
+
+   msTransferEntry OBJECT-TYPE
+       SYNTAX MsTransferEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each MS and per Transfer method."
+       INDEX { applIndex, msTransferIndex }
+       ::= { msTransferTable 1 }
+
+   MsTransferEntry ::= SEQUENCE {
+       msTransferIndex,
+         MsTransferMethod,
+       msTransferSentMessages
+         Counter32,
+       msTransferReceivedMessages
+         Counter32,
+       msTransferSentVolume
+         Counter32,
+       msTransferReceivedVolume
+         Counter32,
+       msTransfers
+         Gauge32,
+       msAccumulatedTranfers,
+         Counter32,
+       msLastTransfer
+         TimeInterval,
+       msFailedTransfers
+         Counter32,
+       msTransferFailureReason
+         DisplayString
+   }
+
+   msTransferIndex OBJECT-TYPE
+       SYNTAX MsTransferMethod
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index used to group statistics per Transfer method."
+       ::= { msTransferEntry 1 }
+
+   msTransferSentMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages sent since MS initialization,
+          per Transfer method."
+       ::= { msTransferEntry 2 }
+
+   msTransferReceivedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages received since MS initialization,
+          per Transfer method."
+       ::= { msTransferEntry 3 }
+
+   msTransferSentVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages sent since MS initialization,
+          per Transfer method, measured in kilo-octets."
+       ::= { msTransferEntry 4 }
+
+   msTransferReceivedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages received since MS initialization,
+          per Transfer method, measured in kilo-octets."
+       ::= { msTransferEntry 5 }
+
+   msTransfers OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current tranfers to/from the MS, per Transfert method."
+       ::= { msTransferEntry 6 }
+
+   msAccumulatedTransfers OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of transfers to/from the MS since MS initialization,
+          per Transfer method."
+       ::= { msTransferEntry 7 }
+
+   msLastTransfer OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that a message was transferred to/from the MS,
+          per Transfer method."
+       ::= { msTransferEntry 8 }
+
+   msRejectedTransfers OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of Transfers that failed since MS
+          initialization, per Transfer method."
+       ::= { msTransferEntry 9 }
+
+   msTransferFailureReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The failure reason, if any, for the last Transfer that failed.
+         An empty string indicates that
+         the last Transfer was successful. If no Transfer attempt
+         has been made since the MS was initialized the value
+         should be 'never'."
+       ::= { msTransferEntry 10 }
+
+
+
+   -- We have introduced the notion of Groups of Users to avoid
+   -- dumping a large table of Users each time we want some detailed
+   -- statistics about the MS.
+   --
+   -- In the case of "Berkeley Mailboxes" a group could correspond to UNIX groups.
+   -- In the case of the "Solstice X.400 MS", we have already introduced
+   -- this notion of Group of Users.
+   --
+   -- If the MS does not support the notion of Group of Users or if a User
+   -- does not belong to any group, then the User should be added to the
+   -- dummy "anonymous" group.
+
+   msGroupTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsGroupEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information specific to each Group of Users."
+       ::= { ms 4 }
+
+   msGroupEntry OBJECT-TYPE
+       SYNTAX MsGroupEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each Group of Users."
+       INDEX { applIndex, msGroupIndex }
+       ::= { msGroupTable 1 }
+
+   MsGroupEntry ::= SEQUENCE {
+       msGroupIndex
+           INTEGER,
+       msGroupUsers
+           Gauge32,
+       msGroupMessages
+           Counter32,
+       msGroupVolume
+           Counter32,
+       msGroupUsers,
+           Gauge32,
+       msGroupName
+           DisplayString
+   }
+
+   msGroupIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index associated with a Group of Users for a given MS."
+       ::= { msGroupEntry 1 }
+
+   msGroupMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages stored for this Group of Users."
+       ::= { msGroupEntry 2 }
+
+   msGroupVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages stored for this Group of Users,
+         measured in kilo-octets."
+       ::= { msGroupEntry 3 }
+
+   msGroupUsers OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of Users in this Group."
+       ::= { msGroupEntry 4 }
+
+   msGroupName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "A descriptive name for the Group of Users."
+       ::= { msGroupEntry 5 }
+
+
+
+   -- msUserTable
+
+   msUserTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsUserEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information specific to each User."
+       ::= { ms 5 }
+
+   msUserEntry OBJECT-TYPE
+       SYNTAX MsUserEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each User."
+       INDEX { applIndex, msGroupIndex, msUserIndex }
+       ::= { msUserTable 1 }
+
+   MsUserEntry ::= SEQUENCE {
+       msUserIndex
+           INTEGER,
+       msUserMessages
+           Counter32,
+       msUserVolume
+           Counter32,
+       msUserFolders
+           Gauge32,
+       msUserName
+           DisplayString
+   }
+
+   msUserIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index associated with a User."
+       ::= { msUserEntry 1 }
+
+   msUserMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages stored for this User."
+       ::= { msUserEntry 2 }
+
+   msUserVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages stored for this User,
+          measured in kilo-octets."
+       ::= { msUserEntry 3 }
+
+   msUserFolders OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of Folders this User owns."
+       ::= { msUserEntry 4 }
+
+   msUserName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "A descriptive name for the User."
+       ::= { msUserEntry 5 }
+
+
+
+   -- msFolderTable:
+   --
+   -- A message can be in 4 different states: new, listed, processed, pending.
+   -- A pending message is a message with the deletion flag set (see IMAP)
+   --
+   -- Question: Is is possible to have an complete of the Folders for a
+   --           a given User? In an X.500 DSA?
+   --
+   -- In the case of the MS "Berkeley Mailboxes", there will be at least
+   -- one Folder: the INBOX Folder.
+   -- The IMAP could perhaps learn the Folders accessed by a User?
+   -- And what about the subsribed Folders?
+
+   msFolderTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsFolderEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information specific to each Folder."
+       ::= { ms 6 }
+
+   msFolderEntry OBJECT-TYPE
+       SYNTAX MsFolderEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each Folder."
+       INDEX { applIndex, msGroupIndex, msUserIndex, msFolderIndex }
+       ::= { msFolderTable 1 }
+
+   MsFolderEntry ::= SEQUENCE {
+       msFolderIndex
+           INTEGER,
+       msFolderNewMessages
+           Gauge32,
+       msFolderListedMessages
+           Gauge32,
+       msFolderProcessedMessages
+           Gauge32,
+       msFolderPendingMessages
+           Gauge32,
+       msFolderNewVolume
+           Gauge32,
+       msFolderListedVolume
+           Gauge32,
+       msFolderProcessedVolume
+           Gauge32,
+       msFolderPendingVolume
+           Gauge32,
+       msFolderCreation
+           TimeInterval,
+       msFolderLastNewMessage
+           TimeInterval,
+       msFolderAccesses
+           Gauge32,
+       msFolderAccumulatedAccesses
+           Counter32,
+       msFolderLastAccess
+           TimeInterval,
+       msFolderIsShared,
+           INTEGER,
+       msFolderName
+           DisplayString
+   }
+
+   msFolderIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index associated with a Folder."
+       ::= { msFolderEntry 1 }
+
+   msFolderNewMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of new messages stored in this Folder."
+       ::= { msFolderEntry 2 }
+
+   msFolderListedMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of listed messages stored in this Folder."
+       ::= { msFolderEntry 3 }
+
+   msFolderProcessedMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of processed messages stored in this Folder."
+       ::= { msFolderEntry 4 }
+
+   msFolderPendingMessages OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of pending messages stored in this Folder."
+       ::= { msFolderEntry 5 }
+
+   msFolderNewVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of new messages stored in this Folder,
+         measured in kilo-octets."
+       ::= { msFolderEntry 6 }
+
+   msFolderListedVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of listed messages stored in this Folder,
+         measured in kilo-octets."
+       ::= { msFolderEntry 7 }
+
+   msFolderProcessedVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of processed messages stored in this Folder,
+         measured in kilo-octets."
+       ::= { msFolderEntry 8 }
+
+   msFolderPendingVolume OBJECT-TYPE
+       SYNTAX Gauge32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of pending messages stored in this Folder,
+         measured in kilo-octets."
+       ::= { msFolderEntry 9 }
+
+   msFolderCreation OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"Time since the this Folder was created."
+       ::= { msFolderEntry 10 }
+
+   msFolderLastNewMessage OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"Time since the last new message was received in this Folder."
+       ::= { msFolderEntry 11 }
+
+   msFolderAccesses OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"Number of current accesses to this Folder."
+       ::= { msFolderEntry 12 }
+
+   msFolderAccumulatedAccesses OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"Number of accumulated accesses to this Folder."
+       ::= { msFolderEntry 13 }
+
+   msFolderLastAccess OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"Time since a User last accessed this Folder."
+       ::= { msFolderEntry 14 }
+
+   msFolderIsShared OBJECT-TYPE
+       SYNTAX INTEGER {
+         yes(1),
+         no(2)
+       }
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+	"yes(1) if this Folder is shared by many Users."
+       ::= { msFolderEntry 15 }
+
+   msFolderName OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "A descriptive name for the Folder."
+       ::= { msFolderEntry 16 }
+
+
+
+   -- The msUserAccessTable provide some statitics about the usage
+   -- of the MS per Access method.
+
+   msUserAccessTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF msGroupEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding statistics specific to each User per
+          Access method."
+       ::= { ms 7 }
+
+   msUserAccessEntry OBJECT-TYPE
+       SYNTAX MsUserAccessEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated with each User per Access method."
+       INDEX { applIndex, msGroupIndex, msUserIndex, msUserAccessIndex }
+       ::= { msUserAccessTable 1 }
+
+   MsUserAccessEntry ::= SEQUENCE {
+       msUserAccessIndex,
+         MsAccessMethod,
+       msUserAccessListedMessages
+         Counter32,
+       msUserAccessFetchedMessages
+         Counter32,
+       msUserAccessDeletedMessages
+         Counter32,
+       msUserAccessListedVolume
+         Counter32,
+       msUserAccessFetchedVolume
+         Counter32,
+       msUserAccessDeletedVolume
+         Counter32,
+       msUserAccesses
+         Gauge32,
+       msUserAccumulatedAccesses
+         Counter32,
+       msUserLastAccess
+         TimeInterval,
+       msUserAccumulatedAccessTime
+         TimeInterval,
+       msUserRejectedAccesses
+         Counter32,
+       msUserAccessRejectionReason
+         DisplayString
+   }
+
+   msUserAccessIndex OBJECT-TYPE
+       SYNTAX MsAccessMethod
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index used to group statistics per Access method."
+       ::= { msUserAccessEntry 1 }
+
+   msUserAccessListedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages listed since MS initialization,
+          per User and per Access method."
+       ::= { msUserAccessEntry 2 }
+
+   msUserAccessFetchedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages fetched since MS initialization,
+          per User and per Access method."
+       ::= { msUserAccessEntry 3 }
+
+   msUserAccessDeletedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages deleted since MS initialization,
+          per User and per Access method."
+       ::= { msUserAccessEntry 4 }
+
+   msUserAccessListedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages listed since MS initialization,
+          per User and per Access method, measured in kilo-octets."
+       ::= { msUserAccessEntry 5 }
+
+   msUserAccessFetchedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages fetched since MS initialization,
+          per User and per Access method, measured in kilo-octets."
+       ::= { msUserAccessEntry 6 }
+
+   msUserAccessDeletedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages deleted since MS initialization,
+          per User and per Access method, measured in kilo-octets."
+       ::= { msUserAccessEntry 7 }
+
+   msUserAccesses OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current accesses per User per Access method."
+       ::= { msUserAccessEntry 8 }
+
+   msUserAccumulatedAccesses OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of accesses to the MS since MS initialization,
+          per User and per Access method."
+       ::= { msUserAccessEntry 9 }
+
+   msUserLastAccess OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that the MS was accessed,
+          per User and per Access method."
+       ::= { msUserAccessEntry 10 }
+
+   msUserAccumulatedAccessTime OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total time this User was connected to the
+          MS since MS initialization, per Access method."
+       ::= { msUserAccessEntry 11 }
+
+   msUserRejectedAccesses OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of accesses the MS has rejected since MS
+          initialization, per User and per Access method."
+       ::= { msUserAccessEntry 12 }
+
+   msUserAccessRejectedReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The failure reason, if any, for the last access this
+         MS refused for that User. An empty string indicates that
+         the last attempt was successful.  If no access attempt
+         has been made since the MS was initialized the value
+         should be 'never'."
+       ::= { msUserAccessEntry 13 }
+
+
+
+   -- The msUserTransferTable provide some statitics about the usage
+   -- of the MS per User and per Transfer method.
+   --
+   -- When the MS application does not communicate with the MTA
+   -- (like "Berkeley Mailboxes"), there will no entry in this table.
+
+   msUserTransferTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF MsUserTransferEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding statistics per User and per
+          Transfer method."
+       ::= { ms 8 }
+
+   msUserTransferEntry OBJECT-TYPE
+       SYNTAX MsUserTransferEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry associated per User and per Transfer method."
+       INDEX { applIndex, msGroupIndex, msUserIndex, msUserTransferIndex }
+       ::= { msUserTransferTable 1 }
+
+   MsUserTransferEntry ::= SEQUENCE {
+       msUserTransferIndex,
+         MsTransferMethod,
+       msUserTransferSentMessages
+         Counter32,
+       msUserTransferReceivedMessages
+         Counter32,
+       msUserTransferSentVolume
+         Counter32,
+       msUserTransferReceivedVolume
+         Counter32,
+       msUserTransfers
+         Gauge32,
+       msUserAccumulatedTranfers,
+         Counter32,
+       msUserLastTransfer
+         TimeInterval,
+       msUserFailedTransfers
+         Counter32,
+       msUserTransferFailureReason
+         DisplayString
+   }
+
+   msUserTransferIndex OBJECT-TYPE
+       SYNTAX MsTransferMethod
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The index used to group statistics per Transfer method."
+       ::= { msUserTransferEntry 1 }
+
+   msUserTransferSentMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages sent since MS initialization,
+          per User and per Transfer method."
+       ::= { msUserTransferEntry 2 }
+
+   msUserTransferReceivedMessages OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of messages received since MS initialization,
+          per User and per Transfer method."
+       ::= { msUserTransferEntry 3 }
+
+   msUserTransferSentVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages sent since MS initialization,
+          per User and per Transfer method, measured in kilo-octets."
+       ::= { msUserTransferEntry 4 }
+
+   msUserTransferReceivedVolume OBJECT-TYPE
+       SYNTAX Counter32
+       UNITS "K-octets"
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total volume of messages received since MS initialization,
+          per User and per Transfer method, measured in kilo-octets."
+       ::= { msUserTransferEntry 5 }
+
+   msUserTransfers OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The number of current tranfers to/from the MS,
+          per User and per Transfert method."
+       ::= { msUserTransferEntry 6 }
+
+   msUserAccumulatedTransfers OBJECT-TYPE
+       SYNTAX Gauge32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of transfers to/from the MS since MS initialization,
+          per User and per Transfer method."
+       ::= { msUserTransferEntry 7 }
+
+   msUserLastTransfer OBJECT-TYPE
+       SYNTAX TimeInterval
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "Time since the last time that a message was transferred to/from the MS,
+          per User and per Transfer method."
+       ::= { msUserTransferEntry 8 }
+
+   msUserRejectedTransfers OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The total number of Transfers that failed since MS
+          initialization, per User and per Transfer method."
+       ::= { msUserTransferEntry 9 }
+
+   msUserTransferFailureReason OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The failure reason, if any, for the last Transfer that failed.
+         An empty string indicates that
+         the last Transfer was successful. If no Transfer attempt
+         has been made since the MS was initialized the value
+         should be 'never'."
+       ::= { msUserTransferEntry 10 }
+
+
+
+   -- The msAssocTable is useful to correlate the associations listed
+   -- in the assocTable (see RFC 1565) with a User, its Group
+   -- and the Folder he is currently accessing.
+   --
+   -- If we do not know the Folder he is currently accessing,
+   -- the value of the msAssocFolderIndex should be "-1".
+
+   msAssocTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF msAssocEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The table holding information regarding the associations
+          for each User."
+       ::= { ms 9 }
+
+   msAssocEntry OBJECT-TYPE
+       SYNTAX MsAssocEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+         "The entry holding information regarding the associations
+          for each User."
+       INDEX { applIndex, msGroupIndex, msUserIndex, msAssocIndex, msAssocFolderIndex }
+       ::= { msAssocTable 1}
+
+   MsAssocEntry ::= SEQUENCE {
+       msAssocIndex
+           INTEGER,
+       msAssocFolderIndex
+           INTEGER
+   }
+
+   msAssocIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The value of assocIndex."
+       ::= { msAssocEntry 1 }
+
+   msAssocFolderIndex OBJECT-TYPE
+       SYNTAX INTEGER
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+         "The value of msFolderIndex."
+       ::= { msAssocEntry 2 }
+
+
+   END
+

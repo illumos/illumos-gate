@@ -262,6 +262,7 @@ extern char	*fpkgparam __P((FILE *fp, char *param));
 extern char	*pkgparam __P((char *pkg, char *param));
 extern void	set_PKGpaths __P((char *path));
 extern char	*get_PKGLOC __P((void));
+extern char	*get_PKGOLD __P((void));
 extern char	*get_PKGADM __P((void));
 extern void	set_PKGADM(char *newpath);
 extern void	set_PKGLOC(char *newpath);

@@ -42,10 +42,18 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <fcntl.h>
+#ifdef u3b2
+#include <sys/sys3b.h>
+#endif	/* u3b2 */
 #include <openssl/err.h>
 #include "pkglib.h"
 #include "pkglibmsgs.h"
 #include "pkglocale.h"
+#ifdef u3b2
+static
+struct stat	orig_st_buf; /* Stat structure of original file (3B2/CTC) */
+static char	ds_ctcflg;
+#endif	/* u3b2 */
 
 /* libadm.a */
 extern char	*devattr(char *device, char *attribute);
@@ -195,7 +203,7 @@ ds_readbuf(char *device)
 			(void) ds_close(0);
 			return (0);
 		}
-		(void) memcpy(ds_header, buf, BLK_SIZE);
+		memcpy(ds_header, buf, BLK_SIZE);
 		ds_headsize = BLK_SIZE;
 
 		if (ds_ginit(device) < 0) {
@@ -224,7 +232,7 @@ ds_volsum(struct dstoc *toc)
 	char volnos[128], tmpvol[128];
 	if (toc->volnos[0]) {
 		int index, sum;
-		(void) sscanf(toc->volnos, "%d %[ 0-9]", &curpartcnt, volnos);
+		sscanf(toc->volnos, "%d %[ 0-9]", &curpartcnt, volnos);
 		volcnt = 0;
 		sum = curpartcnt;
 		while (sum < toc->nparts && sscanf(volnos, "%d %[ 0-9]",
@@ -246,8 +254,7 @@ static void
 ds_pkginit(void)
 {
 	if (ds_toc->volnos[0])
-		(void) sscanf(ds_toc->volnos, "%d %[ 0-9]", &ds_curpartcnt,
-		    ds_volnos);
+		sscanf(ds_toc->volnos, "%d %[ 0-9]", &ds_curpartcnt, ds_volnos);
 	else
 		ds_curpartcnt = -1;
 }
@@ -256,9 +263,9 @@ ds_pkginit(void)
  * functions to pass current package info to exec'ed program
  */
 void
-ds_putinfo(char *buf, size_t sz)
+ds_putinfo(char *buf)
 {
-	(void) snprintf(buf, sz, "%d %d %d %d %d %d %d %d %d %d %s",
+	(void) sprintf(buf, "%d %d %d %d %d %d %d %d %d %d %s",
 	    ds_fd, ds_realfd, ds_volcnt, ds_volno, ds_totread, ds_volpart,
 	    ds_skippart, ds_bufsize, ds_toc->nparts, ds_toc->maxsiz,
 	    ds_toc->volnos);
@@ -428,7 +435,7 @@ ds_init(char *device, char **pkg, char *norewind)
 		(void) ds_close(0);
 		return (1);
 	}
-	(void) memcpy(ds_header_raw, ds_header, header_size);
+	memcpy(ds_header_raw, ds_header, header_size);
 
 	/* read datastream table of contents */
 	ds_head = tail = (struct dstoc *)0;
@@ -447,7 +454,6 @@ ds_init(char *device, char **pkg, char *norewind)
 			(void) free(ds_header);
 			return (-1);
 		}
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(line, "%s %d %d %[ 0-9]", toc_pt->pkg,
 		    &toc_pt->nparts, &toc_pt->maxsiz, toc_pt->volnos) < 3) {
 			progerr(pkg_gt(ERR_UNPACK));
@@ -470,8 +476,8 @@ ds_init(char *device, char **pkg, char *norewind)
 		(void) free(ds_header);
 		return (-1);
 	}
-	(void) sighold(SIGINT);
-	(void) sigrelse(SIGINT);
+	sighold(SIGINT);
+	sigrelse(SIGINT);
 	if (!ds_head) {
 		progerr(pkg_gt(ERR_UNPACK));
 		logerr(pkg_gt(MSG_EMPTY));
@@ -479,22 +485,25 @@ ds_init(char *device, char **pkg, char *norewind)
 		return (-1);
 	}
 	/* this could break, thanks to cpio command limit */
-	(void) snprintf(cmd, sizeof (cmd), "%s -icdumD -C %d",
-	    CPIOPROC, (int)BLK_SIZE);
+#ifndef SUNOS41
+	(void) sprintf(cmd, "%s -icdumD -C %d", CPIOPROC, (int)BLK_SIZE);
+#else
+	(void) sprintf(cmd, "%s -icdum -C %d", CPIOPROC, (int)BLK_SIZE);
+#endif
 	n = 0;
 	for (i = 0; pkg[i]; i++) {
 		if (strcmp(pkg[i], "all") == 0)
 			continue;
 		if (n == 0) {
-			(void) strlcat(cmd, " ", CMDSIZ);
+			strcat(cmd, " ");
 			n = 1;
 		}
-		(void) strlcat(cmd, pkg[i], CMDSIZ);
-		(void) strlcat(cmd, "'/*' ", CMDSIZ);
+		strlcat(cmd, pkg[i], CMDSIZ);
+		strlcat(cmd, "'/*' ", CMDSIZ);
 
 		/* extract signature too, if present. */
-		(void) strlcat(cmd, SIGNATURE_FILENAME, CMDSIZ);
-		(void) strlcat(cmd, " ", CMDSIZ);
+		strlcat(cmd, SIGNATURE_FILENAME, CMDSIZ);
+		strlcat(cmd, " ", CMDSIZ);
 	}
 
 	/*
@@ -599,9 +608,13 @@ ds_getpkg(char *device, int n, char *dstdir)
 			logerr(pkg_gt(MSG_STATFS), errno);
 			return (-1);
 		}
+#ifdef SUNOS41
+		free_blocks = svfsb.f_bfree * howmany(svfsb.f_bsize, DEV_BSIZE);
+#else	/* !SUNOS41 */
 		free_blocks = (((long)svfsb.f_frsize > 0) ?
-		    howmany(svfsb.f_frsize, DEV_BSIZE) :
-		    howmany(svfsb.f_bsize, DEV_BSIZE)) * svfsb.f_bfree;
+			    howmany(svfsb.f_frsize, DEV_BSIZE) :
+			    howmany(svfsb.f_bsize, DEV_BSIZE)) * svfsb.f_bfree;
+#endif	/* SUNOS41 */
 		if ((ds_maxsiz + 50) > free_blocks) {
 			progerr(pkg_gt(ERR_UNPACK));
 			logerr(pkg_gt(MSG_NOSPACE), ds_maxsiz+50, free_blocks);
@@ -646,8 +659,12 @@ ds_skip(char *device, int nskip)
 
 	while (nskip--) {
 		/* skip this one */
-		(void) snprintf(cmd, sizeof (cmd),
-		    "%s -ictD -C %d > /dev/null", CPIOPROC, (int)BLK_SIZE);
+#ifndef SUNOS41
+		(void) sprintf(cmd, "%s -ictD -C %d > /dev/null",
+#else
+		(void) sprintf(cmd, "%s -ict -C %d > /dev/null",
+#endif
+		    CPIOPROC, (int)BLK_SIZE);
 		if (n = esystem(cmd, ds_fd, -1)) {
 			rpterr();
 			progerr(pkg_gt(ERR_UNPACK));
@@ -689,7 +706,11 @@ ds_next(char *device, char *instdir)
 			(void) strcpy(ds_volnos, tmpvol);
 			ds_curpartcnt += index;
 		}
-		(void) snprintf(cmd, sizeof (cmd), "%s -icdumD -C %d",
+#ifndef SUNOS41
+		(void) sprintf(cmd, "%s -icdumD -C %d",
+#else
+		(void) sprintf(cmd, "%s -icdum -C %d",
+#endif
 		    CPIOPROC, (int)BLK_SIZE);
 		if (n = esystem(cmd, ds_fd, -1)) {
 			rpterr();
@@ -773,7 +794,7 @@ BIO_ds_dump_header(PKG_ERR *err, BIO *bio)
 
 	char	zeros[BLK_SIZE];
 
-	(void) memset(zeros, 0, BLK_SIZE);
+	memset(zeros, 0, BLK_SIZE);
 
 	if (BIO_write(bio, ds_header_raw, ds_headsize) != ds_headsize) {
 		pkgerr_add(err, PKGERR_WRITE, ERR_WRITE, "bio",
@@ -786,12 +807,32 @@ BIO_ds_dump_header(PKG_ERR *err, BIO *bio)
 
 /*
  * ds_ginit: Determine the device being accessed, set the buffer size,
- * and perform any device specific initialization.
+ * and perform any device specific initialization.  For the 3B2,
+ * a device with major number of 17 (0x11) is an internal hard disk,
+ * unless the minor number is 128 (0x80) in which case it is an internal
+ * floppy disk.  Otherwise, get the system configuration
+ * table and check it by comparing slot numbers to major numbers.
+ * For the special case of the 3B2 CTC several unusual things must be done.
+ * To enable
+ * streaming mode on the CTC, the file descriptor must be closed, re-opened
+ * (with O_RDWR and O_CTSPECIAL flags set), the STREAMON ioctl(2) command
+ * issued, and the file descriptor re-re-opened either read-only or write_only.
  */
 
 int
 ds_ginit(char *device)
 {
+#ifdef u3b2
+	major_t maj;
+	minor_t min;
+	int nflag, i, count, size;
+	struct s3bconf *buffer;
+	struct s3bc *table;
+	struct stat st_buf;
+	int devtype;
+	char buf[BLK_SIZE];
+	int fd2, fd;
+#endif	/* u3b2 */
 	int oflag;
 	char *pbufsize, cmd[CMDSIZ];
 	int fd2, fd;
@@ -802,7 +843,104 @@ ds_ginit(char *device)
 	} else
 		ds_bufsize = BLK_SIZE;
 	oflag = fcntl(ds_fd, F_GETFL, 0);
+#ifdef u3b2
+	devtype = G_NO_DEV;
+	if (fstat(ds_fd, &st_buf) == -1)
+		return (-1);
+	if (!S_ISCHR(st_buf.st_mode) && !S_ISBLK(st_buf.st_mode))
+		goto lab;
 
+	/*
+	 * We'll have to add a remote attribute to stat but this should
+	 * work for now.
+	 */
+	else if (st_buf.st_dev & 0x8000)	/* if remote  rdev */
+		goto lab;
+
+	maj = major(st_buf.st_rdev);
+	min = minor(st_buf.st_rdev);
+	if (maj == 0x11) { /* internal hard or floppy disk */
+		if (min & 0x80)
+			devtype = G_3B2_FD; /* internal floppy disk */
+		else
+			devtype = G_3B2_HD; /* internal hard disk */
+	} else {
+		if (sys3b(S3BCONF, (struct s3bconf *)&count, sizeof (count)) ==
+		    -1)
+			return (-1);
+		size = sizeof (int) + (count * sizeof (struct s3bconf));
+		buffer = (struct s3bconf *)malloc((unsigned)size);
+		if (sys3b(S3BCONF, buffer, size) == -1)
+			return (-1);
+		table = (struct s3bc *)((char *)buffer + sizeof (int));
+		for (i = 0; i < count; i++) {
+			if (maj == (int)table->board) {
+				if (strncmp(table->name, "CTC", 3) == 0) {
+					devtype = G_3B2_CTC;
+					break;
+				} else if (strncmp(table->name, "TAPE", 4)
+						== 0) {
+					devtype = G_TAPE;
+					break;
+				}
+				/* other possible devices can go here */
+			}
+			table++;
+		}
+	}
+	switch (devtype) {
+		case G_3B2_CTC:	/* do special CTC initialization */
+			ds_bufsize = pbufsize ? ds_bufsize : 15872;
+			if (fstat(ds_fd, &orig_st_buf) < 0) {
+				ds_bufsize = -1;
+				break;
+			}
+			nflag = (O_RDWR | O_CTSPECIAL);
+			(void) close(ds_fd);
+			if ((ds_fd = open(device, nflag, 0666)) != -1) {
+				if (ioctl(ds_fd, STREAMON) != -1) {
+					(void) close(ds_fd);
+					nflag = (oflag == O_WRONLY) ?
+					    O_WRONLY : O_RDONLY;
+					if ((ds_fd =
+					    open(device, nflag, 0666)) == -1) {
+						rpterr();
+						progerr(
+						    pkg_gt(ERR_TRANSFER));
+						logerr(pkg_gt(MSG_OPEN),
+						    device, errno);
+						return (-1);
+					}
+					ds_bufsize = 15872;
+				}
+			} else
+				ds_bufsize = -1;
+			if (oflag == O_RDONLY && ds_header && ds_totread == 0)
+				/* Have already read in first block of header */
+				read(ds_fd, buf, BLK_SIZE);
+			ds_ctcflg = 1;
+
+			break;
+		case G_NO_DEV:
+		case G_3B2_HD:
+		case G_3B2_FD:
+		case G_TAPE:
+		case G_SCSI_HD: /* not developed yet */
+		case G_SCSI_FD:
+		case G_SCSI_9T:
+		case G_SCSI_Q24:
+		case G_SCSI_Q120:
+		case G_386_HD:
+		case G_386_FD:
+		case G_386_Q24:
+			ds_bufsize = pbufsize ? ds_bufsize : BLK_SIZE;
+			break;
+		default:
+			ds_bufsize = -1;
+			errno = ENODEV;
+	} /* devtype */
+lab:
+#endif	/* u3b2 */
 	if (ds_bufsize > BLK_SIZE) {
 		if (oflag & O_WRONLY)
 			fd = 1;
@@ -810,20 +948,20 @@ ds_ginit(char *device)
 			fd = 0;
 		fd2 = fcntl(fd, F_DUPFD, fd);
 		(void) close(fd);
-		(void) fcntl(ds_fd, F_DUPFD, fd);
+		fcntl(ds_fd, F_DUPFD, fd);
 		if (fd)
-			(void) snprintf(cmd, sizeof (cmd),
-			    "%s obs=%d 2>/dev/null", DDPROC, ds_bufsize);
+			sprintf(cmd, "%s obs=%d 2>/dev/null", DDPROC,
+			    ds_bufsize);
 		else
-			(void) snprintf(cmd, sizeof (cmd),
-			    "%s ibs=%d 2>/dev/null", DDPROC, ds_bufsize);
+			sprintf(cmd, "%s ibs=%d 2>/dev/null", DDPROC,
+			    ds_bufsize);
 		if ((ds_pp = popen(cmd, fd ? "w" : "r")) == NULL) {
 			progerr(pkg_gt(ERR_TRANSFER));
 			logerr(pkg_gt(MSG_POPEN), cmd, errno);
 			return (-1);
 		}
 		(void) close(fd);
-		(void) fcntl(fd2, F_DUPFD, fd);
+		fcntl(fd2, F_DUPFD, fd);
 		(void) close(fd2);
 		ds_realfd = ds_fd;
 		ds_fd = fileno(ds_pp);
@@ -834,8 +972,42 @@ ds_ginit(char *device)
 int
 ds_close(int pkgendflg)
 {
+#ifdef u3b2
+	int cnt, mode;
+	char *ptr;
+	struct stat statbuf;
+#endif	/* u3b2 */
 	int n, ret = 0;
 
+#ifdef u3b2
+	if (ds_pp && ds_ctcflg) {
+		ds_ctcflg = 0;
+		if ((mode = fcntl(ds_realfd, F_GETFL, 0)) < 0) {
+			ret = -1;
+		} else if (mode & O_WRONLY) {
+		/*
+		 * pipe to dd write process,
+		 * make sure one more buffer
+		 * gets written out
+		 */
+			if ((ptr = calloc(BLK_SIZE, 1)) == NULL) {
+				ret = -1;
+			/* pad to bufsize */
+			} else {
+				cnt = ds_bufsize;
+				while (cnt > 0) {
+					if ((n = write(ds_fd, ptr,
+					    BLK_SIZE)) < 0) {
+						ret = -1;
+						break;
+					}
+					cnt -= n;
+				}
+				(void) free(ptr);
+			}
+		}
+	}
+#endif
 	if (pkgendflg) {
 		if (ds_header)
 			(void) free(ds_header);

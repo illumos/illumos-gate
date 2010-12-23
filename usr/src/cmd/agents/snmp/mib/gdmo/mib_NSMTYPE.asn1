@@ -1,0 +1,72 @@
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+
+IIMCAPPLICATION-MIBASN1 {iso(1) org(3) dod(6) internet(1) private(4) enterprise(1)
+	 sun(42) products(2) management(2) g2(2) iimc(9) iimcManagement(2)
+		iimcManagementModule(2) 3}
+DEFINITIONS IMPLICIT TAGS ::=
+BEGIN
+IMPORTS	 iimcAutoTrans, iimcManagementNB
+	 FROM IimcAssignedOIDs {iso(1) org(3) dod(6) internet(1)
+	 private(4) enterprise(1) sun(42) products(2) management(2)
+	 g2(2) iimc(9) iimcManagement(2) iimcManagementDoc(3) 1};
+
+
+-- MIB specific syntax
+
+DisplayString ::=
+	 OCTET STRING
+
+DistinguishedName ::=
+	 OCTET STRING
+
+TimeStamp ::=
+	 TimeTicks
+
+Gauge32 ::=
+	 Gauge
+
+Counter32 ::=
+	 Counter
+
+--   application MODULE-IDENTITY
+--       LAST-UPDATED "9311280000Z"
+--       ORGANIZATION "IETF Mail and Directory Management Working Group"
+--       CONTACT-INFO
+--         "        Ned Freed
+--
+--          Postal: Innosoft International, Inc.
+--                  250 West First Street, Suite 240
+--                  Claremont, CA  91711
+--                  US
+--
+--             Tel: +1 909 624 7907
+--             Fax: +1 909 621 5319
+--
+--          E-Mail: ned@innosoft.com"
+--       DESCRIPTION
+--         "The MIB module describing network service applications"
+--       ::= { mib-2 27 }
+
+
+ApplOperStatus ::=
+	 INTEGER {
+         up(1),
+         down(2),
+         halted(3),
+         congested(4),
+         restarting(5)
+       }
+--       MAX-ACCESS read-only
+       
+AssocApplicationType ::=
+	 INTEGER {
+           ua-initiator(1),
+           ua-responder(2),
+           peer-initiator(3),
+           peer-responder(4)}
+--       MAX-ACCESS read-only
+       
+
+
+END
+

@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -384,14 +383,12 @@ sda_slot_handle_detect(sda_slot_t *slot)
 		 * hipri commands for now.
 		 */
 		slot->s_init = B_TRUE;
-		sda_slot_exit(slot);
 
 		/*
 		 * Card insertion occurred.  We have to run this on
 		 * another task, to avoid deadlock as the task may
 		 * need to dispatch commands.
 		 */
-
 		(void) ddi_taskq_dispatch(slot->s_hp_tq, sda_slot_insert, slot,
 		    DDI_SLEEP);
 	} else {
@@ -408,10 +405,9 @@ sda_slot_handle_detect(sda_slot_t *slot)
 		sda_slot_reset(slot);
 
 		slot->s_intransit = 0;
-		sda_slot_exit(slot);
-
 		bd_state_change(slot->s_bdh);
 	}
+	sda_slot_exit(slot);
 
 	sda_slot_wakeup(slot);
 }

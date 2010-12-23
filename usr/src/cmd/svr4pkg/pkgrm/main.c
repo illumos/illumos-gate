@@ -140,6 +140,10 @@ static boolean_t	debugFlag = B_FALSE;
  * imported (external) functions
  */
 
+/* presvr4.c */
+
+extern int	presvr4(char *pkg, int a_nointeract);
+
 /* check.c */
 
 extern int	preremove_verify(char **a_pkgList, zoneList_t a_zlst,
@@ -930,6 +934,11 @@ doRemove(int a_nodelete, char *a_altBinDir, int a_longestPkg, char *a_adminFile,
 			pkginfoFree(&pinfo);
 			return (0);
 		}
+	}
+
+	if (pinfo->status == PI_PRESVR4) {
+		pkginfoFree(&pinfo);
+		return (presvr4(pkginst, nointeract));
 	}
 
 	if (pinfo->status == PI_SPOOLED) {

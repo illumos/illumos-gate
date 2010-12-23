@@ -65,3 +65,4 @@ legacy pkg=SUNWdcar desc="DCA Crypto Accelerator driver" \
     name="DCA Crypto Accelerator (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+$(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require

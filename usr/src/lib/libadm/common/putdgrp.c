@@ -26,10 +26,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 /* LINTLIBRARY */
 
 /*
@@ -76,9 +74,12 @@
  *  L O C A L   D E F I N I T I O N S
  *	TDGTABNM	Name of the temporary device-group table (in the
  *			directory of the existing table)
+ *	TDGTABNMLN	Number of characters added to the directory
+ *			name -- the length of the device-group table temp name
  */
 
 #define	TDGTABNM	"%sdgroup.%6.6d"
+#define	TDGTABNMLN	13
 
 
 /*
@@ -136,51 +137,49 @@ opennewdgrptab(char **pname)	 /* A(ptr to temp filename's path) */
 
 	/* Get the name of the device-group table */
 	if (oldname = _dgrptabpath()) {
-		/*
-		 * It is possible for us to have sufficient
-		 * permissions to create the new file without having
-		 * sufficient permissions to write the original
-		 * dgrptab file.  For consistency with the operations
-		 * which modify the original file by writing it
-		 * directly we require write permissions for the
-		 * original file in order to make a new one.
-		 */
-		if ((fd = open(oldname, O_WRONLY)) == -1)
-			return (NULL);
+	/*
+	 * It is possible for us to have sufficient permissions to create
+	 * the new file without having sufficient permissions to write the
+	 * original dgrptab file.  For consistency with the operations which
+	 * modify the original file by writing it directly we require write
+	 * permissions for the original file in order to make a new one.
+	 */
+	    if ((fd = open(oldname, O_WRONLY)) == -1)
+		return (NULL);
 
-		if (fstat64(fd, &sbuf) == -1) {
-			(void) close(fd);
-			return (NULL);
-		}
+	    if (fstat64(fd, &sbuf) == -1) {
 		(void) close(fd);
+		return (NULL);
+	    }
+	    (void) close(fd);
 
-		/* Get the directory that the device-group table lives in */
-		if (p = strrchr(oldname, '/')) {
-			*(p+1) = '\0';
-			dirname = oldname;
-		} else
-			dirname = "./";
+	    /* Get the directory that the device-group table lives in */
+	    if (p = strrchr(oldname, '/')) {
+		*(p+1) = '\0';
+		dirname = oldname;
+	    } else
+		dirname = "./";
 
-		/* Get space for the temp dgrptab pathname */
-		if (asprintf(&buf, TDGTABNM, dirname, getpid()) >= 0) {
-			/*
-			 * Build the name of the temp dgrptab and open
-			 * the file.  We must reset the owner, group
-			 * and perms to those of the original dgrptab
-			 * file.
-			 */
-			if (fp = fopen(buf, "w")) {
-				*pname = buf;
-				(void) fchmod(fileno(fp), sbuf.st_mode & 0777);
-				(void) fchown(fileno(fp), sbuf.st_uid,
-				    sbuf.st_gid);
-			} else {
-				free(buf);
-			}
+	    /* Get space for the temp dgrptab pathname */
+	    if (buf = malloc(TDGTABNMLN+strlen(dirname)+1)) {
+
+		/*
+		 * Build the name of the temp dgrptab and open the
+		 * file.  We must reset the owner, group and perms to those
+		 * of the original dgrptab file.
+		 */
+		(void) sprintf(buf, TDGTABNM, dirname, getpid());
+		if (fp = fopen(buf, "w")) {
+			*pname = buf;
+			(void) fchmod(fileno(fp), sbuf.st_mode & 0777);
+			(void) fchown(fileno(fp), sbuf.st_uid, sbuf.st_gid);
+		} else {
+			free(buf);
 		}
+	    }
 
-		/* Free the space containing the dgrptab's name */
-		free(oldname);
+	    /* Free the space containing the dgrptab's name */
+	    free(oldname);
 	}
 
 	/* Finished.  Return what we've got */
@@ -244,26 +243,21 @@ mknewdgrptab(char *tempname)		/* Ptr to name of temp dgrp tab */
 	/* Get the dgrptab's pathname */
 	if (dgrpname = _dgrptabpath()) {
 
-		/* Unlink the existing file */
-		if (unlink(dgrpname) == 0) {
+	    /* Unlink the existing file */
+	    if (unlink(dgrpname) == 0) {
 
-			/* Make the temp file the real device-group table */
-			noerr = (link(tempname, dgrpname) == 0) ? TRUE : FALSE;
+		/* Make the temp file the real device-group table */
+		noerr = (link(tempname, dgrpname) == 0) ? TRUE : FALSE;
 
-			/* Remove the temp file */
-			if (noerr)
-				noerr = rmnewdgrptab(tempname);
+		/* Remove the temp file */
+		if (noerr) noerr = rmnewdgrptab(tempname);
 
-		} else {
-			noerr = FALSE;	/* unlink() failed */
-		}
+	    } else noerr = FALSE;	/* unlink() failed */
 
-		/* Free the dgrptab's name */
-		free(dgrpname);
+	    /* Free the dgrptab's name */
+	    free(dgrpname);
 
-	} else {
-		noerr = FALSE; 	/* dgrptabpath() failed */
-	}
+	} else noerr = FALSE; 	/* dgrptabpath() failed */
 
 	/* Finished.  Return success indicator */
 	return (noerr);
@@ -303,54 +297,48 @@ lkdgrptab(
 	noerr = TRUE;
 	if (_opendgrptab(o_mode)) {
 
+	/*
+	 * Lock the device-group table (for writing).  If it's not
+	 * available, wait until it is, then close and open the
+	 * table (modify and delete change the table!) and try
+	 * to lock it again
+	 */
+
+	    /* Build the locking structure */
+	    lockinfo.l_type = lktype;
+	    lockinfo.l_whence = 0;
+	    lockinfo.l_start = 0L;
+	    lockinfo.l_len = 0L;
+	    olderrno = errno;
+
+	    /* Keep on going until we lock the file or an error happens */
+	    while ((fcntl(fileno(oam_dgroup), F_SETLK, &lockinfo) == -1) &&
+		!noerr) {
+
 		/*
-		 * Lock the device-group table (for writing).  If it's not
-		 * available, wait until it is, then close and open the
-		 * table (modify and delete change the table!) and try
-		 * to lock it again
+		 * fcntl() failed.
+		 * If errno=EACCES, it's because the file's locked by someone
+		 * else.  Wait for the file to be unlocked, then close and
+		 * reopen the file and try the lock again.
 		 */
 
-		/* Build the locking structure */
-		lockinfo.l_type = lktype;
-		lockinfo.l_whence = 0;
-		lockinfo.l_start = 0L;
-		lockinfo.l_len = 0L;
-		olderrno = errno;
+		if (errno == EACCES) {
+		    if (fcntl(fileno(oam_dgroup), F_SETLKW, &lockinfo) == -1)
+			noerr = FALSE;
+		    else {
+			_enddgrptab();
+			if (!_opendgrptab(o_mode)) noerr = FALSE;
+			else errno = olderrno;
+		    }
 
-		/* Keep on going until we lock the file or an error happens */
-		while ((fcntl(fileno(oam_dgroup), F_SETLK, &lockinfo) == -1) &&
-		    !noerr) {
+		} else noerr = FALSE;  /* fcntl() failed hard */
 
-			/*
-			 * fcntl() failed.  If errno=EACCES, it's
-			 * because the file's locked by someone else.
-			 * Wait for the file to be unlocked, then
-			 * close and reopen the file and try the lock
-			 * again.
-			 */
+	    }   /* End while (fcntl() && !noerr) */
 
-			if (errno == EACCES) {
-				if (fcntl(fileno(oam_dgroup), F_SETLKW,
-				    &lockinfo) == -1)
-					noerr = FALSE;
-				else {
-					_enddgrptab();
-					if (!_opendgrptab(o_mode))
-						noerr = FALSE;
-					else
-						errno = olderrno;
-				}
+	    /* Don't keep file open if an error happened */
+	    if (!noerr) _enddgrptab();
 
-			} else
-				noerr = FALSE;  /* fcntl() failed hard */
-
-		}   /* End while (fcntl() && !noerr) */
-
-		/* Don't keep file open if an error happened */
-		if (!noerr) _enddgrptab();
-
-	} else
-		noerr = FALSE;	/* _opendgrptab() failed */
+	} else noerr = FALSE;	/* _opendgrptab() failed */
 
 	/* Done */
 	return (noerr);
@@ -511,8 +499,7 @@ _putdgrptabrec(
 
 
 	/* Comment or data record? */
-	if (rec->comment)
-		count = fputs(rec->dataspace, stream);
+	if (rec->comment) count = fputs(rec->dataspace, stream);
 	else {
 
 	/*

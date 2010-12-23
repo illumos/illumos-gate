@@ -25,6 +25,6 @@
 
 # Was renamed to driver/network/llc2, both now obsolete
 
-set name=pkg.fmri value=pkg:/SUNWllc@0.5.11,5.11-0.148
+set name=pkg.fmri value=pkg:/SUNWllc@$(PKGVERS)
 set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)

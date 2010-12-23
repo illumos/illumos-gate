@@ -23,24 +23,6 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# This package is left in place solely to satisfy a dependency from
-# the SFW net-snmp package.  There is an argument to be made that the
-# dependency is actually "soft".  That is, that the net-snmp doesn't
-# really *need* the files that were formerly delivered by this
-# package.  Unfortunately, the packaging system doesn't realize this
-# and would refuse to install net-snmp, which would create problems
-# for FMA, if this package doesn't exist.
-#
-# There may be some fallout from this delivery for now, until the
-# net-snmp package is updated to remove the SEA hacks that Sun had
-# originally added to it.  For now it just deliveres a (duplicate)
-# reference to /etc.
-#
-# Once that is done, this package can be obsoleted.  Note that the
-# previous package, named SUNWsacom, would need to be removed at the
-# same time.
-#
 set name=pkg.fmri value=pkg:/system/management/snmp/sea/sea-config@$(PKGVERS)
 set name=pkg.description \
     value="Solstice Enterprise Agents 1.0.3 files for root file system"
@@ -50,3 +32,41 @@ set name=info.classification \
     value="org.opensolaris.category.2008:System/Enterprise Management"
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
+dir path=etc/init.d group=sys
+dir path=etc/snmp group=sys
+dir path=etc/snmp/conf group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/management group=sys
+dir path=lib/svc/method
+dir path=var group=sys
+dir path=var/snmp group=sys
+dir path=var/snmp/mib group=sys
+file path=etc/init.d/init.snmpdx group=sys mode=0744
+file path=etc/snmp/conf/enterprises.oid group=sys
+file path=etc/snmp/conf/mibiisa.reg group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/mibiisa.reg preserve=true
+file path=etc/snmp/conf/mibiisa.rsrc- group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/mibiisa.rsrc- preserve=true
+file path=etc/snmp/conf/snmpd.conf group=sys mode=0600 \
+    original_name=SUNWsacom:etc/snmp/conf/snmpd.conf preserve=true
+file path=etc/snmp/conf/snmpdx.acl group=sys mode=0600 \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.acl preserve=true
+file path=etc/snmp/conf/snmpdx.reg group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.reg preserve=true
+file path=etc/snmp/conf/snmpdx.rsrc group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.rsrc preserve=true
+file path=lib/svc/manifest/application/management/snmpdx.xml group=sys \
+    mode=0444
+file path=lib/svc/method/svc-snmpdx mode=0555
+file path=var/snmp/mib/snmpdx.mib group=sys
+file path=var/snmp/mib/sun.mib group=sys
+legacy pkg=SUNWsacom \
+    desc="Solstice Enterprise Agents 1.0.3 files for root file system" \
+    name="Solstice Enterprise Agents 1.0.3 files for root file system"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble

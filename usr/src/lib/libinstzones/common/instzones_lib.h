@@ -98,6 +98,9 @@ typedef struct _argArray_t argArray_t;
 /* this locks all packages, in all zones */
 #define	LOBJ_PKGADMIN	"zone.*/package.*"
 
+/* this locks all patches, in all zones */
+#define	LOBJ_PATCHADMIN	"zone.*/patch.*"
+
 #define	LOCK_OBJECT_MAXLEN	512
 #define	LOCK_KEY_MAXLEN		37
 

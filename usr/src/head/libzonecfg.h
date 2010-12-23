@@ -239,6 +239,10 @@ struct zone_pkgtab {
 	char	zone_pkg_version[ZONE_PKG_VERSMAX];
 };
 
+struct zone_patchtab {
+	char	zone_patch_id[MAXNAMELEN];
+};
+
 struct zone_devpermtab {
 	char	zone_devperm_name[MAXPATHLEN];
 	uid_t	zone_devperm_uid;
@@ -262,6 +266,7 @@ typedef struct {
 	uu_avl_node_t	zpe_entry;
 	char		*zpe_name;
 	char		*zpe_vers;
+	uu_avl_t	*zpe_patches_avl;
 } zone_pkg_entry_t;
 
 typedef enum zone_iptype {
@@ -457,6 +462,8 @@ extern	int	zonecfg_devperms_apply(zone_dochandle_t, const char *,
     uid_t, gid_t, mode_t, const char *);
 extern	void	zonecfg_set_swinv(zone_dochandle_t);
 extern	int	zonecfg_add_pkg(zone_dochandle_t, char *, char *);
+extern	int	zonecfg_add_patch(zone_dochandle_t, char *, void **);
+extern	int	zonecfg_add_patch_obs(char *, void *);
 
 /*
  * External zone verification support.

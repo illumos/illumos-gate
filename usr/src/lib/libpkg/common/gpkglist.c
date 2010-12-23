@@ -146,9 +146,8 @@ gpkglist(char *dir, char **pkg, char **catg)
 			if (!info.pkginst || !info.name || !info.arch ||
 			    !info.version)
 				continue;
-			(void) snprintf(temp, sizeof (temp),
-			    "%s %s\n(%s) %s", info.pkginst,
-			    info.name, info.arch, info.version);
+			(void) sprintf(temp, "%s %s\n(%s) %s", info.pkginst,
+				info.name, info.arch, info.version);
 			if (setitem(menup, temp)) {
 				errno = EFAULT;
 				return (NULL);

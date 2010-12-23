@@ -540,6 +540,31 @@ _z_lock_zone(zoneListElement_t *a_zlst, ZLOCKS_T a_lflags)
 	}
 
 	/*
+	 * acquire patch lock
+	 */
+
+	if (a_lflags & ZLOCKS_PATCH_ADMIN) {
+
+		/*
+		 * zone and package administration is locked; lock patch
+		 * administration; if the lock cannot be released, stop,
+		 * release the other locks and return an error
+		 */
+
+		_z_echoDebug(DBG_ZONES_LCK_ZONE_PATCHADM, a_zlst->_zlName,
+		    LOBJ_PATCHADMIN);
+
+		b = _z_lock_zone_object(&a_zlst->_zlLockObjects,
+		    scratchName, LOBJ_PATCHADMIN, (pid_t)0,
+		    MSG_ZONES_LCK_ZONE_PATCHADM,
+		    ERR_ZONES_LCK_ZONE_PATCHADM);
+		if (b == B_FALSE) {
+			(void) _z_unlock_zone(a_zlst, a_lflags);
+			return (b);
+		}
+	}
+
+	/*
 	 * all locks have been obtained - return success!
 	 */
 
@@ -806,6 +831,23 @@ _z_unlock_zone(zoneListElement_t *a_zlst, ZLOCKS_T a_lflags)
 
 	scratchName = a_zlst->_zlScratchName == NULL ? a_zlst->_zlName :
 	    a_zlst->_zlScratchName;
+
+	if (a_lflags & ZLOCKS_PATCH_ADMIN) {
+		/*
+		 * if locked, unlock patch administration lock
+		 * if the lock cannot be released, continue anyway
+		 */
+
+		_z_echoDebug(DBG_ZONES_ULK_ZONE_PATCHADM, a_zlst->_zlName,
+		    LOBJ_PATCHADMIN);
+
+		b = _z_unlock_zone_object(&a_zlst->_zlLockObjects,
+		    scratchName, LOBJ_PATCHADMIN,
+		    WRN_ZONES_ULK_ZONE_PATCHADM);
+		if (b == B_FALSE) {
+			errors = B_TRUE;
+		}
+	}
 
 	if (a_lflags & ZLOCKS_PKG_ADMIN) {
 		/*

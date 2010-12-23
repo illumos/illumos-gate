@@ -26,12 +26,11 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  Al rights reserved.
- */
 
 #ifndef _TIME_H
 #define	_TIME_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.18 */
 
 #include <sys/feature_tests.h>
 #include <iso/time_iso.h>
@@ -178,7 +177,6 @@ extern int daylight;
 
 #if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(__EXTENSIONS__)
-extern time_t timegm(struct tm *);
 extern int cftime(char *, char *, const time_t *);
 extern int ascftime(char *, const char *, const struct tm *);
 extern long altzone;
@@ -200,7 +198,6 @@ extern int getdate_err;
 
 extern int cftime(), ascftime();
 extern void tzset();
-extern time_t timegm();
 
 #ifdef _STRPTIME_DONTZERO
 #ifdef __PRAGMA_REDEFINE_EXTNAME

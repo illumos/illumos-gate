@@ -28,12 +28,23 @@ set name=pkg.description value="Kernel Crypto Framework Test Driver"
 set name=pkg.summary value="Kernel Crypto Framework Test Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
+set name=org.opensolaris.redist value=internal
 set name=variant.arch value=$(ARCH)
+# CRYPT DELETE START
+dir path=etc group=sys
+dir path=etc/certs group=sys
+dir path=etc/crypto group=sys
+dir path=etc/crypto/certs group=sys
+# CRYPT DELETE END
 dir path=kernel group=sys
 dir path=kernel/crypto group=sys
 dir path=kernel/crypto/$(ARCH64) group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+file path=etc/certs/SUNWosnetSE group=sys
+file path=etc/certs/SUNWosnetSolaris group=sys
+file path=etc/crypto/certs/SUNWosnet group=sys
+file path=etc/crypto/certs/SUNWosnetCF group=sys
 file path=kernel/drv/$(ARCH64)/dprov group=sys
 $(i386_ONLY)file path=kernel/drv/dprov group=sys
 file path=kernel/drv/dprov.conf group=sys

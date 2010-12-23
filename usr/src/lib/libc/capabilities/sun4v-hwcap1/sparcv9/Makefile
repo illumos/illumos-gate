@@ -29,6 +29,11 @@ include		$(SRC)/lib/Makefile.lib.64
 AS_CPPFLAGS +=	-D__sparcv9
 ASFLAGS +=	-xarch=v9 -I$(LIBCBASE)/$(MACH64)
 
-all install:	$(SYMCAP)
+all install:	$(LIBCBASE)/$(MACH64)/assym.h $(SYMCAP)
+
+# We need assym.h, but it won't build directly. smt_pause.o depends on
+# assym.h, so building it forces assym.h to be built.
+$(LIBCBASE)/$(MACH64)/assym.h:
+	@cd $(LIBCBASE)/$(MACH64); $(MAKE) pics/smt_pause.o
 
 include		../../Makefile.targ

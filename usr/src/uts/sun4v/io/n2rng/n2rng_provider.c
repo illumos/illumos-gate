@@ -141,6 +141,33 @@ fips_random(n2rng_t *n2rng, uint8_t *out, size_t nbytes)
 		/* nbytes - i is bytes to go */
 		fips_random_inner(frsp->XKEY, tempout, entropy.as32);
 
+		/*
+		 * Compare last round with the results of this round, fail
+		 * if identical.  Save for next round.
+		 */
+		if (n2rng->n_is_fips == B_TRUE) {
+			uint32_t	differ = 0;
+			int		j;
+
+			for (j = 0; j < 5; j++) {
+				differ |= tempout[j] ^ frsp->x_jminus1[j];
+				frsp->x_jminus1[j] = tempout[j];
+			}
+			if (differ == 0) {
+				/*
+				 * If differ == 0, the RNG produced the same
+				 * answer twice.  By FIPS 140-2 Section 4.9 we
+				 * must enter an error state.
+				 */
+				mutex_exit(&frsp->mtx);
+				n2rng_failure(n2rng);
+				cmn_err(CE_WARN,
+				    "n2rng: Continuous random number generator"
+				    " test of FIPS-140 RNG failed.");
+				return (EIO);
+			}
+		}
+
 		bcopy(tempout, &out[i], min(nbytes - i, SHA1BYTES));
 
 		mutex_exit(&frsp->mtx);

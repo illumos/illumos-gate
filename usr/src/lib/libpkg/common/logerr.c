@@ -34,7 +34,7 @@
 #include <stdarg.h>
 #include "pkglocale.h"
 
-/*PRINTFLIKE1*/
+/*VARARGS*/
 void
 logerr(char *fmt, ...)
 {
@@ -59,7 +59,7 @@ logerr(char *fmt, ...)
 	 * this routine be in the same internationalization domain
 	 * as this library.
 	 */
-	(void) vsnprintf(buffer, sizeof (buffer), fmt, ap);
+	(void) vsprintf(buffer, fmt, ap);
 
 	va_end(ap);
 

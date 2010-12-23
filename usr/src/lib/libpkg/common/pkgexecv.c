@@ -40,7 +40,6 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <grp.h>
-#include <note.h>
 #include "pkglib.h"
 #include "pkglibmsgs.h"
 #include "pkglocale.h"
@@ -71,7 +70,6 @@ static int	sig_received = 0;
 static void
 sig_trap(int a_signo)
 {
-	_NOTE(ARGUNUSED(a_signo));
 	sig_received++;
 }
 
@@ -254,7 +252,7 @@ pkgexecv(char *filein, char *fileout, char *uname, char *gname, char *arg[])
 
 		for (;;) {
 			status = 0;
-			waitstat = waitpid(pid, &status, 0);
+			waitstat = waitpid(pid, (int *)&status, 0);
 			if (waitstat < 0) {
 				/* waitpid returned error */
 				if (errno == EAGAIN) {
@@ -295,8 +293,8 @@ pkgexecv(char *filein, char *fileout, char *uname, char *gname, char *arg[])
 		/* error if child process does not match */
 
 		if (waitstat != pid) {
-			progerr(pkg_gt(ERR_WAIT_FAILED), pid, status,
-			    errno, strerror(errno));
+			progerr(pkg_gt(ERR_WAIT_FAILED), pid, waitstat, status,
+				errno, strerror(errno));
 			return (-1);
 		}
 

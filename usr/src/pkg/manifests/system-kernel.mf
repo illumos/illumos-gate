@@ -872,3 +872,4 @@ link path=dev/dld target=../devices/pseudo/dld@0:ctl
 link path=kernel/misc/$(ARCH64)/des \
     target=../../../kernel/crypto/$(ARCH64)/des
 $(i386_ONLY)link path=kernel/misc/des target=../../kernel/crypto/des
+$(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require

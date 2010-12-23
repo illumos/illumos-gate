@@ -80,6 +80,7 @@ typedef unsigned long ZLOCKS_T;
 
 #define	ZLOCKS_ZONE_ADMIN	((ZLOCKS_T)0x00000001)	/* zone admin */
 #define	ZLOCKS_PKG_ADMIN	((ZLOCKS_T)0x00000002)	/* package admin */
+#define	ZLOCKS_PATCH_ADMIN	((ZLOCKS_T)0x00000004)	/* patch admin */
 #define	ZLOCKS_ALL		((ZLOCKS_T)0xFFFFFFFF)	/* all locks */
 #define	ZLOCKS_NONE		((ZLOCKS_T)0x00000000)	/* no locks */
 

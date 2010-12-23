@@ -994,7 +994,7 @@ check_cert(PKG_ERR *err, X509 *cert)
 {
 	char			currtimestr[ATTR_MAX];
 	time_t			currtime;
-	char			*r;
+	char			*r, *before_str, *after_str;
 	/* get current time */
 	if ((currtime = time(NULL)) == (time_t)-1) {
 		pkgerr_add(err, PKGERR_TIME, gettext(ERR_CURR_TIME));
@@ -1942,7 +1942,7 @@ write_keystore(PKG_ERR *err, keystore_t *keystore,
 				 * use the one used when the keystore
 				 * was read
 				 */
-				(void) strlcpy(passbuf, keystore->passphrase,
+				strlcpy(passbuf, keystore->passphrase,
 				    KEYSTORE_PASS_MAX);
 			}
 
@@ -1984,7 +1984,7 @@ write_keystore(PKG_ERR *err, keystore_t *keystore,
 			}
 		} else {
 			/* use the one used when the keystore was read */
-			(void) strlcpy(passbuf, keystore->passphrase,
+			strlcpy(passbuf, keystore->passphrase,
 			    KEYSTORE_PASS_MAX);
 		}
 

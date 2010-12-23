@@ -53,6 +53,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_add_fs_option;
 	zonecfg_add_admin;
 	zonecfg_add_nwif;
+	zonecfg_add_patch;
+	zonecfg_add_patch_obs;
 	zonecfg_add_pkg;
 	zonecfg_add_pset;
 	zonecfg_add_rctl;

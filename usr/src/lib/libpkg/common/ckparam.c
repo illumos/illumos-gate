@@ -162,7 +162,7 @@ static int
 too_long(char *param, char *pt, int len)
 {
 	if (strlen(pt) > (size_t)len) {
-		progerr(pkg_gt(ERR_LEN), param);
+		progerr(pkg_gt(ERR_LEN), pt);
 		return (1);
 	}
 	return (0);

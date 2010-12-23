@@ -1,0 +1,17 @@
+\.ppd$
+\bCVS\b
+~$
+t/lib/File/
+t/Big-Dummy
+t/Problem-Module
+.gz$
+.bak$
+Makefile$
+MANIFEST.perl$
+\.old$
+merge_bleadperl$
+^blib/
+^pm_to_blib
+.DS_Store
+\#
+^bleadperl\.patch$

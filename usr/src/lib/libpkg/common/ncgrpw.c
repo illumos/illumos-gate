@@ -595,16 +595,15 @@ clgrnam(char *nam)
 	struct group *gr;
 	char *instroot, *buf;
 	FILE *gr_ptr;
-	size_t bufsz;
 
 	if ((instroot = get_install_root()) != NULL) {
-		bufsz = strlen(instroot) + strlen(GROUP) + 1;
-		if ((buf = (char *)malloc(bufsz)) == NULL) {
+		if ((buf = (char *)malloc(strlen(instroot) +
+			strlen(GROUP) + 1)) == NULL) {
 			(void) fprintf(stderr,
-			    pkg_gt(ERR_MALLOC), "clgrnam()",
-			    strlen(instroot) + strlen(GROUP), "buf");
+				pkg_gt(ERR_MALLOC), "clgrnam()",
+				strlen(instroot) + strlen(GROUP), "buf");
 		}
-		(void) snprintf(buf, bufsz, "%s%s", instroot, GROUP);
+		(void) sprintf(buf, "%s%s", instroot, GROUP);
 		if ((gr_ptr = fopen(buf, "r")) == NULL) {
 			free(buf);
 			return (NULL);
@@ -637,12 +636,13 @@ clpwnam(char *nam)
 	FILE *pw_ptr;
 
 	if ((instroot = get_install_root()) != NULL) {
-		if (asprintf(&buf, "%s%s", instroot, PASSWD) < 0) {
+		if ((buf = (char *)malloc(strlen(instroot) +
+			strlen(PASSWD) + 1)) == NULL) {
 			(void) fprintf(stderr,
-			    pkg_gt(ERR_MALLOC), "clpwnam()",
-			    strlen(instroot) + strlen(PASSWD), "buf");
-			return (NULL);
+				pkg_gt(ERR_MALLOC), "clpwnam()",
+				strlen(instroot) + strlen(PASSWD), "buf");
 		}
+		(void) sprintf(buf, "%s%s", instroot, PASSWD);
 		if ((pw_ptr = fopen(buf, "r")) == NULL) {
 			free(buf);
 			return (NULL);
@@ -675,13 +675,13 @@ clgrgid(gid_t gid)
 	FILE *gr_ptr;
 
 	if ((instroot = get_install_root()) != NULL) {
-		if (asprintf(&buf, "%s%s", instroot, GROUP) < 0) {
+		if ((buf = (char *)malloc(strlen(instroot) +
+			strlen(GROUP) + 1)) == NULL) {
 			(void) fprintf(stderr,
-			    pkg_gt(ERR_MALLOC), "clgrgid()",
-			    strlen(instroot) + strlen(GROUP), "buf");
-			return (NULL);
+				pkg_gt(ERR_MALLOC), "clgrgid()",
+				strlen(instroot) + strlen(GROUP), "buf");
 		}
-			
+		(void) sprintf(buf, "%s%s", instroot, GROUP);
 		if ((gr_ptr = fopen(buf, "r")) == NULL) {
 			free(buf);
 			return (NULL);
@@ -714,11 +714,13 @@ clpwuid(uid_t uid)
 	FILE *pw_ptr;
 
 	if ((instroot = get_install_root()) != NULL) {
-		if (asprintf(&buf, "%s%s", instroot, PASSWD) < 0) {
-			(void) fprintf(stderr, pkg_gt(ERR_MALLOC), "clpwuid()",
-			    strlen(instroot) + strlen(PASSWD), "buf");
-			return (NULL);
+		if ((buf = (char *)malloc(strlen(instroot) +
+			strlen(PASSWD) + 1)) == NULL) {
+			(void) fprintf(stderr,
+				pkg_gt(ERR_MALLOC), "clpwuid()",
+				strlen(instroot) + strlen(PASSWD), "buf");
 		}
+		(void) sprintf(buf, "%s%s", instroot, PASSWD);
 		if ((pw_ptr = fopen(buf, "r")) == NULL) {
 			free(buf);
 			return (NULL);

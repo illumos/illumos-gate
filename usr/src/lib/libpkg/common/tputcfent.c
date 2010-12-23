@@ -95,14 +95,14 @@ tputcfent(struct cfent *ept, FILE *fp)
 			(void) fprintf(fp, pkg_gt("Major device number: %s\n"),
 			    MSG_INVALID);
 		else
-			(void) fprintf(fp, pkg_gt("Major device number: %ld\n"),
+			(void) fprintf(fp, pkg_gt("Major device number: %d\n"),
 			    ept->ainfo.major);
 
 		if (ept->ainfo.minor == BADMINOR)
 			(void) fprintf(fp, pkg_gt("Minor device number: %s\n"),
 			    MSG_INVALID);
 		else
-			(void) fprintf(fp, pkg_gt("Minor device number: %ld\n"),
+			(void) fprintf(fp, pkg_gt("Minor device number: %d\n"),
 			    ept->ainfo.minor);
 
 		break;
@@ -131,7 +131,7 @@ tputcfent(struct cfent *ept, FILE *fp)
 			(void) fprintf(fp, pkg_gt("Expected mode: %s\n"),
 			    "?");
 		else
-			(void) fprintf(fp, pkg_gt("Expected mode: %04lo\n"),
+			(void) fprintf(fp, pkg_gt("Expected mode: %04o\n"),
 			    ept->ainfo.mode);
 
 		(void) fprintf(fp, pkg_gt("Expected owner: %s\n"),
@@ -148,10 +148,10 @@ tputcfent(struct cfent *ept, FILE *fp)
 		    ept->cinfo.cksum);
 		if (ept->cinfo.modtime > 0) {
 			timep = localtime(&(ept->cinfo.modtime));
-			(void) strftime(timeb, sizeof (timeb),
+			strftime(timeb, sizeof (timeb),
 			    pkg_gt("Expected last modification: %b %d %X %Y\n"),
 			    timep);
-			(void) fputs(timeb, fp);
+			(void) fprintf(fp, timeb);
 		} else
 			(void) fprintf(fp,
 			    pkg_gt("Expected last modification: ?\n"));

@@ -103,7 +103,7 @@ putcfile(struct cfent *a_ept, FILE *a_fp)
 				return (-1);
 			}
 		} else {
-			if (fprintf(a_fp, " %ld", a_ept->ainfo.major) < 0)
+			if (fprintf(a_fp, " %d", a_ept->ainfo.major) < 0)
 				return (-1);
 		}
 
@@ -116,7 +116,7 @@ putcfile(struct cfent *a_ept, FILE *a_fp)
 				return (-1);
 			}
 		} else {
-			if (fprintf(a_fp, " %ld", a_ept->ainfo.minor) < 0)
+			if (fprintf(a_fp, " %d", a_ept->ainfo.minor) < 0)
 				return (-1);
 		}
 	}

@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -175,10 +174,8 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 		 * SIDs are allocated only when mapping
 		 * UID/GID to SIDs
 		 */
-		for (i = 0; i < sib->sib_nmap; i++) {
+		for (i = 0; i < sib->sib_nmap; i++)
 			smb_sid_free(sib->sib_maps[i].sim_sid);
-			free(sib->sib_maps[i].sim_domsid);
-		}
 	}
 
 	if (sib->sib_size && sib->sib_maps) {
@@ -370,6 +367,7 @@ smb_idmap_batch_binsid(smb_idmap_batch_t *sib)
 			return (-1);
 
 		sid = smb_sid_fromstr(sim->sim_domsid);
+		free(sim->sim_domsid);
 		if (sid == NULL)
 			return (-1);
 

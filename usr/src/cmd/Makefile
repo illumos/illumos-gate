@@ -45,6 +45,7 @@ FIRST_SUBDIRS=		\
 	platexec
 
 COMMON_SUBDIRS=		\
+	agents		\
 	allocate	\
 	availdevs	\
 	lp		\
@@ -357,7 +358,6 @@ COMMON_SUBDIRS=		\
 	scsi		\
 	sdiff		\
 	sdpadm		\
-	sed		\
 	sendmail	\
 	setfacl		\
 	setmnt		\

@@ -358,7 +358,7 @@ openserver:
 	assert(args <= sizeof (cmd)/sizeof (char *));
 
 	if (posix_spawn(&pid, PKGSERV_PATH, NULL, NULL, cmd, environ) == 0) {
-		server->onetime |= (mode == RUN_ONCE);
+		server->onetime |= mode == RUN_ONCE;
 		while (wait4(pid, &stat, 0, NULL) != -1) {
 			if (WIFEXITED(stat)) {
 				int s = WEXITSTATUS(stat);
@@ -434,7 +434,6 @@ pkgmodeargument(start_mode_t mode)
 	}
 	progerr(gettext("Bad pkgserv mode: %d"), (int)mode);
 	exit(99);
-	/*NOTREACHED*/
 }
 
 void

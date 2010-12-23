@@ -36,6 +36,7 @@ OBJS=		backup.o	\
 		merginfo.o	\
 		pkgenv.o	\
 		pkgvolume.o	\
+		predepend.o	\
 		quit.o		\
 		reqexec.o	\
 		sortmap.o

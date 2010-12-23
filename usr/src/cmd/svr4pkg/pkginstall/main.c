@@ -150,6 +150,7 @@ int		ireboot = 0;
 int		maxinst = 1;
 int		nocnflct;
 int		nosetuid;
+int		opresvr4 = 0;
 int		pkgverbose = 0;
 int		rprcflag;
 int		warnflag = 0;
@@ -181,6 +182,14 @@ static boolean_t	debugFlag = B_FALSE;
 
 static boolean_t	globalZoneOnly = B_FALSE;
 
+/* Set by -O patchPkgInstall */
+
+static boolean_t patchPkgInstall = B_FALSE;
+
+/* Set by -O patchPkgRemoval */
+
+static boolean_t patchPkgRemoval = B_FALSE;
+
 /* Set by -O preinstallcheck */
 
 static boolean_t	preinstallCheck = B_FALSE;
@@ -196,6 +205,11 @@ static char		*parentZoneType = (char *)NULL;
 #define	DEFPATH		"/sbin:/usr/sbin:/usr/bin"
 #define	MALSIZ	4	/* best guess at likely maximum value of MAXINST */
 #define	LSIZE	256	/* maximum line size supported in copyright file */
+
+#ifdef	ALLOW_EXCEPTION_PKG_LIST
+#define	SCRIPT	0	/* which exception_pkg() pkg list to use (SCRIPTS) */
+#define	LINK	1	/* which exception_pkg() pkg list to use (SYMLINKS) */
+#endif
 
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"
@@ -616,6 +630,29 @@ main(int argc, char *argv[])
 							zoneName = (char *)NULL;
 						}
 					}
+					continue;
+				}
+
+				/*
+				 * If this is a patch installation
+				 * then call setPatchUpdate().
+				 */
+
+				if (strcmp(p, "patchPkgInstall") == 0) {
+					setPatchUpdate();
+					patchPkgInstall = B_TRUE;
+					continue;
+				}
+
+				/*
+				 * If this is a patch removal
+				 * then call setPatchUpdate() and set
+				 * patchPkgRemoval flag.
+				 */
+
+				if (strcmp(p, "patchPkgRemoval") == 0) {
+					setPatchUpdate();
+					patchPkgRemoval = B_TRUE;
 					continue;
 				}
 
@@ -1241,11 +1278,43 @@ main(int argc, char *argv[])
 		non_abi_scripts = 1;
 	}
 
+#ifdef	ALLOW_EXCEPTION_PKG_LIST
+	/*
+	 * *********************************************************************
+	 * this feature is removed starting with Solaris 10 - there is no built
+	 * in list of packages that should be run "the old way"
+	 * *********************************************************************
+	 */
+
+	else if (exception_pkg(srcinst, SCRIPT)) {
+		/*
+		 * Until on1095, set it from exception package names as
+		 * well.
+		 */
+		putparam("NONABI_SCRIPTS", "TRUE");
+		script_in = PROC_XSTDIN;
+		non_abi_scripts = 1;
+	}
+#endif
+
 	/* Set symlinks to be processed the old way */
 	if (abi_sym_ptr && strncasecmp(abi_sym_ptr, "TRUE", 4) == 0) {
 		set_nonABI_symlinks();
 	}
+	/*
+	 * *********************************************************************
+	 * this feature is removed starting with Solaris 10 - there is no built
+	 * in list of packages that should be run "the old way"
+	 * *********************************************************************
+	 */
 
+#ifdef	ALLOW_EXCEPTION_PKG_LIST
+	else if (exception_pkg(srcinst, LINK)) {
+		/* Until 2.9, set it from the execption list */
+		putparam("PKG_NONABI_SYMLINKS", "TRUE");
+		set_nonABI_symlinks();
+	}
+#endif
 	/*
 	 * At this point, script_in, non_abi_scripts & the environment are
 	 * all set correctly for the ABI status of the package.
@@ -1370,13 +1439,14 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Some pkgs (SUNWcsr) already spooled to the zone, check the
-	 * value of UPDATE in their postinstall script.  After a pkg
-	 * has been patched UPDATE exists statically in the pkginfo
-	 * file and this value must be reset when installing a zone.
+	 * Need to force UPDATE to be NULL in case a patch has been applied
+	 * before creating a zone. Some pkgs (SUNWcsr) already spooled
+	 * to the zone, check the value of UPDATE in their postinstall script.
+	 * After a pkg has been patched UPDATE exists statically in the
+	 * pkginfo file and this value must be reset when installing a zone.
 	 */
 
-	if (saveSpoolInstall != 0 && !isUpdate()) {
+	if (saveSpoolInstall != 0 && !isPatchUpdate() && !isUpdate()) {
 		putparam("UPDATE", "");
 	}
 
@@ -1977,6 +2047,19 @@ main(int argc, char *argv[])
 		/*NOTREACHED*/
 	}
 
+	if (opresvr4) {
+		/*
+		 * we are overwriting a pre-svr4 package, so remove the file
+		 * in /usr/options now
+		 */
+		(void) snprintf(path, sizeof (path),
+			"%s/%s.name", get_PKGOLD(), pkginst);
+		if (remove(path) && (errno != ENOENT)) {
+			progerr(ERR_OPRESVR4, path);
+			warnflag++;
+		}
+	}
+
 	/*
 	 * Execute preinstall script, if one was provided with the
 	 * package. We check the package to avoid running an old
@@ -2078,7 +2161,7 @@ main(int argc, char *argv[])
 	 */
 	rm_icas(pkgbin);
 
-	if (globalZoneOnly) {
+	if ((globalZoneOnly) && (!patchPkgInstall) && (!patchPkgRemoval)) {
 		boolean_t   b;
 		b = pkgAddPackageToGzonlyList(pkginst, get_inst_root());
 		if (b == B_FALSE) {
@@ -2146,6 +2229,8 @@ main(int argc, char *argv[])
 	}
 
 	if (!warnflag && !failflag) {
+		if (pt = getenv("PREDEPEND"))
+			predepend(pt);
 		(void) remove(rlockfile);
 		(void) remove(ilockfile);
 		(void) remove(savlog);
@@ -2466,12 +2551,13 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 		newValue = getenv(param);
 
 		/*
-		 * If there is no new value, and a zone attribute
+		 * If zone attributes of patch packages haven't been verified
+		 * by pdo, if there is no new value, and a zone attribute
 		 * is being changed, it is the same as setting the zone package
 		 * attribute to 'false' - make sure current setting is 'false'.
 		 */
 
-		if ((newValue == NULL) &&
+		if ((patchPkgInstall == B_FALSE) && (newValue == NULL) &&
 		    (setZoneAttribute == B_TRUE) &&
 		    (strcasecmp(oldValue, "false") != 0)) {
 
@@ -2500,11 +2586,13 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 		}
 
 		/*
-		 * Check if old and new values differ.
+		 * If zone attributes of patch packages haven't been verified
+		 * by pdo, check if old and new values differ.
 		 * Error if zone parameter
 		 */
 
-		if (setZoneAttribute == B_TRUE) {
+		if ((patchPkgInstall == B_FALSE) &&
+		    (setZoneAttribute == B_TRUE)) {
 			/* illegal change to zone attribute */
 
 			progerr(ERR_MERGINFOS_CHANGE_ZONEATTR, pkgName,
@@ -2534,56 +2622,67 @@ merg_pkginfos(struct cl_attr **pclass, struct cl_attr ***mpclass)
 	}
 
 	/*
-	 * verify that no zone attribute has been
-	 * set to an invalid value
+	 * Skip this if() section, if zone attributes of patch packages
+	 * have been verified by pdo.
 	 */
 
-	/* SUNW_PKG_ALLZONES */
+	if (patchPkgInstall == B_FALSE) {
 
-	newValue = getenv(PKG_ALLZONES_VARIABLE);
+		/*
+		 * verify that no zone attribute has been
+		 * set to an invalid value
+		 */
 
-	/*
-	 * complain if setting SUNW_PKG_ALLZONES to other than "false"
-	 */
+		/* SUNW_PKG_ALLZONES */
+
+		newValue = getenv(PKG_ALLZONES_VARIABLE);
+
+		/*
+		 * complain if setting SUNW_PKG_ALLZONES to other than "false"
+		 */
 
 
-	if ((newValue != NULL) && (*SUNW_PKG_ALLZONES == '\0') &&
-	    (strcasecmp(newValue, "false") != 0)) {
-		/* change ALLZONES from "true" to "false" (unset) */
-		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-		    pkgVersion, PKG_ALLZONES_VARIABLE, newValue);
-		return (1);
+		if ((newValue != NULL) && (*SUNW_PKG_ALLZONES == '\0') &&
+		    (strcasecmp(newValue, "false") != 0)) {
+			/* change ALLZONES from "true" to "false" (unset) */
+			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+			    pkgVersion, PKG_ALLZONES_VARIABLE, newValue);
+			return (1);
+		}
+
+		/* SUNW_PKG_THISZONE */
+
+		newValue = getenv(PKG_THISZONE_VARIABLE);
+
+		/*
+		 * complain if setting SUNW_PKG_THISZONE to other than "false"
+		 */
+
+		if ((newValue != NULL) && (*SUNW_PKG_THISZONE == '\0') &&
+		    (strcasecmp(newValue, "false") != 0)) {
+			/* change THISZONE from "true" to "false" (unset) */
+			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+			    pkgVersion, PKG_THISZONE_VARIABLE, newValue);
+			return (1);
+		}
+
+		/* SUNW_PKG_HOLLOW */
+
+		newValue = getenv(PKG_HOLLOW_VARIABLE);
+
+		/* complain if setting SUNW_PKG_HOLLOW to other than "false" */
+
+		if ((newValue != NULL) && (*SUNW_PKG_HOLLOW == '\0') &&
+		    (strcasecmp(newValue, "false") != 0)) {
+			/* change HOLLOW from "true" to 'false" (unset) */
+			progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
+			    pkgVersion, PKG_HOLLOW_VARIABLE, newValue);
+			return (1);
+		}
+
 	}
 
-	/* SUNW_PKG_THISZONE */
-
-	newValue = getenv(PKG_THISZONE_VARIABLE);
-
-	/*
-	 * complain if setting SUNW_PKG_THISZONE to other than "false"
-	 */
-
-	if ((newValue != NULL) && (*SUNW_PKG_THISZONE == '\0') &&
-	    (strcasecmp(newValue, "false") != 0)) {
-		/* change THISZONE from "true" to "false" (unset) */
-		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-		    pkgVersion, PKG_THISZONE_VARIABLE, newValue);
-		return (1);
-	}
-
-	/* SUNW_PKG_HOLLOW */
-
-	newValue = getenv(PKG_HOLLOW_VARIABLE);
-
-	/* complain if setting SUNW_PKG_HOLLOW to other than "false" */
-
-	if ((newValue != NULL) && (*SUNW_PKG_HOLLOW == '\0') &&
-	    (strcasecmp(newValue, "false") != 0)) {
-		/* change HOLLOW from "true" to 'false" (unset) */
-		progerr(ERR_MERGINFOS_SET_ZONEATTR, pkgName,
-		    pkgVersion, PKG_HOLLOW_VARIABLE, newValue);
-		return (1);
-	}
+	/* return */
 
 	echoDebug(DBG_MERGINFOS_EXIT, pkginfo_path, 0);
 

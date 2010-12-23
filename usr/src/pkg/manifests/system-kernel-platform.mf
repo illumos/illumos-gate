@@ -441,6 +441,11 @@ $(sparc_ONLY)driver name=n2rng \
     alias=SUNW,kt-rng \
     alias=SUNW,n2-rng \
     alias=SUNW,vf-rng
+$(sparc_ONLY)driver name=ncp \
+    alias=SUNW,kt-mau \
+    alias=SUNW,n2-mau \
+    alias=SUNW,sun4v-ncp \
+    alias=SUNW,vf-mau
 $(i386_ONLY)driver name=npe alias=pciex_root_complex
 $(sparc_ONLY)driver name=ntwdt perms="* 0644 root sys"
 $(sparc_ONLY)driver name=oplmsu alias=FJSV,oplmsu
@@ -1121,6 +1126,7 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/ebus group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/glvc group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/mdesc group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/n2rng group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/ncp group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/ntwdt group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/px group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/qcn group=sys
@@ -1132,6 +1138,7 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/bge.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/bmc.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/mdesc.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/n2rng.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/ncp.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/ntwdt.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/trapstat.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/bootdev group=sys \

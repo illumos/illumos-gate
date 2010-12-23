@@ -1,0 +1,414 @@
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+
+MODULE "IIMCAPPLICATION-MIB"
+
+application MANAGED OBJECT CLASS
+   DERIVED FROM "Rec. X.721 | ISO/IEC 10165-2 : 1992":top;
+   CHARACTERIZED BY
+       applicationPkg PACKAGE
+          BEHAVIOUR
+       applicationPkgBehaviour BEHAVIOUR
+       DEFINED AS
+       !This Managed object class maps to the application group
+       with object id { mib-2 27 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+   ATTRIBUTES
+        "iimcManagementDoc 1": internetClassId	GET;;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 };
+
+application-proxyNB NAME BINDING
+    SUBORDINATE OBJECT CLASS application
+        AND SUBCLASSES;
+    NAMED BY SUPERIOR OBJECT CLASS
+        "iimcManagementProxyMIB":cmipsnmpProxyAgent
+        AND SUBCLASSES;
+    WITH ATTRIBUTE
+        "iimcManagementDoc 1": internetClassId;
+    BEHAVIOUR
+        application-proxyNBBehaviour BEHAVIOUR
+        DEFINED AS !The <internet instanceId> portion of
+        the internetClassId value shall be 0.!;;
+REGISTERED AS  { iimcManagementNB 1 1 3 6 1 2 1 27 };
+
+applTable MANAGED OBJECT CLASS
+   DERIVED FROM "Rec. X.721 | ISO/IEC 10165-2 : 1992":top;
+   CHARACTERIZED BY
+       applTablePkg PACKAGE
+          BEHAVIOUR
+       applTablePkgBehaviour BEHAVIOUR
+       DEFINED AS
+       !This Managed object class maps to the applTable object
+       with object id { application 1 } in APPLICATION-MIB
+       See APPLICATION-MIB for attribute semantics.!;;
+   ATTRIBUTES
+        "iimcManagementDoc 1": internetClassId	GET;;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 };
+
+applEntry MANAGED OBJECT CLASS
+   DERIVED FROM "Rec. X.721 | ISO/IEC 10165-2 : 1992":top;
+   CHARACTERIZED BY
+       applEntryPkg PACKAGE
+          BEHAVIOUR
+       applEntryPkgBehaviour BEHAVIOUR
+       DEFINED AS
+         !PARSE
+         MULTIPLEINSTANCES
+            INDEX
+                applIndex;
+            CREATEDELETEATT <label of attribute used for creation and deletion of entries>
+            CREATEDELETEVALUE <label of create/delete attribute indicating deletion>
+         ENDMULTIPLEINSTANCES
+         ENDPARSE
+       This Managed object class maps to the applEntry object
+       with object id { applTable 1 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+   ATTRIBUTES
+        "iimcManagementDoc 1": internetClassId	GET,
+        applName			GET,
+        applDirectoryName			GET,
+        applVersion			GET,
+        applUptime			GET,
+        applOperStatus			GET,
+        applLastChange			GET,
+        applInboundAssociations			GET,
+        applOutboundAssociations			GET,
+        applAccumulatedInboundAssociations			GET,
+        applAccumulatedOutboundAssociations			GET,
+        applLastInboundActivity			GET,
+        applLastOutboundActivity			GET,
+        applRejectedInboundAssociations			GET,
+        applFailedOutboundAssociations			GET;;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 };
+
+applTable-applicationNB NAME BINDING
+    SUBORDINATE OBJECT CLASS applTable
+        AND SUBCLASSES;
+    NAMED BY SUPERIOR OBJECT CLASS application
+        AND SUBCLASSES;
+    WITH ATTRIBUTE
+        "iimcManagementDoc 1": internetClassId;
+    BEHAVIOUR
+        applTable-applicationNBBehaviour BEHAVIOUR
+        DEFINED AS !The <internet instanceId> portion of
+        the internetClassId value shall be 0.!;;
+REGISTERED AS  { iimcManagementNB 1 1 3 6 1 2 1 27 1 };
+
+applEntry-applTableNB NAME BINDING
+    SUBORDINATE OBJECT CLASS applEntry
+        AND SUBCLASSES;
+    NAMED BY SUPERIOR OBJECT CLASS applTable
+        AND SUBCLASSES;
+    WITH ATTRIBUTE
+        "iimcManagementDoc 1": internetClassId;
+    BEHAVIOUR
+        applEntry-applTableNBBehaviour BEHAVIOUR
+        DEFINED AS 
+         !PARSE
+         MULTIPLEINSTANCES
+            INDEX
+                applIndex;
+            CREATEDELETEATT <label of attribute used for creation and deletion of entries>
+            CREATEDELETEVALUE <label of create/delete attribute indicating deletion>
+         ENDMULTIPLEINSTANCES
+         ENDPARSE
+        The <internet instanceId> portion of
+        the internetClassId value shall the value of the 
+        following attributes:
+            applIndex!;;
+        -- CREATE WITH-AUTOMATIC-INSTANCE-NAMING
+        -- DELETE DELETES-CONTAINED-OBJECTS
+REGISTERED AS  { iimcManagementNB 1 1 3 6 1 2 1 27 1 1 };
+
+assocTable MANAGED OBJECT CLASS
+   DERIVED FROM "Rec. X.721 | ISO/IEC 10165-2 : 1992":top;
+   CHARACTERIZED BY
+       assocTablePkg PACKAGE
+          BEHAVIOUR
+       assocTablePkgBehaviour BEHAVIOUR
+       DEFINED AS
+       !This Managed object class maps to the assocTable object
+       with object id { application 2 } in APPLICATION-MIB
+       See APPLICATION-MIB for attribute semantics.!;;
+   ATTRIBUTES
+        "iimcManagementDoc 1": internetClassId	GET;;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 };
+
+assocEntry MANAGED OBJECT CLASS
+   DERIVED FROM "Rec. X.721 | ISO/IEC 10165-2 : 1992":top;
+   CHARACTERIZED BY
+       assocEntryPkg PACKAGE
+          BEHAVIOUR
+       assocEntryPkgBehaviour BEHAVIOUR
+       DEFINED AS
+         !PARSE
+         MULTIPLEINSTANCES
+            INDEX
+                applIndex,
+                assocIndex;
+            CREATEDELETEATT <label of attribute used for creation and deletion of entries>
+            CREATEDELETEVALUE <label of create/delete attribute indicating deletion>
+         ENDMULTIPLEINSTANCES
+         ENDPARSE
+       This Managed object class maps to the assocEntry object
+       with object id { assocTable 1 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+   ATTRIBUTES
+        "iimcManagementDoc 1": internetClassId	GET,
+        assocRemoteApplication			GET,
+        assocApplicationProtocol			GET,
+        assocApplicationType			GET,
+        assocDuration			GET;;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 };
+
+assocTable-applicationNB NAME BINDING
+    SUBORDINATE OBJECT CLASS assocTable
+        AND SUBCLASSES;
+    NAMED BY SUPERIOR OBJECT CLASS application
+        AND SUBCLASSES;
+    WITH ATTRIBUTE
+        "iimcManagementDoc 1": internetClassId;
+    BEHAVIOUR
+        assocTable-applicationNBBehaviour BEHAVIOUR
+        DEFINED AS !The <internet instanceId> portion of
+        the internetClassId value shall be 0.!;;
+REGISTERED AS  { iimcManagementNB 1 1 3 6 1 2 1 27 2 };
+
+assocEntry-assocTableNB NAME BINDING
+    SUBORDINATE OBJECT CLASS assocEntry
+        AND SUBCLASSES;
+    NAMED BY SUPERIOR OBJECT CLASS assocTable
+        AND SUBCLASSES;
+    WITH ATTRIBUTE
+        "iimcManagementDoc 1": internetClassId;
+    BEHAVIOUR
+        assocEntry-assocTableNBBehaviour BEHAVIOUR
+        DEFINED AS 
+         !PARSE
+         MULTIPLEINSTANCES
+            INDEX
+                applIndex,
+                assocIndex;
+            CREATEDELETEATT <label of attribute used for creation and deletion of entries>
+            CREATEDELETEVALUE <label of create/delete attribute indicating deletion>
+         ENDMULTIPLEINSTANCES
+         ENDPARSE
+        The <internet instanceId> portion of
+        the internetClassId value shall the value of the 
+        following attributes:
+            applIndex,
+            assocIndex!;;
+        -- CREATE WITH-AUTOMATIC-INSTANCE-NAMING
+        -- DELETE DELETES-CONTAINED-OBJECTS
+REGISTERED AS  { iimcManagementNB 1 1 3 6 1 2 1 27 2 1 };
+
+applIndex ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IimcCommonDef.Integer;
+MATCHES FOR EQUALITY, ORDERING;
+    BEHAVIOUR
+        applIndexBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applIndex with object id
+        { applEntry 1 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 1 };
+
+applName ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :displayString;
+    BEHAVIOUR
+        applNameBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applName with object id
+        { applEntry 2 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 2 };
+
+applDirectoryName ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IimcCommonDef.OctetString;
+MATCHES FOR	EQUALITY, ORDERING, SUBSTRINGS;
+    BEHAVIOUR
+        applDirectoryNameBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applDirectoryName with object id
+        { applEntry 3 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 3 };
+
+applVersion ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :displayString;
+    BEHAVIOUR
+        applVersionBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applVersion with object id
+        { applEntry 4 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 4 };
+
+applUptime ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :timeTicks;
+    BEHAVIOUR
+        applUptimeBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applUptime with object id
+        { applEntry 5 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 5 };
+
+applOperStatus ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IIMCAPPLICATION-MIBASN1.ApplOperStatus;
+MATCHES FOR EQUALITY;
+    BEHAVIOUR
+        applOperStatusBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applOperStatus with object id
+        { applEntry 6 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 6 };
+
+applLastChange ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :timeTicks;
+    BEHAVIOUR
+        applLastChangeBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applLastChange with object id
+        { applEntry 7 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 7 };
+
+applInboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :gauge32;
+    BEHAVIOUR
+        applInboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applInboundAssociations with object id
+        { applEntry 8 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 8 };
+
+applOutboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :gauge32;
+    BEHAVIOUR
+        applOutboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applOutboundAssociations with object id
+        { applEntry 9 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 9 };
+
+applAccumulatedInboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :counter32;
+    BEHAVIOUR
+        applAccumulatedInboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applAccumulatedInboundAssociations with object id
+        { applEntry 10 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 10 };
+
+applAccumulatedOutboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :counter32;
+    BEHAVIOUR
+        applAccumulatedOutboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applAccumulatedOutboundAssociations with object id
+        { applEntry 11 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 11 };
+
+applLastInboundActivity ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :timeTicks;
+    BEHAVIOUR
+        applLastInboundActivityBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applLastInboundActivity with object id
+        { applEntry 12 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 12 };
+
+applLastOutboundActivity ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :timeTicks;
+    BEHAVIOUR
+        applLastOutboundActivityBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applLastOutboundActivity with object id
+        { applEntry 13 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 13 };
+
+applRejectedInboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :counter32;
+    BEHAVIOUR
+        applRejectedInboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applRejectedInboundAssociations with object id
+        { applEntry 14 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 14 };
+
+applFailedOutboundAssociations ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :counter32;
+    BEHAVIOUR
+        applFailedOutboundAssociationsBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to applFailedOutboundAssociations with object id
+        { applEntry 15 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 1 1 15 };
+
+assocIndex ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IimcCommonDef.Integer;
+MATCHES FOR EQUALITY, ORDERING;
+    BEHAVIOUR
+        assocIndexBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to assocIndex with object id
+        { assocEntry 1 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 1 };
+
+assocRemoteApplication ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :displayString;
+    BEHAVIOUR
+        assocRemoteApplicationBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to assocRemoteApplication with object id
+        { assocEntry 2 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 2 };
+
+assocApplicationProtocol ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IimcCommonDef.ObjectIdentifier;
+MATCHES FOR EQUALITY;
+    BEHAVIOUR
+        assocApplicationProtocolBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to assocApplicationProtocol with object id
+        { assocEntry 3 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 3 };
+
+assocApplicationType ATTRIBUTE
+WITH ATTRIBUTE SYNTAX IIMCAPPLICATION-MIBASN1.AssocApplicationType;
+MATCHES FOR EQUALITY;
+    BEHAVIOUR
+        assocApplicationTypeBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to assocApplicationType with object id
+        { assocEntry 4 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 4 };
+
+assocDuration ATTRIBUTE
+DERIVED FROM "iimcManagementDoc 1" :timeTicks;
+    BEHAVIOUR
+        assocDurationBehaviour BEHAVIOUR
+        DEFINED AS
+        !This attribute maps to assocDuration with object id
+        { assocEntry 5 } in APPLICATION-MIB.
+       See APPLICATION-MIB for attribute semantics.!;;
+REGISTERED AS  { iimcAutoTrans 1 3 6 1 2 1 27 2 1 5 };
+
+
+
+END
+
+

@@ -38,10 +38,12 @@ extern "C" {
 /* environment variable */
 #define	ENV_VAR_DEBUG		"PKGCOND_DEBUG"
 #define	ENV_VAR_PKGROOT		"PKG_INSTALL_ROOT"
+#define	ENV_VAR_PATCHROOT	"ROOTDIR"
 #define	ENV_VAR_SET		"SET_FROM_ENVIRONMENT"
 #define	ENV_VAR_VERBOSE		"PKGCOND_VERBOSE"
 #define	ENV_VAR_PKGZONENAME	"SUNW_PKG_INSTALL_ZONENAME"
 #define	ENV_VAR_INITIAL_INSTALL	"PKG_INIT_INSTALL"
+#define	ENV_VAR_PATCH_CLIENTVER	"PATCH_CLIENT_VERSION"
 
 /* return codes used with pkgcond itself */
 #define	R_SUCCESS	0x0	/* condition match / success */

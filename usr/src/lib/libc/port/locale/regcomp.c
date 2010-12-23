@@ -392,17 +392,7 @@ p_ere_exp(struct parse *p)
 	case '\\':
 		(void) REQUIRE(MORE(), REG_EESCAPE);
 		wc = WGETNEXT();
-		switch (wc) {
-		case '<':
-			EMIT(OBOW, 0);
-			break;
-		case '>':
-			EMIT(OEOW, 0);
-			break;
-		default:
-			ordinary(p, wc);
-			break;
-		}
+		ordinary(p, wc);
 		break;
 	case '{':		/* okay as ordinary except if digit follows */
 		(void) REQUIRE(!MORE() || !isdigit((uch)PEEK()), REG_BADRPT);
@@ -554,12 +544,6 @@ p_simp_re(struct parse *p,
 		break;
 	case '[':
 		p_bracket(p);
-		break;
-	case BACKSL|'<':
-		EMIT(OBOW, 0);
-		break;
-	case BACKSL|'>':
-		EMIT(OEOW, 0);
 		break;
 	case BACKSL|'{':
 		SETERROR(REG_BADRPT);

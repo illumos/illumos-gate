@@ -354,11 +354,7 @@ getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
 #ifdef _LP64
 	struct flock64_32 flock_target;
 
-	/*
-	 * Pr may be NULL when pfiles is inspecting itself, but in that case
-	 * we already know the data model of the two processes must match.
-	 */
-	if ((Pr != NULL) && (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32)) {
+	if (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32) {
 		copyflock(flock_target, *flock_native);
 		ret = pr_fcntl(Pr, fd, F_GETLK, &flock_target);
 		copyflock(*flock_native, flock_target);

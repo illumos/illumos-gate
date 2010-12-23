@@ -120,6 +120,11 @@ typedef struct {
 #define	N2RNG_NOANALOGOUT	0x2
 
 /*
+ * n2rng: config variable in the n2rng.conf file
+ */
+#define	N2RNG_FIPS_STRING	"n2rng-fips-140"
+
+/*
  * There can only be N2_RNG_FIPS_INSTANCES concurrent RNG requsts from
  * the framework.  Making this value large helps benchmarks.  It
  * should probably come from a conf file, but for now it is hard
@@ -234,6 +239,7 @@ typedef struct n2rng {
 	md_t			*n_mdp;
 	uint64_t		n_sticks_per_usec;
 	ddi_taskq_t		*n_taskq;
+	boolean_t		n_is_fips;
 } n2rng_t;
 
 typedef kstat_named_t n2rng_kstat_bias_t[N2RNG_MAX_RNGS][N2RNG_NOSC];

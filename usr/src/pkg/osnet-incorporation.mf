@@ -32,3 +32,6 @@ set name=pkg.depend.install-hold value=core-os.osnet
 <include packages.redist.current>
 <include packages.redist.renamed>
 <include packages.redist.obsolete>
+$(CLOSED_BUILD)<include packages.extra.current>
+$(CLOSED_BUILD)<include packages.extra.renamed>
+$(CLOSED_BUILD)<include packages.extra.obsolete>

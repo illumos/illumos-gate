@@ -1,0 +1,97 @@
+#!/usr/bin/ksh
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# This script was used to generate the perl configuration files used to support
+# the use of gcc to build perl extensions against perl 5.8.4 as shipped in ON.
+# This script should be run from within the perl source directory.
+#
+
+# Delete any old configuration files.
+[[ -f config.sh ]] && rm config.sh
+[[ -f Policy.sh ]] && rm Policy.sh
+
+# Die on error.
+set -e
+
+# Global settings.
+PerlPfx=/usr/perl5		# Prefix for perl installation
+PerlRel=5.8.4			# Perl version
+PerlArch=$(arch)-solaris-64int	# Perl architecture
+
+# Create the config.over file to override some common settings.
+cat > config.over <<'EOF'
+CC=`which cc | sed -e 's!/bin/gcc!!'`
+ccflags=`echo $ccflags | sed -e 's! *-I/usr/local/include *! !'`
+ccflags=`echo $ccflags | sed -e 's! *-fno-strict-aliasing *! !'`
+ccflags="$ccflags -D_TS_ERRNO"
+ccsymbols=`echo $ccsymbols | sed -e 's! *__GNUC__=[0-9][0-9]* *! !g'`
+ccsymbols=`echo $ccsymbols | sed -e 's! *__GNUC_MINOR__=[0-9][0-9]* *! !g'`
+cppsymbols=`echo $cppsymbols | sed -e 's! *__GNUC__=[0-9][0-9]* *! !g'`
+cppsymbols=`echo $cppsymbols | sed -e 's! *__GNUC_MINOR__=[0-9][0-9]* *! !g'`
+ccversion='GNU gcc'
+cf_by='perl-bugs'
+cf_email='perl-bugs@sun.com'
+cf_time=''
+cppflags=''
+gccosandvers=''
+gccversion=''
+inc_version_list=''
+inc_version_list_init='0'
+installusrbinperl='undef'
+lddlflags='-G'
+ldflags=''
+libpth='/lib /usr/lib /usr/ccs/lib'
+#libsdirs=`echo $libsdirs | sed -e "s! *${CC}[^ ]* *! !"`
+#libsfound=`echo $libsfound | sed -e "s! *${CC}[^ ]* *! !"`
+libspath='/lib /usr/lib /usr/ccs/lib'
+locincpth="/usr/sfw/include /opt/sfw/include $locincpth"
+#loclibpth=`echo $loclibpth | sed -e 's!${CC}! !' -e 's!${CC}! !'`
+loclibpth="/usr/sfw/lib /opt/sfw/lib $loclibpth"
+#loclibpth=`echo $loclibpth | sed -e "s! *${CC}[^ ]* *! !"`
+make_set_make='#'
+mydomain='.sun.com'
+myhostname='localhost'
+if [ `uname -p` = "sparc" ]; then
+	myuname='sunos localhost 5.10 sun4u sparc SUNW,Ultra-2'
+else
+	myuname='sunos localhost 5.10 i86pc i386 i86pc'
+fi
+osvers='2.10'
+pager='/usr/bin/more'
+perl5='/bin/perl'
+perladmin='perl-bugs@sun.com'
+EOF
+
+# Run Configure with the correct flags to give the required config files
+./Configure -dsOE \
+    -Duseshrplib -Uusemymalloc -Duse64bitint \
+    -Dcc=gcc -Doptimize='-O2 -fno-strict-aliasing' \
+    -Dprefix=$PerlPfx/$PerlRel \
+    -Dprivlib=$PerlPfx/$PerlRel/lib \
+    -Darchlib=$PerlPfx/$PerlRel/lib/$PerlArch \
+    -Dsiteprefix=$PerlPfx/$PerlRel \
+    -Dsitelib=$PerlPfx/site_perl/$PerlRel \
+    -Dsitearch=$PerlPfx/site_perl/$PerlRel/$PerlArch \
+    -Dvendorprefix=$PerlPfx/$PerlRel \
+    -Dvendorlib=$PerlPfx/vendor_perl/$PerlRel \
+    -Dvendorarch=$PerlPfx/vendor_perl/$PerlRel/$PerlArch \
+    -Dman1dir=$PerlPfx/$PerlRel/man/man1 \
+    -Dman3dir=$PerlPfx/$PerlRel/man/man3 \
+    | 2>&1 tee configure.log
+sed -e "s/^config_args=.*/config_args=''/" \
+    -e "s/^config_argc=.*/config_argc=0/" \
+    -e "/^config_arg[1-9][0-9]*=/d" \
+    -e "s/ threads threads\\/shared//" \
+    -e "s/'  */'/g" \
+    -e "s/  *'/'/g" \
+    config.sh > config.new
+mv config.new config.sh
+
+# Expand config.sh into the generated files used during the build
+./Configure -S

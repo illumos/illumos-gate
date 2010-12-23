@@ -421,8 +421,9 @@ merginfo(struct cl_attr **pclass, int install_from_pspool)
 		}
 
 		if ((strncmp(ep, "UPDATE=", 7) == 0) &&
-		    install_from_pspool != 0 &&
-		    !isUpdate()) {
+				install_from_pspool != 0 &&
+				!isPatchUpdate() &&
+				!isUpdate()) {
 			continue;
 		}
 
@@ -487,7 +488,8 @@ merginfo(struct cl_attr **pclass, int install_from_pspool)
 			quit(1);
 		}
 
-		if ((pdirfp = opendir(path)) != NULL) {
+		if (((pdirfp = opendir(path)) != NULL) &&
+			!isPatchUpdate()) {
 			struct dirent	*dp;
 
 
@@ -557,23 +559,30 @@ merginfo(struct cl_attr **pclass, int install_from_pspool)
 			quit(99);
 		}
 
-		i = snprintf(path, sizeof (path), "%s/pkgmap", instdir);
-		if (i > sizeof (path)) {
-			progerr(ERR_CREATE_PATH_2, instdir, "pkgmap");
-			quit(1);
-		}
+		/*
+		 * Only want to copy the FCS pkgmap if this is not a
+		 * patch installation.
+		 */
 
-		i = snprintf(temp, sizeof (temp), "%s/pkgmap",
-		    saveSpoolInstallDir);
-		if (i > sizeof (path)) {
-			progerr(ERR_CREATE_PATH_2, saveSpoolInstallDir,
-			    "pkgmap");
-			quit(1);
-		}
+		if (!isPatchUpdate()) {
+			i = snprintf(path, sizeof (path), "%s/pkgmap", instdir);
+			if (i > sizeof (path)) {
+				progerr(ERR_CREATE_PATH_2, instdir, "pkgmap");
+				quit(1);
+			}
 
-		if (cppath(MODE_SRC, path, temp, 0644)) {
-			progerr(ERR_CANNOT_COPY, path, temp);
-			quit(99);
+			i = snprintf(temp, sizeof (temp), "%s/pkgmap",
+				saveSpoolInstallDir);
+			if (i > sizeof (path)) {
+				progerr(ERR_CREATE_PATH_2, saveSpoolInstallDir,
+					"pkgmap");
+				quit(1);
+			}
+
+			if (cppath(MODE_SRC, path, temp, 0644)) {
+				progerr(ERR_CANNOT_COPY, path, temp);
+				quit(99);
+			}
 		}
 	}
 
@@ -593,9 +602,11 @@ merginfo(struct cl_attr **pclass, int install_from_pspool)
 			quit(1);
 		}
 
-		if ((stat(path, &status) == 0) && (status.st_mode & S_IFDIR)) {
+		if ((stat(path, &status) == 0) &&
+				(status.st_mode & S_IFDIR) &&
+				!isPatchUpdate()) {
 			i = snprintf(cmd, sizeof (cmd), "cp -pr %s/* %s",
-			    path, pkgsav);
+					path, pkgsav);
 			if (i > sizeof (cmd)) {
 				progerr(ERR_SNPRINTF, "cp -pr %s/* %s");
 				quit(1);

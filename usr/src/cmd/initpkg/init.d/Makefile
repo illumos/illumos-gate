@@ -34,6 +34,7 @@ PROG=		\
 	devlinks	\
 	dhcp		\
 	drvconfig	\
+	init.snmpdx	\
 	ldap.client	\
 	mkdtab		\
 	nfs.server	\

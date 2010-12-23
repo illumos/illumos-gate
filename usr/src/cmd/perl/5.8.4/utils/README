@@ -1,0 +1,22 @@
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+This directory contains utilities that help port a standard perl 5.8.4 build
+directory into the ON tree and patched versions of standard perl files needed
+to work around build issues.
+
+lib/ExtUtils/MM.pm
+lib/ExtUtils/MM_Solaris_ON.pm
+The standard MakeMaker framework is obviously not ON-aware and we can't patch
+the version we ship.  The port/lib directory contains replacement MakeMaker
+components that are ON-aware.  We arrange for these versions to be used during
+the build in preference to the standard ones by setting PERL5INC appropriately
+in the environment.  See the source files themselves for details of the changes
+that were necessary.
+
+port
+This directory contains scripts and data files used to port a stock perl 5.8.4
+source tree into an ON workspace.  See the README in port for details.

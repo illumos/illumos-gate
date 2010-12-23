@@ -27,9 +27,6 @@
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
 #include <locale.h>
 #include <libintl.h>
@@ -43,7 +40,6 @@
 #include <pkglocs.h>
 #include <libadm.h>
 #include <libinst.h>
-#include <messages.h>
 
 static int	options;
 static keystore_handle_t	keystore = NULL;
@@ -51,7 +47,13 @@ static keystore_handle_t	keystore = NULL;
 static void	usage(void);
 static void	trap(int signo);
 
+#define	PASSWD_CMDLINE \
+		"## WARNING: USING <%s> MAKES PASSWORD " \
+		"VISIBLE TO ALL USERS."
+
+#define	PASSPHRASE_PROMPT	"Enter keystore password:"
 #define	KEYSTORE_OPEN	"Retrieving signing certificates from keystore <%s>"
+#define	PARAM_LEN		"Parameter <%s> too long"
 
 int
 main(int argc, char *argv[])
@@ -65,7 +67,7 @@ main(int argc, char *argv[])
 	boolean_t	create_sig = B_FALSE;
 	char		*homedir = NULL;
 	PKG_ERR		*err;
-	int		ret, len;
+	int		ret, len, homelen;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -114,7 +116,7 @@ main(int argc, char *argv[])
 				 * passwords on the command line are highly
 				 * insecure.  complain.
 				 */
-				logerr(PASSWD_CMDLINE, "pass:<pass>");
+				logerr(gettext(PASSWD_CMDLINE), "pass:<pass>");
 			}
 			break;
 
@@ -130,7 +132,9 @@ main(int argc, char *argv[])
 	(void) signal(SIGQUIT, trap);
 	(void) signal(SIGTERM, trap);
 	(void) signal(SIGPIPE, trap);
+#ifndef SUNOS41
 	(void) signal(SIGPWR, trap);
+#endif
 
 	if ((argc-optind) < 2) {
 		usage();
@@ -146,24 +150,33 @@ main(int argc, char *argv[])
 			if (geteuid() == 0) {
 				/* we are superuser, so use their keystore */
 				keystore_file = PKGSEC;
-
-			} else if ((homedir = getenv("HOME")) == NULL) {
+			} else {
+				if ((homedir = getenv("HOME")) == NULL) {
 				/*
 				 * not superuser, but no home dir, so
 				 * use superuser's keystore
 				 */
-				keystore_file = PKGSEC;
-
-			} else if (asprintf(&keystore_file, "%s/.pkg/security",
-			    homedir) < 0) {
-				logerr(ERR_MEM);
-				quit(1);
+					keystore_file = PKGSEC;
+				} else {
+				/* $HOME/.pkg/security\0 */
+					homelen = strlen(homedir) + 15;
+					keystore_file =
+					    malloc(strlen(homedir) + 15);
+					if (((len = snprintf(keystore_file,
+					    homelen, "%s/%s", homedir,
+					    ".pkg/security")) < 0) ||
+					    (len >= homelen)) {
+						logerr(gettext(PARAM_LEN),
+						    "$HOME");
+						quit(1);
+					}
+				}
 			}
 		}
 
 		logerr(gettext(KEYSTORE_OPEN), keystore_file);
 
-		set_passphrase_prompt(MSG_PASSPROMPT);
+		set_passphrase_prompt(gettext(PASSPHRASE_PROMPT));
 
 		/* open keystore for reading */
 		if (open_keystore(err, keystore_file, get_prog_name(),

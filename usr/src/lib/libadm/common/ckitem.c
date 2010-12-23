@@ -27,10 +27,8 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4 */
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -465,7 +463,6 @@ printmenu(CKMENU *menup)
 	for (i = 1; chp; ++i) {
 		if (!(menup->attr & CKUNNUM))
 			(void) fprintf(stderr, "%3d  ", i);
-		/* LINTED E_SEC_PRINTF_VAR_FMT */
 		(void) fprintf(stderr, format, chp->token);
 		if (chp->text) {
 			/* there is text associated with the token */
@@ -476,7 +473,6 @@ printmenu(CKMENU *menup)
 					if (!(menup->attr & CKUNNUM))
 						(void) fprintf(stderr,
 						    "%5s", "");
-					/* LINTED E_SEC_PRINTF_VAR_FMT */
 					(void) fprintf(stderr, format, "");
 					while (isspace((unsigned char)*pt))
 						++pt;
@@ -509,16 +505,17 @@ static int
 getstr(char *strval, char *defstr, char *error, char *help, char *prompt)
 {
 	char input[MAX_INPUT];
-	char end[MAX_INPUT];
+	char *ept, end[MAX_INPUT];
 
-	*end = '\0';
+	*(ept = end) = '\0';
 	if (defstr) {
-		(void) snprintf(end, MAX_INPUT, "(default: %s) ", defstr);
+		(void) sprintf(ept, "(default: %s) ", defstr);
+		ept += strlen(ept);
 	}
 	if (ckquit) {
-		(void) strlcat(end, "[?,??,q]", MAX_INPUT);
+		(void) strcat(ept, "[?,??,q]");
 	} else {
-		(void) strlcat(end, "[?,??]", MAX_INPUT);
+		(void) strcat(ept, "[?,??]");
 	}
 
 start:

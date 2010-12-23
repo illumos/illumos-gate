@@ -21,9 +21,6 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- */
 
 #include <fm/fmd_fmri.h>
 #include <strings.h>
@@ -102,28 +99,20 @@ find_vdev_iter(nvlist_t *nv, uint64_t search)
 		return (nv);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0) {
+	    &child, &children) != 0)
+		return (NULL);
 
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
+	for (c = 0; c < children; c++)
+		if ((ret = find_vdev_iter(child[c], search)) != 0)
+			return (ret);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
-	    &child, &children) == 0) {
+	    &child, &children) != 0)
+		return (NULL);
 
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
-
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
-	    &child, &children) == 0) {
-
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
+	for (c = 0; c < children; c++)
+		if ((ret = find_vdev_iter(child[c], search)) != 0)
+			return (ret);
 
 	return (NULL);
 }

@@ -312,6 +312,7 @@ CRYPT_SRC:
 	@cd uts/common/gssapi/include;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/dummy;        pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/krb5; pwd; $(MAKE) CRYPT_SRC
+	@cd pkg;    pwd; $(MAKE) CRYPT_SRC
 	$(RM) Makefile+
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 			< Makefile > Makefile+

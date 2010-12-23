@@ -209,7 +209,7 @@ extern "C" {
 #define	MSG_KEYSTORE_UNKNOWN	"Unknown"
 
 /* parameter errors */
-#define	ERR_LEN		"length of parameter <%s> value exceeds limit"
+#define	ERR_LEN		"length of parameter value <%s> exceeds limit"
 #define	ERR_ASCII	"parameter <%s> must be ascii"
 #define	ERR_ALNUM	"parameter <%s> must be alphanumeric"
 #define	ERR_CHAR	"parameter <%s> has incorrect first character"
@@ -235,8 +235,7 @@ extern "C" {
 #define	MSG_PKGNAME	"- invalid package name in datastream table-of-contents"
 #define	MSG_NOPKG	"- package <%s> not in datastream"
 #define	MSG_STATFS	"- unable to stat filesystem, errno=%d"
-#define	MSG_NOSPACE	"- not enough space, %ld blocks required, "\
-			"%lld available"
+#define	MSG_NOSPACE	"- not enough space, %d blocks required, %d available"
 
 /* pkglist errors */
 #define	ERR_MEMORY	"memory allocation failure, errno=%d"
@@ -272,7 +271,7 @@ extern "C" {
 #define	LABEL3	"Insert %%v into %%p."
 
 /* package verify errors */
-#define	MSG_WLDDEVNO	"NOTE: <%s> created as device (%ld, %ld)."
+#define	MSG_WLDDEVNO	"NOTE: <%s> created as device (%d, %d)."
 
 #define	WRN_QV_SIZE	"WARNING: quick verify of <%s>; wrong size."
 #define	WRN_QV_MTIME	"WARNING: quick verify of <%s>; wrong mod time."
@@ -289,9 +288,8 @@ extern "C" {
 #define	ERR_CKSUM	"file cksum <%ld> expected <%ld> actual"
 #define	ERR_NO_CKSUM	"unable to checksum, may need to re-run command as " \
 			"user \"root\""
-#define	ERR_MAJMIN	"major/minor device <%ld, %ld> " \
-			"expected <%ld, %ld> actual"
-#define	ERR_PERM	"permissions <%04lo> expected <%04lo> actual"
+#define	ERR_MAJMIN	"major/minor device <%d, %d> expected <%d, %d> actual"
+#define	ERR_PERM	"permissions <%04o> expected <%04o> actual"
 #define	ERR_GROUP	"group name <%s> expected <%s> actual"
 #define	ERR_OWNER	"owner name <%s> expected <%s> actual"
 #define	ERR_MODFAIL	"unable to fix modification time"
@@ -327,8 +325,8 @@ extern "C" {
 
 #define	ERR_TOO_MANY_ARGS	"too many arguments passed to pkgexecl " \
 				"for command <%s>"
-#define	ERR_WAIT_FAILED	"wait for process %ld failed, status " \
-			"<0x%08x> errno <%d> (%s)"
+#define	ERR_WAIT_FAILED	"wait for process %ld failed, pid <%ld> status " \
+			"<0x%08lx> errno <%d> (%s)"
 #define	ERR_FORK_FAILED	"fork() failed errno=%d (%s)"
 #define	ERR_FREOPEN	"freopen(%s, \"%s\", %s) failed, errno=%d (%s)"
 #define	ERR_FDOPEN	"fdopen(%d, \"%s\") failed, errno=%d (%s)"
