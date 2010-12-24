@@ -48,7 +48,6 @@ COMMON_SUBDIRS=		\
 	agents		\
 	allocate	\
 	availdevs	\
-	lp		\
 	perl		\
 	man		\
 	Adm		\
@@ -309,7 +308,6 @@ COMMON_SUBDIRS=		\
 	plockstat	\
 	pr		\
 	prctl		\
-	print		\
 	printf		\
 	priocntl	\
 	profiles	\
@@ -512,7 +510,6 @@ sparc_SUBDIRS=		\
 # (see previous comment about 'lp' and 'man').
 #
 MSGSUBDIRS=		\
-	lp		\
 	man		\
 	abi		\
 	acctadm		\
@@ -655,7 +652,6 @@ MSGSUBDIRS=		\
 	power		\
 	pr		\
 	praudit		\
-	print		\
 	profiles	\
 	projadd		\
 	projects	\
@@ -853,7 +849,6 @@ _dc: $(DCSUBDIRS)
 fs.d: fstyp
 ksh:	shcomp isaexec
 mdb:	terminfo
-print:	lp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \

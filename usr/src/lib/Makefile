@@ -187,7 +187,6 @@ $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/libike
 SUBDIRS += \
 	nsswitch	\
-	print		\
 	libuutil	\
 	libscf		\
 	libinetsvc	\
@@ -638,7 +637,6 @@ librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
 pkcs11:		libcryptoutil libkmsagent
-print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
 		libadm libavl libefi libidmap libmd
