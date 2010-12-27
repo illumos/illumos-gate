@@ -18,60 +18,45 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010 Nexenta Systems, Inc. All rights reserved.
+#
+
+PROG=		beadm
+OBJS=		beadm.o
+SRCS=		$(OBJS:%.o=%.c)
+POFILE=		beadm.po
 
 include ../Makefile.cmd
 
-FILEMODE=0444
+LDLIBS += -lnvpair -lbe
 
-PYTHON=         $(PYTHON_26)
-ROOTPYDIR=      $(ROOT)/usr/lib/python2.6/vendor-packages
-ROOTMODDIR= 	$(ROOTPYDIR)/beadm
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
-PYCMD=          beadm.py
-PYCMDFILE=      $(PYCMD:%.py=%)
-
-PYMODULES=	__init__.py BootEnvironment.py messages.py
-PYMODOBJS=	$(PYMODULES:%.py=%.pyc)
-PYMODFILES=	$(PYMODULES) $(PYMODOBJS)
-
-ROOTCMDFILE=    $(PYCMDFILE:%=$(ROOTSBIN)/%)
-$(ROOTCMDFILE) 	:= FILEMODE = 0555
-ROOTMODFILES=	$(PYMODFILES:%=$(ROOTMODDIR)/%)
-ROOTUSRSBINLINKS= $(PYCMDFILE:%=$(ROOTUSRSBIN)/%)
-
-POFILE = 	beadm.po
-MSGFILES = 	beadm.py messages.py
-XGETTEXT = 	$(GNUXGETTEXT)
-XGETFLAGS = 	$(GNUXGETFLAGS)
+ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
 .KEEP_STATE:
 
-all: $(PYCMDFILE) $(PYMODOBJS)
+.PARALLEL:
 
-install: all $(ROOTCMDFILE) $(ROOTMODFILES) $(ROOTUSRSBINLINKS)
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTSBINPROG) $(ROOTUSRSBINLINKS)
 
 clean:
-	$(RM) $(PYCMDFILE) $(PYMODOBJS)
+	$(RM) $(OBJS)
 
-clobber: clean
+lint:	lint_SRCS
 
-$(ROOTCMDDIR)/%: %
-	$(INS.pyfile)
-
-$(ROOTMODDIR)/%: %
-	$(INS.pyfile)
-
+# Links from /usr/sbin to /sbin
 $(ROOTUSRSBINLINKS):
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
+	-$(RM) $@; $(SYMLINK) ../../sbin/$(PROG) $@
 
-$(POFILE): 	$(MSGFILES)
-		$(BUILDPO.msgfiles)
+FRC:
 
-_msg: 		$(MSGDOMAINPOFILE)
-
-include $(SRC)/Makefile.msg.targ
 include ../Makefile.targ

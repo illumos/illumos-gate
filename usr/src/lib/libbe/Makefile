@@ -31,14 +31,12 @@ HDRS=		libbe.h \
 HDRDIR=		common
 
 SUBDIRS=	$(MACH)
-TESTDIR= 	tbeadm
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
-test := 	TARGET= test
 
 POFILE =	libbe.po
 MSGFILES =	`$(GREP) -l gettext $(HDRDIR)/*.[ch]`
@@ -47,7 +45,7 @@ MSGFILES =	`$(GREP) -l gettext $(HDRDIR)/*.[ch]`
 
 all install lint: install_h $(SUBDIRS)
 
-clean clobber: $(SUBDIRS) $(TESTDIR)
+clean clobber: $(SUBDIRS)
 
 $(POFILE): 	pofile_MSGFILES
 
@@ -56,12 +54,6 @@ install_h: 	$(ROOTHDRS)
 check: 		$(CHECKHDRS)
 
 _msg: $(MSGDOMAINPOFILE)
-
-test:
-	cd tbeadm; pwd; $(MAKE) install
-
-$(TESTDIR): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
