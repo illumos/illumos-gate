@@ -65,7 +65,7 @@
 		type='method'
 		name='start'
 		exec='/lib/svc/method/svc-joyinit %m'
-		timeout_seconds='180'>
+		timeout_seconds='0'>
 	</exec_method>
 
 	<exec_method
