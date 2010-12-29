@@ -303,7 +303,7 @@ again:
 int
 mf_fgets(SPACE *sp, enum e_spflag spflag)
 {
-	struct stat sb;
+	struct stat sb, nsb;
 	size_t len;
 	char *p;
 	int c;
@@ -338,9 +338,15 @@ mf_fgets(SPACE *sp, enum e_spflag spflag)
 			if (*oldfname != '\0') {
 				/* if there was a backup file, remove it */
 				(void) unlink(oldfname);
-				if (link(fname, oldfname) != 0) {
-					warn("link()");
-					(void) unlink(tmpfname);
+				/*
+				 * Backup the original.  Note that hard links
+				 * are not supported on all filesystems.
+				 */
+				if ((link(fname, oldfname) != 0) &&
+				    (rename(fname, oldfname) != 0)) {
+					warn("rename()");
+					if (*tmpfname)
+						(void) unlink(tmpfname);
 					exit(1);
 				}
 				*oldfname = '\0';
@@ -398,9 +404,22 @@ mf_fgets(SPACE *sp, enum e_spflag spflag)
 			(void) unlink(tmpfname);
 			if ((outfile = fopen(tmpfname, "w")) == NULL)
 				err(1, "%s", fname);
-			if (fchown(fileno(outfile), sb.st_uid, sb.st_gid) != 0)
+			/*
+			 * Some file systems don't support chown or
+			 * chmod fully.  On those, the owner/group and
+			 * permissions will already be set to what
+			 * they need to be.
+			 */
+			if (fstat(fileno(outfile), &nsb) != 0) {
+				warn("fstat()");
+			}
+			if (((sb.st_uid != nsb.st_uid) ||
+			    (sb.st_gid != nsb.st_gid)) &&
+			    (fchown(fileno(outfile), sb.st_uid, sb.st_gid)
+			    != 0))
 				warn("fchown()");
-			if (fchmod(fileno(outfile), sb.st_mode & 07777) != 0)
+			if ((sb.st_mode != nsb.st_mode) &&
+			    (fchmod(fileno(outfile), sb.st_mode & 07777) != 0))
 				warn("fchmod()");
 			outfname = tmpfname;
 			if (!ispan) {
