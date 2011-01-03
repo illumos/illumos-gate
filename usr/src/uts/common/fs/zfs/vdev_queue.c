@@ -142,6 +142,7 @@ static void
 vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 {
 	avl_add(&vq->vq_deadline_tree, zio);
+	zfs_zone_zio_enqueue(zio);
 	avl_add(zio->io_vdev_tree, zio);
 }
 
@@ -149,6 +150,7 @@ static void
 vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
 	avl_remove(&vq->vq_deadline_tree, zio);
+	zfs_zone_zio_dequeue(zio);
 	avl_remove(zio->io_vdev_tree, zio);
 }
 
@@ -191,7 +193,11 @@ again:
 	    avl_numnodes(&vq->vq_deadline_tree) == 0)
 		return (NULL);
 
+#ifdef _KERNEL
+	fio = lio = zfs_zone_schedule(vq);
+#else
 	fio = lio = avl_first(&vq->vq_deadline_tree);
+#endif
 
 	t = fio->io_vdev_tree;
 	flags = fio->io_flags & ZIO_FLAG_AGG_INHERIT;

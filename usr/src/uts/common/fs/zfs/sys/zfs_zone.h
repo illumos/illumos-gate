@@ -47,6 +47,11 @@ extern void zfs_zone_io_throttle(zfs_zone_iop_type_t, uint64_t);
 extern void zfs_zone_zio_init(zio_t *);
 extern void zfs_zone_zio_start(zio_t *);
 extern void zfs_zone_zio_done(zio_t *);
+extern void zfs_zone_zio_dequeue(zio_t *);
+extern void zfs_zone_zio_enqueue(zio_t *);
+#ifdef _KERNEL
+extern zio_t *zfs_zone_schedule(vdev_queue_t *);
+#endif
 
 #ifdef	__cplusplus
 }

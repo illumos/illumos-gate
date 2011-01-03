@@ -543,6 +543,9 @@ typedef struct zone {
 	 * Data and counters used for fair-share disk IO.
 	 */
 	rctl_qty_t	zone_zfs_io_share;	/* ZFS IO share */
+	uint_t		zone_zfs_queued;	/* ZFS enqueued count */
+	uint64_t	zone_zfs_queue_bumped;	/* ZFS queue bump counter */
+	void 		*zone_zfs_last_zio;	/* pntr to most recent zio */
 	uint64_t	zone_io_util;		/* IO utilization metric */
 	uint16_t	zone_io_delay;		/* IO delay on writes */
 	kmutex_t	zone_stg_io_lock;	/* protects IO window data */

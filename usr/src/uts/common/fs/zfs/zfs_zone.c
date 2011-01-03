@@ -52,6 +52,16 @@ zfs_zone_zio_done(zio_t *zp)
 {
 }
 
+void
+zfs_zone_zio_dequeue(zio_t *zp)
+{
+}
+
+void
+zfs_zone_zio_enqueue(zio_t *zp)
+{
+}
+
 #else
 
 /*
@@ -111,6 +121,22 @@ typedef struct {
 
 static sys_lat_cycle_t	rd_lat;
 static sys_lat_cycle_t	wr_lat;
+
+boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
+/*
+ * Threshold for when zio scheduling should kick in.
+ *
+ * This threshold is based on 1/2 of the zfs_vdev_max_pending value for the
+ * number of I/Os that can be pending on a device.  If there are more than a
+ * few ops already queued up, beyond those already issued to the vdev, then
+ * use scheduling to get the next zio.
+ */
+int		zfs_zone_schedule_thresh = 5;
+
+typedef struct {
+	uint64_t bump_cnt;
+	zio_t	*zp;
+} zone_q_bump_t;
 
 /*
  * This uses gethrtime() but returns a value in usecs.
@@ -548,6 +574,98 @@ zfs_zone_wait_adjust(hrtime_t now)
 }
 
 /*
+ * Callback used to find a zone with only 1 op in the vdev queue.
+ * We scan the zones looking for ones with 1 op in the queue.  Out of those,
+ * we pick the one that has been bumped the least number of times.
+ * We return that zio pointer we have cached so that we don't have to search
+ * the vdev queue to find it.
+ */
+static int
+get_enqueued_cb(zone_t *zonep, void *arg)
+{
+	zone_q_bump_t *qbp = arg;
+
+	if (zonep->zone_zfs_queued != 1 || zonep->zone_zfs_last_zio == NULL ||
+	    zonep->zone_id == GLOBAL_ZONEID)
+		return (0);
+
+	/*
+	 * If this is the first zone we find with a count of 1 or if this
+	 * zone was bumped less than the one we already found, then use it.
+	 */
+	if (qbp->zp == NULL || qbp->bump_cnt > zonep->zone_zfs_queue_bumped) {
+		qbp->bump_cnt = zonep->zone_zfs_queue_bumped;
+		qbp->zp = (zio_t *)(zonep->zone_zfs_last_zio);
+	}
+	return (0);
+}
+
+/*
+ * See if we need to bump a zone's zio to the head of the queue.
+ *
+ * For single-threaded synchronous workloads a zone cannot get more than
+ * 1 op into the queue at a time unless the zone is running multiple workloads
+ * in parallel.  This can cause an imbalance in performance if there are zones
+ * with many parallel workloads (and ops in the queue) vs. other zones which
+ * are doing simple single-threaded workloads, such as interactive tasks in the
+ * shell.  These zones can get backed up behind a deep queue and their IO
+ * performance will appear to be very poor as a result.  This can make the
+ * zone work badly for interactive behavior.
+ *
+ * The scheduling algorithm kicks in once we start to get a deeper queue.
+ * Once that occurs, we look at all of the zones to see which ones only have
+ * one IO enqueued.  The assumption here is that these zones are the ones
+ * doing simple single-threaded workloads and we want to bump those to the
+ * head of the queue, ahead of zones with multiple ops in the queue, so that
+ * interactive performance is better.
+ *
+ * We keep track of how many times a zone is bumped to the head of the queue so
+ * that we don't keep bumping the same zone when there is more than one in the
+ * queue with a single op.
+ *
+ * We use a counter on the zone so that we can quickly find zones with a
+ * single op in the queue without having to search the entire queue itself.
+ * This scales better since the number of zones is expected to be on the
+ * order of 10-100 whereas the queue depth can be in the range of 50-2000.
+ * In addition, since the zio's in the queue only have the zoneid, we would
+ * have to look up the zone for each zio enqueued and that means the overhead
+ * for scanning the queue each time would be much higher.
+ *
+ * Instead, we only have to iterate all of the zones until we find one or two
+ * with an op count of 1, then scan the queue until we find the zio for the
+ * associated zone.
+ *
+ * Note that we have to ensure that we don't re-use a stale zio from a zone
+ * which had a count > 1 that has now transitioned back down to a count of 1.
+ *
+ * In all cases, we fall back to simply pulling the next op off the queue
+ * if there are no zones to bump to the head of the queue.
+ */
+static zio_t *
+get_next_zio(vdev_queue_t *vq)
+{
+	zone_q_bump_t qbump;
+	zio_t *zp;
+
+	ASSERT(MUTEX_HELD(&vq->vq_lock));
+
+	qbump.zp = NULL;
+	qbump.bump_cnt = 0;
+	(void) zone_walk(get_enqueued_cb, &qbump);
+
+	/* There are no zones with a count of 1 */
+	if (qbump.zp == NULL)
+		return (avl_first(&vq->vq_deadline_tree));
+
+	zp = qbump.zp;
+
+	extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t);
+	__dtrace_probe_zfs__zone__sched__bump((uintptr_t)(zp->io_zoneid));
+
+	return (zp);
+}
+
+/*
  * Add our zone ID to the zio so we can keep track of which zones are doing
  * what, even when the current thread processing the zio is not associated
  * with the zone (e.g. the kernel taskq which pushes out RX groups).
@@ -712,6 +830,97 @@ zfs_zone_zio_done(zio_t *zp)
 
 	__dtrace_probe_zfs__zone__latency((uintptr_t)(zp->io_zoneid),
 	    (uintptr_t)(diff));
+}
+
+void
+zfs_zone_zio_dequeue(zio_t *zp)
+{
+	zone_t	*zonep;
+
+	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
+		return;
+
+	mutex_enter(&zonep->zone_stg_io_lock);
+	ASSERT(zonep->zone_zfs_queued > 0);
+	zonep->zone_zfs_queued--;
+	/*
+	 * We can always NULL out the cached zio here since we are either
+	 * dropping down to a count of 0 or we had more than one zio in the
+	 * queue.  In the second case, we can't assume this cached pointer was
+	 * valid.
+	 */
+	zonep->zone_zfs_last_zio = NULL;
+	mutex_exit(&zonep->zone_stg_io_lock);
+	zone_rele(zonep);
+}
+
+void
+zfs_zone_zio_enqueue(zio_t *zp)
+{
+	zone_t	*zonep;
+
+	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
+		return;
+
+	mutex_enter(&zonep->zone_stg_io_lock);
+	zonep->zone_zfs_queued++;
+	/*
+	 * Just to be safe, we NULL out the zone_zfs_last_zio whenever we're
+	 * not at 1 zio in the queue.
+	 */
+	if (zonep->zone_zfs_queued == 1)
+		zonep->zone_zfs_last_zio = zp;
+	else
+		zonep->zone_zfs_last_zio = NULL;
+	mutex_exit(&zonep->zone_stg_io_lock);
+	zone_rele(zonep);
+}
+
+/*
+ * Called from vdev_queue_io_to_issue.  This function is where zio's are found
+ * at the head of the queue (by avl_first), then pulled off (by
+ * vdev_queue_io_remove) and issued.  We do our scheduling here to find the
+ * next zio to issue.
+ *
+ * The vq->vq_lock mutex is held when we're executing this function so we
+ * can safely access the "last zone" variable on the queue.
+ */
+zio_t *
+zfs_zone_schedule(vdev_queue_t *vq)
+{
+	int cnt;
+	zoneid_t last_zone;
+	zio_t *zp;
+
+	ASSERT(MUTEX_HELD(&vq->vq_lock));
+
+	cnt = avl_numnodes(&vq->vq_deadline_tree);
+	last_zone = vq->vq_last_zone_id;
+
+	/*
+	 * If there are only a few ops in the queue then just issue the head.
+	 * If there are more than a few ops already queued up, then use
+	 * scheduling to get the next zio.
+	 */
+	if (!zfs_zone_schedule_enable || cnt < zfs_zone_schedule_thresh)
+		zp = avl_first(&vq->vq_deadline_tree);
+	else
+		zp = get_next_zio(vq);
+
+	vq->vq_last_zone_id = zp->io_zoneid;
+
+	/*
+	 * Probe with 3 args; the number of IOs in the queue, the zone that
+	 * was last scheduled off this queue, and the zone that was associated
+	 * with the next IO that is scheduled.
+	 */
+	extern void __dtrace_probe_zfs__zone__sched(uintptr_t, uintptr_t,
+	    uintptr_t);
+
+	__dtrace_probe_zfs__zone__sched((uintptr_t)(cnt),
+	    (uintptr_t)(last_zone), (uintptr_t)(zp->io_zoneid));
+
+	return (zp);
 }
 
 #endif
