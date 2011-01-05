@@ -381,13 +381,17 @@ typedef struct zone_kstat {
 typedef struct zone_io_kstat {
 	kstat_named_t zk_zonename;
 	kstat_named_t zk_phyread_ops;
-	kstat_named_t zk_logread_ops;
 	kstat_named_t zk_phywrite_ops;
-	kstat_named_t zk_logwrite_ops;
 	kstat_named_t zk_phyread_bytes;
-	kstat_named_t zk_logread_bytes;
 	kstat_named_t zk_phywrite_bytes;
+	kstat_named_t zk_logread_ops;
+	kstat_named_t zk_logwrite_ops;
+	kstat_named_t zk_logread_bytes;
 	kstat_named_t zk_logwrite_bytes;
+	kstat_named_t zk_svc_time;
+	kstat_named_t zk_svc_lentime;
+	kstat_named_t zk_svc_lastupdate;
+	kstat_named_t zk_svc_cnt;
 } zone_io_kstat_t;
 
 struct cpucap;
@@ -555,15 +559,23 @@ typedef struct zone {
 	/*
 	 * kstats and counters for IO ops and bytes.
 	 */
+	kmutex_t	zone_io_lock;		/* protects IO statistics */
 	kstat_t		*zone_io_kstat;
+
 	uint64_t	zone_io_phyread_ops;	/* ZFS physical read ops */
-	uint64_t	zone_io_logread_ops;	/* ZFS logical read ops */
 	uint64_t	zone_io_phywrite_ops;	/* ZFS physical write ops */
-	uint64_t	zone_io_logwrite_ops;	/* ZFS logical write ops */
 	uint64_t	zone_io_phyread_bytes;	/* ZFS physical read bytes */
-	uint64_t	zone_io_logread_bytes;	/* ZFS logical read bytes */
 	uint64_t	zone_io_phywrite_bytes;	/* ZFS physical write bytes */
+
+	uint64_t	zone_io_logread_ops;	/* ZFS logical read ops */
+	uint64_t	zone_io_logwrite_ops;	/* ZFS logical write ops */
+	uint64_t	zone_io_logread_bytes;	/* ZFS logical read bytes */
 	uint64_t	zone_io_logwrite_bytes;	/* ZFS logical write bytes */
+
+	uint64_t 	zone_io_svc_time; 	/* cumulative svc time */
+	uint64_t 	zone_io_svc_lentime; 	/* cumulative svc len*time */
+	uint64_t 	zone_io_svc_lastupdate; /* last time run queue changed */
+	uint_t		zone_io_svc_cnt;	/* # of elements in run state */
 
 	/*
 	 * Solaris Auditing per-zone audit context

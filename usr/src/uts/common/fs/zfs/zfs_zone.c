@@ -142,6 +142,7 @@ typedef struct {
  * This uses gethrtime() but returns a value in usecs.
  */
 #define	GET_USEC_TIME	(gethrtime() / 1000)
+#define	NANO_TO_MICRO(x)	(x / (NANOSEC / MILLISEC))
 
 /*
  * Keep track of the zone's ZFS IOPs.
@@ -773,6 +774,41 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 }
 
 /*
+ * Maintain counters which allow the calculation of accumulated elapsed time on
+ * IO operations per zone.  This calculation is modeled after the Riemann sum
+ * calculation described in uts/common/sys/kstat.h.
+ *
+ * The counters maintained are:
+ * 	- The current length of the IO service queue
+ * 	- The accumulated time spent servicing IO operations
+ * 	- The accumulated total time multiplied by the average queue length
+ * 	- The last time these statistics were updated
+ *
+ * These counters are exposed as kstats within each zone, and enable consumers
+ * to track per-zone IO latency.  Strictly speaking, only the accumulated time,
+ * time multipled by queue length, and op count are necessary for that
+ * calculation, but the current length and most recent timestamp are exposed to
+ * provide additional observability.  Note that the op count is not tracked in
+ * this function, instead see zfs_zone_zio_done().
+ */
+static void
+zfs_zone_zio_kstat_update(zio_t *zp, zone_t *zonep, hrtime_t now, int qlen)
+{
+	hrtime_t delta;
+	uint_t svc_cnt;
+
+	delta = now - zonep->zone_io_svc_lastupdate;
+	zonep->zone_io_svc_lastupdate = now;
+	svc_cnt = zonep->zone_io_svc_cnt;
+	zonep->zone_io_svc_cnt += qlen;
+
+	if (svc_cnt != 0) {
+		zonep->zone_io_svc_lentime += delta * svc_cnt;
+		zonep->zone_io_svc_time += delta;
+	}
+}
+
+/*
  * Called from zio_vdev_io_start when an IO hits the end of the zio pipeline
  * and is issued.
  * Keep track of start time for latency calculation in zfs_zone_zio_done.
@@ -780,10 +816,20 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 void
 zfs_zone_zio_start(zio_t *zp)
 {
-	if (!zfs_zone_delay_enable)
+	zone_t	*zonep;
+	hrtime_t now;
+
+	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
-	zp->io_start = GET_USEC_TIME;
+	mutex_enter(&zonep->zone_io_lock);
+	now = gethrtime();
+	zfs_zone_zio_kstat_update(zp, zonep, now, 1);
+	mutex_exit(&zonep->zone_io_lock);
+
+	zp->io_start = NANO_TO_MICRO(now);
+
+	zone_rele(zonep);
 }
 
 /*
@@ -795,22 +841,15 @@ void
 zfs_zone_zio_done(zio_t *zp)
 {
 	zone_t	*zonep;
-	hrtime_t now, diff;
-
-	if (!zfs_zone_delay_enable)
-		return;
+	hrtime_t now, unow, udelta;
 
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
-	now = GET_USEC_TIME;
-	/* Calculate latency in usec */
-	diff = now - zp->io_start;
-
-	mutex_enter(&zonep->zone_stg_io_lock);
-	add_iop(zonep, now, zp->io_type == ZIO_TYPE_READ ?
-	    ZFS_ZONE_IOP_READ : ZFS_ZONE_IOP_WRITE, diff);
-	mutex_exit(&zonep->zone_stg_io_lock);
+	mutex_enter(&zonep->zone_io_lock);
+	now = gethrtime();
+	zfs_zone_zio_kstat_update(zp, zonep, now, -1);
+	mutex_exit(&zonep->zone_io_lock);
 
 	if (zp->io_type == ZIO_TYPE_READ) {
 		atomic_add_64(&zonep->zone_io_phyread_ops, 1);
@@ -818,6 +857,16 @@ zfs_zone_zio_done(zio_t *zp)
 	} else {
 		atomic_add_64(&zonep->zone_io_phywrite_ops, 1);
 		atomic_add_64(&zonep->zone_io_phywrite_bytes, zp->io_size);
+	}
+
+	unow = NANO_TO_MICRO(now);
+	udelta = unow - zp->io_start;
+
+	if (zfs_zone_delay_enable) {
+		mutex_enter(&zonep->zone_stg_io_lock);
+		add_iop(zonep, unow, zp->io_type == ZIO_TYPE_READ ?
+		    ZFS_ZONE_IOP_READ : ZFS_ZONE_IOP_WRITE, udelta);
+		mutex_exit(&zonep->zone_stg_io_lock);
 	}
 
 	zone_rele(zonep);
@@ -829,7 +878,7 @@ zfs_zone_zio_done(zio_t *zp)
 	extern void __dtrace_probe_zfs__zone__latency(uintptr_t, uintptr_t);
 
 	__dtrace_probe_zfs__zone__latency((uintptr_t)(zp->io_zoneid),
-	    (uintptr_t)(diff));
+	    (uintptr_t)(udelta));
 }
 
 void

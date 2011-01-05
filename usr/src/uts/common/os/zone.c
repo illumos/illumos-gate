@@ -1843,13 +1843,19 @@ zone_io_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	zk->zk_phyread_ops.value.ui64 = zone->zone_io_phyread_ops;
-	zk->zk_logread_ops.value.ui64 = zone->zone_io_logread_ops;
 	zk->zk_phywrite_ops.value.ui64 = zone->zone_io_phywrite_ops;
-	zk->zk_logwrite_ops.value.ui64 = zone->zone_io_logwrite_ops;
 	zk->zk_phyread_bytes.value.ui64 = zone->zone_io_phyread_bytes;
-	zk->zk_logread_bytes.value.ui64 = zone->zone_io_logread_bytes;
 	zk->zk_phywrite_bytes.value.ui64 = zone->zone_io_phywrite_bytes;
+
+	zk->zk_logread_ops.value.ui64 = zone->zone_io_logread_ops;
+	zk->zk_logwrite_ops.value.ui64 = zone->zone_io_logwrite_ops;
+	zk->zk_logread_bytes.value.ui64 = zone->zone_io_logread_bytes;
 	zk->zk_logwrite_bytes.value.ui64 = zone->zone_io_logwrite_bytes;
+
+	zk->zk_svc_time.value.ui64 = zone->zone_io_svc_time;
+	zk->zk_svc_lentime.value.ui64 = zone->zone_io_svc_lentime;
+	zk->zk_svc_lastupdate.value.ui64 = zone->zone_io_svc_lastupdate;
+	zk->zk_svc_cnt.value.ui64 = zone->zone_io_svc_cnt;
 
 	return (0);
 }
@@ -1898,6 +1904,15 @@ zone_io_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_logwrite_bytes, "io_logical_write_bytes",
 	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&zk->zk_svc_time, "io_svc_time",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_svc_lentime, "io_svc_lentime",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_svc_lastupdate, "io_svc_lastupdate",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_svc_cnt, "io_svc_cnt",
+	    KSTAT_DATA_UINT32);
 
 	ksp->ks_update = updatefunc;
 	ksp->ks_private = zone;
@@ -2037,15 +2052,24 @@ zone_zsd_init(void)
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
 	zone0.zone_zfs_io_share = 1;
+
 	zone0.zone_io_kstat = NULL;
+
 	zone0.zone_io_phyread_ops = 0;
 	zone0.zone_io_phywrite_ops = 0;
-	zone0.zone_io_logread_ops = 0;
-	zone0.zone_io_logwrite_ops = 0;
 	zone0.zone_io_phyread_bytes = 0;
 	zone0.zone_io_phywrite_bytes = 0;
+
+	zone0.zone_io_logread_ops = 0;
+	zone0.zone_io_logwrite_ops = 0;
 	zone0.zone_io_logread_bytes = 0;
 	zone0.zone_io_logwrite_bytes = 0;
+
+	zone0.zone_io_svc_time = 0;
+	zone0.zone_io_svc_lentime = 0;
+	zone0.zone_io_svc_lastupdate = 0;
+	zone0.zone_io_svc_cnt = 0;
+
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
@@ -4322,14 +4346,21 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
 	zone->zone_zfs_io_share= 1;
+
 	zone->zone_io_phyread_ops = 0;
-	zone->zone_io_phywrite_ops = 0;
-	zone->zone_io_logread_ops = 0;
-	zone->zone_io_logwrite_ops = 0;
 	zone->zone_io_phyread_bytes = 0;
+	zone->zone_io_phywrite_ops = 0;
 	zone->zone_io_phywrite_bytes = 0;
+
+	zone->zone_io_logread_ops = 0;
 	zone->zone_io_logread_bytes = 0;
+	zone->zone_io_logwrite_ops = 0;
 	zone->zone_io_logwrite_bytes = 0;
+
+	zone->zone_io_svc_time = 0;
+	zone->zone_io_svc_lentime = 0;
+	zone->zone_io_svc_lastupdate = 0;
+	zone->zone_io_svc_cnt = 0;
 
 	/*
 	 * Zsched initializes the rctls.
