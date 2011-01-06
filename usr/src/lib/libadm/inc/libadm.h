@@ -32,8 +32,6 @@
 #ifndef	_LIBADM_H
 #define	_LIBADM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <valtools.h>
 #include <stdio.h>
 #include <pkginfo.h>
@@ -99,7 +97,6 @@ extern char *fpkginst(char *, ...);
 extern char *fpkgparam(FILE *, char *);
 extern char *get_PKGADM(void);
 extern char *get_PKGLOC(void);
-extern char *get_PKGOLD(void);
 extern int getinput(char *);
 extern char *getfullblkname(char *);
 extern char *getfullrawname(char *);

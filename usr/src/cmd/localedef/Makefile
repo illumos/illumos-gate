@@ -147,6 +147,7 @@ UTF_8_LOCALES		= \
 		ml_IN \
 		mn_CN mn_MN \
 		mr_IN \
+		ms_MY \
 		mt_MT \
 		ne_IN ne_NP \
 		nl_BE nl_NL \

@@ -41,11 +41,6 @@
 <transform set name=variant.arch value=^(?!$(ARCH)).+$ -> abort>
 
 #
-# Don't publish nonredistributable manifests in an open-only build
-#
-$(OPEN_BUILD)<transform set name=org.opensolaris.redist value=nonredist|internal -> abort>
-
-#
 # Catch don't-publish settings from manifest-embedded transforms
 #
 <transform set name=osnet.publish value=false -> abort>

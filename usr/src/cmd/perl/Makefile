@@ -32,12 +32,7 @@ clean	:= TARGET = clean
 test	:= TARGET = test
 
 # PERL_LEGACY is versions of Perl still delivered through ON
-PERL_LEGACY = 5.8.4
-
-# WOS_PERL is non-ON Perl
-WOS_PERL = 5.10.0
-
-PERL_VERSIONS = $(PERL_LEGACY) $(WOS_PERL)
+PERL_VERSIONS = 5.10.0
 
 .PARALLEL: $(PERL_VERSIONS)
 
@@ -49,12 +44,10 @@ PERL_VERSIONS = $(PERL_LEGACY) $(WOS_PERL)
 #
 all install test: contrib/copy_contrib $(PERL_VERSIONS)
 
-all install: THIRDPARTYLICENSE
-
 clean: $(PERL_VERSIONS)
 
 clobber: $(PERL_VERSIONS)
-	$(RM) -r contrib/copy_contrib THIRDPARTYLICENSE $(WOS_PERL)
+	$(RM) -r contrib/copy_contrib $(WOS_PERL)
 
 #
 # Perl is not lint-clean.  Fake up a target.
@@ -68,17 +61,5 @@ $(PERL_VERSIONS): FRC
 	    $(CP) -r skel $@; \
 	fi
 	@ cd $@; pwd; PERL_VERSION=$@ $(MAKE) $(TARGET)
-
-PODDIR = 5.8.4/distrib/pod
-ARTLIC_SRC = $(PODDIR)/perlartistic.pod
-
-#
-# $(PODDIR)/pod2text may already exist (from "make install"), but it
-# doesn't hurt to regenerate it.
-#
-THIRDPARTYLICENSE: $(ARTLIC_SRC)
-	$(PERL) $(PODDIR)/pod2text.PL
-	$(PODDIR)/pod2text $(ARTLIC_SRC) | \
-	    $(SED) -n '/The "Artistic License"/,/The End/p' > $@
 
 FRC:

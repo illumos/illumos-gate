@@ -48,6 +48,17 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_list.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_policy.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_realm.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_services.h
+usr/src/common/bzip2/LICENSE
+usr/src/common/bzip2/Solaris.README.txt
+usr/src/common/bzip2/bzlib.h
+usr/src/common/bzip2/crctable.c
+usr/src/common/bzip2/randtable.c
+usr/src/common/bzip2/blocksort.c
+usr/src/common/bzip2/compress.c
+usr/src/common/bzip2/bzlib.c
+usr/src/common/bzip2/decompress.c
+usr/src/common/bzip2/bzlib_private.h
+usr/src/common/bzip2/huffman.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
 usr/src/lib/gss_mechs/mech_krb5/crypto/cksumtype_to_string.c

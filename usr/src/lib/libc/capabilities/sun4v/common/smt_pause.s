@@ -38,7 +38,7 @@
 #include <sys/stack.h>
 
 #if defined(NIAGARA_IMPL)
-#include "assym.h"
+#include <assym.h>
 #endif
 
 	ENTRY(smt_pause)

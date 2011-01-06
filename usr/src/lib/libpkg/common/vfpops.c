@@ -911,7 +911,7 @@ vfpCheckpointFile(VFP_T **r_cpVfp, VFP_T **a_vfp, char *a_path)
 
 	/* copy contents of VFP to checkpoint to checkpointed VFP */
 
-	memcpy(vfp, avfp, sizeof (VFP_T));
+	(void) memcpy(vfp, avfp, sizeof (VFP_T));
 
 	/* free contents of VFP to checkpoint */
 

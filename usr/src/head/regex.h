@@ -88,6 +88,7 @@ typedef ssize_t regoff_t;
 #define	REG_DUMP	0x2000
 #define	REG_PEND	0x4000
 #define	REG_NOSPEC	0x8000
+#define	REG_STARTEND	0x10000
 
 /* internal flags */
 #define	REG_MUST	0x100		/* check for regmust substring */

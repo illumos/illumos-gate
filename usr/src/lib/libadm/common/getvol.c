@@ -28,7 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -196,7 +195,7 @@ ckilabel(char *label, int flag)
 	} else
 		volname[0] = '\0';
 
-	(void) sprintf(buffer, "/etc/labelit %s", cdevice);
+	(void) snprintf(buffer, sizeof (buffer), "/etc/labelit %s", cdevice);
 	pp = popen(buffer, "r");
 	pt = buffer;
 	while ((c = getc(pp)) != EOF)
@@ -229,6 +228,7 @@ ckilabel(char *label, int flag)
 	if (strcmp(fsname, pfsname) || strcmp(volname, pvolname)) {
 		/* mismatched label */
 		if (flag) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			(void) sprintf(label, "%s,%s", pfsname, pvolname);
 		} else {
 			labelerr(pfsname, pvolname);
@@ -260,17 +260,20 @@ wilabel(char *label)
 		(void) strcpy(volname, origvolname);
 
 	if (IFTAPE(cdevice)) {
-		(void) sprintf(buffer, "/etc/labelit %s \"%s\" \"%s\" -n 1>&2",
+		(void) snprintf(buffer, sizeof (buffer),
+		    "/etc/labelit %s \"%s\" \"%s\" -n 1>&2",
 			cdevice, fsname, volname);
 	} else {
-		(void) sprintf(buffer, "/etc/labelit %s \"%s\" \"%s\" 1>&2",
-			cdevice, fsname, volname);
+		(void) snprintf(buffer, sizeof (buffer),
+		    "/etc/labelit %s \"%s\" \"%s\" 1>&2",
+		    cdevice, fsname, volname);
 	}
 	if (system(buffer)) {
 		(void) fprintf(stderr, "\nWrite of label to %s failed.", pname);
 		return (1);
 	}
 	if (label)
+		/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 		(void) sprintf(label, "%s,%s", fsname, volname);
 	return (0);
 }
@@ -300,7 +303,7 @@ insert(char *device, char *label, int options, char *prompt)
 	dev_type  = devattr(device, "type");
 
 	if (prompt) {
-		(void) strcpy(prmpt, prompt);
+		(void) strlcpy(prmpt, prompt, sizeof (prmpt));
 		for (pt = prmpt; *prompt; ) {
 			if ((*prompt == '\\') && (prompt[1] == '%'))
 				prompt++;
@@ -326,17 +329,21 @@ insert(char *device, char *label, int options, char *prompt)
 		}
 		*pt = '\0';
 	} else {
+		/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 		(void) sprintf(prmpt, "Insert a %s into %s.", voltxt, pname);
 		if (label && (options & DM_ELABEL)) {
 			(void) strcat(prmpt, " The following external label ");
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			(void) sprintf(prmpt+strlen(prmpt),
 				" should appear on the %s:\\n\\t%s",
 				voltxt, label);
 		}
 		if (label && !(options & DM_ELABEL)) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			(void) sprintf(prmpt+strlen(prmpt),
-			"  The %s should be internally labeled as follows:",
-				voltxt);
+			    "  The %s should be internally labeled as follows:",
+			    voltxt);
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			(void) sprintf(prmpt+strlen(prmpt),
 				"\\n\\t%s\\n", label);
 		}
@@ -350,23 +357,28 @@ insert(char *device, char *label, int options, char *prompt)
 
 	if (options & DM_FORMFS) {
 		if (fmtcmd && *fmtcmd && mkfscmd && *mkfscmd) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, FORMFS_MSG, voltxt);
 			keyword[n++] = "f";
 		} else if (fmtcmd && *fmtcmd) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, FORMAT_MSG, voltxt);
 			keyword[n++] = "f";
 		}
 		if (mkfscmd && *mkfscmd) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, MAKEFS_MSG, voltxt);
 			keyword[n++] = "m";
 		}
 	} else if (options & DM_FORMAT) {
 		if (fmtcmd && *fmtcmd) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, FORMAT_MSG, voltxt);
 			keyword[n++] = "f";
 		}
 	}
 	if (options & DM_WLABEL) {
+		/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 		pt += sprintf(pt, WLABEL_MSG, voltxt);
 		keyword[n++] = "w";
 	}
@@ -376,9 +388,11 @@ insert(char *device, char *label, int options, char *prompt)
 	}
 	if (removecmd && *removecmd && dev_type && *dev_type) {
 		if (strcmp(dev_type, "diskette") == 0) {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, EJECT_MSG, voltxt);
 			keyword[n++] = "e";
 		} else {
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
 			pt += sprintf(pt, UNLOAD_MSG, voltxt);
 			keyword[n++] = "u";
 		}
@@ -425,7 +439,7 @@ doformat(char *voltxt, char *fmtcmd, char *mkfscmd)
 
 	if (fmtcmd && *fmtcmd) {
 		(void) fprintf(stderr, "\t[%s]\n", fmtcmd);
-		(void) sprintf(buffer, "(%s) 1>&2", fmtcmd);
+		(void) snprintf(buffer, sizeof (buffer), "(%s) 1>&2", fmtcmd);
 		if (system(buffer)) {
 			(void) fprintf(stderr, ERR_FMT, voltxt);
 			return;
@@ -433,7 +447,7 @@ doformat(char *voltxt, char *fmtcmd, char *mkfscmd)
 	}
 	if (mkfscmd && *mkfscmd) {
 		(void) fprintf(stderr, "\t[%s]\n", mkfscmd);
-		(void) sprintf(buffer, "(%s) 1>&2", mkfscmd);
+		(void) snprintf(buffer, sizeof (buffer), "(%s) 1>&2", mkfscmd);
 		if (system(buffer)) {
 			(void) fprintf(stderr, ERR_MKFS, voltxt);
 			return;
@@ -452,7 +466,8 @@ doremovecmd(char *device, int echo)
 		if (removecmd && *removecmd) {
 			if (echo)
 				(void) fprintf(stderr, "\t[%s]\n", removecmd);
-			(void) sprintf(buffer, "(%s) 1>&2", removecmd);
+			(void) snprintf(buffer, sizeof (buffer),
+			    "(%s) 1>&2", removecmd);
 			if (system(buffer)) {
 				if (echo)
 					(void) fprintf(stderr, ERR_REMOVE,

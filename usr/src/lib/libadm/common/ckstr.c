@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -50,14 +48,14 @@ extern int __step(const char *, const char *);
 #define	ERRMSG2	\
 	"Pattern matching has failed."
 #define	ERRMSG3 \
-	"Please enter a string which contains no imbedded, \
+	"Please enter a string which contains no embedded, \
 	leading or trailing spaces or tabs."
 
 #define	HLPMSG0	"Please enter a string"
 #define	HLPMSG1 "Please enter a string containing no more than %d characters"
 #define	HLPMSG2 "matches one of the following patterns:"
 #define	HLPMSG3 "matches the following pattern:"
-#define	HLPMSG4 "contains no imbedded, leading or trailing spaces or tabs."
+#define	HLPMSG4 "contains no embedded, leading or trailing spaces or tabs."
 
 static char	*errstr;
 
@@ -119,7 +117,8 @@ ckstr_err(char *regexp[], int length, char *error, char *input)
 
 	if (input) {
 		if (ckstr_val(regexp, length, input)) {
-			(void) sprintf(temp, errstr, length);
+			/* LINTED E_SEC_PRINTF_VAR_FMT */
+			(void) snprintf(temp, sizeof (temp), errstr, length);
 			puterror(stdout, temp, error);
 			return;
 		}
@@ -178,7 +177,8 @@ start:
 		return (3);
 	}
 	if (ckstr_val(regexp, length, input)) {
-		(void) sprintf(errbuf, errstr, length);
+		/* LINTED E_SEC_PRINTF_VAR_FMT */
+		(void) snprintf(errbuf, sizeof (errbuf), errstr, length);
 		puterror(stderr, errbuf, error);
 		goto start;
 	}

@@ -70,8 +70,6 @@ HDRS=		../common/include/ntfs/attrib.h \
 		../common/include/ntfs/device_io.h \
 		../common/include/ntfs/dir.h \
 		../common/include/ntfs/endians.h \
-		../common/include/ntfs/gnome-vfs-method.h \
-		../common/include/ntfs/gnome-vfs-module.h \
 		../common/include/ntfs/index.h \
 		../common/include/ntfs/inode.h \
 		../common/include/ntfs/layout.h \

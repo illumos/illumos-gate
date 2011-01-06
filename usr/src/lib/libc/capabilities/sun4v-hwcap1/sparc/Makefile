@@ -29,11 +29,6 @@ ASFLAGS +=	-xarch=v8plus -I$(LIBCBASE)/$(MACH)
 
 .KEEP_STATE:
 
-all install:	$(LIBCBASE)/$(MACH)/assym.h $(SYMCAP)
-
-# We need assym.h, but it won't build directly. smt_pause.o depends on
-# assym.h, so building it forces assym.h to be built.
-$(LIBCBASE)/$(MACH)/assym.h:
-	@cd $(LIBCBASE)/$(MACH); $(MAKE) pics/smt_pause.o
+all install:	$(SYMCAP)
 
 include		../../Makefile.targ

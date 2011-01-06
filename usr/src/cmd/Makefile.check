@@ -77,7 +77,6 @@ MANIFEST_TOPDIRS=			\
 	zoneadmd
 
 MANIFEST_SUBDIRS=			\
-	agents/snmp/snmprelayd		\
 	boot/scripts			\
 	cmd-crypto/scripts		\
 	cmd-inet/usr.lib/ilbd		\

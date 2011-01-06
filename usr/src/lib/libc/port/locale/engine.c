@@ -172,7 +172,7 @@ matcher(struct re_guts *g,
 	/* simplify the situation where possible */
 	if (g->cflags&REG_NOSUB)
 		nmatch = 0;
-#ifdef	REG_STARTEND
+
 	if (eflags&REG_STARTEND) {
 		start = string + pmatch[0].rm_so;
 		stop = string + pmatch[0].rm_eo;
@@ -180,10 +180,7 @@ matcher(struct re_guts *g,
 		start = string;
 		stop = start + strlen(start);
 	}
-#else
-	start = string;
-	stop = start + strlen(start);
-#endif
+
 	if (stop < start)
 		return (REG_EFATAL);
 

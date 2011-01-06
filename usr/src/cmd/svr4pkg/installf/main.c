@@ -358,17 +358,6 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-#ifdef	ALLOW_EXCEPTION_PKG_LIST
-	/*
-	 * *********************************************************************
-	 * this feature is removed starting with Solaris 10 - there is no built
-	 * in list of packages that should be run "the old way"
-	 * *********************************************************************
-	 */
-	/* Until 2.9, set it from the execption list */
-	if (pkginst && exception_pkg(pkginst, LINK))
-		set_nonABI_symlinks();
-#endif
 	/*
 	 * This maps the client filesystems into the server's space.
 	 */
