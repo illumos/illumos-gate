@@ -29,6 +29,14 @@
 cd /
 PATH=/usr/sbin:/usr/bin; export PATH
 
+set_root_passsword() {
+    enc_password=$1
+
+    sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
+      && chmod 400 /etc/shadow.new \
+      && mv /etc/shadow.new /etc/shadow
+}
+
 case "$1" in
 'start')
 
@@ -43,9 +51,7 @@ case "$1" in
         # Set the root password, if one's defined.
         enc_password=$(grep "^root_shadow=" ${USBMOUNT}/config | cut -d'=' -f2 | tr -d "'")
         if [[ -n "${enc_password}" ]]; then
-            sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
-              && chmod 400 /etc/shadow.new \
-              && mv /etc/shadow.new /etc/shadow
+            set_root_password "${enc_password}"
         fi
 
         initial_script=$(grep "^initial_script=" $USBMOUNT/config 2>/dev/null | cut -d'=' -f2-)
@@ -61,6 +67,12 @@ case "$1" in
                 echo "WARNING: initial_script failed with exit code [${result}].  Not starting Ur."
                 enable_ur="false"
             fi
+        fi
+    else
+        # For non-headnode, set the root password, if one's in bootparams.
+        enc_password=$(bootparams | grep "^root_shadow=" | cut -d'=' -f2 | tr -d "'")
+        if [[ -n "${enc_password}" ]]; then
+            set_root_password "${enc_password}"
         fi
     fi
 
