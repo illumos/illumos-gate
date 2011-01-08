@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright 2010-2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 . /lib/svc/share/smf_include.sh
@@ -32,21 +32,22 @@ PATH=/usr/sbin:/usr/bin; export PATH
 case "$1" in
 'start')
 
+    USBMOUNT=
     enable_ur="true"
-
-    # Grab AMQP vars from kernel cmdline
-    /usr/bin/bootparams | grep "^rabbitmq=" | cut -d'=' -f2 \
-      | awk -F':' '{ print $1,$2,$3,$4 }' | { read user pass host port junk
-        export AMQP_HOST="${host}"
-        export AMQP_PORT="${port}"
-        export AMQP_LOGIN="${user}"
-        export AMQP_PASSWORD="${pass}"
-    }
 
     # If we're a headnode, we'll not have AMQP args on the cmdline, and we want
     # to run an initial_script first anyway.
     if /bin/bootparams | grep "headnode=true" > /dev/null 2>&1; then
         USBMOUNT=`svcprop -p joyentfs/usb_mountpoint svc:/system/filesystem/joyent:default`
+
+        # Set the root password, if one's defined.
+        enc_password=$(grep "^root_shadow=" ${USBMOUNT}/config | cut -d'=' -f2 | tr -d "'")
+        if [[ -n "${enc_password}" ]]; then
+            sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
+              && chmod 400 /etc/shadow.new \
+              && mv /etc/shadow.new /etc/shadow
+        fi
+
         initial_script=$(grep "^initial_script=" $USBMOUNT/config 2>/dev/null | cut -d'=' -f2-)
         if [ -n ${initial_script} ] && [ -e ${initial_script} ]; then
             # Execute the script
@@ -62,6 +63,15 @@ case "$1" in
             fi
         fi
     fi
+
+    # Grab AMQP vars from kernel cmdline or headnode config
+    grep '^rabbitmq=' ${USBMOUNT}/config 2>/dev/null || bootparams | grep '^rabbitmq=' | cut -d'=' -f2- \
+      | awk -F':' '{ print $1,$2,$3,$4 }' | { read user pass host port junk
+        export AMQP_HOST="${host}"
+        export AMQP_PORT="${port}"
+        export AMQP_LOGIN="${user}"
+        export AMQP_PASSWORD="${pass}"
+    }
 
     /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
     ;;
