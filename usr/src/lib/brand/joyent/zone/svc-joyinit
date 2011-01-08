@@ -29,7 +29,7 @@
 cd /
 PATH=/usr/sbin:/usr/bin; export PATH
 
-set_root_passsword() {
+set_root_password() {
     enc_password=$1
 
     sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
