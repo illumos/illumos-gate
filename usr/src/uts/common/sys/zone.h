@@ -551,11 +551,12 @@ typedef struct zone {
 	uint64_t	zone_zfs_queue_bumped;	/* ZFS queue bump counter */
 	void 		*zone_zfs_last_zio;	/* pntr to most recent zio */
 	uint64_t	zone_io_util;		/* IO utilization metric */
-	uint16_t	zone_io_delay;		/* IO delay on writes */
+	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */
+	uint16_t	zone_io_delay;		/* IO delay on logical r/w */
 	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
-	sys_zio_cntr_t	rd_ops;			/* Counters for ZFS reads, */
-	sys_zio_cntr_t	wr_ops;			/* writes and logical writes. */
-	sys_zio_cntr_t	lwr_ops;
+	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
+	sys_zio_cntr_t	zone_wr_ops;		/* writes and logical writes. */
+	sys_zio_cntr_t	zone_lwr_ops;
 	/*
 	 * kstats and counters for IO ops and bytes.
 	 */
@@ -574,7 +575,7 @@ typedef struct zone {
 
 	uint64_t 	zone_io_svc_time; 	/* cumulative svc time */
 	uint64_t 	zone_io_svc_lentime; 	/* cumulative svc len*time */
-	uint64_t 	zone_io_svc_lastupdate; /* last time run queue changed */
+	uint64_t 	zone_io_svc_lastupdate; /* last time run queue chnged */
 	uint_t		zone_io_svc_cnt;	/* # of elements in run state */
 
 	/*
