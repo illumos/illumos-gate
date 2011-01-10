@@ -62,6 +62,17 @@ zfs_zone_zio_enqueue(zio_t *zp)
 {
 }
 
+void
+zfs_zone_report_txg_sync(void *dp)
+{
+}
+
+int
+zfs_zone_txg_delay()
+{
+	return (1);
+}
+
 #else
 
 /*
@@ -122,6 +133,14 @@ typedef struct {
 static sys_lat_cycle_t	rd_lat;
 static sys_lat_cycle_t	wr_lat;
 
+/*
+ * Data used to keep track of how often txg flush is running.
+ */
+extern int	zfs_txg_timeout;
+static uint_t	txg_last_check;
+static uint_t	txg_cnt;
+static uint_t	txg_flush_rate;
+
 boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
 /*
  * Threshold for when zio scheduling should kick in.
@@ -133,9 +152,16 @@ boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
  */
 int		zfs_zone_schedule_thresh = 5;
 
+/*
+ * Tunables for delay throttling when TxG flush is occuring.
+ */
+int		zfs_zone_txg_throttle_scale = 2;
+int		zfs_zone_txg_delay_ticks = 2;
+
 typedef struct {
 	uint64_t bump_cnt;
 	zio_t	*zp;
+	zoneid_t zoneid;
 } zone_q_bump_t;
 
 /*
@@ -227,16 +253,16 @@ add_zone_iop(zone_t *zonep, hrtime_t now, zfs_zone_iop_type_t op)
 {
 	switch (op) {
 	case ZFS_ZONE_IOP_READ:
-		(void) compute_historical_zone_cnt(now, &zonep->rd_ops);
-		zonep->rd_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(now, &zonep->zone_rd_ops);
+		zonep->zone_rd_ops.cycle_cnt++;
 		break;
 	case ZFS_ZONE_IOP_WRITE:
-		(void) compute_historical_zone_cnt(now, &zonep->wr_ops);
-		zonep->wr_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(now, &zonep->zone_wr_ops);
+		zonep->zone_wr_ops.cycle_cnt++;
 		break;
 	case ZFS_ZONE_IOP_LOGICAL_WRITE:
-		(void) compute_historical_zone_cnt(now, &zonep->lwr_ops);
-		zonep->lwr_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(now, &zonep->zone_lwr_ops);
+		zonep->zone_lwr_ops.cycle_cnt++;
 		break;
 	}
 }
@@ -407,9 +433,9 @@ static int
 get_zone_io_cnt(hrtime_t now, zone_t *zonep, uint_t *rops, uint_t *wops,
     uint_t *lwops)
 {
-	*rops = calc_zone_cnt(now, &zonep->rd_ops);
-	*wops = calc_zone_cnt(now, &zonep->wr_ops);
-	*lwops = calc_zone_cnt(now, &zonep->lwr_ops);
+	*rops = calc_zone_cnt(now, &zonep->zone_rd_ops);
+	*wops = calc_zone_cnt(now, &zonep->zone_wr_ops);
+	*lwops = calc_zone_cnt(now, &zonep->zone_lwr_ops);
 
 	extern void __dtrace_probe_zfs__zone__io__cnt(uintptr_t,
 	    uintptr_t, uintptr_t, uintptr_t);
@@ -503,15 +529,20 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	zoneio_stats_t *sp = arg;
 	uint16_t delay = zonep->zone_io_delay;
 
+	zonep->zone_io_util_above_avg = B_FALSE;
+
 	/*
 	 * Adjust each IO's delay by a certain amount.  If the overall delay
 	 * becomes too high, avoid increasing beyond the ceiling value.
 	 */
-	if (zonep->zone_io_util > sp->zi_avgutil &&
-	    delay < zfs_zone_delay_ceiling &&
-	    sp->zi_active > 1) {
-		delay = delay + zfs_zone_delay_step < zfs_zone_delay_ceiling ?
-		    delay + zfs_zone_delay_step : zfs_zone_delay_ceiling;
+	if (zonep->zone_io_util > sp->zi_avgutil) {
+		zonep->zone_io_util_above_avg = B_TRUE;
+
+		if (delay < zfs_zone_delay_ceiling && sp->zi_active > 1)
+			delay = (delay + zfs_zone_delay_step <
+			    zfs_zone_delay_ceiling) ?
+			    delay + zfs_zone_delay_step :
+			    zfs_zone_delay_ceiling;
 	} else if (zonep->zone_io_util < sp->zi_avgutil || sp->zi_active <= 1) {
 		delay = delay - zfs_zone_delay_step > 0 ?
 		    delay - zfs_zone_delay_step : 0;
@@ -586,8 +617,13 @@ get_enqueued_cb(zone_t *zonep, void *arg)
 {
 	zone_q_bump_t *qbp = arg;
 
+	/*
+	 * Don't bump any zones which have had an above average utilization in
+	 * the last sample window (ZONE_ZFS_100MS) even if they currently only
+	 * have one IO in the vdev queue.
+	 */
 	if (zonep->zone_zfs_queued != 1 || zonep->zone_zfs_last_zio == NULL ||
-	    zonep->zone_id == GLOBAL_ZONEID)
+	    zonep->zone_id == GLOBAL_ZONEID || zonep->zone_io_util_above_avg)
 		return (0);
 
 	/*
@@ -597,6 +633,7 @@ get_enqueued_cb(zone_t *zonep, void *arg)
 	if (qbp->zp == NULL || qbp->bump_cnt > zonep->zone_zfs_queue_bumped) {
 		qbp->bump_cnt = zonep->zone_zfs_queue_bumped;
 		qbp->zp = (zio_t *)(zonep->zone_zfs_last_zio);
+		qbp->zoneid = zonep->zone_id;
 	}
 	return (0);
 }
@@ -632,6 +669,7 @@ get_enqueued_cb(zone_t *zonep, void *arg)
  * have to look up the zone for each zio enqueued and that means the overhead
  * for scanning the queue each time would be much higher.
  *
+ * XXX
  * Instead, we only have to iterate all of the zones until we find one or two
  * with an op count of 1, then scan the queue until we find the zio for the
  * associated zone.
@@ -658,7 +696,20 @@ get_next_zio(vdev_queue_t *vq)
 	if (qbump.zp == NULL)
 		return (avl_first(&vq->vq_deadline_tree));
 
-	zp = qbump.zp;
+	/*
+	 * XXX there seems to be a bug where we use a stale zp pointer.
+	 * For now walk the queue to find the zio we want to use.
+	 */
+	/* zp = qbump.zp; */
+
+	for (zp = avl_first(&vq->vq_deadline_tree); zp != NULL;
+	    zp = avl_walk(&vq->vq_deadline_tree, zp, AVL_AFTER)) {
+		if (zp->io_zoneid == qbump.zoneid)
+			break;
+	}
+
+	if (zp == NULL)
+		zp = avl_first(&vq->vq_deadline_tree);
 
 	extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t);
 	__dtrace_probe_zfs__zone__sched__bump((uintptr_t)(zp->io_zoneid));
@@ -757,6 +808,14 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 
 	if ((wait = zonep->zone_io_delay) > 0) {
 		/*
+		 * If this is a write and we're doing above normal TxG
+		 * flushing, then throttle for longer than normal.
+		 */
+		if (type == ZFS_ZONE_IOP_LOGICAL_WRITE &&
+		    (txg_cnt > 1 || txg_flush_rate > 1))
+			wait *= zfs_zone_txg_throttle_scale;
+
+		/*
 		 * sdt:::zfs-zone-wait
 		 *
 		 *	arg0: zone ID
@@ -806,6 +865,56 @@ zfs_zone_zio_kstat_update(zio_t *zp, zone_t *zonep, hrtime_t now, int qlen)
 		zonep->zone_io_svc_lentime += delta * svc_cnt;
 		zonep->zone_io_svc_time += delta;
 	}
+}
+
+/*
+ * XXX Ignore the pool pointer parameter for now.
+ *
+ * Keep track to see if the TxG flush rate is running above the expected rate.
+ * If so, this implies that we are filling TxG's at a high rate due to a heavy
+ * write workload.  We use this as input into the zone throttle.
+ *
+ * This function is called every 5 seconds (zfs_txg_timeout) under a normal
+ * write load.  In this case, the flush rate is going to be 1.  When there
+ * is a heavy write load, TxG's fill up fast and the sync thread will write
+ * the TxG more frequently (perhaps once a second).  In this case the rate
+ * will be > 1.  The flush rate is a lagging indicator since it can be up
+ * to 5 seconds old.  We use the txg_cnt to keep track of the rate in the
+ * current 5 second interval and txg_flush_rate to keep track of the previous
+ * 5 second interval.  In that way we don't have a period (1 or more seconds)
+ * where the txg_cnt == 0 and we cut back on throttling even though the rate
+ * is still high.
+ */
+/* ARGSUSED */
+void
+zfs_zone_report_txg_sync(void *dp)
+{
+	uint_t now;
+
+	txg_cnt++;
+	now = (uint_t)(gethrtime() / NANOSEC);
+	if ((now - txg_last_check) >= zfs_txg_timeout) {
+		txg_flush_rate = txg_cnt / 2;
+		txg_cnt = 0;
+		txg_last_check = now;
+	}
+}
+
+int
+zfs_zone_txg_delay()
+{
+	zone_t	*zonep = curzone;
+	int delay = 1;
+
+	if (zonep->zone_io_util_above_avg)
+		delay = zfs_zone_txg_delay_ticks;
+
+	extern void __dtrace_probe_zfs__zone__txg__delay(uintptr_t, uintptr_t);
+
+	__dtrace_probe_zfs__zone__txg__delay((uintptr_t)(zonep->zone_id),
+	    (uintptr_t)delay);
+
+	return (delay);
 }
 
 /*
