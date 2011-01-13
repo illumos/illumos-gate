@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2004 Tim J. Robbins.
  * All rights reserved.
  *
@@ -36,7 +36,10 @@
 int	_none_init(_RuneLocale *);
 int	_ascii_init(_RuneLocale *);
 int	_UTF8_init(_RuneLocale *);
-int	_EUC_init(_RuneLocale *);
+int	_EUC_CN_init(_RuneLocale *);
+int	_EUC_JP_init(_RuneLocale *);
+int	_EUC_KR_init(_RuneLocale *);
+int	_EUC_TW_init(_RuneLocale *);
 int	_GB18030_init(_RuneLocale *);
 int	_GB2312_init(_RuneLocale *);
 int	_GBK_init(_RuneLocale *);
