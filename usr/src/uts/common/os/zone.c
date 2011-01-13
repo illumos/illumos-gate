@@ -1843,9 +1843,7 @@ zone_io_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	zk->zk_phyread_ops.value.ui64 = zone->zone_io_phyread_ops;
-	zk->zk_phywrite_ops.value.ui64 = zone->zone_io_phywrite_ops;
 	zk->zk_phyread_bytes.value.ui64 = zone->zone_io_phyread_bytes;
-	zk->zk_phywrite_bytes.value.ui64 = zone->zone_io_phywrite_bytes;
 
 	zk->zk_logread_ops.value.ui64 = zone->zone_io_logread_ops;
 	zk->zk_logwrite_ops.value.ui64 = zone->zone_io_logwrite_ops;
@@ -1891,16 +1889,12 @@ zone_io_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_logread_ops, "io_logical_read_ops",
 	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_phywrite_ops, "io_physical_write_ops",
-	    KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_logwrite_ops, "io_logical_write_ops",
 	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&zk->zk_phyread_bytes, "io_physical_read_bytes",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_logread_bytes, "io_logical_read_bytes",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_phywrite_bytes, "io_physical_write_bytes",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_logwrite_bytes, "io_logical_write_bytes",
 	    KSTAT_DATA_UINT64);
@@ -2056,9 +2050,7 @@ zone_zsd_init(void)
 	zone0.zone_io_kstat = NULL;
 
 	zone0.zone_io_phyread_ops = 0;
-	zone0.zone_io_phywrite_ops = 0;
 	zone0.zone_io_phyread_bytes = 0;
-	zone0.zone_io_phywrite_bytes = 0;
 
 	zone0.zone_io_logread_ops = 0;
 	zone0.zone_io_logwrite_ops = 0;
@@ -4349,8 +4341,6 @@ zone_create(const char *zone_name, const char *zone_root,
 
 	zone->zone_io_phyread_ops = 0;
 	zone->zone_io_phyread_bytes = 0;
-	zone->zone_io_phywrite_ops = 0;
-	zone->zone_io_phywrite_bytes = 0;
 
 	zone->zone_io_logread_ops = 0;
 	zone->zone_io_logread_bytes = 0;

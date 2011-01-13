@@ -85,6 +85,8 @@ my $old_wops = 0;
 my $old_rbytes = 0;
 my $old_wbytes = 0;
 my $old_hrtime = 0;
+my $old_props = 0;
+my $old_prbytes = 0;
 
 my $ii = 0;
 while (1) {
@@ -117,22 +119,23 @@ sub print_stats {
 
 	my $svc_lentime = $Stats->{'io_svc_lentime'};
 	my $svc_time = $Stats->{'io_svc_time'};
-	my $rops = $Stats->{'io_physical_read_ops'};
-	my $wops = $Stats->{'io_physical_write_ops'};
-	my $rbytes = $Stats->{'io_physical_read_bytes'};
-	my $wbytes = $Stats->{'io_physical_write_bytes'};
+
+	my $rops = $Stats->{'io_logical_read_ops'};
+	my $wops = $Stats->{'io_logical_write_ops'};
+	my $rbytes = $Stats->{'io_logical_read_bytes'};
+	my $wbytes = $Stats->{'io_logical_write_bytes'};
+	my $props = $Stats->{'io_physical_read_ops'};
+	my $prbytes = $Stats->{'io_physical_read_bytes'};
 
 	my $etime = ($Stats->{'io_svc_lastupdate'} - $old_hrtime) / $NS_PER_SEC;
 
 	# An elapsed time of zero is not a good idea
 	if ($etime == 0) {
-		$etime = 0.1;
+		$etime = $interval;
 	}
 
-	# Calculate read, write, and overall transactions per second
-	my $rps = ($rops - $old_rops) / $etime;
-	my $wps = ($wops - $old_wops) / $etime;
-	my $tps = $rps + $wps;
+	# Calculate overall physical transactions per second
+	my $tps = ($props - $old_props) / $etime;
 	
 	# Calculate average length of active queue
 	my $actv = ($svc_lentime - $old_svc_lentime) / $etime / $NS_PER_SEC;
@@ -145,13 +148,16 @@ sub print_stats {
 
 	my $bytes_divisor = $USE_MB ? $BYTES_PER_MB : $BYTES_PER_KB;
 
-	printf("    r/s    w/s   %sr/s   %sw/s   actv  asvc_t    %%b   zone\n",
-	    $USE_MB ? "M" : "k", $USE_MB ? "M" : "k");
-	printf("%7.1f %6.1f %6.1f %6.1f %6.1f %7.1f   %3d   %s\n",
+	printf("    lr/s   lw/s   %sr/s   %sw/s    ractv  " .
+	    "rasvc_t   %%b   zone\n",
+	    $USE_MB ? "M" : "k", $USE_MB ? "M" : "k", $USE_MB ? "M" : "k");
+	printf("%8.1f %6.1f %6.1f %6.1f %8.1f %8.1f  %3d   %s\n",
 	    ($rops - $old_rops) / $etime,
 	    ($wops - $old_wops) / $etime,
 	    ($rbytes - $old_rbytes) / $etime / $bytes_divisor,
 	    ($wbytes - $old_wbytes) / $etime / $bytes_divisor,
+#	    ($props - $old_props) / $etime,
+#	    ($prbytes - $old_prbytes) / $etime / $bytes_divisor,
 	    $actv,
 	    $asvc,
 	    $b_pct,
@@ -164,6 +170,8 @@ sub print_stats {
 	$old_wops = $wops;
 	$old_rbytes = $rbytes;
 	$old_wbytes = $wbytes;
+	$old_props = $props;
+	$old_prbytes = $prbytes;
 	$old_hrtime = $Stats->{'io_svc_lastupdate'};
 }
 

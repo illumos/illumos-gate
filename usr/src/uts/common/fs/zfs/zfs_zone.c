@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -849,17 +849,25 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
  * calculation, but the current length and most recent timestamp are exposed to
  * provide additional observability.  Note that the op count is not tracked in
  * this function, instead see zfs_zone_zio_done().
+ *
+ * Only read I/O is tracked for now, as most write I/O is asynchronous.  This
+ * makes it difficult to track the zone originally initiating the I/O.  It might
+ * be possible, but would require significant changes in other areas of the ZFS
+ * stack to keep the zone's ID around long enough to account for here.
  */
 static void
-zfs_zone_zio_kstat_update(zio_t *zp, zone_t *zonep, hrtime_t now, int qlen)
+zfs_zone_zio_kstat_update(zio_t *zp, zone_t *zonep, hrtime_t now, int qchg)
 {
 	hrtime_t delta;
 	uint_t svc_cnt;
 
+	if (zp->io_type != ZIO_TYPE_READ)
+		return;
+
 	delta = now - zonep->zone_io_svc_lastupdate;
 	zonep->zone_io_svc_lastupdate = now;
 	svc_cnt = zonep->zone_io_svc_cnt;
-	zonep->zone_io_svc_cnt += qlen;
+	zonep->zone_io_svc_cnt += qchg;
 
 	if (svc_cnt != 0) {
 		zonep->zone_io_svc_lentime += delta * svc_cnt;
@@ -963,9 +971,6 @@ zfs_zone_zio_done(zio_t *zp)
 	if (zp->io_type == ZIO_TYPE_READ) {
 		atomic_add_64(&zonep->zone_io_phyread_ops, 1);
 		atomic_add_64(&zonep->zone_io_phyread_bytes, zp->io_size);
-	} else {
-		atomic_add_64(&zonep->zone_io_phywrite_ops, 1);
-		atomic_add_64(&zonep->zone_io_phywrite_bytes, zp->io_size);
 	}
 
 	unow = NANO_TO_MICRO(now);

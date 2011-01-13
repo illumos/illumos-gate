@@ -381,9 +381,7 @@ typedef struct zone_kstat {
 typedef struct zone_io_kstat {
 	kstat_named_t zk_zonename;
 	kstat_named_t zk_phyread_ops;
-	kstat_named_t zk_phywrite_ops;
 	kstat_named_t zk_phyread_bytes;
-	kstat_named_t zk_phywrite_bytes;
 	kstat_named_t zk_logread_ops;
 	kstat_named_t zk_logwrite_ops;
 	kstat_named_t zk_logread_bytes;
@@ -564,9 +562,7 @@ typedef struct zone {
 	kstat_t		*zone_io_kstat;
 
 	uint64_t	zone_io_phyread_ops;	/* ZFS physical read ops */
-	uint64_t	zone_io_phywrite_ops;	/* ZFS physical write ops */
 	uint64_t	zone_io_phyread_bytes;	/* ZFS physical read bytes */
-	uint64_t	zone_io_phywrite_bytes;	/* ZFS physical write bytes */
 
 	uint64_t	zone_io_logread_ops;	/* ZFS logical read ops */
 	uint64_t	zone_io_logwrite_ops;	/* ZFS logical write ops */
