@@ -1,4 +1,4 @@
-#!/sbin/sh
+#!/bin/bash
 #
 # CDDL HEADER START
 #
@@ -22,6 +22,8 @@
 #
 # Copyright 2010-2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
+
+set -o xtrace
 
 . /lib/svc/share/smf_include.sh
 
@@ -76,14 +78,26 @@ case "$1" in
         fi
     fi
 
-    # Grab AMQP vars from kernel cmdline or headnode config
-    grep '^rabbitmq=' ${USBMOUNT}/config 2>/dev/null || bootparams | grep '^rabbitmq=' | cut -d'=' -f2- \
-      | awk -F':' '{ print $1,$2,$3,$4 }' | { read user pass host port junk
-        export AMQP_HOST="${host}"
-        export AMQP_PORT="${port}"
-        export AMQP_LOGIN="${user}"
-        export AMQP_PASSWORD="${pass}"
-    }
+    #
+    # Grab AMQP parameters from the kernel command line or headnode config
+    #
+    rabbit=$(grep '^rabbitmq=' ${USBMOUNT}/config 2> /dev/null)
+
+    if [[ -z $rabbit ]]; then
+        rabbit=$(bootparams | grep '^rabbitmq=')
+
+        if [[ -z $rabbit ]]; then
+            echo "unable to find AMQP parameters!"
+            exit $SMF_EXIT_ERR_FATAL
+        fi
+    fi
+
+    rabbitparams=$(echo $rabbit | cut -d= -f2-)
+
+    export AMQP_LOGIN=$(echo $rabbitparams | cut -d: -f1)
+    export AMQP_PASSWORD=$(echo $rabbitparams | cut -d: -f2)
+    export AMQP_HOST=$(echo $rabbitparams | cut -d: -f3)
+    export AMQP_PORT=$(echo $rabbitparams | cut -d: -f4)
 
     /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
     ;;
