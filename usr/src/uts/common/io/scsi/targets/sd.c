@@ -3496,9 +3496,13 @@ sd_set_mmc_caps(sd_ssc_t *ssc)
 		 * according to the successful response to the page
 		 * 0x2A mode sense request.
 		 */
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "sd_set_mmc_caps: Mode Sense returned "
-		    "invalid block descriptor length\n");
+		/*
+		 * The following warning occurs due to the KVM CD-ROM
+		 * mishandling the multi-media commands.  Ignore it.
+		 * scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		 *     "sd_set_mmc_caps: Mode Sense returned "
+		 *     "invalid block descriptor length\n");
+		 */
 		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
 		return;
 	}
