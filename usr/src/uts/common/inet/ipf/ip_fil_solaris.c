@@ -141,11 +141,13 @@ ipf_stack_t *ifs;
 
 #define	UNDO_HOOK(_f, _b, _e, _h)					\
 	do {								\
+	 	int tmp;						\
 		if (ifs->_f != NULL) {					\
 			if (ifs->_b) {					\
-				ifs->_b = (net_hook_unregister(ifs->_f,	\
-					   _e, ifs->_h) != 0);		\
-				if (!ifs->_b) {				\
+				tmp = net_hook_unregister(ifs->_f,	\
+					   _e, ifs->_h);		\
+				ifs->_b = (tmp != 0 && tmp != ENXIO);	\
+				if (!ifs->_b && ifs->_h != NULL) {	\
 					hook_free(ifs->_h);		\
 					ifs->_h = NULL;			\
 				}					\
