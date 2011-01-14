@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -729,7 +729,6 @@ PORTI18N_COND=			\
 	wcstoul_longlong.o
 
 PORTLOCALE=			\
-	ascii.o			\
 	big5.o			\
 	btowc.o			\
 	collate.o		\

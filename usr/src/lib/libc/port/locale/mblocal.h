@@ -34,7 +34,6 @@
  * Rune initialization function prototypes.
  */
 int	_none_init(_RuneLocale *);
-int	_ascii_init(_RuneLocale *);
 int	_UTF8_init(_RuneLocale *);
 int	_EUC_CN_init(_RuneLocale *);
 int	_EUC_JP_init(_RuneLocale *);
