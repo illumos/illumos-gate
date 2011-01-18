@@ -83,6 +83,10 @@ zfs snapshot $PDS_NAME/${TMPLZONE}@${ZONENAME}
 zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${ZONENAME} \
     $PDS_NAME/$ZONENAME
 
+# Convert quota to MB and use 10% of that value for the zone core dump dataset
+CORE_QUOTA=$((($ZQUOTA * 1000) / 10))
+zfs create -o quota=${CORE_QUOTA}m -o compression=gzip $PDS_NAME/$ZONENAME/cores
+
 chmod 700 $ZONEPATH
 
 egrep -s "netcfg:" $ZROOT/etc/passwd

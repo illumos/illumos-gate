@@ -60,6 +60,7 @@ fi
 
 ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$ZONENAME`
 
+zfs destroy -r $PDS_NAME/$ZONENAME/cores
 zfs destroy -r $PDS_NAME/$ZONENAME
 
 [ "$ORIGIN" != "-" ] && zfs destroy $ORIGIN
