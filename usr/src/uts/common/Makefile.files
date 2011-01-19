@@ -190,7 +190,6 @@ GENUNIX_OBJS +=	\
 		gid.o		\
 		groups.o	\
 		grow.o		\
-		hat.o		\
 		hat_refmod.o	\
 		id32.o		\
 		id_space.o	\
@@ -1938,11 +1937,6 @@ NXGE_HCALL_OBJS =	\
 #	kiconv modules
 #
 KICONV_EMEA_OBJS += kiconv_emea.o
-
-#
-#	blk2scsa
-#
-BLK2SCSA_OBJS = blk2scsa.o
 
 KICONV_JA_OBJS += kiconv_ja.o
 
