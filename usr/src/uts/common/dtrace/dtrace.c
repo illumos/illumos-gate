@@ -10851,7 +10851,7 @@ dtrace_enabling_matchall(void)
 	 * block pending our completion.
 	 */
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
-		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;  
+		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
 		cred_t *cr = dcr->dcr_cred;
 		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
 
