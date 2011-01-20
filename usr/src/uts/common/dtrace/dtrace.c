@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -10851,10 +10852,12 @@ dtrace_enabling_matchall(void)
 	 * block pending our completion.
 	 */
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
-		cred_t *cr = enab->dten_vstate->dtvs_state->dts_cred.dcr_cred;
+		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
+		cred_t *cr = dcr->dcr_cred;
+		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
 
-		if (INGLOBALZONE(curproc) ||
-		    cr != NULL && getzoneid() == crgetzoneid(cr))
+		if ((dcr->dcr_visible & DTRACE_CRV_ALLZONE) || (cr != NULL &&
+		    (zone == GLOBAL_ZONEID || getzoneid() == zone)))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 
