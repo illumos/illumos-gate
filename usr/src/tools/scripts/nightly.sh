@@ -23,6 +23,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -68,6 +69,12 @@ WHICH_SCM=$(dirname $nightly_path)/which_scm
 if [[ ! -x $WHICH_SCM ]]; then
 	WHICH_SCM=which_scm
 fi
+
+function fatal_error
+{
+	print -u2 "nightly: $*"
+	exit 1
+}
 
 #
 # Function to do a DEBUG and non-DEBUG build. Needed because we might
@@ -1275,6 +1282,11 @@ fi
 # contents of stdenv.sh inserted after next line:
 # STDENV_START
 # STDENV_END
+
+# Check if we have sufficient data to continue...
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
+[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
 #
 # place ourselves in a new task, respecting BUILD_PROJECT if set.

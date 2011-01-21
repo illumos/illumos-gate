@@ -22,11 +22,18 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
 # and incrementally.
 #
+
+function fatal_error
+{
+	print -u2 "${progname}: $*"
+	exit 1
+}
 
 function usage
 {
@@ -166,7 +173,7 @@ typeset flags=(
 	)
 )
 
-typeset progname="$(basename "${0}")"
+typeset progname="$(basename -- "${0}")"
 
 OPTIND=1
 SUFFIX="-nd"
@@ -258,6 +265,11 @@ shift
 # STDENV_START
 # STDENV_END
 
+# Check if we have sufficient data to continue...
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
+[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+
 #MACH=$(uname -p)
 
 # must match the getopts in nightly.sh
@@ -283,7 +295,7 @@ if [ -z "$RELEASE_DATE" ]; then
 	RELEASE_DATE=$(LC_ALL=C date +"%B %Y")
 fi
 BUILD_DATE=$(LC_ALL=C date +%Y-%b-%d)
-BASEWSDIR=$(basename $CODEMGR_WS)
+BASEWSDIR=$(basename -- "${CODEMGR_WS}")
 DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 export DEV_CM RELEASE_DATE POUND_SIGN
 
@@ -332,7 +344,7 @@ fi
 #
 # Keep track of this now, before we manipulate $PATH
 #
-WHICH_SCM=$(dirname $(whence $0))/which_scm
+WHICH_SCM="$(dirname -- "$(whence "$0")")/which_scm"
 if [[ ! -x $WHICH_SCM ]]; then
 	WHICH_SCM=which_scm
 fi
@@ -471,7 +483,7 @@ fi
 /usr/bin/newtask -c $$ ${BUILD_PROJECT:+-p$BUILD_PROJECT}
 
 if [[ "${flags.c}" == "false" && -x "$SHELL" && \
-    "$(basename "${SHELL}")" != "csh" ]]; then
+    "$(basename -- "${SHELL}")" != "csh" ]]; then
 	# $SHELL is set, and it's not csh.
 
 	if "${flags.f}" ; then
