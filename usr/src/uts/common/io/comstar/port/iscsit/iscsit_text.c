@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/types.h>
@@ -356,7 +359,7 @@ iscsit_add_tpgs(iscsit_conn_t *ict, iscsit_tgt_t *target,
  * To test with smaller PDUs in order to force multi-PDU responses,
  * set this value such that: 0 < test_max_len < 8192
  */
-uint32_t iscsit_text_max_len = 0;
+uint32_t iscsit_text_max_len = ISCSI_DEFAULT_MAX_RECV_SEG_LEN;
 #endif
 
 /*
@@ -369,55 +372,58 @@ iscsit_send_next_text_response(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	iscsi_text_rsp_hdr_t *th_resp;
 	idm_pdu_t	*resp;
 	uint32_t	len, remainder, max_len;
-	char 		*base;
-	int		final;
+	char		*base;
+	boolean_t	final;
 
 	max_len = ISCSI_DEFAULT_MAX_RECV_SEG_LEN;
 #ifdef DEBUG
-	if (iscsit_text_max_len > 0 && iscsit_text_max_len < 8192)
+	if (iscsit_text_max_len > 0 && iscsit_text_max_len < max_len)
 		max_len = iscsit_text_max_len;
 #endif
-	remainder = ict->ict_text_rsp_valid_len - ict->ict_text_rsp_off;
-	if (remainder <= max_len) {
-		len = remainder;
-		final = 1;
-	} else {
-		len = max_len;
-		final = 0;
-	}
-	/*
-	 * Allocate a PDU and copy in text response buffer
-	 */
-	resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), len);
-	idm_pdu_init(resp, ict->ict_ic, ict, iscsit_text_resp_complete_cb);
-	/* Advance the StatSN for each Text Response sent */
-	resp->isp_flags |= IDM_PDU_SET_STATSN | IDM_PDU_ADVANCE_STATSN;
-	base = ict->ict_text_rsp_buf + ict->ict_text_rsp_off;
-	bcopy(base, resp->isp_data, len);
-	/*
-	 * Fill in the response header
-	 */
-	th_resp = (iscsi_text_rsp_hdr_t *)resp->isp_hdr;
-	bzero(th_resp, sizeof (*th_resp));
-	th_resp->opcode = ISCSI_OP_TEXT_RSP;
-	th_resp->itt = th_req->itt;
-	hton24(th_resp->dlength, len);
-	if (final) {
-		th_resp->flags = ISCSI_FLAG_FINAL;
-		th_resp->ttt = ISCSI_RSVD_TASK_TAG;
-		kmem_free(ict->ict_text_rsp_buf, ict->ict_text_rsp_len);
-		ict->ict_text_rsp_buf = NULL;
-		ict->ict_text_rsp_len = 0;
-		ict->ict_text_rsp_valid_len = 0;
-		ict->ict_text_rsp_off = 0;
-	} else {
-		th_resp->flags = ISCSI_FLAG_TEXT_CONTINUE;
-		th_resp->ttt = ict->ict_text_rsp_ttt;
-		ict->ict_text_rsp_off += len;
-	}
-	/* Send the response on its way */
-	iscsit_conn_hold(ict);
-	iscsit_pdu_tx(resp);
+	do {
+		remainder = ict->ict_text_rsp_valid_len - ict->ict_text_rsp_off;
+		if (remainder <= max_len) {
+			len = remainder;
+			final = B_TRUE;
+		} else {
+			len = max_len;
+			final = B_FALSE;
+		}
+		/*
+		 * Allocate a PDU and copy in text response buffer
+		 */
+		resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), len);
+		idm_pdu_init(resp, ict->ict_ic, ict,
+		    iscsit_text_resp_complete_cb);
+		/* Advance the StatSN for each Text Response sent */
+		resp->isp_flags |= IDM_PDU_SET_STATSN | IDM_PDU_ADVANCE_STATSN;
+		base = ict->ict_text_rsp_buf + ict->ict_text_rsp_off;
+		bcopy(base, resp->isp_data, len);
+		/*
+		 * Fill in the response header
+		 */
+		th_resp = (iscsi_text_rsp_hdr_t *)resp->isp_hdr;
+		bzero(th_resp, sizeof (*th_resp));
+		th_resp->opcode = ISCSI_OP_TEXT_RSP;
+		th_resp->itt = th_req->itt;
+		hton24(th_resp->dlength, len);
+		if (final) {
+			th_resp->flags = ISCSI_FLAG_FINAL;
+			th_resp->ttt = ISCSI_RSVD_TASK_TAG;
+			kmem_free(ict->ict_text_rsp_buf, ict->ict_text_rsp_len);
+			ict->ict_text_rsp_buf = NULL;
+			ict->ict_text_rsp_len = 0;
+			ict->ict_text_rsp_valid_len = 0;
+			ict->ict_text_rsp_off = 0;
+		} else {
+			th_resp->flags = ISCSI_FLAG_TEXT_CONTINUE;
+			th_resp->ttt = ict->ict_text_rsp_ttt;
+			ict->ict_text_rsp_off += len;
+		}
+		/* Send the response on its way */
+		iscsit_conn_hold(ict);
+		iscsit_pdu_tx(resp);
+	} while (!final);
 	/* Free the request pdu */
 	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
 }
