@@ -47,7 +47,7 @@ case "$1" in
 
     # If we're a headnode, we'll not have AMQP args on the cmdline, and we want
     # to run an initial_script first anyway.
-    if /bin/bootparams | grep "headnode=true" > /dev/null 2>&1; then
+    if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
         USBMOUNT=/mnt/`svcprop -p joyentfs/usb_mountpoint svc:/system/filesystem/joyent:default`
 
         # Set the root password, if one's defined.
@@ -78,28 +78,35 @@ case "$1" in
         fi
     fi
 
-    #
-    # Grab AMQP parameters from the kernel command line or headnode config
-    #
-    rabbit=$(grep '^rabbitmq=' ${USBMOUNT}/config 2> /dev/null)
+    if /bin/bootparams | grep "^standalone=true" > /dev/null 2>&1; then
+        echo "INFO: System is standalone"
+    else
+        # headnode + node need Ur
 
-    if [[ -z $rabbit ]]; then
-        rabbit=$(bootparams | grep '^rabbitmq=')
+        #
+        # Grab AMQP parameters from the kernel command line or headnode config
+        #
+        rabbit=$(grep '^rabbitmq=' ${USBMOUNT}/config 2> /dev/null)
 
         if [[ -z $rabbit ]]; then
-            echo "unable to find AMQP parameters!"
-            exit $SMF_EXIT_ERR_FATAL
+            rabbit=$(bootparams | grep '^rabbitmq=')
+
+            if [[ -z $rabbit ]]; then
+                echo "unable to find AMQP parameters!"
+                exit $SMF_EXIT_ERR_FATAL
+            fi
         fi
+
+        rabbitparams=$(echo $rabbit | cut -d= -f2-)
+
+        export AMQP_LOGIN=$(echo $rabbitparams | cut -d: -f1)
+        export AMQP_PASSWORD=$(echo $rabbitparams | cut -d: -f2)
+        export AMQP_HOST=$(echo $rabbitparams | cut -d: -f3)
+        export AMQP_PORT=$(echo $rabbitparams | cut -d: -f4)
+
+        /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
     fi
 
-    rabbitparams=$(echo $rabbit | cut -d= -f2-)
-
-    export AMQP_LOGIN=$(echo $rabbitparams | cut -d: -f1)
-    export AMQP_PASSWORD=$(echo $rabbitparams | cut -d: -f2)
-    export AMQP_HOST=$(echo $rabbitparams | cut -d: -f3)
-    export AMQP_PORT=$(echo $rabbitparams | cut -d: -f4)
-
-    /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
     ;;
 
 'stop')
