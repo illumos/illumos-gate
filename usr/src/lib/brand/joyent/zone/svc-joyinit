@@ -105,6 +105,9 @@ case "$1" in
         export AMQP_PORT=$(echo $rabbitparams | cut -d: -f4)
 
         /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
+        if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
+            /usr/sbin/umount $USBMOUNT
+        fi
     fi
 
     ;;
