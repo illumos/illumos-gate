@@ -784,12 +784,6 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 		mutex_enter(&zonep->zone_stg_io_lock);
 		add_iop(zonep, now, type, 0);
 		mutex_exit(&zonep->zone_stg_io_lock);
-
-		atomic_add_64(&zonep->zone_io_logwrite_ops, 1);
-		atomic_add_64(&zonep->zone_io_logwrite_bytes, size);
-	} else {
-		atomic_add_64(&zonep->zone_io_logread_ops, 1);
-		atomic_add_64(&zonep->zone_io_logread_bytes, size);
 	}
 
 	if (!zfs_zone_delay_enable)
@@ -829,49 +823,6 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 		    (uintptr_t)type, (uintptr_t)wait);
 
 		drv_usecwait(wait);
-	}
-}
-
-/*
- * Maintain counters which allow the calculation of accumulated elapsed time on
- * IO operations per zone.  This calculation is modeled after the Riemann sum
- * calculation described in uts/common/sys/kstat.h.
- *
- * The counters maintained are:
- * 	- The current length of the IO service queue
- * 	- The accumulated time spent servicing IO operations
- * 	- The accumulated total time multiplied by the average queue length
- * 	- The last time these statistics were updated
- *
- * These counters are exposed as kstats within each zone, and enable consumers
- * to track per-zone IO latency.  Strictly speaking, only the accumulated time,
- * time multipled by queue length, and op count are necessary for that
- * calculation, but the current length and most recent timestamp are exposed to
- * provide additional observability.  Note that the op count is not tracked in
- * this function, instead see zfs_zone_zio_done().
- *
- * Only read I/O is tracked for now, as most write I/O is asynchronous.  This
- * makes it difficult to track the zone originally initiating the I/O.  It might
- * be possible, but would require significant changes in other areas of the ZFS
- * stack to keep the zone's ID around long enough to account for here.
- */
-static void
-zfs_zone_zio_kstat_update(zio_t *zp, zone_t *zonep, hrtime_t now, int qchg)
-{
-	hrtime_t delta;
-	uint_t svc_cnt;
-
-	if (zp->io_type != ZIO_TYPE_READ)
-		return;
-
-	delta = now - zonep->zone_io_svc_lastupdate;
-	zonep->zone_io_svc_lastupdate = now;
-	svc_cnt = zonep->zone_io_svc_cnt;
-	zonep->zone_io_svc_cnt += qchg;
-
-	if (svc_cnt != 0) {
-		zonep->zone_io_svc_lentime += delta * svc_cnt;
-		zonep->zone_io_svc_time += delta;
 	}
 }
 
@@ -934,17 +885,23 @@ void
 zfs_zone_zio_start(zio_t *zp)
 {
 	zone_t	*zonep;
-	hrtime_t now;
+
+	/*
+	 * I/Os of type ZIO_TYPE_IOCTL are used to flush the disk cache, not for
+	 * an actual I/O operation.  Ignore those operations as they relate to
+	 * throttling and scheduling.
+	 */
+	if (zp->io_type == ZIO_TYPE_IOCTL)
+		return;
 
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
 	mutex_enter(&zonep->zone_io_lock);
-	now = gethrtime();
-	zfs_zone_zio_kstat_update(zp, zonep, now, 1);
+	kstat_runq_enter(zonep->zone_io_kiop);
 	mutex_exit(&zonep->zone_io_lock);
 
-	zp->io_start = NANO_TO_MICRO(now);
+	zp->io_start = NANO_TO_MICRO(gethrtime());
 
 	zone_rele(zonep);
 }
@@ -960,19 +917,27 @@ zfs_zone_zio_done(zio_t *zp)
 	zone_t	*zonep;
 	hrtime_t now, unow, udelta;
 
+	if (zp->io_type == ZIO_TYPE_IOCTL)
+		return;
+
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
 	mutex_enter(&zonep->zone_io_lock);
-	now = gethrtime();
-	zfs_zone_zio_kstat_update(zp, zonep, now, -1);
-	mutex_exit(&zonep->zone_io_lock);
+
+	kstat_runq_exit(zonep->zone_io_kiop);
 
 	if (zp->io_type == ZIO_TYPE_READ) {
-		atomic_add_64(&zonep->zone_io_phyread_ops, 1);
-		atomic_add_64(&zonep->zone_io_phyread_bytes, zp->io_size);
+		zonep->zone_io_kiop->reads++;
+		zonep->zone_io_kiop->nread += zp->io_size;
+	} else {
+		zonep->zone_io_kiop->writes++;
+		zonep->zone_io_kiop->nwritten += zp->io_size;
 	}
 
+	mutex_exit(&zonep->zone_io_lock);
+
+	now = gethrtime();
 	unow = NANO_TO_MICRO(now);
 	udelta = unow - zp->io_start;
 

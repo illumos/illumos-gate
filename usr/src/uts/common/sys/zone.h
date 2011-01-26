@@ -375,23 +375,6 @@ typedef struct zone_kstat {
 	kstat_named_t zk_value;
 } zone_kstat_t;
 
-/*
- * structure for zone performance kstats
- */
-typedef struct zone_io_kstat {
-	kstat_named_t zk_zonename;
-	kstat_named_t zk_phyread_ops;
-	kstat_named_t zk_phyread_bytes;
-	kstat_named_t zk_logread_ops;
-	kstat_named_t zk_logwrite_ops;
-	kstat_named_t zk_logread_bytes;
-	kstat_named_t zk_logwrite_bytes;
-	kstat_named_t zk_svc_time;
-	kstat_named_t zk_svc_lentime;
-	kstat_named_t zk_svc_lastupdate;
-	kstat_named_t zk_svc_cnt;
-} zone_io_kstat_t;
-
 struct cpucap;
 
 typedef struct {
@@ -399,6 +382,22 @@ typedef struct {
 	uint_t		cycle_cnt;
 	hrtime_t	zone_avg_cnt;
 } sys_zio_cntr_t;
+
+typedef struct zone_vfs_kstat {
+	kstat_named_t 	zv_zonename;
+	kstat_named_t	zv_nread;
+	kstat_named_t	zv_read_bytes;
+	kstat_named_t	zv_read_actv;
+	kstat_named_t	zv_read_time;
+	kstat_named_t	zv_read_lentime;
+	kstat_named_t	zv_read_lastupdate;
+	kstat_named_t	zv_nwrite;
+	kstat_named_t	zv_write_bytes;
+	kstat_named_t	zv_write_actv;
+	kstat_named_t	zv_write_time;
+	kstat_named_t	zv_write_lentime;
+	kstat_named_t	zv_write_lastupdate;
+} zone_vfs_kstat_t;
 
 typedef struct zone {
 	/*
@@ -555,24 +554,32 @@ typedef struct zone {
 	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
 	sys_zio_cntr_t	zone_wr_ops;		/* writes and logical writes. */
 	sys_zio_cntr_t	zone_lwr_ops;
+
 	/*
 	 * kstats and counters for IO ops and bytes.
 	 */
 	kmutex_t	zone_io_lock;		/* protects IO statistics */
-	kstat_t		*zone_io_kstat;
+	kstat_t		*zone_io_ksp;
+	kstat_io_t	*zone_io_kiop;
 
-	uint64_t	zone_io_phyread_ops;	/* ZFS physical read ops */
-	uint64_t	zone_io_phyread_bytes;	/* ZFS physical read bytes */
+	/*
+	 * kstats and counters for VFS operations.
+	 */
+	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
+	kstat_t		*zone_vfs_kstat;
 
-	uint64_t	zone_io_logread_ops;	/* ZFS logical read ops */
-	uint64_t	zone_io_logwrite_ops;	/* ZFS logical write ops */
-	uint64_t	zone_io_logread_bytes;	/* ZFS logical read bytes */
-	uint64_t	zone_io_logwrite_bytes;	/* ZFS logical write bytes */
-
-	uint64_t 	zone_io_svc_time; 	/* cumulative svc time */
-	uint64_t 	zone_io_svc_lentime; 	/* cumulative svc len*time */
-	uint64_t 	zone_io_svc_lastupdate; /* last time run queue chnged */
-	uint_t		zone_io_svc_cnt;	/* # of elements in run state */
+	uint64_t	zone_vfs_nread;		/* VFS read operations */
+	uint64_t	zone_vfs_read_bytes;	/* VFS bytes read */
+	uint64_t	zone_vfs_read_actv;	/* current active VFS reads */
+	uint64_t	zone_vfs_read_time;	/* cumulative read svc time */
+	uint64_t	zone_vfs_read_lentime;	/* cumul. read svc len*time */
+	uint64_t	zone_vfs_read_lastupdate; /* last VFS read update */
+	uint64_t	zone_vfs_nwrite;	/* VFS write operations */
+	uint64_t	zone_vfs_write_bytes;	/* VFS bytes written */
+	uint64_t	zone_vfs_write_actv;	/* current active VFS writes */
+	uint64_t	zone_vfs_write_time;	/* cumulative write svc time */
+	uint64_t	zone_vfs_write_lentime;	/* cumul. write svc len*time */
+	uint64_t	zone_vfs_write_lastupdate; /* last VFS write update */
 
 	/*
 	 * Solaris Auditing per-zone audit context

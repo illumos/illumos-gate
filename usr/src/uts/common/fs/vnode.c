@@ -65,6 +65,7 @@
 #include <fs/fs_subr.h>
 #include <sys/taskq.h>
 #include <fs/fs_reparse.h>
+#include <sys/time.h>
 
 /* Determine if this vnode is a file that is read-only */
 #define	ISROFILE(vp)	\
@@ -187,6 +188,30 @@ static void 		(**vsd_destructor)(void *);
 			vsp->bytecounter.value.ui64 += bytesval;	\
 		}							\
 	}								\
+}
+
+#define	VOPSTATS_ZONE_IO_START(zonep, op, now) { 			\
+	mutex_enter(&zonep->zone_vfs_lock);				\
+	uint64_t actv = zonep->zone_vfs_##op##_actv++;			\
+	hrtime_t delta = now - zonep->zone_vfs_##op##_lastupdate;	\
+	zonep->zone_vfs_##op##_lastupdate = now;			\
+	if (actv != 0) {						\
+		zonep->zone_vfs_##op##_lentime += delta * actv;		\
+		zonep->zone_vfs_##op##_time += delta;			\
+	}								\
+	mutex_exit(&zonep->zone_vfs_lock);				\
+}
+
+#define	VOPSTATS_ZONE_IO_DONE(zonep, op, len, now) { 			\
+	mutex_enter(&zonep->zone_vfs_lock);				\
+	zonep->zone_vfs_n##op++;					\
+	zonep->zone_vfs_##op##_bytes += len;				\
+	uint64_t actv = zonep->zone_vfs_##op##_actv--;			\
+	hrtime_t delta = now - zonep->zone_vfs_##op##_lastupdate;	\
+	zonep->zone_vfs_##op##_lastupdate = now;			\
+	zonep->zone_vfs_##op##_lentime += delta * actv;			\
+	zonep->zone_vfs_##op##_time += delta;				\
+	mutex_exit(&zonep->zone_vfs_lock);				\
 }
 
 /*
@@ -3222,12 +3247,21 @@ fop_read(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	ssize_t len;
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
+		VOPSTATS_ZONE_IO_START(curzone, read, gethrtime());
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, read,
-	    read_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, read, read_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
+		VOPSTATS_ZONE_IO_DONE(curzone, read, len, gethrtime());
+
 	return (err);
 }
 
@@ -3241,12 +3275,21 @@ fop_write(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	ssize_t len;
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
+		VOPSTATS_ZONE_IO_START(curzone, write, gethrtime());
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, write,
-	    write_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, write, write_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
+		VOPSTATS_ZONE_IO_DONE(curzone, write, len, gethrtime());
+
 	return (err);
 }
 

@@ -74,32 +74,38 @@ if ( defined($ARGV[0]) ) {
 $main::opt_h = 0;
 
 my $module = 'zones';
-chomp(my $zname = (`/sbin/zonename`));
+my $BYTES_PER_MB = 1024 * 1024;
+my $BYTES_PER_KB = 1024;
+
+my $BYTES_PREFIX = $USE_MB ? "M" : "k";
+my $BYTES_DIVISOR = $USE_MB ? $BYTES_PER_MB : $BYTES_PER_KB;
 
 my $Modules = $Kstat->{$module};
 
-my $old_svc_lentime = 0;
-my $old_svc_time = 0;
-my $old_rops = 0;
-my $old_wops = 0;
+my $old_wlentime = 0;
+my $old_wtime = 0;
+my $old_rlentime = 0;
+my $old_rtime = 0;
 my $old_rbytes = 0;
 my $old_wbytes = 0;
-my $old_hrtime = 0;
-my $old_props = 0;
-my $old_prbytes = 0;
+my $old_rops = 0;
+my $old_wops = 0;
+my $old_snaptime = 0;
 
 my $ii = 0;
+$Kstat->update();
+
 while (1) {
-	$Kstat->update();
+	printf("    r/s    w/s   %sr/s   %sw/s wait actv wsvc_t asvc_t  " .
+	    "%%w  %%b zone\n", $BYTES_PREFIX, $BYTES_PREFIX, $BYTES_PREFIX);
 
 	foreach my $instance (sort keys(%$Modules)) {
 		my $Instances = $Modules->{$instance};
 	
 		foreach my $name (keys(%$Instances)) {
 			$Stats = $Instances->{$name};
-
-			if ($Stats->{'zonename'} eq $zname) {
-				print_stats();
+			if ($Stats->{'class'} eq 'zone_io') {
+				print_stats($name);
 			}
 		}
 	}
@@ -110,69 +116,63 @@ while (1) {
 	}
 
 	sleep ($interval);
+	$Kstat->update();
 }
 
 sub print_stats {
-	my $NS_PER_SEC = 1000 * 1000 * 1000;
-	my $BYTES_PER_MB = 1024 * 1024;
-	my $BYTES_PER_KB = 1024;
+	my $zonename = $_[0];
 
-	my $svc_lentime = $Stats->{'io_svc_lentime'};
-	my $svc_time = $Stats->{'io_svc_time'};
+	my $wlentime = $Stats->{'wlentime'};
+	my $wtime = $Stats->{'wtime'};
+	my $rlentime = $Stats->{'rlentime'};
+	my $rtime = $Stats->{'rtime'};
 
-	my $rops = $Stats->{'io_logical_read_ops'};
-	my $wops = $Stats->{'io_logical_write_ops'};
-	my $rbytes = $Stats->{'io_logical_read_bytes'};
-	my $wbytes = $Stats->{'io_logical_write_bytes'};
-	my $props = $Stats->{'io_physical_read_ops'};
-	my $prbytes = $Stats->{'io_physical_read_bytes'};
+	my $rbytes = $Stats->{'nread'};
+	my $wbytes = $Stats->{'nwritten'};
+	my $rops = $Stats->{'reads'};
+	my $wops = $Stats->{'writes'};
 
-	my $etime = ($Stats->{'io_svc_lastupdate'} - $old_hrtime) / $NS_PER_SEC;
+	my $etime = $Stats->{'snaptime'} -
+	    ($old_snaptime > 0 ? $old_snaptime : $Stats->{'crtime'});
 
-	# An elapsed time of zero is not a good idea
-	if ($etime == 0) {
-		$etime = $interval;
-	}
-
-	# Calculate overall physical transactions per second
-	my $tps = ($props - $old_props) / $etime;
+	# Calculate overall transactions per second
+	my $tps = ($rops + $wops - $old_rops - $old_wops) / $etime;
 	
-	# Calculate average length of active queue
-	my $actv = ($svc_lentime - $old_svc_lentime) / $etime / $NS_PER_SEC;
+	# Calculate average length of wait and run queues
+	my $wait = ($wlentime - $old_wlentime) / $etime;
+	my $actv = ($rlentime - $old_rlentime) / $etime;
 
-	# Calculate average service time
+	# Calculate average wait and run times
+	my $wsvc = $tps > 0 ? $wait * (1000 / $tps) : 0.0;
 	my $asvc = $tps > 0 ? $actv * (1000 / $tps) : 0.0;
 
-	# Calculate the % time the disk is active
-	my $b_pct = ($svc_time - $old_svc_time) / ($etime * $NS_PER_SEC * 100);
+	# Calculate the % time the wait queue and disk are active
+	my $w_pct = (($wtime - $old_wtime) / $etime) * 100;
+	my $b_pct = (($rtime - $old_rtime) / $etime) * 100;
 
-	my $bytes_divisor = $USE_MB ? $BYTES_PER_MB : $BYTES_PER_KB;
-
-	printf("    lr/s   lw/s   %sr/s   %sw/s    ractv  " .
-	    "rasvc_t   %%b   zone\n",
-	    $USE_MB ? "M" : "k", $USE_MB ? "M" : "k", $USE_MB ? "M" : "k");
-	printf("%8.1f %6.1f %6.1f %6.1f %8.1f %8.1f  %3d   %s\n",
+	printf(" %6.1f %6.1f %6.1f %6.1f %4.1f %4.1f %6.1f %6.1f %3d %3d %s\n",
 	    ($rops - $old_rops) / $etime,
 	    ($wops - $old_wops) / $etime,
-	    ($rbytes - $old_rbytes) / $etime / $bytes_divisor,
-	    ($wbytes - $old_wbytes) / $etime / $bytes_divisor,
-#	    ($props - $old_props) / $etime,
-#	    ($prbytes - $old_prbytes) / $etime / $bytes_divisor,
+	    ($rbytes - $old_rbytes) / $etime / $BYTES_DIVISOR,
+	    ($wbytes - $old_wbytes) / $etime / $BYTES_DIVISOR,
+	    $wait,
 	    $actv,
+	    $wsvc,
 	    $asvc,
+	    $w_pct,
 	    $b_pct,
-	    $zname);
+	    $zonename);
 
 	# Save current calculations for next loop
-	$old_svc_lentime = $svc_lentime;
-	$old_svc_time = $svc_time;
-	$old_rops = $rops;
-	$old_wops = $wops;
+	$old_wlentime = $wlentime;
+	$old_wtime = $wtime;
+	$old_rlentime = $rlentime;
+	$old_rtime = $rtime;
 	$old_rbytes = $rbytes;
 	$old_wbytes = $wbytes;
-	$old_props = $props;
-	$old_prbytes = $prbytes;
-	$old_hrtime = $Stats->{'io_svc_lastupdate'};
+	$old_rops = $rops;
+	$old_wops = $wops;
+	$old_snaptime = $Stats->{'snaptime'};
 }
 
 sub usage {
