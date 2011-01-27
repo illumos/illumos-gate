@@ -73,43 +73,37 @@ if ( defined($ARGV[0]) ) {
 
 $main::opt_h = 0;
 
-my $module = 'zones';
-chomp(my $zname = (`/sbin/zonename`));
-
-my $NS_PER_SEC = 1000 * 1000 * 1000;
 my $BYTES_PER_MB = 1024 * 1024;
 my $BYTES_PER_KB = 1024;
 
 my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? $BYTES_PER_MB : $BYTES_PER_KB;
 
-my $Modules = $Kstat->{$module};
+my $Modules = $Kstat->{'zone_vfs'};
 
-my $old_r_ops = 0;
-my $old_w_ops = 0;
-my $old_r_bytes = 0;
-my $old_w_bytes = 0;
-my $old_r_time = 0;
-my $old_w_time = 0;
-my $old_r_etime = 0;
-my $old_w_etime = 0;
-my $old_r_lentime = 0;
-my $old_w_lentime = 0;
+my $old_rops = 0;
+my $old_wops = 0;
+my $old_rbytes = 0;
+my $old_wbytes = 0;
+my $old_rtime = 0;
+my $old_wtime = 0;
+my $old_rlentime = 0;
+my $old_wlentime = 0;
+my $old_snaptime = 0;
 
 my $ii = 0;
 $Kstat->update();
 
 while (1) {
+	printf("   r/s    w/s   %sr/s   %sw/s wait_t ractv wactv " .
+	    "read_t writ_t  %%b zone\n", $BYTES_PREFIX, $BYTES_PREFIX);
+
 	foreach my $instance (sort keys(%$Modules)) {
 		my $Instances = $Modules->{$instance};
 	
 		foreach my $name (keys(%$Instances)) {
 			$Stats = $Instances->{$name};
-
-			if ($name eq 'zone_vfs' &&
-			    $Stats->{'zonename'} eq $zname) {
-				print_stats();
-			}
+			print_stats($name);
 		}
 	}
 	
@@ -123,75 +117,64 @@ while (1) {
 }
 
 sub print_stats {
-	my $r_ops = $Stats->{'nread'};
-	my $w_ops = $Stats->{'nwrite'};
-	my $r_bytes = $Stats->{'read_bytes'};
-	my $w_bytes = $Stats->{'write_bytes'};
+	my $zonename = $_[0];
 
-	my $r_time = $Stats->{'read_time'};
-	my $w_time = $Stats->{'write_time'};
-	my $r_lentime = $Stats->{'read_lentime'};
-	my $w_lentime = $Stats->{'write_lentime'};
+	my $rops = $Stats->{'reads'};
+	my $wops = $Stats->{'writes'};
+	my $rbytes = $Stats->{'nread'};
+	my $wbytes = $Stats->{'nwritten'};
 
-	my $r_etime = ($Stats->{'read_lastupdate'} - $old_r_etime) /
-	    $NS_PER_SEC;
-	my $w_etime = ($Stats->{'write_lastupdate'} - $old_w_etime) /
-	    $NS_PER_SEC;
+	my $rtime = $Stats->{'rtime'};
+	my $wtime = $Stats->{'wtime'};
+	my $rlentime = $Stats->{'rlentime'};
+	my $wlentime = $Stats->{'wlentime'};
 
-	# An elapsed time of zero is not a good idea
-	if ($r_etime == 0) {
-		$r_etime = $interval;
-	}
-	if ($w_etime == 0) {
-		$w_etime = $interval;
-	}
+	my $etime = $Stats->{'snaptime'} -
+	    ($old_snaptime > 0 ? $old_snaptime : $Stats->{'crtime'});
 
-	my $r_tps = ($r_ops - $old_r_ops) / $r_etime;
-	my $w_tps = ($w_ops - $old_w_ops) / $w_etime;
+	my $r_tps = ($rops - $old_rops) / $etime;
+	my $w_tps = ($wops - $old_wops) / $etime;
 
 	# XXX Need to investigate how to calculate this
 	my $wait_t = 0.0;
 	
 	# Calculate average length of active queue
-	my $r_actv = ($r_lentime - $old_r_lentime) / $r_etime / $NS_PER_SEC;
-	my $w_actv = ($w_lentime - $old_w_lentime) / $w_etime / $NS_PER_SEC;
+	my $r_actv = ($rlentime - $old_rlentime) / $etime;
+	my $w_actv = ($wlentime - $old_wlentime) / $etime;
 
 	# Calculate average service time
 	my $read_t = $r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0;
 	my $writ_t = $w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0;
 
 	# Calculate the % time the VFS layer is active
-	my $r_b_pct = ($r_time - $old_r_time) / ($r_etime * $NS_PER_SEC * 100);
-	my $w_b_pct = ($w_time - $old_w_time) / ($w_etime * $NS_PER_SEC * 100);
+	my $r_b_pct = (($rtime - $old_rtime) / $etime) * 100;
+	my $w_b_pct = (($wtime - $old_wtime) / $etime) * 100;
 	my $b_pct = ($r_b_pct + $w_b_pct) / 2;
 
-	printf("   r/s    w/s   %sr/s   %sw/s wait_t ractv wactv " .
-	    "read_t writ_t  %%b zone\n", $BYTES_PREFIX, $BYTES_PREFIX);
 	printf("%6.1f %6.1f %6.1f %6.1f %6.1f %5.1f %5.1f %6.1f %6.1f " .
 	    "%3d %s\n",
-	    ($r_ops - $old_r_ops) / $r_etime,
-	    ($w_ops - $old_w_ops) / $w_etime,
-	    ($r_bytes - $old_r_bytes) / $r_etime / $BYTES_DIVISOR,
-	    ($w_bytes - $old_w_bytes) / $w_etime / $BYTES_DIVISOR,
+	    ($rops - $old_rops) / $etime,
+	    ($wops - $old_wops) / $etime,
+	    ($rbytes - $old_rbytes) / $etime / $BYTES_DIVISOR,
+	    ($wbytes - $old_wbytes) / $etime / $BYTES_DIVISOR,
 	    $wait_t,
 	    $r_actv,
 	    $w_actv,
 	    $read_t,
 	    $writ_t,
 	    $b_pct,
-	    $zname);
+	    $zonename);
 
 	# Save current calculations for next loop
-	$old_r_ops = $r_ops;
-	$old_w_ops = $w_ops;
-	$old_r_bytes = $r_bytes;
-	$old_w_bytes = $w_bytes;
-	$old_r_time = $r_time;
-	$old_w_time = $w_time;
-	$old_r_etime = $Stats->{'read_lastupdate'};
-	$old_w_etime = $Stats->{'write_lastupdate'};
-	$old_r_lentime = $r_lentime;
-	$old_w_lentime = $w_lentime;
+	$old_rops = $rops;
+	$old_wops = $wops;
+	$old_rbytes = $rbytes;
+	$old_wbytes = $wbytes;
+	$old_rtime = $rtime;
+	$old_wtime = $wtime;
+	$old_rlentime = $rlentime;
+	$old_wlentime = $wlentime;
+	$old_snaptime = $Stats->{'snaptime'};
 }
 
 sub usage {

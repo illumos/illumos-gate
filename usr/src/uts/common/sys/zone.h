@@ -383,22 +383,6 @@ typedef struct {
 	hrtime_t	zone_avg_cnt;
 } sys_zio_cntr_t;
 
-typedef struct zone_vfs_kstat {
-	kstat_named_t 	zv_zonename;
-	kstat_named_t	zv_nread;
-	kstat_named_t	zv_read_bytes;
-	kstat_named_t	zv_read_actv;
-	kstat_named_t	zv_read_time;
-	kstat_named_t	zv_read_lentime;
-	kstat_named_t	zv_read_lastupdate;
-	kstat_named_t	zv_nwrite;
-	kstat_named_t	zv_write_bytes;
-	kstat_named_t	zv_write_actv;
-	kstat_named_t	zv_write_time;
-	kstat_named_t	zv_write_lentime;
-	kstat_named_t	zv_write_lastupdate;
-} zone_vfs_kstat_t;
-
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -556,30 +540,18 @@ typedef struct zone {
 	sys_zio_cntr_t	zone_lwr_ops;
 
 	/*
-	 * kstats and counters for IO ops and bytes.
+	 * kstats and counters for I/O ops and bytes.
 	 */
-	kmutex_t	zone_io_lock;		/* protects IO statistics */
+	kmutex_t	zone_io_lock;		/* protects I/O statistics */
 	kstat_t		*zone_io_ksp;
 	kstat_io_t	*zone_io_kiop;
 
 	/*
-	 * kstats and counters for VFS operations.
+	 * kstats and counters for VFS ops and bytes.
 	 */
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
-	kstat_t		*zone_vfs_kstat;
-
-	uint64_t	zone_vfs_nread;		/* VFS read operations */
-	uint64_t	zone_vfs_read_bytes;	/* VFS bytes read */
-	uint64_t	zone_vfs_read_actv;	/* current active VFS reads */
-	uint64_t	zone_vfs_read_time;	/* cumulative read svc time */
-	uint64_t	zone_vfs_read_lentime;	/* cumul. read svc len*time */
-	uint64_t	zone_vfs_read_lastupdate; /* last VFS read update */
-	uint64_t	zone_vfs_nwrite;	/* VFS write operations */
-	uint64_t	zone_vfs_write_bytes;	/* VFS bytes written */
-	uint64_t	zone_vfs_write_actv;	/* current active VFS writes */
-	uint64_t	zone_vfs_write_time;	/* cumulative write svc time */
-	uint64_t	zone_vfs_write_lentime;	/* cumul. write svc len*time */
-	uint64_t	zone_vfs_write_lastupdate; /* last VFS write update */
+	kstat_t		*zone_vfs_ksp;
+	kstat_io_t	*zone_vfs_kiop;
 
 	/*
 	 * Solaris Auditing per-zone audit context

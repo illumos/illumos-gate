@@ -190,30 +190,6 @@ static void 		(**vsd_destructor)(void *);
 	}								\
 }
 
-#define	VOPSTATS_ZONE_IO_START(zonep, op, now) { 			\
-	mutex_enter(&zonep->zone_vfs_lock);				\
-	uint64_t actv = zonep->zone_vfs_##op##_actv++;			\
-	hrtime_t delta = now - zonep->zone_vfs_##op##_lastupdate;	\
-	zonep->zone_vfs_##op##_lastupdate = now;			\
-	if (actv != 0) {						\
-		zonep->zone_vfs_##op##_lentime += delta * actv;		\
-		zonep->zone_vfs_##op##_time += delta;			\
-	}								\
-	mutex_exit(&zonep->zone_vfs_lock);				\
-}
-
-#define	VOPSTATS_ZONE_IO_DONE(zonep, op, len, now) { 			\
-	mutex_enter(&zonep->zone_vfs_lock);				\
-	zonep->zone_vfs_n##op++;					\
-	zonep->zone_vfs_##op##_bytes += len;				\
-	uint64_t actv = zonep->zone_vfs_##op##_actv--;			\
-	hrtime_t delta = now - zonep->zone_vfs_##op##_lastupdate;	\
-	zonep->zone_vfs_##op##_lastupdate = now;			\
-	zonep->zone_vfs_##op##_lentime += delta * actv;			\
-	zonep->zone_vfs_##op##_time += delta;				\
-	mutex_exit(&zonep->zone_vfs_lock);				\
-}
-
 /*
  * If the filesystem does not support XIDs map credential
  * If the vfsp is NULL, perhaps we should also map?
@@ -3247,10 +3223,14 @@ fop_read(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
 	ssize_t len;
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
-		VOPSTATS_ZONE_IO_START(curzone, read, gethrtime());
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_runq_enter(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
@@ -3259,8 +3239,13 @@ fop_read(
 
 	VOPSTATS_UPDATE_IO(vp, read, read_bytes, len);
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
-		VOPSTATS_ZONE_IO_DONE(curzone, read, len, gethrtime());
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_kiop->reads++;
+		zonep->zone_vfs_kiop->nread += len;
+		kstat_runq_exit(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	return (err);
 }
@@ -3275,10 +3260,19 @@ fop_write(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
 	ssize_t len;
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
-		VOPSTATS_ZONE_IO_START(curzone, write, gethrtime());
+	/*
+	 * For the purposes of VFS kstat consumers, the "waitq" calculation is
+	 * repurposed as the active queue for VFS write operations.  There's no
+	 * actual wait queue for VFS operations.
+	 */
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_waitq_enter(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
@@ -3287,8 +3281,13 @@ fop_write(
 
 	VOPSTATS_UPDATE_IO(vp, write, write_bytes, len);
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK)
-		VOPSTATS_ZONE_IO_DONE(curzone, write, len, gethrtime());
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_kiop->writes++;
+		zonep->zone_vfs_kiop->nwritten += len;
+		kstat_waitq_exit(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	return (err);
 }

@@ -73,14 +73,13 @@ if ( defined($ARGV[0]) ) {
 
 $main::opt_h = 0;
 
-my $module = 'zones';
 my $BYTES_PER_MB = 1024 * 1024;
 my $BYTES_PER_KB = 1024;
 
 my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? $BYTES_PER_MB : $BYTES_PER_KB;
 
-my $Modules = $Kstat->{$module};
+my $Modules = $Kstat->{'zone_io'};
 
 my $old_wlentime = 0;
 my $old_wtime = 0;
@@ -104,9 +103,7 @@ while (1) {
 	
 		foreach my $name (keys(%$Instances)) {
 			$Stats = $Instances->{$name};
-			if ($Stats->{'class'} eq 'zone_io') {
-				print_stats($name);
-			}
+			print_stats($name);
 		}
 	}
 	
