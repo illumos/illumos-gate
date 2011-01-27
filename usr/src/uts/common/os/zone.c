@@ -1986,8 +1986,14 @@ zone_kstat_delete(zone_t *zone)
 	    sizeof (zone_kstat_t));
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
 	    sizeof (zone_kstat_t));
-	zone_kstat_delete_common(&zone->zone_io_ksp,
-	    sizeof (kstat_io_t));
+
+	if (zone->zone_io_ksp != NULL) {
+		kstat_delete(zone->zone_io_ksp);
+		zone->zone_io_ksp = NULL;
+	} else {
+		kmem_free(zone->zone_io_kiop, sizeof (kstat_io_t));
+	}
+
 	zone_kstat_delete_common(&zone->zone_vfs_kstat,
 	    sizeof (zone_vfs_kstat_t));
 }
