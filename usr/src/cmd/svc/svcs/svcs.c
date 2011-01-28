@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -76,7 +77,8 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
-
+#include <libzonecfg.h>
+#include <zone.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -131,6 +133,7 @@ static struct pfmri_list *restarters = NULL;
 static int first_paragraph = 1;		/* For -l mode. */
 static char *common_name_buf;		/* Sized for maximal length value. */
 char *locale;				/* Current locale. */
+char *g_zonename;			/* zone being operated upon */
 
 /*
  * Pathname storage for path generated from the fmri.
@@ -146,6 +149,7 @@ static int *opt_sort = NULL;		/* Indices into columns to sort. */
 static int opt_snum = 0;
 static int opt_nstate_shown = 0;	/* Will nstate be shown? */
 static int opt_verbose = 0;
+static char *opt_zone;			/* zone selected, if any */
 
 /* Minimize string constants. */
 static const char * const scf_property_state = SCF_PROPERTY_STATE;
@@ -210,13 +214,34 @@ struct ht_elem {
 	struct ht_elem	*next;
 };
 
-static struct ht_elem	**ht_buckets;
-static uint_t		ht_buckets_num;
+static struct ht_elem	**ht_buckets = NULL;
+static uint_t		ht_buckets_num = 0;
 static uint_t		ht_num;
 
 static void
-ht_init()
+ht_free(void)
 {
+	struct ht_elem *elem, *next;
+	int i;
+
+	for (i = 0; i < ht_buckets_num; i++) {
+		for (elem = ht_buckets[i]; elem != NULL; elem = next) {
+			next = elem->next;
+			free((char *)elem->fmri);
+			free(elem);
+		}
+	}
+
+	free(ht_buckets);
+	ht_buckets_num = 0;
+	ht_buckets = NULL;
+}
+
+static void
+ht_init(void)
+{
+	assert(ht_buckets == NULL);
+
 	ht_buckets_num = 8;
 	ht_buckets = safe_malloc(sizeof (*ht_buckets) * ht_buckets_num);
 	bzero(ht_buckets, sizeof (*ht_buckets) * ht_buckets_num);
@@ -334,7 +359,7 @@ int
 pg_get_single_val(scf_propertygroup_t *pg, const char *propname, scf_type_t ty,
     void *vp, size_t sz, uint_t flags)
 {
-	char *buf;
+	char *buf, root[MAXPATHLEN];
 	size_t buf_sz;
 	int ret = -1, r;
 	boolean_t multi = B_FALSE;
@@ -427,6 +452,21 @@ misconfigured:
 	free(buf);
 
 out:
+	if (ret != 0 || g_zonename == NULL ||
+	    (strcmp(propname, SCF_PROPERTY_LOGFILE) != 0 &&
+	    strcmp(propname, SCF_PROPERTY_ALT_LOGFILE) != 0))
+		return (ret);
+
+	/*
+	 * If we're here, we have a log file and we have specified a zone.
+	 * As a convenience, we're going to prepend the zone path to the
+	 * name of the log file.
+	 */
+	root[0] = '\0';
+	(void) zone_get_rootpath(g_zonename, root, sizeof (root));
+	(void) strlcat(root, vp, sizeof (root));
+	(void) snprintf(vp, sz, "%s", root);
+
 	return (ret);
 }
 
@@ -1683,6 +1723,49 @@ sortkey_stime(char *buf, int reverse, scf_walkinfo_t *wip)
 		reverse_bytes(buf, STIME_SORTKEY_WIDTH);
 }
 
+/* ZONE */
+#define	ZONE_COLUMN_WIDTH	16
+/*ARGSUSED*/
+static void
+sprint_zone(char **buf, scf_walkinfo_t *wip)
+{
+	size_t newsize;
+	char *newbuf, *zonename = g_zonename, b[ZONENAME_MAX];
+
+	if (zonename == NULL) {
+		zoneid_t zoneid = getzoneid();
+
+		if (getzonenamebyid(zoneid, b, sizeof (b)) < 0)
+			uu_die(gettext("could not determine zone name"));
+
+		zonename = b;
+	}
+
+	if (strlen(zonename) > ZONE_COLUMN_WIDTH)
+		newsize = (*buf ? strlen(*buf) : 0) + strlen(zonename) + 2;
+	else
+		newsize = (*buf ? strlen(*buf) : 0) + ZONE_COLUMN_WIDTH + 2;
+
+	newbuf = safe_malloc(newsize);
+	(void) snprintf(newbuf, newsize, "%s%-*s ", *buf ? *buf : "",
+	    ZONE_COLUMN_WIDTH, zonename);
+
+	if (*buf)
+		free(*buf);
+	*buf = newbuf;
+}
+
+static void
+sortkey_zone(char *buf, int reverse, scf_walkinfo_t *wip)
+{
+	char *tmp = NULL;
+
+	sprint_zone(&tmp, wip);
+	bcopy(tmp, buf, ZONE_COLUMN_WIDTH);
+	free(tmp);
+	if (reverse)
+		reverse_bytes(buf, ZONE_COLUMN_WIDTH);
+}
 
 /*
  * Information about columns which can be displayed.  If you add something,
@@ -1712,6 +1795,8 @@ static const struct column columns[] = {
 		1, sortkey_state },
 	{ "STIME", STIME_COLUMN_WIDTH, sprint_stime,
 		STIME_SORTKEY_WIDTH, sortkey_stime },
+	{ "ZONE", ZONE_COLUMN_WIDTH, sprint_zone,
+		ZONE_COLUMN_WIDTH, sortkey_zone },
 };
 
 #define	MAX_COLUMN_NAME_LENGTH_STR	"6"
@@ -1769,6 +1854,9 @@ description_of_column(int c)
 	case 13:
 		s = gettext("time of last state change");
 		break;
+	case 14:
+		s = gettext("name of zone");
+		break;
 	}
 
 	assert(s != NULL);
@@ -1781,11 +1869,11 @@ print_usage(const char *progname, FILE *f, boolean_t do_exit)
 {
 	(void) fprintf(f, gettext(
 	    "Usage: %1$s [-aHpv] [-o col[,col ... ]] [-R restarter] "
-	    "[-sS col] [<service> ...]\n"
+	    "[-sS col] [-Z | -z zone ]\n            [<service> ...]\n"
 	    "       %1$s -d | -D [-Hpv] [-o col[,col ... ]] [-sS col] "
-	    "[<service> ...]\n"
-	    "       %1$s -l <service> ...\n"
-	    "       %1$s -x [-v] [<service> ...]\n"
+	    "[-Z | -z zone ]\n            [<service> ...]\n"
+	    "       %1$s -l [-Z | -z zone] <service> ...\n"
+	    "       %1$s -x [-v] [-Z | -z zone] [<service> ...]\n"
 	    "       %1$s -?\n"), progname);
 
 	if (do_exit)
@@ -1816,6 +1904,8 @@ print_help(const char *progname)
 	"\t-v  list verbose information appropriate to the type of output\n"
 	"\t-x  explain the status of services that might require maintenance,\n"
 	"\t    or explain the status of the specified service(s)\n"
+	"\t-z  from global zone, show services in a specified zone\n"
+	"\t-Z  from global zone, show services in all zones\n"
 	"\n\t"
 	"Services can be specified using an FMRI, abbreviation, or fnmatch(5)\n"
 	"\tpattern, as shown in these examples for svc:/network/smtp:sendmail\n"
@@ -2371,6 +2461,9 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 	    == 0)
 		(void) printf(fmt, DETAILED_WIDTH, gettext("name"),
 		    common_name_buf);
+
+	if (g_zonename != NULL)
+		(void) printf(fmt, DETAILED_WIDTH, gettext("zone"), g_zonename);
 
 	/*
 	 * Synthesize an 'enabled' property that hides the enabled_ovr
@@ -3310,6 +3403,11 @@ print_line(void *e, void *private)
 	return (UU_WALK_NEXT);
 }
 
+/* ARGSUSED */
+static void
+errignore(const char *str, ...)
+{}
+
 int
 main(int argc, char **argv)
 {
@@ -3318,12 +3416,17 @@ main(int argc, char **argv)
 	char *columns_str = NULL;
 	char *cp;
 	const char *progname;
-	int err;
+	int err, missing = 1, ignored, *errarg;
+	uint_t nzents = 0, zent = 0;
+	zoneid_t *zids = NULL;
+	char zonename[ZONENAME_MAX];
+	void (*errfunc)(const char *, ...);
 
 	int show_all = 0;
 	int show_header = 1;
+	int show_zones = 0;
 
-	const char * const options = "aHpvno:R:s:S:dDl?x";
+	const char * const options = "aHpvno:R:s:S:dDl?xZz:";
 
 	(void) setlocale(LC_ALL, "");
 
@@ -3451,6 +3554,26 @@ main(int argc, char **argv)
 			assert(opt_mode == optopt);
 			break;
 
+		case 'z':
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcs -z may only be used from "
+				    "the global zone\n"));
+			if (show_zones)
+				argserr(progname);
+
+			opt_zone = optarg;
+			break;
+
+		case 'Z':
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcs -Z may only be used from "
+				    "the global zone\n"));
+			if (opt_zone != NULL)
+				argserr(progname);
+
+			show_zones = 1;
+			break;
+
 		case '?':
 			argserr(progname);
 			/* NOTREACHED */
@@ -3467,21 +3590,118 @@ main(int argc, char **argv)
 	if (show_all && optind != argc)
 		uu_warn(gettext("-a ignored when used with arguments.\n"));
 
+	while (show_zones) {
+		uint_t found;
+
+		if (zone_list(NULL, &nzents) != 0)
+			uu_die(gettext("could not get number of zones"));
+
+		if ((zids = malloc(nzents * sizeof (zoneid_t))) == NULL) {
+			uu_die(gettext("could not allocate array for "
+			    "%d zone IDs"), nzents);
+		}
+
+		found = nzents;
+
+		if (zone_list(zids, &found) != 0)
+			uu_die(gettext("could not get zone list"));
+
+		/*
+		 * If the number of zones has not changed between our calls to
+		 * zone_list(), we're done -- otherwise, we must free our array
+		 * of zone IDs and take another lap.
+		 */
+		if (found == nzents)
+			break;
+
+		free(zids);
+	}
+
+	argc -= optind;
+	argv += optind;
+
+again:
 	h = scf_handle_create(SCF_VERSION);
 	if (h == NULL)
 		scfdie();
 
-	if (scf_handle_bind(h) == -1)
+	if (opt_zone != NULL || zids != NULL) {
+		scf_value_t *zone;
+
+		assert(opt_zone == NULL || zids == NULL);
+
+		if (opt_zone == NULL) {
+			if (getzonenamebyid(zids[zent++],
+			    zonename, sizeof (zonename)) < 0) {
+				uu_warn(gettext("could not get name for "
+				    "zone %d; ignoring"), zids[zent - 1]);
+				goto nextzone;
+			}
+
+			g_zonename = zonename;
+		} else {
+			g_zonename = opt_zone;
+		}
+
+		if ((zone = scf_value_create(h)) == NULL)
+			scfdie();
+
+		if (scf_value_set_astring(zone, g_zonename) != SCF_SUCCESS)
+			scfdie();
+
+		if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
+			uu_die(gettext("invalid zone '%s'\n"), g_zonename);
+
+		scf_value_destroy(zone);
+	}
+
+	if (scf_handle_bind(h) == -1) {
+		if (g_zonename != NULL) {
+			uu_warn(gettext("Could not bind to repository "
+			    "server for zone %s: %s\n"), g_zonename,
+			    scf_strerror(scf_error()));
+
+			if (!show_zones)
+				return (UU_EXIT_FATAL);
+
+			goto nextzone;
+		}
+
 		uu_die(gettext("Could not bind to repository server: %s.  "
 		    "Exiting.\n"), scf_strerror(scf_error()));
+	}
 
 	if ((g_pg = scf_pg_create(h)) == NULL ||
 	    (g_prop = scf_property_create(h)) == NULL ||
 	    (g_val = scf_value_create(h)) == NULL)
 		scfdie();
 
-	argc -= optind;
-	argv += optind;
+	if (show_zones) {
+		/*
+		 * It's hard to avoid editorializing here, but suffice it to
+		 * say that scf_walk_fmri() takes an error handler, the
+		 * interface to which has been regrettably misdesigned:  the
+		 * handler itself takes exclusively a string -- even though
+		 * scf_walk_fmri() has detailed, programmatic knowledge
+		 * of the error condition at the time it calls its errfunc.
+		 * That is, only the error message and not the error semantics
+		 * are given to the handler.  This is poor interface at best,
+		 * but it is particularly problematic when we are talking to
+		 * multiple repository servers (as when we are iterating over
+		 * all zones) as we do not want to treat failure to find a
+		 * match in one zone as overall failure.  Ideally, we would
+		 * simply ignore SCF_MSG_PATTERN_NOINSTANCE and correctly
+		 * process the others, but alas, no such interface exists --
+		 * and we must settle for instead ignoring all errfunc-called
+		 * errors in the case that we are iterating over all zones...
+		 */
+		errfunc = errignore;
+		errarg = missing ? &missing : &ignored;
+		missing = 0;
+	} else {
+		errfunc = uu_warn;
+		errarg = &exit_status;
+	}
 
 	/*
 	 * If we're in long mode, take care of it now before we deal with the
@@ -3492,87 +3712,100 @@ main(int argc, char **argv)
 			argserr(progname);
 
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_detailed, NULL, &exit_status, uu_warn)) != 0) {
+		    print_detailed, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
 
-		return (exit_status);
+		goto nextzone;
 	}
 
 	if (opt_mode == 'n') {
 		print_notify_special();
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_notify, NULL, &exit_status, uu_warn)) != 0) {
+		    print_notify, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
 
-		return (exit_status);
+		goto nextzone;
 	}
 
 	if (opt_mode == 'x') {
 		explain(opt_verbose, argc, argv);
-
-		return (exit_status);
-	}
-
-
-	if (opt_snum == 0) {
-		/* Default sort. */
-		add_sort_column("state", 0);
-		add_sort_column("stime", 0);
-		add_sort_column("fmri", 0);
+		goto nextzone;
 	}
 
 	if (columns_str == NULL) {
-		if (!opt_verbose)
-			columns_str = safe_strdup("state,stime,fmri");
-		else
-			columns_str =
-			    safe_strdup("state,nstate,stime,ctid,fmri");
+		if (opt_snum == 0) {
+			if (show_zones)
+				add_sort_column("zone", 0);
+
+			/* Default sort. */
+			add_sort_column("state", 0);
+			add_sort_column("stime", 0);
+			add_sort_column("fmri", 0);
+		}
+
+		if (!opt_verbose) {
+			columns_str = safe_strdup(show_zones ?
+			    "zone,state,stime,fmri" : "state,stime,fmri");
+		} else {
+			columns_str = safe_strdup(show_zones ?
+			    "zone,state,nstate,stime,ctid,fmri" :
+			    "state,nstate,stime,ctid,fmri");
+		}
 	}
 
-	/* Decode columns_str into opt_columns. */
-	line_sz = 0;
+	if (opt_columns == NULL) {
+		/* Decode columns_str into opt_columns. */
+		line_sz = 0;
 
-	opt_cnum = 1;
-	for (cp = columns_str; *cp != '\0'; ++cp)
-		if (*cp == ',')
-			++opt_cnum;
+		opt_cnum = 1;
+		for (cp = columns_str; *cp != '\0'; ++cp)
+			if (*cp == ',')
+				++opt_cnum;
 
-	opt_columns = malloc(opt_cnum * sizeof (*opt_columns));
-	if (opt_columns == NULL)
-		uu_die(gettext("Too many columns.\n"));
+		opt_columns = malloc(opt_cnum * sizeof (*opt_columns));
+		if (opt_columns == NULL)
+			uu_die(gettext("Too many columns.\n"));
 
-	for (n = 0; *columns_str != '\0'; ++n) {
-		i = getcolumnopt(&columns_str);
-		if (i == -1)
-			uu_die(gettext("Unknown column \"%s\".\n"),
-			    columns_str);
+		for (n = 0; *columns_str != '\0'; ++n) {
+			i = getcolumnopt(&columns_str);
+			if (i == -1)
+				uu_die(gettext("Unknown column \"%s\".\n"),
+				    columns_str);
 
-		if (strcmp(columns[i].name, "N") == 0 ||
-		    strcmp(columns[i].name, "SN") == 0 ||
-		    strcmp(columns[i].name, "NSTA") == 0 ||
-		    strcmp(columns[i].name, "NSTATE") == 0)
-			opt_nstate_shown = 1;
+			if (strcmp(columns[i].name, "N") == 0 ||
+			    strcmp(columns[i].name, "SN") == 0 ||
+			    strcmp(columns[i].name, "NSTA") == 0 ||
+			    strcmp(columns[i].name, "NSTATE") == 0)
+				opt_nstate_shown = 1;
 
-		opt_columns[n] = i;
-		line_sz += columns[i].width + 1;
+			opt_columns[n] = i;
+			line_sz += columns[i].width + 1;
+		}
+
+		if ((lines_pool = uu_avl_pool_create("lines_pool",
+		    sizeof (struct avl_string), offsetof(struct avl_string,
+		    node), line_cmp, UU_AVL_DEBUG)) == NULL ||
+		    (lines = uu_avl_create(lines_pool, NULL, 0)) == NULL)
+			uu_die(gettext("Unexpected libuutil error: %s\n"),
+			    uu_strerror(uu_error()));
 	}
-
-
-	if ((lines_pool = uu_avl_pool_create("lines_pool",
-	    sizeof (struct avl_string), offsetof(struct avl_string, node),
-	    line_cmp, UU_AVL_DEBUG)) == NULL ||
-	    (lines = uu_avl_create(lines_pool, NULL, 0)) == NULL)
-		uu_die(gettext("Unexpected libuutil error: %s.  Exiting.\n"),
-		    uu_strerror(uu_error()));
 
 	switch (opt_mode) {
 	case 0:
+		/*
+		 * If we already have a hash table (e.g., because we are
+		 * processing multiple zones), destroy it before creating
+		 * a new one.
+		 */
+		if (ht_buckets != NULL)
+			ht_free();
+
 		ht_init();
 
 		/* Always show all FMRIs when given arguments or restarters */
@@ -3582,7 +3815,7 @@ main(int argc, char **argv)
 		if ((err = scf_walk_fmri(h, argc, argv,
 		    SCF_WALK_MULTIPLE | SCF_WALK_LEGACY,
 		    show_all ? list_instance : list_if_enabled, NULL,
-		    &exit_status, uu_warn)) != 0) {
+		    errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3595,7 +3828,7 @@ main(int argc, char **argv)
 
 		if ((err = scf_walk_fmri(h, argc, argv,
 		    SCF_WALK_MULTIPLE, list_dependencies, NULL,
-		    &exit_status, uu_warn)) != 0) {
+		    errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3630,6 +3863,18 @@ main(int argc, char **argv)
 		assert(0);
 		abort();
 	}
+
+nextzone:
+	if (show_zones && zent < nzents && exit_status == 0) {
+		scf_handle_destroy(h);
+		goto again;
+	}
+
+	if (show_zones && exit_status == 0)
+		exit_status = missing;
+
+	if (opt_columns == NULL)
+		return (exit_status);
 
 	if (show_header)
 		print_header();

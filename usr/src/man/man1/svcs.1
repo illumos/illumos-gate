@@ -3,30 +3,30 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svcs 1 "6 Nov 2008" "SunOS 5.11" "User Commands"
+.TH svcs 1 "17 Apr 2011" "SunOS 5.11" "User Commands"
 .SH NAME
 svcs \- report service status
 .SH SYNOPSIS
 .LP
 .nf
-\fBsvcs\fR [\fB-aHpv?\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]... 
+\fBsvcs\fR [\fB-aHpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]... 
      [\fB-sS\fR \fIcol\fR]... [\fIFMRI\fR | \fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBsvcs\fR {\fB-d\fR | \fB-D\fR} [\fB-Hpv?\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-sS\fR \fIcol\fR]... 
+\fBsvcs\fR {\fB-d\fR | \fB-D\fR} [\fB-Hpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-sS\fR \fIcol\fR]... 
      [\fIFMRI\fR | \fIpattern\fR] ...
 .fi
 
 .LP
 .nf
-\fBsvcs\fR \fB-l\fR [\fB-v\fR] [\fIFMRI\fR | \fIpattern\fR]...
+\fBsvcs\fR \fB-l\fR [\fB-vZ\fR] [\fB-z\fR \fIzone\fR] [\fIFMRI\fR | \fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBsvcs\fR \fB-x\fR [\fB-v\fR] [\fIFMRI\fR]...
+\fBsvcs\fR \fB-x\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fIFMRI\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -345,6 +345,31 @@ are enabled, but are not running.
 .el o
 are preventing another enabled service from running.
 .RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-z \fIzone\fR
+.ad
+.RS 20n
+.rt
+Display only the services in the \fIzone\fR.  This option is only applicable
+in the global zone, see \fBzones\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-Z\fR
+.ad
+.RS 20n
+.rt
+Display services from all zones, with an additional column indicating in which
+zone the service is running.  This option is only applicable in the global
+zone, see \fBzones\fR(5).
 .RE
 
 .SH OPERANDS
@@ -881,4 +906,4 @@ Screen output is Uncommitted. The invocation is Committed.
 .LP
 \fBps\fR(1), \fBsvcprop\fR(1), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBstat\fR(2), \fBlibscf\fR(3LIB), \fBattributes\fR(5),
-\fBfnmatch\fR(5), \fBsmf\fR(5)
+\fBfnmatch\fR(5), \fBsmf\fR(5), \fBzones\fR(5)

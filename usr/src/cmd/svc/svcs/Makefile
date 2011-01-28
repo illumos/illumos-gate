@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
+#
 
 PROG =		svcs
 OBJS =		svcs.o explain.o
@@ -32,7 +34,7 @@ include ../../Makefile.cmd
 include ../../Makefile.ctf
 
 POFILE =	$(PROG)_all.po
-LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair
+LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair -lzonecfg
 CPPFLAGS += -I ../common
 
 lint := LINTFLAGS = -mux
