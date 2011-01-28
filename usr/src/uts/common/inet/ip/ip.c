@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright (c) 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -4646,10 +4647,10 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	/*
 	 * Create the taskq dispatcher thread and initialize related stuff.
 	 */
-	ipst->ips_capab_taskq_thread = thread_create(NULL, 0,
-	    ill_taskq_dispatch, ipst, 0, &p0, TS_RUN, minclsyspri);
 	mutex_init(&ipst->ips_capab_taskq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ipst->ips_capab_taskq_cv, NULL, CV_DEFAULT, NULL);
+	ipst->ips_capab_taskq_thread = thread_create(NULL, 0,
+	    ill_taskq_dispatch, ipst, 0, &p0, TS_RUN, minclsyspri);
 
 	major = mod_name_to_major(INET_NAME);
 	(void) ldi_ident_from_major(major, &ipst->ips_ldi_ident);
