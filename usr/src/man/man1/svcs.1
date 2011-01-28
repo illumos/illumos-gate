@@ -21,7 +21,7 @@ svcs \- report service status
 
 .LP
 .nf
-\fBsvcs\fR \fB-l\fR [\fB-vZ\fR] [\fB-z\fR \fIzone\fR] [\fIFMRI\fR | \fIpattern\fR]...
+\fBsvcs\fR [\fB-l\fR | \fB-L\fR] [\fB-vZ\fR] [\fB-z\fR \fIzone\fR] [\fIFMRI\fR | \fIpattern\fR]...
 .fi
 
 .LP
@@ -243,6 +243,18 @@ specific milestone. See \fBsvcadm\fR(1M) for details.
 .RE
 
 .RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-L\fR
+.ad
+.RS 20n
+.rt
+Display the log file of the selected services and service instances, one
+per-line.
+.RE 
 
 .sp
 .ne 2

@@ -1872,7 +1872,7 @@ print_usage(const char *progname, FILE *f, boolean_t do_exit)
 	    "[-sS col] [-Z | -z zone ]\n            [<service> ...]\n"
 	    "       %1$s -d | -D [-Hpv] [-o col[,col ... ]] [-sS col] "
 	    "[-Z | -z zone ]\n            [<service> ...]\n"
-	    "       %1$s -l [-Z | -z zone] <service> ...\n"
+	    "       %1$s [-l | -L] [-Z | -z zone] <service> ...\n"
 	    "       %1$s -x [-v] [-Z | -z zone] [<service> ...]\n"
 	    "       %1$s -?\n"), progname);
 
@@ -1896,6 +1896,7 @@ print_help(const char *progname)
 	"\t-D  list dependents of the specified service(s)\n"
 	"\t-H  omit header line from output\n"
 	"\t-l  list detailed information about the specified service(s)\n"
+	"\t-L  list the log file associated with the specified service(s)\n"
 	"\t-o  list only the specified columns in the output\n"
 	"\t-p  list process IDs and names associated with each service\n"
 	"\t-R  list only those services with the specified restarter\n"
@@ -2635,6 +2636,34 @@ restarter_common:
 		print_application_properties(wip, snap);
 
 	scf_snapshot_destroy(snap);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+print_log(void *unused, scf_walkinfo_t *wip)
+{
+	scf_propertygroup_t *rpg;
+	char buf[MAXPATHLEN];
+
+	if ((rpg = scf_pg_create(h)) == NULL)
+		scfdie();
+
+	if (scf_instance_get_pg(wip->inst, SCF_PG_RESTARTER, rpg) != 0) {
+		if (scf_error() != SCF_ERROR_NOT_FOUND)
+			scfdie();
+
+		goto out;
+	}
+
+	if (pg_get_single_val(rpg, SCF_PROPERTY_LOGFILE,
+	    SCF_TYPE_ASTRING, buf, sizeof (buf), 0) == 0) {
+		(void) printf("%s\n", buf);
+	}
+
+out:
+	scf_pg_destroy(rpg);
 
 	return (0);
 }
@@ -3426,7 +3455,7 @@ main(int argc, char **argv)
 	int show_header = 1;
 	int show_zones = 0;
 
-	const char * const options = "aHpvno:R:s:S:dDl?xZz:";
+	const char * const options = "aHpvno:R:s:S:dDlL?xZz:";
 
 	(void) setlocale(LC_ALL, "");
 
@@ -3473,6 +3502,7 @@ main(int argc, char **argv)
 		case 'd':
 		case 'D':
 		case 'l':
+		case 'L':
 			if (opt_mode != 0)
 				argserr(progname);
 
@@ -3549,6 +3579,7 @@ main(int argc, char **argv)
 		case 'd':
 		case 'D':
 		case 'l':
+		case 'L':
 		case 'n':
 		case 'x':
 			assert(opt_mode == optopt);
@@ -3713,6 +3744,17 @@ again:
 
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
 		    print_detailed, NULL, errarg, errfunc)) != 0) {
+			uu_warn(gettext("failed to iterate over "
+			    "instances: %s\n"), scf_strerror(err));
+			exit_status = UU_EXIT_FATAL;
+		}
+
+		goto nextzone;
+	}
+
+	if (opt_mode == 'L') {
+		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
+		    print_log, NULL, &exit_status, uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
