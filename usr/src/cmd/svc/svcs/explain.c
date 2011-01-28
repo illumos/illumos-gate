@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -198,6 +199,7 @@ static char *emsg_nomem;
 static char *emsg_invalid_dep;
 
 extern scf_handle_t *h;
+extern char *g_zonename;
 
 /* ARGSUSED */
 static int
@@ -222,7 +224,6 @@ hash_name(const char *name)
 
 	return (h);
 }
-
 
 static void
 x_init(void)
@@ -1996,6 +1997,9 @@ print_service(inst_t *svcp, int verbose)
 		(void) putchar('\n');
 	}
 
+	if (g_zonename != NULL)
+		(void) printf(gettext("  Zone: %s\n"), g_zonename);
+
 	stime = svcp->stime.tv_sec;
 	tmp = localtime(&stime);
 
@@ -2097,7 +2101,12 @@ print_service_cb(void *verbose, scf_walkinfo_t *wip)
 void
 explain(int verbose, int argc, char **argv)
 {
-	/* Initialize globals. */
+	/*
+	 * Initialize globals.  If we have been called before (e.g., for a
+	 * different zone), this will clobber the previous globals -- keeping
+	 * with the proud svcs(1) tradition of not bothering to ever clean
+	 * anything up.
+	 */
 	x_init();
 
 	/* Walk the graph and populate services with inst_t's */
