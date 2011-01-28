@@ -65,6 +65,7 @@
 #include <fs/fs_subr.h>
 #include <sys/taskq.h>
 #include <fs/fs_reparse.h>
+#include <sys/time.h>
 
 /* Determine if this vnode is a file that is read-only */
 #define	ISROFILE(vp)	\
@@ -3222,12 +3223,30 @@ fop_read(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
+	ssize_t len;
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_runq_enter(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, read,
-	    read_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, read, read_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_kiop->reads++;
+		zonep->zone_vfs_kiop->nread += len;
+		kstat_runq_exit(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
+
 	return (err);
 }
 
@@ -3241,12 +3260,35 @@ fop_write(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
+	ssize_t len;
+
+	/*
+	 * For the purposes of VFS kstat consumers, the "waitq" calculation is
+	 * repurposed as the active queue for VFS write operations.  There's no
+	 * actual wait queue for VFS operations.
+	 */
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_waitq_enter(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, write,
-	    write_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, write, write_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_kiop->writes++;
+		zonep->zone_vfs_kiop->nwritten += len;
+		kstat_waitq_exit(zonep->zone_vfs_kiop);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
+
 	return (err);
 }
 

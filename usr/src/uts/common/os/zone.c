@@ -1833,87 +1833,6 @@ zone_swapresv_kstat_update(kstat_t *ksp, int rw)
 	return (0);
 }
 
-static int
-zone_io_kstat_update(kstat_t *ksp, int rw)
-{
-	zone_t *zone = ksp->ks_private;
-	zone_io_kstat_t *zk = ksp->ks_data;
-
-	if (rw == KSTAT_WRITE)
-		return (EACCES);
-
-	zk->zk_phyread_ops.value.ui64 = zone->zone_io_phyread_ops;
-	zk->zk_phyread_bytes.value.ui64 = zone->zone_io_phyread_bytes;
-
-	zk->zk_logread_ops.value.ui64 = zone->zone_io_logread_ops;
-	zk->zk_logwrite_ops.value.ui64 = zone->zone_io_logwrite_ops;
-	zk->zk_logread_bytes.value.ui64 = zone->zone_io_logread_bytes;
-	zk->zk_logwrite_bytes.value.ui64 = zone->zone_io_logwrite_bytes;
-
-	zk->zk_svc_time.value.ui64 = zone->zone_io_svc_time;
-	zk->zk_svc_lentime.value.ui64 = zone->zone_io_svc_lentime;
-	zk->zk_svc_lastupdate.value.ui64 = zone->zone_io_svc_lastupdate;
-	zk->zk_svc_cnt.value.ui64 = zone->zone_io_svc_cnt;
-
-	return (0);
-}
-
-static kstat_t *
-zone_io_kstat_create(zone_t *zone, int (*updatefunc) (kstat_t *, int))
-{
-	kstat_t *ksp;
-	zone_io_kstat_t *zk;
-	char nm[KSTAT_STRLEN];
-
-	(void) snprintf(nm, KSTAT_STRLEN, "zone_%d", zone->zone_id);
-
-	/* module, instance, name, class, type, ndata, flags, zoneid */
-	ksp = kstat_create_zone("zones", zone->zone_id, nm, "zone_stats",
-	    KSTAT_TYPE_NAMED,
-	    sizeof (zone_io_kstat_t) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL, zone->zone_id);
-
-	if (ksp == NULL)
-		return (NULL);
-
-	if (zone->zone_id != GLOBAL_ZONEID)
-		kstat_zone_add(ksp, GLOBAL_ZONEID);
-
-	zk = ksp->ks_data = kmem_alloc(sizeof (zone_io_kstat_t), KM_SLEEP);
-
-	ksp->ks_data_size += strlen(zone->zone_name) + 1;
-	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
-	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
-
-	kstat_named_init(&zk->zk_phyread_ops, "io_physical_read_ops",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_logread_ops, "io_logical_read_ops",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_logwrite_ops, "io_logical_write_ops",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&zk->zk_phyread_bytes, "io_physical_read_bytes",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_logread_bytes, "io_logical_read_bytes",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_logwrite_bytes, "io_logical_write_bytes",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&zk->zk_svc_time, "io_svc_time",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_svc_lentime, "io_svc_lentime",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_svc_lastupdate, "io_svc_lastupdate",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_svc_cnt, "io_svc_cnt",
-	    KSTAT_DATA_UINT32);
-
-	ksp->ks_update = updatefunc;
-	ksp->ks_private = zone;
-	kstat_install(ksp);
-	return (ksp);
-}
-
 static kstat_t *
 zone_rctl_kstat_create_common(zone_t *zone, char *name,
     int (*updatefunc) (kstat_t *, int))
@@ -1950,32 +1869,42 @@ zone_kstat_create(zone_t *zone)
 	zone->zone_nprocs_kstat = zone_rctl_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
-	zone->zone_io_kstat = zone_io_kstat_create(zone,
-	    zone_io_kstat_update);
-}
+	zone->zone_io_ksp = kstat_create_zone("zone_io", zone->zone_id,
+	    zone->zone_name, "disk", KSTAT_TYPE_IO, 1,
+	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
 
-static void
-zone_io_kstat_delete(kstat_t **pkstat)
-{
-	void *data;
+	if (zone->zone_io_ksp != NULL) {
+		zone->zone_io_ksp->ks_lock = &zone->zone_io_lock;
+		kstat_install(zone->zone_io_ksp);
+		zone->zone_io_kiop = zone->zone_io_ksp->ks_data;
+	} else {
+		zone->zone_io_kiop = kmem_zalloc(
+		    sizeof (kstat_io_t), KM_SLEEP);
+	}
 
-	if (*pkstat != NULL) {
-		data = (*pkstat)->ks_data;
-		kstat_delete(*pkstat);
-		kmem_free(data, sizeof (zone_io_kstat_t));
-		*pkstat = NULL;
+	zone->zone_vfs_ksp = kstat_create_zone("zone_vfs", zone->zone_id,
+	    zone->zone_name, "vfs", KSTAT_TYPE_IO, 1,
+	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
+
+	if (zone->zone_vfs_ksp != NULL) {
+		zone->zone_vfs_ksp->ks_lock = &zone->zone_vfs_lock;
+		kstat_install(zone->zone_vfs_ksp);
+		zone->zone_vfs_kiop = zone->zone_vfs_ksp->ks_data;
+	} else {
+		zone->zone_vfs_kiop = kmem_zalloc(
+		    sizeof (kstat_io_t), KM_SLEEP);
 	}
 }
 
 static void
-zone_kstat_delete_common(kstat_t **pkstat)
+zone_kstat_delete_common(kstat_t **pkstat, size_t datasz)
 {
 	void *data;
 
 	if (*pkstat != NULL) {
 		data = (*pkstat)->ks_data;
 		kstat_delete(*pkstat);
-		kmem_free(data, sizeof (zone_kstat_t));
+		kmem_free(data, datasz);
 		*pkstat = NULL;
 	}
 }
@@ -1983,11 +1912,26 @@ zone_kstat_delete_common(kstat_t **pkstat)
 static void
 zone_kstat_delete(zone_t *zone)
 {
-	zone_kstat_delete_common(&zone->zone_lockedmem_kstat);
-	zone_kstat_delete_common(&zone->zone_swapresv_kstat);
-	zone_kstat_delete_common(&zone->zone_nprocs_kstat);
+	zone_kstat_delete_common(&zone->zone_lockedmem_kstat,
+	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_swapresv_kstat,
+	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
+	    sizeof (zone_kstat_t));
 
-	zone_io_kstat_delete(&zone->zone_io_kstat);
+	if (zone->zone_io_ksp != NULL) {
+		kstat_delete(zone->zone_io_ksp);
+		zone->zone_io_ksp = NULL;
+	} else {
+		kmem_free(zone->zone_io_kiop, sizeof (kstat_io_t));
+	}
+
+	if (zone->zone_vfs_ksp != NULL) {
+		kstat_delete(zone->zone_vfs_ksp);
+		zone->zone_vfs_ksp = NULL;
+	} else {
+		kmem_free(zone->zone_vfs_kiop, sizeof (kstat_io_t));
+	}
 }
 
 /*
@@ -2046,21 +1990,6 @@ zone_zsd_init(void)
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
 	zone0.zone_zfs_io_share = 1;
-
-	zone0.zone_io_kstat = NULL;
-
-	zone0.zone_io_phyread_ops = 0;
-	zone0.zone_io_phyread_bytes = 0;
-
-	zone0.zone_io_logread_ops = 0;
-	zone0.zone_io_logwrite_ops = 0;
-	zone0.zone_io_logread_bytes = 0;
-	zone0.zone_io_logwrite_bytes = 0;
-
-	zone0.zone_io_svc_time = 0;
-	zone0.zone_io_svc_lentime = 0;
-	zone0.zone_io_svc_lastupdate = 0;
-	zone0.zone_io_svc_cnt = 0;
 
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
@@ -4337,20 +4266,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_max_lofi_ctl = UINT64_MAX;
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
-	zone->zone_zfs_io_share= 1;
-
-	zone->zone_io_phyread_ops = 0;
-	zone->zone_io_phyread_bytes = 0;
-
-	zone->zone_io_logread_ops = 0;
-	zone->zone_io_logread_bytes = 0;
-	zone->zone_io_logwrite_ops = 0;
-	zone->zone_io_logwrite_bytes = 0;
-
-	zone->zone_io_svc_time = 0;
-	zone->zone_io_svc_lentime = 0;
-	zone->zone_io_svc_lastupdate = 0;
-	zone->zone_io_svc_cnt = 0;
+	zone->zone_zfs_io_share = 1;
 
 	/*
 	 * Zsched initializes the rctls.
