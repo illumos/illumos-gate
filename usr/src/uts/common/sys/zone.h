@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -525,12 +526,11 @@ typedef struct zone {
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
 
 	/*
-	 * Data and counters used for fair-share disk IO.
+	 * Data and counters used for ZFS fair-share disk IO.
 	 */
-	rctl_qty_t	zone_zfs_io_share;	/* ZFS IO share */
-	uint_t		zone_zfs_queued;	/* ZFS enqueued count */
-	uint64_t	zone_zfs_queue_bumped;	/* ZFS queue bump counter */
-	void 		*zone_zfs_last_zio;	/* pntr to most recent zio */
+	rctl_qty_t	zone_zfs_io_pri;	/* ZFS IO priority */
+	uint_t		zone_zfs_queued;	/* enqueued count */
+	uint64_t	zone_zfs_weight;	/* used to prevent starvation */
 	uint64_t	zone_io_util;		/* IO utilization metric */
 	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */
 	uint16_t	zone_io_delay;		/* IO delay on logical r/w */

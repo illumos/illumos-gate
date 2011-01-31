@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -371,7 +372,7 @@ rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_max_swap;
 rctl_hndl_t rc_zone_max_lofi;
 rctl_hndl_t rc_zone_cpu_cap;
-rctl_hndl_t rc_zone_zfs_io_share;
+rctl_hndl_t rc_zone_zfs_io_pri;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_nprocs;
 rctl_hndl_t rc_zone_shmmax;
@@ -1380,19 +1381,19 @@ static rctl_ops_t zone_cpu_cap_ops = {
 };
 
 /*
- * zone.zfs-io-share resource control support (similar to the FSS).
+ * zone.zfs-io-pri resource control support (IO priority).
  */
 /*ARGSUSED*/
 static rctl_qty_t
-zone_zfs_io_share_get(rctl_t *rctl, struct proc *p)
+zone_zfs_io_pri_get(rctl_t *rctl, struct proc *p)
 {
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	return (p->p_zone->zone_zfs_io_share);
+	return (p->p_zone->zone_zfs_io_pri);
 }
 
 /*ARGSUSED*/
 static int
-zone_zfs_io_share_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+zone_zfs_io_pri_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
     rctl_qty_t nv)
 {
 	zone_t *zone = e->rcep_p.zone;
@@ -1404,16 +1405,16 @@ zone_zfs_io_share_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
 		return (0);
 
 	/*
-	 * set share to the new value.
+	 * set priority to the new value.
 	 */
-	zone->zone_zfs_io_share = nv;
+	zone->zone_zfs_io_pri = nv;
 	return (0);
 }
 
-static rctl_ops_t zone_zfs_io_share_ops = {
+static rctl_ops_t zone_zfs_io_pri_ops = {
 	rcop_no_action,
-	zone_zfs_io_share_get,
-	zone_zfs_io_share_set,
+	zone_zfs_io_pri_get,
+	zone_zfs_io_pri_set,
 	rcop_no_test
 };
 
@@ -1989,7 +1990,7 @@ zone_zsd_init(void)
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
-	zone0.zone_zfs_io_share = 1;
+	zone0.zone_zfs_io_pri = 1;
 
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
@@ -2097,11 +2098,10 @@ zone_init(void)
 	    RCTL_GLOBAL_INFINITE,
 	    MAXCAP, MAXCAP, &zone_cpu_cap_ops);
 
-	rc_zone_zfs_io_share = rctl_register("zone.zfs-io-share",
-	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_ALWAYS |
-	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER |
-	    RCTL_GLOBAL_INFINITE,
-	    UINT_MAX, UINT_MAX, &zone_zfs_io_share_ops);
+	rc_zone_zfs_io_pri = rctl_register("zone.zfs-io-priority",
+	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |
+	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER,
+	    1024, 1024, &zone_zfs_io_pri_ops);
 
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
@@ -2142,6 +2142,20 @@ zone_init(void)
 	dval->rcv_action_recip_pid = -1;
 
 	rde = rctl_dict_lookup("zone.cpu-shares");
+	(void) rctl_val_list_insert(&rde->rcd_default_value, dval);
+
+	/*
+	 * Create a rctl_val with PRIVILEGED, NOACTION, value = 1.  Then attach
+	 * this at the head of the rctl_dict_entry for ``zone.zfs-io-priority'.
+	 */
+	dval = kmem_cache_alloc(rctl_val_cache, KM_SLEEP);
+	bzero(dval, sizeof (rctl_val_t));
+	dval->rcv_value = 1;
+	dval->rcv_privilege = RCPRIV_PRIVILEGED;
+	dval->rcv_flagaction = RCTL_LOCAL_NOACTION;
+	dval->rcv_action_recip_pid = -1;
+
+	rde = rctl_dict_lookup("zone.zfs-io-priority");
 	(void) rctl_val_list_insert(&rde->rcd_default_value, dval);
 
 	rc_zone_locked_mem = rctl_register("zone.max-locked-memory",
@@ -4266,7 +4280,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_max_lofi_ctl = UINT64_MAX;
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
-	zone->zone_zfs_io_share = 1;
+	zone->zone_zfs_io_pri = 1;
 
 	/*
 	 * Zsched initializes the rctls.

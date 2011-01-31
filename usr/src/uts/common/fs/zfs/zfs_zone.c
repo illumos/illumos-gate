@@ -125,8 +125,8 @@ typedef struct {
 	hrtime_t zi_now;
 	uint_t zi_avgrlat;
 	uint_t zi_avgwlat;
+	uint_t zi_totpri;
 	uint64_t zi_totutil;
-	uint64_t zi_avgutil;
 	int zi_active;
 } zoneio_stats_t;
 
@@ -159,9 +159,10 @@ int		zfs_zone_txg_throttle_scale = 2;
 int		zfs_zone_txg_delay_ticks = 2;
 
 typedef struct {
-	uint64_t bump_cnt;
-	zio_t	*zp;
-	zoneid_t zoneid;
+	int	zq_qdepth;
+	int	zq_priority;
+	int	zq_wt;
+	zoneid_t zq_zoneid;
 } zone_q_bump_t;
 
 /*
@@ -497,24 +498,27 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 	    (wops * sp->zi_avgwlat) + (lwops * sp->zi_avgwlat)) * 1000;
 	sp->zi_totutil += zonep->zone_io_util;
 
-	if (zonep->zone_io_util > 0)
+	if (zonep->zone_io_util > 0) {
 		sp->zi_active++;
+		sp->zi_totpri += zonep->zone_zfs_io_pri;
+	}
 
 	/*
 	 * sdt:::zfs-zone-utilization
 	 *
 	 *	arg0: zone ID
 	 *	arg1: read operations observed during time window
-	 *	arg2: write operations observed during time window
+	 *	arg2: physical write operations observed during time window
 	 *	arg3: logical write ops observed during time window
 	 *	arg4: calculated utilization given read and write ops
+	 *	arg5: I/O priority assigned to this zone
 	 */
 	extern void __dtrace_probe_zfs__zone__utilization(
-	    uint_t, uint_t, uint_t, uint_t, uint_t);
+	    uint_t, uint_t, uint_t, uint_t, uint_t, uint_t);
 
 	__dtrace_probe_zfs__zone__utilization((uint_t)(zonep->zone_id),
 	    (uint_t)rops, (uint_t)wops, (uint_t)lwops,
-	    (uint_t)zonep->zone_io_util);
+	    (uint_t)zonep->zone_io_util, (uint_t)zonep->zone_zfs_io_pri);
 
 	return (0);
 }
@@ -528,14 +532,24 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 {
 	zoneio_stats_t *sp = arg;
 	uint16_t delay = zonep->zone_io_delay;
+	uint_t fairutil = 0;
 
 	zonep->zone_io_util_above_avg = B_FALSE;
 
 	/*
-	 * Adjust each IO's delay by a certain amount.  If the overall delay
-	 * becomes too high, avoid increasing beyond the ceiling value.
+	 * Given the calculated total utilitzation for all zones, calculate the
+	 * fair share of I/O for this zone.
 	 */
-	if (zonep->zone_io_util > sp->zi_avgutil) {
+	if (sp->zi_totpri > 0) {
+		fairutil = (sp->zi_totutil * zonep->zone_zfs_io_pri) /
+		    sp->zi_totpri;
+	}
+
+	/*
+	 * Adjust each IO's delay.  If the overall delay becomes too high, avoid
+	 * increasing beyond the ceiling value.
+	 */
+	if (zonep->zone_io_util > fairutil) {
 		zonep->zone_io_util_above_avg = B_TRUE;
 
 		if (delay < zfs_zone_delay_ceiling && sp->zi_active > 1)
@@ -543,7 +557,7 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 			    zfs_zone_delay_ceiling) ?
 			    delay + zfs_zone_delay_step :
 			    zfs_zone_delay_ceiling;
-	} else if (zonep->zone_io_util < sp->zi_avgutil || sp->zi_active <= 1) {
+	} else if (zonep->zone_io_util < fairutil || sp->zi_active <= 1) {
 		delay = delay - zfs_zone_delay_step > 0 ?
 		    delay - zfs_zone_delay_step : 0;
 	}
@@ -554,12 +568,14 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	 *	arg0: zone ID
 	 *	arg1: old delay for this zone
 	 *	arg2: new delay for this zone
+	 *	arg3: calculated fair I/O utilization
 	 */
 	extern void __dtrace_probe_zfs__zone__throttle(
-	    uintptr_t, uintptr_t, uintptr_t);
+	    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
-	__dtrace_probe_zfs__zone__throttle((uintptr_t)(zonep->zone_id),
-	    (uintptr_t)zonep->zone_io_delay, (uintptr_t)delay);
+	__dtrace_probe_zfs__zone__throttle(
+	    (uintptr_t)(zonep->zone_id), (uintptr_t)zonep->zone_io_delay,
+	    (uintptr_t)delay, (uintptr_t)fairutil);
 
 	zonep->zone_io_delay = delay;
 
@@ -583,57 +599,80 @@ zfs_zone_wait_adjust(hrtime_t now)
 	if (zone_walk(zfs_zone_wait_adjust_calculate_cb, &stats) != 0)
 		return;
 
-	if (stats.zi_active > 0)
-		stats.zi_avgutil = stats.zi_totutil / stats.zi_active;
-
 	/*
 	 * sdt:::zfs-zone-stats
 	 *
 	 *	arg0: average system read latency
 	 *	arg1: average system write latency
 	 *	arg2: number of active zones
-	 *	arg3: average IO 'utilization' per zone
+	 *	arg3: total I/O 'utilization' for all zones
+	 *	arg4: total I/O priority of all active zones
 	 */
 	extern void __dtrace_probe_zfs__zone__stats(
-	    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+	    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 	__dtrace_probe_zfs__zone__stats((uintptr_t)(stats.zi_avgrlat),
 	    (uintptr_t)(stats.zi_avgwlat),
 	    (uintptr_t)(stats.zi_active),
-	    (uintptr_t)(stats.zi_avgutil));
+	    (uintptr_t)(stats.zi_totutil),
+	    (uintptr_t)(stats.zi_totpri));
 
 	(void) zone_walk(zfs_zone_wait_adjust_delay_cb, &stats);
 }
 
 /*
- * Callback used to find a zone with only 1 op in the vdev queue.
- * We scan the zones looking for ones with 1 op in the queue.  Out of those,
- * we pick the one that has been bumped the least number of times.
- * We return that zio pointer we have cached so that we don't have to search
- * the vdev queue to find it.
+ * Callback used to calculate a zone's IO schedule priority.
+ *
+ * We scan the zones looking for ones with ops in the queue.  Out of those,
+ * we pick the one that calculates to the highest schedule priority.
  */
 static int
-get_enqueued_cb(zone_t *zonep, void *arg)
+get_sched_pri_cb(zone_t *zonep, void *arg)
 {
+	int pri;
 	zone_q_bump_t *qbp = arg;
 
-	/*
-	 * Don't bump any zones which have had an above average utilization in
-	 * the last sample window (ZONE_ZFS_100MS) even if they currently only
-	 * have one IO in the vdev queue.
-	 */
-	if (zonep->zone_zfs_queued != 1 || zonep->zone_zfs_last_zio == NULL ||
-	    zonep->zone_id == GLOBAL_ZONEID || zonep->zone_io_util_above_avg)
+	extern void __dtrace_probe_zfs__zone__enqueued(uintptr_t, uintptr_t);
+	__dtrace_probe_zfs__zone__enqueued((uintptr_t)(zonep->zone_id),
+	    (uintptr_t)(zonep->zone_zfs_queued));
+
+	if (zonep->zone_zfs_queued == 0) {
+		zonep->zone_zfs_weight = 0;
 		return (0);
+	}
 
 	/*
-	 * If this is the first zone we find with a count of 1 or if this
-	 * zone was bumped less than the one we already found, then use it.
+	 * On each pass, increment the zone's weight.  We use this as input
+	 * to the calculation to prevent starvation.  The value is reset
+	 * each time we issue an IO for this zone so zones which haven't
+	 * done any IO over several iterations will see their weight max
+	 * out.
 	 */
-	if (qbp->zp == NULL || qbp->bump_cnt > zonep->zone_zfs_queue_bumped) {
-		qbp->bump_cnt = zonep->zone_zfs_queue_bumped;
-		qbp->zp = (zio_t *)(zonep->zone_zfs_last_zio);
-		qbp->zoneid = zonep->zone_id;
+	if (zonep->zone_zfs_weight < 20)
+		zonep->zone_zfs_weight++;
+
+	/*
+	 * This zone's IO priority is the inverse of the number of IOs
+	 * the zone has enqueued * zone's configured priority * weight.
+	 * The queue depth has already been scaled by 10 to avoid problems
+	 * with int rounding.
+	 *
+	 * This means that zones with fewer IOs in the queue will get
+	 * preference unless other zone's assigned priority pulls them
+	 * ahead.  The weight is factored in to help ensure that zones
+	 * which haven't done IO in a while aren't getting starved.
+	 */
+	pri = (qbp->zq_qdepth / zonep->zone_zfs_queued) *
+	    zonep->zone_zfs_io_pri * zonep->zone_zfs_weight;
+
+	/*
+	 * If this zone has a higher priority than what we found so far,
+	 * schedule it next.
+	 */
+	if (pri > qbp->zq_priority) {
+		qbp->zq_zoneid = zonep->zone_id;
+		qbp->zq_priority = pri;
+		qbp->zq_wt = zonep->zone_zfs_weight;
 	}
 	return (0);
 }
@@ -651,68 +690,61 @@ get_enqueued_cb(zone_t *zonep, void *arg)
  * zone work badly for interactive behavior.
  *
  * The scheduling algorithm kicks in once we start to get a deeper queue.
- * Once that occurs, we look at all of the zones to see which ones only have
- * one IO enqueued.  The assumption here is that these zones are the ones
- * doing simple single-threaded workloads and we want to bump those to the
- * head of the queue, ahead of zones with multiple ops in the queue, so that
- * interactive performance is better.
+ * Once that occurs, we look at all of the zones to see which one calculates
+ * to the highest priority.  We bump that zone's first zio to the head of the
+ * queue.
  *
- * We keep track of how many times a zone is bumped to the head of the queue so
- * that we don't keep bumping the same zone when there is more than one in the
- * queue with a single op.
- *
- * We use a counter on the zone so that we can quickly find zones with a
- * single op in the queue without having to search the entire queue itself.
+ * We use a counter on the zone so that we can quickly find how many ops each
+ * zone has in the queue without having to search the entire queue itself.
  * This scales better since the number of zones is expected to be on the
  * order of 10-100 whereas the queue depth can be in the range of 50-2000.
  * In addition, since the zio's in the queue only have the zoneid, we would
  * have to look up the zone for each zio enqueued and that means the overhead
  * for scanning the queue each time would be much higher.
  *
- * XXX
- * Instead, we only have to iterate all of the zones until we find one or two
- * with an op count of 1, then scan the queue until we find the zio for the
- * associated zone.
- *
- * Note that we have to ensure that we don't re-use a stale zio from a zone
- * which had a count > 1 that has now transitioned back down to a count of 1.
- *
  * In all cases, we fall back to simply pulling the next op off the queue
- * if there are no zones to bump to the head of the queue.
+ * if something should go wrong.
  */
 static zio_t *
-get_next_zio(vdev_queue_t *vq)
+get_next_zio(vdev_queue_t *vq, int qdepth)
 {
 	zone_q_bump_t qbump;
-	zio_t *zp;
+	zio_t *zp = NULL, *zphead;
+	int cnt = 0;
 
 	ASSERT(MUTEX_HELD(&vq->vq_lock));
 
-	qbump.zp = NULL;
-	qbump.bump_cnt = 0;
-	(void) zone_walk(get_enqueued_cb, &qbump);
+	/* To avoid problems with int rounding, scale the queue depth by 10 */
+	qbump.zq_qdepth = qdepth * 10;
+	qbump.zq_priority = 0;
+	qbump.zq_zoneid = 0;
+	(void) zone_walk(get_sched_pri_cb, &qbump);
 
-	/* There are no zones with a count of 1 */
-	if (qbump.zp == NULL)
-		return (avl_first(&vq->vq_deadline_tree));
+	zphead = avl_first(&vq->vq_deadline_tree);
 
-	/*
-	 * XXX there seems to be a bug where we use a stale zp pointer.
-	 * For now walk the queue to find the zio we want to use.
-	 */
-	/* zp = qbump.zp; */
-
-	for (zp = avl_first(&vq->vq_deadline_tree); zp != NULL;
-	    zp = avl_walk(&vq->vq_deadline_tree, zp, AVL_AFTER)) {
-		if (zp->io_zoneid == qbump.zoneid)
-			break;
+	/* Check if the scheduler didn't pick a zone for some reason!? */
+	if (qbump.zq_zoneid != 0) {
+		for (zp = avl_first(&vq->vq_deadline_tree); zp != NULL;
+		    zp = avl_walk(&vq->vq_deadline_tree, zp, AVL_AFTER)) {
+			if (zp->io_zoneid == qbump.zq_zoneid)
+				break;
+			cnt++;
+		}
 	}
 
-	if (zp == NULL)
-		zp = avl_first(&vq->vq_deadline_tree);
-
-	extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t);
-	__dtrace_probe_zfs__zone__sched__bump((uintptr_t)(zp->io_zoneid));
+	if (zp == NULL) {
+		zp = zphead;
+	} else if (zp != zphead) {
+		/*
+		 * Only fire the probe if we actually picked a different zio
+		 * than the one already at the head of the queue.
+		 */
+		extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t,
+		    uintptr_t, uintptr_t, uintptr_t);
+		__dtrace_probe_zfs__zone__sched__bump(
+		   (uintptr_t)(zp->io_zoneid), (uintptr_t)(cnt),
+		   (uintptr_t)(qbump.zq_priority), (uintptr_t)(qbump.zq_wt));
+	}
 
 	return (zp);
 }
@@ -899,6 +931,7 @@ zfs_zone_zio_start(zio_t *zp)
 
 	mutex_enter(&zonep->zone_io_lock);
 	kstat_runq_enter(zonep->zone_io_kiop);
+	zonep->zone_zfs_weight = 0;
 	mutex_exit(&zonep->zone_io_lock);
 
 	zp->io_start = NANO_TO_MICRO(gethrtime());
@@ -970,14 +1003,10 @@ zfs_zone_zio_dequeue(zio_t *zp)
 
 	mutex_enter(&zonep->zone_stg_io_lock);
 	ASSERT(zonep->zone_zfs_queued > 0);
-	zonep->zone_zfs_queued--;
-	/*
-	 * We can always NULL out the cached zio here since we are either
-	 * dropping down to a count of 0 or we had more than one zio in the
-	 * queue.  In the second case, we can't assume this cached pointer was
-	 * valid.
-	 */
-	zonep->zone_zfs_last_zio = NULL;
+	if (zonep->zone_zfs_queued == 0)
+		cmn_err(CE_WARN, "zfs_zone_zio_dequeue: count==0");
+	else
+		zonep->zone_zfs_queued--;
 	mutex_exit(&zonep->zone_stg_io_lock);
 	zone_rele(zonep);
 }
@@ -992,14 +1021,6 @@ zfs_zone_zio_enqueue(zio_t *zp)
 
 	mutex_enter(&zonep->zone_stg_io_lock);
 	zonep->zone_zfs_queued++;
-	/*
-	 * Just to be safe, we NULL out the zone_zfs_last_zio whenever we're
-	 * not at 1 zio in the queue.
-	 */
-	if (zonep->zone_zfs_queued == 1)
-		zonep->zone_zfs_last_zio = zp;
-	else
-		zonep->zone_zfs_last_zio = NULL;
 	mutex_exit(&zonep->zone_stg_io_lock);
 	zone_rele(zonep);
 }
@@ -1033,7 +1054,7 @@ zfs_zone_schedule(vdev_queue_t *vq)
 	if (!zfs_zone_schedule_enable || cnt < zfs_zone_schedule_thresh)
 		zp = avl_first(&vq->vq_deadline_tree);
 	else
-		zp = get_next_zio(vq);
+		zp = get_next_zio(vq, cnt);
 
 	vq->vq_last_zone_id = zp->io_zoneid;
 
