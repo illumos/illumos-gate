@@ -191,9 +191,9 @@ main(int argc, char *argv[])
 static void
 usage(void)
 {
-	(void) fputs(_("usage: sed script [-Ealn] [-i extension] [file ...]\n"
-	    "       sed [-Ealn] [-i extension] [-e script] ... "
-	    "[-f script_file] ... [file ...]"),
+	(void) fputs(_("usage: sed script [-Ealn] [-i extension] [file...]\n"
+	    "       sed [-Ealn] [-i extension] [-e script]... "
+	    "[-f script_file]... [file...]\n"),
 	    stderr);
 	exit(1);
 }
