@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -185,6 +186,7 @@ char *res_types[] = {
 	"admin",
 	"fs-allowed",
 	ALIAS_MAXPROCS,
+	ALIAS_ZFSPRI,
 	NULL
 };
 
@@ -232,6 +234,7 @@ char *prop_types[] = {
 	"fs-allowed",
 	ALIAS_MAXPROCS,
 	"allowed-address",
+	ALIAS_ZFSPRI,
 	NULL
 };
 
@@ -297,6 +300,7 @@ static const char *clear_cmds[] = {
 	"clear " ALIAS_MAXSEMIDS,
 	"clear " ALIAS_SHARES,
 	"clear " ALIAS_MAXPROCS,
+	"clear " ALIAS_ZFSPRI,
 	NULL
 };
 
@@ -347,6 +351,7 @@ static const char *set_cmds[] = {
 	"set hostid=",
 	"set fs-allowed=",
 	"set " ALIAS_MAXPROCS "=",
+	"set " ALIAS_ZFSPRI "=",
 	NULL
 };
 
@@ -1246,6 +1251,8 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_MAXSEMIDS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_SHARES));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_ZFSPRI));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s\n",
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
@@ -3608,6 +3615,9 @@ clear_global(cmd_t *cmd)
 	case PT_SHARES:
 		remove_aliased_rctl(PT_SHARES, ALIAS_SHARES);
 		return;
+	case PT_ZFSPRI:
+		remove_aliased_rctl(PT_ZFSPRI, ALIAS_ZFSPRI);
+		return;
 	case PT_HOSTID:
 		if ((err = zonecfg_set_hostid(handle, NULL)) != Z_OK)
 			z_cmd_rt_perror(CMD_CLEAR, RT_HOSTID, err, B_TRUE);
@@ -4104,6 +4114,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_HOSTID;
 		} else if (prop_type == PT_FS_ALLOWED) {
 			res_type = RT_FS_ALLOWED;
+		} else if (prop_type == PT_ZFSPRI) {
+			res_type = RT_ZFSPRI;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -4308,6 +4320,9 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_SHARES:
 		set_aliased_rctl(ALIAS_SHARES, prop_type, prop_id);
+		return;
+	case RT_ZFSPRI:
+		set_aliased_rctl(ALIAS_ZFSPRI, prop_type, prop_id);
 		return;
 	case RT_HOSTID:
 		if ((err = zonecfg_set_hostid(handle, prop_id)) != Z_OK) {
@@ -5455,6 +5470,7 @@ info_func(cmd_t *cmd)
 		info_aliased_rctl(handle, fp, ALIAS_MAXMSGIDS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSEMIDS);
 		info_aliased_rctl(handle, fp, ALIAS_SHARES);
+		info_aliased_rctl(handle, fp, ALIAS_ZFSPRI);
 		if (!global_zone) {
 			info_fs(handle, fp, cmd);
 			info_net(handle, fp, cmd);
@@ -5517,6 +5533,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_SHARES:
 		info_aliased_rctl(handle, fp, ALIAS_SHARES);
+		break;
+	case RT_ZFSPRI:
+		info_aliased_rctl(handle, fp, ALIAS_ZFSPRI);
 		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);

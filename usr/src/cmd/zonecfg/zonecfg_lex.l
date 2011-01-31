@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -307,6 +308,9 @@ static char *create_token(char *s);
 
 <TSTATE>fs-allowed	{ return FS_ALLOWED; }
 <CSTATE>fs-allowed	{ return FS_ALLOWED; }
+
+<TSTATE>zfs-io-priority	{ return ZFSPRI; }
+<CSTATE>zfs-io-priority	{ return ZFSPRI; }
 
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }
