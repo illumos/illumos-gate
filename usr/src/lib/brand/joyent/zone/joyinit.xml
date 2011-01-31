@@ -36,7 +36,7 @@
 	start.  It also sets up configuration data on that zpool, if necessary.
 -->
 <service
-	name='system/joyinit'
+	name='system/smartdc/init'
 	type='service'
 	version='1'>
 
