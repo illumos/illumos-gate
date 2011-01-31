@@ -425,8 +425,9 @@ static boolean_t zsd_wait_for_inprogress(zone_t *, struct zsd_entry *,
  * Version 5 alters the zone_boot system call, and converts its old
  *     bootargs parameter to be set by the zone_setattr API instead.
  * Version 6 adds the flag argument to zone_create.
+ * Version 7 adds the requested zoneid to zone_create.
  */
-static const int ZONE_SYSCALL_API_VERSION = 6;
+static const int ZONE_SYSCALL_API_VERSION = 7;
 
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
@@ -4185,13 +4186,13 @@ zone_create(const char *zone_name, const char *zone_root,
     caddr_t rctlbuf, size_t rctlbufsz,
     caddr_t zfsbuf, size_t zfsbufsz, int *extended_error,
     int match, uint32_t doi, const bslabel_t *label,
-    int flags)
+    int flags, zoneid_t req_zoneid)
 {
 	struct zsched_arg zarg;
 	nvlist_t *rctls = NULL;
 	proc_t *pp = curproc;
 	zone_t *zone, *ztmp;
-	zoneid_t zoneid;
+	zoneid_t zoneid = -1;
 	int error;
 	int error2 = 0;
 	char *str;
@@ -4207,7 +4208,20 @@ zone_create(const char *zone_name, const char *zone_root,
 		    extended_error));
 
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
-	zoneid = zone->zone_id = id_alloc(zoneid_space);
+	/*
+	 * If zoneadmd is asking for a specific zoneid, see if we can grant
+	 * the request, but allocate a new id if that fails for any reason.
+	 */
+	if (req_zoneid != -1) {
+		zoneid = id_alloc_specific_nosleep(zoneid_space, req_zoneid);
+		if (zoneid == -1)
+			cmn_err(CE_WARN,
+			    "zone_create: re-use zoneid %d failed\n",
+		    	    req_zoneid);
+	}
+	if (zoneid == -1)
+		zoneid = id_alloc(zoneid_space);
+	zone->zone_id = zoneid;
 	zone->zone_status = ZONE_IS_UNINITIALIZED;
 	zone->zone_pool = pool_default;
 	zone->zone_pool_mod = gethrtime();
@@ -6180,6 +6194,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 			zs.doi = zs32.doi;
 			zs.label = (const bslabel_t *)(uintptr_t)zs32.label;
 			zs.flags = zs32.flags;
+			zs.zoneid = zs32.zoneid;
 #else
 			panic("get_udatamodel() returned bogus result\n");
 #endif
@@ -6190,7 +6205,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		    (caddr_t)zs.rctlbuf, zs.rctlbufsz,
 		    (caddr_t)zs.zfsbuf, zs.zfsbufsz,
 		    zs.extended_error, zs.match, zs.doi,
-		    zs.label, zs.flags));
+		    zs.label, zs.flags, zs.zoneid));
 	case ZONE_BOOT:
 		return (zone_boot((zoneid_t)(uintptr_t)arg1));
 	case ZONE_DESTROY:

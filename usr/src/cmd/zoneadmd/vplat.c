@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -4632,8 +4633,15 @@ out:
 	return (res);
 }
 
+/*
+ * The requested zoneid (req_zoneid) is advisory to the kernel and will be
+ * -1 if this is a new instance of a zone without a pre-existing zoneid.
+ * If this zone already exists (i.e. we're rebooting it) then the kernel will
+ * try to reassign the same zoneid, however there is no guarantee that this
+ * will occur.  In practice it should always occur.
+ */
 zoneid_t
-vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
+vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t req_zoneid)
 {
 	zoneid_t rval = -1;
 	priv_set_t *privs;
@@ -4774,7 +4782,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
 	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel,
-	    flags)) == -1) {
+	    flags, req_zoneid)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,

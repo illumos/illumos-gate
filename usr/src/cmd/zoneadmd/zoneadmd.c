@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -529,7 +530,7 @@ notify_zonestatd(zoneid_t zoneid)
  * subcommand.
  */
 static int
-zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
+zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, zoneid_t req_zoneid)
 {
 	int err;
 
@@ -542,7 +543,7 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		goto bad;
 	}
 
-	if ((zone_id = vplat_create(zlogp, mount_cmd)) == -1) {
+	if ((zone_id = vplat_create(zlogp, mount_cmd, req_zoneid)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
@@ -1163,12 +1164,14 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		goto out;
 	}
 
+	zoneid = getzoneidbyname(zone_name);
+
 	if (kernelcall) {
 		/*
 		 * Kernel-initiated requests may lose their validity if the
 		 * zone_t the kernel was referring to has gone away.
 		 */
-		if ((zoneid = getzoneidbyname(zone_name)) == -1 ||
+		if (zoneid == -1 ||
 		    zone_getattr(zoneid, ZONE_ATTR_UNIQID, &uniqid,
 		    sizeof (uniqid)) == -1 || uniqid != zargp->uniqid) {
 			/*
@@ -1204,15 +1207,15 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_INSTALLED:
 		switch (cmd) {
 		case Z_READY:
-			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate);
+			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate, zoneid);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
 		case Z_FORCEBOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
-			    == 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    zoneid)) == 0) {
 				rval = zone_bootup(zlogp, zargp->bootbuf,
 				    zstate);
 			}
@@ -1271,7 +1274,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 			rval = zone_ready(zlogp,
 			    strcmp(zargp->bootbuf, "-U") == 0 ?
-			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate);
+			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate, zoneid);
 			if (rval != 0)
 				break;
 
@@ -1398,7 +1401,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate))
 			    != 0)
 				break;
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    zoneid)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1429,8 +1433,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				boot_args[0] = '\0';
 				break;
 			}
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
-			    != 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    zoneid)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;
