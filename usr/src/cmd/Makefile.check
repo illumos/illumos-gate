@@ -119,7 +119,6 @@ MANIFEST_SUBDIRS=			\
 	krb5/krb5kdc			\
 	krb5/kwarn			\
 	krb5/slave			\
-	lp/cmd/lpsched			\
 	lvm/rpc.mdcommd			\
 	lvm/rpc.metad			\
 	lvm/rpc.metamedd		\
@@ -128,8 +127,6 @@ MANIFEST_SUBDIRS=			\
 	lvm/util			\
 	picl/picld			\
 	pools/poold			\
-	print/bsd-sysv-commands		\
-	print/ppdmgr			\
 	rcap/rcapd			\
 	rpcsvc/rpc.bootparamd		\
 	sendmail/lib			\

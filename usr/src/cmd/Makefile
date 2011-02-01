@@ -25,7 +25,7 @@
 include ../Makefile.master
 
 #
-#	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in
+#	Note that the commands 'perl', and 'man' are first in
 #	the list, violating alphabetical order.  This is because they are very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
@@ -506,8 +506,8 @@ sparc_SUBDIRS=		\
 	vntsd
 
 #
-# Commands that are messaged.  Note that 'lp' and 'man' come first
-# (see previous comment about 'lp' and 'man').
+# Commands that are messaged.  Note that 'man' comes first
+# (see previous comment about 'man').
 #
 MSGSUBDIRS=		\
 	man		\
