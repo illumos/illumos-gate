@@ -96,7 +96,7 @@ $Kstat->update();
 
 while (1) {
 	printf("   r/s    w/s   %sr/s   %sw/s wait_t ractv wactv " .
-	    "read_t writ_t  %%b zone\n", $BYTES_PREFIX, $BYTES_PREFIX);
+	    "read_t writ_t  %%r  %%w zone\n", $BYTES_PREFIX, $BYTES_PREFIX);
 
 	foreach my $instance (sort keys(%$Modules)) {
 		my $Instances = $Modules->{$instance};
@@ -149,10 +149,9 @@ sub print_stats {
 	# Calculate the % time the VFS layer is active
 	my $r_b_pct = (($rtime - $old_rtime) / $etime) * 100;
 	my $w_b_pct = (($wtime - $old_wtime) / $etime) * 100;
-	my $b_pct = ($r_b_pct + $w_b_pct) / 2;
 
 	printf("%6.1f %6.1f %6.1f %6.1f %6.1f %5.1f %5.1f %6.1f %6.1f " .
-	    "%3d %s\n",
+	    "%3d %3d %s\n",
 	    ($rops - $old_rops) / $etime,
 	    ($wops - $old_wops) / $etime,
 	    ($rbytes - $old_rbytes) / $etime / $BYTES_DIVISOR,
@@ -162,7 +161,8 @@ sub print_stats {
 	    $w_actv,
 	    $read_t,
 	    $writ_t,
-	    $b_pct,
+	    $r_b_pct,
+	    $w_b_pct,
 	    $zonename);
 
 	# Save current calculations for next loop
