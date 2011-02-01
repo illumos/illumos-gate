@@ -51,6 +51,7 @@ fi
 
 # Get the dataset of the parent directory of the zonepath.
 dname=${ZONEPATH%/*}
+bname=${ZONEPATH##*/}
 zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
     read mp PDS_NAME
 if [[ -z "$PDS_NAME" ]]; then
@@ -58,10 +59,10 @@ if [[ -z "$PDS_NAME" ]]; then
 	exit $ZONE_SUBPROC_USAGE
 fi
 
-ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$ZONENAME`
+ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$bname`
 
-zfs destroy -r $PDS_NAME/$ZONENAME/cores
-zfs destroy -r $PDS_NAME/$ZONENAME
+zfs destroy -r $PDS_NAME/$bname/cores
+zfs destroy -r $PDS_NAME/$bname
 
 [ "$ORIGIN" != "-" ] && zfs destroy $ORIGIN
 

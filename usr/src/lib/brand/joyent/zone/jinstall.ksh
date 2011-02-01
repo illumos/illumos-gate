@@ -70,6 +70,7 @@ ZROOT=$ZONEPATH/root
 
 # Get the dataset of the parent directory of the zonepath.
 dname=${ZONEPATH%/*}
+bname=${ZONEPATH##*/}
 zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
     read mp PDS_NAME
 [ -z "$PDS_NAME" ] && \
@@ -77,15 +78,15 @@ zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
 
 # zoneadm already created the dataset but we want to use a clone, so first
 # remove the one zoneadm created. 
-zfs destroy $PDS_NAME/$ZONENAME
+zfs destroy $PDS_NAME/$bname
 
-zfs snapshot $PDS_NAME/${TMPLZONE}@${ZONENAME}
-zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${ZONENAME} \
-    $PDS_NAME/$ZONENAME
+zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
+zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
+    $PDS_NAME/$bname
 
 # Convert quota to MB and use 10% of that value for the zone core dump dataset
 CORE_QUOTA=$((($ZQUOTA * 1000) / 10))
-zfs create -o quota=${CORE_QUOTA}m -o compression=gzip $PDS_NAME/$ZONENAME/cores
+zfs create -o quota=${CORE_QUOTA}m -o compression=gzip $PDS_NAME/$bname/cores
 
 chmod 700 $ZONEPATH
 
