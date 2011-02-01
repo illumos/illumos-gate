@@ -24,6 +24,10 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
 # This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
 # common to all SunOS systems.
@@ -451,6 +455,8 @@ AUDIO1575_OBJS += audio1575.o
 AUDIO810_OBJS += audio810.o
 
 AUDIOCMI_OBJS += audiocmi.o
+
+AUDIOCMIHD_OBJS += audiocmihd.o
 
 AUDIOHD_OBJS +=	audiohd.o
 
