@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAPD_H
@@ -126,6 +127,8 @@ typedef struct lookup_state {
 	int			nldap_nqueries;
 	bool_t			eph_map_unres_sids;
 	int			directory_based_mapping;	/* enum */
+	uint_t			id_cache_timeout;
+	uint_t			name_cache_timeout;
 	uint_t			curpos;
 	hashentry_t		*sid_history;
 	uint_t			sid_history_size;
