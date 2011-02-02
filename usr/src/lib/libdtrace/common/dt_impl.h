@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_DT_IMPL_H
 #define	_DT_IMPL_H
 
@@ -251,6 +255,7 @@ struct dtrace_hdl {
 	uint_t dt_droptags;	/* boolean:  set via -xdroptags */
 	uint_t dt_active;	/* boolean:  set once tracing is active */
 	uint_t dt_stopped;	/* boolean:  set once tracing is stopped */
+	uint_t dt_optset;	/* boolean:  set once options have been set */
 	processorid_t dt_beganon; /* CPU that executed BEGIN probe (if any) */
 	processorid_t dt_endedon; /* CPU that executed END probe (if any) */
 	uint_t dt_oflags;	/* dtrace open-time options (see dtrace.h) */

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <unistd.h>
@@ -152,6 +153,24 @@ dtrace_program_exec(dtrace_hdl_t *dtp, dtrace_prog_t *pgp,
 {
 	void *dof;
 	int n, err;
+
+	if (!dtp->dt_optset) {
+		/*
+		 * If we have not yet ioctl'd down our options DOF, we'll
+		 * do that before enabling any probes (some options will
+		 * affect which probes we match).
+		 */
+		if ((dof = dtrace_getopt_dof(dtp)) == NULL)
+			return (-1); /* dt_errno has been set for us */
+
+		err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
+		dtrace_dof_destroy(dtp, dof);
+
+		if (err == -1)
+			return (-1);
+
+		dtp->dt_optset = B_TRUE;
+	}
 
 	dtrace_program_info(dtp, pgp, pip);
 

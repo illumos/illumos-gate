@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -7523,6 +7524,7 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	uint32_t priv;
 	uid_t uid;
 	zoneid_t zoneid;
+	dtrace_state_t *state = enab->dten_vstate->dtvs_state;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	dtrace_ecb_create_cache = NULL;
@@ -7537,8 +7539,22 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	}
 
 	dtrace_probekey(desc, &pkey);
-	dtrace_cred2priv(enab->dten_vstate->dtvs_state->dts_cred.dcr_cred,
-	    &priv, &uid, &zoneid);
+	dtrace_cred2priv(state->dts_cred.dcr_cred, &priv, &uid, &zoneid);
+
+	if ((priv & DTRACE_PRIV_ZONEOWNER) &&
+	    state->dts_options[DTRACEOPT_ZONE] != DTRACEOPT_UNSET) {
+		/*
+		 * If we have the privilege of instrumenting all zones but we
+		 * have been told to instrument but one, we will spoof this up
+		 * depriving ourselves of DTRACE_PRIV_ZONEOWNER for purposes
+		 * of dtrace_match().  (Note that DTRACEOPT_ZONE is not for
+		 * security but rather for performance: it allows the global
+		 * zone to instrument USDT probes in a local zone without
+		 * requiring all zones to be instrumented.)
+		 */
+		priv &= ~DTRACE_PRIV_ZONEOWNER;
+		zoneid = state->dts_options[DTRACEOPT_ZONE];
+	}
 
 	return (dtrace_match(&pkey, priv, uid, zoneid, dtrace_ecb_create_enable,
 	    enab));
