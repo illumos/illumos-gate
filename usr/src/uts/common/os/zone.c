@@ -1872,7 +1872,7 @@ zone_kstat_create(zone_t *zone)
 	    "nprocs", zone_nprocs_kstat_update);
 
 	zone->zone_io_ksp = kstat_create_zone("zone_io", zone->zone_id,
-	    zone->zone_name, "disk", KSTAT_TYPE_IO, 1,
+	    zone->zone_name, "zone_io", KSTAT_TYPE_IO, 1,
 	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
 
 	if (zone->zone_io_ksp != NULL) {
@@ -1885,7 +1885,7 @@ zone_kstat_create(zone_t *zone)
 	}
 
 	zone->zone_vfs_ksp = kstat_create_zone("zone_vfs", zone->zone_id,
-	    zone->zone_name, "vfs", KSTAT_TYPE_IO, 1,
+	    zone->zone_name, "zone_vfs", KSTAT_TYPE_IO, 1,
 	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
 
 	if (zone->zone_vfs_ksp != NULL) {
