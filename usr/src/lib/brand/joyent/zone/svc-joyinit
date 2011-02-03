@@ -31,14 +31,6 @@ set -o xtrace
 cd /
 PATH=/usr/sbin:/usr/bin; export PATH
 
-set_root_password() {
-    enc_password=$1
-
-    sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
-      && chmod 400 /etc/shadow.new \
-      && mv /etc/shadow.new /etc/shadow
-}
-
 case "$1" in
 'start')
 
@@ -49,12 +41,6 @@ case "$1" in
     # to run an initial_script first anyway.
     if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
         USBMOUNT=/mnt/`svcprop -p joyentfs/usb_mountpoint svc:/system/filesystem/smartdc:default`
-
-        # Set the root password, if one's defined.
-        enc_password=$(grep "^root_shadow=" ${USBMOUNT}/config | cut -d'=' -f2 | tr -d "'")
-        if [[ -n "${enc_password}" ]]; then
-            set_root_password "${enc_password}"
-        fi
 
         initial_script=${USBMOUNT}/$(grep "^initial_script=" $USBMOUNT/config 2>/dev/null | cut -d'=' -f2-)
         if [ -n ${initial_script} ] && [ -e ${initial_script} ]; then
@@ -69,12 +55,6 @@ case "$1" in
                 echo "WARNING: initial_script failed with exit code [${result}].  Not starting Ur."
                 enable_ur="false"
             fi
-        fi
-    else
-        # For non-headnode, set the root password, if one's in bootparams.
-        enc_password=$(bootparams | grep "^root_shadow=" | cut -d'=' -f2 | tr -d "'")
-        if [[ -n "${enc_password}" ]]; then
-            set_root_password "${enc_password}"
         fi
     fi
 
