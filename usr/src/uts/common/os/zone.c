@@ -4186,13 +4186,13 @@ zone_create(const char *zone_name, const char *zone_root,
     caddr_t rctlbuf, size_t rctlbufsz,
     caddr_t zfsbuf, size_t zfsbufsz, int *extended_error,
     int match, uint32_t doi, const bslabel_t *label,
-    int flags, zoneid_t req_zoneid)
+    int flags, zoneid_t zone_did)
 {
 	struct zsched_arg zarg;
 	nvlist_t *rctls = NULL;
 	proc_t *pp = curproc;
 	zone_t *zone, *ztmp;
-	zoneid_t zoneid = -1;
+	zoneid_t zoneid;
 	int error;
 	int error2 = 0;
 	char *str;
@@ -4208,20 +4208,8 @@ zone_create(const char *zone_name, const char *zone_root,
 		    extended_error));
 
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
-	/*
-	 * If zoneadmd is asking for a specific zoneid, see if we can grant
-	 * the request, but allocate a new id if that fails for any reason.
-	 */
-	if (req_zoneid != -1) {
-		zoneid = id_alloc_specific_nosleep(zoneid_space, req_zoneid);
-		if (zoneid == -1)
-			cmn_err(CE_WARN,
-			    "zone_create: re-use zoneid %d failed\n",
-		    	    req_zoneid);
-	}
-	if (zoneid == -1)
-		zoneid = id_alloc(zoneid_space);
-	zone->zone_id = zoneid;
+	zoneid = zone->zone_id = id_alloc(zoneid_space);
+	zone->zone_did = zone_did;
 	zone->zone_status = ZONE_IS_UNINITIALIZED;
 	zone->zone_pool = pool_default;
 	zone->zone_pool_mod = gethrtime();

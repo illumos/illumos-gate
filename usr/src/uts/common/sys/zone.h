@@ -425,6 +425,7 @@ typedef struct zone {
 	 */
 	list_node_t	zone_linkage;
 	zoneid_t	zone_id;	/* ID of zone */
+	zoneid_t	zone_did;	/* persistent debug ID of zone */
 	uint_t		zone_ref;	/* count of zone_hold()s on zone */
 	uint_t		zone_cred_ref;	/* count of zone_hold_cred()s on zone */
 	/*

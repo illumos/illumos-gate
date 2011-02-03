@@ -4634,14 +4634,13 @@ out:
 }
 
 /*
- * The requested zoneid (req_zoneid) is advisory to the kernel and will be
- * -1 if this is a new instance of a zone without a pre-existing zoneid.
- * If this zone already exists (i.e. we're rebooting it) then the kernel will
- * try to reassign the same zoneid, however there is no guarantee that this
- * will occur.  In practice it should always occur.
+ * The zone_did is a persistent debug ID.  Each zone should have a unique ID
+ * in the kernel.  This is used for things like DTrace which want to monitor
+ * zones across reboots.  They can't use the zoneid since that changes on
+ * each boot.
  */
 zoneid_t
-vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t req_zoneid)
+vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 {
 	zoneid_t rval = -1;
 	priv_set_t *privs;
@@ -4782,7 +4781,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t req_zoneid)
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
 	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel,
-	    flags, req_zoneid)) == -1) {
+	    flags, zone_did)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,
