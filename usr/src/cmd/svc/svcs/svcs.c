@@ -77,7 +77,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
-#include <zone.h>
+#include <libzonecfg.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -357,7 +357,7 @@ int
 pg_get_single_val(scf_propertygroup_t *pg, const char *propname, scf_type_t ty,
     void *vp, size_t sz, uint_t flags)
 {
-	char *buf;
+	char *buf, root[MAXPATHLEN];
 	size_t buf_sz;
 	int ret = -1, r;
 	boolean_t multi = B_FALSE;
@@ -450,6 +450,21 @@ misconfigured:
 	free(buf);
 
 out:
+	if (ret != 0 || g_zonename == NULL ||
+	    (strcmp(propname, SCF_PROPERTY_LOGFILE) != 0 &&
+	    strcmp(propname, SCF_PROPERTY_ALT_LOGFILE) != 0))
+		return (ret);
+
+	/*
+	 * If we're here, we have a log file and we have specified a zone.
+	 * As a convenience, we're going to prepend the zone path to the
+	 * name of the log file.
+	 */
+	root[0] = '\0';
+	(void) zone_get_rootpath(g_zonename, root, sizeof (root));
+	(void) strlcat(root, vp, sizeof (root));
+	(void) snprintf(vp, sz, "%s", root);
+
 	return (ret);
 }
 

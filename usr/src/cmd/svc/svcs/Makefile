@@ -32,7 +32,7 @@ include ../../Makefile.cmd
 include ../../Makefile.ctf
 
 POFILE =	$(PROG)_all.po
-LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair
+LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair -lzonecfg
 CPPFLAGS += -I ../common
 
 lint := LINTFLAGS = -mux
