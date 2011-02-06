@@ -221,7 +221,6 @@ COMMON_SUBDIRS=		\
 	kstat		\
 	last		\
 	lastcomm	\
-	latencytop	\
 	ldap		\
 	ldapcachemgr	\
 	lgrpinfo	\
@@ -364,7 +363,6 @@ COMMON_SUBDIRS=		\
 	sh		\
 	shcomp		\
 	smbios		\
-	smbsrv		\
 	smserverd	\
 	soelim		\
 	sort		\
@@ -684,7 +682,6 @@ MSGSUBDIRS=		\
 	sgs		\
 	sh		\
 	shcomp		\
-	smbsrv		\
 	sort		\
 	split		\
 	srptadm		\
