@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent Inc. All rights reserved.
 #
 
 #
@@ -120,6 +121,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_get_bootargs;
 	zonecfg_get_brand;
 	zonecfg_get_dflt_sched_class;
+	zonecfg_get_did;
 	zonecfg_getdevent;
 	zonecfg_getdevperment;
 	zonecfg_getdsent;
@@ -196,6 +198,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_set_autoboot;
 	zonecfg_set_bootargs;
 	zonecfg_set_brand;
+	zonecfg_set_did;
 	zonecfg_setdevent;
 	zonecfg_setdevperment;
 	zonecfg_setdsent;
@@ -229,6 +232,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_verify_save;
 	zonecfg_warn_poold;
 	zone_get_brand;
+	zone_get_did;
 	zone_get_devroot;
 	zone_get_id;
 	zone_get_rootpath;

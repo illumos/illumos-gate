@@ -82,6 +82,8 @@
 #define	ZONE_EVENT_PING_SUBCLASS	"ping"
 #define	ZONE_EVENT_PING_PUBLISHER	"solaris"
 
+#define	DEBUGID_FILE	"/etc/zones/did.txt"
+
 /* Hard-code the DTD element/attribute/entity names just once, here. */
 #define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
 #define	DTD_ELEM_COMMENT	(const xmlChar *) "comment"
@@ -137,6 +139,7 @@
 #define	DTD_ATTR_MODE		(const xmlChar *) "mode"
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 #define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
+#define	DTD_ATTR_DID		(const xmlChar *) "debugid"
 #define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
 #define	DTD_ATTR_USER		(const xmlChar *) "user"
 #define	DTD_ATTR_AUTHS		(const xmlChar *) "auths"

@@ -6416,6 +6416,12 @@ verify_func(cmd_t *cmd)
 
 	if (save) {
 		if (ret_val == Z_OK) {
+			/*
+			 * If the zone doesn't yet have a debug ID, set one now.
+			 */
+			if (zonecfg_get_did(handle) == -1)
+				zonecfg_set_did(handle);
+
 			if ((ret_val = zonecfg_save(handle)) == Z_OK) {
 				need_to_commit = B_FALSE;
 				(void) strlcpy(revert_zone, zone,

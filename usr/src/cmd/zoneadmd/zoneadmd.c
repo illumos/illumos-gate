@@ -551,7 +551,10 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		goto bad;
 	}
 
-	if ((zone_id = vplat_create(zlogp, mount_cmd)) == -1) {
+	if (zone_did == 0)
+		zone_did = zone_get_did(zone_name);
+
+	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));

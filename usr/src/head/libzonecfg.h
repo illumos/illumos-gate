@@ -332,6 +332,8 @@ extern	int	zonecfg_set_bootargs(zone_dochandle_t, char *);
 extern	int	zonecfg_get_sched_class(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_sched(zone_dochandle_t, char *);
 extern	int	zonecfg_get_dflt_sched_class(zone_dochandle_t, char *, int);
+extern	zoneid_t zonecfg_get_did(zone_dochandle_t);
+extern	void	zonecfg_set_did(zone_dochandle_t);
 
 /*
  * Set/retrieve the brand for the zone
@@ -525,6 +527,7 @@ extern	int	zonecfg_set_limitpriv(zone_dochandle_t, char *);
  * Higher-level routines.
  */
 extern  int	zone_get_brand(char *, char *, size_t);
+extern  zoneid_t zone_get_did(char *);
 extern	int	zone_get_rootpath(char *, char *, size_t);
 extern	int	zone_get_devroot(char *, char *, size_t);
 extern	int	zone_get_zonepath(char *, char *, size_t);
