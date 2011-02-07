@@ -78,6 +78,8 @@
 #define	ZONE_EVENT_PING_SUBCLASS	"ping"
 #define	ZONE_EVENT_PING_PUBLISHER	"solaris"
 
+#define	DEBUGID_FILE	"/etc/zones/did.txt"
+
 /* Hard-code the DTD element/attribute/entity names just once, here. */
 #define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
 #define	DTD_ELEM_COMMENT	(const xmlChar *) "comment"
@@ -129,6 +131,7 @@
 #define	DTD_ATTR_MODE		(const xmlChar *) "mode"
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 #define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
+#define	DTD_ATTR_DID		(const xmlChar *) "debugid"
 #define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
 #define	DTD_ATTR_USER		(const xmlChar *) "user"
 #define	DTD_ATTR_AUTHS		(const xmlChar *) "auths"
@@ -5522,6 +5525,164 @@ zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
 
 	zonecfg_fini_handle(handle);
 	return (err);
+}
+
+/*
+ * Atomically get a new zone_did value.  The currently allocated value
+ * is stored in /etc/zones/did.txt.  Lock the file, read the current value,
+ * increment, save the new value and unlock the file.  Return the new value
+ * or -1 if there was an error.  The ID namespace is large enough that we
+ * don't worry about recycling an ID when a zone is deleted.
+ */
+static zoneid_t
+new_zone_did()
+{
+	int fd;
+	int len;
+	int val;
+	struct flock lck;
+	char buf[80];
+
+	if ((fd = open(DEBUGID_FILE, O_RDWR | O_CREAT,
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
+		perror("new_zone_did open failed");
+		return (-1);
+	}
+
+        /* Initialize the lock. */
+        lck.l_whence = SEEK_SET;
+        lck.l_start = 0;
+        lck.l_len = 0;
+
+	/* Wait until we acquire an exclusive lock on the file. */
+	lck.l_type = F_WRLCK;
+	if (fcntl(fd, F_SETLKW, &lck) == -1) {
+		perror("new_zone_did lock failed");
+		(void) close(fd);
+		return (-1);
+	}
+
+	/* Get currently allocated value */
+	len = read(fd, buf, sizeof (buf));
+	if (len == -1) {
+		perror("new_zone_did read failed");
+		val = -1;
+	} else {
+		if (lseek(fd, 0L, SEEK_SET) == -1) {
+			perror("new_zone_did seek failed");
+			val = -1;
+		} else {
+			if (len == 0) {
+				/* Just created the file, initialize at 1 */
+				val = 1;
+			} else {
+				val = atoi(buf);
+				val++;
+			}
+
+			(void) snprintf(buf, sizeof (buf), "%d\n", val);
+			len = strlen(buf);
+
+			/* Save newly allocated value */
+			if (write(fd, buf, len) == -1) {
+				perror("new_zone_did write failed");
+				val = -1;
+			}
+		}
+	}
+
+	/* Release the file lock. */
+	lck.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &lck) == -1) {
+		perror("new_zone_did unlock failed");
+		val = -1;
+	}
+
+	if (close(fd) != 0)
+		perror("new_zone_did close failed");
+
+	return (val);
+}
+
+/*
+ * Called by zoneadmd to get the zone's debug ID.
+ * If the zone doesn't already have an ID, a new one is generated and
+ * persistently saved onto the zone.  Normally either zoneadm or zonecfg
+ * will assign a new ID for the zone, so zoneadmd should never have to
+ * generate one, but we also handle that here just to be paranoid.
+ */
+zoneid_t
+zone_get_did(char *zone_name)
+{
+	int res;
+	zoneid_t new_did;
+	zone_dochandle_t handle;
+	char did_str[80];
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (getpid());
+
+	if (zonecfg_get_handle((char *)zone_name, handle) != Z_OK)
+		return (getpid());
+
+	res = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+
+	/* If the zone already has an assigned debug ID, return it. */
+	if (res == Z_OK && did_str[0] != '\0') {
+		zonecfg_fini_handle(handle);
+		return (atoi(did_str));
+	}
+
+	/*
+	 * The zone doesn't have an assigned debug ID yet, generate one and
+	 * save it as part of the zone definition.
+	 */
+	if ((new_did = new_zone_did()) == -1) {
+		/*
+		 * We should really never hit this block of code.
+		 * Generating a new ID failed for some reason.  Use the current
+		 * pid as a temporary ID so that the zone can continue to boot
+		 * but we don't persistently save this temporary ID on the zone.
+		 */
+		zonecfg_fini_handle(handle);
+		return (getpid());
+	}
+
+	/* Now persistently save this new ID onto the zone. */
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
+	(void) zonecfg_save(handle);
+
+	zonecfg_fini_handle(handle);
+	return (new_did);
+}
+
+zoneid_t
+zonecfg_get_did(zone_dochandle_t handle)
+{
+	char did_str[80];
+	int err;
+	zoneid_t did;
+
+	err = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+	if (err == Z_OK && did_str[0] != '\0')
+		did = atoi(did_str);
+	else
+		did = -1;
+
+	return (did);
+}
+
+void
+zonecfg_set_did(zone_dochandle_t handle)
+{
+	zoneid_t new_did;
+	char did_str[80];
+
+	if ((new_did = new_zone_did()) == -1)
+		return;
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
 }
 
 /*

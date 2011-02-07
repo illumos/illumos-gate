@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 201l, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -99,6 +100,7 @@ typedef struct zone_entry {
 	char		zroot[MAXPATHLEN];
 	char		zuuid[UUID_PRINTABLE_STRING_LENGTH];
 	zone_iptype_t	ziptype;
+	zoneid_t	zdid;
 } zone_entry_t;
 
 #define	CLUSTER_BRAND_NAME	"cluster"
@@ -434,6 +436,7 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 	}
 	if (!verbose) {
 		char *cp, *clim;
+		char zdid[80];
 
 		if (!parsable) {
 			(void) printf("%s\n", zent->zname);
@@ -449,8 +452,12 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%.*s\\:", clim - cp, cp);
 			cp = clim + 1;
 		}
-		(void) printf("%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
-		    ip_type_str);
+		if (zent->zdid == -1)
+			zdid[0] = '\0';
+		else
+			(void) snprintf(zdid, sizeof (zdid), "%d", zent->zdid);
+		(void) printf("%s:%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
+		    ip_type_str, zdid);
 		return;
 	}
 	if (zent->zstate_str != NULL) {
@@ -545,6 +552,22 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 		return (Z_OK);
 	}
 
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror2(zent->zname, gettext("could not init handle"));
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(zent->zname, handle)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get handle"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_iptype(handle, &zent->ziptype)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get ip-type"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
 	/*
 	 * There is a race condition where the zone could boot while
 	 * we're walking the index file.  In this case the zone state
@@ -565,25 +588,11 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 				zent->ziptype = ZS_EXCLUSIVE;
 			else
 				zent->ziptype = ZS_SHARED;
-			return (Z_OK);
 		}
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror2(zent->zname, gettext("could not init handle"));
-		return (Z_ERR);
-	}
-	if ((err = zonecfg_get_handle(zent->zname, handle)) != Z_OK) {
-		zperror2(zent->zname, gettext("could not get handle"));
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
+	zent->zdid = zonecfg_get_did(handle);
 
-	if ((err = zonecfg_get_iptype(handle, &zent->ziptype)) != Z_OK) {
-		zperror2(zent->zname, gettext("could not get ip-type"));
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
 	zonecfg_fini_handle(handle);
 
 	return (Z_OK);
@@ -2677,6 +2686,61 @@ no_net:
 	return (return_code);
 }
 
+/*
+ * Called when readying or booting a zone.  We double check that the zone's
+ * debug ID is set and is unique.  This covers the case of pre-existing zones
+ * with no ID.  Also, its possible that a zone was migrated to this host
+ * and as a result it has a duplicate ID.  In this case we preserve the ID
+ * of the first zone we match on in the index file (since it was there before
+ * the current zone) and we assign a new unique ID to the current zone.
+ * Return true if we assigned a new ID, indicating that the zone configuration
+ * needs to be saved.
+ */
+static boolean_t
+verify_fix_did(zone_dochandle_t handle)
+{
+	zoneid_t mydid;
+	zone_entry_t zent;
+	FILE *cookie;
+	char *name;
+	boolean_t fix = B_FALSE;
+
+	mydid = zonecfg_get_did(handle);
+	if (mydid == -1) {
+		zonecfg_set_did(handle);
+		return (B_TRUE);
+	}
+
+	/* Get the full list of zones from the configuration. */
+	cookie = setzoneent();
+	while ((name = getzoneent(cookie)) != NULL) {
+		if (strcmp(target_zone, name) == 0) {
+			free(name);
+			break;	/* Once we find our entry, stop. */
+		}
+
+		if (strcmp(name, "global") == 0 ||
+		    lookup_zone_info(name, ZONE_ID_UNDEFINED, &zent) != Z_OK) {
+			free(name);
+			continue;
+		}
+
+		free(name);
+		if (zent.zdid == mydid) {
+			fix = B_TRUE;
+			break;
+		}
+	}
+	endzoneent(cookie);
+
+	if (fix) {
+		zonecfg_set_did(handle);
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 verify_details(int cmd_num, char *argv[])
 {
@@ -2735,6 +2799,12 @@ verify_details(int cmd_num, char *argv[])
 
 	if (verify_handle(cmd_num, handle, argv) != Z_OK)
 		return_code = Z_ERR;
+
+	if (cmd_num == CMD_READY || cmd_num == CMD_BOOT)
+		if (verify_fix_did(handle))
+			if (zonecfg_save(handle) != Z_OK)
+				(void) fprintf(stderr, gettext("Could not save "
+				    "debug ID.\n"));
 
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
