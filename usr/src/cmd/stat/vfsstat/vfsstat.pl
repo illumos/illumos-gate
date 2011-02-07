@@ -68,6 +68,8 @@ my $USE_MB = defined $main::opt_M ? $main::opt_M : 0;
 my $USE_INTERVAL = defined $main::opt_I ? $main::opt_I : 0;
 my $USE_COMMA = defined $main::opt_r ? $main::opt_r : 0;
 
+chomp(my $zname = (`/sbin/zonename`));
+
 my ($interval, $count);
 if ( defined($ARGV[0]) ) {
 	$interval = $ARGV[0];
@@ -116,7 +118,10 @@ while (1) {
 	
 		foreach my $name (keys(%$Instances)) {
 			$Stats = $Instances->{$name};
-			print_stats($name);
+
+			if ($name eq $zname) {
+				print_stats();
+			}
 		}
 	}
 	
@@ -130,8 +135,6 @@ while (1) {
 }
 
 sub print_stats {
-	my $zonename = $_[0];
-
 	my $rops = $Stats->{'reads'};
 	my $wops = $Stats->{'writes'};
 	my $rbytes = $Stats->{'nread'};
@@ -183,7 +186,7 @@ sub print_stats {
 	    $writ_t,
 	    $r_b_pct,
 	    $w_b_pct,
-	    $zonename);
+	    $zname);
 
 	# Save current calculations for next loop
 	$old_rops = $rops;

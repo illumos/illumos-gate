@@ -1876,6 +1876,9 @@ zone_kstat_create(zone_t *zone)
 	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
 
 	if (zone->zone_io_ksp != NULL) {
+		if (zone->zone_id != GLOBAL_ZONEID)
+			kstat_zone_add(zone->zone_io_ksp, GLOBAL_ZONEID);
+
 		zone->zone_io_ksp->ks_lock = &zone->zone_io_lock;
 		kstat_install(zone->zone_io_ksp);
 		zone->zone_io_kiop = zone->zone_io_ksp->ks_data;
@@ -1889,6 +1892,9 @@ zone_kstat_create(zone_t *zone)
 	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
 
 	if (zone->zone_vfs_ksp != NULL) {
+		if (zone->zone_id != GLOBAL_ZONEID)
+			kstat_zone_add(zone->zone_vfs_ksp, GLOBAL_ZONEID);
+
 		zone->zone_vfs_ksp->ks_lock = &zone->zone_vfs_lock;
 		kstat_install(zone->zone_vfs_ksp);
 		zone->zone_vfs_kiop = zone->zone_vfs_ksp->ks_data;
