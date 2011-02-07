@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -1913,15 +1914,14 @@ dt_lib_depend_free(dtrace_hdl_t *dtp)
 	}
 }
 
-
 /*
- * Open all of the .d library files found in the specified directory and
- * compile each one in topological order to cache its inlines and translators,
- * etc.  We silently ignore any missing directories and other files found
- * therein. We only fail (and thereby fail dt_load_libs()) if we fail to
- * compile a library and the error is something other than #pragma D depends_on.
- * Dependency errors are silently ignored to permit a library directory to
- * contain libraries which may not be accessible depending on our privileges.
+ * Open all the .d library files found in the specified directory and
+ * compile each one of them.  We silently ignore any missing directories and
+ * other files found therein.  We only fail (and thereby fail dt_load_libs()) if
+ * we fail to compile a library and the error is something other than #pragma D
+ * depends_on.  Dependency errors are silently ignored to permit a library
+ * directory to contain libraries which may not be accessible depending on our
+ * privileges.
  */
 static int
 dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
@@ -1931,10 +1931,8 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 	DIR *dirp;
 
 	char fname[PATH_MAX];
-	dtrace_prog_t *pgp;
 	FILE *fp;
 	void *rv;
-	dt_lib_depend_t *dld;
 
 	if ((dirp = opendir(path)) == NULL) {
 		dt_dprintf("skipping lib dir %s: %s\n", path, strerror(errno));
@@ -1957,7 +1955,7 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 
 		dtp->dt_filetag = fname;
 		if (dt_lib_depend_add(dtp, &dtp->dt_lib_dep, fname) != 0)
-			goto err;
+			return (-1); /* preserve dt_errno */
 
 		rv = dt_compile(dtp, DT_CTX_DPROG,
 		    DTRACE_PROBESPEC_NAME, NULL,
@@ -1966,7 +1964,7 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 		if (rv != NULL && dtp->dt_errno &&
 		    (dtp->dt_errno != EDT_COMPILER ||
 		    dtp->dt_errtag != dt_errtag(D_PRAGMA_DEPEND)))
-			goto err;
+			return (-1); /* preserve dt_errno */
 
 		if (dtp->dt_errno)
 			dt_dprintf("error parsing library %s: %s\n",
@@ -1977,6 +1975,27 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 	}
 
 	(void) closedir(dirp);
+
+	return (0);
+}
+
+/*
+ * Perform a topological sorting of all the libraries found across the entire
+ * dt_lib_path.  Once sorted, compile each one in topological order to cache its
+ * inlines and translators, etc.  We silently ignore any missing directories and
+ * other files found therein. We only fail (and thereby fail dt_load_libs()) if
+ * we fail to compile a library and the error is something other than #pragma D
+ * depends_on.  Dependency errors are silently ignored to permit a library
+ * directory to contain libraries which may not be accessible depending on our
+ * privileges.
+ */
+static int
+dt_load_libs_sort(dtrace_hdl_t *dtp)
+{
+	dtrace_prog_t *pgp;
+	FILE *fp;
+	dt_lib_depend_t *dld;
+
 	/*
 	 * Finish building the graph containing the library dependencies
 	 * and perform a topological sort to generate an ordered list
@@ -2044,6 +2063,9 @@ dt_load_libs(dtrace_hdl_t *dtp)
 			return (-1); /* errno is set for us */
 		}
 	}
+
+	if (dt_load_libs_sort(dtp) < 0)
+		return (-1); /* errno is set for us */
 
 	return (0);
 }
