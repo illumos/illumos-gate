@@ -106,10 +106,12 @@
 #define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
 #define	DTD_ATTR_DEFROUTER	(const xmlChar *) "defrouter"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
+#define	DTD_ATTR_GNIC		(const xmlChar *) "global-nic"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
 #define	DTD_ATTR_BOOTARGS	(const xmlChar *) "bootargs"
 #define	DTD_ATTR_SCHED		(const xmlChar *) "scheduling-class"
+#define	DTD_ATTR_MAC		(const xmlChar *) "mac-addr"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -119,6 +121,7 @@
 #define	DTD_ATTR_SPECIAL	(const xmlChar *) "special"
 #define	DTD_ATTR_TYPE		(const xmlChar *) "type"
 #define	DTD_ATTR_VALUE		(const xmlChar *) "value"
+#define	DTD_ATTR_VLANID		(const xmlChar *) "vlan-id"
 #define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
 #define	DTD_ATTR_NCPU_MIN	(const xmlChar *) "ncpu_min"
 #define	DTD_ATTR_NCPU_MAX	(const xmlChar *) "ncpu_max"
@@ -2092,8 +2095,14 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	int err;
 	char address[INET6_ADDRSTRLEN];
 	char physical[LIFNAMSIZ];
+	char mac[MAXMACADDRLEN];
+	char vlan_id[10];
+	char gnic[LIFNAMSIZ];
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
+	size_t macspec;			/* nonzero if tabptr has mac addr */
+	size_t vlanidspec;		/* nonzero if tabptr has vlan ID */
+	size_t gnicspec;		/* nonzero if tabptr has gnic */
 	size_t defrouterspec;		/* nonzero if tabptr has def. router */
 	size_t allowed_addrspec;
 	zone_iptype_t iptype;
@@ -2105,17 +2114,22 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	 * Determine the fields that will be searched.  There must be at least
 	 * one.
 	 *
-	 * zone_nwif_address, zone_nwif_physical, and zone_nwif_defrouter are
+	 * zone_nwif_address, zone_nwif_physical, zone_nwif_defrouter,
+	 * zone_nwif_mac, zone_nwif_vlan_id and zone_nwif_gnic  are
 	 * arrays, so no NULL checks are necessary.
 	 */
 	addrspec = strlen(tabptr->zone_nwif_address);
 	physspec = strlen(tabptr->zone_nwif_physical);
+	macspec = strlen(tabptr->zone_nwif_mac);
+	vlanidspec = strlen(tabptr->zone_nwif_vlan_id);
+	gnicspec = strlen(tabptr->zone_nwif_gnic);
 	defrouterspec = strlen(tabptr->zone_nwif_defrouter);
 	allowed_addrspec = strlen(tabptr->zone_nwif_allowed_address);
 	if (addrspec != 0 && allowed_addrspec != 0)
 		return (Z_INVAL); /* can't specify both */
 	if (addrspec == 0 && physspec == 0 && defrouterspec == 0 &&
-	    allowed_addrspec == 0)
+	    allowed_addrspec == 0 && macspec == 0 && vlanidspec == 0 &&
+	    gnicspec == 0)
 		return (Z_INSUFFICIENT_SPEC);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -2141,6 +2155,20 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		if (physspec != 0 && (fetchprop(cur, DTD_ATTR_PHYSICAL,
 		    physical, sizeof (physical)) != Z_OK ||
 		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && macspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_MAC, mac, sizeof (mac)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_mac, mac) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && vlanidspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_VLANID, vlan_id,
+		    sizeof (vlan_id)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_vlan_id, vlan_id) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && gnicspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_GNIC, gnic,
+		    sizeof (gnic)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_gnic, gnic) != 0))
 			continue;
 		if (iptype == ZS_SHARED && addrspec != 0 &&
 		    (fetchprop(cur, DTD_ATTR_ADDRESS, address,
@@ -2184,6 +2212,21 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 
 	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
 	    (err = fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS,
 	    tabptr->zone_nwif_allowed_address,
 	    sizeof (tabptr->zone_nwif_allowed_address))) != Z_OK)
@@ -2216,12 +2259,24 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    tabptr->zone_nwif_physical)) != Z_OK)
 		return (err);
 	/*
-	 * Do not add this property when it is not set, for backwards
-	 * compatibility and because it is optional.
+	 * Do not add these properties when they are not set, for backwards
+	 * compatibility and because they are optional.
 	 */
 	if ((strlen(tabptr->zone_nwif_defrouter) > 0) &&
 	    ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter)) != Z_OK))
+		return (err);
+	if (strlen(tabptr->zone_nwif_mac) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_MAC,
+	    tabptr->zone_nwif_mac)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_vlan_id) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_VLANID,
+	    tabptr->zone_nwif_vlan_id)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_gnic) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_GNIC,
+	    tabptr->zone_nwif_gnic)) != Z_OK)
 		return (err);
 	return (Z_OK);
 }
@@ -2247,7 +2302,8 @@ static int
 zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur = handle->zone_dh_cur;
-	boolean_t addr_match, phys_match, allowed_addr_match;
+	boolean_t addr_match, phys_match, allowed_addr_match, mac_match,
+	    vlan_id_match, gnic_match;
 
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
@@ -2259,8 +2315,15 @@ zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		    tabptr->zone_nwif_allowed_address);
 		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
 		    tabptr->zone_nwif_physical);
+		mac_match = match_prop(cur, DTD_ATTR_MAC,
+		    tabptr->zone_nwif_mac);
+		vlan_id_match = match_prop(cur, DTD_ATTR_VLANID,
+		    tabptr->zone_nwif_vlan_id);
+		gnic_match = match_prop(cur, DTD_ATTR_GNIC,
+		    tabptr->zone_nwif_gnic);
 
-		if ((addr_match || allowed_addr_match) && phys_match) {
+		if ((addr_match || allowed_addr_match || mac_match ||
+		    vlan_id_match || gnic_match) && phys_match) {
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);
@@ -4751,6 +4814,24 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 	}
 
+	if ((err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
 	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter,
 	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK) {
@@ -5549,10 +5630,10 @@ new_zone_did()
 		return (-1);
 	}
 
-        /* Initialize the lock. */
-        lck.l_whence = SEEK_SET;
-        lck.l_start = 0;
-        lck.l_len = 0;
+	/* Initialize the lock. */
+	lck.l_whence = SEEK_SET;
+	lck.l_start = 0;
+	lck.l_len = 0;
 
 	/* Wait until we acquire an exclusive lock on the file. */
 	lck.l_type = F_WRLCK;
