@@ -29,7 +29,7 @@ tick-1ms
 /i++ <= 100/
 {
 	@two = llquantize(i, 2, 0, 6, 2);
-	@three= llquantize(i, 3, 0, 1, 9);
+	@three = llquantize(i, 3, 0, 1, 9);
 	@four = llquantize(i, 4, 0, 1, 4);
 	@five = llquantize(i, 5, 0, 1, 25);
 	@six = llquantize(i, 6, 0, 3, 12);
