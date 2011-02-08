@@ -108,10 +108,12 @@
 #define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
 #define	DTD_ATTR_DEFROUTER	(const xmlChar *) "defrouter"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
+#define	DTD_ATTR_GNIC		(const xmlChar *) "global-nic"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
 #define	DTD_ATTR_BOOTARGS	(const xmlChar *) "bootargs"
 #define	DTD_ATTR_SCHED		(const xmlChar *) "scheduling-class"
+#define	DTD_ATTR_MAC		(const xmlChar *) "mac-addr"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -121,6 +123,7 @@
 #define	DTD_ATTR_SPECIAL	(const xmlChar *) "special"
 #define	DTD_ATTR_TYPE		(const xmlChar *) "type"
 #define	DTD_ATTR_VALUE		(const xmlChar *) "value"
+#define	DTD_ATTR_VLANID		(const xmlChar *) "vlan-id"
 #define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
 #define	DTD_ATTR_NCPU_MIN	(const xmlChar *) "ncpu_min"
 #define	DTD_ATTR_NCPU_MAX	(const xmlChar *) "ncpu_max"
@@ -2095,8 +2098,14 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	int err;
 	char address[INET6_ADDRSTRLEN];
 	char physical[LIFNAMSIZ];
+	char mac[MAXMACADDRLEN];
+	char vlan_id[10];
+	char gnic[LIFNAMSIZ];
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
+	size_t macspec;			/* nonzero if tabptr has mac addr */
+	size_t vlanidspec;		/* nonzero if tabptr has vlan ID */
+	size_t gnicspec;		/* nonzero if tabptr has gnic */
 	size_t defrouterspec;		/* nonzero if tabptr has def. router */
 	size_t allowed_addrspec;
 	zone_iptype_t iptype;
@@ -2108,17 +2117,22 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	 * Determine the fields that will be searched.  There must be at least
 	 * one.
 	 *
-	 * zone_nwif_address, zone_nwif_physical, and zone_nwif_defrouter are
+	 * zone_nwif_address, zone_nwif_physical, zone_nwif_defrouter,
+	 * zone_nwif_mac, zone_nwif_vlan_id and zone_nwif_gnic  are
 	 * arrays, so no NULL checks are necessary.
 	 */
 	addrspec = strlen(tabptr->zone_nwif_address);
 	physspec = strlen(tabptr->zone_nwif_physical);
+	macspec = strlen(tabptr->zone_nwif_mac);
+	vlanidspec = strlen(tabptr->zone_nwif_vlan_id);
+	gnicspec = strlen(tabptr->zone_nwif_gnic);
 	defrouterspec = strlen(tabptr->zone_nwif_defrouter);
 	allowed_addrspec = strlen(tabptr->zone_nwif_allowed_address);
 	if (addrspec != 0 && allowed_addrspec != 0)
 		return (Z_INVAL); /* can't specify both */
 	if (addrspec == 0 && physspec == 0 && defrouterspec == 0 &&
-	    allowed_addrspec == 0)
+	    allowed_addrspec == 0 && macspec == 0 && vlanidspec == 0 &&
+	    gnicspec == 0)
 		return (Z_INSUFFICIENT_SPEC);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -2144,6 +2158,20 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		if (physspec != 0 && (fetchprop(cur, DTD_ATTR_PHYSICAL,
 		    physical, sizeof (physical)) != Z_OK ||
 		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && macspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_MAC, mac, sizeof (mac)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_mac, mac) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && vlanidspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_VLANID, vlan_id,
+		    sizeof (vlan_id)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_vlan_id, vlan_id) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && gnicspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_GNIC, gnic,
+		    sizeof (gnic)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_gnic, gnic) != 0))
 			continue;
 		if (iptype == ZS_SHARED && addrspec != 0 &&
 		    (fetchprop(cur, DTD_ATTR_ADDRESS, address,
@@ -2187,6 +2215,21 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 
 	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
 	    (err = fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS,
 	    tabptr->zone_nwif_allowed_address,
 	    sizeof (tabptr->zone_nwif_allowed_address))) != Z_OK)
@@ -2219,12 +2262,24 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    tabptr->zone_nwif_physical)) != Z_OK)
 		return (err);
 	/*
-	 * Do not add this property when it is not set, for backwards
-	 * compatibility and because it is optional.
+	 * Do not add these properties when they are not set, for backwards
+	 * compatibility and because they are optional.
 	 */
 	if ((strlen(tabptr->zone_nwif_defrouter) > 0) &&
 	    ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter)) != Z_OK))
+		return (err);
+	if (strlen(tabptr->zone_nwif_mac) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_MAC,
+	    tabptr->zone_nwif_mac)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_vlan_id) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_VLANID,
+	    tabptr->zone_nwif_vlan_id)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_gnic) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_GNIC,
+	    tabptr->zone_nwif_gnic)) != Z_OK)
 		return (err);
 	return (Z_OK);
 }
@@ -2250,7 +2305,8 @@ static int
 zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur = handle->zone_dh_cur;
-	boolean_t addr_match, phys_match, allowed_addr_match;
+	boolean_t addr_match, phys_match, allowed_addr_match, mac_match,
+	    vlan_id_match, gnic_match;
 
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
@@ -2262,8 +2318,15 @@ zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		    tabptr->zone_nwif_allowed_address);
 		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
 		    tabptr->zone_nwif_physical);
+		mac_match = match_prop(cur, DTD_ATTR_MAC,
+		    tabptr->zone_nwif_mac);
+		vlan_id_match = match_prop(cur, DTD_ATTR_VLANID,
+		    tabptr->zone_nwif_vlan_id);
+		gnic_match = match_prop(cur, DTD_ATTR_GNIC,
+		    tabptr->zone_nwif_gnic);
 
-		if (addr_match && allowed_addr_match && phys_match) {
+		if ((addr_match || allowed_addr_match || mac_match ||
+		    vlan_id_match || gnic_match) && phys_match) {
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);
@@ -4754,6 +4817,24 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 	}
 
+	if ((err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
 	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter,
 	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK) {
@@ -5528,6 +5609,164 @@ zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
 
 	zonecfg_fini_handle(handle);
 	return (err);
+}
+
+/*
+ * Atomically get a new zone_did value.  The currently allocated value
+ * is stored in /etc/zones/did.txt.  Lock the file, read the current value,
+ * increment, save the new value and unlock the file.  Return the new value
+ * or -1 if there was an error.  The ID namespace is large enough that we
+ * don't worry about recycling an ID when a zone is deleted.
+ */
+static zoneid_t
+new_zone_did()
+{
+	int fd;
+	int len;
+	int val;
+	struct flock lck;
+	char buf[80];
+
+	if ((fd = open(DEBUGID_FILE, O_RDWR | O_CREAT,
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
+		perror("new_zone_did open failed");
+		return (-1);
+	}
+
+	/* Initialize the lock. */
+	lck.l_whence = SEEK_SET;
+	lck.l_start = 0;
+	lck.l_len = 0;
+
+	/* Wait until we acquire an exclusive lock on the file. */
+	lck.l_type = F_WRLCK;
+	if (fcntl(fd, F_SETLKW, &lck) == -1) {
+		perror("new_zone_did lock failed");
+		(void) close(fd);
+		return (-1);
+	}
+
+	/* Get currently allocated value */
+	len = read(fd, buf, sizeof (buf));
+	if (len == -1) {
+		perror("new_zone_did read failed");
+		val = -1;
+	} else {
+		if (lseek(fd, 0L, SEEK_SET) == -1) {
+			perror("new_zone_did seek failed");
+			val = -1;
+		} else {
+			if (len == 0) {
+				/* Just created the file, initialize at 1 */
+				val = 1;
+			} else {
+				val = atoi(buf);
+				val++;
+			}
+
+			(void) snprintf(buf, sizeof (buf), "%d\n", val);
+			len = strlen(buf);
+
+			/* Save newly allocated value */
+			if (write(fd, buf, len) == -1) {
+				perror("new_zone_did write failed");
+				val = -1;
+			}
+		}
+	}
+
+	/* Release the file lock. */
+	lck.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &lck) == -1) {
+		perror("new_zone_did unlock failed");
+		val = -1;
+	}
+
+	if (close(fd) != 0)
+		perror("new_zone_did close failed");
+
+	return (val);
+}
+
+/*
+ * Called by zoneadmd to get the zone's debug ID.
+ * If the zone doesn't already have an ID, a new one is generated and
+ * persistently saved onto the zone.  Normally either zoneadm or zonecfg
+ * will assign a new ID for the zone, so zoneadmd should never have to
+ * generate one, but we also handle that here just to be paranoid.
+ */
+zoneid_t
+zone_get_did(char *zone_name)
+{
+	int res;
+	zoneid_t new_did;
+	zone_dochandle_t handle;
+	char did_str[80];
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (getpid());
+
+	if (zonecfg_get_handle((char *)zone_name, handle) != Z_OK)
+		return (getpid());
+
+	res = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+
+	/* If the zone already has an assigned debug ID, return it. */
+	if (res == Z_OK && did_str[0] != '\0') {
+		zonecfg_fini_handle(handle);
+		return (atoi(did_str));
+	}
+
+	/*
+	 * The zone doesn't have an assigned debug ID yet, generate one and
+	 * save it as part of the zone definition.
+	 */
+	if ((new_did = new_zone_did()) == -1) {
+		/*
+		 * We should really never hit this block of code.
+		 * Generating a new ID failed for some reason.  Use the current
+		 * pid as a temporary ID so that the zone can continue to boot
+		 * but we don't persistently save this temporary ID on the zone.
+		 */
+		zonecfg_fini_handle(handle);
+		return (getpid());
+	}
+
+	/* Now persistently save this new ID onto the zone. */
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
+	(void) zonecfg_save(handle);
+
+	zonecfg_fini_handle(handle);
+	return (new_did);
+}
+
+zoneid_t
+zonecfg_get_did(zone_dochandle_t handle)
+{
+	char did_str[80];
+	int err;
+	zoneid_t did;
+
+	err = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+	if (err == Z_OK && did_str[0] != '\0')
+		did = atoi(did_str);
+	else
+		did = -1;
+
+	return (did);
+}
+
+void
+zonecfg_set_did(zone_dochandle_t handle)
+{
+	zoneid_t new_did;
+	char did_str[80];
+
+	if ((new_did = new_zone_did()) == -1)
+		return;
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
 }
 
 /*

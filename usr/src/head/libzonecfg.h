@@ -42,6 +42,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#include <sys/mac.h>
 #include <stdio.h>
 #include <rctl.h>
 #include <zone.h>
@@ -196,6 +197,9 @@ struct zone_nwiftab {
 	char	zone_nwif_address[INET6_ADDRSTRLEN]; /* shared-ip only */
 	char	zone_nwif_allowed_address[INET6_ADDRSTRLEN]; /* excl-ip only */
 	char	zone_nwif_physical[LIFNAMSIZ];
+	char	zone_nwif_mac[MAXMACADDRLEN];		/* excl-ip only */
+	char	zone_nwif_vlan_id[10];		/* excl-ip only */
+	char	zone_nwif_gnic[LIFNAMSIZ];		/* excl-ip only */
 	char	zone_nwif_defrouter[INET6_ADDRSTRLEN];
 };
 

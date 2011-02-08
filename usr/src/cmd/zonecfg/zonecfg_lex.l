@@ -57,10 +57,11 @@ extern void yyerror(char *s);
 static char *create_token(char *s);
 %}
 
-%a 7000
+%a 8000
 %p 5000
 %e 2000
 %n 1000
+%o 13000
 
 %{
 /*
@@ -235,6 +236,15 @@ static char *create_token(char *s);
 
 <TSTATE>defrouter	{ return DEFROUTER; }
 <CSTATE>defrouter	{ return DEFROUTER; }
+
+<TSTATE>mac-addr	{ return MAC; }
+<CSTATE>mac-addr	{ return MAC; }
+
+<TSTATE>vlan-id		{ return VLANID; }
+<CSTATE>vlan-id		{ return VLANID; }
+
+<TSTATE>global-nic	{ return GNIC; }
+<CSTATE>global-nic	{ return GNIC; }
 
 <TSTATE>dir	{ return DIR; }
 <CSTATE>dir	{ return DIR; }

@@ -235,6 +235,10 @@ char *prop_types[] = {
 	"fs-allowed",
 	ALIAS_MAXPROCS,
 	"allowed-address",
+	ALIAS_ZFSPRI,
+	"mac-addr",
+	"vlan-id",
+	"global-nic",
 	NULL
 };
 
@@ -408,8 +412,17 @@ static const char *net_res_scope_cmds[] = {
 	"help",
 	"info",
 	"set address=",
-	"set physical=",
+	"set allowed-address=",
 	"set defrouter=",
+	"set global-nic=",
+	"set mac-addr=",
+	"set physical=",
+	"set vlan-id=",
+	"clear allowed-address",
+	"clear defrouter",
+	"clear global-nic",
+	"clear mac-addr",
+	"clear vlan-id",
 	NULL
 };
 
@@ -1083,6 +1096,12 @@ usage(boolean_t verbose, uint_t flags)
 			    gettext("<IP-address>"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_PHYSICAL), gettext("<interface>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_MAC), gettext("<mac-address>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_VLANID), gettext("<vlan ID>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_GNIC), gettext("<global zone NIC>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
 			(void) fprintf(fp, gettext("%s %s is valid "
@@ -1090,10 +1109,12 @@ usage(boolean_t verbose, uint_t flags)
 			    "must not be set.\n"),
 			    cmd_to_str(CMD_SET), pt_to_str(PT_ADDRESS),
 			    pt_to_str(PT_IPTYPE), gettext("shared"));
-			(void) fprintf(fp, gettext("%s %s is valid "
-			    "if the %s property is set to %s, otherwise it "
-			    "must not be set.\n"),
-			    cmd_to_str(CMD_SET), pt_to_str(PT_ALLOWED_ADDRESS),
+			(void) fprintf(fp, gettext("%s (%s, %s, %s, %s) are "
+			    "valid if the %s property is set to %s, otherwise "
+			    "they must not be set.\n"),
+			    cmd_to_str(CMD_SET),
+			    pt_to_str(PT_ALLOWED_ADDRESS), pt_to_str(PT_MAC),
+			    pt_to_str(PT_VLANID), pt_to_str(PT_GNIC),
 			    pt_to_str(PT_IPTYPE), gettext("exclusive"));
 			(void) fprintf(fp, gettext("\t%s %s=%s\n%s %s "
 			    "is valid if the %s or %s property is set, "
@@ -1336,9 +1357,12 @@ usage(boolean_t verbose, uint_t flags)
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
 		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
-		(void) fprintf(fp, "\t%s\t\t%s, %s, %s|%s\n", rt_to_str(RT_NET),
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s, %s|%s\n",
+		    rt_to_str(RT_NET),
 		    pt_to_str(PT_ADDRESS), pt_to_str(PT_ALLOWED_ADDRESS),
-		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_DEFROUTER));
+		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_MAC),
+		    pt_to_str(PT_VLANID), pt_to_str(PT_GNIC),
+		    pt_to_str(PT_DEFROUTER));
 		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DEVICE),
 		    pt_to_str(PT_MATCH));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_RCTL),
@@ -1970,6 +1994,9 @@ export_func(cmd_t *cmd)
 		export_prop(of, PT_ALLOWED_ADDRESS,
 		    nwiftab.zone_nwif_allowed_address);
 		export_prop(of, PT_PHYSICAL, nwiftab.zone_nwif_physical);
+		export_prop(of, PT_MAC, nwiftab.zone_nwif_mac);
+		export_prop(of, PT_VLANID, nwiftab.zone_nwif_vlan_id);
+		export_prop(of, PT_GNIC, nwiftab.zone_nwif_gnic);
 		export_prop(of, PT_DEFROUTER, nwiftab.zone_nwif_defrouter);
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
@@ -2718,6 +2745,21 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
 			(void) strlcpy(nwiftab->zone_nwif_physical,
 			    pp->pv_simple,
 			    sizeof (nwiftab->zone_nwif_physical));
+			break;
+		case PT_MAC:
+			(void) strlcpy(nwiftab->zone_nwif_mac,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_mac));
+			break;
+		case PT_VLANID:
+			(void) strlcpy(nwiftab->zone_nwif_vlan_id,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_vlan_id));
+			break;
+		case PT_GNIC:
+			(void) strlcpy(nwiftab->zone_nwif_gnic,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_gnic));
 			break;
 		case PT_DEFROUTER:
 			(void) strlcpy(nwiftab->zone_nwif_defrouter,
@@ -3597,6 +3639,30 @@ clear_property(cmd_t *cmd)
 			return;
 		}
 		break;
+	case RT_NET:
+		switch (prop_type) {
+		case PT_ALLOWED_ADDRESS:
+			in_progress_nwiftab.zone_nwif_allowed_address[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_DEFROUTER:
+			in_progress_nwiftab.zone_nwif_defrouter[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_GNIC:
+			in_progress_nwiftab.zone_nwif_gnic[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_MAC:
+			in_progress_nwiftab.zone_nwif_mac[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_VLANID:
+			in_progress_nwiftab.zone_nwif_vlan_id[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		}
+		break;
 	default:
 		break;
 	}
@@ -4466,6 +4532,21 @@ set_func(cmd_t *cmd)
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_physical));
 			break;
+		case PT_MAC:
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_mac,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_mac));
+			break;
+		case PT_VLANID:
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_vlan_id,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_vlan_id));
+			break;
+		case PT_GNIC:
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_gnic,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_gnic));
+			break;
 		case PT_DEFROUTER:
 			if (validate_net_address_syntax(prop_id, B_TRUE)
 			    != Z_OK) {
@@ -5034,8 +5115,11 @@ output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 	output_prop(fp, PT_ADDRESS, nwiftab->zone_nwif_address, B_TRUE);
 	output_prop(fp, PT_ALLOWED_ADDRESS,
 	    nwiftab->zone_nwif_allowed_address, B_TRUE);
-	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
 	output_prop(fp, PT_DEFROUTER, nwiftab->zone_nwif_defrouter, B_TRUE);
+	output_prop(fp, PT_GNIC, nwiftab->zone_nwif_gnic, B_TRUE);
+	output_prop(fp, PT_MAC, nwiftab->zone_nwif_mac, B_TRUE);
+	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
+	output_prop(fp, PT_VLANID, nwiftab->zone_nwif_vlan_id, B_TRUE);
 }
 
 static void

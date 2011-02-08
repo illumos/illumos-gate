@@ -137,9 +137,13 @@ extern "C" {
 #define	PT_FS_ALLOWED	39
 #define	PT_MAXPROCS	40
 #define	PT_ALLOWED_ADDRESS	41
+#define	PT_ZFSPRI	42
+#define	PT_MAC		43
+#define	PT_VLANID	44
+#define	PT_GNIC		45
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_ALLOWED_ADDRESS
+#define	PT_MAX		PT_GNIC
 
 #define	MAX_EQ_PROP_PAIRS	3
 
