@@ -69,6 +69,7 @@ dir path=opt/SUNWdtrt/tst/common/io
 dir path=opt/SUNWdtrt/tst/common/ip
 dir path=opt/SUNWdtrt/tst/common/java_api
 dir path=opt/SUNWdtrt/tst/common/lexer
+dir path=opt/SUNWdtrt/tst/common/llquantize
 dir path=opt/SUNWdtrt/tst/common/mdb
 dir path=opt/SUNWdtrt/tst/common/mib
 dir path=opt/SUNWdtrt/tst/common/misc
@@ -930,6 +931,57 @@ file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren3.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/tst.D_MACRO_OFLOW.ParIntOvflow.d.ksh \
     mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.nodivide.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.notfactor.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORNSTEPS.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORSMALL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORVAL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWTYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGRANGE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGTOOBIG.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPVAL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/mdb/tst.dtracedcmd.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/mib/tst.icmp.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/mib/tst.tcp.ksh mode=0444

@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_DT_ERRTAGS_H
 #define	_DT_ERRTAGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -235,7 +237,24 @@ typedef enum {
 	D_FREOPEN_INVALID,		/* frename() filename is invalid */
 	D_LQUANT_MATCHBASE,		/* lquantize() mismatch on base */
 	D_LQUANT_MATCHLIM,		/* lquantize() mismatch on limit */
-	D_LQUANT_MATCHSTEP		/* lquantize() mismatch on step */
+	D_LQUANT_MATCHSTEP,		/* lquantize() mismatch on step */
+	D_LLQUANT_FACTORTYPE,		/* llquantize() bad magnitude type */
+	D_LLQUANT_FACTORVAL,		/* llquantize() bad magnitude value */
+	D_LLQUANT_FACTORMATCH,		/* llquantize() mismatch on magnitude */
+	D_LLQUANT_LOWTYPE,		/* llquantize() bad low mag type */
+	D_LLQUANT_LOWVAL,		/* llquantize() bad low mag value */
+	D_LLQUANT_LOWMATCH,		/* llquantize() mismatch on low mag */
+	D_LLQUANT_HIGHTYPE,		/* llquantize() bad high mag type */
+	D_LLQUANT_HIGHVAL,		/* llquantize() bad high mag value */
+	D_LLQUANT_HIGHMATCH,		/* llquantize() mismatch on high mag */
+	D_LLQUANT_NSTEPTYPE,		/* llquantize() bad # steps type */
+	D_LLQUANT_NSTEPVAL,		/* llquantize() bad # steps value */
+	D_LLQUANT_NSTEPMATCH,		/* llquantize() mismatch on # steps */
+	D_LLQUANT_MAGRANGE,		/* llquantize() bad magnitude range */
+	D_LLQUANT_FACTORNSTEPS,		/* llquantize() # steps < factor */
+	D_LLQUANT_FACTOREVEN,		/* llquantize() bad # steps/factor */
+	D_LLQUANT_FACTORSMALL,		/* llquantize() magnitude too small */
+	D_LLQUANT_MAGTOOBIG		/* llquantize() high mag too large */
 } dt_errtag_t;
 
 extern const char *dt_errtag(dt_errtag_t);

@@ -201,7 +201,7 @@ dt_pragma_binding(const char *prname, dt_node_t *dnp)
 		dtp->dt_globals->dh_defer = &dt_pragma_apply;
 }
 
-static void 
+static void
 dt_pragma_depends_finddep(dtrace_hdl_t *dtp, const char *lname, char *lib,
     size_t len)
 {
