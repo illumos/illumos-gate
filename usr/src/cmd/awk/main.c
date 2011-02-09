@@ -137,8 +137,11 @@ main(int argc, char *argv[], char *envp[])
 	}
 	/* argv[1] is now the first argument */
 	if (npfile == 0) {	/* no -f; first argument is program */
-		if (argc <= 1)
+		if (argc <= 1) {
+			if (dbg)
+				exit(0);
 			ERROR "no program given" FATAL;
+		}
 		dprintf(("program = |%s|\n", argv[1]));
 		lexprog = (uchar *)argv[1];
 		argc--;
