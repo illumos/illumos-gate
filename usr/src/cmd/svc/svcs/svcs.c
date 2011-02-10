@@ -3430,6 +3430,11 @@ print_line(void *e, void *private)
 	return (UU_WALK_NEXT);
 }
 
+/* ARGSUSED */
+static void
+errignore(const char *str, ...)
+{}
+
 int
 main(int argc, char **argv)
 {
@@ -3438,10 +3443,11 @@ main(int argc, char **argv)
 	char *columns_str = NULL;
 	char *cp;
 	const char *progname;
-	int err;
+	int err, missing = 1, ignored, *errarg;
 	uint_t nzents = 0, zent = 0;
 	zoneid_t *zids = NULL;
 	char zonename[ZONENAME_MAX];
+	void (*errfunc)(const char *, ...);
 
 	int show_all = 0;
 	int show_header = 1;
@@ -3667,7 +3673,7 @@ again:
 			scfdie();
 
 		if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
-			scfdie();
+			uu_die(gettext("invalid zone '%s'\n"), g_zonename);
 
 		scf_value_destroy(zone);
 	}
@@ -3689,6 +3695,33 @@ again:
 	    (g_val = scf_value_create(h)) == NULL)
 		scfdie();
 
+	if (show_zones) {
+		/*
+		 * It's hard to avoid editorializing here, but suffice it to
+		 * say that scf_walk_fmri() takes an error handler, the
+		 * interface to which has been regrettably misdesigned:  the
+		 * handler itself takes exclusively a string -- even though
+		 * scf_walk_fmri() has detailed, programmatic knowledge
+		 * of the error condition at the time it calls its errfunc.
+		 * That is, only the error message and not the error semantics
+		 * are given to the handler.  This is poor interface at best,
+		 * but it is particularly problematic when we are talking to
+		 * multiple repository servers (as when we are iterating over
+		 * all zones) as we do not want to treat failure to find a
+		 * match in one zone as overall failure.  Ideally, we would
+		 * simply ignore SCF_MSG_PATTERN_NOINSTANCE and correctly
+		 * process the others, but alas, no such interface exists --
+		 * and we must settle for instead ignoring all errfunc-called
+		 * errors in the case that we are iterating over all zones...
+		 */
+		errfunc = errignore;
+		errarg = missing ? &missing : &ignored;
+		missing = 0;
+	} else {
+		errfunc = uu_warn;
+		errarg = &exit_status;
+	}
+
 	/*
 	 * If we're in long mode, take care of it now before we deal with the
 	 * sorting and the columns, since we won't use them anyway.
@@ -3698,7 +3731,7 @@ again:
 			argserr(progname);
 
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_detailed, NULL, &exit_status, uu_warn)) != 0) {
+		    print_detailed, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3712,7 +3745,7 @@ again:
 			argserr(progname);
 
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_log, NULL, &exit_status, uu_warn)) != 0) {
+		    print_log, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3724,7 +3757,7 @@ again:
 	if (opt_mode == 'n') {
 		print_notify_special();
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_notify, NULL, &exit_status, uu_warn)) != 0) {
+		    print_notify, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3807,7 +3840,7 @@ again:
 		if ((err = scf_walk_fmri(h, argc, argv,
 		    SCF_WALK_MULTIPLE | SCF_WALK_LEGACY,
 		    show_all ? list_instance : list_if_enabled, NULL,
-		    &exit_status, uu_warn)) != 0) {
+		    errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3820,7 +3853,7 @@ again:
 
 		if ((err = scf_walk_fmri(h, argc, argv,
 		    SCF_WALK_MULTIPLE, list_dependencies, NULL,
-		    &exit_status, uu_warn)) != 0) {
+		    errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3861,6 +3894,9 @@ nextzone:
 		scf_handle_destroy(h);
 		goto again;
 	}
+
+	if (show_zones && exit_status == 0)
+		exit_status = missing;
 
 	if (opt_columns == NULL)
 		return (exit_status);
