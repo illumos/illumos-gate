@@ -20,6 +20,8 @@
 #include <shared.h>
 #include <term.h>
 
+#define MENU_ROWS 7
+
 grub_jmp_buf restart_env;
 
 struct silentbuf silent;
@@ -306,7 +308,7 @@ restart:
       if (current_term->flags & TERM_DUMB)
 	print_entries_raw (num_entries, first_entry, menu_entries);
       else
-	print_border (3, 12);
+	print_border (3, MENU_ROWS);
 
       grub_printf ("\n\
       Use the %c and %c keys to select which entry is highlighted.\n",
@@ -335,7 +337,7 @@ restart:
       if (current_term->flags & TERM_DUMB)
 	grub_printf ("\n\nThe selected entry is %d ", entryno);
       else
-	print_entries (3, 12, first_entry, entryno, menu_entries);
+	print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
     }
 
   /* XX using RT clock now, need to initialize value */
@@ -425,7 +427,7 @@ restart:
 		  else if (first_entry > 0)
 		    {
 		      first_entry--;
-		      print_entries (3, 12, first_entry, entryno,
+		      print_entries (3, MENU_ROWS, first_entry, entryno,
 				     menu_entries);
 		    }
 		}
@@ -449,17 +451,17 @@ restart:
 					      first_entry + entryno,
 					      0));
 		  }
-		else if (num_entries > 12 + first_entry)
+		else if (num_entries > MENU_ROWS + first_entry)
 		  {
 		    first_entry++;
-		    print_entries (3, 12, first_entry, entryno, menu_entries);
+		    print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 		  }
 		}
 	    }
 	  else if (c == 7)
 	    {
 	      /* Page Up */
-	      first_entry -= 12;
+	      first_entry -= MENU_ROWS;
 	      if (first_entry < 0)
 		{
 		  entryno += first_entry;
@@ -467,20 +469,20 @@ restart:
 		  if (entryno < 0)
 		    entryno = 0;
 		}
-	      print_entries (3, 12, first_entry, entryno, menu_entries);
+	      print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 	    }
 	  else if (c == 3)
 	    {
 	      /* Page Down */
-	      first_entry += 12;
+	      first_entry += MENU_ROWS;
 	      if (first_entry + entryno + 1 >= num_entries)
 		{
-		  first_entry = num_entries - 12;
+		  first_entry = num_entries - MENU_ROWS;
 		  if (first_entry < 0)
 		    first_entry = 0;
 		  entryno = num_entries - first_entry - 1;
 		}
-	      print_entries (3, 12, first_entry, entryno, menu_entries);
+	      print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 	    }
 
 	  if (config_entries)
@@ -541,7 +543,7 @@ restart:
 
 		      if (entryno >= num_entries)
 			entryno--;
-		      if (first_entry && num_entries < 12 + first_entry)
+		      if (first_entry && num_entries < MENU_ROWS + first_entry)
 			first_entry--;
 		    }
 
@@ -553,7 +555,7 @@ restart:
 		      grub_printf ("\n");
 		    }
 		  else
-		    print_entries (3, 12, first_entry, entryno, menu_entries);
+		    print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 		}
 
 	      cur_entry = menu_entries;
