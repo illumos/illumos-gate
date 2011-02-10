@@ -1613,7 +1613,7 @@ create_func(cmd_t *cmd)
 	(void) strlcpy(zone_template, "SUNWdefault", sizeof (zone_template));
 
 	optind = 0;
-	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:"))
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:X"))
 	    != EOF) {
 		switch (arg) {
 		case '?':
@@ -1639,6 +1639,17 @@ create_func(cmd_t *cmd)
 			(void) strlcpy(zone_template, optarg,
 			    sizeof (zone_template));
 			break;
+		case 'X':
+			(void) snprintf(zone_template, sizeof (zone_template),
+			    "/etc/zones/%s.xml", zone);
+			err = zonecfg_get_xml_handle(zone_template, handle);
+			if (err != Z_OK) {
+				zone_perror(execname, err, B_TRUE);
+				exit(Z_ERR);
+			}
+			got_handle = B_TRUE;
+			need_to_commit = B_TRUE;
+			return;
 		default:
 			short_usage(CMD_CREATE);
 			arg_err = B_TRUE;
