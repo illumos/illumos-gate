@@ -2905,6 +2905,12 @@ getzoneid(void)
 	return (curproc->p_zone->zone_id);
 }
 
+zoneid_t
+getzonedid(void)
+{
+	return (curproc->p_zone->zone_did);
+}
+
 /*
  * Internal versions of zone_find_by_*().  These don't zone_hold() or
  * check the validity of a zone's state.
@@ -5396,6 +5402,14 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				error = EFAULT;
 		}
 		kmem_free(zbuf, bufsize);
+		break;
+	case ZONE_ATTR_DID:
+		size = sizeof (zoneid_t);
+		if (bufsize > size)
+			bufsize = size;
+
+		if (buf != NULL && copyout(&zone->zone_did, buf, bufsize) != 0)
+			error = EFAULT;
 		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {

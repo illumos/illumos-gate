@@ -6503,7 +6503,7 @@ dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp, zoneid_t *zoneidp)
 		priv = DTRACE_PRIV_ALL;
 	} else {
 		*uidp = crgetuid(cr);
-		*zoneidp = crgetzoneid(cr);
+		*zoneidp = crgetzonedid(cr);
 
 		priv = 0;
 		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_KERNEL, B_FALSE))
@@ -6999,7 +6999,7 @@ dtrace_register(const char *name, const dtrace_pattr_t *pap, uint32_t priv,
 	provider->dtpv_priv.dtpp_flags = priv;
 	if (cr != NULL) {
 		provider->dtpv_priv.dtpp_uid = crgetuid(cr);
-		provider->dtpv_priv.dtpp_zoneid = crgetzoneid(cr);
+		provider->dtpv_priv.dtpp_zoneid = crgetzonedid(cr);
 	}
 	provider->dtpv_pops = *pops;
 
@@ -10967,10 +10967,10 @@ dtrace_enabling_matchall(void)
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
 		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
 		cred_t *cr = dcr->dcr_cred;
-		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
+		zoneid_t zone = cr != NULL ? crgetzonedid(cr) : 0;
 
 		if ((dcr->dcr_visible & DTRACE_CRV_ALLZONE) || (cr != NULL &&
-		    (zone == GLOBAL_ZONEID || getzoneid() == zone)))
+		    (zone == GLOBAL_ZONEID || getzonedid() == zone)))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 
