@@ -788,7 +788,7 @@ static int
 dt_opt_zone(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
 	dtrace_optval_t val = 0;
-	zoneid_t z;
+	zoneid_t z, did;
 
 	if (arg == NULL)
 		return (dt_set_errno(dtp, EDT_BADOPTVAL));
@@ -808,7 +808,10 @@ dt_opt_zone(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 			return (dt_set_errno(dtp, EDT_BADOPTVAL));
 	}
 
-	dtp->dt_options[DTRACEOPT_ZONE] = z;
+	if (zone_getattr(z, ZONE_ATTR_DID, &did, sizeof (did)) < 0)
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
+
+	dtp->dt_options[DTRACEOPT_ZONE] = did;
 
 	return (0);
 }

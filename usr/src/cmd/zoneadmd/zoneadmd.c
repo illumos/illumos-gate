@@ -531,7 +531,7 @@ notify_zonestatd(zoneid_t zoneid)
  * subcommand.
  */
 static int
-zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, zoneid_t zone_did)
+zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 {
 	int err;
 
@@ -543,6 +543,9 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, zoneid_t zone_did)
 		    zonecfg_strerror(err));
 		goto bad;
 	}
+
+	if (zone_did == 0)
+		zone_did = zone_get_did(zone_name);
 
 	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
@@ -1037,34 +1040,6 @@ audit_put_record(zlog_t *zlogp, ucred_t *uc, int return_val,
 	(void) adt_end_session(ah);
 }
 
-static zoneid_t
-getzone_did(char *zonename)
-{
-	int len;
-	FILE *fp;
-	char buf[256];
-	char pat[ZONENAME_MAX + 2];
-	int id = 1;
-
-	(void) snprintf(pat, sizeof (pat), "%s:", zonename);
-	len = strlen(pat);
-	if ((fp = fopen("/etc/zones/index", "r")) == NULL)
-		return (getpid());
-
-	while (fgets(buf, sizeof (buf), fp) != NULL) {
-		if (strncmp(buf, pat, len) == 0) {
-			fclose(fp);
-			return (id);
-		}
-
-		if (isalpha(buf[0]) && strncmp(buf, "global:", 7) != 0)
-			id++;
-	}
-
-	fclose(fp);
-	return (getpid());
-}
-
 /*
  * The main routine for the door server that deals with zone state transitions.
  */
@@ -1193,9 +1168,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		goto out;
 	}
 
-	if (zone_did == 0)
-		zone_did = getzone_did(zone_name);
-
 	if (kernelcall) {
 		/*
 		 * Kernel-initiated requests may lose their validity if the
@@ -1237,15 +1209,15 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_INSTALLED:
 		switch (cmd) {
 		case Z_READY:
-			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate, zone_did);
+			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
 		case Z_FORCEBOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
-			    zone_did)) == 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
+			    == 0) {
 				rval = zone_bootup(zlogp, zargp->bootbuf,
 				    zstate);
 			}
@@ -1304,7 +1276,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 			rval = zone_ready(zlogp,
 			    strcmp(zargp->bootbuf, "-U") == 0 ?
-			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate, zone_did);
+			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate);
 			if (rval != 0)
 				break;
 
@@ -1431,8 +1403,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate))
 			    != 0)
 				break;
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
-			    zone_did)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1463,8 +1434,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				boot_args[0] = '\0';
 				break;
 			}
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
-			    zone_did)) != 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
+			    != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;

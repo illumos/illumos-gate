@@ -221,7 +221,6 @@ COMMON_SUBDIRS=		\
 	kstat		\
 	last		\
 	lastcomm	\
-	latencytop	\
 	ldap		\
 	ldapcachemgr	\
 	lgrpinfo	\
@@ -324,7 +323,6 @@ COMMON_SUBDIRS=		\
 	pwck		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\
@@ -365,7 +363,6 @@ COMMON_SUBDIRS=		\
 	sh		\
 	shcomp		\
 	smbios		\
-	smbsrv		\
 	smserverd	\
 	soelim		\
 	sort		\
@@ -662,7 +659,6 @@ MSGSUBDIRS=		\
 	ptools		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\
@@ -686,7 +682,6 @@ MSGSUBDIRS=		\
 	sgs		\
 	sh		\
 	shcomp		\
-	smbsrv		\
 	sort		\
 	split		\
 	srptadm		\

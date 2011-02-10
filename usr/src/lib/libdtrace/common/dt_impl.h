@@ -605,6 +605,8 @@ extern int dt_print_quantize(dtrace_hdl_t *, FILE *,
     const void *, size_t, uint64_t);
 extern int dt_print_lquantize(dtrace_hdl_t *, FILE *,
     const void *, size_t, uint64_t);
+extern int dt_print_llquantize(dtrace_hdl_t *, FILE *,
+    const void *, size_t, uint64_t);
 extern int dt_print_agg(const dtrace_aggdata_t *, void *);
 
 extern int dt_handle(dtrace_hdl_t *, dtrace_probedata_t *);

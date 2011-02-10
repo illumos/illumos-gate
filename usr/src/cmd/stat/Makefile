@@ -27,7 +27,8 @@
 
 include ../Makefile.cmd
 
-SUBDIRS=	fsstat \
+SUBDIRS=	arcstat \
+		fsstat \
 		iostat \
 		mpstat \
 		vfsstat \

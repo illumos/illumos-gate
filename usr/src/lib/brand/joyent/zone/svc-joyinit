@@ -37,6 +37,12 @@ case "$1" in
     USBMOUNT=
     enable_ur="true"
 
+    # If we're not importing the pools, we shouldn't try to setup as a headnode
+    # (since there'll be no zpool)
+    if /bin/bootparams | grep "^noimport=true" > /dev/null 2>&1; then
+        exit $SMF_EXIT_OK
+    fi
+
     # If we're a headnode, we'll not have AMQP args on the cmdline, and we want
     # to run an initial_script first anyway.
     if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then

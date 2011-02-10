@@ -101,6 +101,7 @@ extern "C" {
 #define	ZONE_ATTR_HOSTID	15
 #define	ZONE_ATTR_FS_ALLOWED	16
 #define	ZONE_ATTR_NETWORK	17
+#define	ZONE_ATTR_DID		18
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -605,6 +606,7 @@ extern zone_t *zone_find_by_name(char *);
 extern zone_t *zone_find_by_any_path(const char *, boolean_t);
 extern zone_t *zone_find_by_path(const char *);
 extern zoneid_t getzoneid(void);
+extern zoneid_t getzonedid(void);
 extern zone_t *zone_find_by_id_nolock(zoneid_t);
 extern int zone_datalink_walk(zoneid_t, int (*)(datalink_id_t, void *), void *);
 extern int zone_check_datalink(zoneid_t *, datalink_id_t);

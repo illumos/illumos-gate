@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -56,6 +56,11 @@ ALTROOT=$5
 if [ $cmd -eq 0 ]; then
 	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
 	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
+	[ ! -d $ZONEPATH/root/checkpoints ] && \
+	    mkdir -m755 $ZONEPATH/root/checkpoints
+
+	# Force zone snapshots to get mounted
+	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
 fi
 
 exit 0

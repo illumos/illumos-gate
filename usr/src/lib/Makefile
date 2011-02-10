@@ -222,7 +222,6 @@ SUBDIRS += \
 	raidcfg_plugins	\
 	cfgadm_plugins	\
 	libmail		\
-	lvm		\
 	libsmedia	\
 	libipp		\
 	libdiskmgt	\
@@ -238,10 +237,7 @@ SUBDIRS += \
 	libzpool	\
 	libzfs		\
 	libbe 		\
-	pylibbe 	\
 	libzfs_jni	\
-	pyzfs		\
-	pysolaris	\
 	libmapid	\
 	brand		\
 	policykit	\
@@ -301,9 +297,6 @@ fm:			\
 #
 NOWAIT_SUBDIRS= $(SUBDIRS:.WAIT=)
 
-DCSUBDIRS =		\
-	lvm
-
 MSGSUBDIRS=		\
 	abi		\
 	auditd_plugins	\
@@ -359,12 +352,9 @@ MSGSUBDIRS=		\
 	libwanbootutil	\
 	libzfs		\
 	libzonecfg	\
-	lvm		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pyzfs		\
-	pysolaris	\
 	rpcsec_gss	\
 	libreparse
 MSGSUBDIRS += \
@@ -480,7 +470,6 @@ HDRSUBDIRS=		\
 	libzonestat	\
 	hal		\
 	policykit	\
-	lvm		\
 	pkcs11		\
 	passwdutil	\
 	../cmd/sendmail/libmilter	\
@@ -660,9 +649,6 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
-pylibbe: 	libbe libzfs
-pyzfs:		libnvpair libzfs
-pysolaris:	libsec libidmap
 libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug

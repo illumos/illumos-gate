@@ -43,6 +43,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#include <sys/mac.h>
 #include <stdio.h>
 #include <rctl.h>
 #include <zone.h>
@@ -197,6 +198,9 @@ struct zone_nwiftab {
 	char	zone_nwif_address[INET6_ADDRSTRLEN]; /* shared-ip only */
 	char	zone_nwif_allowed_address[INET6_ADDRSTRLEN]; /* excl-ip only */
 	char	zone_nwif_physical[LIFNAMSIZ];
+	char	zone_nwif_mac[MAXMACADDRLEN];		/* excl-ip only */
+	char	zone_nwif_vlan_id[10];		/* excl-ip only */
+	char	zone_nwif_gnic[LIFNAMSIZ];		/* excl-ip only */
 	char	zone_nwif_defrouter[INET6_ADDRSTRLEN];
 };
 
@@ -319,6 +323,8 @@ extern	int	zonecfg_set_bootargs(zone_dochandle_t, char *);
 extern	int	zonecfg_get_sched_class(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_sched(zone_dochandle_t, char *);
 extern	int	zonecfg_get_dflt_sched_class(zone_dochandle_t, char *, int);
+extern	zoneid_t zonecfg_get_did(zone_dochandle_t);
+extern	void	zonecfg_set_did(zone_dochandle_t);
 
 /*
  * Set/retrieve the brand for the zone
@@ -511,6 +517,7 @@ extern	int	zonecfg_set_limitpriv(zone_dochandle_t, char *);
  * Higher-level routines.
  */
 extern  int	zone_get_brand(char *, char *, size_t);
+extern  zoneid_t zone_get_did(char *);
 extern	int	zone_get_rootpath(char *, char *, size_t);
 extern	int	zone_get_devroot(char *, char *, size_t);
 extern	int	zone_get_zonepath(char *, char *, size_t);
