@@ -9,13 +9,14 @@ svcprop \- retrieve values of service configuration properties
 .SH SYNOPSIS
 .LP
 .nf
-\fBsvcprop\fR [\fB-fqtv\fR] [\fB-C\fR | \fB-c\fR | \fB-s\fR \fIsnapshot\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR]... 
+\fBsvcprop\fR [\fB-fqtv\fR] [\fB-C\fR | \fB-c\fR | \fB-s\fR \fIsnapshot\fR]
+     [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR]... 
      {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fBsvcprop\fR \fB-w\fR [\fB-fqtv\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR] {\fIFMRI\fR | \fIpattern\fR}
+\fBsvcprop\fR \fB-w\fR [\fB-fqtv\fR] [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR] {\fIFMRI\fR | \fIpattern\fR}
 .fi
 
 .SH DESCRIPTION
@@ -185,6 +186,17 @@ This option is only valid when a single entity is specified. If more than one
 operand is specified, or an operand matches more than one instance, an error
 message is printed and no action is taken. The -C option is implied.
 .RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-z\fR \fIzone\fR
+.ad
+.RS 14n
+.rt
+Uses properties from the service or instance in the specified \fIzone\fR.
+This option is only applicable from the global zone, see \fBzones\fR(5).
 
 .SH OPERANDS
 .sp
@@ -426,4 +438,5 @@ Invalid command line options were specified.
 .LP
 \fBsvcs\fR(1), \fBinetd\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBservice_bundle\fR(4), \fBattributes\fR(5),
-\fBfnmatch\fR(5), \fBsmf\fR(5), \fBsmf_method\fR(5), \fBsmf_security\fR(5)
+\fBfnmatch\fR(5), \fBsmf\fR(5), \fBsmf_method\fR(5), \fBsmf_security\fR(5),
+\fBzones\fR(5)

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * svcadm - request adminstrative actions for service instances
  */
 
@@ -44,6 +48,7 @@
 #include <procfs.h>
 #include <assert.h>
 #include <errno.h>
+#include <zone.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -140,7 +145,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-	"Usage: %1$s [-v] [cmd [args ... ]]\n\n"
+	"Usage: %1$s [-v] [-z zone] [cmd [args ... ]]\n\n"
 	"\t%1$s enable [-rst] <service> ...\t- enable and online service(s)\n"
 	"\t%1$s disable [-st] <service> ...\t- disable and offline service(s)\n"
 	"\t%1$s restart <service> ...\t\t- restart specified service(s)\n"
@@ -2099,15 +2104,39 @@ main(int argc, char *argv[])
 	if (h == NULL)
 		scfdie();
 
+	while ((o = getopt(argc, argv, "vz:")) != -1) {
+		switch (o) {
+		case 'v':
+			verbose = 1;
+			break;
+
+		case 'z': {
+			scf_value_t *zone;
+
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcadm -z may only be used "
+				    "from the global zone\n"));
+
+			if ((zone = scf_value_create(h)) == NULL)
+				scfdie();
+
+			if (scf_value_set_astring(zone, optarg) != SCF_SUCCESS)
+				scfdie();
+
+			if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
+				uu_die(gettext("invalid zone '%s'\n"), optarg);
+
+			scf_value_destroy(zone);
+			break;
+		}
+
+		default:
+			usage();
+		}
+	}
+
 	if (scf_handle_bind(h) == -1)
 		uu_die(gettext("Couldn't bind to svc.configd.\n"));
-
-	while ((o = getopt(argc, argv, "v")) != -1) {
-		if (o == 'v')
-			verbose = 1;
-		else
-			usage();
-	}
 
 	if (optind >= argc)
 		usage();

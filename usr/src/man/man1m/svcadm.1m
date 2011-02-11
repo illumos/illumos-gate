@@ -9,32 +9,32 @@ svcadm \- manipulate service instances
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] mark [\fB-It\fR] \fIinstance_state\fR 
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] mark [\fB-It\fR] \fIinstance_state\fR 
      {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
@@ -60,9 +60,21 @@ The following options are supported:
 .na
 \fB\fB-v\fR\fR
 .ad
-.RS 6n
+.RS 20n
 .rt  
 Print actions verbosely to standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-z\fR \fIzone\fR
+.ad
+.RS 20n
+.rt
+Administer services in the specified zone.  This option is only applicable
+from the global zone, see \fBzones\fR(5).
 .RE
 
 .SH SUBCOMMANDS
@@ -520,7 +532,7 @@ output are Committed.
 .LP
 \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBinetd\fR(1M), \fBinit\fR(1M),
 \fBsvccfg\fR(1M), \fBsvc.startd\fR(1M), \fBlibscf\fR(3LIB), \fBcontract\fR(4),
-\fBattributes\fR(5), \fBsmf\fR(5), \fBsmf_security\fR(5)
+\fBattributes\fR(5), \fBsmf\fR(5), \fBsmf_security\fR(5), \fBzones\fR(5)
 .SH NOTES
 .sp
 .LP
