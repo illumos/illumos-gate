@@ -23,11 +23,12 @@
 #
 # vfsstat - report VFS statistics per zone
 #
-# USAGE:    vfsstat [-hIMrZ] [interval [count]]
+# USAGE:    vfsstat [-hIMrzZ] [interval [count]]
 #           -h              # help
 #	    -I              # print results per interval (where applicable)
 #	    -M              # print results in MB/s
 #	    -r		    # print data in comma-separated format
+#           -z              # hide zones with no VFS activity
 #	    -Z		    # print data for all zones
 #
 #   eg,	    vfsstat               # print summary since zone boot
@@ -61,13 +62,14 @@ my $Kstat = Sun::Solaris::Kstat->new();
 
 # Process command line args
 usage() if defined $ARGV[0] and $ARGV[0] eq "--help";
-getopts('hIMrZ') or usage();
+getopts('hIMrzZ') or usage();
 usage() if defined $main::opt_h;
 $main::opt_h = 0;
 
 my $USE_MB = defined $main::opt_M ? $main::opt_M : 0;
 my $USE_INTERVAL = defined $main::opt_I ? $main::opt_I : 0;
 my $USE_COMMA = defined $main::opt_r ? $main::opt_r : 0;
+my $HIDE_ZEROES = defined $main::opt_z ? $main::opt_z : 0;
 my $ALL_ZONES = defined $main::opt_Z ? $main::opt_Z : 0;
 
 my ($interval, $count);
@@ -173,8 +175,12 @@ sub print_stats {
 	my $r_b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
 	my $w_b_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
 
-	printf($DATA_FMT, $reads, $writes, $nread, $nwritten, $wait_t,
-	    $r_actv, $w_actv, $read_t, $writ_t, $r_b_pct, $w_b_pct, $zone);
+	if (! $HIDE_ZEROES || $reads != 0.0 || $writes != 0.0 ||
+	    $nread != 0.0 || $nwritten != 0.0) {
+		printf($DATA_FMT, $reads, $writes, $nread, $nwritten,
+		    $wait_t, $r_actv, $w_actv, $read_t, $writ_t,
+		    $r_b_pct, $w_b_pct, $zone);
+	}
 
 	# Save current calculations for next loop
 	foreach (@fields) { $old->{$_} = $data->{$_}; }
@@ -182,13 +188,14 @@ sub print_stats {
 
 sub usage {
         print STDERR <<END;
-USAGE: vfsstat [-hIMrZ] [interval [count]]
+USAGE: vfsstat [-hIMrzZ] [interval [count]]
    eg, vfsstat               # print summary since zone boot
        vfsstat 1             # print continually every 1 second
        vfsstat 1 5           # print 5 times, every 1 second
        vfsstat -I            # print results per interval (where applicable)
        vfsstat -M            # print results in MB/s
        vfsstat -r            # print results in comma-separated format
+       vfsstat -z            # hide zones with no VFS activity
        vfsstat -Z            # print results for all zones
 END
         exit 1;

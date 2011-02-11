@@ -23,11 +23,12 @@
 #
 # ziostat - report I/O statistics per zone
 #
-# USAGE:    ziostat [-hIMrZ] [interval [count]]
+# USAGE:    ziostat [-hIMrzZ] [interval [count]]
 #           -h              # help
 #           -I              # print results per interval (where applicable)
 #	    -M              # print results in MB/s
 #	    -r		    # print data in comma-separated format
+#	    -z		    # hide zones with no ZFS I/O activity
 #	    -Z		    # print data for all zones
 #
 #   eg,	    ziostat               # print summary since zone boot
@@ -59,13 +60,14 @@ my $Kstat = Sun::Solaris::Kstat->new();
 
 # Process command line args
 usage() if defined $ARGV[0] and $ARGV[0] eq "--help";
-getopts('hIMrZ') or usage();
+getopts('hIMrzZ') or usage();
 usage() if defined $main::opt_h;
 $main::opt_h = 0;
 
 my $USE_MB = defined $main::opt_M ? $main::opt_M : 0;
 my $USE_INTERVAL = defined $main::opt_I ? $main::opt_I : 0;
 my $USE_COMMA = defined $main::opt_r ? $main::opt_r : 0;
+my $HIDE_ZEROES = defined $main::opt_z ? $main::opt_z : 0;
 my $ALL_ZONES = defined $main::opt_Z ? $main::opt_Z : 0;
 
 my ($interval, $count);
@@ -166,8 +168,11 @@ sub print_stats {
 	my $w_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
 	my $b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
 
-	printf($DATA_FMT, $reads, $writes, $nread, $nwritten, $wait, $actv,
-	    $wsvc, $asvc, $w_pct, $b_pct, $zone);
+	if (! $HIDE_ZEROES || $reads != 0.0 || $writes != 0.0 ||
+	    $nread != 0.0 || $nwritten != 0.0) {
+		printf($DATA_FMT, $reads, $writes, $nread, $nwritten,
+		    $wait, $actv, $wsvc, $asvc, $w_pct, $b_pct, $zone);
+	}
 
 	# Save current calculations for next loop
 	foreach (@fields) { $old->{$_} = $data->{$_}; }
@@ -175,13 +180,14 @@ sub print_stats {
 
 sub usage {
         print STDERR <<END;
-USAGE: ziostat [-hIMrZ] [interval [count]]
+USAGE: ziostat [-hIMrzZ] [interval [count]]
    eg, ziostat               # print summary since zone boot
        ziostat 1             # print continually every 1 second
        ziostat 1 5           # print 5 times, every 1 second
        ziostat -I            # print results per interval (where applicable)
        ziostat -M            # print results in MB/s
        ziostat -r            # print results in comma-separated format
+       ziostat -z            # hide zones with no ZFS I/O activity
        ziostat -Z            # print results for all zones
 END
         exit 1;
