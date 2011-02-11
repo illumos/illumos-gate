@@ -23,16 +23,16 @@
 #
 # ziostat - report I/O statistics per zone
 #
-# USAGE:    ziostat [-hIMr] [interval [count]]
+# USAGE:    ziostat [-hIMrZ] [interval [count]]
 #           -h              # help
 #           -I              # print results per interval (where applicable)
 #	    -M              # print results in MB/s
 #	    -r		    # print data in comma-separated format
+#	    -Z		    # print data for all zones
 #
 #   eg,	    ziostat               # print summary since zone boot
 #           ziostat 1             # print continually every 1 second
 #           ziostat 1 5           # print 5 times, every 1 second
-#           ziostat -M 1          # print results in MB/s, every 1 second
 #
 # NOTES:
 #
@@ -59,14 +59,14 @@ my $Kstat = Sun::Solaris::Kstat->new();
 
 # Process command line args
 usage() if defined $ARGV[0] and $ARGV[0] eq "--help";
-getopts('hIMr') or usage();
+getopts('hIMrZ') or usage();
 usage() if defined $main::opt_h;
+$main::opt_h = 0;
 
 my $USE_MB = defined $main::opt_M ? $main::opt_M : 0;
 my $USE_INTERVAL = defined $main::opt_I ? $main::opt_I : 0;
 my $USE_COMMA = defined $main::opt_r ? $main::opt_r : 0;
-
-chomp(my $zname = (`/sbin/zonename`));
+my $ALL_ZONES = defined $main::opt_Z ? $main::opt_Z : 0;
 
 my ($interval, $count);
 if ( defined($ARGV[0]) ) {
@@ -77,8 +77,6 @@ if ( defined($ARGV[0]) ) {
 	$interval = 1;
 	$count = 1; 
 }
-
-$main::opt_h = 0;
 
 my $HEADER_FMT = $USE_COMMA ?
      "r/%s,w/%s,%sr/%s,%sw/%s,wait,actv,wsvc_t,asvc_t,%%w,%%b,zone\n" :
@@ -92,40 +90,43 @@ my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? 1024 * 1024 : 1024;
 my $INTERVAL_SUFFIX = $USE_INTERVAL ? "i" : "s";
 
-my $Modules = $Kstat->{'zone_io'};
+my @fields = ( 'reads', 'writes', 'nread', 'nwritten', 'rtime', 'wtime',
+    'rlentime', 'wlentime', 'snaptime' );
 
-my $old_wlentime = 0;
-my $old_wtime = 0;
-my $old_rlentime = 0;
-my $old_rtime = 0;
-my $old_rbytes = 0;
-my $old_wbytes = 0;
-my $old_rops = 0;
-my $old_wops = 0;
-my $old_snaptime = 0;
+chomp(my $curzone = (`/sbin/zonename`));
 
-my $ii = 0;
+# Read list of visible zones and their zone IDs
+my @zones = ();
+my %zoneids = ();
+my $zoneadm = `zoneadm list -p | cut -d: -f1,2`;
+@lines = split(/\n/, $zoneadm);
+foreach $line (@lines) {
+	@tok = split(/:/, $line);
+	$zoneids->{$tok[1]} = $tok[0];
+	push(@zones, $tok[1]);
+}
+
+my %old = ();
+
 $Kstat->update();
 
-while (1) {
+for (my $ii = 0; $ii < $count; $ii++) {
 	printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
 	    $INTERVAL_SUFFIX, $BYTES_PREFIX, $INTERVAL_SUFFIX);
 
-	foreach my $instance (sort keys(%$Modules)) {
-		my $Instances = $Modules->{$instance};
-	
-		foreach my $name (keys(%$Instances)) {
-			$Stats = $Instances->{$name};
-
-			if ($name eq $zname) {
-				print_stats();
-			}
+	foreach $zone (@zones) {
+		if ((!$ALL_ZONES) && ($zone ne $curzone)) {
+			next;
 		}
-	}
-	
-	$ii++;
-	if ($ii == $count) {
-		exit (0);
+
+		if (! defined $old->{$zone}) {
+			$old->{$zone} = ();
+			foreach $field (@fields) { $old->{$zone}->{$field} = 0; }
+		}
+
+		my $zoneid = $zoneids->{$zone};
+		print_stats($zone, $Kstat->{'zone_io'}{$zoneid}{$zone},
+		    $old->{$zone});
 	}
 
 	sleep ($interval);
@@ -133,75 +134,55 @@ while (1) {
 }
 
 sub print_stats {
-	my $wlentime = $Stats->{'wlentime'};
-	my $wtime = $Stats->{'wtime'};
-	my $rlentime = $Stats->{'rlentime'};
-	my $rtime = $Stats->{'rtime'};
+	my $zone = $_[0];
+	my $data = $_[1];
+	my $old = $_[2];
 
-	my $rbytes = $Stats->{'nread'};
-	my $wbytes = $Stats->{'nwritten'};
-	my $rops = $Stats->{'reads'};
-	my $wops = $Stats->{'writes'};
-
-	my $etime = $Stats->{'snaptime'} -
-	    ($old_snaptime > 0 ? $old_snaptime : $Stats->{'crtime'});
+	my $etime = $data->{'snaptime'} -
+	    ($old->{'snaptime'} > 0 ? $old->{'snaptime'} : $data->{'crtime'});
 
 	# Calculate basic statistics
 	my $rate_divisor = $USE_INTERVAL ? 1 : $etime;
-	my $reads = ($rops - $old_rops) / $rate_divisor;
-	my $writes = ($wops - $old_wops) / $rate_divisor;
-	my $nread = ($rbytes - $old_rbytes) / $rate_divisor / $BYTES_DIVISOR;
-	my $nwritten = ($wbytes - $old_wbytes) / $rate_divisor / $BYTES_DIVISOR;
+	my $reads = ($data->{'reads'} - $old->{'reads'}) / $rate_divisor;
+	my $writes = ($data->{'writes'} - $old->{'writes'}) / $rate_divisor;
+	my $nread = ($data->{'nread'} - $old->{'nread'}) /
+	    $rate_divisor / $BYTES_DIVISOR;
+	my $nwritten = ($data->{'nwritten'} - $old->{'nwritten'}) /
+	    $rate_divisor / $BYTES_DIVISOR;
 
 	# Calculate overall transactions per second
-	my $tps = ($rops + $wops - $old_rops - $old_wops) / $etime;
+	my $tps = ($data->{'reads'} - $old->{'reads'} +
+	    $data->{'writes'} - $old->{'writes'}) / $etime;
 
 	# Calculate average length of wait and run queues
-	my $wait = ($wlentime - $old_wlentime) / $etime;
-	my $actv = ($rlentime - $old_rlentime) / $etime;
+	my $wait = ($data->{'wlentime'} - $old->{'wlentime'}) / $etime;
+	my $actv = ($data->{'rlentime'} - $old->{'rlentime'}) / $etime;
 
 	# Calculate average wait and run times
 	my $wsvc = $tps > 0 ? $wait * (1000 / $tps) : 0.0;
 	my $asvc = $tps > 0 ? $actv * (1000 / $tps) : 0.0;
 
 	# Calculate the % time the wait queue and disk are active
-	my $w_pct = (($wtime - $old_wtime) / $etime) * 100;
-	my $b_pct = (($rtime - $old_rtime) / $etime) * 100;
+	my $w_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
+	my $b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
 
-	printf($DATA_FMT,
-	    $reads,
-	    $writes,
-	    $nread,
-	    $nwritten,
-	    $wait,
-	    $actv,
-	    $wsvc,
-	    $asvc,
-	    $w_pct,
-	    $b_pct,
-	    $zname);
+	printf($DATA_FMT, $reads, $writes, $nread, $nwritten, $wait, $actv,
+	    $wsvc, $asvc, $w_pct, $b_pct, $zone);
 
 	# Save current calculations for next loop
-	$old_wlentime = $wlentime;
-	$old_wtime = $wtime;
-	$old_rlentime = $rlentime;
-	$old_rtime = $rtime;
-	$old_rbytes = $rbytes;
-	$old_wbytes = $wbytes;
-	$old_rops = $rops;
-	$old_wops = $wops;
-	$old_snaptime = $Stats->{'snaptime'};
+	foreach (@fields) { $old->{$_} = $data->{$_}; }
 }
 
 sub usage {
         print STDERR <<END;
-USAGE: ziostat [-hIMr] [interval [count]]
+USAGE: ziostat [-hIMrZ] [interval [count]]
    eg, ziostat               # print summary since zone boot
        ziostat 1             # print continually every 1 second
        ziostat 1 5           # print 5 times, every 1 second
        ziostat -I            # print results per interval (where applicable)
        ziostat -M            # print results in MB/s
        ziostat -r            # print results in comma-separated format
+       ziostat -Z            # print results for all zones
 END
         exit 1;
 }
