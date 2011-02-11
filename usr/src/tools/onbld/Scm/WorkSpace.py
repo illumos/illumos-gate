@@ -15,7 +15,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2008, 2010, Richard Lowe
+# Copyright 2008, 2011, Richard Lowe
 #
 
 #
@@ -37,10 +37,10 @@
 # was renamed or merely copied.  Each changed file has an
 # associated ActiveEntry.
 #
-# The ActiveList being a list ActiveEntrys can thus present the entire
-# change in workspace state between a parent and its child, and is the
-# important bit here (in that if it is incorrect, everything else will
-# be as incorrect, or more)
+# The ActiveList, being a list of ActiveEntry objects, can thus
+# present the entire change in workspace state between a parent and
+# its child and is the important bit here (in that if it is incorrect,
+# everything else will be as incorrect, or more)
 #
 
 import cStringIO
@@ -49,6 +49,7 @@ from mercurial import cmdutil, context, error, hg, node, patch, repair, util
 from hgext import mq
 
 from onbld.Scm import Version
+
 
 #
 # Mercurial 1.6 moves findoutgoing into a discover module
@@ -73,208 +74,224 @@ class ActiveEntry(object):
 
     .is_<change>() methods.'''
 
-    MODIFIED = 1
-    ADDED = 2
-    REMOVED = 3
+    MODIFIED = intern('modified')
+    ADDED = intern('added')
+    REMOVED = intern('removed')
 
-    def __init__(self, name):
+    def __init__(self, name, change):
         self.name = name
-        self.change = None
+        self.change = intern(change)
+
+        assert change in (self.MODIFIED, self.ADDED, self.REMOVED)
+
         self.parentname = None
         # As opposed to copied (or neither)
         self.renamed = False
         self.comments = []
 
-    #
-    # ActiveEntrys sort by the name of the file they represent.
-    #
     def __cmp__(self, other):
         return cmp(self.name, other.name)
 
     def is_added(self):
-        return self.change == self.ADDED
+        '''Return True if this ActiveEntry represents an added file'''
+        return self.change is self.ADDED
 
     def is_modified(self):
-        return self.change == self.MODIFIED
+        '''Return True if this ActiveEntry represents a modified file'''
+        return self.change is self.MODIFIED
 
     def is_removed(self):
-        return self.change == self.REMOVED
+        '''Return True if this ActiveEntry represents a removed file'''
+        return self.change is self.REMOVED
 
     def is_renamed(self):
+        '''Return True if this ActiveEntry represents a renamed file'''
         return self.parentname and self.renamed
 
     def is_copied(self):
+        '''Return True if this ActiveEntry represents a copied file'''
         return self.parentname and not self.renamed
 
 
 class ActiveList(object):
-    '''Complete representation of workspace change.
+    '''Complete representation of change between two changesets.
 
-    In practice, a container for ActiveEntrys, and methods to build them,
-    update them, and deal with them en masse.'''
+    In practice, a container for ActiveEntry objects, and methods to
+    create them, and deal with them as a group.'''
 
     def __init__(self, ws, parenttip, revs=None):
-        self._active = {}
+        '''Initialize the ActiveList
+
+        parenttip is the revision with which to compare (likely to be
+        from the parent), revs is a topologically sorted list of
+        revisions ending with the revision to compare with (likely to
+        be the child-local revisions).'''
+
+        assert parenttip is not None
+
         self.ws = ws
-
         self.revs = revs
-
-        self.base = None
         self.parenttip = parenttip
-
-        #
-        # If we couldn't find a parenttip, the two repositories must
-        # be unrelated (Hg catches most of this, but this case is valid for it
-        # but invalid for us)
-        #
-        if self.parenttip == None:
-            raise util.Abort('repository is unrelated')
         self.localtip = None
 
-        if revs:
-            self.base = revs[0]
-            self.localtip = revs[-1]
-
+        self._active = {}
         self._comments = []
 
-        self._build(revs)
+        if revs:
+            self.localtip = revs[-1]
+            self._build()
 
-    def _build(self, revs):
-        if not revs:
-            return
+    def _status(self):
+        '''Return the status of any file mentioned in any of the
+        changesets making up this active list.'''
 
-        status = self.ws.status(self.parenttip.node(), self.localtip.node())
-
-        files = []
-        for ctype in status.values():
-            files.extend(ctype)
-
-        #
-        # When a file is renamed, two operations actually occur.
-        # A file copy from source to dest and a removal of source.
-        #
-        # These are represented as two distinct entries in the
-        # changectx and status (one on the dest file for the
-        # copy, one on the source file for the remove).
-        #
-        # Since these are unconnected in both the context and
-        # status we can only make the association by explicitly
-        # looking for it.
-        #
-        # We deal with this thusly:
-        #
-        # We maintain a dict dest -> source of all copies
-        # (updating dest as appropriate, but leaving source alone).
-        #
-        # After all other processing, we mark as renamed any pair
-        # where source is on the removed list.
-        #
-        copies = {}
+        files = set()
+        for c in self.revs:
+            files.update(c.files())
 
         #
-        # Walk revs looking for renames and adding files that
-        # are in both change context and status to the active
-        # list.
+        # Any file not in the parenttip or the localtip is ephemeral
+        # and can be ignored. Mercurial will complain regarding these
+        # files if the localtip is a workingctx, so remove them in
+        # that case.
         #
-        for ctx in revs:
-            desc = ctx.description().splitlines()
+        # Compare against the dirstate because a workingctx manifest
+        # is created on-demand and is particularly expensive.
+        #
+        if self.localtip.rev() is None:
+            for f in files.copy():
+                if f not in self.parenttip and f not in self.ws.repo.dirstate:
+                    files.remove(f)
 
-            self._comments.extend(desc)
+        return self.ws.status(self.parenttip, self.localtip, files=files)
 
-            for fname in ctx.files():
-                #
-                # We store comments per-entry as well, for the sake of
-                # webrev and similar.  We store twice to avoid the problems
-                # of uniquifying comments for the general list (and possibly
-                # destroying multi-line entities in the process).
-                #
-                if fname not in self:
-                    self._addentry(fname)
-                self[fname].comments.extend(desc)
+    def _build(self):
+        '''Construct ActiveEntry objects for each changed file.
 
-                try:
+        This works in 3 stages:
+
+          - Create entries for every changed file with
+            semi-appropriate change type
+
+          - Track renames/copies, and set change comments (both
+            ActiveList-wide, and per-file).
+
+          - Cleanup
+            - Drop circular renames
+            - Drop the removal of the old name of any rename
+            - Drop entries for modified files that haven't actually changed'''
+
+        #
+        # Keep a cache of filectx objects (keyed on pathname) so that
+        # we can avoid opening filelogs numerous times.
+        #
+        fctxcache = {}
+
+        def oldname(ctx, fname):
+            '''Return the name 'fname' held prior to any possible
+            rename/copy in the given changeset.'''
+            try:
+                if fname in fctxcache:
+                    octx = fctxcache[fname]
+                    fctx = ctx.filectx(fname, filelog=octx.filelog())
+                else:
                     fctx = ctx.filectx(fname)
-                except error.LookupError:
+                    #
+                    # workingfilectx objects may not refer to the
+                    # right filelog (in case of rename).  Don't cache
+                    # them.
+                    #
+                    if not isinstance(fctx, context.workingfilectx):
+                        fctxcache[fname] = fctx
+            except error.LookupError:
+                return None
+
+            rn = fctx.renamed()
+            return rn and rn[0] or fname
+
+        status = self._status()
+        self._active = dict((fname, ActiveEntry(fname, kind))
+                            for fname, kind in status.iteritems()
+                            if kind in ('modified', 'added', 'removed'))
+
+        #
+        # We do two things:
+        #    - Gather checkin comments (for the entire ActiveList, and
+        #      per-file)
+        #    - Set the .parentname of any copied/renamed file
+        #
+        # renames/copies:
+        #   We walk the list of revisions backward such that only files
+        #   that ultimately remain active need be considered.
+        #
+        #   At each iteration (revision) we update the .parentname of
+        #   any active file renamed or copied in that revision (the
+        #   current .parentname if set, or .name otherwise, reflects
+        #   the name of a given active file in the revision currently
+        #   being looked at)
+        #
+        for ctx in reversed(self.revs):
+            desc = ctx.description().splitlines()
+            self._comments = desc + self._comments
+            cfiles = set(ctx.files())
+
+            for entry in self:
+                fname = entry.parentname or entry.name
+                if fname not in cfiles:
                     continue
 
+                entry.comments = desc + entry.comments
+
                 #
-                # NB: .renamed() is a misnomer, this actually checks
-                #     for copies.
+                # We don't care about the name history of any file
+                # that ends up being removed, since that trumps any
+                # possible renames or copies along the way.
                 #
-                rn = fctx.renamed()
-                if rn:
-                    #
-                    # If the source file is a known copy we know its
-                    # ancestry leads us to the parent.
-                    # Otherwise make sure the source file is known to
-                    # be in the parent, we need not care otherwise.
-                    #
-                    # We detect cycles at a later point.  There is no
-                    # reason to continuously handle them.
-                    #
-                    if rn[0] in copies:
-                        copies[fname] = copies[rn[0]]
-                    elif rn[0] in self.parenttip.manifest():
-                        copies[fname] = rn[0]
+                # Changes that we may care about involving an
+                # intermediate name of a removed file will appear
+                # separately (related to the eventual name along
+                # that line)
+                #
+                if not entry.is_removed():
+                    entry.parentname = oldname(ctx, fname)
 
-        #
-        # Walk the copy list marking as copied any non-cyclic pair
-        # where the destination file is still present in the local
-        # tip (to avoid ephemeral changes)
-        #
-        # Where source is removed, mark as renamed, and remove the
-        # AL entry for the source file
-        #
-        for fname, oldname in copies.iteritems():
-            if fname == oldname or fname not in self.localtip.manifest():
-                continue
-
-            self[fname].parentname = oldname
-
-            if oldname in status['removed']:
-                self[fname].renamed = True
-                if oldname in self:
-                    del self[oldname]
-
-        #
-        # Walk the active list setting the change type for each active
-        # file.
-        #
-        # In the case of modified files that are not renames or
-        # copies, we do a content comparison, and drop entries that
-        # are not actually modified.
-        #
-        # We walk a copy of the AL such that we can drop entries
-        # within the loop.
-        #
         for entry in self._active.values():
-            if entry.name not in files:
-                del self[entry.name]
-                continue
+            #
+            # For any file marked as copied or renamed, clear the
+            # .parentname if the copy or rename is cyclic (source ==
+            # destination) or if the .parentname did not exist in the
+            # parenttip.
+            #
+            # If the parentname is marked as removed, set the renamed
+            # flag and remove any ActiveEntry we may have for the
+            # .parentname.
+            #
+            if entry.parentname:
+                if (entry.parentname == entry.name or
+                    entry.parentname not in self.parenttip):
+                    entry.parentname = None
+                elif status.get(entry.parentname) == 'removed':
+                    entry.renamed = True
 
-            if entry.name in status['added']:
-                entry.change = ActiveEntry.ADDED
-            elif entry.name in status['removed']:
-                entry.change = ActiveEntry.REMOVED
-            elif entry.name in status['modified']:
-                entry.change = ActiveEntry.MODIFIED
+                    if entry.parentname in self:
+                        del self[entry.parentname]
 
             #
-            # There are cases during a merge where a file will be in
-            # the status return as modified, but in reality be an
-            # addition (ie, not in the parenttip).
+            # There are cases during a merge where a file will be seen
+            # as modified by status but in reality be an addition (not
+            # in the parenttip), so we have to check whether the file
+            # is in the parenttip and set it as an addition, if not.
             #
-            # We need to check whether the file is actually present
-            # in the parenttip, and set it as an add, if not.
+            # If a file is modified (and not a copy or rename), we do
+            # a full comparison to the copy in the parenttip and
+            # ignore files that are parts of active revisions but
+            # unchanged.
             #
-            if entry.name not in self.parenttip.manifest():
+            if entry.name not in self.parenttip:
                 entry.change = ActiveEntry.ADDED
             elif entry.is_modified():
                 if not self._changed_file(entry.name):
                     del self[entry.name]
-                    continue
-
-            assert entry.change
 
     def __contains__(self, fname):
         return fname in self._active
@@ -289,12 +306,7 @@ class ActiveList(object):
         del self._active[key]
 
     def __iter__(self):
-        for entry in self._active.values():
-            yield entry
-
-    def _addentry(self, fname):
-        if fname not in self:
-            self[fname] = ActiveEntry(fname)
+        return self._active.itervalues()
 
     def files(self):
         '''Return the list of pathnames of all files touched by this
@@ -305,11 +317,13 @@ class ActiveList(object):
         '''
 
         ret = self._active.keys()
-        ret.extend([x.parentname for x in self
-                    if x.is_renamed() and x.parentname not in ret])
-        return ret
+        ret.extend(x.parentname for x in self if x.is_renamed())
+        return set(ret)
 
     def comments(self):
+        '''Return the full set of changeset comments associated with
+        this ActiveList'''
+
         return self._comments
 
     def bases(self):
@@ -390,6 +404,134 @@ class ActiveList(object):
         '''Return a Mercurial context object representing the entire
         ActiveList as one change.'''
         return activectx(self, message, user)
+
+    def as_text(self, paths):
+        '''Return the ActiveList as a block of text in a format
+        intended to aid debugging and simplify the test suite.
+
+        paths should be a list of paths for which file-level data
+        should be included.  If it is empty, the whole active list is
+        included.'''
+
+        cstr = cStringIO.StringIO()
+
+        cstr.write('parent tip: %s:%s\n' % (self.parenttip.rev(),
+                                            self.parenttip))
+        if self.localtip:
+            rev = self.localtip.rev()
+            cstr.write('local tip:  %s:%s\n' %
+                       (rev is None and "working" or rev, self.localtip))
+        else:
+            cstr.write('local tip:  None\n')
+
+        cstr.write('entries:\n')
+        for entry in self:
+            if paths and self.ws.filepath(entry.name) not in paths:
+                continue
+
+            cstr.write('  - %s\n' % entry.name)
+            cstr.write('    parentname: %s\n' % entry.parentname)
+            cstr.write('    change: %s\n' % entry.change)
+            cstr.write('    renamed: %s\n' % entry.renamed)
+            cstr.write('    comments:\n')
+            cstr.write('      ' + '\n      '.join(entry.comments) + '\n')
+            cstr.write('\n')
+
+        return cstr.getvalue()
+
+
+class WorkList(object):
+    '''A (user-maintained) list of files changed in this workspace as
+    compared to any parent workspace.
+
+    Internally, the WorkList is stored in .hg/cdm/worklist as a list
+    of file pathnames, one per-line.
+
+    This may only safely be used as a hint regarding possible
+    modifications to the working copy, it should not be relied upon to
+    suggest anything about committed changes.'''
+
+    def __init__(self, ws):
+        '''Load the WorkList for the specified WorkSpace from disk.'''
+
+        self._ws = ws
+        self._repo = ws.repo
+        self._file = os.path.join('cdm', 'worklist')
+        self._files = set()
+        self._valid = False
+
+        if os.path.exists(self._repo.join(self._file)):
+            self.load()
+
+    def __nonzero__(self):
+        '''A WorkList object is true if it was loaded from disk,
+        rather than freshly created.
+        '''
+
+        return self._valid
+
+    def list(self):
+        '''List of pathnames contained in the WorkList
+        '''
+
+        return list(self._files)
+
+    def status(self):
+        '''Return the status (in tuple form) of files from the
+        WorkList as they are in the working copy
+        '''
+
+        match = self._ws.matcher(files=self.list())
+        return self._repo.status(match=match)
+
+    def add(self, fname):
+        '''Add FNAME to the WorkList.
+        '''
+
+        self._files.add(fname)
+
+    def write(self):
+        '''Write the WorkList out to disk.
+        '''
+
+        dirn = os.path.split(self._file)[0]
+
+        if dirn and not os.path.exists(self._repo.join(dirn)):
+            try:
+                os.makedirs(self._repo.join(dirn))
+            except EnvironmentError, e:
+                raise util.Abort("Couldn't create directory %s: %s" %
+                                 (self._repo.join(dirn), e))
+
+        fh = self._repo.opener(self._file, 'w', atomictemp=True)
+
+        for name in self._files:
+            fh.write("%s\n" % name)
+
+        fh.rename()
+        fh.close()
+
+    def load(self):
+        '''Read in the WorkList from disk.
+        '''
+
+        fh = self._repo.opener(self._file, 'r')
+        self._files = set(l.rstrip('\n') for l in fh)
+        self._valid = True
+        fh.close()
+
+    def delete(self):
+        '''Empty the WorkList
+
+        Remove the on-disk WorkList and clear the file-list of the
+        in-memory copy
+        '''
+
+        if os.path.exists(self._repo.join(self._file)):
+            os.unlink(self._repo.join(self._file))
+
+        self._files = set()
+        self._valid = False
 
 
 class activectx(context.memctx):
@@ -477,10 +619,6 @@ class WorkSpace(object):
         will be the most recent head on the current branch.
         '''
 
-        #
-        # A modified working copy is seen as a proto-branch, and thus
-        # our only option as the local tip.
-        #
         if (wctx.files() or len(wctx.parents()) > 1 or
             wctx.branch() != wctx.parents()[0].branch()):
             return wctx
@@ -497,13 +635,14 @@ class WorkSpace(object):
 
         return ltip
 
-    def _parenttip(self, heads, outgoing):
+    def parenttip(self, heads, outgoing):
         '''Return the highest-numbered, non-outgoing changeset that is
         an ancestor of a changeset in heads.
 
-        This is intended to find the most recent changeset on a given
-        branch that is shared between a parent and child workspace,
-        such that it can act as a stand-in for the parent workspace.
+        This returns the most recent changeset on a given branch that
+        is shared between a parent and child workspace, in effect the
+        common ancestor of the chosen local tip and the parent
+        workspace.
         '''
 
         def tipmost_shared(head, outnodes):
@@ -529,15 +668,20 @@ class WorkSpace(object):
         ptips = map(lambda x: tipmost_shared(x, nodes), heads)
         return sorted(ptips, key=lambda x: x.rev(), reverse=True)[0]
 
-    def status(self, base='.', head=None):
+    def status(self, base='.', head=None, files=None):
         '''Translate from the hg 6-tuple status format to a hash keyed
         on change-type'''
 
         states = ['modified', 'added', 'removed', 'deleted', 'unknown',
-              'ignored']
+                  'ignored']
 
-        chngs = self.repo.status(base, head)
-        return dict(zip(states, chngs))
+        match = self.matcher(files=files)
+        chngs = self.repo.status(base, head, match=match)
+
+        ret = {}
+        for paths, change in zip(chngs, states):
+            ret.update((f, change) for f in paths)
+        return ret
 
     def findoutgoing(self, parent):
         '''Return the base set of outgoing nodes.
@@ -568,12 +712,14 @@ class WorkSpace(object):
 
     def modified(self):
         '''Return a list of files modified in the workspace'''
+
         wctx = self.workingctx()
         return sorted(wctx.files() + wctx.deleted()) or None
 
     def merged(self):
         '''Return boolean indicating whether the workspace has an uncommitted
         merge'''
+
         wctx = self.workingctx()
         return len(wctx.parents()) > 1
 
@@ -584,60 +730,65 @@ class WorkSpace(object):
         wctx = self.workingctx()
         return wctx.branch() != wctx.parents()[0].branch()
 
-    def active(self, parent=None):
+    def active(self, parent=None, thorough=False):
         '''Return an ActiveList describing changes between workspace
         and parent workspace (including uncommitted changes).
-        If workspace has no parent, ActiveList will still describe any
-        uncommitted changes.'''
+        If the workspace has no parent, ActiveList will still describe any
+        uncommitted changes.
+
+        If thorough is True use neither the WorkList nor any cached
+        results (though the result of this call will be cached for
+        future, non-thorough, calls).'''
 
         parent = self.parent(parent)
-        if parent in self.activecache:
+
+        #
+        # Use the cached copy if we can (we have one, and weren't
+        # asked to be thorough)
+        #
+        if not thorough and parent in self.activecache:
             return self.activecache[parent]
 
+        #
+        # outbases: The set of outgoing nodes with no outgoing ancestors
+        # outnodes: The full set of outgoing nodes
+        #
         if parent:
-            outgoing = self.findoutgoing(parent)
-            outnodes = self.repo.changelog.nodesbetween(outgoing)[0]
-        else:
-            outgoing = []       # No parent, no outgoing nodes
+            outbases = self.findoutgoing(parent)
+            outnodes = self.repo.changelog.nodesbetween(outbases)[0]
+        else:               # No parent, no outgoing nodes
+            outbases = []
             outnodes = []
 
-        localtip = self._localtip(outnodes, self.workingctx())
+        wctx = self.workingctx(worklist=not thorough)
+        localtip = self._localtip(outnodes, wctx)
 
         if localtip.rev() is None:
             heads = localtip.parents()
         else:
             heads = [localtip]
 
+        parenttip = self.parenttip(heads, outnodes)
+
+        #
+        # If we couldn't find a parenttip, the two repositories must
+        # be unrelated (Hg catches most of this, but this case is
+        # valid for it but invalid for us)
+        #
+        if parenttip == None:
+            raise util.Abort('repository is unrelated')
+
+        headnodes = [h.node() for h in heads]
         ctxs = [self.repo.changectx(n) for n in
-                self.repo.changelog.nodesbetween(outgoing,
-                                                 [h.node() for h in heads])[0]]
+                self.repo.changelog.nodesbetween(outbases, headnodes)[0]]
 
         if localtip.rev() is None:
             ctxs.append(localtip)
 
-        act = ActiveList(self, self._parenttip(heads, outnodes), ctxs)
-
+        act = ActiveList(self, parenttip, ctxs)
         self.activecache[parent] = act
+
         return act
-
-    def pdiff(self, pats, opts, parent=None):
-        'Return diffs relative to PARENT, as best as we can make out'
-
-        parent = self.parent(parent)
-        act = self.active(parent)
-
-        #
-        # act.localtip maybe nil, in the case of uncommitted local
-        # changes.
-        #
-        if not act.revs:
-            return
-
-        matchfunc = cmdutil.match(self.repo, pats, opts)
-        opts = patch.diffopts(self.ui, opts)
-
-        return self.diff(act.parenttip.node(), act.localtip.node(),
-                         match=matchfunc, opts=opts)
 
     def squishdeltas(self, active, message, user=None):
         '''Create a single conglomerate changeset based on a given
@@ -722,9 +873,9 @@ class WorkSpace(object):
         self.ui.pushbuffer()
 
         #
-        # Remove the active lists component changesets by stripping
-        # the base of any active branch (of which there may be
-        # several)
+        # Remove the previous child-local changes by stripping the
+        # nodes that form the base of the ActiveList (removing their
+        # children in the process).
         #
         try:
             try:
@@ -772,6 +923,7 @@ class WorkSpace(object):
 
     def filepath(self, path):
         'Return the full path to a workspace file.'
+
         return self.repo.pathto(path)
 
     def clean(self, rev=None):
@@ -787,22 +939,60 @@ class WorkSpace(object):
 
     def mq_applied(self):
         '''True if the workspace has Mq patches applied'''
+
         q = mq.queue(self.ui, self.repo.join(''))
         return q.applied
 
-    def workingctx(self):
-        return self.repo.changectx(None)
+    def workingctx(self, worklist=False):
+        '''Return a workingctx object representing the working copy.
+
+        If worklist is true, return a workingctx object created based
+        on the status of files in the workspace's worklist.'''
+
+        wl = WorkList(self)
+
+        if worklist and wl:
+            return context.workingctx(self.repo, changes=wl.status())
+        else:
+            return self.repo.changectx(None)
+
+    def matcher(self, pats=None, opts=None, files=None):
+        '''Return a match object suitable for Mercurial based on
+        specified criteria.
+
+        If files is specified it is a list of pathnames relative to
+        the repository root to be matched precisely.
+
+        If pats and/or opts are specified, these are as to
+        cmdutil.match'''
+
+        of_patterns = pats is not None or opts is not None
+        of_files = files is not None
+        opts = opts or {}       # must be a dict
+
+        assert not (of_patterns and of_files)
+
+        if of_patterns:
+            return cmdutil.match(self.repo, pats, opts)
+        elif of_files:
+            return cmdutil.matchfiles(self.repo, files)
+        else:
+            return cmdutil.matchall(self.repo)
 
     def diff(self, node1=None, node2=None, match=None, opts=None):
+        '''Return the diff of changes between two changesets as a string'''
+
+        #
+        # Retain compatibility by only calling diffopts() if it
+        # obviously has not already been done.
+        #
+        if isinstance(opts, dict):
+            opts = patch.diffopts(self.ui, opts)
+
         ret = cStringIO.StringIO()
-        try:
-            for chunk in patch.diff(self.repo, node1, node2, match=match,
-                                    opts=opts):
-                ret.write(chunk)
-        finally:
-            # Workaround Hg bug 1651
-            if not Version.at_least("1.3"):
-                self.repo.dirstate.invalidate()
+        for chunk in patch.diff(self.repo, node1, node2, match=match,
+                                opts=opts):
+            ret.write(chunk)
 
         return ret.getvalue()
 
