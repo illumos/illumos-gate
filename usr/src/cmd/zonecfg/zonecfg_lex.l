@@ -246,6 +246,9 @@ static char *create_token(char *s);
 <TSTATE>global-nic	{ return GNIC; }
 <CSTATE>global-nic	{ return GNIC; }
 
+<TSTATE>property	{ return NPROP; }
+<CSTATE>property	{ return NPROP; }
+
 <TSTATE>dir	{ return DIR; }
 <CSTATE>dir	{ return DIR; }
 
@@ -364,6 +367,13 @@ static char *create_token(char *s);
 
 <CSTATE>[^ \t\n\",;=\(\)]+	{
 			yylval.strval = create_token(yytext);
+			return TOKEN;
+		}
+
+<CSTATE>\"[^\"\n]*[\"\n] {
+			yylval.strval = create_token(yytext + 1);
+			if (yylval.strval[yyleng - 2] == '"')
+				yylval.strval[yyleng - 2] = 0;
 			return TOKEN;
 		}
 

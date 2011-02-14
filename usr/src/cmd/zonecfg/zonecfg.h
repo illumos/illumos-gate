@@ -141,9 +141,10 @@ extern "C" {
 #define	PT_MAC		43
 #define	PT_VLANID	44
 #define	PT_GNIC		45
+#define	PT_NPROP	46
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_GNIC
+#define	PT_MAX		PT_NPROP
 
 #define	MAX_EQ_PROP_PAIRS	3
 

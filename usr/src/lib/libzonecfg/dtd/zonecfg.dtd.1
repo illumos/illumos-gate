@@ -46,7 +46,11 @@
 
 <!ATTLIST inherited-pkg-dir	directory	CDATA #REQUIRED>
 
-<!ELEMENT network	EMPTY>
+<!ELEMENT net-attr	EMPTY>
+<!ATTLIST net-attr	name		CDATA #REQUIRED
+			value		CDATA #REQUIRED>
+
+<!ELEMENT network	(net-attr)*>
 
 <!ATTLIST network	address		CDATA ""
 			allowed-address	CDATA ""

@@ -239,6 +239,7 @@ char *prop_types[] = {
 	"mac-addr",
 	"vlan-id",
 	"global-nic",
+	"property",
 	NULL
 };
 
@@ -411,6 +412,13 @@ static const char *net_res_scope_cmds[] = {
 	"exit",
 	"help",
 	"info",
+	"add property ",
+	"clear allowed-address",
+	"clear defrouter",
+	"clear global-nic",
+	"clear mac-addr",
+	"clear vlan-id",
+	"remove property ",
 	"set address=",
 	"set allowed-address=",
 	"set defrouter=",
@@ -418,11 +426,6 @@ static const char *net_res_scope_cmds[] = {
 	"set mac-addr=",
 	"set physical=",
 	"set vlan-id=",
-	"clear allowed-address",
-	"clear defrouter",
-	"clear global-nic",
-	"clear mac-addr",
-	"clear vlan-id",
 	NULL
 };
 
@@ -1091,6 +1094,9 @@ usage(boolean_t verbose, uint_t flags)
 			(void) fprintf(fp, gettext("Valid commands:\n"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_ADDRESS), gettext("<IP-address>"));
+			(void) fprintf(fp, "\t%s %s (%s=<value>,%s=<value>)\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), pt_to_str(PT_VALUE));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_ALLOWED_ADDRESS),
 			    gettext("<IP-address>"));
@@ -1099,9 +1105,9 @@ usage(boolean_t verbose, uint_t flags)
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_MAC), gettext("<mac-address>"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
-			    pt_to_str(PT_VLANID), gettext("<vlan ID>"));
-			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_GNIC), gettext("<global zone NIC>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_VLANID), gettext("<vlan ID>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
 			(void) fprintf(fp, gettext("%s %s is valid "
@@ -1357,12 +1363,12 @@ usage(boolean_t verbose, uint_t flags)
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
 		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
-		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s, %s|%s\n",
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s, %s, %s %s\n",
 		    rt_to_str(RT_NET),
 		    pt_to_str(PT_ADDRESS), pt_to_str(PT_ALLOWED_ADDRESS),
-		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_MAC),
-		    pt_to_str(PT_VLANID), pt_to_str(PT_GNIC),
-		    pt_to_str(PT_DEFROUTER));
+		    pt_to_str(PT_GNIC), pt_to_str(PT_MAC),
+		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_NPROP),
+		    pt_to_str(PT_VLANID), pt_to_str(PT_DEFROUTER));
 		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DEVICE),
 		    pt_to_str(PT_MATCH));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_RCTL),
@@ -1722,6 +1728,17 @@ create_func(cmd_t *cmd)
 			(void) strlcpy(zone_template, optarg,
 			    sizeof (zone_template));
 			break;
+		case 'X':
+			(void) snprintf(zone_template, sizeof (zone_template),
+			    "%s/%s.xml", ZONE_CONFIG_ROOT, zone);
+			err = zonecfg_get_xml_handle(zone_template, handle);
+			if (err != Z_OK) {
+				zone_perror(execname, err, B_TRUE);
+				exit(Z_ERR);
+			}
+			got_handle = B_TRUE;
+			need_to_commit = B_TRUE;
+			return;
 		default:
 			short_usage(CMD_CREATE);
 			arg_err = B_TRUE;
@@ -1825,6 +1842,7 @@ export_func(cmd_t *cmd)
 	struct zone_dstab dstab;
 	struct zone_psettab psettab;
 	struct zone_rctlvaltab *valptr;
+	struct zone_nwif_attrtab *nap;
 	struct zone_admintab admintab;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
@@ -1998,6 +2016,13 @@ export_func(cmd_t *cmd)
 		export_prop(of, PT_VLANID, nwiftab.zone_nwif_vlan_id);
 		export_prop(of, PT_GNIC, nwiftab.zone_nwif_gnic);
 		export_prop(of, PT_DEFROUTER, nwiftab.zone_nwif_defrouter);
+		for (nap = nwiftab.zone_nwif_attrp; nap != NULL;
+		    nap = nap->zone_nwif_attr_next) {
+			fprintf(of, "%s %s (%s=%s,%s=\"%s\")\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), nap->zone_nwif_attr_name,
+			    pt_to_str(PT_VALUE), nap->zone_nwif_attr_value);
+		}
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 	(void) zonecfg_endnwifent(handle);
@@ -2377,6 +2402,65 @@ bad:
 }
 
 static void
+do_nwif_attr(complex_property_ptr_t cpp)
+{
+	complex_property_ptr_t cp;
+	struct zone_nwif_attrtab *np;
+	int err;
+	boolean_t seen_name = B_FALSE, seen_value = B_FALSE;
+
+	if ((np = calloc(1, sizeof (struct zone_nwif_attrtab))) == NULL) {
+		zone_perror(zone, Z_NOMEM, B_TRUE);
+		exit(Z_ERR);
+	}
+
+	for (cp = cpp; cp != NULL; cp = cp->cp_next) {
+		switch (cp->cp_type) {
+		case PT_NAME:
+			if (seen_name) {
+				zerr(gettext("%s already specified"),
+				    pt_to_str(PT_NAME));
+				goto bad;
+			}
+			(void) strlcpy(np->zone_nwif_attr_name, cp->cp_value,
+			    sizeof (np->zone_nwif_attr_name));
+			seen_name = B_TRUE;
+			break;
+		case PT_VALUE:
+			if (seen_value) {
+				zerr(gettext("%s already specified"),
+				    pt_to_str(PT_VALUE));
+				goto bad;
+			}
+			(void) strlcpy(np->zone_nwif_attr_value, cp->cp_value,
+			    sizeof (np->zone_nwif_attr_value));
+			seen_value = B_TRUE;
+			break;
+		default:
+			zone_perror(pt_to_str(PT_NPROP), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			zonecfg_free_nwif_attr_list(np);
+			return;
+		}
+	}
+
+	if (!seen_name)
+		zerr(gettext("%s not specified"), pt_to_str(PT_NAME));
+	if (!seen_value)
+		zerr(gettext("%s not specified"), pt_to_str(PT_VALUE));
+
+	err = zonecfg_add_nwif_attr(&in_progress_nwiftab, np);
+	if (err != Z_OK)
+		zone_perror(pt_to_str(PT_NPROP), err, B_TRUE);
+	return;
+
+bad:
+	zonecfg_free_nwif_attr_list(np);
+}
+
+static void
 add_property(cmd_t *cmd)
 {
 	char *prop_id;
@@ -2442,6 +2526,24 @@ add_property(cmd_t *cmd)
 					    B_TRUE);
 			}
 		}
+		return;
+	case RT_NET:
+		if (prop_type != PT_NPROP) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		pp = cmd->cmd_property_ptr[0];
+		if (pp->pv_type != PROP_VAL_COMPLEX) {
+			zerr(gettext("A %s value was expected here."),
+			    pvt_to_str(PROP_VAL_COMPLEX));
+			saw_error = B_TRUE;
+			return;
+		}
+
+		do_nwif_attr(pp->pv_complex);
 		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
@@ -2547,8 +2649,9 @@ add_func(cmd_t *cmd)
 		resource_scope = cmd->cmd_res_type;
 		end_op = CMD_ADD;
 		add_resource(cmd);
-	} else
+	} else {
 		add_property(cmd);
+	}
 }
 
 /*
@@ -3443,6 +3546,7 @@ remove_property(cmd_t *cmd)
 	int err, res_type, prop_type;
 	property_value_ptr_t pp;
 	struct zone_rctlvaltab *rctlvaltab;
+	struct zone_nwif_attrtab *np;
 	complex_property_ptr_t cx;
 
 	res_type = resource_scope;
@@ -3503,6 +3607,49 @@ remove_property(cmd_t *cmd)
 			}
 		}
 		return;
+	case RT_NET:
+		if (prop_type != PT_NPROP) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_REMOVE, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		pp = cmd->cmd_property_ptr[0];
+		if (pp->pv_type != PROP_VAL_COMPLEX) {
+			zerr(gettext("A %s value was expected here."),
+			    pvt_to_str(PROP_VAL_COMPLEX));
+			saw_error = B_TRUE;
+			return;
+		}
+
+		np = alloca(sizeof (struct zone_nwif_attrtab));
+		for (cx = pp->pv_complex; cx != NULL; cx = cx->cp_next) {
+			switch (cx->cp_type) {
+			case PT_NAME:
+				(void) strlcpy(np->zone_nwif_attr_name,
+				    cx->cp_value,
+				    sizeof (np->zone_nwif_attr_name));
+				break;
+			case PT_VALUE:
+				(void) strlcpy(np->zone_nwif_attr_value,
+				    cx->cp_value,
+				    sizeof (np->zone_nwif_attr_value));
+				break;
+			default:
+				zone_perror(pt_to_str(prop_type),
+				    Z_NO_PROPERTY_TYPE, B_TRUE);
+				long_usage(CMD_REMOVE, B_TRUE);
+				usage(B_FALSE, HELP_PROPS);
+				return;
+			}
+		}
+		np->zone_nwif_attr_next = NULL;
+
+		err = zonecfg_remove_nwif_attr(&in_progress_nwiftab, np);
+		if (err != Z_OK)
+			zone_perror(pt_to_str(prop_type), err, B_TRUE);
+		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -3555,18 +3702,6 @@ remove_property(cmd_t *cmd)
 			zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		zonecfg_free_rctl_value_list(rctlvaltab);
 		return;
-	case RT_NET:
-		if (prop_type != PT_DEFROUTER) {
-			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    B_TRUE);
-			long_usage(CMD_REMOVE, B_TRUE);
-			usage(B_FALSE, HELP_PROPS);
-			return;
-		} else {
-			bzero(&in_progress_nwiftab.zone_nwif_defrouter,
-			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
-			return;
-		}
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
 		long_usage(CMD_REMOVE, B_TRUE);
@@ -4269,10 +4404,12 @@ set_func(cmd_t *cmd)
 	 * A nasty expression but not that complicated:
 	 * 1. fs options are simple or list (tested below)
 	 * 2. rctl value's are complex or list (tested below)
+	 * 3. net attr's are complex (tested below)
 	 * Anything else should be simple.
 	 */
 	if (!(res_type == RT_FS && prop_type == PT_OPTIONS) &&
 	    !(res_type == RT_RCTL && prop_type == PT_VALUE) &&
+	    !(res_type == RT_NET && prop_type == PT_NPROP) &&
 	    (pp->pv_type != PROP_VAL_SIMPLE ||
 	    (prop_id = pp->pv_simple) == NULL)) {
 		zerr(gettext("A %s value was expected here."),
@@ -4556,6 +4693,20 @@ set_func(cmd_t *cmd)
 			(void) strlcpy(in_progress_nwiftab.zone_nwif_defrouter,
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
+			break;
+		case PT_NPROP:
+			if (pp->pv_type != PROP_VAL_COMPLEX) {
+				zerr(gettext("A %s value was expected here."),
+				    pvt_to_str(PROP_VAL_COMPLEX));
+				saw_error = B_TRUE;
+				return;
+			}
+			zonecfg_free_nwif_attr_list(
+			    in_progress_nwiftab.zone_nwif_attrp);
+			in_progress_nwiftab.zone_nwif_attrp = NULL;
+			if (!(pp->pv_type == PROP_VAL_LIST &&
+			    pp->pv_list == NULL))
+				add_property(cmd);
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -5111,6 +5262,8 @@ loopend:
 static void
 output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 {
+	struct zone_nwif_attrtab *np;
+
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_NET));
 	output_prop(fp, PT_ADDRESS, nwiftab->zone_nwif_address, B_TRUE);
 	output_prop(fp, PT_ALLOWED_ADDRESS,
@@ -5120,6 +5273,14 @@ output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 	output_prop(fp, PT_MAC, nwiftab->zone_nwif_mac, B_TRUE);
 	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
 	output_prop(fp, PT_VLANID, nwiftab->zone_nwif_vlan_id, B_TRUE);
+
+	for (np = nwiftab->zone_nwif_attrp; np != NULL;
+	    np = np->zone_nwif_attr_next) {
+		fprintf(fp, "\t%s: (%s=%s,%s=\"%s\")\n",
+		    pt_to_str(PT_NPROP),
+		    pt_to_str(PT_NAME), np->zone_nwif_attr_name,
+		    pt_to_str(PT_VALUE), np->zone_nwif_attr_value);
+	}
 }
 
 static void

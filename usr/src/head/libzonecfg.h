@@ -128,6 +128,8 @@ extern "C" {
 #define	MAXAUTHS		4096
 #define	ZONE_MGMT_PROF		"Zone Management"
 
+#define	ZONE_INT32SZ		11		/* string to hold 32bit int. */
+
 /* Owner, group, and mode (defined by packaging) for the config directory */
 #define	ZONE_CONFIG_UID		0		/* root */
 #define	ZONE_CONFIG_GID		3		/* sys */
@@ -193,14 +195,21 @@ struct zone_fstab {
 	char		zone_fs_raw[MAXPATHLEN];	/* device to fsck */
 };
 
+struct zone_nwif_attrtab {
+	char	zone_nwif_attr_name[MAXNAMELEN];
+	char	zone_nwif_attr_value[MAXNAMELEN];
+	struct zone_nwif_attrtab *zone_nwif_attr_next;
+};
+
 struct zone_nwiftab {
 	char	zone_nwif_address[INET6_ADDRSTRLEN]; /* shared-ip only */
 	char	zone_nwif_allowed_address[INET6_ADDRSTRLEN]; /* excl-ip only */
 	char	zone_nwif_physical[LIFNAMSIZ];
 	char	zone_nwif_mac[MAXMACADDRLEN];		/* excl-ip only */
-	char	zone_nwif_vlan_id[10];		/* excl-ip only */
+	char	zone_nwif_vlan_id[ZONE_INT32SZ];	/* excl-ip only */
 	char	zone_nwif_gnic[LIFNAMSIZ];		/* excl-ip only */
 	char	zone_nwif_defrouter[INET6_ADDRSTRLEN];
+	struct zone_nwif_attrtab *zone_nwif_attrp;
 };
 
 struct zone_devtab {
@@ -345,10 +354,15 @@ extern	int 	zonecfg_find_mounts(char *, int(*)(const struct mnttab *,
  * Network interface configuration.
  */
 extern	int	zonecfg_add_nwif(zone_dochandle_t, struct zone_nwiftab *);
+extern	int	zonecfg_add_nwif_attr(struct zone_nwiftab *,
+    struct zone_nwif_attrtab *);
 extern	int	zonecfg_delete_nwif(zone_dochandle_t, struct zone_nwiftab *);
+extern	void	zonecfg_free_nwif_attr_list(struct zone_nwif_attrtab *);
 extern	int	zonecfg_modify_nwif(zone_dochandle_t, struct zone_nwiftab *,
     struct zone_nwiftab *);
 extern	int	zonecfg_lookup_nwif(zone_dochandle_t, struct zone_nwiftab *);
+extern	int	zonecfg_remove_nwif_attr(struct zone_nwiftab *,
+    struct zone_nwif_attrtab *);
 
 /*
  * Hostid emulation configuration.
