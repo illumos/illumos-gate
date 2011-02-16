@@ -1029,6 +1029,7 @@ typedef struct smb_user {
 #define	SMB_TREE_QUOTA			0x00010000
 #define	SMB_TREE_DFSROOT		0x00020000
 #define	SMB_TREE_SPARSE			0x00040000
+#define	SMB_TREE_TRAVERSE_MOUNTS	0x00080000
 
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,
@@ -1103,12 +1104,16 @@ typedef struct smb_tree {
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_SHORTNAMES) : 0)
 
 /*
- * SMB_TREE_CONTAINS_NODE is used to check that a node is in the same
- * file system as the tree.
+ * SMB_TREE_CONTAINS_NODE is used to check if a node is on the same
+ * file system as the tree's root filesystem, or if mount point traversal
+ * should be allowed.  Note that this is also called in some cases with
+ * sr=NULL, where it is expected to evaluate to TRUE.
  */
+
 #define	SMB_TREE_CONTAINS_NODE(sr, node)                                \
-	(((sr) && (sr)->tid_tree) ?                                     \
-	(SMB_TREE_VFS((sr)->tid_tree) == SMB_NODE_VFS(node)) : 1)
+	((sr) == NULL || (sr)->tid_tree == NULL ||                      \
+	SMB_TREE_VFS((sr)->tid_tree) == SMB_NODE_VFS(node) ||           \
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_TRAVERSE_MOUNTS))
 
 /*
  * SMB_OFILE_IS_READONLY reflects whether an ofile is readonly or not.
