@@ -27,6 +27,8 @@ unset LD_LIBRARY_PATH
 PATH=/usr/bin:/usr/sbin
 export PATH
 
+. /lib/sdc/config.sh
+
 # state
 # ZONE_STATE_CONFIGURED		0 (script will never see this)
 # ZONE_STATE_INCOMPLETE		1 (script will never see this)
@@ -49,18 +51,111 @@ state=$3
 cmd=$4
 ALTROOT=$5
 
-# If we're readying the zone, then make sure the per-zone writable
+# We only do work if we're readying the zone.
+if [ $cmd -ne 0 ]; then
+	exit 0;
+fi
+
+# We're readying the zone.  Make sure the per-zone writable
 # directories exist so that we can lofs mount them.  We do this here,
 # instead of in the install script, since this list has evolved and there
 # are already zones out there in the installed state.
-if [ $cmd -eq 0 ]; then
-	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
-	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
-	[ ! -d $ZONEPATH/root/checkpoints ] && \
-	    mkdir -m755 $ZONEPATH/root/checkpoints
+[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
+[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
+[ ! -d $ZONEPATH/root/checkpoints ] &&  mkdir -m755 $ZONEPATH/root/checkpoints
 
-	# Force zone snapshots to get mounted
-	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
-fi
+# Force zone snapshots to get mounted
+ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
+
+#
+# Finish by setting up the vnic(s) for the zone.
+#
+
+# Load sysinfo variables with SYSINFO_ prefix
+load_sdc_sysinfo
+# Load config variables with CONFIG_ prefix, and sets the headnode variable
+load_sdc_config
+
+for nic in $_ZONECFG_net_resources
+do
+	# Get simplified versions of the network config. variables.
+	address=$(eval echo \$_ZONECFG_net_${nic}_address)
+	dhcp_spoof=$(eval echo \$_ZONECFG_net_${nic}_dhcp_spoof)
+	global_nic=$(eval echo \$_ZONECFG_net_${nic}_global_nic)
+	mac_addr=$(eval echo \$_ZONECFG_net_${nic}_mac_addr)
+	vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
+
+	# If address set, must be a shared stack zone
+	[[ -n $address ]] && exit 0
+
+	# XXX For backwards compatibility
+	orig_global=$global_nic
+	[[ "$global_nic" == "admin" ]] && global_nic=$SYSINFO_NIC_admin
+	[[ "$global_nic" == "external" ]] && global_nic=$SYSINFO_NIC_external
+
+	# For backwards compatibility with the other parts of the
+	# system, check if this zone already has this vnic setup.
+	# If so, move on to the next vnic.
+	dladm show-vnic -p -o LINK $nic >/dev/null 2>&1
+	(( $? == 0 )) && continue
+
+	#
+	# Create the vnic.
+	#
+
+	opt_str=""
+	[[ -n $mac_addr ]] && opt_str="$opt_str -m $mac_addr"
+
+	[[ -n $vlan_id && $vlan_id != 0 ]] && opt_str="$opt_str -v $vlan_id"
+
+	dladm create-vnic -l $global_nic $opt_str $nic
+	(( $? != 0 )) && exit 1
+
+	if [[ -z $mac_addr ]]; then
+		# There was no assigned mac address
+
+		# Get newly assigned mac address.
+		mac_addr=$(dladm show-vnic -p -o MACADDRESS ${nic})
+
+		# Save newly assigned mac address
+		[[ -n $mac_addr ]] && zonecfg -z $ZONENAME \
+		    "select net physical=$nic; " \
+		    "set mac-addr=$mac_addr; end; exit"
+	fi
+
+	#
+	# XXX For backwards compatibility, special handling for zone
+	# named "dhcpd".  Remove this check once property is added to zone.
+	#
+	if [[ $ZONENAME == "dhcpd" ]]; then
+		dladm set-linkprop -p "protection=mac-nospoof" ${nic}
+	else
+		# Enable antispoof, but not dhcp antispoof if the zone's
+		# dhcp-spoof property is set.
+		spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
+		[[ -n $dhcp_spoof ]] && spoof_opts="mac-nospoof"
+		dladm set-linkprop -p "protection=${spoof_opts}" ${nic}
+	fi
+
+	# Get the static IP for the vnic from the zone config file.
+	hostname_file="/zones/$ZONENAME/root/etc/hostname.$nic"
+	if [ -e $hostname_file ]; then
+		zone_ip=`nawk '{if ($1 ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)
+		    print $1}' $hostname_file`
+
+		[[ -n "${zone_ip}" ]] && \
+		    dladm set-linkprop -p "allowed-ips=${zone_ip}" ${nic}
+
+	fi
+
+	# If on VMWare and we have external IPs, create a bridge to allow
+	# zones to reach the external gateway
+	# XXX fix orig_global
+	if [[ ${headnode} == "true" && ${orig_global} == "external" ]]; then
+		dladm show-bridge -p -o BRIDGE vmwareextbr >/dev/null 2>&1
+		(( $? != 0 )) && dladm create-bridge \
+		    -l ${SYSINFO_NIC_external} vmwareextbr
+	fi
+done
 
 exit 0

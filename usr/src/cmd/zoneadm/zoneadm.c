@@ -2598,11 +2598,6 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				dladm_close(dh);
 			}
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("WARNING: skipping network "
-				    "interface '%s': %s\n"),
-				    nwiftab.zone_nwif_physical,
-				    dladm_status2str(status, errmsg));
 				break;
 			}
 			dl_owner_zid = ALL_ZONES;

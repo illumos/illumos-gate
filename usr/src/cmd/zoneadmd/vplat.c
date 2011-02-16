@@ -2184,13 +2184,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
 		/*
 		 * Here, we know that the interface can't be brought up.
-		 * A similar warning message was already printed out to
-		 * the console by zoneadm(1M) so instead we log the
-		 * message to syslog and continue.
 		 */
-		zerror(&logsys, B_TRUE, "WARNING: skipping network interface "
-		    "'%s' which may not be present/plumbed in the "
-		    "global zone.", lifr.lifr_name);
 		(void) close(s);
 		return (Z_OK);
 	}
