@@ -80,7 +80,7 @@ for nic in $_ZONECFG_net_resources
 do
 	# Get simplified versions of the network config. variables.
 	address=$(eval echo \$_ZONECFG_net_${nic}_address)
-	dhcp_spoof=$(eval echo \$_ZONECFG_net_${nic}_dhcp_spoof)
+	dhcp_server=$(eval echo \$_ZONECFG_net_${nic}_dhcp_server)
 	global_nic=$(eval echo \$_ZONECFG_net_${nic}_global_nic)
 	mac_addr=$(eval echo \$_ZONECFG_net_${nic}_mac_addr)
 	vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
@@ -88,7 +88,6 @@ do
 	# If address set, must be a shared stack zone
 	[[ -n $address ]] && exit 0
 
-	# XXX For backwards compatibility
 	orig_global=$global_nic
 	[[ "$global_nic" == "admin" ]] && global_nic=$SYSINFO_NIC_admin
 	[[ "$global_nic" == "external" ]] && global_nic=$SYSINFO_NIC_external
@@ -123,19 +122,20 @@ do
 		    "set mac-addr=$mac_addr; end; exit"
 	fi
 
-	#
-	# XXX For backwards compatibility, special handling for zone
-	# named "dhcpd".  Remove this check once property is added to zone.
-	#
-	if [[ $ZONENAME == "dhcpd" ]]; then
-		dladm set-linkprop -p "protection=mac-nospoof" ${nic}
+	if [[ -n $dhcp_server ]]; then
+		spoof_opts="mac-nospoof"
 	else
-		# Enable antispoof, but not dhcp antispoof if the zone's
-		# dhcp-spoof property is set.
-		spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
-		[[ -n $dhcp_spoof ]] && spoof_opts="mac-nospoof"
-		dladm set-linkprop -p "protection=${spoof_opts}" ${nic}
+		# XXX For backwards compatibility, special handling for zone
+		# named "dhcpd".  Remove this check once property is added to
+		# zone.
+		if [[ $ZONENAME == "dhcpd" ]]; then
+		    spoof_opts="mac-nospoof"
+		else
+		    # Enable full antispoof if the zone is not a dhcp server.
+		    spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
+		fi
 	fi
+	dladm set-linkprop -p "protection=${spoof_opts}" ${nic}
 
 	# Get the static IP for the vnic from the zone config file.
 	hostname_file="/zones/$ZONENAME/root/etc/hostname.$nic"
@@ -150,7 +150,6 @@ do
 
 	# If on VMWare and we have external IPs, create a bridge to allow
 	# zones to reach the external gateway
-	# XXX fix orig_global
 	if [[ ${headnode} == "true" && ${orig_global} == "external" ]]; then
 		dladm show-bridge -p -o BRIDGE vmwareextbr >/dev/null 2>&1
 		(( $? != 0 )) && dladm create-bridge \
