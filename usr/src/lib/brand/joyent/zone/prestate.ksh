@@ -88,6 +88,9 @@ do
 	# If address set, must be a shared stack zone
 	[[ -n $address ]] && exit 0
 
+	# If no global-nic, must be a dedicated physical NIC instead of a vnic
+	[[ -z $global_nic ]] && continue
+
 	orig_global=$global_nic
 	[[ "$global_nic" == "admin" ]] && global_nic=$SYSINFO_NIC_admin
 	[[ "$global_nic" == "external" ]] && global_nic=$SYSINFO_NIC_external
