@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/* Copyright 2011 Nexenta Systems, Inc.  All rights reserved. */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -58,6 +59,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <locale.h>
+#include <err.h>
 
 /* externs from libcurses */
 extern int tigetnum();
@@ -166,15 +168,23 @@ main(int argc, char **argv)
 			exit(outputcap(cap, argc, argv));
 		return (0);
 	} else {			/* standard input argumets	*/
-		char buff[128];
+		char buff[256];
 		char **v;
 
-		/* allocate storage for the 'faked' argv[] array	*/
+		/*
+		 * allocate storage for the 'faked' argv[] array
+		 *
+		 * fixme: The algorithm here is botched. Who or what defines
+		 * that only 10 arguments with 32 bytes each are passed?
+		 */
 		v = (char **)malloc(10 * sizeof (char *));
-		for (i = 0; i < 10; i++)
-			v[i] = (char *)malloc(32 * sizeof (char));
+		for (i = 0; i < 10; i++) {
+			v[i] = (char *)malloc(32);
+			if (!v[i])
+				err(EXIT_FAILURE, "no memory for argv[] array");
+		}
 
-		while (gets(buff) != NULL) {
+		while (fgets(buff, sizeof (buff), stdin) != NULL) {
 			/* read standard input line; skip over empty lines */
 			if ((std_argc =
 			    sscanf(buff, "%s %s %s %s %s %s %s %s %s %s",

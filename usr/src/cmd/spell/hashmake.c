@@ -26,8 +26,7 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright 2011 Nexenta Systems, Inc.  All rights reserved. */
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -51,7 +50,7 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	hashinit();
-	while (gets(word)) {
+	while (fgets(word, sizeof (word), stdin)) {
 		(void) printf("%.*lo\n", (HASHWIDTH+2)/3, hash(word));
 	}
 	return (0);
