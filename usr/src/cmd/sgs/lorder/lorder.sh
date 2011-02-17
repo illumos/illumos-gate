@@ -36,7 +36,7 @@ else
 fi
 trap "rm -f $TDIR/$$symdef $TDIR/$$symref $TDIR/$$tmp; exit"  1 2 13 15
 PFX=
-WHERE=/usr/ccs/bin
+WHERE=/usr/bin
 
 USAGE="Usage: ${PFX}lorder file ..."
 for i in "$@"
