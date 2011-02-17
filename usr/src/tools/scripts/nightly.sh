@@ -1285,8 +1285,13 @@ fi
 
 # Check if we have sufficient data to continue...
 [[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
-[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
-[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+if  [[ "${NIGHTLY_OPTIONS}" == ~(F)n ]] ; then
+	# Check if the gate data are valid if we don't do a "bringover" below
+	[[ -d "${CODEMGR_WS}" ]] || \
+		fatal_error "Error: ${CODEMGR_WS} is not a directory."
+	[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || \
+		fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+fi
 
 #
 # place ourselves in a new task, respecting BUILD_PROJECT if set.
@@ -2503,6 +2508,11 @@ if [[ "$O_FLAG" = y && "$CLOSED_IS_PRESENT" != "yes" ]]; then
 	    | tee -a "$mail_msg_file" >> $LOGFILE
 	exit 1
 fi
+
+# Safeguards
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
+[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
 
