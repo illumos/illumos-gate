@@ -84,6 +84,7 @@ do
 	global_nic=$(eval echo \$_ZONECFG_net_${nic}_global_nic)
 	mac_addr=$(eval echo \$_ZONECFG_net_${nic}_mac_addr)
 	vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
+	blocked_outgoing_ports=$(eval echo \$_ZONECFG_net_${nic}_blocked_outgoing_ports)
 
 	# If address set, must be a shared stack zone
 	[[ -n $address ]] && exit 0
@@ -158,6 +159,19 @@ do
 		(( $? != 0 )) && dladm create-bridge \
 		    -l ${SYSINFO_NIC_external} vmwareextbr
 	fi
+
+	if [[ -n $blocked_outgoing_ports ]]; then
+		OLDIFS=$IFS
+		IFS=,
+		for port in $blocked_outgoing_ports; do
+			# br='block remote'.  Flow names should be < 31 chars in length so
+			# that they get unique kstats
+			flowadm add-flow -l $nic -a transport=tcp,remote_port=$port \
+			    -p maxbw=0 ${nic}_br_${port}
+		done
+		IFS=$OLDIFS
+	fi
+
 done
 
 exit 0
