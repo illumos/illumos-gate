@@ -154,7 +154,7 @@ do
 
 	# If on VMWare and we have external IPs, create a bridge to allow
 	# zones to reach the external gateway
-	if [[ ${headnode} == "true" && ${orig_global} == "external" ]]; then
+	if [[ ${headnode} == "true" && ${orig_global} == "external" && "${SYSINFO_Product}" == "VMware Virtual Platform" ]]; then
 		dladm show-bridge -p -o BRIDGE vmwareextbr >/dev/null 2>&1
 		(( $? != 0 )) && dladm create-bridge \
 		    -l ${SYSINFO_NIC_external} vmwareextbr
