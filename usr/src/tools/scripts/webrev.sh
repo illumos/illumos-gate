@@ -2063,8 +2063,11 @@ function build_old_new_git
 	typeset n_mode=
 	typeset o_object=
 	typeset n_object=
+	typeset OWD=$PWD
 	typeset file
 	typeset type
+
+	cd $CWS
 
 	#
 	# Get old file and its mode from the git object tree
@@ -2110,6 +2113,7 @@ function build_old_new_git
 		# should never happen
 		print -u2 "ERROR: set mode of $newdir/$file"
 	fi
+	cd $OWD
 }
 
 function build_old_new_subversion
