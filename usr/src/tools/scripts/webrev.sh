@@ -2769,9 +2769,19 @@ elif [[ $SCM_MODE == "git" ]]; then
 		codemgr_parent=$CODEMGR_PARENT
 	fi
 
-	if [[ -z $codemgr_parent ]]; then
-		codemgr_parent=origin/master
+	# Try to figure out the parent based on the branch the current
+	# branch is tracking, if we fail, use origin/master
+	this_branch=$(git branch | nawk '$1 == "*" { print $2 }')
+	par_branch="origin/master"
 
+	git for-each-ref                                                  \
+	    --format='%(refname:short) %(upstream:short)' refs/heads/ |   \
+	    while read local remote; do                                   \
+		[[ "$local" == "$this_branch" ]] && par_branch="$remote"; \
+	    done
+
+	if [[ -z $codemgr_parent ]]; then
+		codemgr_parent=$par_branch
 	fi
 	PWS=$codemgr_parent
 
@@ -2780,7 +2790,7 @@ elif [[ $SCM_MODE == "git" ]]; then
 	# the natural workspace parent (file list, comments, etc)
 	#
 	if [[ -n $parent_webrev ]]; then
-		real_parent=origin/master
+		real_parent=$par_branch
 	else
 		real_parent=$PWS
 	fi
