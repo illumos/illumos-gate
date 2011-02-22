@@ -24,8 +24,8 @@
 # Use is subject to license terms.
 #
 
-PROGS =		jinstall juninstall pinstall prestate poststate
-XMLDOCS=	config.xml platform.xml
+PROGS =		jattach jinstall juninstall pinstall prestate poststate
+XMLDOCS=	config.xml platform.xml common.ksh
 USERFILES=
 MANIFEST=	joyinit.xml
 SVCMETHOD=	svc-joyinit

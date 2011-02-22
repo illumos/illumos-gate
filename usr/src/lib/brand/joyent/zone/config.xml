@@ -45,7 +45,7 @@
 	<verify_adm></verify_adm>
 	<postclone></postclone>
 	<postinstall>/usr/lib/brand/joyent/pinstall -z %z -R %R</postinstall>
-	<attach></attach>
+	<attach>/usr/lib/brand/joyent/jattach -z %z -R %R</attach>
 	<detach></detach>
 	<clone></clone>
 	<uninstall>/usr/lib/brand/joyent/juninstall -z %z -R %R</uninstall>
