@@ -95,12 +95,20 @@ do
 	orig_global=$global_nic
 	[[ "$global_nic" == "admin" ]] && global_nic=$SYSINFO_NIC_admin
 	[[ "$global_nic" == "external" ]] && global_nic=$SYSINFO_NIC_external
+	[[ "$global_nic" == "internal" ]] && global_nic=$SYSINFO_NIC_internal
 
 	# For backwards compatibility with the other parts of the
 	# system, check if this zone already has this vnic setup.
 	# If so, move on to the next vnic.
 	dladm show-vnic -p -o LINK $nic >/dev/null 2>&1
 	(( $? == 0 )) && continue
+
+	if [[ -z $global_nic ]]; then
+		echo "skipping undefined VNIC $nic (global NIC $orig_global)"
+		logger -p daemon.err "zone $ZONENAME skipping undefined " \
+		    "VNIC $nic (global NIC $orig_global)"
+		continue
+	fi
 
 	#
 	# Create the vnic.
@@ -111,8 +119,13 @@ do
 
 	[[ -n $vlan_id && $vlan_id != 0 ]] && opt_str="$opt_str -v $vlan_id"
 
-	dladm create-vnic -l $global_nic $opt_str $nic
-	(( $? != 0 )) && exit 1
+	dladm create-vnic -t -l $global_nic $opt_str $nic
+	if (( $? != 0 )); then
+		echo "error creating VNIC $nic (global NIC $orig_global)"
+		logger -p daemon.err "zone $ZONENAME error creating " \
+		    "VNIC $nic (global NIC $orig_global)"
+		continue
+	fi
 
 	if [[ -z $mac_addr ]]; then
 		# There was no assigned mac address
@@ -139,7 +152,7 @@ do
 		    spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
 		fi
 	fi
-	dladm set-linkprop -p "protection=${spoof_opts}" ${nic}
+	dladm set-linkprop -t -p "protection=${spoof_opts}" ${nic}
 
 	# Get the static IP for the vnic from the zone config file.
 	hostname_file="/zones/$ZONENAME/root/etc/hostname.$nic"
@@ -148,13 +161,14 @@ do
 		    print $1}' $hostname_file`
 
 		[[ -n "${zone_ip}" ]] && \
-		    dladm set-linkprop -p "allowed-ips=${zone_ip}" ${nic}
+		    dladm set-linkprop -t -p "allowed-ips=${zone_ip}" ${nic}
 
 	fi
 
 	# If on VMWare and we have external IPs, create a bridge to allow
 	# zones to reach the external gateway
-	if [[ ${headnode} == "true" && ${orig_global} == "external" && "${SYSINFO_Product}" == "VMware Virtual Platform" ]]; then
+	if [[ ${headnode} == "true" && ${orig_global} == "external" && \
+	    "${SYSINFO_Product}" == "VMware Virtual Platform" ]]; then
 		dladm show-bridge -p -o BRIDGE vmwareextbr >/dev/null 2>&1
 		(( $? != 0 )) && dladm create-bridge \
 		    -l ${SYSINFO_NIC_external} vmwareextbr
@@ -164,9 +178,10 @@ do
 		OLDIFS=$IFS
 		IFS=,
 		for port in $blocked_outgoing_ports; do
-			# br='block remote'.  Flow names should be < 31 chars in length so
-			# that they get unique kstats
-			flowadm add-flow -l $nic -a transport=tcp,remote_port=$port \
+			# br='block remote'.  Flow names should be < 31 chars
+			# in length so that they get unique kstats
+			flowadm add-flow -l $nic \
+			    -a transport=tcp,remote_port=$port \
 			    -p maxbw=0 ${nic}_br_${port}
 		done
 		IFS=$OLDIFS

@@ -2947,10 +2947,13 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
-			(void) zonecfg_endnwifent(handle);
-			zonecfg_fini_handle(handle);
-			zerror(zlogp, B_TRUE, "failed to add network device");
-			return (-1);
+			char emsg[80 + LIFNAMSIZ];
+
+			(void) snprintf(emsg, sizeof (emsg),
+			    "failed to add network device %s",
+			    nwiftab.zone_nwif_physical);
+			zerror(zlogp, B_FALSE, emsg);
+			continue;
 		}
 		/* set up the new IP interface, and add them all later */
 		new = malloc(sizeof (*new));
