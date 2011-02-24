@@ -35,7 +35,6 @@ case "$1" in
 'start')
 
     USBMOUNT=
-    enable_ur="true"
 
     # If we're not importing the pools, we shouldn't try to setup as a headnode
     # (since there'll be no zpool)
@@ -58,42 +57,14 @@ case "$1" in
                 echo "REBOOTING!" >> /dev/console
                 enable_ur="false"
             elif [ ${result} -ne 0 ]; then
-                echo "WARNING: initial_script failed with exit code [${result}].  Not starting Ur."
-                enable_ur="false"
+                echo "WARNING: initial_script failed with exit code [${result}]."
+                exit $SMF_EXIT_ERR_FATAL
             fi
         fi
     fi
 
-    if /bin/bootparams | grep "^standalone=true" > /dev/null 2>&1; then
-        echo "INFO: System is standalone"
-    else
-        # headnode + node need Ur
-
-        #
-        # Grab AMQP parameters from the kernel command line or headnode config
-        #
-        rabbit=$(grep '^rabbitmq=' ${USBMOUNT}/config 2> /dev/null)
-
-        if [[ -z $rabbit ]]; then
-            rabbit=$(bootparams | grep '^rabbitmq=')
-
-            if [[ -z $rabbit ]]; then
-                echo "unable to find AMQP parameters!"
-                exit $SMF_EXIT_ERR_FATAL
-            fi
-        fi
-
-        rabbitparams=$(echo $rabbit | cut -d= -f2-)
-
-        export AMQP_LOGIN=$(echo $rabbitparams | cut -d: -f1)
-        export AMQP_PASSWORD=$(echo $rabbitparams | cut -d: -f2)
-        export AMQP_HOST=$(echo $rabbitparams | cut -d: -f3)
-        export AMQP_PORT=$(echo $rabbitparams | cut -d: -f4)
-
-        /joyent/ur-agent/ur-agent >/etc/svc/volatile/ur-agent.log 2>&1 &
-        if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
-            /usr/sbin/umount $USBMOUNT
-        fi
+    if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
+        /usr/sbin/umount $USBMOUNT
     fi
 
     ;;

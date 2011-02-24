@@ -740,6 +740,85 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 }
 
 /*
+ * env variable name format
+ *	_ZONECFG_{resource name}_{identifying attr. name}_{property name}
+ * Any dashes (-) in the property names are replaced with underscore (_).
+ */
+static void
+set_zonecfg_env(char *phys, char *name, char *val)
+{
+	char *p;
+	char nm[MAXNAMELEN];
+
+	(void) snprintf(nm, sizeof (nm), "_ZONECFG_net_%s_%s", phys, name);
+
+	p = nm;
+	while ((p = strchr(p, '-')) != NULL)
+		*p++ = '_';
+
+	(void) setenv(nm, val, 1);
+}
+
+/*
+ * Export zonecfg network settings into environment for the boot and state
+ * change hooks.
+ *
+ * We could export more of the config in the future, as necessary.
+ */
+static int
+setup_subproc_env()
+{
+	int res;
+	zone_dochandle_t handle;
+	struct zone_nwiftab ntab;
+	char net_resources[MAXNAMELEN * 2];
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		exit(Z_NOMEM);
+
+	net_resources[0] = '\0';
+	if ((res = zonecfg_get_handle(zone_name, handle)) != Z_OK)
+		goto done;
+
+	if ((res = zonecfg_setnwifent(handle)) != Z_OK)
+		goto done;
+
+	while (zonecfg_getnwifent(handle, &ntab) == Z_OK) {
+		struct zone_nwif_attrtab *np;
+		char *phys;
+
+		phys = ntab.zone_nwif_physical;
+
+		(void) strlcat(net_resources, phys, sizeof (net_resources));
+		(void) strlcat(net_resources, " ", sizeof (net_resources));
+
+		set_zonecfg_env(phys, "physical", phys);
+
+		set_zonecfg_env(phys, "address", ntab.zone_nwif_address);
+		set_zonecfg_env(phys, "allowed-address",
+		    ntab.zone_nwif_allowed_address);
+		set_zonecfg_env(phys, "defrouter", ntab.zone_nwif_defrouter);
+		set_zonecfg_env(phys, "global-nic", ntab.zone_nwif_gnic);
+		set_zonecfg_env(phys, "mac-addr", ntab.zone_nwif_mac);
+		set_zonecfg_env(phys, "vlan-id", ntab.zone_nwif_vlan_id);
+
+		for (np = ntab.zone_nwif_attrp; np != NULL;
+		    np = np->zone_nwif_attr_next)
+			set_zonecfg_env(phys, np->zone_nwif_attr_name,
+			    np->zone_nwif_attr_value);
+	}
+
+	(void) setenv("_ZONECFG_net_resources", net_resources, 1);
+
+	(void) zonecfg_endnwifent(handle);
+	res = Z_OK;
+
+done:
+	zonecfg_fini_handle(handle);
+	return (res);
+}
+
+/*
  * If retstr is not NULL, the output of the subproc is returned in the str,
  * otherwise it is output using zerror().  Any memory allocated for retstr
  * should be freed by the caller.
@@ -762,6 +841,11 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 		rd_cnt = 0;
 	} else {
 		inbuf = buf;
+	}
+
+	if (setup_subproc_env() != Z_OK) {
+		zerror(zlogp, B_FALSE, "failed to setup environment");
+		return (-1);
 	}
 
 	file = popen(cmdbuf, "r");

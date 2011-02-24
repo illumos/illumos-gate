@@ -2184,13 +2184,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
 		/*
 		 * Here, we know that the interface can't be brought up.
-		 * A similar warning message was already printed out to
-		 * the console by zoneadm(1M) so instead we log the
-		 * message to syslog and continue.
 		 */
-		zerror(&logsys, B_TRUE, "WARNING: skipping network interface "
-		    "'%s' which may not be present/plumbed in the "
-		    "global zone.", lifr.lifr_name);
 		(void) close(s);
 		return (Z_OK);
 	}
@@ -2953,10 +2947,13 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
-			(void) zonecfg_endnwifent(handle);
-			zonecfg_fini_handle(handle);
-			zerror(zlogp, B_TRUE, "failed to add network device");
-			return (-1);
+			char emsg[80 + LIFNAMSIZ];
+
+			(void) snprintf(emsg, sizeof (emsg),
+			    "failed to add network device %s",
+			    nwiftab.zone_nwif_physical);
+			zerror(zlogp, B_FALSE, emsg);
+			continue;
 		}
 		/* set up the new IP interface, and add them all later */
 		new = malloc(sizeof (*new));

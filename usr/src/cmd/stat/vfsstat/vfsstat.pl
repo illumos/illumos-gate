@@ -23,16 +23,17 @@
 #
 # vfsstat - report VFS statistics per zone
 #
-# USAGE:    vfsstat [-hIMr] [interval [count]]
+# USAGE:    vfsstat [-hIMrzZ] [interval [count]]
 #           -h              # help
 #	    -I              # print results per interval (where applicable)
 #	    -M              # print results in MB/s
 #	    -r		    # print data in comma-separated format
+#           -z              # hide zones with no VFS activity
+#	    -Z		    # print data for all zones
 #
 #   eg,	    vfsstat               # print summary since zone boot
 #           vfsstat 1             # print continually every 1 second
 #           vfsstat 1 5           # print 5 times, every 1 second
-#           vfsstat -M 1          # print results in MB/s, every 1 second
 #
 # NOTES:
 #
@@ -61,14 +62,15 @@ my $Kstat = Sun::Solaris::Kstat->new();
 
 # Process command line args
 usage() if defined $ARGV[0] and $ARGV[0] eq "--help";
-getopts('hIMr') or usage();
+getopts('hIMrzZ') or usage();
 usage() if defined $main::opt_h;
+$main::opt_h = 0;
 
 my $USE_MB = defined $main::opt_M ? $main::opt_M : 0;
 my $USE_INTERVAL = defined $main::opt_I ? $main::opt_I : 0;
 my $USE_COMMA = defined $main::opt_r ? $main::opt_r : 0;
-
-chomp(my $zname = (`/sbin/zonename`));
+my $HIDE_ZEROES = defined $main::opt_z ? $main::opt_z : 0;
+my $ALL_ZONES = defined $main::opt_Z ? $main::opt_Z : 0;
 
 my ($interval, $count);
 if ( defined($ARGV[0]) ) {
@@ -79,8 +81,6 @@ if ( defined($ARGV[0]) ) {
 	$interval = 1;
 	$count = 1; 
 }
-
-$main::opt_h = 0;
 
 my $HEADER_FMT = $USE_COMMA ?
     "r/%s,w/%s,%sr/%s,%sw/%s,wait_t,ractv,wactv,read_t,writ_t,%%r,%%w,zone\n" :
@@ -94,121 +94,109 @@ my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? 1024 * 1024 : 1024;
 my $INTERVAL_SUFFIX = $USE_INTERVAL ? "i" : "s";
 
-my $Modules = $Kstat->{'zone_vfs'};
+my @fields = ( 'reads', 'writes', 'nread', 'nwritten', 'rtime', 'wtime',
+    'rlentime', 'wlentime', 'snaptime' );
 
-my $old_rops = 0;
-my $old_wops = 0;
-my $old_rbytes = 0;
-my $old_wbytes = 0;
-my $old_rtime = 0;
-my $old_wtime = 0;
-my $old_rlentime = 0;
-my $old_wlentime = 0;
-my $old_snaptime = 0;
+chomp(my $curzone = (`/sbin/zonename`));
 
-my $ii = 0;
+# Read list of visible zones and their zone IDs
+my @zones = ();
+my %zoneids = ();
+my $zoneadm = `zoneadm list -p | cut -d: -f1,2`;
+@lines = split(/\n/, $zoneadm);
+foreach $line (@lines) {
+	@tok = split(/:/, $line);
+	$zoneids->{$tok[1]} = $tok[0];
+	push(@zones, $tok[1]);
+}
+
+my %old = ();
+
 $Kstat->update();
 
-while (1) {
+for (my $ii = 0; $ii < $count; $ii++) {
 	printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
 	    $INTERVAL_SUFFIX, $BYTES_PREFIX, $INTERVAL_SUFFIX);
 
-	foreach my $instance (sort keys(%$Modules)) {
-		my $Instances = $Modules->{$instance};
-	
-		foreach my $name (keys(%$Instances)) {
-			$Stats = $Instances->{$name};
-
-			if ($name eq $zname) {
-				print_stats();
-			}
+	foreach $zone (@zones) {
+		if ((!$ALL_ZONES) && ($zone ne $curzone)) {
+			next;
 		}
-	}
-	
-	$ii++;
-	if ($ii == $count) {
-		exit (0);
+
+		if (! defined $old->{$zone}) {
+			$old->{$zone} = ();
+			foreach $field (@fields) { $old->{$zone}->{$field} = 0; }
+		}
+
+		my $zoneid = $zoneids->{$zone};
+		print_stats($zone, $Kstat->{'zone_vfs'}{$zoneid}{$zone},
+		    $old->{$zone});
 	}
 
 	sleep ($interval);
 	$Kstat->update();
 }
 
+exit(0);
+
 sub print_stats {
-	my $rops = $Stats->{'reads'};
-	my $wops = $Stats->{'writes'};
-	my $rbytes = $Stats->{'nread'};
-	my $wbytes = $Stats->{'nwritten'};
+	my $zone = $_[0];
+	my $data = $_[1];
+	my $old = $_[2];
 
-	my $rtime = $Stats->{'rtime'};
-	my $wtime = $Stats->{'wtime'};
-	my $rlentime = $Stats->{'rlentime'};
-	my $wlentime = $Stats->{'wlentime'};
-
-	my $etime = $Stats->{'snaptime'} -
-	    ($old_snaptime > 0 ? $old_snaptime : $Stats->{'crtime'});
-
-	# XXX Need to investigate how to calculate this
-	my $wait_t = 0.0;
+	my $etime = $data->{'snaptime'} -
+	    ($old->{'snaptime'} > 0 ? $old->{'snaptime'} : $data->{'crtime'});
 
 	# Calculate basic statistics
 	my $rate_divisor = $USE_INTERVAL ? 1 : $etime;
-	my $reads = ($rops - $old_rops) / $rate_divisor;
-	my $writes = ($wops - $old_wops) / $rate_divisor;
-	my $nread = ($rbytes - $old_rbytes) / $rate_divisor / $BYTES_DIVISOR;
-	my $nwritten = ($wbytes - $old_wbytes) / $rate_divisor / $BYTES_DIVISOR;
+	my $reads = ($data->{'reads'} - $old->{'reads'}) / $rate_divisor;
+	my $writes = ($data->{'writes'} - $old->{'writes'}) / $rate_divisor;
+	my $nread = ($data->{'nread'} - $old->{'nread'}) /
+	    $rate_divisor / $BYTES_DIVISOR;
+	my $nwritten = ($data->{'nwritten'} - $old->{'nwritten'}) /
+	    $rate_divisor / $BYTES_DIVISOR;
 	
+	# XXX Need to investigate how to calculate this
+	my $wait_t = 0.0;
+
 	# Calculate transactions per second
-	my $r_tps = ($rops - $old_rops) / $etime;
-	my $w_tps = ($wops - $old_wops) / $etime;
+	my $r_tps = ($data->{'reads'} - $old->{'reads'}) / $etime;
+	my $w_tps = ($data->{'writes'} - $old->{'writes'}) / $etime;
 
 	# Calculate average length of active queue
-	my $r_actv = ($rlentime - $old_rlentime) / $etime;
-	my $w_actv = ($wlentime - $old_wlentime) / $etime;
+	my $r_actv = ($data->{'rlentime'} - $old->{'rlentime'}) / $etime;
+	my $w_actv = ($data->{'wlentime'} - $old->{'wlentime'}) / $etime;
 
 	# Calculate average service time
 	my $read_t = $r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0;
 	my $writ_t = $w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0;
 
 	# Calculate the % time the VFS layer is active
-	my $r_b_pct = (($rtime - $old_rtime) / $etime) * 100;
-	my $w_b_pct = (($wtime - $old_wtime) / $etime) * 100;
+	my $r_b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
+	my $w_b_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
 
-	printf($DATA_FMT,
-	    $reads,
-	    $writes,
-	    $nread,
-	    $nwritten,
-	    $wait_t,
-	    $r_actv,
-	    $w_actv,
-	    $read_t,
-	    $writ_t,
-	    $r_b_pct,
-	    $w_b_pct,
-	    $zname);
+	if (! $HIDE_ZEROES || $reads != 0.0 || $writes != 0.0 ||
+	    $nread != 0.0 || $nwritten != 0.0) {
+		printf($DATA_FMT, $reads, $writes, $nread, $nwritten,
+		    $wait_t, $r_actv, $w_actv, $read_t, $writ_t,
+		    $r_b_pct, $w_b_pct, $zone);
+	}
 
 	# Save current calculations for next loop
-	$old_rops = $rops;
-	$old_wops = $wops;
-	$old_rbytes = $rbytes;
-	$old_wbytes = $wbytes;
-	$old_rtime = $rtime;
-	$old_wtime = $wtime;
-	$old_rlentime = $rlentime;
-	$old_wlentime = $wlentime;
-	$old_snaptime = $Stats->{'snaptime'};
+	foreach (@fields) { $old->{$_} = $data->{$_}; }
 }
 
 sub usage {
         print STDERR <<END;
-USAGE: vfsstat [-hIMr] [interval [count]]
+USAGE: vfsstat [-hIMrzZ] [interval [count]]
    eg, vfsstat               # print summary since zone boot
        vfsstat 1             # print continually every 1 second
        vfsstat 1 5           # print 5 times, every 1 second
        vfsstat -I            # print results per interval (where applicable)
        vfsstat -M            # print results in MB/s
        vfsstat -r            # print results in comma-separated format
+       vfsstat -z            # hide zones with no VFS activity
+       vfsstat -Z            # print results for all zones
 END
         exit 1;
 }

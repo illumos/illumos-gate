@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 201l, Joyent Inc. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -2598,11 +2598,6 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				dladm_close(dh);
 			}
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("WARNING: skipping network "
-				    "interface '%s': %s\n"),
-				    nwiftab.zone_nwif_physical,
-				    dladm_status2str(status, errmsg));
 				break;
 			}
 			dl_owner_zid = ALL_ZONES;

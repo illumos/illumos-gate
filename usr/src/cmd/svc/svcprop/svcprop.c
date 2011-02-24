@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * svcprop - report service configuration properties
@@ -140,10 +142,10 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext("Usage: %1$s [-fqtv] "
-	    "[-C | -c | -s snapshot] "
+	    "[-C | -c | -s snapshot] [-z zone] "
 	    "[-p [name/]name]... \n"
 	    "         {FMRI | pattern}...\n"
-	    "       %1$s -w [-fqtv] [-p [name/]name] "
+	    "       %1$s -w [-fqtv] [-z zone] [-p [name/]name] "
 	    "{FMRI | pattern}\n"), uu_getpname());
 	exit(UU_EXIT_USAGE);
 }
@@ -1012,7 +1014,11 @@ main(int argc, char *argv[])
 
 	prop_list = uu_list_create(prop_pool, NULL, 0);
 
-	while ((c = getopt(argc, argv, "Ccfp:qs:tvw")) != -1) {
+	hndl = scf_handle_create(SCF_VERSION);
+	if (hndl == NULL)
+		scfdie();
+
+	while ((c = getopt(argc, argv, "Ccfp:qs:tvwz:")) != -1) {
 		switch (c) {
 		case 'C':
 			if (cflag || sflag || wait)
@@ -1064,6 +1070,23 @@ main(int argc, char *argv[])
 			wait = 1;
 			break;
 
+		case 'z': {
+			scf_value_t *zone;
+			scf_handle_t *h = hndl;
+
+			if ((zone = scf_value_create(h)) == NULL)
+				scfdie();
+
+			if (scf_value_set_astring(zone, optarg) != SCF_SUCCESS)
+				scfdie();
+
+			if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
+				uu_die(gettext("invalid zone '%s'\n"), optarg);
+
+			scf_value_destroy(zone);
+			break;
+		}
+
 		case '?':
 			switch (optopt) {
 			case 'p':
@@ -1090,9 +1113,6 @@ main(int argc, char *argv[])
 	    max_scf_fmri_length == -1)
 		scfdie();
 
-	hndl = scf_handle_create(SCF_VERSION);
-	if (hndl == NULL)
-		scfdie();
 	if (scf_handle_bind(hndl) == -1)
 		die(gettext("Could not connect to configuration repository: "
 		    "%s.\n"), scf_strerror(scf_error()));

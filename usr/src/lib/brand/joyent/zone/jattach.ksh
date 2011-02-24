@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright 2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,9 +39,6 @@ while getopts "R:t:U:q:z:" opt
 do
 	case "$opt" in
 		R)	ZONEPATH="$OPTARG";;
-		t)	TMPLZONE="$OPTARG";;
-			# UUID is only used in the postinstall script
-		U)	UUID="$OPTARG";;
 		q)	ZQUOTA="$OPTARG";;
 		z)	ZONENAME="$OPTARG";;
 		*)	printf "$m_usage\n"
@@ -52,12 +49,6 @@ shift OPTIND-1
 
 if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
 	print -u2 "Brand error: No zone path or name"
-	exit $ZONE_SUBPROC_USAGE
-fi
-
-# The install requires a template zone.
-if [[ -z $TMPLZONE ]]; then
-	print -u2 "Brand error: a zone template is required"
 	exit $ZONE_SUBPROC_USAGE
 fi
 
@@ -76,14 +67,6 @@ zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
     read mp PDS_NAME
 [ -z "$PDS_NAME" ] && \
     print -u2 "Brand error: missing parent ZFS dataset for $dname"
-
-# zoneadm already created the dataset but we want to use a clone, so first
-# remove the one zoneadm created. 
-zfs destroy $PDS_NAME/$bname
-
-zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
-zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
-    $PDS_NAME/$bname
 
 final_setup
 

@@ -1,3 +1,4 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,42 +19,43 @@
 #
 # CDDL HEADER END
 #
-
-#
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROGS =		jattach jinstall juninstall pinstall prestate poststate
-XMLDOCS=	config.xml platform.xml common.ksh
-USERFILES=
-MANIFEST=	joyinit.xml
-SVCMETHOD=	svc-joyinit
-TEMPLATES =	Joyent.xml
-CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
 
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.joyent
+# state
+# ZONE_STATE_CONFIGURED		0 (script will never see this)
+# ZONE_STATE_INCOMPLETE		1 (script will never see this)
+# ZONE_STATE_INSTALLED		2
+# ZONE_STATE_READY		3
+# ZONE_STATE_RUNNING		4
+# ZONE_STATE_SHUTTING_DOWN	5
+# ZONE_STATE_DOWN		6
+# ZONE_STATE_MOUNTED		7
 
-ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
+# cmd
+#
+# ready				0
+# boot				1
+# halt				4
 
-.KEEP_STATE:
+ZONENAME=$1
+ZONEPATH=$2
+state=$3
+cmd=$4
+ALTROOT=$5
 
-all:	$(PROGS)
+# We only do work if we're halting the zone.
+(( $cmd != 4 )) && exit 0;
 
-POFILES =	$(PROGS:%=%.po) common.po
-POFILE =	joyent.po
+for nic in $_ZONECFG_net_resources
+do
+	dladm delete-vnic $nic
+done
 
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
+exit 0
 
-install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
-	$(ROOTTEMPLATES) $(ETCUSER)
-
-lint:
-
-clean:
-	-$(RM) $(PROGS) $(POFILES) $(POFILE)
-
-include $(SRC)/cmd/Makefile.targ
