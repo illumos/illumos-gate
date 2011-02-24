@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/library/security/libsasl@$(PKGVERS)
@@ -40,9 +41,11 @@ file path=usr/lib/$(ARCH64)/libsasl.so.1
 file path=usr/lib/libsasl.so.1
 file path=usr/lib/sasl/$(ARCH64)/crammd5.so.1
 file path=usr/lib/sasl/$(ARCH64)/digestmd5.so.1
+file path=usr/lib/sasl/$(ARCH64)/login.so.1
 file path=usr/lib/sasl/$(ARCH64)/plain.so.1
 file path=usr/lib/sasl/crammd5.so.1
 file path=usr/lib/sasl/digestmd5.so.1
+file path=usr/lib/sasl/login.so.1
 file path=usr/lib/sasl/plain.so.1
 legacy pkg=SUNWlibsasl \
     desc="Simple Authentication and Security Layer (SASL) v2 shared library and plugins" \

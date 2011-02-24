@@ -21,8 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Note, to build SASL msg file go to $SRC/lib/libsasl and make _msg
@@ -30,7 +29,7 @@
 
 include	../Makefile.lib
 
-SUBDIRS =	cram digestmd5 gssapi plain
+SUBDIRS =	cram digestmd5 gssapi plain login
 
 all :=		TARGET= all
 clean :=	TARGET= clean
