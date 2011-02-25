@@ -24,6 +24,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_api.c"
 
@@ -1047,18 +1050,14 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		switch (ha->device_id) {
 		case 0x2300:
 		case 0x2312:
-#if !defined(__sparc) || defined(QL_DEBUG_ROUTINES)
-		/*
-		 * per marketing, fibre-lite HBA's are not supported
-		 * on sparc platforms
-		 */
+		case 0x2322:
 		case 0x6312:
 		case 0x6322:
-#endif	/* !defined(__sparc) || defined(QL_DEBUG_ROUTINES) */
 			if (ql_pci_config_get8(ha, PCI_CONF_IPIN) == 2) {
 				ha->flags |= FUNCTION_1;
 			}
-			if (ha->device_id == 0x6322) {
+			if ((ha->device_id == 0x6322) ||
+			    (ha->device_id == 0x2322)) {
 				ha->cfg_flags |= CFG_CTRL_6322;
 				ha->fw_class = 0x6322;
 				ha->risc_dump_size = QL_6322_FW_DUMP_SIZE;
@@ -1108,20 +1107,6 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		case 0x5422:
 		case 0x5432:
 		case 0x8432:
-#ifdef __sparc
-			/*
-			 * Per marketing, the QLA/QLE-2440's (which
-			 * also use the 2422 & 2432) are only for the
-			 * x86 platform (SMB market).
-			 */
-			if (ha->subsys_id == 0x145 || ha->subsys_id == 0x147 ||
-			    ha->subsys_id == 0x13e) {
-				cmn_err(CE_WARN,
-				    "%s(%d): Unsupported HBA ssid: %x",
-				    QL_NAME, instance, ha->subsys_id);
-				goto attach_failed;
-			}
-#endif	/* __sparc */
 			if (ql_pci_config_get8(ha, PCI_CONF_IPIN) == 2) {
 				ha->flags |= FUNCTION_1;
 			}
