@@ -331,7 +331,6 @@ static int
 user_key_allowed_from_plugin(struct passwd *pw, Key *key)
 {
 	int (*authorize)(struct passwd *, RSA *, const char *) = NULL;
-	char *error = NULL;
 	char *fp = NULL;
 	void *handle = NULL;
 	int success = 0;
@@ -340,17 +339,17 @@ user_key_allowed_from_plugin(struct passwd *pw, Key *key)
 		return success;
 
 	handle = dlopen(options.pubkey_plugin, RTLD_NOW);
-	if ((handle == NULL) || ((error = dlerror()) != NULL)) {
+	if ((handle == NULL)) {
 		debug("Unable to open library %s: %s", options.pubkey_plugin,
-			error);
+			dlerror());
 		goto out;
 	}
 
 	authorize = (int (*)(struct passwd *, RSA *, const char *))dlsym(
 		handle, RSA_SYM_NAME);
 
-	if ((error = dlerror()) != NULL) {
-		debug("Unable to resolve symbol %s: %s", RSA_SYM_NAME, error);
+	if (authorize == NULL) {
+		debug("Unable to resolve symbol %s: %s", RSA_SYM_NAME, dlerror());
 		goto out;
 	}
 
@@ -372,6 +371,7 @@ user_key_allowed_from_plugin(struct passwd *pw, Key *key)
 out:
 	if (handle != NULL) {
 		dlclose(handle);
+		authorize = NULL;
 		handle = NULL;
 	}
 
