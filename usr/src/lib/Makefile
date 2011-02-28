@@ -206,6 +206,7 @@ SUBDIRS += \
 	libxcurses2	\
 	libbrand	.WAIT   \
 	libzonecfg	\
+	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
 	libtsnet	\
@@ -352,6 +353,7 @@ MSGSUBDIRS=		\
 	libwanbootutil	\
 	libzfs		\
 	libzonecfg	\
+	libzdoor	\
 	madv		\
 	mpss		\
 	pam_modules	\
@@ -612,6 +614,7 @@ libpool:	libnvpair libexacct
 libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
+libzdoor:	libc libzonecfg libcontract
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 libproject:	libpool libproc libsecdb
 libtsnet:	libnsl libtsol libsecdb
