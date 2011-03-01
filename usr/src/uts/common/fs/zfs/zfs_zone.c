@@ -94,7 +94,7 @@ zfs_zone_txg_delay()
 
 /*
  * The zone throttle delays read and write operations from certain zones based
- * on each zone's IO utilitzation.  Once a cycle (defined by ZONE_CYCLE_TIME
+ * on each zone's IO utilitzation.  Once a cycle (defined by zfs_zone_cycle_time
  * below), the delays for each zone are recalculated based on the utilization
  * over the previous window.
  */
@@ -121,15 +121,16 @@ boolean_t	zfs_zone_priority_enable = B_TRUE;  /* enable IO priority */
 uint_t		zfs_zone_rw_lat_limit = 10;
 
 /*
- * Our timestamps are in microseconds.  Our system average cycle is one second
- * or 1 million microseconds.  Our zone counter update cycle is two seconds or 2
- * million microseconds.  We use a longer duration for that cycle because some
- * ops can see a little over two seconds of latency when they are being starved
- * by another zone.
+ * Throughout this subsystem, our timestamps are in microseconds.  Our system
+ * average cycle is one second or 1 million microseconds.  Our zone counter
+ * update cycle is two seconds or 2 million microseconds.  We use a longer
+ * duration for that cycle because some ops can see a little over two seconds of
+ * latency when they are being starved by another zone.
  */
-#define	SYS_CYCLE_TIME		1000000
-#define	ZONE_CYCLE_TIME		2000000
-#define	ZONE_THROTTLE_ADJUST	100000
+uint_t 		zfs_zone_sys_avg_cycle = 1000000;	/* 1 s */
+uint_t 		zfs_zone_cycle_time = 2000000;		/* 2 s */
+
+uint_t 		zfs_zone_adjust_time = 250000;	/* 250 ms */
 
 typedef struct {
 	hrtime_t	cycle_start;
@@ -142,7 +143,7 @@ typedef struct {
 	hrtime_t zi_now;
 	uint_t zi_avgrlat;
 	uint_t zi_avgwlat;
-	uint_t zi_totpri;
+	uint64_t zi_totpri;
 	uint64_t zi_totutil;
 	int zi_active;
 } zoneio_stats_t;
@@ -196,11 +197,12 @@ typedef struct {
  * IO but is not able to get any ops through the system.  We don't want to lose
  * track of this zone so we factor in its decayed count into the current count.
  *
- * Each cycle (SYS_CYCLE_TIME) we want to update the decayed count.  However,
- * since this calculation is driven by IO activity and since IO does not happen
- * at fixed intervals, we use a timestamp to see when the last update was made.
- * If it was more than one cycle ago, then we need to decay the historical
- * count by the proper number of additional cycles in which no IO was performed.
+ * Each cycle (zfs_zone_sys_avg_cycle) we want to update the decayed count.
+ * However, since this calculation is driven by IO activity and since IO does
+ * not happen at fixed intervals, we use a timestamp to see when the last update
+ * was made.  If it was more than one cycle ago, then we need to decay the
+ * historical count by the proper number of additional cycles in which no IO was
+ * performed.
  *
  * Return true if we actually computed a new historical count.
  * If we're still within an active cycle there is nothing to do, return false.
@@ -216,7 +218,7 @@ compute_historical_zone_cnt(hrtime_t now, sys_zio_cntr_t *cp)
 	 * If we're still collecting data for the current cycle, return false.
 	 */
 	delta = now - cp->cycle_start;
-	if (delta < ZONE_CYCLE_TIME)
+	if (delta < zfs_zone_cycle_time)
 		return (delta);
 
 	/* A previous cycle is past, compute the new zone count. */
@@ -226,7 +228,7 @@ compute_historical_zone_cnt(hrtime_t now, sys_zio_cntr_t *cp)
 	 * count, since multiple cycles may have elapsed since our last IO.
 	 * We depend on int rounding here.
 	 */
-	gen_cnt = (int)(delta / ZONE_CYCLE_TIME);
+	gen_cnt = (int)(delta / zfs_zone_cycle_time);
 
 	/* If more than 5 cycles since last the IO, reset count. */
 	if (gen_cnt > 5) {
@@ -292,8 +294,9 @@ add_zone_iop(zone_t *zonep, hrtime_t now, zfs_zone_iop_type_t op)
  * activity decreases or stops, then the average should quickly decay
  * down to the new value.
  *
- * Each cycle (SYS_CYCLE_TIME) we want to update the decayed average.  However,
- * since this calculation is driven by IO activity and since IO does not happen
+ * Each cycle (zfs_zone_sys_avg_cycle) we want to update the decayed average.
+ * However, since this calculation is driven by IO activity and since IO does
+ * not happen
  *
  * at fixed intervals, we use a timestamp to see when the last update was made.
  * If it was more than one cycle ago, then we need to decay the average by the
@@ -313,7 +316,7 @@ compute_new_sys_avg(hrtime_t now, sys_lat_cycle_t *cp)
 	 * If we're still collecting data for the current cycle, return false.
 	 */
 	delta = now - cp->cycle_start;
-	if (delta < SYS_CYCLE_TIME)
+	if (delta < zfs_zone_sys_avg_cycle)
 		return (0);
 
 	/* A previous cycle is past, compute a new system average. */
@@ -323,7 +326,7 @@ compute_new_sys_avg(hrtime_t now, sys_lat_cycle_t *cp)
 	 * cycles may have elapsed since our last IO.
 	 * We count on int rounding here.
 	 */
-	gen_cnt = (int)(delta / SYS_CYCLE_TIME);
+	gen_cnt = (int)(delta / zfs_zone_sys_avg_cycle);
 
 	/* If more than 5 cycles since last the IO, reset average. */
 	if (gen_cnt > 5) {
@@ -389,7 +392,7 @@ calc_zone_cnt(hrtime_t now, sys_zio_cntr_t *cp)
 		 * the current count plus half the historical count, otherwise
 		 * just use the current count.
 		 */
-		if (delta < (ZONE_CYCLE_TIME / 2))
+		if (delta < (zfs_zone_cycle_time / 2))
 			cnt = cp->cycle_cnt + (cp->zone_avg_cnt / 2);
 		else
 			cnt = cp->cycle_cnt;
@@ -508,12 +511,8 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 		return (0);
 	}
 
-	/*
-	 * This calculation is (somewhat arbitrarily) scaled up by 1000 so this
-	 * algorithm can use integers and not floating-point numbers.
-	 */
-	zonep->zone_io_util = ((rops * sp->zi_avgrlat) +
-	    (wops * sp->zi_avgwlat) + (lwops * sp->zi_avgwlat)) * 1000;
+	zonep->zone_io_util = (rops * sp->zi_avgrlat) +
+	    (wops * sp->zi_avgwlat) + (lwops * sp->zi_avgwlat);
 	sp->zi_totutil += zonep->zone_io_util;
 
 	if (zonep->zone_io_util > 0) {
@@ -777,8 +776,8 @@ get_next_zio(vdev_queue_t *vq, int qdepth)
 		extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t,
 		    uintptr_t, uintptr_t, uintptr_t);
 		__dtrace_probe_zfs__zone__sched__bump(
-		   (uintptr_t)(zp->io_zoneid), (uintptr_t)(cnt),
-		   (uintptr_t)(qbump.zq_priority), (uintptr_t)(qbump.zq_wt));
+		    (uintptr_t)(zp->io_zoneid), (uintptr_t)(cnt),
+		    (uintptr_t)(qbump.zq_priority), (uintptr_t)(qbump.zq_wt));
 	}
 
 	return (zp);
@@ -862,7 +861,7 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 	 * of our data to track each zone's IO, so the algorithm may make
 	 * incorrect throttling decisions until the data is refreshed.
 	 */
-	if ((now - zfs_zone_last_checked) > ZONE_THROTTLE_ADJUST) {
+	if ((now - zfs_zone_last_checked) > zfs_zone_adjust_time) {
 		zfs_zone_last_checked = now;
 		zfs_zone_wait_adjust(now);
 	}
