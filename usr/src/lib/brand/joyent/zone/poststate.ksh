@@ -113,7 +113,7 @@ do
 	# boot at the same time with the same VNIC name.  Use a temp. name
 	# to create the VNIC then rename it to have the correct name.
 	#
-	tname=${ZONENAME}0
+	tname=tmp$$0
 	dout=`dladm create-vnic -t -l $global_nic $opt_str $tname 2>&1`
 	if (( $? != 0 )); then
 		echo "error creating VNIC $nic (global NIC $orig_global)"
