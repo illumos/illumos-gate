@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -86,6 +87,7 @@ ibd_delete_link(dladm_handle_t dlh, char *link)
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
+	getlinkid.ld_zoneid = -1;
 
 	if ((status = ibd_dladm_door_call(dlh, &getlinkid, sizeof (getlinkid),
 	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {

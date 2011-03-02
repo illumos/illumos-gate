@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DLS_H
@@ -110,7 +111,7 @@ extern void		dls_devnet_close(dls_dl_handle_t);
 extern boolean_t	dls_devnet_rebuild();
 
 extern int		dls_devnet_rename(datalink_id_t, datalink_id_t,
-			    const char *);
+			    const char *, boolean_t);
 extern int		dls_devnet_create(mac_handle_t, datalink_id_t,
 			    zoneid_t);
 extern int		dls_devnet_destroy(mac_handle_t, datalink_id_t *,

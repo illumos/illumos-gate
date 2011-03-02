@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -45,13 +46,10 @@
 /*
  * There are three datalink AVL tables.  The dlmgmt_name_avl tree contains all
  * datalinks and is keyed by zoneid and link name.  The dlmgmt_id_avl also
- * contains all datalinks, and it is keyed by link ID.  The dlmgmt_loan_avl is
- * keyed by link name, and contains the set of global-zone links that are
- * currently on loan to non-global zones.
+ * contains all datalinks, and it is keyed by link ID.
  */
 avl_tree_t	dlmgmt_name_avl;
 avl_tree_t	dlmgmt_id_avl;
-avl_tree_t	dlmgmt_loan_avl;
 
 avl_tree_t	dlmgmt_dlconf_avl;
 
@@ -162,8 +160,6 @@ dlmgmt_linktable_init(void)
 	    offsetof(dlmgmt_link_t, ll_name_node));
 	avl_create(&dlmgmt_id_avl, cmp_link_by_id, sizeof (dlmgmt_link_t),
 	    offsetof(dlmgmt_link_t, ll_id_node));
-	avl_create(&dlmgmt_loan_avl, cmp_link_by_name, sizeof (dlmgmt_link_t),
-	    offsetof(dlmgmt_link_t, ll_loan_node));
 	avl_create(&dlmgmt_dlconf_avl, cmp_dlconf_by_id,
 	    sizeof (dlmgmt_dlconf_t), offsetof(dlmgmt_dlconf_t, ld_node));
 	dlmgmt_nextlinkid = 1;
@@ -181,7 +177,6 @@ dlmgmt_linktable_fini(void)
 
 	avl_destroy(&dlmgmt_dlconf_avl);
 	avl_destroy(&dlmgmt_name_avl);
-	avl_destroy(&dlmgmt_loan_avl);
 	avl_destroy(&dlmgmt_id_avl);
 }
 
@@ -385,7 +380,6 @@ link_activate(dlmgmt_link_t *linkp)
 
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
-			avl_add(&dlmgmt_loan_avl, linkp);
 			linkp->ll_onloan = B_TRUE;
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
@@ -429,10 +423,6 @@ link_by_name(const char *name, zoneid_t zoneid)
 	(void) strlcpy(link.ll_link, name, MAXLINKNAMELEN);
 	link.ll_zoneid = zoneid;
 	linkp = avl_find(&dlmgmt_name_avl, &link, NULL);
-	if (linkp == NULL && zoneid == GLOBAL_ZONEID) {
-		/* The link could be on loan to a non-global zone? */
-		linkp = avl_find(&dlmgmt_loan_avl, &link, NULL);
-	}
 	return (linkp);
 }
 
@@ -510,8 +500,6 @@ dlmgmt_destroy_common(dlmgmt_link_t *linkp, uint32_t flags)
 
 	if ((flags & DLMGMT_ACTIVE) && linkp->ll_zoneid != GLOBAL_ZONEID) {
 		(void) zone_remove_datalink(linkp->ll_zoneid, linkp->ll_linkid);
-		if (linkp->ll_onloan)
-			avl_remove(&dlmgmt_loan_avl, linkp);
 	}
 
 	if (linkp->ll_flags == 0) {

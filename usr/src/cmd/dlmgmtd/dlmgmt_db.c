@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -43,6 +44,7 @@
 #include <libcontract.h>
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
+#include <sys/vnic.h>
 #include "dlmgmt_impl.h"
 
 typedef enum dlmgmt_db_op {
@@ -1451,8 +1453,29 @@ dlmgmt_db_fini(zoneid_t zoneid)
 	while (linkp != NULL) {
 		next_linkp = AVL_NEXT(&dlmgmt_name_avl, linkp);
 		if (linkp->ll_zoneid == zoneid) {
+			vnic_ioc_delete_t ioc;
+			boolean_t onloan;
+
+			ioc.vd_vnic_id = linkp->ll_linkid;
+			onloan = linkp->ll_onloan;
+
+			/*
+			 * Cleanup any VNICs that were loaned to the zone
+			 * before the zone goes away and we can no longer
+			 * refer to the VNIC by the name/zoneid.
+			 */
+			if (onloan)
+				(void) dlmgmt_delete_db_entry(linkp,
+				     DLMGMT_ACTIVE);
+
 			(void) dlmgmt_destroy_common(linkp,
 			    DLMGMT_ACTIVE | DLMGMT_PERSIST);
+
+			if (onloan && ioctl(dladm_dld_fd(dld_handle),
+			    VNIC_IOC_DELETE, &ioc) < 0)
+				dlmgmt_log(LOG_WARNING, "dlmgmt_db_fini "
+				    "delete VNIC ioctl failed %d %d",
+				    ioc.vd_vnic_id, errno);
 		}
 		linkp = next_linkp;
 	}

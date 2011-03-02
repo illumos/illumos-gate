@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -386,10 +387,14 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
 /*
  * Case 1: rename an existing link1 to a link2 that does not exist.
  * Result: <linkid1, link2>
+ * The zonename parameter is used to allow us to create a VNIC in the global
+ * zone which is assigned to a non-global zone.  Since there is a race condition
+ * in the create process if two VNICs have the same name, we need to rename it
+ * after it has been assigned to the zone.
  */
 static dladm_status_t
 i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
-    const char *link1, const char *link2, uint32_t flags)
+    const char *link1, const char *link2, uint32_t flags, const char *zonename)
 {
 	dld_ioc_rename_t	dir;
 	dladm_status_t		status = DLADM_STATUS_OK;
@@ -402,6 +407,10 @@ i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
 		dir.dir_linkid1 = linkid1;
 		dir.dir_linkid2 = DATALINK_INVALID_LINKID;
 		(void) strlcpy(dir.dir_link, link2, MAXLINKNAMELEN);
+		if (zonename != NULL)
+			dir.dir_zoneinit = B_TRUE;
+		else
+			dir.dir_zoneinit = B_FALSE;
 
 		if (ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir) < 0) {
 			status = dladm_errno2status(errno);
@@ -412,6 +421,7 @@ i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
 	status = dladm_remap_datalink_id(handle, linkid1, link2);
 	if (status != DLADM_STATUS_OK && (flags & DLADM_OPT_ACTIVE)) {
 		(void) strlcpy(dir.dir_link, link1, MAXLINKNAMELEN);
+		dir.dir_zoneinit = B_FALSE;
 		(void) ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir);
 	}
 	return (status);
@@ -508,6 +518,7 @@ i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
 	 */
 	dir.dir_linkid1 = linkid1;
 	dir.dir_linkid2 = linkid2;
+	dir.dir_zoneinit = B_FALSE;
 	if (ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir) < 0)
 		status = dladm_errno2status(errno);
 
@@ -617,7 +628,8 @@ done:
 }
 
 dladm_status_t
-dladm_rename_link(dladm_handle_t handle, const char *link1, const char *link2)
+dladm_rename_link(dladm_handle_t handle, const char *zonename,
+    const char *link1, const char *link2)
 {
 	datalink_id_t		linkid1 = DATALINK_INVALID_LINKID;
 	datalink_id_t		linkid2 = DATALINK_INVALID_LINKID;
@@ -627,11 +639,11 @@ dladm_rename_link(dladm_handle_t handle, const char *link1, const char *link2)
 	boolean_t		remphy2 = B_FALSE;
 	dladm_status_t  	status;
 
-	(void) dladm_name2info(handle, link1, &linkid1, &flags1, &class1,
-	    &media1);
-	if ((dladm_name2info(handle, link2, &linkid2, &flags2, &class2,
-	    &media2) == DLADM_STATUS_OK) && (class2 == DATALINK_CLASS_PHYS) &&
-	    (flags2 == DLADM_OPT_PERSIST)) {
+	(void) dladm_zname2info(handle, zonename, link1, &linkid1, &flags1,
+	    &class1, &media1);
+	if ((dladm_zname2info(handle, zonename, link2, &linkid2, &flags2,
+	    &class2, &media2) == DLADM_STATUS_OK) &&
+	    (class2 == DATALINK_CLASS_PHYS) && (flags2 == DLADM_OPT_PERSIST)) {
 		/*
 		 * see whether link2 is a removed physical link.
 		 */
@@ -645,7 +657,7 @@ dladm_rename_link(dladm_handle_t handle, const char *link1, const char *link2)
 			 * does not exist.
 			 */
 			status = i_dladm_rename_link_c1(handle, linkid1, link1,
-			    link2, flags1);
+			    link2, flags1, zonename);
 		} else if (remphy2) {
 			/*
 			 * case 2: rename an available link to a REMOVED

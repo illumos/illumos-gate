@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -438,6 +439,10 @@ dlmgmt_getlinkid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	dlmgmt_getlinkid_retval_t *retvalp = retp;
 	dlmgmt_link_t		*linkp;
 	int			err = 0;
+
+	/* Enable the global zone to lookup links it has given away. */
+	if (zoneid == GLOBAL_ZONEID && getlinkid->ld_zoneid != -1)
+		zoneid = getlinkid->ld_zoneid;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -1245,7 +1250,19 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			    "zone %d: %s", linkid, oldzoneid, strerror(err));
 			goto done;
 		}
-		avl_remove(&dlmgmt_loan_avl, linkp);
+
+		if (newzoneid == GLOBAL_ZONEID && linkp->ll_onloan) {
+			/*
+			 * We can only reassign a loaned VNIC back to the
+			 * global zone when the zone is shutting down, since
+			 * otherwise the VNIC is in use by the zone and will be
+			 * busy.  Leave the VNIC assigned to the zone so we can
+			 * still see it and delete it when dlmgmt_zonehalt()
+			 * runs.
+			 */
+			goto done;
+		}
+
 		linkp->ll_onloan = B_FALSE;
 	}
 	if (newzoneid != GLOBAL_ZONEID) {
@@ -1256,7 +1273,6 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			(void) zone_add_datalink(oldzoneid, linkid);
 			goto done;
 		}
-		avl_add(&dlmgmt_loan_avl, linkp);
 		linkp->ll_onloan = B_TRUE;
 	}
 

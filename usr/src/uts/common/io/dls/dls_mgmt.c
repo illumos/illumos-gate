@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -526,6 +527,7 @@ dls_mgmt_get_linkid(const char *link, datalink_id_t *linkid)
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
+	getlinkid.ld_zoneid = getzoneid();
 
 	if ((err = i_dls_mgmt_upcall(&getlinkid, sizeof (getlinkid), &retval,
 	    sizeof (retval))) == 0) {
@@ -781,15 +783,24 @@ dls_devnet_stat_destroy(dls_devnet_t *ddp, zoneid_t zoneid)
  * and create the new set using the new name.
  */
 static void
-dls_devnet_stat_rename(dls_devnet_t *ddp)
+dls_devnet_stat_rename(dls_devnet_t *ddp, boolean_t zoneinit)
 {
 	if (ddp->dd_ksp != NULL) {
 		kstat_delete(ddp->dd_ksp);
 		ddp->dd_ksp = NULL;
 	}
-	/* We can't rename a link while it's assigned to a non-global zone. */
+	if (zoneinit && ddp->dd_zone_ksp != NULL) {
+		kstat_delete(ddp->dd_zone_ksp);
+		ddp->dd_zone_ksp = NULL;
+	}
+	/*
+	 * We can't rename a link while it's assigned to a non-global zone
+	 * unless we're first initializing the zone while readying it.
+	 */
 	ASSERT(ddp->dd_zone_ksp == NULL);
 	dls_devnet_stat_create(ddp, ddp->dd_owner_zid);
+	if (zoneinit)
+		dls_devnet_stat_create(ddp, ddp->dd_zid);
 }
 
 /*
@@ -1261,9 +1272,15 @@ dls_devnet_phydev(datalink_id_t vlanid, dev_t *devp)
  *
  *    This case does not change the <link name, linkid> mapping, so the link's
  *    kstats need to be updated with using name associated the given id2.
+ *
+ * The zonename parameter is used to allow us to create a VNIC in the global
+ * zone which is assigned to a non-global zone.  Since there is a race condition
+ * in the create process if two VNICs have the same name, we need to rename it
+ * after it has been assigned to the zone.
  */
 int
-dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
+dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
+    boolean_t zoneinit)
 {
 	dls_dev_handle_t	ddh = NULL;
 	int			err = 0;
@@ -1313,13 +1330,16 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	 * is currently accessing the link kstats, or if the link is on-loan
 	 * to a non-global zone. Then set the DD_KSTAT_CHANGING flag to
 	 * prevent any access to the kstats while we delete and recreate
-	 * kstats below.
+	 * kstats below.  However, we skip this check if we're renaming the
+	 * vnic as part of bringing it up for a zone.
 	 */
 	mutex_enter(&ddp->dd_mutex);
-	if (ddp->dd_ref > 1) {
-		mutex_exit(&ddp->dd_mutex);
-		err = EBUSY;
-		goto done;
+	if (!zoneinit) {
+		if (ddp->dd_ref > 1) {
+			mutex_exit(&ddp->dd_mutex);
+			err = EBUSY;
+			goto done;
+		}
 	}
 
 	ddp->dd_flags |= DD_KSTAT_CHANGING;
@@ -1406,7 +1426,7 @@ done:
 	 */
 	rw_exit(&i_dls_devnet_lock);
 	if (err == 0)
-		dls_devnet_stat_rename(ddp);
+		dls_devnet_stat_rename(ddp, zoneinit);
 
 	if (clear_dd_flag) {
 		mutex_enter(&ddp->dd_mutex);

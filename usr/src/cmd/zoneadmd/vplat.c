@@ -2947,12 +2947,10 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
-			char emsg[80 + LIFNAMSIZ];
-
-			(void) snprintf(emsg, sizeof (emsg),
-			    "failed to add network device %s",
-			    nwiftab.zone_nwif_physical);
-			zerror(zlogp, B_FALSE, emsg);
+			/*
+			 * Failed to add network device, but the brand hook
+			 * might be doing this for us, so keep silent.
+			 */
 			continue;
 		}
 		/* set up the new IP interface, and add them all later */

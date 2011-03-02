@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -865,7 +866,7 @@ drv_ioc_rename(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		return (err);
 
 	if ((err = dls_devnet_rename(dir->dir_linkid1, dir->dir_linkid2,
-	    dir->dir_link)) != 0)
+	    dir->dir_link, dir->dir_zoneinit)) != 0)
 		return (err);
 
 	if (dir->dir_linkid2 == DATALINK_INVALID_LINKID)
