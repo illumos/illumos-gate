@@ -27,6 +27,13 @@ unset LD_LIBRARY_PATH
 PATH=/usr/bin:/usr/sbin
 export PATH
 
+myzone=`zonename`
+
+if [[ $myzone != "global" ]]; then
+	echo "zonemon can only be run in the global zone"
+	exit 1
+fi
+
 echo "Current status:"
 echo "::zone" | mdb -k | nawk '{
 	print $0
