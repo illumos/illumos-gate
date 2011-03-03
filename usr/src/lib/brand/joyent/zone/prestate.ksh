@@ -51,20 +51,27 @@ state=$3
 cmd=$4
 ALTROOT=$5
 
-# We only do work if we're readying the zone.
-if [ $cmd -ne 0 ]; then
-	exit 0;
+if (( $cmd == 0 )); then
+	# We're readying the zone.  Make sure the per-zone writable
+	# directories exist so that we can lofs mount them.  We do this here,
+	# instead of in the install script, since this list has evolved and
+	# there are already zones out there in the installed state.
+	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
+	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
+	[ ! -d $ZONEPATH/root/checkpoints ] && \
+	    mkdir -m755 $ZONEPATH/root/checkpoints
+
+	# Force zone snapshots to get mounted
+	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
 fi
 
-# We're readying the zone.  Make sure the per-zone writable
-# directories exist so that we can lofs mount them.  We do this here,
-# instead of in the install script, since this list has evolved and there
-# are already zones out there in the installed state.
-[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
-[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
-[ ! -d $ZONEPATH/root/checkpoints ] &&  mkdir -m755 $ZONEPATH/root/checkpoints
-
-# Force zone snapshots to get mounted
-ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
+if (( $cmd == 4 )); then
+	# We're halting the zone.
+	# Cleanup any flows that were setup.
+	for nic in $_ZONECFG_net_resources
+	do
+		flowadm remove-flow -t -z $ZONENAME -l $nic
+	done
+fi
 
 exit 0

@@ -180,7 +180,7 @@ do
 		for port in $blocked_outgoing_ports; do
 			# br='block remote'.  Flow names should be < 31 chars
 			# in length so that they get unique kstats
-			flowadm add-flow -l $nic \
+			flowadm add-flow -t -l $nic -z $ZONENAME \
 			    -a transport=tcp,remote_port=$port \
 			    -p maxbw=0 ${nic}_br_${port}
 		done
