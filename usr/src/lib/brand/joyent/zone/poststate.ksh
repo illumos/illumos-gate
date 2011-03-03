@@ -180,9 +180,12 @@ do
 		for port in $blocked_outgoing_ports; do
 			# br='block remote'.  Flow names should be < 31 chars
 			# in length so that they get unique kstats
+			# Use the VNIC mac addr. to generate a unique name.
+			mac_addr=`dladm show-vnic -z $ZONENAME -p \
+			    -o MACADDRESS $nic | tr ':' '_'`
 			flowadm add-flow -t -l $nic -z $ZONENAME \
 			    -a transport=tcp,remote_port=$port \
-			    -p maxbw=0 ${nic}_br_${port}
+			    -p maxbw=0 f${mac_addr}_br_${port}
 		done
 		IFS=$OLDIFS
 	fi
