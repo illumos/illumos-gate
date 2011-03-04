@@ -3489,7 +3489,7 @@ get_implicit_datasets(zlog_t *zlogp, char **retstr)
 	    > sizeof (cmdbuf))
 		return (-1);
 
-	if (do_subproc(zlogp, cmdbuf, retstr) != 0)
+	if (do_subproc(zlogp, cmdbuf, retstr, B_FALSE) != 0)
 		return (-1);
 
 	return (0);
@@ -5097,7 +5097,8 @@ unmounted:
 }
 
 int
-vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
+vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
+    boolean_t debug)
 {
 	char *kzone;
 	zoneid_t zoneid;
@@ -5185,7 +5186,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	brand_close(bh);
 
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
-	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
+	    (do_subproc(zlogp, cmdbuf, NULL, debug) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto error;
 	}

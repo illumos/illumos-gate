@@ -244,6 +244,7 @@ typedef enum zone_cmd {
 typedef struct zone_cmd_arg {
 	uint64_t	uniqid;		/* unique "generation number" */
 	zone_cmd_t	cmd;		/* requested action */
+	boolean_t	debug;		/* enable brand hook debug */
 	uint32_t	_pad;		/* need consistent 32/64 bit alignmt */
 	char locale[MAXPATHLEN];	/* locale in which to render messages */
 	char bootbuf[BOOTARGS_MAX];	/* arguments passed to zone_boot() */

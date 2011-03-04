@@ -456,7 +456,7 @@ mkzonedir(zlog_t *zlogp)
  * Run the brand's pre-state change callback, if it exists.
  */
 static int
-brand_prestatechg(zlog_t *zlogp, int state, int cmd)
+brand_prestatechg(zlog_t *zlogp, int state, int cmd, boolean_t debug)
 {
 	char cmdbuf[2 * MAXPATHLEN];
 	const char *altroot;
@@ -469,7 +469,7 @@ brand_prestatechg(zlog_t *zlogp, int state, int cmd)
 	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
-	if (do_subproc(zlogp, cmdbuf, NULL) != 0)
+	if (do_subproc(zlogp, cmdbuf, NULL, debug) != 0)
 		return (-1);
 
 	return (0);
@@ -479,7 +479,7 @@ brand_prestatechg(zlog_t *zlogp, int state, int cmd)
  * Run the brand's post-state change callback, if it exists.
  */
 static int
-brand_poststatechg(zlog_t *zlogp, int state, int cmd)
+brand_poststatechg(zlog_t *zlogp, int state, int cmd, boolean_t debug)
 {
 	char cmdbuf[2 * MAXPATHLEN];
 	const char *altroot;
@@ -492,7 +492,7 @@ brand_poststatechg(zlog_t *zlogp, int state, int cmd)
 	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
-	if (do_subproc(zlogp, cmdbuf, NULL) != 0)
+	if (do_subproc(zlogp, cmdbuf, NULL, debug) != 0)
 		return (-1);
 
 	return (0);
@@ -531,11 +531,11 @@ notify_zonestatd(zoneid_t zoneid)
  * subcommand.
  */
 static int
-zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
+zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, boolean_t debug)
 {
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_READY) != 0)
+	if (brand_prestatechg(zlogp, zstate, Z_READY, debug) != 0)
 		return (-1);
 
 	if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
@@ -555,14 +555,15 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 	}
 	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
-		(void) vplat_teardown(NULL, (mount_cmd != Z_MNT_BOOT), B_FALSE);
+		(void) vplat_teardown(NULL, (mount_cmd != Z_MNT_BOOT), B_FALSE,
+		    debug);
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
 		goto bad;
 	}
 
-	if (brand_poststatechg(zlogp, zstate, Z_READY) != 0)
+	if (brand_poststatechg(zlogp, zstate, Z_READY, debug) != 0)
 		goto bad;
 
 	return (0);
@@ -572,7 +573,7 @@ bad:
 	 * If something goes wrong, we up the zones's state to the target
 	 * state, READY, and then invoke the hook as if we're halting.
 	 */
-	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT);
+	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT, debug);
 	return (-1);
 }
 
@@ -762,11 +763,12 @@ set_zonecfg_env(char *phys, char *name, char *val)
 /*
  * Export zonecfg network settings into environment for the boot and state
  * change hooks.
+ * If debug is true, export the brand hook debug env. variable as well.
  *
  * We could export more of the config in the future, as necessary.
  */
 static int
-setup_subproc_env()
+setup_subproc_env(boolean_t debug)
 {
 	int res;
 	zone_dochandle_t handle;
@@ -811,6 +813,12 @@ setup_subproc_env()
 	(void) setenv("_ZONECFG_net_resources", net_resources, 1);
 
 	(void) zonecfg_endnwifent(handle);
+
+	if (debug)
+		(void) setenv("_ZONEADMD_brand_debug", "1", 1);
+	else
+		(void) setenv("_ZONEADMD_brand_debug", "", 1);
+
 	res = Z_OK;
 
 done:
@@ -824,7 +832,7 @@ done:
  * should be freed by the caller.
  */
 int
-do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
+do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 {
 	char buf[1024];		/* arbitrary large amount */
 	char *inbuf;
@@ -843,7 +851,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 		inbuf = buf;
 	}
 
-	if (setup_subproc_env() != Z_OK) {
+	if (setup_subproc_env(debug) != Z_OK) {
 		zerror(zlogp, B_FALSE, "failed to setup environment");
 		return (-1);
 	}
@@ -888,7 +896,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 }
 
 static int
-zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
+zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 {
 	zoneid_t zoneid;
 	struct stat st;
@@ -903,7 +911,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	char errmsg[DLADM_STRSIZE];
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_BOOT) != 0)
+	if (brand_prestatechg(zlogp, zstate, Z_BOOT, debug) != 0)
 		return (-1);
 
 	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
@@ -1009,7 +1017,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	 * is booted.
 	 */
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
-	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
+	    (do_subproc(zlogp, cmdbuf, NULL, debug) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto bad;
 	}
@@ -1035,7 +1043,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 		goto bad;
 	}
 
-	if (brand_poststatechg(zlogp, zstate, Z_BOOT) != 0)
+	if (brand_poststatechg(zlogp, zstate, Z_BOOT, debug) != 0)
 		goto bad;
 
 	return (0);
@@ -1045,21 +1053,22 @@ bad:
 	 * If something goes wrong, we up the zones's state to the target
 	 * state, RUNNING, and then invoke the hook as if we're halting.
 	 */
-	(void) brand_poststatechg(zlogp, ZONE_STATE_RUNNING, Z_HALT);
+	(void) brand_poststatechg(zlogp, ZONE_STATE_RUNNING, Z_HALT, debug);
 	if (links_loaded)
 		(void) dladm_zone_halt(dld_handle, zoneid);
 	return (-1);
 }
 
 static int
-zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate)
+zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
+    boolean_t debug)
 {
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_HALT) != 0)
+	if (brand_prestatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
 
-	if (vplat_teardown(zlogp, unmount_cmd, rebooting) != 0) {
+	if (vplat_teardown(zlogp, unmount_cmd, rebooting, debug) != 0) {
 		if (!bringup_failure_recovery)
 			zerror(zlogp, B_FALSE, "unable to destroy zone");
 		return (-1);
@@ -1069,7 +1078,7 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate)
 		zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 		    zonecfg_strerror(err));
 
-	if (brand_poststatechg(zlogp, zstate, Z_HALT) != 0)
+	if (brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
 
 	return (0);
@@ -1137,6 +1146,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 	zone_state_t zstate;
 	zone_cmd_t cmd;
+	boolean_t debug;
 	zone_cmd_arg_t *zargp;
 
 	boolean_t kernelcall;
@@ -1188,6 +1198,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		goto out;
 	}
 	cmd = zargp->cmd;
+	debug = zargp->debug;
 
 	if (door_ucred(&uc) != 0) {
 		zerror(&logsys, B_TRUE, "door_ucred");
@@ -1293,23 +1304,23 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_INSTALLED:
 		switch (cmd) {
 		case Z_READY:
-			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate);
+			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate, debug);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
 		case Z_FORCEBOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
-			    == 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    debug)) == 0) {
 				rval = zone_bootup(zlogp, zargp->bootbuf,
-				    zstate);
+				    zstate, debug);
 			}
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE, B_FALSE,
-				    zstate);
+				    zstate, debug);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
@@ -1360,7 +1371,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 			rval = zone_ready(zlogp,
 			    strcmp(zargp->bootbuf, "-U") == 0 ?
-			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate);
+			    Z_MNT_UPDATE : Z_MNT_SCRATCH, zstate, debug);
 			if (rval != 0)
 				break;
 
@@ -1425,12 +1436,13 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			(void) strlcpy(boot_args, zargp->bootbuf,
 			    sizeof (boot_args));
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			rval = zone_bootup(zlogp, zargp->bootbuf, zstate);
+			rval = zone_bootup(zlogp, zargp->bootbuf, zstate,
+			    debug);
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE, B_TRUE,
-				    zstate);
+				    zstate, debug);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			boot_args[0] = '\0';
@@ -1438,8 +1450,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_HALT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate))
-			    != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate,
+			    debug)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
@@ -1462,7 +1474,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			rval = zone_halt(zlogp, B_TRUE, B_FALSE, zstate);
+			rval = zone_halt(zlogp, B_TRUE, B_FALSE, zstate, debug);
 			if (rval == 0) {
 				eventstream_write(Z_EVT_ZONE_HALTED);
 				(void) sema_post(&scratch_sem);
@@ -1484,10 +1496,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_DOWN:
 		switch (cmd) {
 		case Z_READY:
-			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate))
-			    != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate,
+			    debug)) != 0)
 				break;
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    debug)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1503,8 +1516,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = 0;
 			break;
 		case Z_HALT:
-			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate))
-			    != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate,
+			    debug)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
@@ -1512,23 +1525,24 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			(void) strlcpy(boot_args, zargp->bootbuf,
 			    sizeof (boot_args));
 			eventstream_write(Z_EVT_ZONE_REBOOTING);
-			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate))
-			    != 0) {
+			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate,
+			    debug)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;
 			}
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
-			    != 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    debug)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;
 			}
-			rval = zone_bootup(zlogp, zargp->bootbuf, zstate);
+			rval = zone_bootup(zlogp, zargp->bootbuf, zstate,
+			    debug);
 			audit_put_record(zlogp, uc, rval, "reboot");
 			if (rval != 0) {
 				(void) zone_halt(zlogp, B_FALSE, B_TRUE,
-				    zstate);
+				    zstate, debug);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			boot_args[0] = '\0';

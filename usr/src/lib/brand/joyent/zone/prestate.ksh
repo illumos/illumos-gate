@@ -27,51 +27,17 @@ unset LD_LIBRARY_PATH
 PATH=/usr/bin:/usr/sbin
 export PATH
 
-. /lib/sdc/config.sh
-
-# state
-# ZONE_STATE_CONFIGURED		0 (script will never see this)
-# ZONE_STATE_INCOMPLETE		1 (script will never see this)
-# ZONE_STATE_INSTALLED		2
-# ZONE_STATE_READY		3
-# ZONE_STATE_RUNNING		4
-# ZONE_STATE_SHUTTING_DOWN	5
-# ZONE_STATE_DOWN		6
-# ZONE_STATE_MOUNTED		7
-
-# cmd
-#
-# ready				0
-# boot				1
-# halt				4
-
-ZONENAME=$1
-ZONEPATH=$2
-state=$3
-cmd=$4
-ALTROOT=$5
-
-if (( $cmd == 0 )); then
-	# We're readying the zone.  Make sure the per-zone writable
-	# directories exist so that we can lofs mount them.  We do this here,
-	# instead of in the install script, since this list has evolved and
-	# there are already zones out there in the installed state.
-	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
-	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
-	[ ! -d $ZONEPATH/root/checkpoints ] && \
-	    mkdir -m755 $ZONEPATH/root/checkpoints
-
-	# Force zone snapshots to get mounted
-	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
+if [[ -n $_ZONEADMD_brand_debug ]]; then
+	logfile=/var/log/zone_bh.$1
+	date >>$logfile
+	echo "zone $1 pre-state-change $3 $4" >>$logfile
+	ksh -x /usr/lib/brand/joyent/statechange "pre" $1 $2 $3 $4 \
+	    >>$logfile 2>&1
+	res=$?
+	echo "zone $1 pre-state-change result $?" >>$logfile
+else
+	/usr/lib/brand/joyent/statechange "pre" $1 $2 $3 $4
+	res=$?
 fi
 
-if (( $cmd == 4 )); then
-	# We're halting the zone.
-	# Cleanup any flows that were setup.
-	for nic in $_ZONECFG_net_resources
-	do
-		flowadm remove-flow -t -z $ZONENAME -l $nic
-	done
-fi
-
-exit 0
+exit $res
