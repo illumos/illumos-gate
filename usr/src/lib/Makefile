@@ -209,6 +209,7 @@ SUBDIRS += \
 	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
+	libsmartsshd	\
 	libtsnet	\
 	libtsol		\
 	gss_mechs/mech_spnego	\
@@ -354,6 +355,7 @@ MSGSUBDIRS=		\
 	libzfs		\
 	libzonecfg	\
 	libzdoor	\
+	libsmartsshd	\
 	madv		\
 	mpss		\
 	pam_modules	\
@@ -615,6 +617,7 @@ libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
 libzdoor:	libc libzonecfg libcontract
+libsmartsshd:	libc libcontract
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 libproject:	libpool libproc libsecdb
 libtsnet:	libnsl libtsol libsecdb
