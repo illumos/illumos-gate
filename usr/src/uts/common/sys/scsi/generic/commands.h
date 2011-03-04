@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_COMMANDS_H
@@ -233,13 +235,15 @@ extern "C" {
 #define	SCMD_READ_BUFFER	0x3c
 #define	SCMD_READ_LONG		0x3E
 #define	SCMD_WRITE_LONG		0x3F
+#define	SCMD_WRITE_SAME_G1	0x41
+#define	SCMD_UNMAP		0x42
+#define	SCMD_GET_CONFIGURATION	0x46
+#define	SCMD_LOG_SELECT_G1	0x4c
+#define	SCMD_LOG_SENSE_G1	0x4d
 #define	SCMD_RESERVE_G1		0x56
 #define	SCMD_RELEASE_G1		0x57
 #define	SCMD_MODE_SELECT_G1	0x55
 #define	SCMD_MODE_SENSE_G1	0x5A
-#define	SCMD_GET_CONFIGURATION	0x46
-#define	SCMD_LOG_SELECT_G1	0x4C
-#define	SCMD_LOG_SENSE_G1	0x4d
 
 
 /*
@@ -333,6 +337,7 @@ extern "C" {
 #define	SCMD_READ_G4		0x88
 #define	SCMD_WRITE_G4		0x8a
 #define	SCMD_WRITE_VERIFY_G4	0x8e
+#define	SCMD_WRITE_SAME_G4	0x93
 #define	SCMD_SVC_ACTION_IN_G4	0x9e
 #define	SCMD_SVC_ACTION_OUT_G4	0x9f
 
@@ -455,9 +460,12 @@ extern "C" {
 /* 0x3c */ SCMD_READ_BUFFER,		"read_buffer",			\
 /* 0x3e */ SCMD_READ_LONG,		"read_long",			\
 /* 0x3f */ SCMD_WRITE_LONG,		"write_long",			\
+/* 0x41 */ SCMD_WRITE_SAME_G1,		"write_same(10)",		\
+/* 0x42 */ SCMD_UNMAP,			"unmap",			\
 /* 0x44 */ SCMD_REPORT_DENSITIES |					\
 		/* SCMD_READ_HEADER (from cdio.h) | */			\
 		0,			"report_densities/read_header",	\
+/* 0x46 */ SCMD_GET_CONFIGURATION,	"get_configuration",		\
 /* 0x4c */ SCMD_LOG_SELECT_G1,		"log_select",			\
 /* 0x4d */ SCMD_LOG_SENSE_G1,		"log_sense",			\
 /* 0x55 */ SCMD_MODE_SELECT_G1,		"mode_select(10)",		\
@@ -477,6 +485,7 @@ extern "C" {
 /* 0x8f */ SCMD_VERIFY_G4,		"verify(16)",			\
 /* 0x91 */ SCMD_SPACE_G4,		"space(16)",			\
 /* 0x92 */ SCMD_LOCATE_G4,		"locate(16)",			\
+/* 0x92 */ SCMD_WRITE_SAME_G4,		"write_same(16)",		\
 /* 0x9e */ SCMD_SVC_ACTION_IN_G4,	"service_action_in(16)",	\
 /* 0x9f */ SCMD_SVC_ACTION_OUT_G4,	"service_action_out(16)",	\
 /* 0xa0 */ SCMD_REPORT_LUNS,		"report_luns",			\

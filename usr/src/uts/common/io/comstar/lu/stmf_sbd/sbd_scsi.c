@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -97,6 +99,11 @@ void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
 void sbd_handle_identifying_info(scsi_task_t *task, stmf_data_buf_t *dbuf);
+
+static void sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf,
+    uint32_t buflen);
+static void sbd_handle_unmap(scsi_task_t *task, stmf_data_buf_t *dbuf);
+static void sbd_handle_write_same(scsi_task_t *task);
 
 extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
@@ -1754,6 +1761,10 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 			    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
 		}
 		break;
+	case SCMD_UNMAP:
+		sbd_handle_unmap_xfer(task,
+		    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		break;
 	case SCMD_PERSISTENT_RESERVE_OUT:
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
 			st_ret = stmf_proxy_scsi_cmd(task, dbuf);
@@ -1815,6 +1826,9 @@ sbd_handle_read_capacity(struct scsi_task *task,
 		p[7] = s & 0xff;
 		p[10] = (blksize >> 8) & 0xff;
 		p[11] = blksize & 0xff;
+		if (sl->sl_flags & SL_UNMAP_ENABLED) {
+			p[14] = 0x80;
+		}
 		sbd_handle_short_read_transfers(task, initial_dbuf, p,
 		    cdb_len, 32);
 		break;
@@ -2216,6 +2230,105 @@ sbd_parse_mgmt_url(char **url_addr) {
 	return (url_length);
 }
 
+static void
+sbd_handle_write_same(scsi_task_t *task)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint64_t addr, len;
+	uint8_t *p;
+
+	task->task_cmd_xfer_length = 0;
+	if (task->task_additional_flags &
+	    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
+		task->task_expected_xfer_length = 0;
+	}
+	if (task->task_cdb[1] & 0xF7) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+	p = &task->task_cdb[2];
+	addr = READ_SCSI64(p, uint64_t);
+	addr <<= sl->sl_data_blocksize_shift;
+	len = READ_SCSI32(p+8, uint64_t);
+	len <<= sl->sl_data_blocksize_shift;
+
+	/* TODO -> full write_same support with data checks... */
+	if (sbd_unmap(sl, addr, len) != 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_LBA_OUT_OF_RANGE);
+		return;
+	}
+	stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+}
+
+static void
+sbd_handle_unmap(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	uint32_t cmd_xfer_len;
+
+	cmd_xfer_len = READ_SCSI16(&task->task_cdb[7], uint32_t);
+
+	if (task->task_cdb[1] & 1) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+
+	if (cmd_xfer_len == 0) {
+		task->task_cmd_xfer_length = 0;
+		if (task->task_additional_flags &
+		    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
+			task->task_expected_xfer_length = 0;
+		}
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		return;
+	}
+
+	sbd_handle_short_write_transfers(task, dbuf, cmd_xfer_len);
+}
+
+static void
+sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf, uint32_t buflen)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint32_t ulen, dlen, num_desc;
+	uint64_t addr, len;
+	uint8_t *p;
+	int ret;
+
+	if (buflen < 24) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+	ulen = READ_SCSI16(buf, uint32_t);
+	dlen = READ_SCSI16(buf + 2, uint32_t);
+	num_desc = dlen >> 4;
+	if (((ulen + 2) != buflen) || ((dlen + 8) != buflen) || (dlen & 0xf) ||
+	    (num_desc == 0)) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+
+	for (p = buf + 8; num_desc; num_desc--, p += 16) {
+		addr = READ_SCSI64(p, uint64_t);
+		addr <<= sl->sl_data_blocksize_shift;
+		len = READ_SCSI32(p+8, uint64_t);
+		len <<= sl->sl_data_blocksize_shift;
+		ret = sbd_unmap(sl, addr, len);
+		if (ret != 0) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_LBA_OUT_OF_RANGE);
+			return;
+		}
+	}
+
+unmap_done:
+	stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+}
+
 void
 sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
@@ -2228,6 +2341,8 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint16_t cmd_size;
 	uint32_t xfer_size = 4;
 	uint32_t mgmt_url_size = 0;
+	uint8_t exp;
+	uint64_t s;
 	char *mgmt_url = NULL;
 
 
@@ -2380,6 +2495,8 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	switch (cdbp[2]) {
 	case 0x00:
 		page_length = 4 + (mgmt_url_size ? 1 : 0);
+		if (sl->sl_flags & SL_UNMAP_ENABLED)
+			page_length += 2;
 
 		p[0] = byte0;
 		p[3] = page_length;
@@ -2392,6 +2509,10 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			if (mgmt_url_size != 0)
 				p[i++] = 0x85;
 			p[i++] = 0x86;
+			if (sl->sl_flags & SL_UNMAP_ENABLED) {
+				p[i++] = 0xb0;
+				p[i++] = 0xb2;
+			}
 		}
 		xfer_size = page_length + 4;
 		break;
@@ -2479,6 +2600,43 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		 * to claim support only for Simple TA.
 		 */
 		p[5] = 1;
+		xfer_size = page_length + 4;
+		break;
+
+	case 0xb0:
+		if ((sl->sl_flags & SL_UNMAP_ENABLED) == 0) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			goto err_done;
+		}
+		page_length = 0x3c;
+		p[0] = byte0;
+		p[1] = 0xb0;
+		p[3] = page_length;
+		p[20] = p[21] = p[22] = p[23] = 0xFF;
+		p[24] = p[25] = p[26] = p[27] = 0xFF;
+		xfer_size = page_length + 4;
+		break;
+
+	case 0xb2:
+		if ((sl->sl_flags & SL_UNMAP_ENABLED) == 0) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			goto err_done;
+		}
+		page_length = 4;
+		p[0] = byte0;
+		p[1] = 0xb2;
+		p[3] = page_length;
+
+		exp = (uint8_t)sl->sl_data_blocksize_shift;
+		s = sl->sl_lu_size >> sl->sl_data_blocksize_shift;
+		while (s & ((uint64_t)0xFFFFFFFF80000000ull)) {
+			s >>= 1;
+			exp++;
+		}
+		p[4] = exp;
+		p[5] = 0xc0;
 		xfer_size = page_length + 4;
 		break;
 
@@ -2905,6 +3063,16 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if ((cdb0 == SCMD_MODE_SELECT) || (cdb0 == SCMD_MODE_SELECT_G1)) {
 		sbd_handle_mode_select(task, initial_dbuf);
+		return;
+	}
+
+	if ((cdb0 == SCMD_UNMAP) && (sl->sl_flags & SL_UNMAP_ENABLED)) {
+		sbd_handle_unmap(task, initial_dbuf);
+		return;
+	}
+
+	if ((cdb0 == SCMD_WRITE_SAME_G4) && (sl->sl_flags & SL_UNMAP_ENABLED)) {
+		sbd_handle_write_same(task);
 		return;
 	}
 
