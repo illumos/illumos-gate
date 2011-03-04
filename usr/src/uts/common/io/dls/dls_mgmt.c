@@ -742,11 +742,22 @@ dls_devnet_stat_update(kstat_t *ksp, int rw)
  * Create the "link" kstats.
  */
 static void
-dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid)
+dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid, zoneid_t newzoneid)
 {
 	kstat_t	*ksp;
+	char	*nm;
+	char	kname[MAXLINKNAMELEN];
 
-	if (dls_stat_create("link", 0, ddp->dd_linkname, zoneid,
+	if (zoneid != newzoneid) {
+		ASSERT(zoneid == GLOBAL_ZONEID);
+		(void) snprintf(kname, sizeof (kname), "z%d_%s", newzoneid,
+		    ddp->dd_linkname);
+		nm = kname;
+	} else {
+		nm = ddp->dd_linkname;
+	}
+
+	if (dls_stat_create("link", 0, nm, zoneid,
 	    dls_devnet_stat_update, ddp, &ksp) == 0) {
 		ASSERT(ksp != NULL);
 		if (zoneid == ddp->dd_owner_zid) {
@@ -798,9 +809,10 @@ dls_devnet_stat_rename(dls_devnet_t *ddp, boolean_t zoneinit)
 	 * unless we're first initializing the zone while readying it.
 	 */
 	ASSERT(ddp->dd_zone_ksp == NULL);
-	dls_devnet_stat_create(ddp, ddp->dd_owner_zid);
+	dls_devnet_stat_create(ddp, ddp->dd_owner_zid,
+	    (zoneinit ? ddp->dd_zid : ddp->dd_owner_zid));
 	if (zoneinit)
-		dls_devnet_stat_create(ddp, ddp->dd_zid);
+		dls_devnet_stat_create(ddp, ddp->dd_zid, ddp->dd_zid);
 }
 
 /*
@@ -898,7 +910,7 @@ done:
 		 * lock hierarchy is kstat locks -> i_dls_devnet_lock.
 		 */
 		if (stat_create)
-			dls_devnet_stat_create(ddp, zoneid);
+			dls_devnet_stat_create(ddp, zoneid, zoneid);
 		if (ddpp != NULL)
 			*ddpp = ddp;
 	}
@@ -1353,7 +1365,15 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
 		/* rename mac client name and its flow if exists */
 		if ((err = mac_open(ddp->dd_mac, &mh)) != 0)
 			goto done;
-		(void) mac_rename_primary(mh, link);
+		if (zoneinit) {
+			char tname[MAXLINKNAMELEN];
+
+			(void) snprintf(tname, sizeof (tname), "z%d_%s",
+			    ddp->dd_zid, link);
+			(void) mac_rename_primary(mh, tname);
+		} else {
+			(void) mac_rename_primary(mh, link);
+		}
 		mac_close(mh);
 		goto done;
 	}
@@ -1527,7 +1547,7 @@ dls_devnet_setzid(dls_dl_handle_t ddh, zoneid_t new_zid)
 	if (old_zid != GLOBAL_ZONEID)
 		dls_devnet_stat_destroy(ddh, old_zid);
 	if (new_zid != GLOBAL_ZONEID)
-		dls_devnet_stat_create(ddh, new_zid);
+		dls_devnet_stat_create(ddh, new_zid, new_zid);
 
 	return (0);
 }
