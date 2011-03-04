@@ -111,12 +111,19 @@ foreach $line (@lines) {
 }
 
 my %old = ();
+my $rows_printed = 0;
 
 $Kstat->update();
 
 for (my $ii = 0; $ii < $count; $ii++) {
-	printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
-	    $INTERVAL_SUFFIX, $BYTES_PREFIX, $INTERVAL_SUFFIX);
+	# Print the column header every 20 rows
+	if ($rows_printed == 0 || $ALL_ZONES) {
+		printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX,
+		    $BYTES_PREFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
+		    $INTERVAL_SUFFIX);
+	}
+
+	$rows_printed = $rows_printed >= 20 ? 0 : $rows_printed + 1;
 
 	foreach $zone (@zones) {
 		if ((!$ALL_ZONES) && ($zone ne $curzone)) {
