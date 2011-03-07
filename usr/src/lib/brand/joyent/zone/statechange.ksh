@@ -256,6 +256,8 @@ setup_fs()
 
 	# Force zone snapshots to get mounted
 	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
+
+	uname -v > $ZONEPATH/lastbooted
 }
 
 #
