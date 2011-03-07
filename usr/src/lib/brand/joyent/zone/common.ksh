@@ -26,9 +26,15 @@
 final_setup()
 {
 	# Convert quota to MB and use 10% of that value for the zone core dump
-	# dataset
+	# dataset.  The infrastructure zones can use 50%.
 	if [ ! -d $ZONEPATH/cores ]; then
-		CORE_QUOTA=$((($ZQUOTA * 1000) / 10))
+		case $ZONENAME in
+			adminui|assets|atropos|ca|capi|dhcpd|mapi|portal| \
+			pubapi|rabbitmq)
+				CORE_QUOTA=$((($ZQUOTA * 1000) / 2));;
+			*)
+				CORE_QUOTA=$((($ZQUOTA * 1000) / 10));;
+		esac
 		zfs create -o quota=${CORE_QUOTA}m -o compression=gzip \
 		   $PDS_NAME/$bname/cores
 	fi
