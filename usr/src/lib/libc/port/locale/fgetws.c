@@ -63,7 +63,7 @@ _fgetws_impl(wchar_t *_RESTRICT_KYWD ws, int n, FILE *_RESTRICT_KYWD fp,
 	}
 
 	wsp = ws;
-	while (n--) {
+	while (n-- > 1) {
 		wc = _fgetwc_unlocked(fp);
 		if (wc == EOF) {
 			/*
