@@ -34,6 +34,18 @@ if [[ $myzone != "global" ]]; then
 	exit 1
 fi
 
+kernel_only=0
+
+while getopts "k" opt
+do
+	case "$opt" in
+		k)	kernel_only=1;;
+		*)	printf "zonemon [-k]\n"
+			exit 1;;
+	esac
+done
+shift OPTIND-1
+
 echo "Current status:"
 echo "::zone" | mdb -k | nawk '{
 	print $0
@@ -52,6 +64,8 @@ echo "::zone" | mdb -k | nawk '{
 		system(cmd);
 	}
 }'
+
+(( $kernel_only == 1 )) && exit 0
 
 echo
 echo "Watching:"
