@@ -84,11 +84,11 @@ if ( defined($ARGV[0]) ) {
 
 my $HEADER_FMT = $USE_COMMA ?
     "r/%s,w/%s,%sr/%s,%sw/%s,wait_t,ractv,wactv,read_t,writ_t,%%r,%%w,zone\n" :
-    "   r/%s    w/%s   %sr/%s   %sw/%s wait_t ractv wactv " .
+    "  r/%s   w/%s  %sr/%s  %sw/%s wait_t ractv wactv " .
     "read_t writ_t  %%r  %%w zone\n";
 my $DATA_FMT = $USE_COMMA ?
-    "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%s\n" :
-    "%6.1f %6.1f %6.1f %6.1f %6.1f %5.1f %5.1f %6.1f %6.1f %3d %3d %s\n";
+    "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%s,%d\n" :
+    "%5.1f %5.1f %5.1f %5.1f %6.1f %5.1f %5.1f %6.1f %6.1f %3d %3d %s (%d)\n";
 
 my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? 1024 * 1024 : 1024;
@@ -135,9 +135,16 @@ for (my $ii = 0; $ii < $count; $ii++) {
 			foreach $field (@fields) { $old->{$zone}->{$field} = 0; }
 		}
 
+		#
+		# Kstats have a 30-character limit (KSTAT_STRLEN) on their
+		# names, so if the zone name exceeds that limit, use the first
+		# 30 characters.
+		#
+		my $trimmed_zone = substr($zone, 0, 30);
 		my $zoneid = $zoneids->{$zone};
-		print_stats($zone, $Kstat->{'zone_vfs'}{$zoneid}{$zone},
-		    $old->{$zone});
+
+		print_stats($zone, $zoneid,
+		    $Kstat->{'zone_vfs'}{$zoneid}{$trimmed_zone}, $old->{$zone});
 	}
 
 	sleep ($interval);
@@ -148,8 +155,9 @@ exit(0);
 
 sub print_stats {
 	my $zone = $_[0];
-	my $data = $_[1];
-	my $old = $_[2];
+	my $zoneid = $_[1];
+	my $data = $_[2];
+	my $old = $_[3];
 
 	my $etime = $data->{'snaptime'} -
 	    ($old->{'snaptime'} > 0 ? $old->{'snaptime'} : $data->{'crtime'});
@@ -186,7 +194,7 @@ sub print_stats {
 	    $nread != 0.0 || $nwritten != 0.0) {
 		printf($DATA_FMT, $reads, $writes, $nread, $nwritten,
 		    $wait_t, $r_actv, $w_actv, $read_t, $writ_t,
-		    $r_b_pct, $w_b_pct, $zone);
+		    $r_b_pct, $w_b_pct, substr($zone, 0, 8), $zoneid);
 	}
 
 	# Save current calculations for next loop
