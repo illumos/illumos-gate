@@ -253,6 +253,11 @@ setup_fs()
 	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
 	[ ! -d $ZONEPATH/root/checkpoints ] && \
 	    mkdir -m755 $ZONEPATH/root/checkpoints
+	if [ ! -d $ZONEPATH/ccs ]; then
+		mkdir -m755 $ZONEPATH/ccs
+		(cd /usr/ccs; tar cbf 512 - *) | \
+		    (cd $ZONEPATH/ccs; tar xbf 512 -)
+	fi
 
 	# Force zone snapshots to get mounted
 	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1

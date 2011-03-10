@@ -49,6 +49,8 @@
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="%R/local" directory="/usr/local"
 	    opt="nodevices" type="lofs" />
+	<global_mount special="%R/ccs" directory="/usr/ccs"
+	    opt="nodevices" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
 	<mount special="/proc" directory="/proc" type="proc" />
