@@ -40,7 +40,6 @@
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
 #include <sys/sa.h>
-#include <sys/zfs_zone.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
@@ -958,12 +957,6 @@ dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 	dmu_buf_t **dbp;
 	int numbufs, i, err;
 	xuio_t *xuio = NULL;
-
-	/*
-	 * XXX There's a bug here in that I think the reader zone could be
-	 * throttled even if all the reads are coming from the ARC.
-	 */
-	zfs_zone_io_throttle(ZFS_ZONE_IOP_READ, size);
 
 	/*
 	 * NB: we could do this block-at-a-time, but it's nice
