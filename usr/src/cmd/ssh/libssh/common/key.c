@@ -874,3 +874,20 @@ key_demote(Key *k)
 
 	return (pk);
 }
+
+int
+key_type_plain(int type)
+{
+	switch (type) {
+	case KEY_RSA_CERT_V00:
+	case KEY_RSA_CERT:
+		return KEY_RSA;
+	case KEY_DSA_CERT_V00:
+	case KEY_DSA_CERT:
+		return KEY_DSA;
+	case KEY_ECDSA_CERT:
+		return KEY_ECDSA;
+	default:
+		return type;
+	}
+}
