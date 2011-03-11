@@ -212,7 +212,7 @@ kcf_global_swq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	kcf_global_swq_t swq;
 	kcf_global_swq_t *ptr;
 
-	if (!flags && DCMD_ADDRSPEC) {
+	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_readsym(&ptr, sizeof (uintptr_t), "gswq")
 		    == -1) {
 			mdb_warn("cannot read gswq");

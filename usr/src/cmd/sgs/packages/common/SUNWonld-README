@@ -1622,3 +1622,12 @@ Bugid   Risk Synopsis
 6975290 ld mishandles GOT relocation against local ABS symbol
 6972860 ld should provide user guidance to improve objects (D)
 	PSARC/2010/312 Link-editor guidance
+--------------------------------------------------------------------------------
+
+--------------
+Illumos
+--------------
+Bugid   Risk Synopsis
+================================================================================
+
+308     ld may misalign sections only preceded by empty sections

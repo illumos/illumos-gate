@@ -90,7 +90,7 @@ crypto_provider_ext_info(uintptr_t addr, uint_t flags, int argc,
 	 */
 	char scratch[33];
 
-	if (!(flags && DCMD_ADDRSPEC))
+	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
 	if (mdb_vread(&ext_prov, sizeof (crypto_provider_ext_info_t), addr)

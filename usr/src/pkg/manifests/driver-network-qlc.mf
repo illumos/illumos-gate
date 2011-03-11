@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -43,21 +44,11 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/qlc group=sys
 dir path=kernel/misc/qlc/$(ARCH64) group=sys
-$(i386_ONLY)driver name=qlc class=fibre-channel perms="* 0666 root sys" \
-    alias=pci1077,132 \
+driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pci1077,2200 \
     alias=pci1077,2300 \
     alias=pci1077,2312 \
-    alias=pci1077,2422 \
-    alias=pciex1077,2432 \
-    alias=pciex1077,2532 \
-    alias=pciex1077,5432 \
-    alias=pciex1077,8001 \
-    alias=pciex1077,8021
-$(sparc_ONLY)driver name=qlc class=fibre-channel perms="* 0666 root sys" \
-    alias=pci1077,2200 \
-    alias=pci1077,2300 \
-    alias=pci1077,2312 \
+    alias=pci1077,2322 \
     alias=pci1077,2422 \
     alias=pciex1077,2432 \
     alias=pciex1077,2532 \

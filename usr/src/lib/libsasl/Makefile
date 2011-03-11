@@ -22,8 +22,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include	../Makefile.lib
@@ -49,6 +48,7 @@ MSGFILES=	lib/canonusr.c lib/checkpw.c lib/client.c lib/common.c \
 			$(SRC)/lib/sasl_plugins/cram/cram.c \
 			$(SRC)/lib/sasl_plugins/digestmd5/digestmd5.c \
 			$(SRC)/lib/sasl_plugins/gssapi/gssapi.c \
+			$(SRC)/lib/sasl_plugins/login/login.c \
 			$(SRC)/lib/sasl_plugins/plain/plain.c
 
 .KEEP_STATE:

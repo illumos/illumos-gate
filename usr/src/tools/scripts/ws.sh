@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 #	This script sets up the environment variables for a SunOS
 #	codemgr workspace and spawns a shell with the environment
@@ -352,6 +352,14 @@ if [[ -n "$TERMPROTO" ]]; then	# fallback area specifed
 fi
 
 osbld_flag=0
+
+if [[ ! -v CLOSED_IS_PRESENT ]]; then
+        if [[ -d $SRC/../closed ]]; then
+                export CLOSED_IS_PRESENT="yes"
+        else
+                export CLOSED_IS_PRESENT="no"
+        fi
+fi
 
 if [[ -z "$ONBLD_DIR" ]]; then
 	ONBLD_DIR=$(dirname $(whence $0))

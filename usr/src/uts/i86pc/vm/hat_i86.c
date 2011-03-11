@@ -25,7 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
-
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * VM - Hardware Address Translation management for i386 and amd64
@@ -2804,46 +2806,6 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 	XPV_ALLOW_MIGRATE();
 	return (pfn);
 }
-
-/*
- * hat_getkpfnum() is an obsolete DDI routine, and its use is discouraged.
- * Use hat_getpfnum(kas.a_hat, ...) instead.
- *
- * We'd like to return PFN_INVALID if the mappings have underlying page_t's
- * but can't right now due to the fact that some software has grown to use
- * this interface incorrectly. So for now when the interface is misused,
- * return a warning to the user that in the future it won't work in the
- * way they're abusing it, and carry on.
- *
- * Note that hat_getkpfnum() is never supported on amd64.
- */
-#if !defined(__amd64)
-pfn_t
-hat_getkpfnum(caddr_t addr)
-{
-	pfn_t	pfn;
-	int badcaller = 0;
-
-	if (khat_running == 0)
-		panic("hat_getkpfnum(): called too early\n");
-	if ((uintptr_t)addr < kernelbase)
-		return (PFN_INVALID);
-
-	XPV_DISALLOW_MIGRATE();
-	if (segkpm && IS_KPM_ADDR(addr)) {
-		badcaller = 1;
-		pfn = hat_kpm_va2pfn(addr);
-	} else {
-		pfn = hat_getpfnum(kas.a_hat, addr);
-		badcaller = pf_is_memory(pfn);
-	}
-
-	if (badcaller)
-		hat_getkpfnum_badcall(caller());
-	XPV_ALLOW_MIGRATE();
-	return (pfn);
-}
-#endif /* __amd64 */
 
 /*
  * int hat_probe(hat, addr)

@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * SCSI disk target driver.
@@ -9109,6 +9112,7 @@ static void
 sd_set_errstats(struct sd_lun *un)
 {
 	struct	sd_errstats	*stp;
+	char 			*sn;
 
 	ASSERT(un != NULL);
 	ASSERT(un->un_errstats != NULL);
@@ -9147,6 +9151,17 @@ sd_set_errstats(struct sd_lun *un)
 	if (bcmp(&SD_INQUIRY(un)->inq_pid[9], "SUN", 3) == 0) {
 		bcopy(&SD_INQUIRY(un)->inq_serial, stp->sd_serial.value.c,
 		    sizeof (SD_INQUIRY(un)->inq_serial));
+	} else {
+		/*
+		 * Set the "Serial No" kstat for non-Sun qualified drives
+		 */
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, SD_DEVINFO(un),
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    INQUIRY_SERIAL_NO, &sn) == DDI_SUCCESS) {
+			(void) strlcpy(stp->sd_serial.value.c, sn,
+			    sizeof (stp->sd_serial.value.c));
+			ddi_prop_free(sn);
+		}
 	}
 
 	if (un->un_f_blockcount_is_valid != TRUE) {
