@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -780,9 +782,9 @@ ill_input_short_v6(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 			ire_refrele(rtc->rtc_ire);
 		rtc->rtc_ire = ire;
 		rtc->rtc_ip6addr = nexthop;
-	} else if (IN6_ARE_ADDR_EQUAL(&nexthop, &rtc->rtc_ip6addr)) {
+	} else if (IN6_ARE_ADDR_EQUAL(&nexthop, &rtc->rtc_ip6addr) &&
+	    rtc->rtc_ire != NULL) {
 		/* Use the route cache */
-		ASSERT(rtc->rtc_ire != NULL);
 		ire = rtc->rtc_ire;
 	} else {
 		/* Update the route cache */
