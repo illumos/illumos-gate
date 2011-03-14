@@ -63,6 +63,7 @@ dir path=opt/SUNWdtrt/tst/common/exit
 dir path=opt/SUNWdtrt/tst/common/fbtprovider
 dir path=opt/SUNWdtrt/tst/common/funcs
 dir path=opt/SUNWdtrt/tst/common/grammar
+dir path=opt/SUNWdtrt/tst/common/include
 dir path=opt/SUNWdtrt/tst/common/inline
 dir path=opt/SUNWdtrt/tst/common/io
 dir path=opt/SUNWdtrt/tst/common/ip
@@ -841,6 +842,7 @@ file path=opt/SUNWdtrt/tst/common/grammar/err.D_ADDROF_LVAL.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_EMPTY.empty.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.clauses.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.stmts.d mode=0444
+file path=opt/SUNWdtrt/tst/common/include/tst.includefirst.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_IDENT_UNDEF.recur.d mode=0444
