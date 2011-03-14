@@ -1,0 +1,300 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_url 3LDAP "02 Dec 2003" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_url, ldap_is_ldap_url, ldap_url_parse, ldap_url_parse_nodn,
+ldap_free_urldesc, ldap_url_search, ldap_url_search_s, ldap_url_search_st,
+ldap_dns_to_url, ldap_dn_to_url \- LDAP Uniform Resource Locator functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_is_ldap_url\fR(\fBchar\fR \fI*url\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_url_parse\fR(\fBchar\fR \fI*url\fR, \fBLDAPURLDesc\fR \fI**ludpp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_url_parse_nodn\fR(\fBchar\fR \fI*url\fR, \fBLDAPURLDesc\fR \fI**ludpp\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBldap_free_urldesc\fR(\fBLDAPURLDesc\fR \fI*ludp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_url_search\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*url\fR, \fBint\fR \fIattrsonly\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_url_search_s\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*url\fR,
+     \fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_url_search_st\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*url\fR, \fBint\fR \fIattrsonly\fR,
+     \fBstruct timeval\fR \fI*timeout\fR, \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBldap_dns_to_url\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*dns_name\fR, \fBchar\fR \fI*attrs\fR,
+     \fBchar\fR \fI*scope\fR, \fBchar\fR \fI*filter\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBldap_dn_to_url\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*dn\fR, \fBint\fR \fInameparts\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions support the use of LDAP URLs (Uniform Resource Locators). The
+following shows the formatting used for LDAP URLs.
+.sp
+.in +2
+.nf
+\fBldap://\fR\fIhostport\fR\fB/\fR\fIdn\fR[\fB?\fR\fIattributes\fR[\fB?\fR\fIscope\fR[\fB?\fR\fIfilter\fR]]]
+.fi
+.in -2
+
+.sp
+.LP
+where:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhostport\fR\fR
+.ad
+.RS 14n
+.rt  
+Host name with an optional \fB:portnumber\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdn\fR\fR
+.ad
+.RS 14n
+.rt  
+Base DN to be used for an LDAP search operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattributes\fR\fR
+.ad
+.RS 14n
+.rt  
+Comma separated list of attributes to be retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIscope\fR\fR
+.ad
+.RS 14n
+.rt  
+One of these three strings: base one sub (default=base).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilter\fR\fR
+.ad
+.RS 14n
+.rt  
+LDAP search filter as used in a call to \fBldap_search\fR(3LDAP).
+.RE
+
+.sp
+.LP
+The following is an example of an LDAP URL:
+.sp
+.in +2
+.nf
+ldap://ldap.itd.umich.edu/c=US?o,description?one?o=umich
+.fi
+.in -2
+
+.sp
+.LP
+URLs preceded \fBURL:\fR or wrapped in angle-brackets are tolerated. URLs can
+also be preceded by \fBURL:\fR and wrapped in angle-brackets.
+.sp
+.LP
+\fBldap_is_ldap_url()\fR returns a non-zero value if \fIurl\fR looks like an
+LDAP URL (as opposed to some other kind of URL). It can be used as a quick
+check for an LDAP URL; the \fBldap_url_parse()\fR function should be used if a
+more thorough check is needed.
+.sp
+.LP
+\fBldap_url_parse()\fR breaks down an LDAP URL passed in \fIurl\fR into its
+component pieces. If successful, zero is returned, an LDAP URL description is
+allocated, filled in, and \fIludpp\fR is set to point to it. See \fBRETURN
+VALUES\fR for values returned upon error.
+.sp
+.LP
+\fBldap_url_parse_nodn()\fR acts just like \fBldap_url_parse()\fR but does not
+require \fIdn\fR in the LDAP URL.
+.sp
+.LP
+\fBldap_free_urldesc()\fR should be called to free an LDAP URL description that
+was obtained from a call to \fBldap_url_parse()\fR.
+.sp
+.LP
+\fBldap_url_search()\fR initiates an asynchronous LDAP search based on the
+contents of the \fIurl\fR string. This function acts just like
+\fBldap_search\fR(3LDAP) except that many search parameters are pulled out of
+the URL.
+.sp
+.LP
+\fBldap_url_search_s()\fR performs a synchronous LDAP search based on the
+contents of the \fIurl\fR string. This function acts just like
+\fBldap_search_s\fR(3LDAP) except that many search parameters are pulled out of
+the URL.
+.sp
+.LP
+\fBldap_url_search_st()\fR performs a synchronous LDAP URL search with a
+specified \fItimeout\fR. This function acts just like
+\fBldap_search_st\fR(3LDAP) except that many search parameters are pulled out
+of the URL.
+.sp
+.LP
+\fBldap_dns_to_url()\fR locates the LDAP URL associated with a DNS domain name.
+The supplied DNS domain name is converted into a distinguished name. The
+directory entry specified by that distinguished name is searched for a labeled
+URI attribute. If successful then the corresponding LDAP URL is returned. If
+unsuccessful then that entry's parent is searched and so on until the target
+distinguished name is reduced to only two nameparts. If \fIdns_name\fR is
+\fINULL\fR then the environment variable LOCALDOMAIN is used. If \fIattrs\fR is
+not \fINULL\fR then it is appended to the URL's attribute list. If \fIscope\fR
+is not NULL then it overrides the URL's scope. If \fIfilter\fR is not
+\fINULL\fR then it is merged with the URL's filter. If an error is encountered
+then zero is returned, otherwise a string URL is returned. The caller should
+free the returned string if it is non-zero.
+.sp
+.LP
+\fBldap_dn_to_url()\fR locates the LDAP URL associated with a distinguished
+name. The number of nameparts in the supplied distinguished name must be
+provided. The specified directory entry is searched for a labeledURI attribute.
+If successful then the LDAP URL is returned. If unsuccessful then that entry's
+parent is searched and so on until the target distinguished name is reduced to
+only two nameparts. If an error is encountered then zero is returned, otherwise
+a string URL is returned. The caller should free the returned string if it is
+non-zero.
+.SH RETURN VALUES
+.sp
+.LP
+Upon error, one of these values is returned for \fBldap_url_parse()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_URL_ERR_BADSCOPE\fR\fR
+.ad
+.RS 25n
+.rt  
+URL scope string is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_URL_ERR_HOSTPORT\fR\fR
+.ad
+.RS 25n
+.rt  
+URL hostport is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_URL_ERR_MEM\fR\fR
+.ad
+.RS 25n
+.rt  
+Can't allocate memory space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_URL_ERR_NODN\fR\fR
+.ad
+.RS 25n
+.rt  
+URL has no DN (required).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_URL_ERR_NOTLDAP\fR\fR
+.ad
+.RS 25n
+.rt  
+URL doesn't begin with \fBldap://\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP), \fBattributes\fR(5)
+.sp
+.LP
+\fBAn\fR \fBLDAP\fR \fBURL\fR \fBFormat,\fR Tim Howes and Mark Smith, December
+1995. Internet Draft (work in progress). Currently available at this URL.
+.sp
+.in +2
+.nf
+ftp://ds.internic.net/internet-drafts/draft-ietf-asid-ldap-format-03.txt
+.fi
+.in -2
+

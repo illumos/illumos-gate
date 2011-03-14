@@ -1,0 +1,110 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree_register_handler 3PICLTREE "1 Aug 2000" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+ptree_register_handler \- register a handler for the event
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicltree\fR [ \fIlibrary\fR... ]
+#include <picltree.h>
+
+\fBint\fR \fBptree_register_handler\fR(\fBconst char *\fR\fIename\fR,
+     \fBvoid (*\fR\fIevt_handler\fR)(\fBconst char *\fR\fIename\fR, const void *\fIearg\fR,
+     \fBsize_t\fR \fIsize\fR, \fBvoid *\fR\fIcookie\fR), \fBvoid *\fR\fIcookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree_register_handler()\fR function registers an event handler for a
+PICL event. The argument \fIename\fR specifies the name of the PICL event for
+which to register the handler. The argument \fIevt_handler\fR specifies the
+event handler function. The argument \fIcookie\fR is a pointer to
+caller-specific data to be passed as an argument to the event handler when it
+is invoked.
+.sp
+.LP
+The event handler function must be defined as
+.sp
+.in +2
+.nf
+void evt_handler(const char *\fIename\fR, const void *\fIearg\fR, \e
+        size_t \fIsize\fR, void *\fIcookie\fR)
+.fi
+.in -2
+
+.sp
+.LP
+where, \fIename\fR, \fIearg\fR, \fIsize\fR, and \fIcookie\fR are the arguments
+passed to the event handler when it is invoked. The argument \fIename\fR is the
+PICL event name for which the handler is invoked. The arguments \fIearg\fR and
+\fIsize\fR gives the pointer to the event argument buffer and its size,
+respectively. The argument \fIcookie\fR is the pointer to the caller specific
+data registered with the handler. The arguments \fIename\fR and \fIearg\fR
+point to buffers that are transient and shall not be modified by the event
+handler or reused after the event handler finishes execution.
+.sp
+.LP
+The PICL framework invokes the event handlers in the order in which they were
+registered when dispatching an event. If the event handler execution order is
+required to be the same as the plug-in dependency order, then a plug-in should
+register its handlers from its init function. The handlers that do not have any
+ordering dependencies on other plug-in handlers can be registered at any time.
+.sp
+.LP
+The registered handler may be called at any time after this function is called.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a non-negative
+integer is returned to indicate an error and the handler is not registered.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDARG\fR\fR
+.ad
+.RS 19n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 19n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBptree_unregister_handler\fR(3PICLTREE), \fBattributes\fR(5)

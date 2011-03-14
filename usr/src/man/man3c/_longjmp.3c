@@ -1,0 +1,92 @@
+'\" te
+.\" Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _longjmp 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+_longjmp, _setjmp \- non-local goto
+.SH SYNOPSIS
+.LP
+.nf
+#include <setjmp.h>
+
+\fBvoid\fR \fB_longjmp\fR(\fBjmp_buf\fR \fIenv\fR, \fBint\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_setjmp\fR(\fBjmp_buf\fR \fIenv\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB_longjmp()\fR and \fB_setjmp()\fR functions are identical to
+\fBlongjmp\fR(3C) and \fBsetjmp\fR(3C), respectively, with the additional
+restriction that \fB_longjmp()\fR and \fB_setjmp()\fR do not manipulate the
+signal mask.
+.sp
+.LP
+If \fB_longjmp()\fR is called even though \fBenv\fR was never initialized by a
+call to \fB_setjmp()\fR, or when the last such call was in a function that has
+since returned, the results are undefined.
+.SH RETURN VALUES
+.sp
+.LP
+Refer to \fBlongjmp\fR(3C) and \fBsetjmp\fR(3C).
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+If \fB_longjmp()\fR is executed and the environment in which \fB_setjmp()\fR
+was executed no longer exists, errors can occur. The conditions under which the
+environment of the \fB_setjmp()\fR no longer exists include exiting the
+function that contains the \fB_setjmp()\fR call, and exiting an inner block
+with temporary storage. This condition might not be detectable, in which case
+the \fB_longjmp()\fR occurs and, if the environment no longer exists, the
+contents of the temporary storage of an inner block are unpredictable. This
+condition might also cause unexpected process termination. If the function has
+returned, the results are undefined.
+.sp
+.LP
+Passing \fBlongjmp()\fR a pointer to a buffer not created by \fBsetjmp(\|),\fR
+passing \fB_longjmp()\fR a pointer to a buffer not created by \fB_setjmp()\fR,
+passing \fBsiglongjmp\fR(3C) a pointer to a buffer not created by
+\fBsigsetjmp\fR(3C) or passing any of these three functions a buffer that has
+been modified by the user can cause all the problems listed above, and more.
+.sp
+.LP
+The \fB_longjmp()\fR and \fB_setjmp()\fR functions are included to support
+programs written to historical system interfaces.  New applications should use
+\fBsiglongjmp\fR(3C) and \fBsigsetjmp\fR(3C) respectively.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlongjmp\fR(3C), \fBsetjmp\fR(3C), \fBsiglongjmp\fR(3C), \fBsigsetjmp\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

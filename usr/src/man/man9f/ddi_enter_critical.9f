@@ -1,0 +1,89 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_enter_critical 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_enter_critical, ddi_exit_critical \- enter and exit a critical region of
+control
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBunsigned int\fR \fBddi_enter_critical\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_exit_critical\fR(\fBunsignedint\fR \fIddic\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIddic\fR\fR
+.ad
+.RS 8n
+.rt  
+The returned value from the call to \fBddi_enter_critical()\fR must be passed
+to \fBddi_exit_critical()\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Nearly all driver operations can be done without any special synchronization
+and protection mechanisms beyond those provided by, for example, mutexes (see
+\fBmutex\fR(9F)). However, for certain devices there can exist a very short
+critical region of code which \fBmust\fR be allowed to run uninterrupted. The
+function \fBddi_enter_critical()\fR provides a mechanism by which a driver can
+ask the system to guarantee to the best of its ability that the current thread
+of execution will neither be preempted nor interrupted. This stays in effect
+until a bracketing call to \fBddi_exit_critical()\fR is made (with an argument
+which was the returned value from \fBddi_enter_critical()\fR).
+.sp
+.LP
+The driver may not call any functions external to itself in between the time it
+calls \fBddi_enter_critical()\fR and the time it calls
+\fBddi_exit_critical()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_enter_critical()\fR function returns an opaque unsigned integer
+which must be used in the subsequent call to \fBddi_exit_critical()\fR.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, interrupt, or kernel context.
+.SH WARNINGS
+.sp
+.LP
+Driver writers should note that in a multiple processor system  this function
+does not temporarily suspend other processors from executing. This function
+also cannot guarantee to actually block the hardware from doing such things as
+interrupt acknowledge cycles. What it \fBcan\fR do is guarantee that the
+currently executing thread will not be preempted.
+.sp
+.LP
+Do not write code  bracketed by \fBddi_enter_critical()\fR and
+\fBddi_exit_critical()\fR that can get caught in an infinite loop, as the
+machine may crash if you do.
+.SH SEE ALSO
+.sp
+.LP
+\fBmutex\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

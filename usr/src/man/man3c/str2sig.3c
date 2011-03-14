@@ -1,0 +1,71 @@
+'\" te
+.\" Copyright (c) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH str2sig 3C "7 Oct 1999" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+str2sig, sig2str \- translation between signal name and signal number
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h> 
+
+\fBint\fR \fBstr2sig\fR(\fBconst char *\fR\fIstr\fR, \fBint\fR \fI*signum\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsig2str\fR(\fBint\fR \fIsignum\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstr2sig()\fR function translates the signal name \fIstr\fR to a signal
+number, and stores that result in the location referenced by \fIsignum\fR. The
+name in \fIstr\fR can be either the symbol for that signal, without the "SIG"
+prefix, or a decimal number.  All the signal symbols defined in
+<\fBsys/signal.h\fR> are recognized.  This means that both "CLD" and "CHLD" are
+recognized and return the same signal number, as do both "POLL" and "IO".  For
+access to the signals in the range \fBSIGRTMIN\fR to \fBSIGRTMAX\fR, the first
+four signals match the strings "RTMIN", "RTMIN+1", "RTMIN+2", and "RTMIN+3" and
+the last four match the strings "RTMAX-3", "RTMAX-2", "RTMAX-1", and "RTMAX".
+.sp
+.LP
+The \fBsig2str()\fR function translates the signal number \fIsignum\fR to the
+symbol for that signal, without the "SIG" prefix, and stores that symbol at the
+location specified by \fIstr\fR. The storage referenced by \fIstr\fR should be
+large enough to hold the symbol and a terminating null byte. The symbol
+\fBSIG2STR_MAX\fR defined by \fB<signal.h>\fR gives the maximum size in bytes
+required.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBstr2sig()\fR function returns \fB0\fR if it recognizes the signal name
+specified in \fIstr\fR; otherwise, it returns \fB\(mi1\fR\&.
+.sp
+.LP
+The \fBsig2str()\fR function returns \fB0\fR if the value \fIsignum\fR
+corresponds to a valid signal number; otherwise, it returns \fB\(mi1\fR\&.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program using the \fBstr2sig()\fR function.
+.sp
+.in +2
+.nf
+int i;
+char buf[SIG2STR_MAX];     /*storage for symbol */
+
+str2sig("KILL",&i);        /*stores 9 in i */
+str2sig("9", &i);          /* stores 9 in i */
+sig2str(SIGKILL,buf);      /* stores "KILL" in buf */
+sig2str(9,buf);            /* stores "KILL" in buf */
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBstrsignal\fR(3C)

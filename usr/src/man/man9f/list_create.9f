@@ -1,0 +1,193 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH list_create 9F "17 Sep 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+list_create, list_destroy, list_insert_after, list_insert_before,
+list_insert_head, list_insert_tail, list_remove, list_remove_head,
+list_remove_tail, list_head, list_tail, list_next, list_prev, list_is_empty,
+list_link_init, list_link_active, list_move_tail, list_link_replace \- list
+functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/list.h>
+
+\fBvoid\fR \fBlist_create\fR(\fBlist_t *\fR \fIlist\fR, \fBsize_t\fR \fIsize\fR, \fBsize_t\fR \fIoffset\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_destroy\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_insert_after\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR,
+     \fBvoid *\fR\fInew_item\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_insert_before\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR,
+     \fBvoid *\fR\fInew_item\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_insert_head\fR(\fBlist_t *\fR \fIlist\fR*, \fBvoid *\fR\fInew_item\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_insert_tail\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fInew_item\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_remove\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fRitem);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_remove_head\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_remove_tail\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_head\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_tail\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_next\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBlist_prev\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBlist_is_empty\fR(\fBlist_t *\fR \fIlist\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_link_init\fR(\fBlist_node_t *\fR\fInode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBlist_link_active\fR(\fBlist_node_t *\fR\fInode\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_move_tail\fR(\fBlist_t *\fR\fIdst\fR, \fBlist_t *\fR\fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlist_link_replace\fR(\fBlist_node_t *\fR\fInode1\fR, \fBlist_node_t *\fR\fInode2\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlist_create()\fR function initializes a new list. The driver supplies
+the storage for the list handle, the size of an individual element, and the
+offset of a \fBlist_node_t\fR within the element to use for the links of the
+list.
+.sp
+.LP
+The \fBlist_destroy()\fR function destroys the list handle, including freeing
+any resources that may have been internally allocated for the list. The list
+must be empty when this function is called.
+.sp
+.LP
+The \fBlist_insert_after()\fR and \fBlist_insert_before()\fR functions insert
+\fInew_item\fR into the linked list at a location after or before the reference
+item, which must already be on the list.
+.sp
+.LP
+The \fBlist_insert_head()\fR and \fBlist_insert_tail()\fR functions insert the
+\fInew_item\fR on the list at either the head or tail of the list.  (The head
+is the first item, the tail is the last item).
+.sp
+.LP
+The \fBlist_remove()\fR function removes the item from the list.
+.sp
+.LP
+The \fBlist_remove_head()\fR and \fBlist_remove_tail()\fR functions remove the
+head (first) or tail (last) item from the list. The item removed is returned to
+the caller. If the list is empty when these functions are called, then no
+change is made and \fINULL\fR is returned to the caller.
+.sp
+.LP
+The \fBlist_head()\fR and \fBlist_tail()\fR functions simply return the head
+(first) or tail (last) item on the list.  \fINULL\fR is returned if the list is
+empty.
+.sp
+.LP
+The \fBlist_next()\fR and \fBlist_prev()\fR functions return the next or
+previous item in the list, relative to the named reference item which must be
+linked on the list.
+.sp
+.LP
+The \fBlist_is_empty()\fR function returns 0 if the list has items in it, or
+non-zero otherwise.
+.sp
+.LP
+The \fBlist_link_init()\fR function initializes the \fBlist_node_t\fR. It is
+functionally equivalent to \fBbzero\fR(\fInode\fR, \fBsizeof\fR(*\fInode\fR));
+.sp
+.LP
+The \fBlist_link_active()\fR function returns non-zero if the node is on an
+active list.
+.sp
+.LP
+The \fBlist_move_tail()\fR function is used to append the items on the
+\fIsrc\fR list to the end of the \fIdst\fR list. It is mandatory that the two
+lists were initialized using identical size and offset parameters. Upon
+completion, the \fIsrc\fR list will be empty.
+.sp
+.LP
+The \fBlist_link_replace()\fR function swaps two items on a list.  Note that
+the items need not be on the same list, but extreme care must be used to ensure
+that both lists are protected from concurrent accesses and that the lists were
+initialized with identical size and offset parameters.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

@@ -1,0 +1,215 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_prop_get_int 9F "25 Aug 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_prop_get_int\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR, 
+     \fBchar *\fR\fIname\fR, \fBint\fR \fIdefvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint64_t\fR \fBddi_prop_get_int64\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR,
+     \fBchar *\fR\fIname\fR, \fBint64_t\fR \fIdefvalue\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImatch_dev\fR\fR
+.ad
+.RS 13n
+.rt  
+Device number associated with property or \fBDDI_DEV_T_ANY.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the device info node of device whose property list should be
+searched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 13n
+.rt  
+Possible flag values are some combination of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_DONTPASS\fR\fR
+.ad
+.RS 21n
+.rt  
+Do not pass request to parent device information node if property not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_NOTPROM\fR\fR
+.ad
+.RS 21n
+.rt  
+Do not look at \fBPROM \fRproperties (ignored on platforms that do not support
+\fBPROM \fRproperties).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 13n
+.rt  
+String containing the name of the property.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdefvalue\fR\fR
+.ad
+.RS 13n
+.rt  
+An integer value that is returned if the property cannot be found.
+.RE
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR functions search
+for an integer property and, if found, returns the value of the property.
+.sp
+.LP
+Properties are searched for based on the \fIdip\fR, \fIname\fR,
+\fImatch_dev\fR, and the type of the data (integer). The property search order
+is as follows:
+.RS +4
+.TP
+1.
+Search software properties created by the driver.
+.RE
+.RS +4
+.TP
+2.
+Search the software properties created by the system (or nexus nodes in the
+device info tree).
+.RE
+.RS +4
+.TP
+3.
+Search the driver global properties list.
+.RE
+.RS +4
+.TP
+4.
+If \fBDDI_PROP_NOTPROM\fR is not set, search the \fBPROM \fRproperties (if
+they exist).
+.RE
+.RS +4
+.TP
+5.
+If \fBDDI_PROP_DONTPASS\fR is not set, pass this request to the parent
+device information node.
+.RE
+.RS +4
+.TP
+6.
+Return \fIdefvalue\fR.
+.RE
+.sp
+.LP
+Usually, the \fImatch_dev\fR argument should be set to the actual device number
+that this property is associated with. However, if the \fImatch_dev\fR argument
+is \fBDDI_DEV_T_ANY,\fR then \fBddi_prop_get_int()\fR and
+\fBddi_prop_get_int()\fR will match the request regardless of the
+\fImatch_dev\fR the property was created with. If a property was created with
+\fImatch_dev\fR set to \fBDDI_DEV_T_NONE,\fR then the only way to look up this
+property is with a \fImatch_dev\fR set to \fBDDI_DEV_T_ANY.\fR \fBPROM
+\fRproperties are always created with \fImatch_dev\fR set to
+\fBDDI_DEV_T_NONE.\fR
+.sp
+.LP
+\fIname\fR must always be set to the name of the property being looked up.
+.sp
+.LP
+The return value of the routine is the value of the property. If the property
+is not found, the argument \fIdefvalue\fR is returned as the value of the
+property.
+.sp
+.LP
+\fBddi_prop_get_int64()\fR will not search the PROM for 64-bit property values.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR return the value of the
+property. If the property is not found, the argument \fBdefvalue\fR is
+returned. If the property is found, but cannot be decoded into an \fBint\fR or
+an \fBint64\fR, then \fBDDI_PROP_NOT_FOUND\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+\fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR can be called from user
+or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBddi_prop_get_int()\fR
+.sp
+.LP
+The following example demonstrates the use of \fBddi_prop_get_int()\fR.
+
+.sp
+.in +2
+.nf
+\fB	
+/*
+	* Get the value of the integer "width" property, using
+	* our own default if no such property exists
+	*/
+	width = ddi_prop_get_int(xx_dev, xx_dip, 0, "width", 
+	           XX_DEFAULT_WIDTH);\fR
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_prop_exists\fR(9F), \fBddi_prop_lookup\fR(9F),
+\fBddi_prop_remove\fR(9F), \fBddi_prop_update\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

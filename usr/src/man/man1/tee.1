@@ -1,0 +1,256 @@
+'\" te
+.\" Copyright 1989 AT&T 
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tee 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+tee \- replicate the standard output
+.SH SYNOPSIS
+.SS "/usr/bin/tee"
+.LP
+.nf
+\fB/usr/bin/tee\fR [\fB-ai\fR] [\fIfile\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBtee\fR [\fB-ail\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/tee"
+.sp
+.LP
+\fB/usr/bin/tee\fR copies standard input to standard output, making a copy in
+zero or more files. \fBtee\fR does not buffer its output. The options determine
+if the specified files are overwritten or appended to.
+.SS "ksh93"
+.sp
+.LP
+The \fBtee\fR built-in in \fBksh93\fR is associated with the \fB/bin\fR and
+\fB/usr/bin\fR paths. It is invoked when tee is executed without a pathname
+prefix and the pathname search finds a \fB/bin/tee\fR or \fB/usr/bin/tee\fR
+executable.
+.sp
+.LP
+\fBtee\fR copies standard input to standard output and to zero or more files.
+The options determine whether the specified files are overwritten or appended
+to. The tee utility does not buffer output. If a write to a file fails,
+\fBtee\fR continues to write to other files although it exits with a non-zero
+exit status.
+.sp
+.LP
+The number of \fIfile\fR operands that can be specified is limited by the
+underlying operating system.
+.SH OPTIONS
+.SS "/usr/bin/tee"
+.sp
+.LP
+The following options are supported by \fB/usr/bin/tee\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Appends the output to the files rather than overwriting them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Ignores interrupts.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by the \fBtee\fR built-in command in
+\fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.br
+.na
+\fB\fB--append\fR\fR
+.ad
+.RS 23n
+.rt  
+Appends the output to the files rather than overwriting them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.br
+.na
+\fB\fB--ignore-interrupts\fR\fR
+.ad
+.RS 23n
+.rt  
+Ignores \fBSIGINT\fR signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.br
+.na
+\fB\fB--line-buffer\fR\fR
+.ad
+.RS 23n
+.rt  
+Sets the standard output to be line buffered.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of an output file. Processing of at least 13 \fIfile\fR operands
+are supported.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBtee\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBtee\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.SS "/usr/bin/tee"
+.sp
+.LP
+The following exit values are returned by \fB/usr/bin/tee\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The standard input was successfully copied to all output files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+The number of files that could not be opened or whose status could not be
+obtained.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following exit values are returned by \fBtee\fR in \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/tee"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBksh93\fR built-in binding to \fB/bin\fR and \fB/usr/bin\fR is Volatile.
+The built-in interfaces are Uncommitted.
+.SH SEE ALSO
+.sp
+.LP
+\fBcat\fR(1), \fBksh93\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)

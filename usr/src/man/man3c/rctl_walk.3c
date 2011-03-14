@@ -1,0 +1,112 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rctl_walk 3C " 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+rctl_walk \- visit registered rctls on current system
+.SH SYNOPSIS
+.LP
+.nf
+#include <rctl.h>
+
+\fBint\fR \fBrctl_walk\fR(\fBint (*\fR\fIcallback\fR)(const char *\fIrctlname\fR, void *\fIwalk_data\fR),
+     \fBvoid *\fR\fIinit_data\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrctl_walk()\fR function provides a mechanism for the application author
+to examine all active resource controls (rctls) on the current system.  The
+\fIcallback\fR function provided by the application is given the name of an
+rctl at each invocation and can use the \fIwalk_data\fR to record its own
+state. The callback function should return non-zero if it encounters an error
+condition or attempts to terminate the walk prematurely; otherwise the callback
+function should return 0.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBrctl_walk()\fR returns 0. It returns \(mi1 if
+the \fIcallback\fR function returned a non-zero value or if the walk
+encountered an error, in which case \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrctl_walk()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient memory available to set up the initial data for the walk.
+.RE
+
+.sp
+.LP
+Other returned error values are presumably caused by the \fIcallback\fR
+function.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCount the number of rctls available on the system.
+.sp
+.LP
+The following example counts the number of resource controls on the system.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <rctl.h>
+#include <stdio.h>
+
+typedef struct wdata {
+     uint_t count;
+} wdata_t;
+
+wdata_t total_count;
+
+int
+simple_callback(const char *name, void *pvt)
+{
+     wdata_t *w = (wdata_t *)pvt;
+     w->count++;
+     return (0);
+}
+
+\&...
+
+total_count.count = 0;
+errno = 0;
+if (rctl_walk(simple_callback, &total_count)) == 0)
+     (void) printf("count = %u\en", total_count.count);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsetrctl\fR(2), \fBattributes\fR(5)

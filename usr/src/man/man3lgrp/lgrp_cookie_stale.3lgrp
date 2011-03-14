@@ -1,0 +1,79 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_cookie_stale 3LGRP "16 Apr 2003" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_cookie_stale \- determine whether snapshot of lgroup hierarchy is stale
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <sys/lgrp_user.h>
+
+\fBint\fR \fBlgrp_cookie_stale\fR(\fBlgrp_cookie_t\fR \fIcookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_cookie_stale()\fR function takes a \fIcookie\fR representing the
+snapshot of the lgroup hierarchy obtained from \fBlgrp_init\fR(3LGRP) and
+returns whether it is stale. The snapshot can become out-of-date for a number
+of reasons depending on its view.  If the snapshot was taken with
+\fBLGRP_VIEW_OS\fR, changes in the lgroup hierarchy from dynamic
+reconfiguration, CPU on/offline, or other conditions can cause the snapshot to
+become out-of-date. A snapshot taken with \fBLGRP_VIEW_CALLER\fR can be
+affected by the caller's processor set binding and changes in its processor set
+itself, as well as changes in the lgroup hierarchy.
+.sp
+.LP
+If the snapshot needs to be updated, \fBlgrp_fini\fR(3LGRP) should be called
+with the old cookie and \fBlgrp_init()\fR should be called to obtain a new
+snapshot.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBlgrp_cookie_stale()\fR returns whether the
+cookie is stale. Otherwise, it returns \(mi1 and sets \fBerrno\fR to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBlgrp_cookie_stale()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The cookie is not valid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_init\fR(3LGRP), \fBlgrp_fini\fR(3LGRP), \fBlgrp_view\fR(3LGRP),
+\fBliblgrp\fR(3LIB), \fBattributes\fR(5)

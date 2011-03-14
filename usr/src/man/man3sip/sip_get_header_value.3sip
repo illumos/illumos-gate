@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_get_header_value 3SIP "25 Jan 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_get_header_value, sip_get_next_value \- get a SIP header value
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBconst struct sip_value *\fR\fIsip_get_header_value\fR
+     (\fBconst struct sip_header *\fR\fIsip_header\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_value *\fR\fIsip_get_next_value\fR
+     (\fBsip_header_value_t\fR \fIold_value\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_get_header_value()\fR function returns the first valid value from
+\fBSIP\fR header \fIsip_header\fR.
+.sp
+.LP
+The \fBsip_get_next_value()\fR function returns the next valid value following
+the \fBSIP\fR value \fIold_value\fR.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return the queried value on success and \fINULL\fR on failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+If the error is non-null, one of the following values is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+If any of the required input is \fINULL\fR or if the specified \fBSIP\fR header
+value is marked deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPROTO\fR\fR
+.ad
+.RS 10n
+.rt  
+If the returned \fBSIP\fR header value is invalid (i.e. the parser encountered
+errors when parsing the value).
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

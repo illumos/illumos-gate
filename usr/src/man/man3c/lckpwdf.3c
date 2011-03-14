@@ -1,0 +1,104 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lckpwdf 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+lckpwdf, ulckpwdf \- manipulate shadow password database lock file
+.SH SYNOPSIS
+.LP
+.nf
+#include <shadow.h>
+
+\fBint\fR \fBlckpwdf\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBulckpwdf\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlckpwdf()\fR and \fBulckpwdf()\fR functions enable modification access
+to the password databases through the lock file. A process first uses
+\fBlckpwdf()\fR to lock the lock file, thereby gaining exclusive rights to
+modify the  \fB/etc/passwd\fR or  \fB/etc/shadow\fR password database.  See
+\fBpasswd\fR(4) and \fBshadow\fR(4). Upon completing modifications, a process
+should release the lock on the lock file using \fBulckpwdf()\fR. This mechanism
+prevents simultaneous modification of the password databases. The lock file,
+\fB/etc/.pwd.lock\fR, is used to coordinate modification access to the password
+databases \fB/etc/passwd\fR and  \fB/etc/shadow\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If \fBlckpwdf()\fR is successful in locking the file within 15 seconds, it
+returns \fB0\fR. If unsuccessful (for example,  \fB/etc/.pwd.lock\fR is already
+locked), it returns \fB\(mi1\fR\&.
+.sp
+.LP
+If \fBulckpwdf()\fR is successful in unlocking the file  \fB/etc/.pwd.lock\fR,
+it returns \fB0\fR. If unsuccessful (for example,  \fB/etc/.pwd.lock\fR is
+already unlocked), it returns \fB\(mi1\fR\&.
+.SH USAGE
+.sp
+.LP
+These routines are for internal use only; compatibility is not guaranteed.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 18n
+.rt  
+password database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/shadow\fR\fR
+.ad
+.RS 18n
+.rt  
+shadow password database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/.pwd.lock\fR\fR
+.ad
+.RS 18n
+.rt  
+lock file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBpasswd\fR(4), \fBshadow\fR(4),
+\fBattributes\fR(5)

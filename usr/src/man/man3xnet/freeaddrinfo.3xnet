@@ -1,0 +1,354 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH freeaddrinfo 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+freeaddrinfo, getaddrinfo \- get address information
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <sys/socket.h>
+#include <netdb.h>
+
+\fBvoid\fR \fBfreeaddrinfo\fR(\fBstruct addrinfo *\fR\fIai\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetaddrinfo\fR(\fBconst char *restrict\fR \fInodename\fR,
+     \fBconst char *restrict\fR \fIservname\fR, \fBconst struct addrinfo *restrict\fR \fIhints\fR,
+     \fBstruct addrinfo **restrict\fR \fIres\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfreeaddrinfo()\fR function frees one or more \fBaddrinfo\fR structures
+returned by \fBgetaddrinfo()\fR, along with any additional storage associated
+with those structures. If the \fBai_next\fR member of the structure is not
+null, the entire list of structures is freed. The \fBfreeaddrinfo()\fR function
+supports the freeing of arbitrary sublists of an \fBaddrinfo\fR list originally
+returned by \fBgetaddrinfo()\fR.
+.sp
+.LP
+The \fBgetaddrinfo()\fR function translates the name of a service location (for
+example, a host name) and/or a service name and returns a set of socket
+addresses and associated information to be used in creating a socket with which
+to address the specified service.
+.sp
+.LP
+The \fInodename\fR and \fIservname\fR arguments are either null pointers or
+pointers to null-terminated strings. One or both of these two arguments are
+supplied by the application as a non-null pointer.
+.sp
+.LP
+The format of a valid name depends on the address family or families. If a
+specific family is not given and the name could be interpreted as valid within
+multiple supported families, the implementation attempts to resolve the name in
+all supported families and, in absence of errors, one or more results are
+returned.
+.sp
+.LP
+If the \fInodename\fR argument is not null, it can be a descriptive name or can
+be an address string. If the specified address family is \fBAF_INET\fR,
+\fBAF_INET6\fR, or \fBAF_UNSPEC\fR, valid descriptive names include host names.
+If the specified address family is \fBAF_INET\fR or \fBAF_UNSPEC\fR, address
+strings using Internet standard dot notation as specified in
+\fBinet_addr\fR(3XNET) are valid.
+.sp
+.LP
+If the specified address family is \fBAF_INET6\fR or \fBAF_UNSPEC\fR, standard
+IPv6 text forms described in \fBinet_ntop\fR(3XNET) are valid.
+.sp
+.LP
+If \fInodename\fR is not null, the requested service location is named by
+\fInodename\fR; otherwise, the requested service location is local to the
+caller.
+.sp
+.LP
+If \fIservname\fR is null, the call returns network-level addresses for the
+specified \fInodename\fR. If \fIservname\fR is not null, it is a
+null-terminated character string identifying the requested service. This string
+can be either a descriptive name or a numeric representation suitable for use
+with the address family or families. If the specified address family is
+\fBAF_INET\fR, \fBAF_INET6\fR, or \fBAF_UNSPEC\fR, the service can be specified
+as a string specifying a decimal port number.
+.sp
+.LP
+If the \fIhints\fR argument is not null, it refers to a structure containing
+input values that can direct the operation by providing options and by limiting
+the returned information to a specific socket type, address family and/or
+protocol. In this \fIhints\fR structure every member other than \fBai_flags\fR,
+\fBai_family\fR , \fBai_socktype\fR, and \fBai_protocol\fR is set to 0 or a
+null pointer. A value of \fBAF_UNSPEC\fR for \fBai_family\fR means that the
+caller accepts any address family. A value of 0 for \fBai_socktype\fR means
+that the caller accepts any socket type. A value of 0 for \fBai_protocol\fR
+means that the caller accepts any protocol. If \fIhints\fR is a null pointer,
+the behavior is as if it referred to a structure containing the value 0 for the
+\fBai_flags\fR, \fBai_socktype\fR, and \fBai_protocol\fR members, and
+\fBAF_UNSPEC\fR for the \fBai_family\fR member.
+.sp
+.LP
+The \fBai_flags\fR member to which the \fIhints\fR parameter points is set to 0
+or be the bitwise-inclusive OR of one or more of the values \fBAI_PASSIVE\fR,
+\fBAI_CANONNAME\fR, \fBAI_NUMERICHOST\fR, and \fBAI_NUMERICSERV\fR.
+.sp
+.LP
+If the \fBAI_PASSIVE\fR flag is specified, the returned address information is
+suitable for use in binding a socket for accepting incoming connections for the
+specified service. In this case, if the \fInodename\fR argument is null, then
+the IP address portion of the socket address structure is set to
+\fBINADDR_ANY\fR for an IPv4 address or \fBIN6ADDR_ANY_INIT\fR for an IPv6
+address. If the \fBAI_PASSIVE\fR flag is not specified, the returned address
+information is suitable for a call to \fBconnect\fR(3XNET) (for a
+connection-mode protocol) or for a call to \fBconnect()\fR,
+\fBsendto\fR(3XNET), or \fBsendmsg\fR(3XNET) (for a connectionless protocol).
+In this case, if the \fInodename\fR argument is null, then the IP address
+portion of the socket address structure is set to the loopback address.
+.sp
+.LP
+If the \fBAI_CANONNAME\fR flag is specified and the \fInodename\fR argument is
+not null, the function attempts to determine the canonical name corresponding
+to \fInodename\fR (for example, if \fInodename\fR is an alias or shorthand
+notation for a complete name).
+.sp
+.LP
+If the \fBAI_NUMERICHOST\fR flag is specified, then a non-null \fInodename\fR
+string supplied is a numeric host address string. Otherwise, an
+\fBEAI_NONAME\fR error is returned. This flag prevents any type of name
+resolution service (for example, the DNS) from being invoked.
+.sp
+.LP
+If the \fBAI_NUMERICSERV\fR flag is specified, then a non-null \fIservname\fR
+string supplied is a numeric port string. Otherwise, an \fBEAI_NONAME\fR error
+is returned. This flag prevents any type of name resolution service (for
+example, NIS+) from being invoked.
+.sp
+.LP
+If the \fBAI_V4MAPPED\fR flag is specified along with an \fBai_family\fR of
+\fBAF_INET6\fR, then \fBgetaddrinfo()\fR returns IPv4-mapped IPv6 addresses on
+finding no matching IPv6 addresses (\fBai_addrlen\fR is 16). The
+\fBAI_V4MAPPED\fR flag is ignored unless \fBai_family\fR equals \fBAF_INET6\fR.
+If the \fBAI_ALL\fR flag is used with the \fBAI_V4MAPPED\fR flag, then
+\fBgetaddrinfo()\fR returns all matching IPv6 and IPv4 addresses. The
+\fBAI_ALL\fR flag without the \fBAI_V4MAPPED\fR flag is ignored.
+.sp
+.LP
+The \fBai_socktype\fR member to which argument hints points specifies the
+socket type for the service, as defined in \fBsocket\fR(3XNET). If a specific
+socket type is not given (for example, a value of 0) and the service name could
+be interpreted as valid with multiple supported socket types, the
+implementation attempts to resolve the service name for all supported socket
+types and, in the absence of errors, all possible results are returned. A
+non-zero socket type value limits the returned information to values with the
+specified socket type.
+.sp
+.LP
+If the \fBai_family\fR member to which hints points has the value
+\fBAF_UNSPEC\fR, addresses are returned for use with any address family that
+can be used with the specified \fInodename\fR and/or \fIservname\fR. Otherwise,
+addresses are returned for use only with the specified address family. If
+\fBai_family\fR is not \fBAF_UNSPEC\fR and \fBai_protocol\fR is not 0, then
+addresses are returned for use only with the specified address family and
+protocol; the value of \fBai_protocol\fR is interpreted as in a call to the
+\fBsocket()\fR function with the corresponding values of \fBai_family\fR and
+\fBai_protocol\fR.
+.SH RETURN VALUES
+.sp
+.LP
+A 0 return value for \fBgetaddrinfo()\fR indicates successful completion; a
+non-zero return value indicates failure. The possible values for the failures
+are listed in the ERRORS section.
+.sp
+.LP
+Upon successful return of \fBgetaddrinfo()\fR, the location to which res points
+refers to a linked list of \fBaddrinfo\fR structures, each of which specifies a
+socket address and information for use in creating a socket with which to use
+that socket address. The list includes at least one \fBaddrinfo\fR structure.
+The \fBai_next\fR member of each structure contains a pointer to the next
+structure on the list, or a null pointer if it is the last structure on the
+list. Each structure on the list includes values for use with a call to the
+socket function, and a socket address for use with the connect function or, if
+the \fBAI_PASSIVE\fR flag was specified, for use with the \fBbind\fR(3XNET)
+function. The \fBai_family\fR , \fBai_socktype\fR, and \fBai_protocol\fR
+members are usable as the arguments to the \fBsocket()\fR function to create a
+socket suitable for use with the returned address. The \fBai_addr\fR and
+\fBai_addrlen\fR members are usable as the arguments to the \fBconnect()\fR or
+\fBbind()\fR functions with such a socket, according to the \fBAI_PASSIVE\fR
+flag.
+.sp
+.LP
+If \fInodename\fR is not null, and if requested by the \fBAI_CANONNAME\fR flag,
+the \fBai_canonname\fR member of the first returned \fBaddrinfo\fR structure
+points to a null-terminated string containing the canonical name corresponding
+to the input \fInodename\fR. If the canonical name is not available, then
+\fBai_canonname\fR refers to the \fInodename\fR argument or a string with the
+same contents. The contents of the \fBai_flags\fR member of the returned
+structures are undefined.
+.sp
+.LP
+All members in socket address structures returned by \fBgetaddrinfo()\fR that
+are not filled in through an explicit argument (for example,
+\fBsin6_flowinfo\fR) are set to 0, making it easier to compare socket address
+structures.
+.SH ERRORS
+.sp
+.LP
+The \fBgetaddrinfo()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_AGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+The name could not be resolved at this time. Future attempts might succeed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_BADFLAGS\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fBai_flags\fR member of the \fBaddrinfo\fR structure had an invalid value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_FAIL\fR\fR
+.ad
+.RS 16n
+.rt  
+A non-recoverable error occurred when attempting to resolve the name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_FAMILY\fR\fR
+.ad
+.RS 16n
+.rt  
+The address family was not recognized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_MEMORY\fR\fR
+.ad
+.RS 16n
+.rt  
+There was a memory allocation failure when trying to allocate storage for the
+return value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_NONAME\fR\fR
+.ad
+.RS 16n
+.rt  
+he name does not resolve for the supplied parameters.  Neither \fInodename\fR
+nor \fIservname\fR were supplied. At least one of these must be supplied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_SERVICE\fR\fR
+.ad
+.RS 16n
+.rt  
+The service passed was not recognized for the specified socket type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_SOCKTYPE\fR\fR
+.ad
+.RS 16n
+.rt  
+The intended socket type was not recognized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error occurred. The error code can be found in \fBerrno\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_OVERFLOW\fR\fR
+.ad
+.RS 16n
+.rt  
+An argument buffer overflowed.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If the caller handles only TCP and not UDP, for example, then the
+\fBai_protocol\fR member of the \fIhints\fR structure should be set to
+\fBIPPROTO_TCP\fR when \fBgetaddrinfo()\fR is called.
+.sp
+.LP
+If the caller handles only IPv4 and not IPv6, then the \fBai_family\fR member
+of the \fIhints\fR structure should be set to \fBAF_INET\fR when
+\fBgetaddrinfo()\fR is called.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBconnect\fR(3XNET), \fBgai_strerror\fR(3XNET), \fBgethostbyname\fR(3XNET),
+\fBgetnameinfo\fR(3XNET), \fBgetservbyname\fR(3XNET), \fBinet_addr\fR(3XNET),
+\fBinet_ntop\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
+\fBstandards\fR(5)

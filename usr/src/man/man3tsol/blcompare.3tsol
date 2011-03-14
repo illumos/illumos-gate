@@ -1,0 +1,92 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH blcompare 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+blcompare, blequal, bldominates, blstrictdom, blinrange \- compare binary
+labels
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+#include <tsol/label.h>
+
+\fBint\fR \fBblequal\fR(\fBconst m_label_t *\fR\fIlabel1\fR, \fBconst m_label_t *\fR\fIlabel2\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBbldominates\fR(\fBconst m_label_t *\fR\fIlabel1\fR, \fBconst m_label_t *\fR\fIlabel2\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBblstrictdom\fR(\fBconst m_label_t *\fR\fIlabel1\fR, \fBconst m_label_t *\fR\fIlabel2\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBblinrange\fR(\fBconst m_label_t *\fR\fIlabel\fR, \fBconst brange_t *\fR\fIrange\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compare binary labels for meeting a particular condition.
+.sp
+.LP
+The \fBblequal()\fR function compares two labels for equality.
+.sp
+.LP
+The \fBbldominates()\fR  function compares label \fIlabel1\fR for dominance
+over label \fIlabel2\fR.
+.sp
+.LP
+The \fBblstrictdom()\fR  function compares label \fIlabel1\fR for strict
+dominance over label \fIlabel2\fR.
+.sp
+.LP
+The \fBblinrange()\fR  function compares label \fIlabel\fR for dominance over
+\fIrange\fR\(->\fIlower_bound\fR and \fIrange\fR\(->\fIupper_bound\fR for
+dominance over level \fIlabel\fR.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return non-zero if their respective conditions are met,
+otherwise zero is returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetplabel\fR(3TSOL), \fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB),
+\fBucred_getlabel\fR(3C), \fBlabel_encodings\fR(4), \fBattributes\fR(5),
+\fBlabels\fR(5)
+.sp
+.LP
+\fIDetermining the Relationship Between Two Labels\fR in \fISolaris Trusted
+Extensions Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

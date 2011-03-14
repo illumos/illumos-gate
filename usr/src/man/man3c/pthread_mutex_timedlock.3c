@@ -1,0 +1,136 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_mutex_timedlock 3C "5 Jun 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_mutex_timedlock, pthread_mutex_reltimedlock_np \- lock a mutex
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+#include <time.h>
+
+\fBint\fR \fBpthread_mutex_timedlock\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
+     \fBconst struct timespec *restrict\fR \fIabs_timeout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutex_reltimedlock_np\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
+     \fBconst struct timespec *restrict\fR \fIrel_timeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_mutex_timedlock()\fR function locks the mutex object referenced
+by \fImutex\fR. If the mutex is already locked, the calling thread blocks until
+the mutex becomes available as in the \fBpthread_mutex_lock\fR(3C). If the
+mutex cannot be locked without waiting for another thread to unlock the mutex,
+this wait is terminated when the specified timeout expires.
+.sp
+.LP
+The \fBpthread_mutex_reltimedlock_np()\fR function is identical to the
+\fBpthread_mutex_timedlock()\fR function, except that the timeout is specified
+as a relative time interval.
+.sp
+.LP
+For \fBpthread_mutex_timedlock()\fR, the timeout expires when the absolute time
+specified by \fIabs_timeout\fR passes, as measured by the clock on which
+timeouts are based (that is, when the value of that clock equals or exceeds
+\fIabs_timeout\fR), or if the absolute time specified by \fIabs_timeout\fR has
+already been passed at the time of the call.
+.sp
+.LP
+For \fBpthread_mutex_reltimedlock_np()\fR, the timeout expires when the time
+interval specified by \fIrel_timeout\fR passes, as measured by the
+\fBCLOCK_REALTIME\fR clock, or if the time interval specified by
+\fIrel_timeout\fR is negative at the time of the call.
+.sp
+.LP
+The resolution of the timeout is the resolution of the \fBCLOCK_REALTIME\fR
+clock. The \fBtimespec\fR data type is defined in the \fB<time.h>\fRheader.
+.sp
+.LP
+Under no circumstance will either function fail with a timeout if the mutex can
+be locked immediately. The validity of the \fItimeout\fR parameter is not
+checked if the mutex can be locked immediately.
+.sp
+.LP
+As a consequence of the priority inheritance rules (for mutexes initialized
+with the \fBPRIO_INHERIT\fR protocol), if a timed mutex wait is terminated
+because its timeout expires, the priority of the owner of the mutex is adjusted
+as necessary to reflect the fact that this thread is no longer among the
+threads waiting for the mutex.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_mutex_timedlock()\fR and
+\fBpthread_mutex_reltimedlock_np()\fR functions return 0. Otherwise, an error
+number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_mutex_timedlock()\fR and \fBpthread_mutex_reltimedlock_np()\fR
+functions will fail for the same reasons as \fBpthread_mutex_lock\fR(3C). In
+addition, they will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The caller would have blocked and the \fItimeout\fR parameter specified a
+nanoseconds field value less than zero or greater than or equal to 1,000
+million.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETIMEDOUT\fR\fR
+.ad
+.RS 13n
+.rt  
+The mutex could not be locked before the specified \fItimeout\fR expired.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+.TE
+
+.sp
+.LP
+The \fBpthread_mutex_timedlock()\fR is Standard. The
+\fBpthread_mutex_reltimedlock_np()\fR function is Stable.
+.SH SEE ALSO
+.sp
+.LP
+\fBtime\fR(2), \fBpthread_mutex_destroy\fR(3C), \fBpthread_mutex_lock\fR(3C),
+\fBpthread_mutex_trylock\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

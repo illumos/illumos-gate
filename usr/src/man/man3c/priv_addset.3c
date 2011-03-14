@@ -1,0 +1,241 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priv_addset 3C "28 Jan 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+priv_addset, priv_allocset, priv_copyset, priv_delset, priv_emptyset,
+priv_fillset, priv_freeset, priv_intersect, priv_inverse, priv_isemptyset,
+priv_isequalset, priv_isfullset, priv_ismember, priv_issubset, priv_union \-
+privilege set manipulation functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <priv.h>
+
+\fBint\fR \fBpriv_addset\fR(\fBpriv_set_t *\fR\fIsp\fR, \fBconst char *\fR\fIpriv\fR);
+.fi
+
+.LP
+.nf
+\fBpriv_set_t *\fR\fBpriv_allocset\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_copyset\fR(\fBconst priv_set_t *\fR\fIsrc\fR, \fBpriv_set_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpriv_delset\fR(\fBpriv_set_t *\fR\fIsp\fR, \fBconst char *\fR\fIpriv\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_emptyset\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_fillset\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_freeset\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_intersect\fR(\fBconst priv_set_t *\fR\fIsrc\fR, \fBpriv_set_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_inverse\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_isemptyset\fR(\fBconst priv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_isequalset\fR(\fBconst priv_set_t *\fR\fIsrc\fR, \fBconst priv_set_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_isfullset\fR(\fBconst priv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_ismember\fR(\fBconst priv_set_t *\fR\fIsp\fR, \fBconst char *\fR\fIpriv\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_issubset\fR(\fBconst priv_set_t *\fR\fIsrc\fR, \fBconst priv_set_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_union\fR(\fBconst priv_set_t *\fR\fIsrc\fR, \fBpriv_set_t *\fR\fIdst\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fIsp\fR, \fIsrc\fR, and \fIdst\fR arguments point to privilege sets. The
+\fIpriv\fR argument points to a named privilege.
+.sp
+.LP
+The \fBpriv_addset()\fR function adds the named privilege \fIpriv\fR to
+\fIsp\fR.
+.sp
+.LP
+The \fBpriv_allocset()\fR function allocates sufficient memory to contain a
+privilege set. The value of the returned privilege set is indeterminate. The
+function returns \fINULL\fR and sets \fBerrno\fR when it fails to allocate
+memory.
+.sp
+.LP
+The \fBpriv_copyset()\fR function copies the set \fIsrc\fR to \fIdst\fR.
+.sp
+.LP
+The \fBpriv_delset()\fR function removes the named privilege \fIpriv\fR from
+\fIsp\fR.
+.sp
+.LP
+The \fBpriv_emptyset()\fR function clears all privileges from \fIsp\fR.
+.sp
+.LP
+The \fBpriv_fillset()\fR function asserts all privileges in \fIsp\fR, including
+the privileges not currently defined in the system.
+.sp
+.LP
+The \fBpriv_freeset()\fR function frees the storage allocated by
+\fBpriv_allocset()\fR.
+.sp
+.LP
+The \fBpriv_intersect()\fR function intersects \fIsrc\fR with \fIdst\fR and
+places the results in \fIdst\fR.
+.sp
+.LP
+The \fBpriv_inverse()\fR function inverts the privilege set given as argument
+in place.
+.sp
+.LP
+The \fBpriv_isemptyset()\fR function checks whether the argument is an empty
+set.
+.sp
+.LP
+The \fBpriv_isequalset()\fR function checks whether the privilege set \fIsrc\fR
+is equal to \fIdst\fR.
+.sp
+.LP
+The \fBpriv_isfullset()\fR function checks whether the argument is a full set.
+A full set is a set with all bits set, regardless of whether the privilege is
+currently defined in the system.
+.sp
+.LP
+The \fBpriv_ismember()\fR function checks whether the named privilege
+\fIpriv\fR is a member of \fIsp\fR.
+.sp
+.LP
+The \fBpriv_issubset()\fR function checks whether \fIsrc\fR is a subset of
+\fIdst\fR.
+.sp
+.LP
+The \fBpriv_union()\fR function takes the union of \fIsrc\fR and \fIdst\fR and
+places the result in \fIdst\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpriv_allocset()\fR returns a pointer to an
+opaque data structure. It returns \fINULL\fR if memory allocation fails and
+sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBpriv_isemptyset()\fR, \fBpriv_isfullset()\fR,
+\fBpriv_isequalset()\fR, \fBpriv_issubset()\fR, and \fBpriv_ismember()\fR
+return \fBB_TRUE\fR. Otherwise, they return \fBB_FALSE\fR.
+.sp
+.LP
+Upon successful completion, \fBpriv_delset()\fR and \fBpriv_addset()\fR return
+0. Otherwise, they return -1 and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpriv_allocset()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The physical limits of the system are exceeded by the memory allocation needed
+to hold a privilege set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient memory for allocation to hold a privilege set. The
+application can try again later.
+.RE
+
+.sp
+.LP
+The \fBpriv_delset()\fR and \fBpriv_addset()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The privilege argument is not a valid privilege name.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsetppriv\fR(2), \fBmalloc\fR(3C), \fBpriv_str_to_set\fR(3C),
+\fBattributes\fR(5), \fBprivileges\fR(5)
+.SH NOTES
+.sp
+.LP
+The functions that compare sets operate on all bits of the set, regardless of
+whether the specific privileges are currently defined in the system.

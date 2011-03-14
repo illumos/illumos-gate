@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH posix_spawnattr_getsigignore_np 3C "28 Oct 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+posix_spawnattr_getsigignore_np, posix_spawnattr_setsigignore_np \- get and set
+spawn-sigignore attribute of spawn attributes object
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+#include <spawn.h>
+
+\fBint\fR \fBposix_spawnattr_getsigignore_np\fR(
+     \fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
+     \fBsigset_t *restrict\fR \fIsigignore\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBposix_spawnattr_setsigignore_np\fR(
+     \fBposix_spawnattr_t *restrict\fR \fIattr\fR,
+     \fBconst sigset_t *restrict\fR \fIsigignore\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBposix_spawnattr_getsigignore_np()\fR function obtains the value of the
+\fIspawn-sigignore\fR attribute from the attributes object referenced by
+\fIattr\fR.
+.sp
+.LP
+The \fBposix_spawnattr_setsigignore_np()\fR function sets the
+\fIspawn-sigignore\fR attribute in an initialized attributes object referenced
+by \fIattr\fR.
+.sp
+.LP
+The \fIspawn-sigignore\fR attribute represents the set of signals to be forced
+to be ignored in the new process image (if \fBPOSIX_SPAWN_SETSIGIGN_NP\fR is
+set in the spawn-flags attribute) by a spawn operation. The default value of
+this attribute is an empty signal set.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBposix_spawnattr_getsigignore_np()\fR returns 0
+and stores the value of the \fIspawn-sigignore\fR attribute of \fIattr\fR into
+the object referenced by the \fIsigignore\fR parameter.  Otherwise, an error
+value is returned to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBposix_spawnattr_setsigignore_np()\fR returns 0.
+Otherwise, an error value is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBposix_spawnattr_setsigignore_np()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the attribute being set is not valid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBposix_spawn\fR(3C), \fBposix_spawnattr_destroy\fR(3C),
+\fBposix_spawnattr_getflags\fR(3C), \fBposix_spawnattr_getpgroup\fR(3C),
+\fBposix_spawnattr_getschedparam\fR(3C),
+\fBposix_spawnattr_getschedpolicy\fR(3C),
+\fBposix_spawnattr_setsigdefault\fR(3C), \fBposix_spawnattr_setsigmask\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag and the
+\fBposix_spawnattr_getsigignore_np()\fR and
+\fBposix_spawnattr_setsigignore_np()\fR functions are non-portable Solaris
+extensions to the \fBposix_spawn\fR(3C) and \fBposix_spawnp()\fR interfaces.

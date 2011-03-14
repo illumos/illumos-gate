@@ -1,0 +1,129 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH biodone 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+biodone \- release buffer after buffer I/O transfer and notify blocked threads
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/buf.h>
+
+
+
+\fBvoid\fR \fBbiodone\fR(\fBstruct buf *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBbuf\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbiodone()\fR function notifies blocked processes waiting for the\fB
+I/O\fR to complete, sets the \fBB_DONE\fR flag in the \fBb_flags\fR field of
+the \fBbuf\fR(9S) structure, and releases the buffer if the \fBI/O\fR is
+asynchronous. \fBbiodone()\fR is called by either the driver interrupt or
+\fBstrategy\fR(9E) routines when a buffer \fBI/O\fR request is complete.
+.sp
+.LP
+The \fBbiodone()\fR function provides the capability to call a completion
+routine if \fIbp\fR describes a kernel buffer. The address of the routine is
+specified in the \fBb_iodone\fR field of the \fBbuf\fR(9S) structure. If such a
+routine is specified, \fBbiodone()\fR calls it and returns without performing
+any other actions. Otherwise, it performs the steps above.
+.SH CONTEXT
+.sp
+.LP
+The \fBbiodone()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+Generally, the first validation test performed by any block device
+\fBstrategy\fR(9E) routine is a check for an end-of-file (\fBEOF\fR) condition.
+The \fBstrategy\fR(9E) routine is responsible for determining an \fBEOF\fR
+condition when the device is accessed directly. If a \fBread\fR(2) request is
+made for one block beyond the limits of the device (line 10), it will report an
+\fBEOF\fR condition.  Otherwise, if the request is outside the limits of the
+device, the routine will report an error condition.  In either case, report the
+\fBI/O\fR operation as complete (line 27).
+.sp
+.in +2
+.nf
+ 1   #define RAMDNBLK	1000	/* Number of blocks in RAM disk */
+ 2   #define RAMDBSIZ	512	/* Number of bytes per block */
+ 3   char ramdblks[RAMDNBLK][RAMDBSIZ];	/* Array containing RAM disk */
+ 4
+ 5   static int
+ 6   ramdstrategy(struct buf *bp)
+ 7   {
+ 8      daddr_t blkno = bp->b_blkno;	/* get block number */
+ 9
+10      if ((blkno < 0) || (blkno >= RAMDNBLK)) {
+11            /*
+12             * If requested block is outside RAM disk
+13             * limits, test for EOF which could result
+14             * from a direct (physio) request.
+15             */
+16            if ((blkno == RAMDNBLK) && (bp->b_flags & B_READ)) {
+17             /*
+18              * If read is for block beyond RAM disk
+19              * limits, mark EOF condition.
+20              */
+21              bp->b_resid = bp->b_bcount;	/* compute return value */
+22
+23           } else {	/* I/O attempt is beyond */
+24              bp->b_error = ENXIO;	/*    limits of RAM disk */
+25              bp->b_flags |= B_ERROR;	/* return error */
+26           } 
+27           biodone(bp);	/* mark I/O complete (B_DONE) */
+28             /*
+29              * Wake any processes awaiting this I/O
+30              * or release buffer for asynchronous
+31              * (B_ASYNC) request.
+32              */
+33           return (0);
+34      } 
+           .\|.\|.\| 
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBstrategy\fR(9E), \fBbiowait\fR(9F), \fBddi_add_intr\fR(9F),
+\fBdelay\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F), \fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+After calling \fBbiodone()\fR, \fIbp\fR is no longer available to be referred
+to by the driver. If the driver makes any reference to \fIbp\fR after calling
+\fBbiodone()\fR, a panic may result.
+.SH NOTES
+.sp
+.LP
+Drivers that use the \fBb_iodone\fR field of the \fBbuf\fR(9S) structure to
+specify a substitute completion routine should save the value of \fBb_iodone\fR
+before changing it, and then restore the old value before calling
+\fBbiodone()\fR to release the buffer.

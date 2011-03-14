@@ -1,0 +1,350 @@
+'\" te
+.\" Copyright (c) 2003-2004 Apple Computer, Inc. All Rights Reserved. 
+.\" Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing,
+.\" software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.TH dns-sd 1M "21 Aug 2007" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+dns-sd \- Multicast DNS (mDNS) & DNS Service Discovery (DNS-SD) Test Tool
+.SH SYNOPSIS
+.LP
+.nf
+\fBdns-sd\fR \fB-R\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR [\fIkey\fR=\fIvalue\fR ...]
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-B\fR \fItype\fR \fIdomain\fR
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-L\fR \fIname\fR \fItype\fR \fIdomain\fR
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-Q\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-C\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-P\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR \fIhost\fR \fIIP\fR [\fIkey\fR=\fIvalue\fR ...]
+.fi
+
+.LP
+.nf
+\fBdns-sd\fR \fB-E\fR | \fB-F\fR | \fB-A\fR | \fB-U\fR | \fB-N\fR | \fB-T\fR | \fB-M\fR | \fB-I\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdns-sd\fR command is a network diagnostic tool, much like \fBping\fR(1M)
+or \fBtraceroute\fR(1M). However, unlike those tools, most of its functionality
+is not implemented in the \fBdns-sd\fR executable itself, but in library code
+that is available to any application. The library \fBAPI\fR that \fBdns-sd\fR
+uses is documented in \fB/usr/include/dns_sd.h\fR.
+.sp
+.LP
+The \fBdns-sd\fR command is primarily intended for interactive use. Because its
+command-line arguments and output format are subject to change, invoking it
+from a shell script can be unpredictable. Additionally, the asynchronous nature
+of \fBDNS\fR Service Discovery does not easily lend itself to script-oriented
+programming. This style of asynchronous interaction works best with
+applications that are either multi-threaded, or use a main event-handling loop
+to receive keystrokes, network data, and other asynchronous event notifications
+as they happen.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR
+[\fIkey\fR=\fIvalue\fR ...]\fR
+.ad
+.sp .6
+.RS 4n
+Register (advertise) a service in the specified domain with the given
+\fIname\fR and \fItype\fR as listening (on the current machine) on the
+specified \fIport\fR.
+.sp
+\fIname\fR can be any arbitrary unicode text, containing any legal unicode
+characters (including dots, spaces, slashes, colons, and so on without any
+restrictions), up to 63 \fBUTF-8\fR bytes long.
+.sp
+\fItype\fR must be of the form "_app-proto._tcp" or "_app-proto._udp", where
+"app-proto" is an application protocol name registered at
+http://www.dns-sd.org/ServiceTypes.html.
+.sp
+\fIdomain\fR is the domain in which to register the service. In current
+implementations, only the local multicast domain "local" is supported. In the
+future, registering will be supported in any arbitrary domain that has a
+working \fBDNS\fR Update server [\fBRFC\fR 2136]. The domain "." is a synonym
+for "pick a sensible default", which currently means "local".
+.sp
+\fIport\fR is a number from 0 to 65535, and is the \fBTCP\fR or \fBUDP\fR port
+number upon which the service is listening. Registering a service on port 0
+allows an application to explicitly advertise the non-availability of a
+service.
+.sp
+Additional attributes of the service may optionally be described by
+\fIkey/value\fR pairs, which are stored in the advertised service's \fBDNS\fR
+\fBTXT\fR record. Allowable keys and values are listed with the service
+registration at http://www.dns-sd.org/ServiceTypes.html
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR \fItype\fR \fIdomain\fR\fR
+.ad
+.sp .6
+.RS 4n
+Browse for instances of service \fItype\fR in \fIdomain\fR.
+.sp
+For valid types, see http://www.dns-sd.org/ServiceTypes.html. Omitting the
+domain name or using "." means "pick a sensible default."
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR \fIname\fR \fItype\fR \fIdomain\fR\fR
+.ad
+.sp .6
+.RS 4n
+Look up and display the information necessary to contact and use the named
+service. This information includes the hostname of the machine where that
+service is available, the port number on which the service is listening, and
+(if present) \fBTXT\fR record attributes describing properties of the service.
+.sp
+In a typical application, browsing happens rarely, while lookup (or
+"resolving") happens every time the service is used. For example, a user does
+not browse the network to pick a default printer that often, but once a default
+printer has been picked, that named service is resolved to its current IP
+address and port number every time the user presses Cmd-P to print.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Q\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic query for any resource record type and class.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic query for any resource record type and class. This option also
+reconfirms each result from the query. Reconfirming the record instructs
+\fBmdnsd\fR(1M) to verify the validity of the record. If the record is not
+valid \fBmdnsd\fR(1M) flushes the record from the daemon's cache and  also from
+other \fBmdnsd\fR(1M) caches on the network.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR \fIhost\fR \fIIP\fR
+[\fIkey\fR=\fIvalue\fR ...]\fR
+.ad
+.sp .6
+.RS 4n
+Register (advertise) a service in the specified domain with the given
+\fIname\fR and \fItype\fR listening on the specified port and accessible on
+another host. This option should be used to advertise by proxy a service
+accessible on another host. The host name and \fBIPv4\fR address to access the
+service must be specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Discover recommended registration domains. This option returns the recommended
+domains to register a service. The recommended registration domains are
+returned by querying the name servers in \fBresolv.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Discover recommended browsing domains. This option returns the recommended
+domains for browsing services. The recommended browsing domains are returned by
+querying the name servers in \fBresolv.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test registering service with Multicast \fBDNS\fR and test the add, update and
+delete operations of \fBDNS\fR records with Multicast \fBDNS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test registering service with Multicast \fBDNS\fR and test updating of
+\fBDNS\fR \fBTXT\fR records for a service registered with Multicast \fBDNS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test adding a large \fBNULL\fR record for a service registered with Multicast
+\fBDNS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test adding a large \fBTXT\fR record for a service registered with Multicast
+\fBDNS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test creating a registration with multiple \fBTXT\fR records.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR\fR
+.ad
+.sp .6
+.RS 4n
+Test registering and then immediately updating a \fBTXT\fR record.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAdvertising a printing service
+.sp
+.LP
+The following command advertises the existence of \fBLPR\fR printing service on
+port 515 on this machine, so that it will be available to \fBDNS-SD\fR
+compatible printing clients:
+
+.sp
+.in +2
+.nf
+dns-sd -R "My Test" _printer._tcp. . 515 pdl=application/postscript
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For this registration to be useful, the LPR service should be available on port
+515. Advertising a service that does not exist is not very useful.
+.LP
+\fBExample 2 \fRAdvertising a web page
+.sp
+.LP
+The following command advertises a web page being served by an \fBHTTP\fR
+server on port 80 on this machine, so that it will appear on the Bonjour list
+in Safari and other DNS-SD compatible Web clients:
+
+.sp
+.in +2
+.nf
+dns-sd -R "My Test" _http._tcp . 80 path=/path-to-page.html
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRFinding the advertised web pages on the local network
+.sp
+.LP
+The following command finds the advertised web pages on the local network (the
+same list that Safari shows):
+
+.sp
+.in +2
+.nf
+dns-sd -B _http._tcp
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmdnsd\fR(1M), \fBping\fR(1M), \fBtraceroute\fR(1M), \fBresolv.conf\fR(4),
+\fBattributes\fR(5)

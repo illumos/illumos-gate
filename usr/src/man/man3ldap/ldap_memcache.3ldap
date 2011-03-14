@@ -1,0 +1,262 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_memcache 3LDAP "6 Jan 2003" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_memcache, ldap_memcache_init, ldap_memcache_set, ldap_memcache_get,
+ldap_memcache_flush, ldap_memcache_destroy, ldap_memcache_update \- LDAP client
+caching functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-flag \&.\|.\|.\fR \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR] 
+#include <ldap.h>
+
+\fBint\fR \fBldap_memcache_init\fR(\fBunsigned long\fR \fIttl\fR, \fBunsigned long\fR \fIsize\fR,
+     \fBchar **\fR\fIbaseDNs\fR,\fBstruct ldap_thread_fns *\fR\fIthread_fns\fR,
+     \fBLDAPMemCache **\fR\fIcachep\fR
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_memcache_set\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMemCache **\fR\fIcache\fR
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_memcache_get\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMemCache **\fR\fIcachep\fR
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_memcache_flush\fR(\fBLDAPMemCache *\fR\fIcache\fR, \fBchar *\fR\fIdn\fR, \fBint\fR \fIscope\fR
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_memcache_destroy\fR(\fBLDAPMemCache *\fR\fIcache\fR
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_memcache_update\fR(\fBLDAPMemCache *\fR\fIcache\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Use the \fBldap_memcache\fR functions to maintain an in-memory client side
+cache to store search requests. Caching improves performance and reduces
+network bandwidth when a client makes repeated requests. The \fIcache\fR uses
+search criteria as the key to the cached items. When you send a search request,
+the \fIcache\fR checks the search criteria to determine if that request has
+been previously stored . If the request was stored, the search results are read
+from the \fIcache\fR.
+.sp
+.LP
+Make a call to \fBldap_memcache_init()\fR to create the in-memory client side
+\fIcache\fR. The function passes back a pointer to an \fBLDAPMemCache\fR
+structure, which represents the \fIcache\fR. Make a call to the
+\fBldap_memcache_set()\fR function to associate this \fIcache\fR with an LDAP
+connection handle, an LDAP structure. \fIttl\fR is the the maximum  amount of
+time (in seconds) that an item can be cached. If a \fIttl\fR value  of 0 is
+passed, there is no limit to the amount of time that an item  can be cached.
+\fIsize\fR is the maximum amount of memory (in bytes) that the cache will
+consume. A zero value of \fIsize\fR means the cache has  no size limit.
+\fIbaseDNS\fR is an array of the base DN strings representing  the base DNs of
+the search requests you want cached. If \fIbaseDNS\fR is not \fINULL\fR, only
+the search requests with the specified base DNs will be cached. If
+\fIbaseDNS\fR is \fINULL\fR,  all search requests are cached. The
+\fIthread_fns\fR parameter takes an \fBldap_thread_fns structure\fR specifying
+the functions that you want used to ensure that the cache is thread-safe. You
+should specify this if you have multiple threads that are using the same
+connection handle and cache. If you are not using multiple threads, pass
+\fINULL\fR for this parameter.
+.sp
+.LP
+\fBldap_memcache_set()\fR associates an in-memory \fIcache\fR that you have
+already  created by calling the \fBldap_memcache_init()\fR function with an
+LDAP connection handle. The \fIld\fR parameter should be the result of a
+successful call to \fBldap_open\fR(3LDAP). The \fIcache\fR parameter should be
+the result  of a \fIcache\fR created by the \fBldap_memcache_init()\fR call.
+After you call this function, search requests made over the specified LDAP
+connection will use this cache. To disassociate the cache from the LDAP
+connection handle, make a call to the \fBldap_bind\fR(3LDAP) or
+\fBldap_bind\fR(3LDAP) function. Make a call to \fBldap_memcache_set()\fR if
+you want to associate  a cache with multiple LDAP connection handles. For
+example, call  the \fBldap_memcache_get()\fR function to get the \fIcache\fR
+associated with one connection, then you can call this function and associate
+the \fIcache\fR with another connection.
+.sp
+.LP
+The \fBldap_memcache_get()\fR function gets the \fIcache\fR associated with the
+specified connection handle (LDAP structure). This \fIcache\fR is used by all
+search  requests made through that connection. When you call this function, the
+function sets the \fIcachep\fR parameter as a pointer to the \fBLDAPMemCache\fR
+structure that is associated with the connection handle.
+.sp
+.LP
+\fBldap_memcache_flush()\fR flushes search requests from the \fIcache\fR. If
+the base DN of a search request is within the scope specified by the \fIdn\fR
+and \fIscope\fR arguments, the search request is flushed from the \fIcache\fR.
+If no DN is specified, the entire cache is flushed. The \fIscope\fR parameter,
+along with the \fIdn\fR parameter, identifies the search requests that you want
+flushed from the \fIcache\fR. This argument can have one of the following
+values:
+.br
+.in +2
+\fBLDAP_SCOPE_BASE\fR
+.in -2
+.br
+.in +2
+\fBLDAP_SCOPE_ONELEVEL\fR
+.in -2
+.br
+.in +2
+\fBLDAP_SCOPE_SUBTREE\fR
+.in -2
+.sp
+.LP
+\fBldap_memcache_destroy()\fR frees the specified \fBLDAPMemCache\fR structure
+pointed to by \fIcache\fR from memory. Call this function after you are done
+working with a \fIcache\fR.
+.sp
+.LP
+\fBldap_memcache_update()\fR checks the cache for items that have expired  and
+removes them. This check is typically done as part of the way the \fIcache\fR
+normally works. You do not need to call this function unless you  want to
+update the \fIcache\fR at this point in time. This function is only  useful in
+a multithreaded application, since it will not return until the \fIcache\fR is
+destroyed.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIttl\fR\fR
+.ad
+.RS 14n
+.rt  
+The maximum amount of time (in seconds) that an item can be cached
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 14n
+.rt  
+The maximum amount of memory (in bytes)  that the cache will consume.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbaseDNs\fR\fR
+.ad
+.RS 14n
+.rt  
+An array of the base DN strings representing  the base DNs of the search
+requests you want cached
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIthread_fns\fR\fR
+.ad
+.RS 14n
+.rt  
+A pointer to the \fBldap_thread_fns structure\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcachep\fR\fR
+.ad
+.RS 14n
+.rt  
+A pointer to the \fBLDAPMemCache\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcache\fR\fR
+.ad
+.RS 14n
+.rt  
+The result of a \fIcache\fR created by the \fBldap_memcache_init()\fR call
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIld\fR\fR
+.ad
+.RS 14n
+.rt  
+The result of a successful call to \fBldap_open\fR(3LDAP)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdn\fR\fR
+.ad
+.RS 14n
+.rt  
+The search requests that you want flushed from the \fIcache\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIscope\fR\fR
+.ad
+.RS 14n
+.rt  
+The search requests that you want flushed from the \fIcache\fR
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The functions that have \fBint\fR return values return \fBLDAP_SUCCESS\fR if
+the operation was successful. Otherwise, they return another LDAP error code.
+See \fBldap_error\fR(3LDAP) for a list of the LDAP error codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap_error\fR(3LDAP), \fBldap_open\fR(3LDAP), \fBldap_search\fR(3LDAP),
+\fBattributes\fR(5)

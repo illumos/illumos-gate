@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_node_private_set 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_node_private_set, di_node_private_get, di_path_private_set,
+di_path_private_get, di_minor_private_set, di_minor_private_get,
+di_link_private_set, di_link_private_get, di_lnode_private_set,
+di_lnode_private_get \- manipulate libdevinfo user traversal pointers
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldevinfo\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libdevinfo.h>
+
+\fBvoid\fR \fBdi_node_private_set\fR(\fBdi_node_t\fR \fInode\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBdi_node_private_get\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdi_path_private_set\fR(\fBdi_path_t\fR \fIpath\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBdi_path_private_get\fR(\fBdi_path_t\fR \fIpath\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdi_minor_private_set\fR(\fBdi_minor_t\fR \fIminor\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBdi_minor_private_get\fR(\fBdi_minor_t\fR \fIminor\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdi_link_private_set\fR(\fBdi_link_t\fR \fIlink\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBdi_link_private_get\fR(\fBdi_link_t\fR \fIlink\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdi_lnode_private_set\fR(\fBdi_lnode_t\fR \fIlnode\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBdi_lnode_private_get\fR(\fBdi_lnode_t\fR \fIlnode\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInode\fR\fR
+.ad
+.RS 9n
+.rt  
+The handle to a devinfo node in a \fBdi_init\fR(3DEVINFO) snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpath\fR\fR
+.ad
+.RS 9n
+.rt  
+The handle to a path node in a snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor\fR\fR
+.ad
+.RS 9n
+.rt  
+The handle to a minor node in a snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlink\fR\fR
+.ad
+.RS 9n
+.rt  
+The handle to a link in a snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlnode\fR\fR
+.ad
+.RS 9n
+.rt  
+The handle to an lnode in a snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR\fR
+.ad
+.RS 9n
+.rt  
+A pointer to caller-specific data.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdi_node_private_set()\fR function allows a caller to associate
+caller-specific data pointed to by \fIdata\fR with a devinfo node, thereby
+facilitating traversal of devinfo nodes in the snapshot.
+.sp
+.LP
+The \fBdi_node_private_get()\fR function allows a caller to retrieve a data
+pointer that was associated with a devinfo node obtained by a call to
+\fBdi_node_private_set()\fR.
+.sp
+.LP
+The \fBdi_path_private_set()\fR function allows a caller to associate
+caller-specific data pointed to by \fIdata\fR with a devinfo path node, thereby
+facilitating traversal of path nodes in the snapshot.
+.sp
+.LP
+The  \fBdi_path_private_get()\fRfunction allows a caller to retrieve a data
+pointer that was associated with a path node obtained by a call to
+\fBdi_path_private_set()\fR.
+.sp
+.LP
+The \fBdi_minor_private_set()\fR function allows a caller to associate
+caller-specific data pointed to by \fIdata\fR with a minor node specified by
+\fIminor\fR, thereby facilitating traversal of minor nodes in the snapshot.
+.sp
+.LP
+The \fBdi_minor_private_get()\fR function allows a caller to retrieve a data
+pointer that was associated with a minor node obtained by a call to
+\fBdi_minor_private_set()\fR.
+.sp
+.LP
+The \fBdi_link_private_set()\fR function allows a caller to associate
+caller-specific data pointed to by \fIdata\fR with a link, thereby facilitating
+traversal of links in the snapshot.
+.sp
+.LP
+The \fBdi_link_private_get()\fR function allows a caller to retrieve a data
+pointer that was associated with a link obtained by a call to
+\fBdi_link_private_set()\fR.
+.sp
+.LP
+The \fBdi_lnode_private_set()\fR function allows a caller to associate
+caller-specific data pointed to by \fIdata\fR with an lnode specified by
+\fIlnode\fR, thereby facilitating traversal of lnodes in the snapshot.
+.sp
+.LP
+The \fBdi_lnode_private_get()\fR function allows a caller to retrieve a data
+pointer that was associated with an lnode by a call to
+\fBdi_lnode_private_set()\fR.
+.sp
+.LP
+These functions do not perform any type of locking. It is up to the caller to
+satisfy any locking needs.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdi_node_private_set()\fR, \fBdi_path_private_set()\fR,
+\fBdi_minor_private_set()\fR, \fBdi_link_private_set()\fR, and
+\fBdi_lnode_private_set()\fR functions do not return values.
+.sp
+.LP
+The \fBdi_node_private_get()\fR, \fBdi_path_private_get()\fR,
+\fBdi_minor_private_get()\fR, \fBdi_link_private_get()\fR, and
+\fBdi_lnode_private_get()\fR functions return a pointer to caller-specific data
+that was initialized with their corresponding \fB*_set()\fR function. If no
+caller-specific data was assigned with a \fB*_set()\fR function, the results
+are undefined.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)

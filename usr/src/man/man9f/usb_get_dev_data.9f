@@ -1,0 +1,466 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usb_get_dev_data 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+usb_get_dev_data, usb_free_dev_data, usb_free_descr_tree, usb_print_descr_tree
+\- Retrieve device configuration information
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/usba.h>
+
+
+
+\fBint\fR \fBusb_get_dev_data\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_client_dev_data_t **\fR\fIdev_data\fR,
+     \fBusb_reg_parse_lvl_t\fR \fIparse_level\fR, \fBusb_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_dev_data\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_client_dev_data_t *\fR\fIdev_data\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_descr_tree\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_client_dev_data_t *\fR\fIdev_data\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBusb_print_descr_tree\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_client_dev_data_t *\fR\fIdev_data\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.LP
+For \fBusb_get_dev_data()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 15n
+.rt  
+Pointer to device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_data\fR\fR
+.ad
+.RS 15n
+.rt  
+Address in which pointer to info is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIparse_level\fR\fR
+.ad
+.RS 15n
+.rt  
+Portion of device represented in the tree of parsed descriptors. See below for
+possible usb_reg_parse_lvl_t values and explanations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 15n
+.rt  
+Not used.
+.RE
+
+.sp
+.LP
+For \fBusb_free_dev_data()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_data\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to usb_client_dev_data_t to be freed.
+.RE
+
+.sp
+.LP
+For \fBusb_free_descr_tree()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_data\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to usb_client_dev_data_t containing the descriptor tree to free.
+.RE
+
+.sp
+.LP
+For \fBusb_print_descr_tree()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_data\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to usb_client_dev_data_t containing the descriptor tree to display
+on-screen.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusb_get_dev_data()\fR function interrogates a device and returns its
+configuration information in a usb_client_dev_data_t structure. Most USBA
+functions require information which comes from a usb_client_dev_data_t, and all
+other functions in this man page operate on this structure. Please see
+\fBusb_client_dev_data(9S)\fR for a full content description. Pass the
+usb_client_dev_data_t structure to \fBusb_client_detach\fR(9F) to completely
+deallocate it.
+.sp
+.LP
+A descriptor tree is included in the information returned. The
+usb_reg_parse_lvl_t type represents the extent of the device to be
+represented by the returned tree (2nd arg to usb_get_dev_data) or what is
+actually represented in the returned tree (dev_parse_level field of the
+returned usb_client_dev_data_t). It has the following possible values:
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_PARSE_LVL_NONE\fR
+.ad
+.RS 22n
+.rt  
+Build no tree. dev_n_cfg  returns 0, dev_cfg and dev_curr_cfg  are returned
+NULL, and  the dev_curr_xxx fields are invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_PARSE_LVL_IF\fR
+.ad
+.RS 22n
+.rt  
+If configuration number and interface properties are set (as when different
+interfaces are viewed by the OS as different device instances), parse
+configured interface only. If an OS device instance is set up to represent an
+entire physical device, USB_PARSE_LVL_IF works like USB_PARSE_LVL_ALL.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_PARSE_LVL_CFG\fR
+.ad
+.RS 22n
+.rt  
+Parse entire configuration of configured interface only. Behaves similarly to
+USB_PARSE_LVL_IF, except that entire configuration is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_PARSE_LVL_ALL\fR
+.ad
+.RS 22n
+.rt  
+Parse entire device (all configurations), even when driver is bound to a single
+interface of a single configuration.
+.RE
+
+.sp
+.LP
+The \fBusb_free_dev_data()\fR function undoes what \fBusb_get_dev_data()\fR set
+up.  It releases memory for all strings, descriptors, and trees set up by
+\fBusb_get_dev_data()\fR.
+.sp
+.LP
+The \fBusb_free_descr_tree()\fR function frees the descriptor tree of its
+usb_client_dev_data_t argument, while leaving the rest of the information
+intact. The intent is for drivers to free memory after copying needed
+descriptor information from the tree. Upon return, the following
+usb_client_dev_data_t fields  are modified as follows: dev_cfg is NULL,
+dev_n_cfg  is zero and dev_parse_level  is USB_PARSE_LVL_NONE. Additionally,
+dev_curr_cfg is NULL and dev_curr_if is invalid.
+.sp
+.LP
+The \fBusb_print_descr_tree()\fR function is an easy-to-use diagnostic aid
+which dumps the descriptor tree to the screen when the system is verbose booted
+(\fBboot\fR \fB-v\fR). Output is spaced with blank lines for readability and
+provides you with an on-screen look at what a device has to offer.
+.SH RETURN VALUES
+.sp
+.LP
+For \fBusb_get_dev_data()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_SUCCESS\fR
+.ad
+.RS 23n
+.rt  
+Registration is successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_ARGS\fR
+.ad
+.RS 23n
+.rt  
+\fIdip\fR or \fIdev_data\fR is \fBNULL\fR. \fIparse_level\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_CONTEXT\fR
+.ad
+.RS 23n
+.rt  
+Called from interrupt context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_VERSION\fR
+.ad
+.RS 23n
+.rt  
+\fBusb_client_attach\fR(9F) was not called first.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_FAILURE\fR
+.ad
+.RS 23n
+.rt  
+Bad descriptor info or other internal error.
+.RE
+
+.sp
+.LP
+For \fBusb_free_dev_data()\fR: None
+.sp
+.LP
+For \fBusb_free_descr_tree()\fR: None, but no operation occurs if \fIdip\fR
+and/or \fIdev_data\fR are NULL.
+.sp
+.LP
+For \fBusb_print_descr_tree()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_SUCCESS\fR
+.ad
+.RS 23n
+.rt  
+Descriptor tree dump is successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_ARGS\fR
+.ad
+.RS 23n
+.rt  
+\fIdev_data\fR or \fIdip\fR are NULL.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_CONTEXT\fR
+.ad
+.RS 23n
+.rt  
+Called from interrupt context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_FAILURE\fR
+.ad
+.RS 23n
+.rt  
+Other error.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBusb_get_dev_data()\fR and \fBusb_print_descr_tree()\fR functions may be
+called from user or kernel context.
+.sp
+.LP
+The \fBusb_free_dev_data()\fR and \fBusb_free_descr_tree()\fR functions may be
+called from user, kernel or interrupt context.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+In this example, assume a device has the configuration shown 
+below, and the endpoint of config 2, iface 1, alt 1  
+which supports intr IN transfers needs to be found.
+Config 2, iface 1 is the "default" config/iface for the
+current OS device node.
+
+      config 1
+          iface 0
+              endpt 0
+      config 2
+          iface 0
+          iface 1
+              alt 0
+                  endpt 0
+                      cv 0
+              alt 1
+                  endpt 0
+                  endpt 1
+                      cv 0
+                  endpt 2
+              alt 2
+                  endpt 0
+                      cv 0
+
+      usb_client_dev_data_t *dev_data;
+      usb_ep_descr_t ep_descr;
+      usb_ep_data_t *ep_tree_node;
+      uint8_t interface = 1;
+      uint8_t alternate = 1;
+      uint8_t first_ep_number = 0;
+
+      /*
+       * We want default config/iface, so specify USB__PARSE_LVL_IF.
+       * Default config will be returned as dev_cfg[0].
+      /
+        if (usb_get_dev_data(dip, &dev_data,
+          USB_PARSE_LVL_IF, 0) != USB_SUCCESS) {
+              cmn_err (CE_WARN,
+                  "%s%d: Couldn't get USB configuration descr tree",
+                  ddi_driver_name(dip), ddi_get_instance(dip));
+
+              return (USB_FAILURE);
+      }
+
+      ep_tree_node = usb_lookup_ep_data(dip, dev_data, interface,
+           alternate, first_ep_number, USB_EP_ATTR_INTR, USB_EP_DIR_IN); 
+      if (ep_tree_node != NULL) {
+          ep_descr = ep_tree_node->ep_descr;
+      } else {
+              cmn_r (CE_WARN,
+                  "%s%d: Device is missing intr-IN endpoint",
+                  ddi_driver_name(dip), ddi_get_instance(dip));
+
+              usb_free_descr_tree(dip, &dev_data);
+
+              return (USB_FAILURE);
+      }
+                       
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based systems
+_
+Interface stabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBusb_client_attach\fR(9F), \fBusb_get_alt_if\fR(9F),
+\fBusb_get_cfg\fR(9F), \fBusb_get_string_descr\fR(9F),
+\fBusb_lookup_ep_data\fR(9F), \fBusb_parse_data\fR(9F),
+\fBusb_pipe_open\fR(9F), \fBusb_cfg_descr\fR(9S),
+\fBusb_client_dev_data(9S)\fR, \fBusb_ep_descr\fR(9S), \fBusb_if_descr\fR(9S),
+\fBusb_string_descr\fR(9S)

@@ -1,0 +1,45 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dev 7FS "9 June 2006" "SunOS 5.11" "File Systems"
+.SH NAME
+dev \- Device name file system
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdev\fR filesystem manages the name spaces of devices under the Solaris
+operating environment. The global zone's instance of the \fBdev\fR filesystem
+is mounted during boot on \fB/dev\fR.
+.sp
+.LP
+A subdirectory under \fB/dev\fR may have unique operational semantics. Most of
+the common device names under \fB/dev\fR are created automatically by
+\fBdevfsadm\fR(1M).  Others, such as \fB/dev/pts\fR, are dynamic and reflect
+the operational state of the system. You can manually generate device names for
+newly attached hardware by invoking \fBdevfsadm\fR(1M) or implicitly, by
+indirectly causing a lookup or readdir operation in the filesystem to occur.
+For example, you can discover a disk that was attached when the system was
+powered down (and generate a name for that device) by invoking
+\fBformat\fR(1M)).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB/dev\fR
+.ad
+.RS 8n
+.rt  
+Mount point for the \fB/dev\fR filesystem in the global zone.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdevfsadm\fR(1M), \fBformat\fR(1M), \fBdevfs\fR(7FS)
+.SH NOTES
+.sp
+.LP
+The global \fB/dev\fR instance cannot be unmounted.

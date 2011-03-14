@@ -1,0 +1,151 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_path_client_next_path 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_path_client_next_path, di_path_phci_next_path \- libdevinfo path node
+traversal functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
+#include <libdevinfo.h>
+
+\fBdi_path_t\fR \fBdi_path_client_next_path\fR(\fBdi_node_t node\fR \fInode\fR,
+     \fBdi_path_t\fR \fIpath\fR);
+.fi
+
+.LP
+.nf
+\fBdi_path_t\fR \fBdi_path_phci_next_path\fR(\fBdi_node_t node\fR \fInode\fR,
+     \fBdi_path_t\fR \fIpath\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInode\fR\fR
+.ad
+.RS 8n
+.rt  
+The handle to a device node in a \fBdi_init\fR(3DEVINFO) snapshot.  For
+\fBdi_path_client_next_path()\fR, \fInode\fR must be a client device node.  For
+\fBdi_path_phci_next_path()\fR, \fInode\fR must be a pHCI device node.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpath\fR\fR
+.ad
+.RS 8n
+.rt  
+\fBDI_PATH_NIL\fR, or the handle to a path node in a snapshot.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Each path node is an element in a pHCI-client matrix. The matrix is implemented
+by dual linked lists: one list links path nodes related to a common client
+head, and the other links path nodes related to a common pHCI head.
+.sp
+.LP
+The \fBdi_path_client_next_path()\fR function is called on a
+multipathing 'client' device node, where a 'client' is the child of a vHCI device node, and
+is associated with a specific endpoint device identity (independent of physical
+paths).  If the path argument is \fINULL\fR, \fBdi_path_client_next_path()\fR
+returns the first path node associated with the client. To walk all path nodes
+associated with a client, returned \fBdi_path_t\fR values are fed back into
+\fBdi_path_client_next_path()\fR, via the \fIpath\fR argument, until a null
+path node is returned.  For each path node, \fBdi_path_bus_addr\fR(3DEVINFO)
+returns the pHCI child path node unit-address.
+.sp
+.LP
+The \fBdi_path_phci_next_path()\fR function is called on a multipathing pHCI
+device node. If the path argument is \fINULL\fR, \fBdi_path_phci_next_path()\fR
+returns the first path node associated with the pHCI. To walk all path nodes
+associated with a pHCI, returned \fBdi_path_t\fR values are fed back into
+\fBdi_path_phci_next_path()\fR, via the \fIpath\fR argument, until a null path
+node is returned.  For each path node, \fBdi_path_client_node\fR(3DEVINFO)
+provides a pointer to the associated client device node.
+.sp
+.LP
+A device node can be a client device node of one multipathing class and a pHCI
+device node of another class.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a handle to the next path node is returned.
+Otherwise, \fBDI_PATH_NIL\fR is returned and \fBerrno\fR is set to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+One or more argument was invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+Path node information is not available in the snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The end of the path node list was reached.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBdi_path_bus_addr\fR(3DEVINFO),
+\fBdi_path_client_node\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB),
+\fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

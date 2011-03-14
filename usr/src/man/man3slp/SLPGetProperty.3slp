@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPGetProperty 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPGetProperty \- return SLP configuration property
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBconst char*\fR \fBSLPGetProperty\fR(\fBconst char*\fR \fIpcName\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPGetProperty()\fR function returns the value of the  corresponding
+\fBSLP\fR  property  name,  or \fINULL\fR,  if  none.   If  there is no  error,
+\fBSLPGetProperty()\fR returns  a  pointer to the  property value.  If  the
+property  was not set, it returns  the empty string,  \fB""\fR.  If an  error
+occurs, \fBSLPGetProperty()\fR returns \fINULL\fR.  The returned string should
+not  be freed.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcName\fR\fR
+.ad
+.RS 10n
+.rt  
+A null-terminated  string with the property name.   \fIpcName\fR cannot  be
+\fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBSLPGetProperty()\fR
+.sp
+.LP
+Use the following example to return a list of configured scopes:
+
+.sp
+.in +2
+.nf
+const char* useScopes
+
+useScopes = SLPGetProperty("net.slp.useScopes");
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

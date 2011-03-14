@@ -1,0 +1,171 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_sm_acct_mgmt 3PAM "18 Nov 2003" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_sm_acct_mgmt \- service provider implementation for pam_acct_mgmt
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+#include <security/pam_modules.h>
+
+
+
+\fBint\fR \fBpam_sm_acct_mgmt\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR, \fBint\fR \fIargc\fR,
+     \fBconst char **\fR\fIargv\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In response to a call to \fBpam_acct_mgmt\fR(3PAM), the  \fBPAM\fR framework
+calls \fBpam_sm_acct_mgmt()\fR from the modules listed in the \fBpam.conf\fR(4)
+file. The account management provider supplies the back-end functionality for
+this interface function. Applications should not call this  \fBAPI\fR directly.
+.sp
+.LP
+The \fBpam_sm_acct_mgmt()\fR function determines whether or not the current
+user's account and password are valid.   This includes checking for password
+and account expiration, and valid login times. The user in question is
+specified by a prior call to \fBpam_start()\fR, and is referenced by the
+authentication handle, \fIpamh\fR, which is passed as the first argument to
+\fBpam_sm_acct_mgmt()\fR. The following flags may be set in the \fIflags\fR
+field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 29n
+.rt  
+The account management service should not generate any messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
+.ad
+.RS 29n
+.rt  
+The account management service should return  \fBPAM_NEW_AUTHTOK_REQD\fR if the
+user has a null authentication token.
+.RE
+
+.sp
+.LP
+The \fIargc\fR argument represents the number of module options passed in from
+the configuration file \fBpam.conf\fR(4). \fIargv\fR specifies the module
+options, which are interpreted and processed by the account management service.
+Please refer to the specific module man pages for the various available
+\fIoptions\fR. If an unknown option is passed to the module, an error should be
+logged through \fBsyslog\fR(3C) and the option ignored.
+.sp
+.LP
+If an account management module determines that the user password has aged or
+expired, it should save this information as state in the authentication handle,
+\fIpamh\fR, using  \fBpam_set_data()\fR. \fBpam_chauthok()\fR uses this
+information to determine which passwords have expired.
+.SH RETURN VALUES
+.sp
+.LP
+If there are no restrictions to logging in,  \fBPAM_SUCCESS\fR is returned.
+The following error values may also be returned upon error:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 24n
+.rt  
+User not known to underlying authentication module.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
+.ad
+.RS 24n
+.rt  
+New authentication token required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_ACCT_EXPIRED\fR\fR
+.ad
+.RS 24n
+.rt  
+User account has expired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.RS 24n
+.rt  
+User denied access to account at this time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 24n
+.rt  
+Ignore underlying account module regardless of whether the control flag is
+\fIrequired,\fR \fIoptional\fR or \fIsufficient\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM), \fBpam_set_data\fR(3PAM),
+\fBpam_start\fR(3PAM), \fBsyslog\fR(3C), \fBlibpam\fR(3LIB), \fBpam.conf\fR(4),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own  \fBPAM\fR handle.
+.sp
+.LP
+If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is set and a service module does
+not recognize the type, the service module does not process any information,
+and returns \fBPAM_IGNORE\fR. If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is
+not set, a service module performs its default action.

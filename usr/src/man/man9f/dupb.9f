@@ -1,0 +1,182 @@
+'\" te
+.\" Copyright 1989 AT&T  
+.\" Copyright (C) 2002, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dupb 9F "22 Mar 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+dupb \- duplicate a message block descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBdupb\fR(\fBmblk_t *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+\fBdupb()\fR creates a new  \fBmblk_t\fR structure (see \fBmsgb\fR(9S)) to
+reference the message block pointed to by  \fIbp\fR.
+.sp
+.LP
+Unlike  \fBcopyb\fR(9F), \fBdupb()\fR does not copy the information in the
+\fBdblk_t\fR structure (see \fBdatab\fR(9S)), but creates a new  \fBmblk_t\fR
+structure to point to it. The reference count in the  \fBdblk_t\fR structure
+(\fBdb_ref\fR) is incremented.  The new \fBmblk_t\fR structure contains the
+same information as the original.  Note that \fBb_rptr\fRand \fBb_wptr\fR are
+copied from the \fIbp\fR.
+.sp
+Printed copy or docs.sun.com shows a figure that shows a new mblk_t structure
+created, with the original and new bp both pointing to the dblk_t structure,
+and db_ref incremented by one
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to the message block to be duplicated. \fBmblk_t\fR is an instance of
+the  \fBmsgb\fR(9S) structure.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+If successful,  \fBdupb()\fR returns a pointer to the new message block. A
+\fINULL\fR pointer is returned if  \fBdupb()\fR cannot allocate a new message
+block descriptor or if the \fBdb_ref\fR field of the data block structure (see
+\fBdatab\fR(9S)) has reached a maximum value (\fB255\fR).
+.SH CONTEXT
+.sp
+.LP
+\fBdupb()\fR can be called from user, kernel, or interrupt context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBdupb()\fR
+.sp
+.LP
+This  \fBsrv\fR(9E) (service) routine adds a header to  all  \fBM_DATA\fR
+messages before passing them along.   \fBdupb\fR is used instead of
+\fBcopyb\fR(9F) because the contents of the header block are not changed.
+
+.sp
+.LP
+For each message on the queue, if it is a priority message, pass it along
+immediately (lines 10-11). Otherwise, if it is anything other than an
+\fBM_DATA\fR message (line 12), and if it can be sent along (line 13), then do
+so (line 14). Otherwise, put the message back on the queue and return (lines
+16-17). For all  \fBM_DATA\fR messages, first check to see if the stream is
+flow-controlled (line 20). If it is, put the message back on the queue and
+return (lines 37-38).  If it is not, the header block is duplicated (line 21).
+
+.sp
+.LP
+\fBdupb()\fR can fail either due to lack of resources or because the message
+block has already been duplicated 255 times.  In order to handle the  latter
+case, the example calls \fBcopyb\fR(9F) (line 22).  If \fBcopyb\fR(9F) fails,
+it is due to buffer allocation failure.  In this case,  \fBqbufcall\fR(9F) is
+used to initiate a callback (lines 30-31) if one is not already pending (lines
+26-27).
+
+.sp
+.LP
+The callback function, \fBxxxcallback()\fR, clears the recorded
+\fBqbufcall\fR(9F) callback id and schedules the service procedure (lines
+49-50).  Note  that the close routine,  \fBxxxclose()\fR, must cancel any
+outstanding  \fBqbufcall\fR(9F) callback requests (lines 58-59).
+
+.sp
+.LP
+If  \fBdupb()\fR or  \fBcopyb\fR(9F) succeed, link the  \fBM_DATA\fR message to
+the new message block (line 34)  and pass it along (line 35).
+
+.sp
+.in +2
+.nf
+       1  xxxsrv(q)
+      2      queue_t *q;
+      3  {
+      4   struct xx *xx = (struct xx *)q->q_ptr;
+      5   mblk_t *mp;
+      6   mblk_t *bp;
+      7   extern mblk_t *hdr;
+      8 
+      9   while ((mp = getq(q)) != NULL) {
+     10        if (mp->b_datap->db_type >= QPCTL) {
+     11             putnext(q, mp);
+     12        } else if (mp->b_datap->db_type != M_DATA) {
+     13             if (canputnext(q))
+     14                  putnext(q, mp);
+     15             else {
+     16                  putbq(q, mp);
+     17                  return;
+     18             }
+     19        } else {  /* M_DATA */
+     20             if (canputnext(q)) {
+     21                  if ((bp = dupb(hdr)) == NULL)
+     22                       bp = copyb(hdr);
+     23                  if (bp == NULL) {
+     24                       size_t size = msgdsize(mp);
+     25                       putbq(q, mp);
+     26                       if (xx->xx_qbufcall_id) {
+     27                            /* qbufcall pending */
+     28                            return;
+     29                       } 
+     30                       xx->xx_qbufcall_id = qbufcall(q, size,
+     31                            BPRI_MED, xxxcallback, (intptr_t)q);
+     32                       return;
+     33                  }
+     34                  linkb(bp, mp);
+     35                  putnext(q, bp);
+     36             } else {
+     37                  putbq(q, mp);
+     38                  return;
+     39             }
+     40        }
+     41   }
+     42  }
+     43   void
+     44   xxxcallback(q)
+     45        queue_t *q;
+     46   {
+     47        struct xx *xx = (struct xx *)q->q_ptr;
+     48
+     49        xx->xx_qbufcall_id = 0;
+     50        qenable(q);
+     51   }
+
+     52   xxxclose(q, cflag, crp)
+     53        queue_t *q;
+     54        int  cflag;
+     55        cred_t *crp;     
+     56   {
+     57        struct xx *xx = (struct xx *)q->q_ptr;
+               ...
+     58        if (xx->xx_qbufcall_id)
+     59             qunbufcall(q, xx->xx_qbufcall_id);
+               ...
+     60   }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsrv\fR(9E), \fBcopyb\fR(9F), \fBqbufcall\fR(9F), \fBdatab\fR(9S),
+\fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

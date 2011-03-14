@@ -1,0 +1,26 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1994 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH glob 1 "15 Apr 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+glob \- shell built-in function to expand a word list
+.SH SYNOPSIS
+.SS "csh"
+.LP
+.nf
+\fBglob\fR \fIwordlist\fR
+.fi
+
+.SH DESCRIPTION
+.SS "csh"
+.sp
+.LP
+\fBglob\fR performs filename expansion on \fIwordlist\fR. Like \fBecho\fR(1),
+but no `\fB\e\fR\&' escapes are recognized. Words are delimited by null
+characters in the output.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBecho\fR(1), \fBattributes\fR(5)

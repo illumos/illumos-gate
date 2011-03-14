@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vsyslog 3C "30 Aug 2006" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+vsyslog \- log message with a stdarg argument list
+.SH SYNOPSIS
+.LP
+.nf
+#include <syslog.h>
+#include <stdarg.h>
+
+\fBvoid\fR \fBvsyslog\fR(\fBint\fR \fIpriority\fR, \fBconst char *\fR\fImessage\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvsyslog()\fR function is identical to \fBsyslog\fR(3C), except that it
+is called with an argument list as defined by <\fBstdarg.h\fR> rather than with
+a variable number of arguments.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBvsyslog()\fR to write an error routine.
+.sp
+.LP
+The following example demonstrates the use of \fBvsyslog()\fR in writing an
+error routine.
+
+.sp
+.in +2
+.nf
+#include <syslog.h>
+#include <stdarg.h>
+ 
+/*
+ * error should be called like:
+ *   error(pri, function_name, format, arg1, arg2...);
+ */
+
+void
+error(int pri, char *function_name, char *format, ...)
+{
+        va_list args;
+
+        va_start(args, format);
+        /* log name of function causing error */
+        (void) syslog(pri, "ERROR in %s.", function_name);
+        /* log remainder of message */
+        (void) vsyslog(pri, format, args);
+        va_end(args);
+        (void) abort( );
+}
+
+main()
+{
+        error(LOG_ERR, "main", "process %d is dying", getpid());
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsyslog\fR(3C), \fBattributes\fR(5)

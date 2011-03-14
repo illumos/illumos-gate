@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tcsetpgrp 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+tcsetpgrp \- set foreground process group ID
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <unistd.h>
+
+\fBint\fR \fBtcsetpgrp\fR(\fBint\fR \fIfildes\fR, \fBpid_t\fR \fIpgid_id\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+If the process has a controlling terminal, \fBtcsetpgrp()\fR will set the
+foreground process group \fBID\fR associated with the terminal to
+\fIpgid_id\fR. The file associated with \fIfildes\fR must be the controlling
+terminal of the calling process and the controlling terminal must be currently
+associated with the session of the calling process. The value of \fIpgid_id\fR
+must match a process group \fBID\fR of a process in the same session as the
+calling process.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtcsetpgrp()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+This implementation does not support the value in the \fIpgid_id\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process does not have a controlling terminal, or the file is not
+the controlling terminal, or the controlling terminal is no longer associated
+with the session of the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+The process is not ignoring or holding \fBSIGTTOU\fR and is a member of an
+orphaned process group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIpgid_id\fR does not match the process group \fBID\fR of a
+process in the same session as the calling process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe, and Async-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtcgetpgrp\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5), \fBtermio\fR(7I)

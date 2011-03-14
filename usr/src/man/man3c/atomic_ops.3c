@@ -1,0 +1,153 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH atomic_ops 3C "12 Aug 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+atomic_ops \- atomic operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBatomic.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This collection of functions provides atomic memory operations. There are 8
+different classes of atomic operations:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_add\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic addition of a signed value to a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_and\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic logical 'and' of a value to a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_bits\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide atomic bit setting and clearing within a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_cas\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic comparison of a value with a variable. If the
+comparison is equal, then swap in a new value for the variable, returning the
+old value of the variable in either case.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_dec\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic decrement on a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_inc\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic increment on a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_or\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic logical 'or' of a value to a variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatomic_swap\fR(3C)\fR
+.ad
+.RS 19n
+.rt  
+These functions provide an atomic swap of a value with a variable, returning
+the old value of the variable.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBatomic_add\fR(3C), \fBatomic_and\fR(3C), \fBatomic_bits\fR(3C),
+\fBatomic_cas\fR(3C), \fBatomic_dec\fR(3C), \fBatomic_inc\fR(3C),
+\fBatomic_or\fR(3C), \fBatomic_swap\fR(3C), \fBmembar_ops\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Atomic instructions ensure global visibility of atomically-modified variables
+on completion.  In a relaxed store order system, this does not guarantee that
+the visibility of other variables will be synchronized with the completion of
+the atomic instruction. If such synchronization is required, memory barrier
+instructions must be used. See \fBmembar_ops\fR(3C).
+.sp
+.LP
+Atomic instructions can be expensive since they require synchronization to
+occur at a hardware level. This means they should be used with care to ensure
+that forcing hardware level synchronization occurs a minimum number of times.
+For example, if you have several variables that need to be incremented as a
+group, and each needs to be done atomically, then do so with a mutex lock
+protecting all of them being incremented rather than using the
+\fBatomic_inc\fR(3C) operation on each of them.

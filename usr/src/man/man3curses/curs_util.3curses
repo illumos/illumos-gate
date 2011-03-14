@@ -1,0 +1,140 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_util 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_util, unctrl, keyname, filter, use_env, putwin, getwin, delay_output,
+flushinp \- curses miscellaneous utility routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBchar *\fR\fBunctrl\fR(\fBchtype\fR \fIc\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBkeyname\fR(\fBint\fR \fIc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfilter\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBuse_env\fR(\fBchar\fR \fIbool\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBputwin\fR(\fBWINDOW *\fR\fIwin\fR, \fBFILE *\fR\fIfilep\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBgetwin\fR(\fBFILE *\fR\fIfilep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdelay_output\fR(\fBint\fR \fIms\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBflushinp\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBunctrl()\fR macro expands to a character string which is a printable
+representation of the character \fIc\fR. Control characters are displayed in
+the \fB^\fR\fIX\fR notation. Printing characters are displayed as is.
+.sp
+.LP
+With the \fBkeyname()\fR routine, a character string corresponding to the key
+\fIc\fR is returned.
+.sp
+.LP
+The \fBfilter()\fR routine, if used, is called before \fBinitscr()\fR or
+\fBnewterm()\fR are called. It makes \fBcurses\fR think that there is a
+one-line screen. \fBcurses\fR does not use any terminal capabilities that
+assume that they know on what line of the screen the cursor is positioned.
+.sp
+.LP
+The \fBuse_env()\fR routine, if used, is called before \fBinitscr()\fR or
+\fBnewterm()\fR are called. When called with \fBFALSE\fR as an argument, the
+values of \fBlines\fR and \fBcolumns\fR specified in the \fIterminfo\fR
+database will be used, even if environment variables \fBLINES\fR and
+\fBCOLUMNS\fR (used by default) are set, or if \fBcurses\fR is running in a
+window (in which case default behavior would be to use the window size if
+\fBLINES\fR and \fBCOLUMNS\fR are not set).
+.sp
+.LP
+With the \fBputwin()\fR routine, all data associated with window \fIwin\fR is
+written into the file to which \fIfilep\fR points. This information can be
+later retrieved using  the \fBgetwin()\fR function.
+.sp
+.LP
+The \fBgetwin()\fR routine reads window related data stored in the file by
+\fBputwin()\fR. The routine then creates and initializes a new window using
+that data. It returns a pointer to the new window.
+.sp
+.LP
+The \fBdelay_output()\fR routine inserts an \fIms\fR millisecond pause in
+output. This routine should not be used extensively because padding characters
+are used rather than a \fBCPU\fR pause.
+.sp
+.LP
+The \fBflushinp()\fR routine throws away any typeahead that has been typed by
+the user and has not yet been read by the program.
+.SH RETURN VALUES
+.sp
+.LP
+Except for \fBflushinp()\fR, routines that return an integer return \fBERR\fR
+upon failure and an integer value other than \fBERR\fR upon successful
+completion.
+.sp
+.LP
+\fBflushinp()\fR always returns \fBOK\fR.
+.sp
+.LP
+Routines that return pointers return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_initscr\fR(3CURSES), \fBcurs_scr_dump\fR(3CURSES),
+\fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBunctrl()\fR is a macro, which is defined in <\fBunctrl.h\fR>.

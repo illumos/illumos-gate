@@ -1,0 +1,234 @@
+'\" te
+.\"  Copyright (c) 1998 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH plimit 1 "8 Jun 1998" "SunOS 5.11" "User Commands"
+.SH NAME
+plimit \- get or set the resource limits of running processes
+.SH SYNOPSIS
+.LP
+.nf
+\fBplimit\fR [\fB-km\fR] \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fBplimit\fR {\fB-cdfnstv\fR} \fIsoft\fR,\fIhard\fR... pid...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+If one or more of the \fBcdfnstv\fR options is specified, \fBplimit\fR sets the
+soft (current) limit and/or the hard (maximum) limit of the indicated
+resource(s) in the processes identified by the process-ID list, \fIpid\fR.
+Otherwise \fBplimit\fR reports the resource limits of the processes identified
+by the process-ID list, \fIpid\fR.
+.sp
+.LP
+Only the owner of a process or the super-user is permitted either to get or to
+set the resource limits of a process. Only the super-user can increase the hard
+limit.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+On output, show file sizes in kilobytes (1024 bytes) rather than in 512-byte
+blocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+On output, show file and memory sizes in megabytes (1024*1024 bytes).
+.RE
+
+.sp
+.LP
+The remainder of the options are used to change specified resource limits. They
+each accept an argument of the form:
+.sp
+.LP
+\fIsoft\fR,\fIhard\fR
+.sp
+.LP
+where \fIsoft\fR specifies the soft (current) limit and \fIhard\fR specifies
+the hard (maximum) limit. If the hard limit is not specified, the comma may be
+omitted. If the soft limit is an empty string, only the hard limit is set. Each
+limit is either the literal string \fBunlimited\fR, or a number, with an
+optional scaling factor, as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBk\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIn\fR kilobytes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBm\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIn\fR megabytes (minutes for CPU time)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBh\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIn\fR hours (for CPU time only)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImm\fR\fB:\fR\fIss\fR\fR
+.ad
+.RS 9n
+.rt  
+minutes and seconds (for CPU time only)
+.RE
+
+.sp
+.LP
+The soft limit cannot exceed the hard limit.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set core file size limits (default unit is 512-byte blocks).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set data segment (heap) size limits (default unit is kilobytes).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set file size limits (default unit is 512-byte blocks).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set file descriptor limits (no default unit).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set stack segment size limits (default unit is kilobytes).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set CPU time limits (default unit is seconds).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fI soft,hard\fR\fR
+.ad
+.RS 16n
+.rt  
+Set virtual memory size limits (default unit is kilobytes).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported.
+.sp
+.ne 2
+.mk
+.na
+\fBpid\fR
+.ad
+.RS 7n
+.rt  
+Process ID list.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+\fBplimit\fR returns the exit value zero on success, non-zero on failure (such
+as no such process, permission denied, or invalid option).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/\fR\fIpid\fR\fB/*\fR\fR
+.ad
+.RS 15n
+.rt  
+process information and control files
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBulimit\fR(1), \fBproc\fR(1), \fBgetrlimit\fR(2), \fBsetrlimit\fR(2),
+\fBproc\fR(4), \fBattributes\fR(5),

@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mlock 3C "10 Apr 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mlock, munlock \- lock or unlock pages in memory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/mman.h>
+
+\fBint\fR \fBmlock\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmunlock\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+#include <sys/mman.h>
+
+\fBint\fR \fBmlock\fR(\fBconst void *\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmunlock\fR(\fBconst void *\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBmlock()\fR function uses the mappings established for the address range
+[\fIaddr, addr + len\fR) to identify pages to be locked in memory. If the page
+identified by a mapping changes, such as occurs when a copy of a writable
+\fBMAP_PRIVATE\fR page is made upon the first store, the lock will be
+transferred to the newly copied private page.
+.sp
+.LP
+The \fBmunlock()\fR function removes locks established with \fBmlock()\fR.
+.sp
+.LP
+A given page may be locked multiple times by executing an \fBmlock()\fR through
+different mappings. That is, if two different processes lock the same page,
+then the page will remain locked until both processes remove their locks.
+However, within a given mapping, page locks do not nest \(mi multiple
+\fBmlock()\fR operations on the same address in the same process will all be
+removed with a single \fBmunlock()\fR. Of course, a page locked in one process
+and mapped in another (or visible through a different mapping in the locking
+process) is still locked in memory. This fact can be used to create
+applications that do nothing other than lock important data in memory, thereby
+avoiding page I/O faults on references from other processes in the system.
+.sp
+.LP
+The contents of the locked pages will not be transferred to or from disk except
+when explicitly requested by one of the locking processes. This guarantee
+applies only to the mapped data, and not to any associated data structures
+(file descriptors and on-disk metadata, among others).
+.sp
+.LP
+If the mapping through which an \fBmlock()\fR has been performed is removed, an
+\fBmunlock()\fR is implicitly performed. An \fBmunlock()\fR is also performed
+implicitly when a page is deleted through file removal or truncation.
+.sp
+.LP
+Locks established with \fBmlock()\fR are not inherited by a child process after
+a  \fBfork()\fR and are not nested.
+.sp
+.LP
+Attempts to \fBmlock()\fR more memory than a system-specific limit will fail.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the  \fBmlock()\fR and  \fBmunlock()\fR functions
+return \fB0\fR.  Otherwise, no changes are made to any locks in the address
+space of the process, the functions return \fB\(mi1\fR and set \fBerrno\fR to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmlock()\fR and  \fBmunlock()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaddr\fR argument is not a multiple of the page size as returned by
+\fBsysconf\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Addresses in the range [\fIaddr, addr + len\fR) are invalid for the address
+space of a process, or specify one or more pages which are not mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 10n
+.rt  
+The system does not support this memory locking interface.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_LOCK_MEMORY\fR} privilege is not asserted in the effective
+set of the calling process.
+.RE
+
+.sp
+.LP
+The \fBmlock()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+Some or all of the memory identified by the range [\fIaddr, addr + len\fR)
+could not be locked because of insufficient system resources or because of a
+limit or resource control on locked memory.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Because of the impact on system resources, the use of \fBmlock()\fR and
+\fBmunlock()\fR is restricted to users with the {\fBPRIV_PROC_LOCK_MEMORY\fR}
+privilege.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfork\fR(2), \fBmemcntl\fR(2), \fBmmap\fR(2), \fBplock\fR(3C),
+\fBmlockall\fR(3C), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

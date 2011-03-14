@@ -1,0 +1,76 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_insch 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_insch, insch, winsch, mvinsch, mvwinsch \- insert a character before the
+character under the cursor in a curses window
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBinsch\fR(\fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwinsch\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvinsch\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwinsch\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+With these routines, the character \fIch\fR is inserted before the character
+under the cursor. All characters to the right of the cursor are moved one space
+to the right, with the possibility of the rightmost character on the line being
+lost. The cursor position does not change (after moving to \fIy\fR, \fIx\fR, if
+specified). (This does not imply use of the hardware insert character feature.)
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBinsch()\fR, \fBmvinsch()\fR, and \fBmvwinsch()\fR may be macros.

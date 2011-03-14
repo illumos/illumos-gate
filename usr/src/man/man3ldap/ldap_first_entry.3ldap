@@ -1,0 +1,111 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_first_entry 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_first_entry, ldap_next_entry, ldap_count_entries, ldap_count_references,
+ldap_first_reference, ldap_next_reference \- LDAP entry parsing and counting
+functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBLDAPMessage *\fR\fBldap_first_entry\fR(\fBLDAP\fR\fI*ld\fR, \fBLDAPMessage\fR \fI*result\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPMessage *\fR\fBldap_next_entry\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*entry\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBldap_count_entries\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*result\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPMessage *\fR\fBldap_first_reference\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPMessage *\fR\fBldap_next_reference\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_count_references\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to parse results received from
+\fBldap_result\fR(3LDAP) or the synchronous LDAP search operation functions
+\fBldap_search_s\fR(3LDAP) and \fBldap_search_st\fR(3LDAP).
+.sp
+.LP
+The \fBldap_first_entry()\fR function is used to retrieve the first entry in a
+chain of search results.  It takes the \fIresult\fR as returned by a call to
+\fBldap_result\fR(3LDAP) or \fBldap_search_s\fR(3LDAP) or
+\fBldap_search_st\fR(3LDAP) and returns a pointer to the first entry in the
+result.
+.sp
+.LP
+This pointer should be supplied on a subsequent call to \fBldap_next_entry()\fR
+to get the next entry, the result of which should be supplied to the next call
+to \fBldap_next_entry()\fR, etc. \fBldap_next_entry()\fR will return
+\fINULL\fR when there are no more entries.  The entries returned from these
+calls are used in calls to the functions described in \fBldap_get_dn\fR(3LDAP),
+\fBldap_first_attribute\fR(3LDAP), \fBldap_get_values\fR(3LDAP), etc.
+.sp
+.LP
+A count of the number of entries in the search result can be obtained by
+calling \fBldap_count_entries()\fR.
+.sp
+.LP
+\fBldap_first_reference()\fR and   \fBldap_next_reference()\fR are used to step
+through and retrieve the list of continuation references from a search result
+chain.
+.sp
+.LP
+The \fBldap_count_references()\fR function is used to count the number of
+references that are contained in and remain in a search result chain.
+.SH ERRORS
+.sp
+.LP
+If an error occurs in \fBldap_first_entry()\fR or \fBldap_next_entry()\fR,
+\fINULL\fR is returned and the  \fBld_errno\fR field in the \fIld\fR parameter
+is set to indicate the error.  If an error occurs in
+\fBldap_count_entries()\fR, \fB\(mi1\fR is returned, and \fBld_errno\fR is set
+appropriately.  See \fBldap_error\fR(3LDAP) for a description of possible error
+codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_result\fR(3LDAP), \fBldap_search\fR(3LDAP),
+\fBldap_first_attribute\fR(3LDAP), \fBldap_get_values\fR(3LDAP),
+\fBldap_get_dn\fR(3LDAP), \fBattributes\fR(5)

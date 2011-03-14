@@ -1,0 +1,63 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1994 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH times 1 "15 Apr 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+times \- shell built-in function to report time usages of the current shell
+.SH SYNOPSIS
+.SS "sh"
+.LP
+.nf
+\fBtimes\fR 
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBtimes\fR 
+.fi
+
+.SH DESCRIPTION
+.SS "sh"
+.sp
+.LP
+Print the accumulated user and system times for processes run from the shell.
+.SS "ksh"
+.sp
+.LP
+Print the accumulated user and system times for the shell and for processes run
+from the shell.
+.sp
+.LP
+On this man page, \fBksh\fR(1) commands that are preceded by one or two *
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words, following a command preceded by ** that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBksh\fR(1), \fBsh\fR(1), \fBtime\fR(1), \fBattributes\fR(5)

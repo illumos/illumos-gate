@@ -1,0 +1,115 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qtimeout 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qtimeout \- execute a function after a specified length of time
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+\fBtimeout_id_t\fR \fBqtimeout\fR(\fBqueue_t *\fR\fIq\fR, \fBvoid\fR (\fI*func\fR)(\fIvoid *\fR), 
+     \fBvoid\fR \fI*arg\fR, \fBclock_t\fR \fIticks\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to \fBSTREAMS\fR queue structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfunc\fR\fR
+.ad
+.RS 9n
+.rt  
+Kernel function to invoke when the time increment expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 9n
+.rt  
+Argument to the function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIticks\fR\fR
+.ad
+.RS 9n
+.rt  
+Number of clock ticks to wait before the function is called. Use
+\fBdrv_usectohz\fR(9F) to convert microseconds to clock ticks.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqtimeout()\fR function schedules the specified function \fIfunc\fR to be
+called after a specified time interval. \fIfunc\fR is called with \fIarg\fR as
+a parameter. Control is immediately returned to the caller. This is useful when
+an event is known to occur within a specific time frame, or when you want to
+wait for I/O processes when an interrupt is not available or might cause
+problems. The exact time interval over which the timeout takes effect cannot be
+guaranteed, but the value given is a close approximation.
+.sp
+.LP
+The \fBqtimeout()\fR function is tailored to be used with the enhanced
+\fBSTREAMS \fRframework interface which is based on the concept of perimeters.
+(See \fBmt-streams\fR(9F).) \fBqtimeout()\fR schedules the specified function
+to execute after entering the perimeters associated with the queue passed in as
+the first parameter to \fBqtimeout()\fR. All outstanding timeouts and bufcalls
+must be cancelled (using, respectively, \fBquntimeout\fR(9F) and
+\fBqunbufcall\fR(9F)) before a driver close routine can block and before the
+close  routine calls \fBqprocsoff\fR(9F).
+.sp
+.LP
+The \fBqprocson\fR(9F) function must be called before calling \fBqtimeout()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBqtimeout()\fR function returns an opaque non-zero \fBtimeout\fR
+identifier that can be passed to \fBquntimeout\fR(9F) to cancel the request.
+Note: No value is returned from the called function.
+.SH CONTEXT
+.sp
+.LP
+The \fBqtimeout()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdrv_usectohz\fR(9F), \fBmt-streams\fR(9F), \fBqbufcall\fR(9F),
+\fBqprocson\fR(9F), \fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

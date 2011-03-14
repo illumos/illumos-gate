@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH miocnak 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+miocnak \- Negatively acknowledge an M_IOCTL message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBvoid\fR \fBmiocnak\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBint\fR \fIcount\fR, \fBint\fR \fIerror\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwq\fR\fR
+.ad
+.RS 9n
+.rt  
+Write queue associated with the read queue to send the M_IOCNAK on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 9n
+.rt  
+M_IOCTL message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 9n
+.rt  
+Value to set the ioc_count of the \fBiocblk\fR(9S) to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerror\fR\fR
+.ad
+.RS 9n
+.rt  
+Value to set the ioc_error of the \fBiocblk\fR(9S) to.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmiocnak()\fR function converts an M_IOCTL message into an M_IOCNAK
+message and sends the resulting message upstream.
+.sp
+.LP
+To convert the message, \fBmiocnak()\fR changes the message type to M_IOCNAK,
+sets the\fB ioc_count\fR and \fBioc_error\fR members of the \fBiocblk\fR(9S)
+associated with \fImp\fR to the passed-in values, and clears the \fBioc_rval\fR
+field.  Since payloads cannot currently be associated with M_IOCNAK messages,
+\fIcount\fR must always be zero. If \fIerror\fR is passed as zero, \fBEINVAL\fR
+is assumed.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH NOTES
+.sp
+.LP
+Callers must not hold any locks across a \fBmiocnak()\fR that can be acquired
+as part of \fBput\fR(9E) processing.
+.SH SEE ALSO
+.sp
+.LP
+\fBmioc2ack\fR(9F), \fBmiocack\fR(9F), \fBput\fR(9E), \fBiocblk\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,165 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_enable_trans_logging 3SIP "11 Jan 2008" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_enable_trans_logging, sip_enable_dialog_logging,
+sip_disable_dialog_logging, sip_disable_trans_logging \- transaction and dialog
+logging operations
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -\fBlsip\fR [ \fIlibrary\fR... ]
+#include <sip.h>
+
+\fBint\fR \fBsip_enable_trans_logging\fR(\fBFILE *\fR\fIlogfile\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_enable_dialog_logging\fR(\fBFILE *\fR\fIlogfile\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsip_disable_dialog_logging\fR();
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsip_disable_trans_logging\fR();
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_enable_trans_logging()\fR and \fBsip_enable_dialog_logging()\fR
+functions enable transaction and dialog logging respectively. The \fIlogfile\fR
+argument points to a file to which the SIP messages are logged. The flags
+argument controls the amount of logging. The only flag defined in \fB<sip.h>\fR
+is \fBSIP_DETAIL_LOGGING\fR. Either transaction or dialog logging, or both, can
+be enabled at any time. For dialog logging to work, the SIP stack must be
+enabled to manage dialogs (using \fBSIP_STACK_DIALOGS\fR, see
+\fBsip_stack_init\fR(3SIP)) when the stack is initialized.
+.sp
+.LP
+All the messages exchanged within a transaction/dialog is captured and later
+dumped to a log file when the transaction or dialog is deleted or terminated.
+Upon termination, each dialog writes to the file the messages that were
+processed in its context. Similarly, upon termination each transaction writes
+to the file the messages that were processed in its context.
+.sp
+.LP
+The \fBsip_disable_trans_logging()\fR and \fBsip_disable_dialog_logging()\fR
+functions disable the transaction or dialog logging. These functions do not
+close the files. It is the responsibility of the application to close them.
+.sp
+.LP
+The log contains the state of the transaction or dialog at the time the message
+was processed.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsip_enable_trans_logging()\fR and
+\fBsip_enable_dialog_logging()\fR return 0. They return \fBEINVAL\fR if
+\fIlogfile\fR is \fINULL\fR or \fIflags\fR is unrecognized.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDialog logging
+.sp
+.LP
+The following is an example of dialog logging.
+
+.sp
+.in +2
+.nf
+FILE    *logfile;
+
+logfile = fopen("/tmp/ApplicationA", "a+");
+sip_enable_dialog_logging(logfile, SIP_DETAIL_LOGGING);
+
+/* Application sends INVITE, recieves 180 and 200 response and dialog is
+        created. */
+/* Application sends ACK request */
+/* Application sends BYE and recieves 200 response */
+
+/* Application disables logging */
+sip_disable_dialog_logging();
+
+The log file will be of the following format.
+
+
+************* Begin Dialog *************
+Digest       : 43854 43825 26120 9475 5415 21595 25658 18538
+
+-----------------------------
+Dialog State            : SIP_DLG_NEW
+
+Tue Nov 27 15:53:34 2007| Message - 1
+INVITE sip:user@example.com SIP/2.0
+From: "Me" < sip:me@mydomain.com > ; TAG=tag-from-01
+To: "You" < sip:you@yourdomain.com >
+Contact: < sip:myhome.host.com >
+MAX-FORWARDS: 70
+Call-ID: 1261K6A6492KF33549XM
+CSeq: 111 INVITE
+CONTENT-TYPE: application/sdp
+Via: SIP/2.0/UDP 192.0.0.1 : 5060 ;branch=z9hG4bK-via-EVERYTHINGIDO-05
+Record-Route: <sip:server1.com;lr>
+Record-Route: <sip:server2.com;lr>
+CONTENT-LENGTH : 0
+
+Tue Nov 27 15:53:34 2007| Message - 2
+SIP/2.0 180 Ringing
+Via: SIP/2.0/UDP 192.0.0.1 : 5060 ;branch=z9hG4bK-via-EVERYTHINGIDO-05
+From: "Me" < sip:me@mydomain.com > ; TAG=tag-from-01
+To: "You" < sip:you@yourdomain.com >;tag=1
+Call-ID: 1261K6A6492KF33549XM
+CSeq: 111 INVITE
+Contact: <sip:whitestar2-0.East.Sun.COM:5060;transport=UDP>
+Record-Route: <sip:server1.com;lr>
+Record-Route: <sip:server2.com;lr>
+Content-Length: 0
+
+-----------------------------
+Dialog State            : SIP_DLG_EARLY
+
+/* Entire 200 OK SIP Response */
+
+-----------------------------
+Dialog State            : SIP_DLG_CONFIRMED
+
+/* Entire ACK Request */
+
+/* Entire BYE Request */
+/* Entire 200 OK Response */
+-----------------------------
+************* End Dialog *************
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsip_stack_init\fR(3SIP), \fBattributes\fR(5)

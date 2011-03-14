@@ -1,0 +1,253 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH border_set 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+border_set, box_set, wborder_set \- use complex characters (and renditions) to
+draw borders
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBborder_set\fR(\fBconst cchar_t *\fR\fIls\fR, \fBconst cchar_t *\fR\fIrs\fR, \fBconst cchar_t *\fR\fIts\fR,
+     \fBconst cchar_t *\fR\fIbs\fR, \fBconst cchar_t *\fR\fItl\fR, \fBconst cchar_t *\fR\fItr\fR,
+     \fBconst cchar_t *\fR\fIbl\fR,\fBconst cchar_t *\fR\fIbr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwborder_set\fR(\fBWINDOW *\fR\fIwin\fR, \fBconst cchar_t *\fR\fIls\fR, \fBconst cchar_t *\fR\fIrs\fR,
+     \fBconst cchar_t *\fR\fIts\fR,\fBconst cchar_t *\fR\fIbs\fR, \fBconst cchar_t *\fR\fItl\fR,
+     \fBconst cchar_t *\fR\fItr\fR, \fBconst cchar_t *\fR\fIbl\fR,\fBconst cchar_t *\fR\fIbr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBbox_set\fR(\fBWINDOW *\fR\fIwin\fR, \fBconst cchar_t *\fR\fIverch\fR, \fBconst cchar_t *\fR\fIhorch\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBborder_set()\fR and \fBwborder_set()\fR functions draw a border around
+the specified window.  All parameters must be spacing complex characters with
+renditions. A parameter which is a null pointer is replaced by the default
+character.
+.sp
+.LP
+\fBConstant Values for Borders\fR
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.83i) cw(1.83i) cw(1.83i) 
+cw(1.83i) cw(1.83i) cw(1.83i) 
+.
+Constant Values for Borders
+_
+ParameterDefault ConstantDefault Character
+_
+\fIverch \fR\fBWACS_VLINE\fR\fB|\fR
+\fIhorch \fR\fBWACS_HLINE\fR\fB-\fR
+\fBls\fR\fBWACS_VLINE\fR\fB|\fR
+\fIrs\fR\fBWACS_VLINE\fR\fB|\fR
+\fIts\fR\fBWACS_HLINE\fR\fB-\fR
+\fIbs\fR\fBWACS_HLINE\fR\fB-\fR
+\fIbl\fR\fBWACS_BLCORNER\fR\fB+\fR
+\fIbr\fR\fBWACS_BRCORNER\fR\fB+\fR
+\fItl\fR\fBWACS_ULCORNER\fR\fB+\fR
+\fBtr\fR\fBWACS_URCORNER\fR\fB+\fR
+.TE
+
+.sp
+.LP
+The call
+.sp
+.in +2
+.nf
+\fBbox_set(\fR\fIwin\fR,
+\fIverch\fR, \fIhorch\fR)
+.fi
+.in -2
+
+.sp
+.LP
+is a short form for
+.sp
+.in +2
+.nf
+\fBwborder(\fR\fIwin\fR,
+\fIverch\fR, \fIverch\fR,
+\fIhorch\fR, \fIhorch\fR, NULL,
+NULL, NULL, NULL)
+.fi
+.in -2
+
+.sp
+.LP
+When the window is boxed, the bottom and top rows and right and left columns
+are unavailable for text.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIls\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the left side of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrs\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the right side of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIts\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the top of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbs\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the bottom of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItl\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the top-left corner of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItr\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the top-right corner of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbl\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the bottom-left corner of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbr\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the bottom-right corner of the border.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the pointer to the window in which the border or box is to be drawn.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIverch\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the left and right columns of the box.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhorch\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the character and rendition used for the top and bottom rows of the box.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBadd_wch\fR(3XCURSES), \fBaddch\fR(3XCURSES), \fBattr_get\fR(3XCURSES),
+\fBattroff\fR(3XCURSES), \fBborder\fR(3XCURSES), \fBlibcurses\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

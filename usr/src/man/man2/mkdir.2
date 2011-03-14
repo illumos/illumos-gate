@@ -1,0 +1,298 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mkdir 2 "18 May 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+mkdir \- make a directory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+
+\fBint\fR \fBmkdir\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmkdir()\fR function creates a  new directory named by the path name
+pointed to by \fIpath\fR. The mode of the new directory is  initialized from
+\fImode\fR (see \fBchmod\fR(2) for values of mode). The protection part of the
+\fImode\fR argument is modified by the process's file creation mask (see
+\fBumask\fR(2)).
+.sp
+.LP
+The directory's owner \fBID\fR is set to  the process's effective user ID. The
+directory's group \fBID\fR is set to the  process's effective group ID, or if
+the \fBS_ISGID\fR bit is set in the parent directory, then the group \fBID\fR
+of the directory is inherited from the parent.  The \fBS_ISGID\fR bit of the
+new directory is  inherited from the parent directory.
+.sp
+.LP
+If \fIpath\fR names a symbolic link, \fBmkdir()\fR fails and sets errno to
+\fBEEXIST\fR.
+.sp
+.LP
+The newly created directory is empty with the exception of entries for itself
+(\fB\&.\fR) and its parent directory (\fB\&..\fR).
+.sp
+.LP
+Upon successful completion, \fBmkdir()\fR marks for update the \fBst_atime\fR,
+\fBst_ctime\fR and \fBst_mtime\fR fields of the directory. Also, the
+\fBst_ctime\fR and \fBst_mtime\fR fields of the directory that contains the new
+entry are marked for update.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned, no directory is created, and  \fBerrno\fR is set to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBmkdir()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Either a component of the path prefix denies search permission or write
+permission is denied on the parent directory of the directory to be created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDQUOT\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory where the new file entry is being placed cannot be extended
+because the user's quota of disk blocks on that file system has been exhausted;
+the new directory cannot be created because the user's quota of disk blocks on
+that file system has been exhausted; or the user's quota of inodes on the file
+system where the file is being created has been exhausted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 16n
+.rt  
+The named file already exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+An attempt was made to create an extended attribute that is a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error has occurred while accessing the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 16n
+.rt  
+The path argument includes non-UTF8 characters and the file system accepts only
+file names where all characters are part of the UTF-8 character codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating \fIpath\fR, or a loop
+exists in symbolic links encountered during resolution of \fIpath\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The maximum number of links to the parent directory would be exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds \fBPATH_MAX\fR, or the length of
+a \fIpath\fR component exceeds \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix does not exist or is a null pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 16n
+.rt  
+No free space is available on the device containing the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix is not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The path prefix resides on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBmkdir()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+As a result of encountering a symbolic link in resolution of the \fIpath\fR
+argument, the length of the substituted pathname string exceeded
+{\fBPATH_MAX\fR}.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreate a directory.
+.sp
+.LP
+The following example demonstrates how to create a directory named
+\fB/home/cnd/mod1\fR, with read, write, and search permissions for owner and
+group, and with read and search permissions for others.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+int status;
+\&...
+status = mkdir("/home/cnd/mod1", 
+     S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(2), \fBmknod\fR(2), \fBumask\fR(2), \fBmkdirp\fR(3GEN),
+\fBstat.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

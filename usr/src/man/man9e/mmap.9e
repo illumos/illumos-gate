@@ -1,0 +1,286 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mmap 9E "27 Sep 2002" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+mmap \- check virtual mapping for memory mapped device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/cred.h>
+#include <sys/mman.h>
+#include <sys/ddi.h>
+
+
+
+\fBint prefix\fR\fBmmap\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoff\fR, \fBint\fR \fIprot\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+This interface is obsolete. \fBdevmap\fR(9E) should be used instead.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 9n
+.rt  
+Device whose memory is to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 9n
+.rt  
+Offset within device memory at which mapping begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprot\fR \fR
+.ad
+.RS 9n
+.rt  
+A bit field that specifies the protections this page of memory will receive.
+Possible settings are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_READ\fR \fR
+.ad
+.RS 15n
+.rt  
+Read access will be granted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_WRITE\fR \fR
+.ad
+.RS 15n
+.rt  
+Write access will be granted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_EXEC\fR \fR
+.ad
+.RS 15n
+.rt  
+Execute access will be granted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_USER\fR \fR
+.ad
+.RS 15n
+.rt  
+User-level access will be granted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_ALL\fR \fR
+.ad
+.RS 15n
+.rt  
+All access will be granted.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Future releases of Solaris will provide this function for binary and source
+compatibility. However, for increased functionality, use \fBdevmap\fR(9E)
+instead. See \fBdevmap\fR(9E) for details.
+.sp
+.LP
+The \fBmmap()\fR entry point is a required entry point for character drivers
+supporting memory-mapped devices. A memory mapped device has memory that can be
+mapped into a process's address space. The \fBmmap\fR(2) system call, when
+applied to a character special file, allows this device memory to be mapped
+into user space for direct access by the user application.
+.sp
+.LP
+The \fBmmap()\fR entry point is called as a result of an \fBmmap\fR(2) system
+call, and also as a result of a page fault. \fBmmap()\fR is called to translate
+the offset \fIoff\fR in device memory to the corresponding physical page frame
+number.
+.sp
+.LP
+The \fBmmap()\fR entry point checks if the offset \fIoff\fR is within the range
+of pages exported by the device. For example, a device that has 512 bytes of
+memory that can be mapped into user space should not support offsets greater
+than 512. If the offset does not exist, then \fB-1\fR is returned. If the
+offset does exist, \fBmmap()\fR returns the value returned by
+\fBhat_getkpfnum\fR(9F) for the physical page in device memory containing the
+offset \fIoff\fR.
+.sp
+.LP
+\fBhat_getkpfnum\fR(9F) accepts a kernel virtual address as an argument. A
+kernel virtual address can be obtained by calling \fBddi_regs_map_setup\fR(9F)
+in the driver's \fBattach\fR(9E) routine. The corresponding
+\fBddi_regs_map_free\fR(9F) call can be made in the driver's \fBdetach\fR(9E)
+routine. Refer to the example below \fImmap Entry Point\fR for more
+information.
+.sp
+.LP
+\fBmmap()\fR should only be supported for memory-mapped devices. See
+\fBsegmap\fR(9E) for further information on memory-mapped device drivers.
+.sp
+.LP
+If a device driver shares data structures with the application, for example
+through exported kernel memory, and the driver gets recompiled for a 64-bit
+kernel but the application remains 32-bit, the binary layout of any data
+structures will be incompatible if they contain longs or pointers. The driver
+needs to know whether there is a model mismatch between the current thread and
+the kernel and take necessary action. \fBddi_mmap_get_model\fR(9F) can be use
+to get the C Language Type Model which the current thread expects. In
+combination with \fBddi_model_convert_from\fR(9F) the driver can determine
+whether there is a data model mismatch between the current thread and the
+device driver. The device driver might have to adjust the shape of data
+structures before exporting them to a user thread which supports a different
+data model. See \fBddi_mmap_get_model\fR(9F) for an example.
+.SH RETURN VALUES
+.sp
+.LP
+If the protection and offset are valid for the device, the driver should return
+the value returned by \fBhat_getkpfnum\fR(9F), for the page at offset \fIoff\fR
+in the device's memory. If not, \fB-1\fR should be returned.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBmmap()\fR Entry Point
+.sp
+.LP
+The following is an example of the \fBmmap()\fR entry point. If offset
+\fIoff\fR is valid, \fBhat_getkpfnum\fR(9F) is called to obtain the page frame
+number corresponding to this offset in the device's memory. In this example,
+\fBxsp\(->regp\(->csr\fR is a kernel virtual address which maps to device
+memory. \fBddi_regs_map_setup\fR(9F) can be used to obtain this address. For
+example, \fBddi_regs_map_setup\fR(9F) can be called in the driver's
+\fBattach\fR(9E) routine. The resulting kernel virtual address is stored in the
+\fBxxstate\fR structure, which is accessible from the driver's \fBmmap()\fR
+entry point. See \fBddi_soft_state\fR(9F). The corresponding
+\fBddi_regs_map_free\fR(9F) call can be made in the driver's  \fBdetach\fR(9E)
+routine.
+
+.sp
+.in +2
+.nf
+struct reg {
+	        uint8_t	csr;
+	        uint8_t	data;
+};
+struct xxstate {
+        .\|.\|.
+	        struct reg	*regp
+        .\|.\|.
+};
+
+struct xxstate *xsp;
+\&.\|.\|.
+
+static int
+xxmmap(dev_t dev, off_t off, int prot)
+{
+        int		instance;
+        struct xxstate *xsp; 
+
+         /* No write access */
+        if (prot & PROT_WRITE)
+		            return (-1);
+
+        instance = getminor(dev);
+        xsp = ddi_get_soft_state(statep, instance);
+        if (xsp == NULL)
+		            return (-1);
+
+        /* check for a valid offset */
+	       if ( off is invalid )
+		            return (-1);
+	       return (hat_getkpfnum (xsp->regp->csr + off));
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBattributes\fR(5), \fBattach\fR(9E), \fBdetach\fR(9E),
+\fBdevmap\fR(9E), \fBsegmap\fR(9E), \fBddi_btop\fR(9F),
+\fBddi_get_soft_state\fR(9F), \fBddi_mmap_get_model\fR(9F),
+\fBddi_model_convert_from\fR(9F), \fBddi_regs_map_free\fR(9F),
+\fBddi_regs_map_setup\fR(9F), \fBddi_soft_state\fR(9F), \fBdevmap_setup\fR(9F),
+\fBgetminor\fR(9F), \fBhat_getkpfnum\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+For some devices, mapping device memory in the driver's \fBattach\fR(9E)
+routine and unmapping device memory in the driver's \fBdetach\fR(9E) routine is
+a sizeable drain on system resources. This is especially true for devices with
+a large amount of physical address space.
+.sp
+.LP
+One alternative is to create a mapping for only the first page of device memory
+in \fBattach\fR(9E). If the device memory is contiguous, a kernel page frame
+number may be obtained by calling \fBhat_getkpfnum\fR(9F) with the kernel
+virtual address of the first page of device memory and adding the desired page
+offset to the result. The page offset may be obtained by converting the byte
+offset \fIoff\fR to pages. See \fBddi_btop\fR(9F).
+.sp
+.LP
+Another alternative is to call \fBddi_regs_map_setup\fR(9F) and
+\fBddi_regs_map_free\fR(9F) in \fBmmap()\fR. These function calls would bracket
+the call to \fBhat_getkpfnum\fR(9F).
+.sp
+.LP
+However, note that the above alternatives may not work in all cases. The
+existence of intermediate nexus devices with memory management unit translation
+resources that are not locked down may cause unexpected and undefined behavior.

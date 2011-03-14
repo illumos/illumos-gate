@@ -1,0 +1,80 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setcat 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+setcat \- define default catalog
+.SH SYNOPSIS
+.LP
+.nf
+#include <pfmt.h>
+
+\fBchar *\fR\fBsetcat\fR(\fBconst char *\fR\fIcatalog\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetcat()\fR function defines the default message catalog to be used by
+subsequent calls to \fBgettxt\fR(3C), \fBlfmt\fR(3C), or \fBpfmt\fR(3C) that do
+not explicitly specify a message catalog.
+.sp
+.LP
+The \fIcatalog\fR argument must be limited to 14 characters. These characters
+must be selected from a set of all characters values, excluding \fB\e0\fR
+(null) and the ASCII codes for \fB/\fR (slash) and \fB:\fR (colon).
+.sp
+.LP
+The \fBsetcat()\fR function assumes that the catalog exists. No checking is
+done on the argument.
+.sp
+.LP
+A null pointer passed as an argument will result in the return of a pointer to
+the current default message catalog name. A pointer to an empty string passed
+as an argument will cancel the default catalog.
+.sp
+.LP
+If no default catalog is specified, or if \fIcatalog\fR is an invalid catalog
+name, subsequent calls to \fBgettxt\fR(3C), \fBlfmt\fR(3C), or \fBpfmt\fR(3C)
+that do not explicitely specify a catalog name will use \fBMessage not
+found!!\en\fR as default string.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsetcat()\fR returns a pointer to the catalog
+name.  Otherwise, it returns a null pointer.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBsetcat()\fR function.
+.sp
+.in +2
+.nf
+        setcat("test");
+        gettxt(":10", "hello world\en")
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgettxt\fR(3C), \fBlfmt\fR(3C), \fBpfmt\fR(3C), \fBsetlocale\fR(3C),
+\fBattributes\fR(5), \fBenviron\fR(5)

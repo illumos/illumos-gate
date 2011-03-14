@@ -1,0 +1,115 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sigprocmask 2 "23 Mar 2005" "SunOS 5.11" "System Calls"
+.SH NAME
+sigprocmask \- change or examine caller's signal mask
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBsigprocmask\fR(\fBint\fR \fIhow\fR, \fBconst sigset_t *restrict\fR \fIset\fR,
+     \fBsigset_t *restrict\fR \fIoset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsigprocmask()\fR function is used to examine and/or change the caller's
+signal mask. If the value is  \fBSIG_BLOCK\fR, the set pointed to by the
+\fIset\fR argument is added to the current signal mask. If the value is
+\fBSIG_UNBLOCK\fR, the set pointed by the  \fIset\fR argument is removed from
+the current signal mask. If the value is  \fBSIG_SETMASK\fR, the current signal
+mask is replaced by the set pointed to by the  \fIset\fR argument. If the
+\fIoset\fR argument is not  \fINULL\fR, the previous mask is stored in the
+space pointed to by \fIoset\fR. If the value of the  \fIset\fR argument is
+\fINULL\fR, the value  \fIhow\fR is not significant and the caller's signal
+mask is unchanged; thus, the call can be used to inquire about currently
+blocked signals. If the \fIset\fR or \fIoset\fR argument points to an invalid
+address, the behavior is undefined and \fBerrno\fR may be set to \fBEFAULT\fR.
+.sp
+.LP
+If there are any pending unblocked signals after the call to
+\fBsigprocmask()\fR, at least one of those signals will be delivered before the
+call to \fBsigprocmask()\fR returns.
+.sp
+.LP
+It is not possible to block signals that cannot be caught or ignored (see
+\fBsigaction\fR(2)). It is also not possible to block or unblock SIGCANCEL, as
+SIGCANCEL is reserved for the implementation of POSIX thread cancellation (see
+\fBpthread_cancel\fR(3C) and \fBcancellation\fR(5)). This restriction is
+silently enforced by the standard C library.
+.sp
+.LP
+If \fBsigprocmask()\fR fails, the caller's signal mask is not changed.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsigprocmask()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIhow\fR argument is not equal to one of the defined values.
+.RE
+
+.sp
+.LP
+The \fBsigprocmask()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIset\fR or \fIoset\fR argument points to an illegal address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigaction\fR(2), \fBpthread_cancel\fR(3C), \fBpthread_sigmask\fR(3C),
+\fBsignal\fR(3C), \fBsignal.h\fR(3HEAD), \fBsigsetops\fR(3C),
+\fBattributes\fR(5), \fBcancellation\fR(5)
+.SH NOTES
+.sp
+.LP
+The call to \fBsigprocmask()\fR affects only the calling thread's signal mask.
+It is identical to a call to \fBpthread_sigmask\fR(3C).
+.sp
+.LP
+Signals that are generated synchronously should not be masked. If such a signal
+is blocked and delivered, the receiving process is killed.

@@ -1,0 +1,105 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strccpy 3GEN "29 Dec 1996" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+strccpy, streadd, strcadd, strecpy \- copy strings, compressing or expanding
+escape codes
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBchar *\fR\fBstrccpy\fR(\fBchar *\fR\fIoutput\fR, \fBconst char *\fR\fIinput\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBstrcadd\fR(\fBchar *\fR\fIoutput\fR, \fBconst char *\fR\fIinput\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBstrecpy\fR(\fBchar *\fR\fIoutput\fR, \fBconst char *\fR\fIinput\fR, \fBconst char *\fR\fIexceptions\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBstreadd\fR(\fBchar *\fR\fIoutput\fR, \fBconst char *\fR\fIinput\fR, \fBconst char *\fR\fIexceptions\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBstrccpy()\fR copies the \fIinput\fR string, up to a null byte, to the
+\fIoutput\fR string, compressing the C-language escape sequences (for example,
+\fB\en\fR, \fB\e001\fR) to the equivalent character.  A null byte is appended
+to the output. The \fIoutput\fR argument must point to a space big enough to
+accommodate the result. If it is as big as the space pointed to by \fIinput\fR
+it is guaranteed to be big enough. \fBstrccpy()\fR returns the \fIoutput\fR
+argument.
+.sp
+.LP
+\fBstrcadd()\fR is identical to \fBstrccpy()\fR, except that it returns the
+pointer to the null byte that terminates the output.
+.sp
+.LP
+\fBstrecpy()\fR copies the \fIinput\fR string, up to a null byte, to the
+\fIoutput\fR string, expanding non-graphic characters to their equivalent
+C-language escape sequences (for example, \fB\en\fR, \fB\e001\fR).  The
+\fIoutput\fR argument must point to a space big enough to accommodate the
+result; four times the  space pointed to by \fIinput\fR is guaranteed to be big
+enough (each character could become \fB\e\fR and 3 digits). Characters in the
+\fIexceptions\fR string are not expanded.  The \fIexceptions\fR argument may be
+zero, meaning all non-graphic characters are expanded. \fBstrecpy()\fR returns
+the \fIoutput\fR argument.
+.sp
+.LP
+\fBstreadd()\fR is identical to \fBstrecpy()\fR, except that it returns the
+pointer to the null byte that terminates the output.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of expanding and compressing escape codes.
+.sp
+.in +2
+.nf
+/* expand all but newline and tab */
+strecpy( output, input, "\en\et" );
+
+/* concatenate and compress several strings */
+cp = strcadd( output, input1 );
+cp = strcadd( cp, input2 );
+cp = strcadd( cp, input3 );
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstring\fR(3C), \fBstrfind\fR(3GEN), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multi-thread applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multi-thread
+applications.

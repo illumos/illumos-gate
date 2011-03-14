@@ -1,0 +1,189 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_window 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_window, newwin, delwin, mvwin, subwin, derwin, mvderwin, dupwin, wsyncup,
+syncok, wcursyncup, wsyncdown \- create curses windows
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBWINDOW *\fR\fBnewwin\fR(\fBint\fR \fInlines\fR, \fBint\fR \fIncols\fR, \fBint\fR \fIbegin_y\fR, \fBint\fR \fIbegin_x\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdelwin\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwin\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBsubwin\fR(\fBWINDOW *\fR\fIorig\fR, \fBint\fR \fInlines\fR, \fBint\fR \fIncols\fR,
+     \fBint\fR \fIbegin_y\fR, \fBint\fR \fIbegin_x\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBderwin\fR(\fBWINDOW *\fR\fIorig\fR, \fBint\fR \fInlines\fR, \fBint\fR \fIncols\fR,
+     \fBint\fR \fIbegin_y\fR, \fBint\fR \fIbegin_x\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvderwin\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIpar_y\fR, \fBint\fR \fIpar_x\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBdupwin\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwsyncup\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsyncok\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwcursyncup\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwsyncdown\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnewwin()\fR routine creates and returns a pointer to a new window with
+the given number of lines, \fInlines\fR, and columns, \fIncols\fR. The upper
+left-hand corner of the window is at line \fIbegin_y\fR, column \fIbegin_x\fR.
+If either \fInlines\fR or \fIncols\fR is zero, they default to \fBLINES\fR \(em
+\fIbegin_y\fR and \fBCOLS\fR \(em \fIbegin_x\fR. A new full-screen window is
+created by calling \fBnewwin(0,0,0,0)\fR.
+.sp
+.LP
+The \fBdelwin()\fR routine deletes the named window, freeing all memory
+associated with it. Subwindows must be deleted before the main window can be
+deleted.
+.sp
+.LP
+The \fBmvwin()\fR routine moves the window so that the upper left-hand corner
+is at position (\fIx\fR, \fIy\fR). If the move would cause the window to be off
+the screen, it is an error and the window is not moved. Moving subwindows is
+allowed, but should be avoided.
+.sp
+.LP
+The \fBsubwin()\fR routine creates and returns a pointer to a new window with
+the given number of lines, \fInlines\fR, and columns, \fIncols\fR. The window
+is at position (\fIbegin_y\fR, \fIbegin_x\fR) on the screen. (This position is
+relative to the screen, and not to the window \fIorig\fR.) The window is made
+in the middle of the window \fIorig\fR, so that changes made to one window will
+affect both windows. The subwindow shares memory with the window \fIorig\fR.
+When using this routine, it is necessary to call \fBtouchwin()\fR or
+\fBtouchline()\fR on \fIorig\fR before calling \fBwrefresh()\fR on the
+subwindow.
+.sp
+.LP
+The \fBderwin()\fR routine is the same as \fBsubwin()\fR, except that
+\fIbegin_y\fR and \fIbegin_x\fR are relative to the origin of the window
+\fIorig\fR rather than the screen. There is no difference between the
+subwindows and the derived windows.
+.sp
+.LP
+The \fBmvderwin()\fR routine moves a derived window (or subwindow) inside its
+parent window. The screen-relative parameters of the window are not changed.
+This routine is used to display different parts of the parent window at the
+same physical position on the screen.
+.sp
+.LP
+The \fBdupwin()\fR routine creates an exact duplicate of the window \fIwin\fR.
+.sp
+.LP
+Each \fBcurses\fR window maintains two data structures: the character image
+structure and the status structure. The character image structure is shared
+among all windows in the window hierarchy (that is, the window with all
+subwindows). The status structure, which contains information about individual
+line changes in the window, is private to each window. The routine
+\fBwrefresh()\fR uses the status data structure when performing screen
+updating. Since status structures are not shared, changes made to one window in
+the hierarchy may not be properly reflected on the screen.
+.sp
+.LP
+The routine \fBwsyncup()\fR causes the changes in the status structure of a
+window to be reflected in the status structures of its ancestors. If
+\fBsyncok()\fR is called with second argument \fBTRUE\fR then \fBwsyncup()\fR
+is called automatically whenever there is a change in the window.
+.sp
+.LP
+The routine \fBwcursyncup()\fR updates the current cursor position of all the
+ancestors of the window to reflect the current cursor position of the window.
+.sp
+.LP
+The routine \fBwsyncdown()\fR updates the status structure of the window to
+reflect the changes in the status structures of its ancestors. Applications
+seldom call this routine because it is called automatically by
+\fBwrefresh()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return an integer return the integer \fBERR\fR upon failure and
+an integer value other than \fBERR\fR upon successful completion.
+.sp
+.LP
+\fBdelwin()\fR returns the integer \fBERR\fR upon failure and \fBOK\fR upon
+successful completion.
+.sp
+.LP
+Routines that return pointers return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_refresh\fR(3CURSES), \fBcurs_touch\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+If many small changes are made to the window, the \fBwsyncup()\fR option could
+degrade performance.
+.sp
+.LP
+Note that \fBsyncok()\fR may be a macro.

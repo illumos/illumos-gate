@@ -1,0 +1,193 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_notify 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_notify \- propagate notification of a state change event
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_ev_notify\fR(\fIdev_info_t *dip\fR, \fIminor_t minor\fR, \fIint spec_type\fR, 
+     \fIldi_ev_cookie_t cookie\fR, \fIvoid *ev_data\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_info_t *dip\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBdevinfo\fR node of the layered consumer exporting the minor device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_t minor\fR\fR
+.ad
+.sp .6
+.RS 4n
+The minor number of the exported minor device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIint spec_type\fR\fR
+.ad
+.sp .6
+.RS 4n
+The type of minor device (\fBS_IFCHR\fR or \fBS_IFBLK\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_cookie_t cookie\fR\fR
+.ad
+.sp .6
+.RS 4n
+An opaque event cookie for the event type returned by a previous call to
+\fBldi_ev_get_cookie\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvoid *ev_data\fR\fR
+.ad
+.sp .6
+.RS 4n
+Event specific data.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_notify()\fR function propagates an event up the software stack.
+It may result in two actions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invocation of \fBLDI\fR callback handlers registered by layered drivers up the
+software stack.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Device contract events generated on minors exported to \fBuserland\fR.
+.RE
+.sp
+.LP
+The event propagated up the software stack may be different than the event
+received by the layered driver invoking \fBldi_ev_notify()\fR. For example, a
+volume manager may receive an "offline" event on one of it's \fBLDI\fR opened
+disks, but may choose to propagate a "degraded" event on minors it exports to
+\fBuserland\fR (since it may have more than one copy of the data). The event
+cookie argument to \fBldi_ev_notify()\fR may be different from the event cookie
+currently possessed by the layered driver. If that is the case, the layered
+driver must generate another event cookie via a new \fBldi_ev_get_cookie\fR(9F)
+call.
+.sp
+.LP
+The\fBldi_ev_*\fR interfaces are designed to ensure that a "finalize" call is
+generated for layered driver consumers at the earliest point where an
+\fBLDI_EV_FAILURE\fR is detected. If this happens inside the \fBLDI\fR event
+framework, then the framework will invoke finalize. In the event a layered
+driver detects/generates an \fBLDI_EV_FAILURE\fR, then the layered driver must
+invoke \fBldi_ev_finalize()\fR. The following is an example of a layered driver
+invoking \fBldi_ev_finalize()\fR for the "foo" event:
+.sp
+.in +2
+.nf
+static int
+ widget_notify(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie, void *arg,
+     void *ev_data)
+ {
+
+         ASSERT(strcmp(ldi_ev_get_type(foo_cookie), LDI_EV_FOO) == 0);
+
+         /* Map imported minors to exported minor */
+         widget_map(lh, &minor, &spec_type);
+
+         /*
+          * Call ldi_ev_notify() to propagate events to our consumers.
+          * This *must* happen before we check if widget should block
+          * foo
+          */
+          if (ldi_ev_notify(dip, minor, spec_type, foo_cookie, ev_data)
+              != LDI_EV_SUCCESS)
+                  return (LDI_EV_FAILURE);
+
+         /*
+          * Next, check if we can allow the foo event
+          */
+          if (widget_release(lh, LDI_EV_FOO) == WIDGET_SUCCESS) {
+                  return (LDI_EV_SUCCESS)
+          }
+
+          /*
+           * We cannot permit the foo event. The first layer that detects
+           * failure i.e. us, must generate finalize events for *our*
+           * consumers
+           */
+          ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE,
+              foo_cookie, ev_data);
+
+          return (LDI_EV_FAILURE);
+}
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+The return values for this function are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Consumers up the software stack permit state change.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_FAILURE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Consumers are blocking the state change.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
+\fBldi_ev_remove_callbacks\fR(9F)

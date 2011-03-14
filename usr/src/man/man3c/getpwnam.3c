@@ -1,0 +1,471 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getpwnam 3C "5 Apr 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getpwnam, getpwnam_r, getpwent, getpwent_r, getpwuid, getpwuid_r, setpwent,
+endpwent, fgetpwent, fgetpwent_r \- get password entry
+.SH SYNOPSIS
+.LP
+.nf
+#include <pwd.h>
+
+\fBstruct passwd *\fR\fBgetpwnam\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBgetpwnam_r\fR(\fBconst char *\fR\fIname\fR, \fBstruct passwd *\fR\fIpwd\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBgetpwent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBgetpwent_r\fR(\fBstruct passwd *\fR\fIpwd\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBgetpwuid\fR(\fBuid_t\fR \fIuid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBgetpwuid_r\fR(\fBuid_t\fR \fIuid\fR, \fBstruct passwd *\fR\fIpwd\fR,
+    \fBchar *\fR\fIbuffer\fR, \fBint\fR  \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetpwent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBendpwent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBfgetpwent\fR(\fBFILE *\fR\fIf\fR);
+.fi
+
+.LP
+.nf
+\fBstruct passwd *\fR\fBfgetpwent_r\fR(\fBFILE *\fR\fIf\fR, \fBstruct passwd *\fR\fIpwd\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+cc [ \fIflag\fR...] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\fR... ]
+
+\fBint\fR \fBgetpwnam_r\fR(\fBconst char *\fR\fIname\fR, \fBstruct passwd *\fR\fIpwd\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBsize_t\fR \fIbufsize\fR, \fBstruct passwd **\fR\fIresult\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetpwuid_r\fR(\fBuid_t\fR \fIuid\fR, \fBstruct passwd *\fR\fIpwd\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBsize_t\fR \fIbufsize\fR, \fBstruct passwd **\fR\fIresult\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to obtain password entries. Entries can come from any
+of the sources for \fBpasswd\fR specified in the \fB/etc/nsswitch.conf\fR file
+(see \fBnsswitch.conf\fR(4)).
+.sp
+.LP
+The \fBgetpwnam()\fR function searches for a password entry with the login name
+specified by the character string parameter \fIname\fR.
+.sp
+.LP
+The \fBgetpwuid()\fR function searches for a password entry with the (numeric)
+user \fBID\fR specified by the \fIuid\fR parameter.
+.sp
+.LP
+The \fBsetpwent()\fR, \fBgetpwent()\fR, and \fBendpwent()\fR functions are used
+to enumerate password entries from the database. The \fBsetpwent()\fR function
+sets (or resets) the enumeration to the beginning of the set of password
+entries. This function should be called before the first call to
+\fBgetpwent()\fR. Calls to \fBgetpwnam()\fR and \fBgetpwuid()\fR leave the
+enumeration position in an indeterminate state. Successive calls to
+\fBgetpwent()\fR return either successive entries or a null pointer, indicating
+the end of the enumeration.
+.sp
+.LP
+The \fBendpwent()\fR function may be called to indicate that the caller expects
+to do no further password retrieval operations; the system may then  close the
+password file, deallocate resources it was using, and so forth.  It is still
+allowed, but possibly less efficient, for the process to call more password
+functions after calling \fBendpwent()\fR.
+.sp
+.LP
+The \fBfgetpwent()\fR function, unlike the other functions above, does not use
+\fBnsswitch.conf\fR but reads and parses the next line from the stream \fIf\fR,
+which is assumed to have the format of the \fBpasswd\fR file.  See
+\fBpasswd\fR(4).
+.SS "Reentrant Interfaces"
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwuid()\fR, \fBgetpwent()\fR, and \fBfgetpwent()\fR
+functions use thread-specific data storage that is reused in each call to one
+of these functions by the same thread, making them safe to use but not
+recommended for multithreaded applications.
+.sp
+.LP
+The parallel functions \fBgetpwnam_r()\fR, \fBgetpwuid_r()\fR,
+\fBgetpwent_r()\fR, and \fBfgetpwent_r()\fR provide reentrant interfaces for
+these operations.
+.sp
+.LP
+Each reentrant interface performs the same operation as its non-reentrant
+counterpart, named by removing the "\|_r\|" suffix. The reentrant interfaces,
+however, use buffers supplied by the caller to store returned results instead
+of using thread-specific data that can be overwritten by each call. They are
+safe for use in both single-threaded and multithreaded applications.
+.sp
+.LP
+Each reentrant interface takes the same parameters as its non-reentrant
+counterpart, as well as the following additional parameters. The \fIpwd\fR
+parameter must be a pointer to a \fBstruct passwd\fR structure allocated by the
+caller. On successful completion, the function returns the password entry in
+this structure. The parameter \fIbuffer\fR is a pointer to a buffer supplied by
+the caller, used as storage space for the password data. All pointers within
+the returned \fBstruct passwd\fR \fIpwd\fR point to data stored within this
+buffer; see \fBpasswd Structure\fR below. The buffer must be large enough to
+hold all the data associated with the password entry. The parameter
+\fIbuflen\fR (or \fIbufsize\fR for the standard-conforming versions; see
+\fBstandards\fR(5)) should give the size in bytes of \fIbuffer\fR. The maximum
+size needed for this buffer can be determined with the
+{\fB_SC_GETPW_R_SIZE_MAX\fR} \fBsysconf\fR(3C) parameter. The
+standard-conforming versions place a pointer to the modified \fIpwd\fR
+structure in the \fIresult\fR parameter, instead of returning a pointer to this
+structure. A null pointer is returned at the location pointed to by
+\fIresult\fR on error or if the requested entry is not found.
+.sp
+.LP
+For enumeration in multithreaded applications, the position within the
+enumeration is a process-wide property shared by all threads. The
+\fBsetpwent()\fR function can be used in a multithreaded application but resets
+the enumeration position for all threads.  If multiple threads interleave calls
+to \fBgetpwent_r()\fR, the threads will enumerate disjoint subsets of the
+password database.
+.sp
+.LP
+Like their non-reentrant counterparts, \fBgetpwnam_r()\fR and
+\fBgetpwuid_r()\fR leave the enumeration position in an indeterminate state.
+.SS "passwd Structure"
+.sp
+.LP
+Password entries are represented by the \fBstruct passwd\fR structure defined
+in <\fBpwd.h\fR>:
+.sp
+.in +2
+.nf
+struct passwd {
+    char *pw_name;      /* user's login name */
+    char *pw_passwd;    /* no longer used */
+    uid_t pw_uid;       /* user's uid */
+    gid_t pw_gid;       /* user's gid */
+    char *pw_age;       /* not used */
+    char *pw_comment;   /* not used */
+    char *pw_gecos;     /* typically user's full name */
+    char *pw_dir;       /* user's home dir */
+    char *pw_shell;     /* user's login shell */
+};
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpw_passwd\fR member should not be used as the encrypted password for the
+user; use \fBgetspnam()\fR or \fBgetspnam_r()\fR instead. See
+\fBgetspnam\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, and
+\fBgetpwuid_r()\fR functions each return a pointer to a \fBstruct passwd\fR if
+they successfully locate the requested entry. A null pointer is returned if the
+requested entry is not found, or an error occurs. On error, \fBerrno\fR is set
+to indicate the error.
+.sp
+.LP
+Applications wishing to check for error situations should set \fBerrno\fR to 0
+before calling \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR,
+\fBgetpwuid_r()\fR, \fBgetpwent()\fR, \fBgetpwent_r()\fR, \fBfgetpwent()\fR,
+and \fBfgetpwent_r()\fR. If these non-reentrant functions return a null pointer
+and \fBerrno\fR is non-zero, an error occurred.
+.sp
+.LP
+The standard-conforming functions \fBgetpwnam_r()\fR and \fBgetpwuid_r()\fR can
+return \fB0\fR even on an error, particularly in the case where the requested
+entry is not found. The application needs to check the return value and that
+the \fIpwd\fR pointer is non-null. Otherwise, an error value is returned to
+indicate the error.
+.sp
+.LP
+The \fBgetpwent()\fR, \fBgetpwent_r()\fR, \fBfgetpwent()\fR, and
+\fBfgetpwent_r()\fR functions each return a pointer to a \fBstruct passwd\fR if
+they successfully enumerate an entry; otherwise they return a null pointer on
+end-of-file or error. On error, \fBerrno\fR is set to indicate the error.
+.sp
+.LP
+See \fBIntro\fR(2) for the proper usage and interpretation of \fBerrno\fR in
+multithreaded applications.
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwuid()\fR, \fBgetpwent()\fR, and \fBfgetpwent()\fR
+functions use thread-specific data storage, so returned data must be copied
+before a subsequent call to any of these functions if the data is to be saved.
+.sp
+.LP
+When the pointer returned by the reentrant functions \fBgetpwnam_r()\fR,
+\fBgetpwuid_r()\fR, \fBgetpwent_r()\fR, and \fBfgetpwent_r()\fR is non-null, it
+is always equal to the \fIpwd\fR pointer that was supplied by the caller.
+.SH ERRORS
+.sp
+.LP
+The \fBgetpwent_r()\fR, \fBfgetpwent()\fR, and \fBfgetpwent_r()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+An I/O error has occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
+the data to be referenced by the resulting \fBpasswd\fR structure.
+.RE
+
+.sp
+.LP
+The \fBgetpwent_r()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The maximum allowable number of files is currently open in the system.
+.RE
+
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR,
+\fBgetpwent()\fR, \fBsetpwent()\fR, and \fBendpwent()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 7n
+.rt  
+An I/O error has occurred.
+.RE
+
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR,
+\fBgetpwent()\fR, and \fBsetpwent()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The maximum allowable number of files is currently open in the system.
+.RE
+
+.sp
+.LP
+The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, and
+\fBgetpwuid_r()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+A signal was caught during the execution of the function call.
+.RE
+
+.sp
+.LP
+The \fBgetpwnam_r()\fR and \fBgetpwuid_r()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
+the data to be referenced by the resulting \fBpasswd\fR structure.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Three names associated with the current process can be determined:
+\fBgetpwuid\fR(\fBgeteuid()\fR) returns the name associated with the effective
+user ID of the process; \fBgetlogin()\fR returns the name associated with the
+current login activity; and \fBgetpwuid\fR(\fBgetuid()\fR) returns the name
+associated with the real user ID of the process.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSee \fBReentrant Interfaces\fR in \fBDESCRIPTION\fR.
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBendpwent()\fR,  \fBgetpwent()\fR,  \fBgetpwnam()\fR,
+\fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR, and \fBsetpwent()\fR,
+see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBnispasswd\fR(1), \fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(2),
+\fBIntro\fR(3), \fBcuserid\fR(3C), \fBgetgrnam\fR(3C), \fBgetlogin\fR(3C),
+\fBgetspnam\fR(3C), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBshadow\fR(4),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded programs, see \fBIntro\fR(3).
+.sp
+.LP
+Use of the enumeration interfaces \fBgetpwent()\fR and \fBgetpwent_r()\fR is
+discouraged; enumeration is supported for the \fBpasswd\fR file, \fBNIS,\fR and
+\fBNIS+,\fR but in general is not efficient and might not be supported for all
+database sources.  The semantics of enumeration are discussed further in
+\fBnsswitch.conf\fR(4).
+.sp
+.LP
+Previous releases allowed the use of `+' and `-' entries in \fB/etc/passwd\fR
+to selectively include and exclude \fBNIS\fR entries. The primary usage of
+these `+/-' entries is superseded by the name service switch, so the `+/-' form
+might not be supported in future releases.
+.sp
+.LP
+If required, the `+/-' functionality can still be obtained for \fBNIS\fR by
+specifying \fBcompat\fR as the source for \fBpasswd\fR.
+.sp
+.LP
+If the `+/-' functionality is required in conjunction with \fBNIS+,\fR specify
+both \fBcompat\fR as the source for \fBpasswd\fR and \fBnisplus\fR as the
+source for the pseudo-database \fBpasswd_compat\fR. See \fBpasswd\fR(4),
+\fBshadow\fR(4), and \fBnsswitch.conf\fR(4) for details.
+.sp
+.LP
+If the `+/-' is used, both \fB/etc/shadow\fR and \fB/etc/passwd\fR should have
+the same `+' and `-' entries to ensure consistency between the password and
+shadow databases.
+.sp
+.LP
+If a password entry from any of the sources contains an empty \fIuid\fR or
+\fIgid\fR field, that entry will be ignored by the files, \fBNIS\fR, and
+\fBNIS+\fR name service switch backends, causing the user to appear unknown to
+the system.
+.sp
+.LP
+If a password entry contains an empty \fIgecos\fR, \fIhome directory\fR, or
+\fIshell\fR field, \fBgetpwnam()\fR and \fBgetpwnam_r()\fR return a pointer to
+a null string in the respective field of the \fBpasswd\fR structure.
+.sp
+.LP
+If the shell field is empty, \fBlogin\fR(1) automatically assigns the default
+shell.  See \fBlogin\fR(1).
+.sp
+.LP
+Solaris 2.4 and earlier releases provided definitions of the \fBgetpwnam_r()\fR
+and \fBgetpwuid_r()\fR functions as specified in POSIX.1c Draft 6. The final
+POSIX.1c standard changed the interface for these functions. Support for the
+Draft 6 interface is provided for compatibility only and might not be supported
+in future releases. New applications and libraries should use the
+standard-conforming interface.
+.sp
+.LP
+For POSIX.1c-conforming applications, the \fB_POSIX_PTHREAD_SEMANTICS\fR and
+\fB_REENTRANT\fR flags are automatically turned on by defining the
+\fB_POSIX_C_SOURCE\fR flag with a value \(>=199506L.

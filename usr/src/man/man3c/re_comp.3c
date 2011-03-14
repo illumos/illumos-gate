@@ -1,0 +1,86 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH re_comp 3C "26 Feb 1997" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+re_comp, re_exec \- compile and execute regular expressions
+.SH SYNOPSIS
+.LP
+.nf
+#include <re_comp.h>
+
+\fBchar *\fR\fBre_comp\fR(\fBconst char *\fR\fIstring\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBre_exec\fR(\fBconst char *\fR\fIstring\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBre_comp()\fR function converts a regular expression string (RE) into an
+internal form suitable for pattern matching.  The \fBre_exec()\fR function
+compares the string pointed to by the \fIstring\fR argument with the last
+regular expression passed to \fBre_comp()\fR.
+.sp
+.LP
+If \fBre_comp()\fR is called with a null pointer argument, the current regular
+expression remains unchanged.
+.sp
+.LP
+Strings passed to both \fBre_comp()\fR and \fBre_exec()\fR must be terminated
+by a null byte, and may include \fBNEWLINE\fR characters.
+.sp
+.LP
+The \fBre_comp()\fR and \fBre_exec()\fR functions support \fIsimple regular
+expressions\fR, which are defined on the \fBregexp\fR(5) manual page. The
+regular expressions of the form \fB\e{\fRm\fB\e}\fR, \fB\e{\fRm,\fB\e}\fR, or
+\fB\e{\fRm,n\fB\e}\fR are not supported.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBre_comp()\fR function returns a null pointer when the string pointed to
+by the \fIstring\fR argument is successfully converted.  Otherwise, a pointer
+to one of the following error message strings is returned:
+.sp
+.in +2
+.nf
+No previous regular expression
+Regular expression too long
+unmatched \e\|(
+missing ]
+too many \e\|(\|\e\|) pairs
+unmatched \e\|)
+.fi
+.in -2
+
+.sp
+.LP
+Upon successful completion, \fBre_exec()\fR returns \fB1\fR if \fIstring\fR
+matches the last compiled regular expression.  Otherwise, \fBre_exec()\fR
+returns \fB0\fR if \fIstring\fR fails to match the last compiled regular
+expression, and \fB\(mi1\fR if the compiled regular expression is invalid
+(indicating an internal error).
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+For portability to implementations conforming to X/Open standards prior to SUS,
+\fBregcomp\fR(3C) and \fBregexec\fR(3C) are preferred to these functions.  See
+\fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBgrep\fR(1), \fBregcmp\fR(1), \fBregcmp\fR(3C), \fBregcomp\fR(3C),
+\fBregexec\fR(3C), \fBregexpr\fR(3GEN), \fBregexp\fR(5), \fBstandards\fR(5)

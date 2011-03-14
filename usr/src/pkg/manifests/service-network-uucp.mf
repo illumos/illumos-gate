@@ -42,6 +42,8 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/uucp group=uucp owner=uucp
 dir path=usr/sbin
+dir path=usr/share/man/man1c
+dir path=usr/share/man/man1m
 dir path=var group=sys
 dir path=var/spool
 dir path=var/spool/uucp group=uucp owner=uucp
@@ -108,6 +110,28 @@ file path=usr/lib/uucp/uudemon.poll group=uucp mode=0555
 file path=usr/lib/uucp/uusched group=uucp mode=4511 owner=uucp
 file path=usr/lib/uucp/uuxqt group=uucp mode=4511 owner=uucp
 file path=usr/sbin/in.uucpd group=uucp mode=0555
+file path=usr/share/man/man1c/ct.1c
+file path=usr/share/man/man1c/cu.1c
+file path=usr/share/man/man1c/rup.1c
+file path=usr/share/man/man1c/uucp.1c
+file path=usr/share/man/man1c/uudecode.1c
+file path=usr/share/man/man1c/uuencode.1c
+file path=usr/share/man/man1c/uuglist.1c
+file path=usr/share/man/man1c/uulog.1c
+file path=usr/share/man/man1c/uuname.1c
+file path=usr/share/man/man1c/uupick.1c
+file path=usr/share/man/man1c/uustat.1c
+file path=usr/share/man/man1c/uuto.1c
+file path=usr/share/man/man1c/uux.1c
+file path=usr/share/man/man1m/Uutry.1m
+file path=usr/share/man/man1m/in.uucpd.1m
+file path=usr/share/man/man1m/uucheck.1m
+file path=usr/share/man/man1m/uucico.1m
+file path=usr/share/man/man1m/uucleanup.1m
+file path=usr/share/man/man1m/uucpd.1m
+file path=usr/share/man/man1m/uusched.1m
+file path=usr/share/man/man1m/uutry.1m
+file path=usr/share/man/man1m/uuxqt.1m
 hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
 legacy pkg=SUNWbnur desc="configuration and start-up files for UUCP utilities" \
     name="Networking UUCP Utilities, (Root)"

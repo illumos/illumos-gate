@@ -1,0 +1,87 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ssignal 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ssignal, gsignal \- software signals
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBvoid\fR(\fB*ssignal\fR (\fBint\fR \fIsig\fR, \fBint\fR (*\fIaction\fR)(\fBint\fR)))(\fBint\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgsignal\fR(\fBint\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBssignal()\fR and \fBgsignal()\fR functions implement a software facility
+similar to \fBsignal\fR(3C). This facility is made available to users for their
+own purposes.
+.SS "ssignal(\|)"
+.sp
+.LP
+Software signals made available to users are associated with integers in the
+inclusive range 1 through 17. A call to \fBssignal()\fR associates a procedure,
+\fIaction\fR, with the software signal \fIsig\fR; the software signal,
+\fIsig\fR, is raised by a call to \fBgsignal()\fR. Raising a software signal
+causes the action established for that signal to be taken.
+.sp
+.LP
+The first argument to \fBssignal()\fR is a number identifying the type of
+signal for which an action is to be established. The second argument defines
+the action; it is either the name of a (user-defined) \fIaction\fR
+\fIfunction\fR or one of the manifest constants \fBSIG_DFL\fR (default) or
+\fBSIG_IGN\fR (ignore). The \fBssignal()\fR function returns the action
+previously established for that signal type; if no action has been established
+or the signal number is illegal, \fBssignal()\fR returns \fBSIG_DFL\fR.
+.SS "gsignal(\|)"
+.sp
+.LP
+The \fBgsignal()\fR raises the signal identified by its argument, \fIsig\fR.
+.sp
+.LP
+If an action function has been established for \fIsig\fR, then that action is
+reset to \fBSIG_DFL\fR and the action function is entered with argument
+\fIsig\fR. The \fBgsignal()\fR function returns the value returned to it by the
+action function.
+.sp
+.LP
+If the action for \fIsig\fR is \fBSIG_IGN\fR, \fBgsignal()\fR returns the value
+1 and takes no other action.
+.sp
+.LP
+If the action for \fIsig\fR is \fBSIG_DFL\fR, \fBgsignal()\fR returns the value
+0 and takes no other action.
+.sp
+.LP
+If \fIsig\fR has an illegal value or no action was ever specified for
+\fIsig\fR, \fBgsignal()\fR returns the value 0 and takes no other action.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBraise\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5)

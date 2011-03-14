@@ -1,0 +1,225 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH igb 7D "20 Jul 2007" "SunOS 5.11" "Devices"
+.SH NAME
+igb \- Intel 82575 1Gb PCI Express NIC Driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/igb*\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBigb\fR Gigabit Ethernet driver is a  multi-threaded,  loadable,
+clonable, GLD-based STREAMS driver supporting the Data Link Provider Interface,
+\fBdlpi\fR(7P),  on  Intel 82575 Gigabit Ethernet controllers.
+.sp
+.LP
+The \fBigb\fR driver functions include controller  initialization, frame
+transmit and receive, promiscuous and multicast support, and error recovery and
+reporting.
+.sp
+.LP
+The \fBigb\fR driver and hardware support auto-negotiation, a protocol
+specified by the 1000  Base-T  standard.  Auto-negotiation allows each device
+to advertise its capabilities and discover those of its peer (link partner).
+The highest common  denominator  supported  by  both link  partners  is
+automatically  selected,  yielding  the  greatest  available throughput, while
+requiring no manual configuration. The \fBigb\fR driver also allows you to
+configure the advertised capabilities to less than the maximum (where the full
+speed  of  the interface is not required), or to force a specific mode of
+operation, irrespective of  the  link  partner's  advertised capabilities.
+.SH APPLICATION PROGRAMMING INTERFACE 
+.sp
+.LP
+The cloning character-special device, \fB /dev/igb\fR, is used to access all
+Intel 82575 Gigabit devices installed within the system.
+.sp
+.LP
+The igb driver is managed  by the \fBdladm\fR(1M) command  line utility, which
+allows  VLANs to be defined on top of \fBigb\fR instances and  for \fBigb\fR
+instances to be aggregated.  See \fBdladm\fR(1M) for more details.
+.sp
+.LP
+You must send an explicit DL_ATTACH_REQ message to associate the opened stream
+with a particular device (PPA). The PPA ID is interpreted as an unsigned
+integer data type and  indicates the corresponding device instance (unit)
+number. The driver returns an error (DL_ERROR_ACK) if  the PPA field value does
+not correspond to a valid device instance number for the system. The device is
+initialized on first attach and de-initialized (stopped) at last detach.
+.sp
+.LP
+The values returned by the driver in the DL_INFO_ACK primitive in response to
+your DL_INFO_REQ are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU is 9000.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+DLSAP address length is 8.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+MAC type is DL_ETHER.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+SAP (Service Access Point) length value is -2, meaning the physical address
+component is followed immediately by a 2-byte SAP component within the DLSAP
+address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Broadcast address value is the Ethernet/IEEE broadcast address
+(FF:FF:FF:FF:FF:FF).
+.sp
+Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
+particular SAP with the stream.
+.RE
+.SH CONFIGURATION
+.sp
+.LP
+By default, the  igb driver performs auto-negotiation to select the link speed
+and mode. Link speed and mode can be any one of the following, (as described
+in  the \fIIEEE803.2\fR standard):
+.sp
+.LP
+1000 Mbps, full-duplex.
+.sp
+.LP
+100 Mbps, full-duplex.
+.sp
+.LP
+100 Mbps, half-duplex.
+.sp
+.LP
+10 Mbps, full-duplex.
+.sp
+.LP
+10 Mbps, half-duplex.
+.sp
+.LP
+The auto-negotiation protocol automatically selects speed (1000 Mbps, 100 Mbps,
+or 10 Mbps) and operation mode (full-duplex or half-duplex) as the highest
+common denominator supported by both link partners.
+.sp
+.LP
+Alternatively, you can set the capabilities advertised by the \fBigb\fR device
+using \fBndd\fR(1M). The driver supports a number of parameters whose names
+begin with \fIadv_\fR (see below). Each of these parameters contains a boolean
+value that determines if the device advertises that mode of operation. For
+example,  the \fIadv_1000fdx_cap\fR parameter indicates if 1000M full duplex is
+advertised to link partner. The  \fIadv_autoneg\fR cap parameter controls
+whether auto-negotiation is performed. If \fIadv_autoneg_cap\fR is set to 0,
+the driver forces the mode of operation  selected by the first  non-zero
+parameter in priority order as shown below:
+.sp
+.in +2
+.nf
+                        (highest priority/greatest throughput)
+        adv_1000fdx_cap         1000Mbps full duplex
+        adv_100fdx_cap          100Mpbs full duplex
+        adv_100hdx_cap          100Mbps half duplex
+        adv_10fdx_cap           10Mpbs full duplex
+        adv_10hdx_cap           10Mpbs half duplex
+                                (lowest priority/least throughput)
+.fi
+.in -2
+
+.sp
+.LP
+All capabilities default to enabled. Note that changing any capability
+parameter causes the link to go down while the link partners renegotiate the
+link speed/duplex using the newly changed capabilities.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/igb*\fR\fR
+.ad
+.RS 27n
+.rt  
+Special character device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/igb\fR\fR
+.ad
+.RS 27n
+.rt  
+32-bit device driver (x86).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/amd64/igb\fR\fR
+.ad
+.RS 27n
+.rt  
+64-bit device driver (x86).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/sparcv9/igb\fR\fR
+.ad
+.RS 27n
+.rt  
+64-bit device driver (SPARC).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/igb.conf\fR\fR
+.ad
+.RS 27n
+.rt  
+Configuration file.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdladm\fR(1M), \fBndd\fR(1M), \fBnetstat\fR(1M), \fBdriver.conf\fR(4),
+\fBattributes\fR(5), \fBstreamio\fR(7I), \fBdlpi\fR(7P),
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

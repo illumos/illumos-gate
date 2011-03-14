@@ -1,0 +1,724 @@
+'\" te
+.\" Copyright 2007, Sun Microsystems Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH appcert 1 "29 Jan 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+appcert \- examine application-level products for unstable use of Solaris
+interfaces
+.SH SYNOPSIS
+.LP
+.nf
+\fBappcert\fR [\fB-h\fR] [\fB-n\fR] [\fB-f\fR \fIinfile\fR] [\fB-w\fR \fIworking_dir\fR] [\fB-B\fR] [\fB-L\fR] 
+     [\fB-S\fR] {\fIobj\fR | \fIdir\fR}...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBappcert\fR utility examines an application's conformance to the Solaris
+Application Binary Interface (\fBABI\fR). The Solaris \fBABI\fR defines the
+runtime library interfaces in Solaris that are safe and stable for application
+use. More specifically, \fBappcert\fR identifies any dependencies on unstable
+runtime interfaces, as well as certain other risks that could cause the product
+to fail to work on a subsequent release of Solaris.
+.sp
+.LP
+\fBappcert\fR checks for:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIPrivate symbol usage in Solaris  libraries.\fR These are private symbols,
+that is, functions or data, that are not intended for developer consumption.
+They are interfaces that Solaris libraries use to call one another. These
+symbols might change their semantic behavior or even disappear altogether
+(so-called  \fBdemoted\fR symbols), so it is a good practice to make sure your
+application does not depend upon any of them.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIStatic linking.\fR In particular, this refers to static linking of archives
+\fBlibc.a\fR, \fBlibsocket.a\fR, and \fBlibnsl.a\fR, that is, instead of
+dynamically linking the corresponding shared object \fB\&.so\fR's. Because the
+semantics of private symbol calls from one Solaris library to another can
+change from  one release to another, it is not a good practice to hardwire
+library code into your binary objects.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIUnbound symbols.\fR These are library symbols (that is, functions or data)
+that the dynamic linker could not resolve when \fBappcert\fR was run. This
+might be an environment problem (for example, \fBLD_LIBRARY_PATH\fR) or a build
+problem (for example, not specifying \fB-l\fR\fIlib\fR and/or \fB-z\fR
+\fBdefs\fR with compiling). They are flagged to point these problems out and in
+case a more serious problem is indicated.
+.RE
+.sp
+.LP
+An entire product can be readily examined by \fBappcert\fR (that is, if the
+product is a collection of many programs and supporting shared objects) by
+referring \fBappcert\fR to the directories where the product is installed.
+.sp
+.LP
+To perform its task, \fBappcert\fR constructs a profile of interface
+dependencies for each object file within the product (whether an executable
+object or shared object), to determine all the Solaris system interfaces that
+are depended upon. (Notice that \fBappcert\fR uses the Solaris runtime linker
+to make this determination.) These dependency profiles are then compared to a
+definition of the Solaris \fBABI\fR to identify any interfaces that are Private
+(unsafe and unstable for application-level use).
+.sp
+.LP
+\fBappcert\fR generates a simple roll-up report that indicates which of the
+product's components, if any, had liabilities and what those liabilities were.
+The report aids developers who are examining their product's release-to-release
+stability.
+.sp
+.LP
+Notice that \fBappcert\fR produces complete interface dependency information,
+both the Public (safe and stable) Solaris interfaces and the Private (non-ABI)
+interfaces. This information can also be examined for each product component,
+if you want.
+.sp
+.LP
+IMPORTANT: \fBappcert\fR must run in the same environment in which the
+application being checked runs. See NOTES.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fR
+.ad
+.RS 18n
+.rt  
+If \fBappcert\fR is run in batch mode, the output report will contain one line
+per binary, beginning with \fBPASS\fR if no problems were detected for the
+binary, \fBFAIL\fR if any problems were found, or \fBINC\fR if the binary could
+not be completely checked. Do not interpret these labels too literally. For
+example, \fBPASS\fR just means that none of the \fBappcert\fR warnings were
+triggered. These strings are flush left and so can be selected via \fBgrep\fR
+\fB^FAIL\fR \fB\&...\fR, and so forth.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIinfile\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the file \fIinfile\fR that contains a list of files (one per line) to
+check. This list is appended to the list determined from the command line
+operands (see OPERANDS below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 18n
+.rt  
+Prints out the usage information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBappcert\fR examines your product for the presence of shared objects. If it
+finds some, it appends the directories they reside in to \fBLD_LIBRARY_PATH\fR.
+Use this flag to prevent \fBappcert\fR from doing this.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 18n
+.rt  
+When searching directories for binaries to check, this option does not follow
+symbolic links. See \fBfind\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 18n
+.rt  
+Appends Solaris library directories (that is,
+\fB/usr/openwin/lib:/usr/dt/lib\fR) to \fBLD_LIBRARY_PATH\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fIworking_dir\fR\fR
+.ad
+.RS 18n
+.rt  
+Identifies the directory in which to run the library components and create
+temporary files (default is \fB/tmp\fR).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB{\fIobj\fR | \fIdir\fR}  ...\fR
+.ad
+.RS 20n
+.rt  
+A complete list of objects and/or directories that contain the objects
+constituting the product to be checked. \fBappcert\fR recursively searches
+directories looking for object files; non-object files are ignored.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+\fBappcert\fR ran successfully and found no potential binary stability
+problems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+\fBappcert\fR failed to run successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Some of the objects checked have potential binary stability problems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+No binary objects were located that could be checked.
+.RE
+
+.SH LIMITATIONS
+.sp
+.LP
+If the object file to be examined depends on libraries, those dependencies must
+be recorded in it (by using the compiler's \fB-l\fR switch).
+.sp
+.LP
+If the object file to be examined depends on other shared libraries, those
+libraries must be accessible via \fBLD_LIBRARY_PATH\fR or \fBRUNPATH\fR when
+\fBappcert\fR is run.
+.sp
+.LP
+To check 64-bit applications, the machine must be running the 64-bit Solaris
+kernel. See \fBisalist\fR(1). Also, the checks for static linking are currently
+not done on 64-bit applications.
+.sp
+.LP
+\fBappcert\fR cannot examine:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Object files that are completely or partially statically linked.
+.br
+.in +2
+Completely statically linked objects are reported as unstable.
+.in -2
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Executable files that do not have execute permission set.
+.br
+.in +2
+These are skipped. Shared objects without execute permission are not skipped.
+.in -2
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Object files that are setuid root.
+.br
+.in +2
+Due to limitations in \fBldd\fR(1), these are skipped. Copy and/or change the
+permissions to check them.
+.in -2
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Non-\fBELF\fR file executables such as shell scripts.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Non-C language interfaces to Solaris; for example, C++ and Java.
+.br
+.in +2
+The code itself need not be in C as long as the calls to Solaris libaries are
+in C.
+.in -2
+.RE
+.SH OUTPUT FILES
+.sp
+.LP
+\fBappcert\fR records its findings in the following files in the working
+directory (\fB/tmp/appcert.\fI?????\fR\fR by default):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIndex\fR\fR
+.ad
+.RS 11n
+.rt  
+A mapping between checked binaries and the subdirectory in the working
+directory in which the output specific to that binary can be found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBReport\fR\fR
+.ad
+.RS 11n
+.rt  
+A copy of the rollup report that was displayed on stdout when \fBappcert\fR was
+run.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSkipped\fR\fR
+.ad
+.RS 11n
+.rt  
+A list of binaries that \fBappcert\fR was asked to check but had to skip, along
+with a brief reason why each was skipped.
+.RE
+
+.sp
+.LP
+In addition, there is per-object information in the subdirectories under
+\fBappcert.\fI?????\fR/objects/\fR, in the following files:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcheck.demoted_symbols\fR\fR
+.ad
+.RS 25n
+.rt  
+A list of symbols suspected to be demoted Solaris symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcheck.dynamic.private\fR\fR
+.ad
+.RS 25n
+.rt  
+A list of private Solaris symbols to which the object makes direct bindings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcheck.dynamic.public\fR\fR
+.ad
+.RS 25n
+.rt  
+A list of public Solaris symbols to which the object makes direct bindings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcheck.dynamic.unbound\fR\fR
+.ad
+.RS 25n
+.rt  
+A list of symbols not bound by the dynamic linker when \fBldd\fR \fB-r\fR was
+run. For convenience, \fBldd\fR output lines containing \fBfile not found\fR
+are also included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsummary.dynamic\fR\fR
+.ad
+.RS 25n
+.rt  
+A pretty-printed summary of dynamic bindings for the objects examined,
+including tables of Public and Private symbols used from each Solaris library.
+.RE
+
+.sp
+.LP
+Other files are temporary files used internally by \fBappcert\fR.
+.SH OUTPUT MESSAGES
+.SS "Private Symbol Use"
+.sp
+.LP
+Private symbols are functions or data variables in a Solaris library that are
+not intended for developer or external use. These symbols are interfaces that
+the Solaris libraries use to call and communicate with one another. They are
+marked in \fBpvs\fR(1) output with the symbol version name \fBSUNWprivate\fR.
+.sp
+.LP
+Private symbols can change their semantic behavior or even disappear altogether
+(\fBdemoted\fR or \fBdeprecated\fR symbols), so your application should not
+depend upon any of them.
+.SS "Demoted Symbols"
+.sp
+.LP
+Demoted symbols are functions or data variables in a Solaris library that were
+once private to that library and have been removed (or possibly scoped local to
+the library) in a later Solaris release. If your application directly calls one
+of these demoted symbols, it will fail to run (relocation error) on the release
+in which the symbol was removed and releases thereafter.
+.sp
+.LP
+In some rare cases, a demoted symbol will return in a later release, but
+nevertheless there are still some releases on which the application will not
+run.
+.sp
+.LP
+Sun Microsystems Inc. performed most of the library scoping in the transition
+from Solaris 2.5.1 to 2.6. This action was done to increase binary stability.
+By making these completely internal interfaces invisible (that is, they cannot
+be dynamically linked against), a developer cannot accidentally or
+intentionally call these interfaces. For more information, see the \fILinker
+and Libraries Guide\fR, in particular the chapter on versioning. This document
+may be found online at \fBhttp://docs.sun.com\fR.
+.SS "Unbound Symbols"
+.sp
+.LP
+Unbound symbols are library symbols (that is, functions or data) referenced by
+the application that the dynamic linker could not resolve when \fBappcert\fR
+was run. \fBNote:\fR \fBappcert\fR does not actually run your application, so
+some aspect of the environment that affects dynamic linking might not be set
+properly.
+.sp
+.LP
+Unbound symbols do not necessarily indicate a potential binary stability
+problem. They only mean that when \fBappcert\fR was run, the runtime dynamic
+linker could not resolve these symbols.
+.sp
+.LP
+Unbound symbols might be due to \fBLD_LIBRARY_PATH\fR not being correctly set.
+Make sure it is set, so that all of your binary objects can find all of the
+libraries they depend on (either your product's own libraries, Solaris
+libraries, or those of a third party). Then re-run \fBappcert\fR.
+.sp
+.LP
+You might find it useful to write a shell script that sets up the environment
+correctly and then runs \fBappcert\fR on the binaries you want to check.
+.sp
+.LP
+Another common cause for unbound symbols is when a shared object under test has
+not recorded its dynamic dependencies, that is, at build time the \fB-l\fR
+switch was \fBnot\fR supplied to the compiler and \fBld\fR(1). So the shared
+object requires that the \fBexecutables\fR that link against it have the
+correct dependencies recorded.
+.sp
+.LP
+Notice that such a shared object can either be linked in the standard way (that
+is, specified at an executable's build time) or dynamically opened (for
+example, an executable calls \fBdlopen\fR(3C) on the shared object sometimes
+when running). Either case can give rise to unbound symbols when \fBappcert\fR
+is run. The former can usually be resolved by setting \fBLD_LIBRARY_PATH\fR
+appropriately before running \fBappcert\fR. The latter (\fBdlopen\fR) is
+usually difficult to resolve. Under some circumstances, you might be able to
+set \fBLD_PRELOAD\fR appropriately to preload the needed libraries, but this
+procedure does not always work.
+.sp
+.LP
+How do you know if the environment has been set up correctly so that there will
+be no unbound symbols? It must be set up so that running \fBldd\fR \fB-r\fR on
+the binary yields no "\fBfile not found\fR" or "\fBsymbol not found\fR" errors.
+See \fBld.so.1\fR(1) and \fBldd\fR(1) for more information on dynamic linking.
+.sp
+.LP
+In any event, \fBappcert\fR flags unbound symbols as a warning in case they
+might indicate a more serious problem. Unbound symbols can be an indicator of
+dependencies on demoted symbols (symbols that have been removed from a library
+or scoped local to it). Dependencies on demoted symbols will lead to serious
+binary stability problems.
+.sp
+.LP
+However, setting up the environment properly should remove most unbound
+symbols. In general, it is good practice to record library dependencies at
+build time whenever possible because it helps make the binary object better
+defined and self-contained. Also recommended is using the \fB-z\fR \fBdefs\fR
+flag when building shared objects, to force the resolution of all symbols
+during compilation. See \fBld\fR(1) for more information.
+.SS "No Bindings Found"
+.sp
+.LP
+\fBappcert\fR runs \fB/bin/ldd\fR \fB-r\fR on each binary object to be tested.
+It sets the environment variable \fBLD_DEBUG\fR="\fBfiles,bindings\fR". (See
+\fBldd\fR(1) and \fBld.so.1\fR(1) for more information). If that command fails
+for some reason, \fBappcert\fR will have no dynamic symbol binding information
+and will find "\fBno bindings\fR".
+.sp
+.LP
+\fBappcert\fR can fail if any of the following is true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The binary object does not have read permission.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The binary object is SUID or SGID and the user does not have sufficient
+privileges.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The binary object is an executable without the execute permission bit set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The binary object is completely statically linked.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The binary object has no library dependency information recorded.
+.RE
+.sp
+.LP
+Other cases exist as well (for example, out of memory). In general, this flag
+means that \fBappcert\fR could not completely examine the object due to
+permissions or environment. Try to modify the permissions or environment so
+that the dynamic bindings can be recorded.
+.SS "Obsolete Library"
+.sp
+.LP
+An obsolete library is one whose use is deprecated and that might, in some
+future release, be removed from Solaris altogether. \fBappcert\fR flags these
+because applications depending on them might not run in future releases of
+Solaris. All interfaces, including Private ones, in an obsolete library are
+frozen and will not change.
+.SS "Use of sys_errlist/sys_nerr"
+.sp
+.LP
+Direct use of the symbols \fBsys_errlist\fR or \fBsys_nerr\fR presents a risk
+in which reference might be made past the end of the \fBsys_errlist\fR array.
+These symbols are deprecated in 32-bit versions of Solaris and are absent
+altogether in 64-bit versions. Use \fBstrerror\fR(3C) instead.
+.SS "Use of Strong vs. Weak Symbols"
+.sp
+.LP
+The "strong" symbols (for example, \fB_socket\fR) associated with "weak"
+symbols (for example, \fBsocket\fR ) are reserved as private (their behavior
+could change in the future). Your application should only directly reference
+the weak symbol (usually the strong symbols begin with "\fB_\fR").
+.sp
+.LP
+\fBNote:\fR Under certain build environments, the strong/private symbol
+dependency gets recorded into your binary instead of the weak/public one, even
+though the source code doesn't appear to reference the private symbol.
+Nevertheless, steps should be taken to trace down why this is occurring and fix
+the dependency.
+.SH NOTES
+.sp
+.LP
+\fBappcert\fR needs to run in the same environment in which the application
+being checked runs. Otherwise it might not be able to resolve references
+correctly to interfaces in the Solaris libraries. Take the following steps:
+.RS +4
+.TP
+1.
+Make sure that \fBLD_LIBRARY_PATH\fR and any other aspects of the
+environment are set to whatever settings are used when the application is run.
+Also make sure that it contains the directories containing any non-Solaris
+shared objects that are part of the product, so that they can be found when
+referenced.
+.RE
+.RS +4
+.TP
+2.
+Make sure that all the binaries to be checked:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Are dynamically linked \fBELF\fR objects
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Have execute permission set on executables (this is not necessary for shared
+objects)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Are not \fBSUID\fR root (otherwise you will have to be root to check them; make
+non-\fBSUID\fR copies and check those if necessary).
+.RE
+.RE
+.sp
+.LP
+You might find it useful to write a shell script that sets up the environment
+correctly and then runs \fBappcert\fR.
+.sp
+.LP
+Some potential problems that can be encountered are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBappcert\fR reports unbound symbols that appear to be part of Solaris
+libraries.
+.sp
+This is probably caused when the application uses \fBdlopen\fR(3C) to access a
+shared object that does not have its Solaris dependencies recorded.
+\fBappcert\fR cannot resolve symbol use in such cases, since the dynamic linker
+is never invoked on the shared object, and there is no other dependency
+information that could be used to resolve the Solaris symbol bindings. This can
+also occur with non-Solaris symbols.
+.sp
+To avoid this problem, make sure that when a shared object is built, its
+dependencies on Solaris libraries are explicitly recorded by using the
+\fB-l\fR\fIlib\fR option on the compile line (see \fBcc\fR(1) and \fBld\fR(1)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBappcert\fR reports that the application uses a Solaris private symbol that
+is not referenced in the application's source code.
+.sp
+This problem is most likely due to static linking of a Solaris library that
+references that symbol. Since \fBappcert\fR uses the dynamic linker to resolve
+symbols, statically linked libraries appear to \fBappcert\fR to be part of the
+application code (which, in a sense, they are). This can also sometimes happen
+as a result of macro substitution in a Solaris header file.
+.sp
+To avoid this problem, whenever possible do not statically link Solaris library
+archives into your application.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBappcert\fR does not recognize a library as part of Solaris.
+.sp
+Some obsolete Solaris libraries are so old that they were obsoleted before
+their symbols could be versioned. Consequently, \fBappcert\fR cannot recognize
+them as being part of Solaris.
+.RE
+.SH BUGS
+.sp
+.LP
+The use of the terms "\fBpublic\fR" and "\fBprivate\fR" as equivalent to
+"\fBstable\fR" and "\fBunstable\fR" is unfortunately somewhat confusing. In
+particular, experimental or evolving interfaces are public in the sense that
+they are documented and their use is encouraged. But they are unstable, because
+an application built with them might not run on subsequent releases. Thus, they
+are classified as private for \fBappcert\fR's purposes until they are no longer
+evolving. Conversely, obsolete interfaces will eventually disappear, and so are
+unstable, even though they have been public and stable in the past and are
+still treated as public by \fBappcert\fR. Fortunately, these two situations are
+rare.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface stabilityStable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcc\fR(1), \fBfind\fR(1), \fBisalist\fR(1), \fBld\fR(1), \fBldd\fR(1),
+\fBld.so.1\fR(1), \fBpvs\fR(1), \fBdlopen\fR(3C), \fBstrerror\fR(3C),
+\fBIntro\fR(4), \fBattributes\fR(5)

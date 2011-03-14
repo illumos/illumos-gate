@@ -1,0 +1,262 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH keypad 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+keypad \- enable/disable keypad handling
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBkeypad\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to the window in which to enable/disable keypad handling.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbf\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a Boolean expression.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkeypad()\fR function controls keypad translation. If \fIbf\fR is
+\fBTRUE\fR, keypad translation is enabled. If \fIbf\fR is \fBFALSE\fR, keypad
+translation is disabled. The initial state is \fBFALSE\fR.
+.sp
+.LP
+This function affects the behavior of any function that provides keyboard
+input.
+.sp
+.LP
+If the terminal in use requires a command to enable it to transmit distinctive
+codes when a function key is pressed, then after keypad translation is first
+enabled, the implementation transmits this command to the terminal before an
+affected input function tries to read any characters from that terminal.
+.sp
+.LP
+The Curses input model provides the following ways to obtain input from the
+keyboard:
+.SS "Keypad processing"
+.sp
+.LP
+The application can enable or disable keypad translation by calling
+\fBkeypad()\fR. When translation is enabled, Curses attempts to translate a
+sequence of terminal input that represents the pressing of a function into a
+single key code. When translation is disabled, Curses passes terminal input to
+the application without such translation, and any interpretation of the input
+as representing the pressing of a keypad key must be done by the application.
+.sp
+.LP
+The complete set of key codes for keypad keys that Curses can process is
+specified by the constants defined in <\fBcurses.h\fR> whose names begin with
+"\fBKEY_\fR". Each terminal type described in the \fBterminfo\fR database may
+support some or all of these key codes. The \fBterminfo\fR database specifies
+the sequence of input characters from the terminal type that correspond to each
+key code.
+.sp
+.LP
+The Curses inplementation cannot translate keypad keys on terminals where
+pressing the keys does not transmit a unique sequence.
+.sp
+.LP
+When translation is enabled and a character that could be the beginning of a
+function key (such as escape) is received, Curses notes the time and begins
+accumulating characters. If Curses  receives additional characters that
+represent the processing of a keypad key within an unspecified interval from
+the time the character was received, then Curses converts this input to a key
+code for presentation to the application. If such characters are not received
+during this interval, translation of this input does not occur and the
+individual characters are presented to the application separately. (Because
+Curses waits for this interval to accumulate a key code, many terminals
+experience a delay between the time a user presses the escape key and the time
+the escape key is returned to the application.)
+.sp
+.LP
+In addition, No Timeout Mode provides that in any case where Curses has
+received part of a function key sequence, it waits indefinitely for the
+complete key sequence. The "unspecified interval" in the previous paragraph
+becomes infinite in No Timeout Mode. No Timeout Mode allows the use of function
+keys over slow communication lines. No Timeout Mode lets the user type the
+individual characters of a function key sequence, but also delays application
+response when the user types a character (not a function key) that begins a
+function key sequence. For this reason, in No Timeout Mode many terminals will
+appear to hang between the time a user presses the escape key and the time
+another key is pressed. No Timeout Mode is switchable by calling
+\fBnotimeout\fR(3XCURSES).
+.sp
+.LP
+If any special characters (<backspace>, <carriage return>, <newline>, <tab>)
+are defined or redefined to be characters that are members of a function key
+sequence, then Curses will be unable to recognize and translate those function
+keys.
+.sp
+.LP
+Several of the modes discussed below are described in terms of availability of
+input. If keypad translation is enabled, then input is not available once
+Curses has begun receiving a keypad sequence until the sequence is completely
+received or the interval has elapsed.
+.SS "Input Mode"
+.sp
+.LP
+The following four mutually-specific Curses modes let the application control
+the effect of flow-control characters, the interrupt character, the erase
+character, and the kill character:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.44i) cw(4.06i) 
+lw(1.44i) lw(4.06i) 
+.
+ Input Mode Effect
+Cooked ModeT{
+ This achieves normal line-at-a-time processing with all special characters handled outside the application. This achieves the same effect as canonical-mode input processing. The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode by calling \fBnocbreak\fR(3XCURSES), and are set upon entering this mode by calling \fBnoraw\fR(3XCURSES).Erase and kill characters are supported from any supported locale, no matter the width of the character.
+T}
+\fBcbreak\fR ModeT{
+Characters typed by the user are immediately available to the application and Curses does not perform special processing on either the erase character or the kill character. An application can set \fBcbreak\fR mode to do its own line editing but to let the abort character be used to abort the task. This mode achieves the same effect as non-canonical-mode, Case B input processing (with MIN set to 1 and ICRNL cleared.) The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode.
+T}
+Half-Delay ModeT{
+ The effect is the same as \fBcbreak\fR, except that input functions wait until a character is available or an interval defined by the application elapses, whichever comes first. This mode achieves the same effect as non-canonical-mode, Case C input processing (with TIME set to the value specified by the application.) The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode.
+T}
+Raw ModeT{
+Raw mode gives the application maximum control over terminal input. The application sees each character as it is typed. This achieves the same effect as non-canonical mode, Case D input processing. The \fBISIG\fR and \fBIXON\fR flags are cleared upon entering this mode.
+T}
+.TE
+
+.sp
+.LP
+The terminal interface settings are reported when the process calls
+\fBinitscr\fR(3XCURSES) or \fBnewterm\fR(3XCURSES) to initialize Curses and
+restores these settings when \fBendwin\fR(3XCURSES) is called. The initial
+input mode for Curses operations is especially unless Enhanced Curses
+compliance, in which the initial mode is \fBcbreak\fR mode, is supported.
+.sp
+.LP
+The behavior of the \fBBREAK\fR key depends on other bits in the display driver
+that are not set by Curses.
+.SS "Delay Mode"
+.sp
+.LP
+Two mutually-exclusive delay modes specify how quickly certain Curses functions
+return to the application when there is no terminal input waiting when the
+function is called:
+.sp
+.ne 2
+.mk
+.na
+\fBNo Delay\fR
+.ad
+.RS 12n
+.rt  
+The function fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDelay\fR
+.ad
+.RS 12n
+.rt  
+ The application waits until text is passed through to the application. If
+\fBcbreak\fR or Raw Mode is set, this is after one character. Otherwise, this
+is after the first <newline> character, end-of-line character, or end-of-file
+character.
+.RE
+
+.sp
+.LP
+The effect of No Delay Mode on function key processing is unspecified.
+.SS "Echo processing"
+.sp
+.LP
+Echo mode determines whether Curses echoes typed characters to the screen. The
+effect of Echo mode is analogous to the effect of the \fBECHO\fR flag in the
+local mode field of the \fBtermios\fR structure associated with the terminal
+device connected to the window. However, Curses always clears the \fBECHO\fR
+flag when invoked, to inhibit the operating system from performing echoing. The
+method of echoing characters is not identical to the operating system's method
+of echoing characters, because Curses performs additional processing of
+terminal input.
+.sp
+.LP
+If in Echo mode, Curses performs 's's own echoing. Any visible input character
+is stored in the current or specified window by the input function that the
+application called, at that window's cursor position, as though
+\fBaddch\fR(3XCURSES) were called, with all consequent effects such as cursor
+movement and wrapping.
+.sp
+.LP
+If not in Echo mode, any echoing of input must be performed by the application.
+Applications often perform their own echoing in a controlled area of the
+screen, or do not echo at all, so they disable Echo mode.
+.sp
+.LP
+It may not be possible to turn off echo processing for synchronous and
+networked asynchronous terminals because echo processing is done directly by
+the terminals. Applications running on such terminals should be aware that any
+characters typed will appear on the screen at wherever the cursor is
+positioned.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBkeypad()\fR function returns \fBOK\fR.
+Otherwise, it returns \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddch\fR(3XCURSES), \fBendwin\fR(3XCURSES), \fBgetch\fR(3XCURSES),
+\fBinitscr\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBnewterm\fR(3XCURSES),
+\fBnocbreak\fR(3XCURSES), \fBnoraw\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

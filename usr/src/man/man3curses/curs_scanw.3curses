@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_scanw 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_scanw, scanw, wscanw, mvscanw, mvwscanw, vwscanw \- convert formatted
+input from a curses widow
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBscanw\fR(\fBchar *\fR\fIfmt\fR, \fB/*\fR \fIarg\fR */ ...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwscanw\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIfmt\fR, \fB/*\fR \fIarg\fR */ ...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvscanw\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIfmt\fR, \fB/*\fR \fIarg\fR */ ...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwscanw\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIfmt\fR, \fB/*\fR \fIarg\fR */...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvwscanw\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIfmt\fR, \fBva_list\fR \fIvarglist\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscanw()\fR, \fBwscanw()\fR, and \fBmvscanw()\fR routines correspond to
+\fBscanf()\fR (see \fBscanf\fR(3C)). The effect of these routines is as though
+\fBwgetstr()\fR were called on the window, and the resulting line used as input
+for the scan. Fields which do not map to a variable in the \fBfmt\fR field are
+lost.
+.sp
+.LP
+The \fBvwscanw()\fR routine is similar to \fBvwprintw()\fR \fBin\fR \fBthat\fR
+it performs a \fBwscanw()\fR using a variable argument list. The third argument
+is a \fIva_list\fR, a pointer to a list of arguments, as defined in
+\fB<varargs.h>\fR\&.
+.SH RETURN VALUES
+.sp
+.LP
+\fBvwscanw()\fR returns \fBERR\fR on failure and an integer equal to the number
+of fields scanned on success.
+.sp
+.LP
+Applications may interrogate the return value from the \fBscanw\fR,
+\fBwscanw()\fR, \fBmvscanw()\fR, and \fBmvwscanw()\fR routines to determine the
+number of fields which were mapped in the call.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_getstr\fR(3CURSES), \fBcurs_printw\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBscanf\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.

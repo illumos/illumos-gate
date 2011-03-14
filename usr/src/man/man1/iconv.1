@@ -1,0 +1,298 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH iconv 1 "14 Nov 2003" "SunOS 5.11" "User Commands"
+.SH NAME
+iconv \- code set conversion utility
+.SH SYNOPSIS
+.LP
+.nf
+\fBiconv\fR [\fB-cs\fR] \fB-f\fR \fIfrommap\fR \fB-t\fR \fItomap\fR [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBiconv\fR \fB-f\fR \fIfromcode\fR [\fB-cs\fR] [\fB-t\fR \fItocode\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBiconv\fR \fB-t\fR \fItocode\fR [\fB-cs\fR] [\fB-f\fR \fIfromcode\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBiconv\fR \fB-l\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBiconv\fR utility converts the characters or sequences of characters in
+\fIfile\fR from one code set to another and writes the results to standard
+output. If no conversion exists for a particular character, an
+implementation-defined conversion is performed on this character.
+.sp
+.LP
+The list of supported conversions and the locations of the associated
+conversion tables are provided in the \fBiconv\fR(5) manual page.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 18n
+.rt  
+Omits any characters that are invalid in the codeset of the input file from the
+output. When \fB-c\fR is not used, the results of encountering invalid
+characters in the input stream depend on the specified codesets for the
+conversion. Invalid characters can be either those that are not valid
+characters in the codeset of the input file or those that have no corresponding
+character in the codeset of the output file. The presence or absence of
+\fB-c\fR does not affect the exit status of \fBiconv\fR. When \fIfromcode\fR is
+specified for the \fIfromcodeset\fR of the \fB-f\fR option or \fItocode\fR is
+specified for the \fItocodeset\fR of the \fB-t\fR option, the specification of
+\fB-c\fR may be ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfromcodeset\fR\fR
+.ad
+.RS 18n
+.rt  
+Identifies the code set of the input file. The following two forms of the
+\fIfromcodeset\fR option-argument are recognized:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfromcode\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIfromcode\fR option-argument must not contain a	 slash (\fB/\fR)
+character. It is interpreted as the name of one of the codeset descriptions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfrommap\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIfrommap\fR option-argument must contain a slash character. It is
+interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(5).
+If the pathname does not represent a valid, readable charmap file, the results
+are undefined.
+.RE
+
+If this option is omitted, the codeset of the current locale is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 18n
+.rt  
+Writes all supported \fIfromcode\fR and \fItocode\fR values to standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 18n
+.rt  
+Suppresses any messages written to standard error concerning invalid
+characters. When \fB-s\fR is not used, the results of encountering invalid
+characters in the input stream depend on the specified codesets for the
+conversion. Invalid characters can be either those that are not valid
+characters in the codeset of the input file or those that have no corresponding
+character in the codeset of the output file. The presence or absence of
+\fB-s\fR does not affect the exit status of \fBiconv\fR. When \fIfromcode\fR is
+specified for the \fIfromcodeset\fR of the \fB-f\fR option or \fItocode\fR is
+specified for the \fItocodeset\fR of the \fB-t\fR option, the specification of
+\fB-s\fR may be ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItocodeset\fR\fR
+.ad
+.RS 18n
+.rt  
+Identifies the code set used for the output file. The following two forms of
+the \fItocodeset\fR option-argument are recognized:
+.sp
+.ne 2
+.mk
+.na
+\fB\fItocode\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fItocode\fR option-argument must not contain a	 slash (\fB/\fR) character.
+It is interpreted as the name of one of the codeset descriptions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItomap\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fItomap\fR option-argument must contain a slash character. It is
+interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(5).
+If the pathname does not represent a valid, readable charmap file, the results
+are undefined.
+.RE
+
+If this option is omitted, the codeset of the current locale is used.
+.RE
+
+.sp
+.LP
+If either \fB-f\fR or \fB-t\fR represents a charmap file but the other does
+not, or is omitted, or if both \fB-f\fR and \fB-t\fR are omitted, \fBiconv\fR
+fails as an error.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of an input file. If no file operands are specified, or if a file
+operand is '\fB-\fR', the standard input is used.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRConverting and storing files
+.sp
+.LP
+The following example converts the contents of file \fBmail1\fR from code set
+\fB8859\fR to \fB646fr\fR and stores the results in file \fBmail.local\fR:
+
+.sp
+.in +2
+.nf
+example% \fBiconv -f 8859 -t 646fr mail1 > mail.local\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBiconv\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+An error has occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/iconv/iconv_data\fR\fR
+.ad
+.RS 29n
+.rt  
+list of conversions supported by conversion tables
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiconv\fR(3C), \fBiconv_open\fR(3C), \fBattributes\fR(5), \fBcharmap\fR(5),
+\fBenviron\fR(5), \fBiconv\fR(5), \fBiconv_unicode\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Make sure that both charmap files use the same symbolic names for characters
+the two codesets have in common.
+.sp
+.LP
+The output format of the \fB-l\fR option is unspecified. The \fB-l\fR option is
+not intended for shell script usage.
+.sp
+.LP
+When \fIfromcode\fR or \fItocode\fR is specified for the codeset conversion,
+\fBiconv\fR uses the \fBiconv_open\fR(3C) function. If \fBiconv_open\fR(3C)
+fails to open the specified codeset conversion, \fBiconv\fR searches for an
+appropriate conversion table. As for the supported codeset conversion by
+\fBiconv_open\fR(3C), please refer to \fBiconv\fR(5) and \fBiconv_locale\fR(5).

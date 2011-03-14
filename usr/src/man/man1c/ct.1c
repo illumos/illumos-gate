@@ -1,0 +1,149 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ct 1C "14 Sep 1992" "SunOS 5.11" "Communication Commands"
+.SH NAME
+ct \- spawn login to a remote terminal
+.SH SYNOPSIS
+.LP
+.nf
+\fBct\fR [\fIoptions\fR] \fItelno\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBct\fR utility dials the telephone number of a modem that is attached to
+a terminal and spawns a \fBlogin\fR process to that terminal. The \fItelno\fR
+is a telephone number, with equal signs for secondary dial tones and minus
+signs for delays at appropriate places. (The set of legal characters for
+\fItelno\fR is 0 through 9, -, =, *, and #. The maximum length \fItelno\fR is
+31 characters). If more than one telephone number is specified, \fBct\fR will
+try each in succession until one answers; this is useful for specifying
+alternate dialing paths.
+.sp
+.LP
+\fBct\fR will try each line listed in the file \fB/etc/uucp/Devices\fR until it
+finds an available line with appropriate attributes, or runs out of entries.
+.sp
+.LP
+After the user on the destination terminal logs out, there are two things that
+could occur depending on what type of port monitor is monitoring the port. In
+the case of no port monitor, \fBct\fR prompts: \fBReconnect?\fR If the response
+begins with the letter \fBn\fR, the line will be dropped; otherwise,
+\fBttymon\fR will be started again and the \fBlogin:\fR prompt will be printed.
+In the second case, where a port monitor is monitoring the port, the port
+monitor reissues the \fBlogin:\fR prompt.
+.sp
+.LP
+The user should log out properly before disconnecting.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 11n
+.rt  
+Normally,  \fBct\fR will hang up the current line so that it can be used to
+answer the incoming call.  The \fB-h\fR option will prevent this action. The
+\fB-h\fR option will also wait for the termination of the specified \fBct\fR
+process before returning control to the user's terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fIspeed\fR\fR
+.ad
+.RS 11n
+.rt  
+The data rate may be set with the \fB-s\fR option. \fIspeed\fR is expressed in
+baud rates.  The default baud rate is 1200.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 11n
+.rt  
+If the \fB-v\fR (verbose) option is used,  \fBct\fR will send a running
+narrative to the standard error output stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fIn\fR\fR
+.ad
+.RS 11n
+.rt  
+If there are no free lines \fBct\fR will ask if it should wait, and for how
+many minutes,  before it gives up. \fBct\fR will continue to try to open the
+dialers at one-minute intervals until the specified limit is exceeded. This
+dialogue may be overridden by specifying the \fB-w\fR\fIn\fR option. \fIn\fR is
+the maximum number of minutes that \fBct\fR is to wait for a line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fIn\fR\fR
+.ad
+.RS 11n
+.rt  
+This option is used for debugging; it produces a detailed output of the program
+execution on stderr. \fIn\fR is a single number between 0 and 9. As \fIn\fR
+increases to 9, more detailed debugging information is given.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/uucp/Devices\fR\fR
+.ad
+.RS 21n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/ctlog\fR\fR
+.ad
+.RS 21n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcu\fR(1C), \fBlogin\fR(1), \fBuucp\fR(1C), \fBttymon\fR(1M),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBct\fR program will not work with a DATAKIT Multiplex interface.
+.sp
+.LP
+For a shared port, one used for both dial-in and dial-out, the \fBttymon\fR
+program running on the line must have the \fB-r\fR and \fB-b\fR options
+specified (see \fBttymon\fR(1M)).

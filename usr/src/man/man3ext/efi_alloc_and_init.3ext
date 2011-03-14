@@ -1,0 +1,249 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH efi_alloc_and_init 3EXT "8 May 2008" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+efi_alloc_and_init, efi_alloc_and_read, efi_free, efi_write, efi_use_whole_disk
+\- manipulate a disk's EFI Partition Table
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lefi\fR [ \fIlibrary \&.\|.\|.\fR ]
+#include <sys/vtoc.h>
+#include <sys/efi_partition.h>
+
+\fBint\fR \fBefi_alloc_and_init\fR(\fBint\fR \fIfd\fR, \fBuint32_t\fR \fInparts\fR, \fBdk_gpt_t **\fR\fIvtoc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBefi_alloc_and_read\fR(\fBint\fR \fIfd\fR, \fBdk_gpt_t **\fR\fIvtoc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBefi_free\fR(\fBdk_gpt_t *\fR\fIvtoc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBefi_write\fR(\fBint\fR \fIfd\fR, \fBdk_gpt_t *\fR\fIvtoc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBefi_use_whole_disk\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBefi_alloc_and_init()\fR function initializes the \fBdk_gpt_t\fR
+structure specified by \fIvtoc\fR in preparation for a call to
+\fBefi_write()\fR. It calculates and initializes the \fBefi_version\fR,
+\fBefi_lbasize\fR, \fBefi_nparts\fR, \fBefi_first_u_lba\fR, \fBefi_last_lba\fR,
+and \fBefi_last_u_lba\fR members of this sturcture. The caller can then set the
+\fBefi_nparts\fR member.
+.sp
+.LP
+The \fBefi_alloc_and_read()\fR function allocates memory and returns the
+partition table.
+.sp
+.LP
+The \fBefi_free()\fR function frees the memory allocated by
+\fBefi_alloc_and_init()\fR and \fBefi_alloc_and_read()\fR.
+.sp
+.LP
+The \fBefi_write()\fR function writes the EFI partition table.
+.sp
+.LP
+The \fBefi_use_whole_disk()\fR function takes any space that is not contained
+in the disk label and adds it to the last physically non-zero area before the
+reserved slice (from slice 0 to slice 6 or unallocated space).
+.sp
+.LP
+The \fIfd\fR argument refers to any slice on a raw disk, opened with
+\fBO_NDELAY\fR. See \fBopen\fR(2).
+.sp
+.LP
+The \fInparts\fR argument specifies the number of desired partitions.
+.sp
+.LP
+The \fIvtoc\fR argument is a \fBdk_gpt_t\fR structure that describes an EFI
+partition table and contains at least the following members:
+.sp
+.in +2
+.nf
+uint_t          efi_version;     /* set to EFI_VERSION_CURRENT */
+uint_t          efi_nparts;      /* number of partitions in efi_parts */
+uint_t          efi_lbasize;     /* size of block in bytes */
+diskaddr_t      efi_last_lba;    /* last block on the disk */
+diskaddr_t      efi_first_u_lba; /* first block after labels */
+diskaddr_t      efi_last_u_lba;  /* last block before backup labels */
+struct dk_part  efi_parts[];     /* array of partitions */
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBefi_alloc_and_init()\fR returns 0. Otherwise it
+returns \fBVT_EIO\fR if an I/O operation to the disk fails.
+.sp
+.LP
+Upon successful completion, \fBefi_alloc_and_read()\fR returns a positive
+integer indicating the slice index associated with the open file descriptor.
+Otherwise, it returns a negative integer to indicate one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EIO\fR\fR
+.ad
+.RS 13n
+.rt  
+An I/O error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_ERROR\fR\fR
+.ad
+.RS 13n
+.rt  
+An unknown error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+An EFI label was not found.
+.RE
+
+.sp
+.LP
+Upon successful completion, \fBefi_write()\fR returns 0. Otherwise, it returns
+a negative integer to indicate one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EIO\fR\fR
+.ad
+.RS 13n
+.rt  
+An I/O error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_ERROR\fR\fR
+.ad
+.RS 13n
+.rt  
+An unknown error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The label contains incorrect data.
+.RE
+
+.sp
+.LP
+Upon successfully completion, \fBefi_use_whole_disk()\fR returns 0. Otherwise,
+it returns a negative integer to indicate one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EIO\fR\fR
+.ad
+.RS 13n
+.rt  
+An I/O error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_ERROR\fR\fR
+.ad
+.RS 13n
+.rt  
+An unknown error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_EINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The label contains incorrect data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVT_ENOSPC\fR\fR
+.ad
+.RS 13n
+.rt  
+Space out of label was not found.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The EFI label is used on disks with more than 1^32-1 blocks. For compatibility
+reasons, the \fBread_vtoc\fR(3EXT) and \fBwrite_vtoc()\fR functions should be
+used on smaller disks. The application should attempt the \fBread_vtoc()\fR or
+\fBwrite_vtoc()\fR call, check for an error of \fBVT_ENOTSUP\fR, then call the
+analogous EFI function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfmthard\fR(1M), \fBformat\fR(1M), \fBprtvtoc\fR(1M), \fBioctl\fR(2),
+\fBopen\fR(2), \fBlibefi\fR(3LIB), \fBread_vtoc\fR(3EXT), \fBattributes\fR(5),
+\fBdkio\fR(7I)

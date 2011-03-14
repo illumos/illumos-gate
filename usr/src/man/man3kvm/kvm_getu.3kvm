@@ -1,0 +1,110 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kvm_getu 3KVM "2 May 2002" "SunOS 5.11" "Kernel VM Library Functions"
+.SH NAME
+kvm_getu, kvm_getcmd \- get the u-area or invocation arguments for a process
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkvm\fR [ \fIlibrary\fR\&.\|.\|.]
+#include <kvm.h>
+#include <sys/param.h>
+#include <sys/user.h>
+#include <sys/proc.h>
+
+\fBstruct user *\fR\fBkvm_getu\fR(\fBkvm_t *\fR\fIkd\fR, \fBstruct proc *\fR\fIproc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkvm_getcmd\fR(\fBkvm_t *\fR\fIkd\fR, \fBstruct proc *\fR\fIproc\fR, \fBstruct user *\fR\fIu\fR, \fBchar ***\fR\fIarg\fR,
+     \fBchar ***\fR\fIenv\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkvm_getu()\fR function reads the u-area of the process specified by
+\fIproc\fR to an area of static storage associated with \fIkd\fR and returns a
+pointer to it. Subsequent calls to \fBkvm_getu()\fR will overwrite this static
+area.
+.sp
+.LP
+The \fIkd\fR argument is a pointer to a kernel descriptor returned by
+\fBkvm_open\fR(3KVM). The \fIproc\fR argument is a pointer to a copy in the
+current process's address space of a \fIproc\fR structure, obtained, for
+instance, by a prior \fBkvm_nextproc\fR(3KVM) call.
+.sp
+.LP
+The \fBkvm_getcmd()\fR function constructs a list of string pointers that
+represent the command arguments and environment that were used to initiate the
+process specified by \fIproc\fR.
+.sp
+.LP
+The \fIkd\fR argument is a pointer to a kernel descriptor returned by
+\fBkvm_open\fR(3KVM). The \fIu\fR argument is a pointer to a copy in the
+current process's address space of a \fBuser\fR structure, obtained, for
+instance, by a prior \fBkvm_getu()\fR call. If \fIarg\fR is not \fINULL\fR, the
+command line arguments are formed into a null-terminated array of string
+pointers. The address of the first such pointer is returned in \fIarg\fR. If
+\fIenv\fR is not \fINULL\fR, the environment is formed into a null-terminated
+array of string pointers.  The address of the first of these is returned in
+\fIenv\fR.
+.sp
+.LP
+The pointers returned in \fIarg\fR and \fIenv\fR refer to data allocated by
+\fBmalloc()\fR and should be freed by a call to \fBfree()\fR when no longer
+needed. See \fBmalloc\fR(3C). Both the string pointers and the strings
+themselves are deallocated when freed.
+.sp
+.LP
+Since the environment and command line arguments might have been modified by
+the user process, there is no guarantee that it will be possible to reconstruct
+the original command at all.  The \fBkvm_getcmd()\fR function will make the
+best attempt possible, returning \(mi1 if the user process data is
+unrecognizable.
+.SH RETURN VALUES
+.sp
+.LP
+On success, \fBkvm_getu()\fR returns a pointer to a copy of the u-area of the
+process specified by \fIproc\fR. On failure, it returns \fINULL\fR.
+.sp
+.LP
+The \fBkvm_getcmd()\fR function returns 0 on success and \(mi1 on failure. If
+\(mi1 is returned, the caller still has the option of using the command line
+fragment that is stored in the u-area.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkvm_nextproc\fR(3KVM), \fBkvm_open\fR(3KVM), \fBkvm_kread\fR(3KVM),
+\fBmalloc\fR(3C), \fBlibkvm\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+On systems that support both 32-bit and 64-bit processes, the 64-bit
+implementation of \fBlibkvm\fR ensures that the \fIarg\fR and \fBenv\fR pointer
+arrays for \fBkvm_getcmd()\fR are translated to the same form as if they were
+64-bit processes.  Applications that wish to access the raw 32-bit stack
+directly can use \fBkvm_uread()\fR. See \fBkvm_read\fR(3KVM).

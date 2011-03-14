@@ -1,0 +1,53 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH vipw 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+vipw \- edit the password file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/vipw\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBvipw\fR edits the password file while setting the appropriate locks, and
+does any necessary processing after the password file is unlocked. If the
+password file is already being edited, then you will be told to try again
+later.  The \fBvi\fR(1) editor will be used unless the environment variable
+\fBVISUAL\fR or \fBEDITOR\fR indicates an alternate editor.
+.sp
+.LP
+\fBvipw\fR performs a number of consistency checks on the password entry for
+root, and will not allow a password file with a "mangled" root entry to be
+installed.  It also checks the \fB/etc/shells\fR file to verify the login shell
+for root.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/ptmp\fR\fR
+.ad
+.RS 15n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/shells\fR\fR
+.ad
+.RS 15n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpasswd\fR(1), \fBvi\fR(1), \fBpasswd\fR(4), \fBattributes\fR(5)

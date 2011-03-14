@@ -1,0 +1,82 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _lwp_kill 2 "8 Aug 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+_lwp_kill \- send a signal to a LWP
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/lwp.h>
+#include <signal.h>
+
+\fBint\fR \fB_lwp_kill\fR(\fBlwpid_t\fR \fItarget_lwp\fR, \fBint\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB_lwp_kill()\fR function sends a signal to the LWP specified by
+\fItarget_lwp\fR. The signal that is to be sent is specified by \fIsig\fR and
+must be one from the list given in \fBsignal.h\fR(3HEAD). If \fIsig\fR is 0
+(the null signal), error checking is performed but no signal is actually sent.
+This can be used to check the validity of \fItarget_lwp\fR.
+.sp
+.LP
+The \fItarget_lwp\fR must be an LWP within the same process as the calling LWP.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. A non-zero value indicates an
+error.
+.SH ERRORS
+.sp
+.LP
+If any of the following conditions occur, \fB_lwp_kill()\fR fails and returns
+the corresponding value:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsig\fR argument is not a valid signal number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fItarget_lwp\fR argument cannot be found in the current process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(2), \fBsigaction\fR(2), \fBsigprocmask\fR(2), \fBsignal.h\fR(3HEAD),
+\fBattributes\fR(5)

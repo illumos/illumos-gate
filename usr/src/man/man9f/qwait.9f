@@ -1,0 +1,161 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qwait 9F "15 Dec 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qwait, qwait_sig \- STREAMS wait routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+#include <sys/ddi.h> 
+
+
+
+\fBvoid\fR \fBqwait\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBqwait_sig\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIqp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the queue that is being opened or closed.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBqwait()\fR and \fBqwait_sig()\fR are used to wait for a message to arrive to
+the \fBput\fR(9E) or \fBsrv\fR(9E) procedures. \fBqwait()\fR and
+\fBqwait_sig()\fR can also be used to wait for \fBqbufcall\fR(9F) or
+\fBqtimeout\fR(9F) callback procedures to execute. These routines can be used
+in the \fBopen\fR(9E) and \fBclose\fR(9E) procedures in a STREAMS driver or
+module.
+.sp
+.LP
+The thread that calls \fBclose()\fR does not necessarily have the ability to
+receive signals, particularly when called by \fBexit\fR(2). In this case,
+\fBqwait_sig()\fR behaves exactly as \fBqwait()\fR. Driver writers may use
+\fBddi_can_receive_sig\fR(9F) to determine when this is the case, and, if so,
+arrange some means to avoid blocking indefinitely (for example, by using
+\fBqtimeout\fR(9F).
+.sp
+.LP
+\fBqwait()\fR and \fBqwait_sig()\fR atomically exit the inner and outer
+perimeters associated with the queue, and wait for a thread to leave the
+module's \fBput\fR(9E), \fBsrv\fR(9E), or \fBqbufcall\fR(9F) /
+\fBqtimeout\fR(9F) callback procedures. Upon return they re-enter the inner and
+outer perimeters.
+.sp
+.LP
+This can be viewed as there being an implicit wakeup when a thread leaves a
+\fBput\fR(9E) or \fBsrv\fR(9E) procedure or after a \fBqtimeout\fR(9F) or
+\fBqbufcall\fR(9F) callback procedure has been run in the same perimeter.
+.sp
+.LP
+\fBqprocson\fR(9F) must be called before calling \fBqwait()\fR or
+\fBqwait_sig()\fR.
+.sp
+.LP
+\fBqwait()\fR is not interrupted by a signal, whereas \fBqwait_sig()\fR is
+interrupted by a signal. \fBqwait_sig()\fR normally returns non-zero, and
+returns zero when the waiting was interrupted by a signal.
+.sp
+.LP
+\fBqwait()\fR and \fBqwait_sig()\fR are similar to \fBcv_wait()\fR and
+\fBcv_wait_sig()\fR except that the mutex is replaced by the inner and outer
+perimeters and the signalling is implicit when a thread leaves the inner
+perimeter. See \fBcondvar\fR(9F).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+For \fBqwait_sig()\fR, indicates that the condition was not necessarily
+signaled, and the function returned because a signal was pending.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can only be called from an \fBopen\fR(9E) or \fBclose\fR(9E)
+routine.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBqwait()\fR
+.sp
+.LP
+The open routine sends down a \fBT_INFO_REQ\fR message and waits for the
+\fBT_INFO_ACK\fR. The arrival of the \fBT_INFO_ACK\fR is recorded by resetting
+a flag in the unit structure (\fBWAIT_INFO_ACK\fR). The example assumes that
+the module is \fBD_MTQPAIR\fR or \fBD_MTPERMOD\fR.
+
+.sp
+.in +2
+.nf
+xxopen(qp, .\|.\|.)
+       queue_t *qp;
+{
+	      struct xxdata *xx;
+	       /* Allocate xxdata structure */
+       qprocson(qp);
+       /* Format T_INFO_ACK in mp */
+       putnext(qp, mp);
+       xx->xx_flags |= WAIT_INFO_ACK;
+       while (xx->xx_flags & WAIT_INFO_ACK)
+		            qwait(qp);
+	      return (0);
+}
+xxrput(qp, mp)
+       queue_t *qp;
+       mblk_t *mp;
+{
+       struct xxdata *xx = (struct xxdata *)q->q_ptr;
+
+	      ...
+
+	      case T_INFO_ACK:
+		            if (xx->xx_flags & WAIT_INFO_ACK) {
+			              /* Record information from info ack */
+			              xx->xx_flags &= ~WAIT_INFO_ACK;
+			              freemsg(mp);
+			              return;
+		            }
+
+	      ...
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
+\fBcondvar\fR(9F), \fBddi_can_receive_sig\fR(9F), \fBmt-streams\fR(9F),
+\fBqbufcall\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR

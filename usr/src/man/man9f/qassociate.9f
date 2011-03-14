@@ -1,0 +1,156 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qassociate 9F "01 Feb 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qassociate \- associate STREAMS queue with driver instance
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/stropts.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBqassociate\fR(\fBqueue_t *\fR\fIq\fR, \fBint\fR \fIinstance\fR
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fBqueue_t *\fIq\fR\fR
+.ad
+.RS 16n
+.rt  
+Pointer to a \fBqueue\fR(9S) structure. Either the read or write queue can be
+used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBint \fIinstance\fR\fR
+.ad
+.RS 16n
+.rt  
+Driver instance number or -1.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqassociate()\fR function must be used by \fBDLPI\fR style 2 device
+drivers to manage the association between STREAMS queues and device instances.
+The \fBgld\fR(7D) does this automatically on behalf of drivers based on it. It
+is recommended that the \fBgld\fR(7D) be used for network device drivers
+whenever possible.
+.sp
+.LP
+The \fBqassociate()\fR function associates the specified STREAMS queue with the
+specified instance of the bottom driver in the queue. Upon successful return,
+the stream is associated with the instance with any prior association
+dissolved.
+.sp
+.LP
+A DLPI style 2 driver calls \fBqassociate()\fR while processing the
+\fBDL_ATTACH_REQ\fR message. The driver is also expected to call this interface
+while performing stream associations through other means, such as \fBndd\fR(1M)
+ioctl commands.
+.sp
+.LP
+If \fIinstance\fR is -1, the stream is left unassociated with any hardware
+instance.
+.sp
+.LP
+If the interface returns failure, the stream is not associated with the
+specified instance. Any prior association is left untouched.
+.sp
+.LP
+The interface typically fails because of failure to locate and attach the
+device instance. The interface never fails if the specified instance is -1.
+.SH CONTEXT
+.sp
+.LP
+The \fBqassociate()\fR function can be called from the stream's \fBput\fR(9E)
+entry point.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+Failure.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+DLPI style 2 network driver \fBDL_ATTACH_REQ\fR code specifies:
+.sp
+.in +2
+.nf
+if (qassociate(q, instance) != 0)
+                goto fail;
+.fi
+.in -2
+
+.sp
+.LP
+The association prevents Dynamic Reconfiguration (DR) from detaching the
+instance.
+.sp
+.LP
+DLPI style 2 network driver \fBDL_DETACH\fR code specifies:
+.sp
+.in +2
+.nf
+(void) qassociate(q, -1);
+.fi
+.in -2
+
+.sp
+.LP
+This dissolves the queue's association with any device instance.
+.sp
+.LP
+DLPI style 2 network driver \fBopen\fR(9E) code must call:
+.sp
+.in +2
+.nf
+qassociate(q, -1);
+.fi
+.in -2
+
+.sp
+.LP
+This informs the framework that this driver has been modified to be
+DDI-compliant.
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi\fR(7P), \fBgld\fR(7D), \fBopen\fR(9E), \fBput\fR(9E),
+\fBddi_no_info\fR(9F), \fBqueue\fR(9S)

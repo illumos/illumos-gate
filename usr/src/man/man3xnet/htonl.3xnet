@@ -1,0 +1,92 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH htonl 3XNET "10 Jun 2002" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+htonl, htons, ntohl, ntohs \- convert values between host and network byte
+order
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <arpa/inet.h>
+ 
+\fBuint32_t\fR \fBhtonl\fR(\fBuint32_t\fR \fIhostlong\fR);
+.fi
+
+.LP
+.nf
+\fBuint16_t\fR \fBhtons\fR(\fBuint16_t\fR \fIhostshort\fR);
+.fi
+
+.LP
+.nf
+\fBuint32_t\fR \fBntohl\fR(\fBuint32_t\fR \fInetlong\fR);
+.fi
+
+.LP
+.nf
+\fBuint16_t\fR  \fBntohs\fR(\fBuint16_t\fR \fI netshort\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions convert 16-bit and 32-bit quantities between network byte order
+and host byte order.
+.sp
+.LP
+The  \fBuint32_t\fR and  \fBuint16_t\fR types are made available by inclusion
+of \fB<inttypes.h>\fR\&.
+.SH USAGE
+.sp
+.LP
+These functions are most often used in conjunction with Internet addresses and
+ports as returned by \fBgethostent\fR(3XNET) and \fBgetservent\fR(3XNET).
+.sp
+.LP
+On some architectures these functions are defined as macros that expand to the
+value of their argument.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBhtonl()\fR and \fBhtons()\fR functions return the argument value
+converted from host to network byte order.
+.sp
+.LP
+The \fBntohl()\fR and \fBntohs()\fR functions return the argument value
+converted from network to host byte order.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBendhostent\fR(3XNET), \fBendservent\fR(3XNET), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_set_timeout 3DLPI "21 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_set_timeout \- set DLPI handle timeout interval
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
+#include <libdlpi.h>
+
+\fBint\fR \fIdlpi_set_timeout\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBint\fR \fIsec\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_set_timeout()\fR function sets the timeout interval to \fIsec\fR
+seconds on DLPI handle \fIdh\fR. This timeout is used by \fBlibdlpi\fR(3LIB)
+functions that require explicit acknowledgment from the associated DLPI link,
+and bounds the number of seconds that a function will wait for an
+acknowledgment before returning \fBDLPI_ETIMEDOUT\fR. Except for
+\fBdlpi_recv\fR(3DLPI), which has a \fItimeout\fR argument, any function that
+is documented to return \fBDLPI_ETIMEDOUT\fR can take up to the \fItimeout\fR
+interval to complete.
+.sp
+.LP
+Callers that do not require an upper bound on timeouts are strongly encouraged
+to never call \fBdlpi_set_timeout()\fR, and allow \fBlibdlpi\fR to use its
+default \fItimeout\fR value. The default \fItimeout\fR value is intended to
+ensure that \fBDLPI_ETIMEDOUT\fR will only be returned if the DLPI link has
+truly become unresponsive. The default \fItimeout\fR value is intended to
+ensure that \fBDLPI_ETIMEDOUT\fR will be returned only if the DLPI link has
+truly become unresponsive.
+.sp
+.LP
+Callers that do require an explicit upper bound can specify that value at any
+time by calling \fBdlpi_set_timeout()\fR.  However, note that values less than
+5 seconds may trigger spurious failures on certain DLPI links and systems under
+high load, and thus are discouraged. Attempts to set the \fItimeout\fR value to
+less than 1 second will fail.
+.sp
+.LP
+If \fIsec\fR is set to \fBDLPI_DEF_TIMEOUT\fR, the default \fItimeout\fR value
+is restored.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. Otherwise, a \fBDLPI\fR error
+value is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

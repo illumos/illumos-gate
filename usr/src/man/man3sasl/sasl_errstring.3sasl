@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_errstring 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_errstring \- translate a SASL return code to a human-readable form
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBconst char *\fR \fBsasl_errstring\fR(\fBint\fR \fIsaslerr\fR, \fBconst char *\fR\fIlanglist\fR,
+     \fBconst char **\fR\fIoutlang\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsasl_errstring()\fR interface is called to convert a SASL return code
+from an integer into a human readable string.
+.sp
+.LP
+You should not used the \fBsasl_errstring()\fR interface to extract error code
+information from SASL. Applications should use \fBsasl_errdetail\fR(3SASL)
+instead, which contains this error information and more.
+.sp
+.LP
+The \fBsasl_errstring()\fR interface supports only \fBi-default\fR and
+\fBi-local\fR at this time.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsaslerr\fR\fR
+.ad
+.RS 12n
+.rt  
+The error number to be translated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlanglist\fR\fR
+.ad
+.RS 12n
+.rt  
+A comma-separated list of languages. See \fIRFC 1766\fR. If the\fIlanglist\fR
+parameter has a\fINULL\fR value, the default language,\fBi-default\fR, is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutlang\fR\fR
+.ad
+.RS 12n
+.rt  
+The language actually used. The \fIoutlang\fR parameter can be \fINULL\fR. The
+returned error string is in \fBUTF-8\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBsasl_errstring()\fR returns the string that describes the error that
+occurred, or \fINULL\fR, if there was an error retrieving it.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsasl_errors\fR(3SASL), \fBsasl_seterror\fR(3SASL), \fBattributes\fR(5)
+.sp
+.LP
+Alvestrand, H. \fIRFC 1766, Tags for the Identification of Languages\fR.
+Network Working Group. November 1995.

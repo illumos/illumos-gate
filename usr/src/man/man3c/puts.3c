@@ -1,0 +1,78 @@
+'\" te
+.\" Copyright 1989 AT&T. Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH puts 3C "18 Jun 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+puts, fputs \- put a string on a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBint\fR \fBputs\fR(\fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfputs\fR(\fBconst char *\fR\fIs\fR, \fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBputs()\fR function writes the string pointed to by \fIs\fR, followed by
+a \fBNEWLINE\fR character, to the standard output stream \fBstdout\fR (see
+\fBIntro\fR(3)). The terminating null byte is not written.
+.sp
+.LP
+The \fBfputs()\fR function writes the null-terminated string pointed to by
+\fIs\fR to the named output \fIstream\fR. The terminating null byte is not
+written.
+.sp
+.LP
+The \fBst_ctime\fR and \fBst_mtime\fR fields of the file will be marked for
+update between the successful execution of \fBfputs()\fR and the next
+successful completion of a call to \fBfflush\fR(3C) or \fBfclose\fR(3C) on the
+same stream or a call to \fBexit\fR(2) or \fBabort\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, both functions return the number of bytes written;
+otherwise they return \fBEOF\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+Refer to \fBfputc\fR(3C).
+.SH USAGE
+.sp
+.LP
+Unlike \fBputs()\fR, the \fBfputs()\fR function does not write a NEWLINE
+character at the end of the string.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBwrite\fR(2), \fBIntro\fR(3), \fBabort\fR(3C),
+\fBfclose\fR(3C), \fBferror\fR(3C), \fBfflush\fR(3C), \fBfopen\fR(3C),
+\fBfputc\fR(3C), \fBprintf\fR(3C), \fBstdio\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

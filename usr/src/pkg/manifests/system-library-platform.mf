@@ -150,6 +150,8 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/nfs
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/ufs
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/zfs
 $(sparc_ONLY)dir path=usr/platform/sun4v/sbin
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man3lib
 $(sparc_ONLY)file path=usr/platform/SUNW,Netra-CP3010/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Netra-CP3260/lib/libprtdiag_psr.so.1
@@ -194,6 +196,9 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/libprtdiag.so.1
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/libtsalarm.so.1
 $(sparc_ONLY)file path=usr/platform/sun4v/sbin/device_remap mode=0544
 $(sparc_ONLY)file path=usr/platform/sun4v/sbin/prtdiag group=sys mode=2755
+file path=usr/share/man/man1m/device_remap.1m
+file path=usr/share/man/man1m/scadm.1m
+file path=usr/share/man/man3lib/libtsalarm.3lib
 $(i386_ONLY)legacy pkg=SUNWkvm.i arch=$(ARCH).i86pc \
     desc="core software for a specific hardware platform group" \
     name="Core Architecture, (Kvm)"

@@ -1,0 +1,236 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_verify_mic 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_verify_mic \- verify integrity of a received message
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_verify_mic\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBconst gss_ctx_id_t\fR \fIcontext_handle\fR, \fBconst gss_buffer_t\fR \fImessage_buffer\fR,
+     \fBconst gss_buffer_t\fR \fItoken_buffer\fR, \fBgss_qop_t *\fR\fIqop_state\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_verify_mic()\fR function verifies that a cryptographic \fBMIC\fR,
+contained in the token parameter, fits the supplied message. The
+\fIqop_state\fR parameter allows a message recipient to determine the strength
+of protection that was applied to the message.
+.sp
+.LP
+Since some application-level protocols may wish to use tokens emitted by
+\fBgss_wrap\fR(3GSS) to provide secure framing, the \fBGSS-API\fR supports the
+calculation and verification of \fBMIC\fRs over zero-length messages.
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_verify_mic()\fR follow:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 18n
+.rt  
+The status code returned by the underlying mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcontext_handle\fR\fR
+.ad
+.RS 18n
+.rt  
+Identifies the context on which the message arrived.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImessage_buffer\fR\fR
+.ad
+.RS 18n
+.rt  
+The message to be verified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItoken_buffer\fR\fR
+.ad
+.RS 18n
+.rt  
+The token associated with the message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIqop_state\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the quality of protection gained from the \fBMIC\fR. Specify
+\fBNULL\fR if this parameter is not required.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+\fBgss_verify_mic()\fR may return the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 25n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DEFECTIVE_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+The token failed consistency checks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_SIG\fR\fR
+.ad
+.RS 25n
+.rt  
+The \fBMIC\fR was incorrect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DUPLICATE_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+The token was valid and contained a correct \fBMIC\fR for the message, but it
+had already been processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_OLD_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+The token was valid and contained a correct \fBMIC\fR for the message, but it
+is too old to check for duplication.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_UNSEQ_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+The token was valid and contained a correct \fBMIC\fR for the message, but it
+has been verified out of sequence; a later token has already been received.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_GAP_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+The token was valid and contained a correct \fBMIC\fR for the message, but it
+has been verified out of sequence; an earlier expected token has not yet been
+received.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CONTEXT_EXPIRED\fR\fR
+.ad
+.RS 25n
+.rt  
+The context has already expired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_NO_CONTEXT\fR\fR
+.ad
+.RS 25n
+.rt  
+The \fIcontext_handle\fR parameter did not identify a valid context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 25n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_wrap\fR(3GSS), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptm 7D "5 Feb 1997" "SunOS 5.11" "Devices"
+.SH NAME
+ptm \- STREAMS pseudo-tty master driver
+.SH DESCRIPTION
+.sp
+.LP
+The pseudo-tty subsystem simulates a terminal connection, where the master side
+represents the terminal and the slave represents the user process's special
+device end point. In order to use the pseudo-tty subsystem, a node for the
+master side driver \fB/dev/ptmx\fR and \fBN\fR number of nodes for the slave
+driver must be installed. See \fBpts\fR(7D). The master device is set up as a
+cloned device where its major device number is the major for the clone device
+and its minor device number is the major for the \fBptm\fR driver. There are no
+nodes in the file system for master devices. The master pseudo driver is opened
+using the \fBopen\fR(2) system call with \fB/dev/ptmx\fR as the device
+parameter. The clone open finds the next available minor device for the
+\fBptm\fR major device.
+.sp
+.LP
+A master device is available only if it and its corresponding slave device are
+not already open. When the master device is opened, the corresponding slave
+device is automatically locked out. Only one open is allowed on a master
+device.  Multiple opens are allowed on the slave device. After both the master
+and slave have been opened, the user has two file descriptors which are the end
+points of a full duplex connection composed of two streams which are
+automatically connected at the master and slave drivers. The user may then push
+modules onto either side of the stream pair.
+.sp
+.LP
+The master and slave drivers pass all messages to their adjacent queues. Only
+the \fBM_FLUSH\fR needs some processing. Because the read queue of one side is
+connected to the write queue of the other, the \fBFLUSHR\fR flag is changed to
+the \fBFLUSHW\fR flag and vice versa. When the master device is closed an
+\fBM_HANGUP\fR message is sent to the slave device which will render the device
+unusable. The process on the slave side gets the errno \fBEIO\fR when
+attempting to write on that stream but it will be able to read any data
+remaining on the stream head read queue. When all the data has been read,
+\fBread()\fR returns 0 indicating that the stream can no longer be used. On the
+last close of the slave device, a 0-length message is sent to the master
+device. When the application on the master side issues a \fBread()\fR or
+\fBgetmsg()\fR and 0 is returned, the user of the master device decides whether
+to issue a \fBclose()\fR that dismantles the pseudo-terminal subsystem. If the
+master device is not closed, the pseudo-tty subsystem will be available to
+another user to open the slave device.
+.sp
+.LP
+If \fBO_NONBLOCK\fR or \fBO_NDELAY\fR is set, read on the master side returns
+\(mi1 with errno set to \fBEAGAIN\fR if no data is available, and write returns
+\(mi1 with errno set to \fBEAGAIN\fR if there is internal flow control.
+.SH IOCTLS
+.sp
+.LP
+The master driver supports the \fBISPTM\fR and \fBUNLKPT\fR ioctls that are
+used by the functions \fBgrantpt\fR(3C), \fBunlockpt\fR(3C) and
+\fBptsname\fR(3C). The ioctl \fBISPTM\fR determines whether the file descriptor
+is that of an open master device. On success, it returns the 0. The ioctl
+\fBUNLKPT\fR unlocks the master and slave devices. It returns 0 on success. On
+failure, the errno is set to \fBEINVAL\fR indicating that the master device is
+not open.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/ptmx\fR\fR
+.ad
+.RS 14n
+.rt  
+master clone device
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/pts/M\fR\fR
+.ad
+.RS 14n
+.rt  
+slave devices (M = 0 -> N-1)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgrantpt\fR(3C), \fBptsname\fR(3C), \fBunlockpt\fR(3C), \fBpckt\fR(7M),
+\fBpts\fR(7D)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

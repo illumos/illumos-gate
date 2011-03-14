@@ -1,0 +1,130 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pullupmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+pullupmsg \- concatenate bytes in a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBpullupmsg\fR(\fBmblk_t *\fR\fImp\fR, \fBssize_t\fR \fIlen\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the message whose blocks are to be concatenated. \fBmblk_t\fR is an
+instance of the \fBmsgb\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 7n
+.rt  
+Number of bytes to concatenate.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpullupmsg()\fR function tries to combine multiple data blocks into a
+single block. \fBpullupmsg()\fR concatenates and aligns the first \fIlen\fR
+data bytes of the message pointed to by \fImp\fR. If \fIlen\fR equals \fB-1\fR,
+all data are concatenated. If \fIlen\fR bytes of the same message type cannot
+be found, \fBpullupmsg()\fR fails and returns \fB0\fR.
+.SH RETURN VALUES
+.sp
+.LP
+On success, \fB1\fR is returned; on failure, \fB0\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBpullupmsg()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBpullupmsg()\fR
+.sp
+.LP
+This is a driver write \fBsrv\fR(9E) (service) routine for a device that does
+not support scatter/gather \fBDMA\fR. For all  \fBM_DATA\fR messages, the data
+will be transferred to the device with \fBDMA\fR. First, try to pull up the
+message into one message block with the \fBpullupmsg()\fR function (line 12).
+If successful, the transfer can be accomplished in one \fBDMA \fRjob.
+Otherwise, it must be done one message block at a time (lines 19-22). After the
+data has been transferred to the device, free the message and continue
+processing messages on the queue.
+
+.sp
+.in +2
+.nf
+ 
+ 1 xxxwsrv(q)
+ 2    queue_t *q;
+ 3 {
+ 4	    mblk_t *mp;
+ 5	    mblk_t *tmp;
+ 6	    caddr_t dma_addr;
+ 7     ssize_t dma_len;
+ 8
+ 9	    while ((mp = getq(q)) != NULL) {
+10	            switch (mp->b_datap->db_type) {
+11             case M_DATA:
+12	                   if (pullupmsg(mp, -1)) {
+13                            dma_addr = vtop(mp->b_rptr);
+14	                           dma_len = mp->b_wptr - mp->b_rptr;
+15	                           xxx_do_dma(dma_addr, dma_len);
+16	                           freemsg(mp);
+17	                           break;
+18	                   }
+19	                   for (tmp = mp; tmp; tmp = tmp->b_cont) {
+20                            dma_addr = vtop(tmp->b_rptr);
+21                            dma_len = tmp->b_wptr - tmp->b_rptr;
+22                            xxx_do_dma(dma_addr, dma_len);
+23                    }
+24	                   freemsg(mp);
+25	                   break;
+     	 . . .
+26		        }
+27	    }
+28 }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsrv\fR(9E), \fBallocb\fR(9F), \fBmsgpullup\fR(9F), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The \fBpullupmsg()\fR function is not included in the \fBDKI\fR and will be
+removed from the system in a future release. Device driver writers are strongly
+encouraged to use \fBmsgpullup\fR(9F) instead of \fBpullupmsg()\fR.

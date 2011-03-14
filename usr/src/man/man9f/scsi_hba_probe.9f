@@ -1,0 +1,69 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_hba_probe 9F "30 Aug 1995" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_hba_probe \- default SCSI HBA probe function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_hba_probe\fR(\fBstruct scsi_device *\fR\fIsd\fR, \fBint\fR\fB(*\fRwaitfunc\fB)(void)\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsd\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a  \fBscsi_device\fR(9S) structure describing the target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwaitfunc\fR \fR
+.ad
+.RS 13n
+.rt  
+\fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBscsi_hba_probe()\fR is a function providing the semantics of
+\fBscsi_probe\fR(9F). An \fBHBA\fR driver may call \fBscsi_hba_probe()\fR from
+its \fBtran_tgt_probe\fR(9E) entry point, to probe for the existence of a
+target on the \fBSCSI\fR bus, or the \fBHBA\fR may set \fBtran_tgt_probe\fR(9E)
+to point to \fBscsi_hba_probe\fR directly.
+.SH RETURN VALUES
+.sp
+.LP
+See \fBscsi_probe\fR(9F) for the return values from \fBscsi_hba_probe()\fR.
+.SH CONTEXT
+.sp
+.LP
+\fBscsi_hba_probe()\fR should only be called from the \fBHBA\fR's
+\fBtran_tgt_probe\fR(9E) entry point.
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_tgt_probe\fR(9E), \fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

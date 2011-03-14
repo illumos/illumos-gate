@@ -1,0 +1,238 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kiconv_open 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+kiconv_open \- code conversion descriptor allocation function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunddi.h>
+
+
+
+\fBkiconv_t\fR \fBkiconv_open\fR(\fBconst\fR \fBchar *\fR\fItocode\fR, \fBconst\fR \fBchar *\fR\fIfromcode\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fItocode\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a target codeset name string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfromcode\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a source codeset name string.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkiconv_open()\fR function returns a code conversion descriptor that
+describes a conversion from the codeset specified by \fIfromcode\fR to the
+codeset specified by \fItocode\fR. For state-dependent encodings, the
+conversion descriptor is in a codeset-dependent initial state (ready for
+immediate use with the \fBkiconv()\fR function).
+.sp
+.LP
+Supported code conversions are between \fBUTF-8\fR and the following:
+.sp
+.in +2
+.nf
+Name                    Description
+
+ Big5                    Traditional Chinese Big5
+ Big5-HKSCS              Traditional Chinese Big5-Hong Kong
+                         Supplementary Character Set
+ CP720                   DOS Arabic                                          
+ CP737                   DOS Greek                                           
+ CP850                   DOS Latin-1 (Western European)                      
+ CP852                   DOS Latin-2 (Eastern European)                      
+ CP857                   DOS Latin-5 (Turkish)                               
+ CP862                   DOS Hebrew                                          
+ CP866                   DOS Cyrillic Russian                                
+ CP932                   Japanese Shift JIS (Windows)                       
+ CP950-HKSCS             Traditional Chinese HKSCS-2001 (Windows)           
+ CP1250                  Central Europe
+ CP1251                  Cyrillic
+ CP1252                  Western Europe
+ CP1253                  Greek
+ CP1254                  Turkish
+ CP1255                  Hebrew
+ CP1256                  Arabic
+ CP1257                  Baltic
+ EUC-CN                  Simplified Chinese EUC
+ EUC-JP                  Japanese EUC
+ EUC-JP-MS               Japanese EUC MS
+ EUC-KR                  Korean EUC
+ EUC-TW                  Traditional Chinese EUC
+ GB18030                 Simplified Chinese GB18030
+ GBK                     Simplified Chinese GBK                              
+ ISO-8859-1              Latin-1 (Western European)
+ ISO-8859-2              Latin-2 (Eastern European) 
+ ISO-8859-3              Latin-3 (Southern European)                         
+ ISO-8859-4              Latin-4 (Northern European)                         
+ ISO-8859-5              Cyrillic
+ ISO-8859-6              Arabic
+ ISO-8859-7              Greek
+ ISO-8859-8              Hebrew
+ ISO-8859-9              Latin-5 (Turkish)
+ ISO-8859-10             Latin-6 (Nordic)                                    
+ ISO-8859-13             Latin-7 (Baltic)
+ ISO-8859-15             Latin-9 (Western European with euro sign)
+ KOI8-R                  Cyrillic
+ Shift_JIS               Japanese Shift JIS (JIS)                            
+ TIS_620                 Thai (a.k.a. ISO 8859-11)
+ Unified-Hangul          Korean Unified Hangul                          
+       
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBUTF-8\fR and the above names can be used at \fItocode\fR and \fIfromcode\fR
+to specify the desired code conversion. The following aliases are also
+supported as alternative names to be used:
+.sp
+.in +2
+.nf
+Aliases                 Original Name                                
+  720                     CP720                                          
+  737                     CP737                                         
+  850                     CP850                                         
+  852                     CP852                                      
+  857                     CP857                                              
+  862                     CP862                                          
+  866                     CP866                                          
+  932                     CP932                                        
+  936, CP936              GBK                                            
+  949, CP949              Unified-Hangul                                 
+  950, CP950              Big5                                           
+  1250                    CP1250                                         
+  1251                    CP1251                                         
+  1252                    CP1252                                         
+  1253                    CP1253                                         
+  1254                    CP1254                                         
+  1255                    CP1255                                         
+  1256                    CP1256                                         
+  1257                    CP1257                                         
+  ISO-8859-11             TIS_620                                        
+  PCK, SJIS               Shift_JIS                                      
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A conversion descriptor remains valid until it is closed by using
+\fBkiconv_close()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBkiconv_open()\fR returns a code conversion
+descriptor for use on subsequent calls to \fBkiconv()\fR. Otherwise, if the
+conversion specified by \fIfromcode\fR and \fItocode\fR is not supported or for
+any other reasons the code conversion descriptor cannot be allocated,
+\fBkiconv_open()\fR returns (\fBkiconv_t\fR)-1 to indicate the error.
+.SH CONTEXT
+.sp
+.LP
+\fBkiconv_close()\fR can be called from user context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fROpening a Code Conversion
+.sp
+.LP
+The following example shows how to open a code conversion from \fBISO\fR
+8859-15 to \fBUTF-8\fR
+
+.sp
+.in +2
+.nf
+#include <sys/sunddi.h>
+
+kiconv_t cd;
+
+cd = kiconv_open("UTF-8", "ISO-8859-15");
+if (cd == (kiconv_t)-1) {
+         /* Cannot open up the code conversion. */
+         return (-1);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBiconv_open\fR(3C),
+\fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
+\fBuconv_u16tou32\fR(3C), \fBuconv_u16tou8\fR(3C), \fBuconv_u32tou16\fR(3C),
+\fBuconv_u32tou8\fR(3C), \fBuconv_u8tou16\fR(3C), \fBuconv_u8tou32\fR(3C),
+\fBattributes\fR(5), \fBkiconv\fR(9F), \fBkiconvstr\fR(9F),
+\fBkiconv_close\fR(9F), \fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F),
+\fBu8_validate\fR(9F), \fBuconv_u16tou32\fR(9F), \fBuconv_u16tou8\fR(9F),
+\fBuconv_u32tou16\fR(9F), \fBuconv_u32tou8\fR(9F), \fBuconv_u8tou16\fR(9F),
+\fBuconv_u8tou32\fR(9F)
+.sp
+.LP
+The Unicode Standard
+.sp
+.LP
+http://www.unicode.org/standard/standard.html
+.SH NOTES
+.sp
+.LP
+The code conversions are available between \fBUTF-8\fR and the above noted
+\fIcodesets\fR. For example, to convert from \fBEUC-JP \fRto \fBShift_JIS\fR,
+first convert \fBEUC-JP\fR to \fBUTF-8\fR and then convert \fBUTF-8\fR to
+\fBShift_JIS\fR.
+.sp
+.LP
+The code conversions supported are based on simple one-to-one mappings. There
+is no special treatment or processing done during code conversions such as case
+conversion, Unicode Normalization, or mapping between combining or conjoining
+sequences of \fBUTF-\fR8 and pre-composed characters in non-\fBUTF-8\fR
+codesets.
+.sp
+.LP
+All supported non-\fBUTF-8\fR codesets use pre-composed characters only.
+However, \fBUTF-8\fR allows combining or conjoining characters too. For this
+reason, using a form of Unicode Normalizations on \fBUTF-8\fR text with
+\fBu8_textprep_str()\fR before or after doing code conversions might be
+necessary.

@@ -1,0 +1,133 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceCreateConnection 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceCreateConnection, DNSServiceRegisterRecord, DNSServiceAddRecord,
+DNSServiceUpdateRecord, DNSServiceRemoveRecord \- registering multiple records
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceCreateConnection\fR(\fBDNSServiceRef\fR *\fIsdRef\fR);
+.fi
+
+.LP
+.nf
+\fBDNSServiceErrorType\fR \fIDNSServiceRegisterRecord\fR(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSRecordRef\fR *\fIRecordRef\fR, \fBDNSServiceFlags\fR \fIflags\fR,
+     \fBuint32_t\fR \fIinterfaceIndex\fR, \fBconst char\fR *\fIfullname\fR,
+     \fBuint16_t\fR \fIrrtype\fR, \fBuint16_t\fR \fIrrclass\fR, \fBuint16_t\fR \fIrdlen\fR,
+     \fBconst void\fR *\fIrdata\fR, \fBuint32_t\fR \fIttl\fR,
+     \fBDNSServiceServiceRegisterRecordReply\fR \fIcallBack\fR,
+     \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceRegisterRecordReply\fR)(\fBDNSServiceRef\fR \fIsdRef\fR, 
+     \fBDNSServiceRecordRef\fR \fIRecordRef\fR, \fBDNSServiceFlags\fR \fIflags\fR,
+     \fBDNSServiceErrorType\fR \fIerrorCode\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBDNSServiceErrorType\fR \fIDNSServiceAddRecord\fR(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSRecordRef\fR *\fIRecordRef\fR, \fBDNSServiceFlags\fR \fIflags\fR,
+     \fBuint16_t\fR \fIrrtype\fR, \fBuint16_t\fR \fIrdlen\fR, \fBconst void\fR *\fIrdata\fR,
+     \fBuint32_t\fR \fIttl\fR);
+.fi
+
+.LP
+.nf
+\fBDNSServiceErrorType\fR \fIDNSServiceUpdateRecord\fR(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSRecordRef\fR \fIRecordRef\fR, \fBDNSServiceFlags\fR \fIflags\fR,
+     \fBuint16_t\fR \fIrdlen\fR, \fBconst void\fR *\fIrdata\fR,
+     \fBuint32_t\fR \fIttl\fR);
+.fi
+
+.LP
+.nf
+\fBDNSServiceErrorType\fR \fIDNSServiceRemoveRecord\fR(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSRecordRef\fR \fIRecordRef\fR, \fBDNSServiceFlags\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceCreateConnection()\fR function allows the creation of a
+connection to the \fBmDNS\fR daemon in order to register multiple individual
+records.
+.sp
+.LP
+The \fBDNSServiceRegisterRecord()\fR function uses the connection created by
+\fBDNSServiceCreateConnection()\fR to register a record. Name conflicts that
+occur from this function should be handled by the client in the callback.
+.sp
+.LP
+The \fBDNSServiceAddRecord()\fR call adds a \fBDNS\fR record to a registered
+service. The name of the record is the same as registered service name. The
+\fIRecordRef\fR argument to \fBDNSServiceAddRecord()\fR points to an
+uninitialized \fBDNSRecordRef\fR. After successful completion of
+\fBDNSServiceAddRecord()\fR, the \fBDNS\fR record can be updated or
+deregistered by passing the \fBDNSRecordRef\fR initialized by
+\fBDNSServiceAddRecord()\fR to \fBDNSServiceUpdateRecord()\fR or to
+\fBDNSServiceRemoveRecord()\fR.
+.sp
+.LP
+The \fBDNSServiceUpdateRecords()\fR call updates the \fBDNS\fR record of the
+registered service. The \fBDNS\fR record must be the primary resource record
+registered using \fBDNSServiceRegister()\fR or a record added to a registered
+service using \fBDNSServiceAddRecord()\fR or an individual record added via
+\fBDNSServiceRegisterRecord()\fR.
+.sp
+.LP
+The \fBDNSServiceRemoveRecord()\fR call removes a record that was added using
+\fBDNSServiceAddRecord()\fR or \fBDNSServiceRegisterRecord()\fR.
+.sp
+.LP
+The \fIsdRef\fR argument points to \fBDNSServiceRef\fR initialized from a call
+to \fBDNSServiceRegister()\fR. If the \fIsdRef\fR argument is passed to
+\fBDNSServiceRefDeallocate()\fR and the service is deregistered \fBDNS\fR
+records added via \fBDNSServiceAddRecord()\fR are invalidated and cannot be
+further used. The \fIflags\fR argument is currently ignored and reserved for
+future use. The \fIrrtype\fR parameter value indicates the type of the
+\fBDNS\fR record. Suitable values for the \fIrrtype\fR parameter are defined in
+\fB<dns_sd.h>\fR: \fBkDNSServiceType_TXT\fR, for example. The \fIrdata\fR
+argument points to the raw rdata to be contained in the resource record. The
+\fIttl\fR value indicates the time to live of the resource record in seconds. A
+\fIttl\fR value of \fB0\fR should be passed to use a default value.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceCreateConnection\fR function returns
+\fBkDNSServiceErr_NoError\fR on success. Otherwise, an error code defined in
+\fB<dns_sd.h>\fR is returned to indicate the specific failure that occurred.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBDNSServiceRegister\fR(3DNS_SD),
+\fBattributes\fR(5)

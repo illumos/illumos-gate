@@ -1,0 +1,69 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH drv_hztousec 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+drv_hztousec \- convert clock ticks to microseconds
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBclock_t\fR \fBdrv_hztousec\fR(\fBclock_t\fR \fIhertz\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhertz\fR\fR
+.ad
+.RS 9n
+.rt  
+The number of clock ticks to convert.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdrv_hztousec()\fR function converts into microseconds the time expressed
+by \fIhertz\fR, which is in system clock ticks.
+.sp
+.LP
+The kernel variable \fBlbolt\fR, whose value should be retrieved by calling
+\fBddi_get_lbolt\fR(9F), is the length of time the system has been up since
+boot and is expressed in clock ticks. Drivers often use the value of
+\fBlbolt\fR before and after an \fBI/O\fR request to measure the amount of time
+it took the device to process the request. The \fBdrv_hztousec()\fR function
+can be used by the driver to convert the reading from clock ticks to a known
+unit of time.
+.SH RETURN VALUES
+.sp
+.LP
+The number of microseconds equivalent to the \fIhertz\fR parameter. No error
+value is returned. If the microsecond equivalent to \fIhertz\fR is too large to
+be represented as a \fBclock_t\fR, then the maximum \fBclock_t\fR value will be
+returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBdrv_hztousec()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_get_lbolt\fR(9F), \fBdrv_usectohz\fR(9F), \fBdrv_usecwait\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

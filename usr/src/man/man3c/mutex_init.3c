@@ -1,0 +1,1009 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1995 IEEE  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mutex_init 3C "5 Jun 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mutex_init, mutex_lock, mutex_trylock, mutex_unlock, mutex_consistent,
+mutex_destroy \- mutual exclusion locks
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <thread.h> 
+#include <synch.h> 
+
+\fBint\fR \fBmutex_init\fR(\fBmutex_t *\fR\fImp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_lock\fR(\fBmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_trylock\fR(\fBmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_unlock\fR(\fBmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_consistent\fR(\fBmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_destroy\fR(\fBmutex_t *\fR\fImp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Mutual exclusion locks (mutexes) prevent multiple threads from simultaneously
+executing critical sections of code that access shared data (that is, mutexes
+are used to serialize the execution of threads). All mutexes must be global. A
+successful call for a mutex lock by way of  \fBmutex_lock()\fR will cause
+another thread that is also trying to lock the same mutex to block until the
+owner thread unlocks it by way of  \fBmutex_unlock()\fR. Threads within the
+same process or within other processes can share mutexes.
+.sp
+.LP
+Mutexes can synchronize threads within the same process or in other  processes.
+Mutexes can be used to synchronize threads between processes if the mutexes are
+allocated in writable memory and shared among the cooperating processes (see
+\fBmmap\fR(2)), and have been initialized for this task.
+.SS "Initialize"
+.sp
+.LP
+Mutexes are either intra-process or inter-process, depending  upon the argument
+passed implicitly or explicitly  to the initialization of that mutex. A
+statically allocated mutex does not need to be explicitly  initialized; by
+default, a statically allocated mutex is initialized  with all zeros and its
+scope is set to be within the calling process.
+.sp
+.LP
+For inter-process synchronization, a mutex needs to be allocated  in memory
+shared between these processes. Since the memory for such a mutex must be
+allocated dynamically,  the mutex needs to be explicitly initialized using
+\fBmutex_init()\fR.
+.sp
+.LP
+The  \fBmutex_init()\fR function initializes the mutex referenced by \fImp\fR
+with the type specified by  \fItype\fR. Upon successful initialization the
+state of the mutex becomes initialized and unlocked. Only the attribute type
+\fBLOCK_PRIO_PROTECT\fR uses \fIarg\fR. The \fItype\fR argument must be one of
+the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_THREAD\fR\fR
+.ad
+.sp .6
+.RS 4n
+The mutex can synchronize threads only in this process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_PROCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The mutex can synchronize threads in this process and other processes. The
+object initialized with this attribute must be allocated in memory shared
+between processes, either in System V shared memory (see  \fBshmop\fR(2)) or in
+memory mapped to a file (see  \fBmmap\fR(2)). If the object is not allocated in
+such shared memory, it will not be shared between processes.
+.RE
+
+.sp
+.LP
+The \fItype\fR argument can be augmented by the bitwise-inclusive-\fBOR\fR of
+zero or more of the following flags:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOCK_ROBUST\fR\fR
+.ad
+.sp .6
+.RS 4n
+The mutex can synchronize threads robustly. At the time of thread or process
+death, either by calling \fBthr_exit()\fR or \fBexit()\fR or due to process
+abnormal termination, the lock is unlocked if is held by the thread or process.
+The next owner of the mutex will acquire it with an error return of
+\fBEOWNERDEAD\fR. The application must always check the return value from
+\fBmutex_lock()\fR for a mutex of this type. The new owner of this mutex should
+then attempt to make the state protected by the mutex consistent, since this
+state could have been left inconsistent when the last owner died. If the new
+owner is able to make the state consistent, it should call
+\fBmutex_consistent()\fR to restore the state of the mutex and then unlock the
+mutex. All subsequent calls to \fBmutex_lock()\fRwill then behave normally.
+Only the new owner can make the mutex consistent. If for any reason the new
+owner is not able to make the state consistent, it should not call
+\fBmutex_consistent()\fR but should simply unlock the mutex. All waiting
+processes will be awakened and all subsequent calls to \fBmutex_lock()\fR will
+fail in acquiring the mutex with an error value of \fBENOTRECOVERABLE\fR. If
+the thread or process that acquired the lock with \fBEOWNERDEAD\fR terminates
+without unlocking the mutex, the next owner will acquire the lock with an error
+value of \fBEOWNERDEAD\fR.
+.sp
+The memory for the object to be initialized with this attribute must be zeroed
+before initialization. Any thread or process interested in the robust lock can
+call \fBmutex_init()\fR to potentially initialize it, provided that all such
+callers of \fBmutex_init()\fR specify the same set of attribute flags. In this
+situation, if  \fBmutex_init()\fR is called on a previously initialized robust
+mutex, \fBmutex_init()\fR will not reinitialize the mutex and will return the
+error value \fBEBUSY\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOCK_RECURSIVE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A thread attempting to relock this mutex without first unlocking it will
+succeed in locking the mutex. The mutex must be unlocked as many times as it is
+locked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOCK_ERRORCHECK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Unless \fBLOCK_RECURSIVE\fR is also set, a thread attempting to relock this
+mutex without first unlocking it will return with an error rather than
+deadlocking itself.  A thread attempting to unlock this mutex without first
+owning it will return with an error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOCK_PRIO_INHERIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+When a thread is blocking higher priority threads because of owning one or more
+mutexes with the \fBLOCK_PRIO_INHERIT\fR attribute, it executes at the higher
+of its priority or the priority of the highest priority thread waiting on any
+of the mutexes owned by this thread and initialized with this attribute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOCK_PRIO_PROTECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+When a thread owns one or more mutexes initialized with the
+\fBLOCK_PRIO_PROTECT\fR attribute, it executes at the higher of its priority or
+the highest of the priority ceilings of all the mutexes owned by this thread
+and initialized with this attribute, regardless of whether other threads are
+blocked on any of these mutexes.  When this attribute is specified, \fIarg\fR
+must point to an \fBint\fR containing the priority ceiling.
+.RE
+
+.sp
+.LP
+See \fBpthread_mutexattr_getrobust\fR(3C) for more information about robust
+mutexes. The \fBLOCK_ROBUST\fR attribute is the same as the POSIX
+\fBPTHREAD_MUTEX_ROBUST\fR attribute.
+.sp
+.LP
+See \fBpthread_mutexattr_settype\fR(3C) for more information on recursive and
+error checking mutex types. The combination (\fBLOCK_RECURSIVE\fR |
+\fBLOCK_ERRORCHECK\fR) is the same as the POSIX \fBPTHREAD_MUTEX_RECURSIVE\fR
+type. By itself, \fBLOCK_ERRORCHECK\fR is the same as the \fBPOSIX
+PTHREAD_MUTEX_ERRORCHECK\fR type.
+.sp
+.LP
+The \fBLOCK_PRIO_INHERIT\fR attribute is the same as the POSIX
+\fBPTHREAD_PRIO_INHERIT\fR attribute. The \fBLOCK_PRIO_PROTECT\fR attribute is
+the same as the POSIX \fBPTHREAD_PRIO_PROTECT\fR attribute. See
+\fBpthread_mutexattr_getprotocol\fR(3C),
+\fBpthread_mutexattr_getprioceiling\fR(3C), and
+\fBpthread_mutex_getprioceiling\fR(3C) for a full discussion. The
+\fBLOCK_PRIO_INHERIT\fR and \fBLOCK_PRIO_PROTECT\fR attributes are mutually
+exclusive. Specifying both of these attributes causes \fBmutex_init()\fR to
+fail with \fBEINVAL\fR.
+.sp
+.LP
+Initializing mutexes can also be accomplished  by allocating in zeroed memory
+(default), in which case a \fItype\fR of \fBUSYNC_THREAD\fR is assumed. In
+general, the following rules apply to mutex initialization:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The same mutex must not be simultaneously initialized by multiple threads.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A mutex lock must not be reinitialized while in use by other threads.
+.RE
+.sp
+.LP
+These rules do not apply to \fBLOCK_ROBUST\fR mutexes. See the description for
+\fBLOCK_ROBUST\fRabove. If default mutex attributes are used, the macro
+\fBDEFAULTMUTEX\fR can be used to initialize mutexes that are statically
+allocated.
+.sp
+.LP
+Default mutex initialization (intra-process):
+.sp
+.in +2
+.nf
+mutex_t mp;
+mutex_init(&mp, USYNC_THREAD, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+mutex_t  mp  =  DEFAULTMUTEX;
+.fi
+.in -2
+
+.sp
+.LP
+Customized mutex initialization (inter-process):
+.sp
+.in +2
+.nf
+mutex_init(&mp, USYNC_PROCESS, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+Customized mutex initialization (inter-process robust):
+.sp
+.in +2
+.nf
+mutex_init(&mp, USYNC_PROCESS | LOCK_ROBUST, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+Statically allocated mutexes can also be initialized with macros specifying
+\fBLOCK_RECURSIVE\fR and/or \fBLOCK_ERRORCHECK\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmutex_t mp = RECURSIVEMUTEX;\fR\fR
+.ad
+.sp .6
+.RS 4n
+Same as (\fBUSYNC_THREAD\fR | \fBLOCK_RECURSIVE\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmutex_t mp = ERRORCHECKMUTEX;\fR\fR
+.ad
+.sp .6
+.RS 4n
+Same as (\fBUSYNC_THREAD\fR | \fBLOCK_ERRORCHECK\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmutex_t mp = RECURSIVE_ERRORCHECKMUTEX;\fR\fR
+.ad
+.sp .6
+.RS 4n
+Same as (\fBUSYNC_THREAD\fR | \fBLOCK_RECURSIVE\fR | \fBLOCK_ERRORCHECK\fR)
+.RE
+
+.SS "Lock and Unlock"
+.sp
+.LP
+A critical section of code is enclosed by  a the call to lock the mutex and the
+call to unlock the mutex to protect it from simultaneous access by multiple
+threads. Only one thread at a time may possess mutually exclusive access to
+the critical section of code that is enclosed by the mutex-locking call and the
+mutex-unlocking call, whether the mutex's scope  is intra-process or
+inter-process. A thread calling to lock the mutex either gets exclusive  access
+to the code starting from the successful locking until its call to unlock the
+mutex, or it waits until the mutex is unlocked by the thread that locked it.
+.sp
+.LP
+Mutexes have ownership, unlike semaphores. Although any thread, within the
+scope of a mutex, can get an unlocked mutex and lock access to the same
+critical section of code, only the thread that locked a mutex should unlock it.
+.sp
+.LP
+If a thread waiting for a mutex receives a signal, upon return from the signal
+handler, the thread resumes waiting for the mutex as if there was no interrupt.
+A mutex protects code, not data; therefore, strongly bind a mutex  with the
+data by putting both within the same structure, or at least within the same
+procedure.
+.sp
+.LP
+A call to \fBmutex_lock()\fR locks the mutex object referenced by \fImp\fR. If
+the mutex is already locked, the calling thread blocks until the mutex is
+freed; this will return with the mutex object referenced by \fImp\fR in the
+locked state with the calling thread as its owner. If the current owner of a
+mutex tries to relock the mutex, it will result in deadlock.
+.sp
+.LP
+The \fBmutex_trylock()\fR function is the same as \fBmutex_lock()\fR,
+respectively, except that if the mutex object referenced by \fImp\fR is locked
+(by any thread, including the current thread), the call returns immediately
+with an error.
+.sp
+.LP
+The \fBmutex_unlock()\fR function are called by the owner of the mutex object
+referenced by \fImp\fR to release it. The mutex must be locked and the calling
+thread must be the one that last locked the mutex (the owner). If there are
+threads blocked on the mutex object referenced by \fImp\fR when
+\fBmutex_unlock()\fR is called, the \fImp\fR is freed, and the scheduling
+policy will determine which thread gets the mutex. If the calling thread is not
+the owner of the lock, no error status is returned, and the behavior of the
+program is undefined.
+.SS "Destroy"
+.sp
+.LP
+The \fBmutex_destroy()\fR function destroys the mutex object referenced by
+\fImp\fR. The mutex object becomes uninitialized. The space used by the
+destroyed mutex variable is not freed. It needs to be explicitly reclaimed.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, these functions return \fB0\fR. Otherwise, an error number is
+returned.
+.SH ERRORS
+.sp
+.LP
+The \fBmutex_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fItype\fR is invalid, or the \fBLOCK_PRIO_INHERIT\fR
+and \fBLOCK_PRIO_PROTECT\fR attributes are both specified.
+.RE
+
+.sp
+.LP
+The \fBmutex_init()\fR function will fail for  \fBLOCK_ROBUST\fR type mutex if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex pointed to by  \fImp\fR was previously initialized and has not yet
+been destroyed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex pointed to by \fImp\fR was previously initialized with a different
+set of attribute flags.
+.RE
+
+.sp
+.LP
+The \fBmutex_trylock()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+.rt  
+The mutex pointed to by \fImp\fR is already locked.
+.RE
+
+.sp
+.LP
+The \fBmutex_lock()\fR and \fBmutex_trylock()\fR functions will fail for a
+\fBLOCK_RECURSIVE\fR mutex if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex could not be acquired because the maximum number of recursive locks
+for the mutex has been reached.
+.RE
+
+.sp
+.LP
+The \fBmutex_lock()\fR function will fail for a \fBLOCK_ERRORCHECK\fR and
+non-\fBLOCK_RECURSIVE\fR mutex if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The caller already owns the mutex.
+.RE
+
+.sp
+.LP
+The \fBmutex_lock()\fR function may fail for a non-\fBLOCK_ERRORCHECK\fR and
+non-\fBLOCK_RECURSIVE\fR mutex if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The caller already owns the mutex.
+.RE
+
+.sp
+.LP
+The \fBmutex_unlock()\fR function will fail for a \fBLOCK_ERRORCHECK\fR mutex
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+.rt  
+The caller does not own the mutex.
+.RE
+
+.sp
+.LP
+The \fBmutex_lock()\fR or \fBmutex_trylock()\fR functions will fail for
+\fBLOCK_ROBUST\fR type mutex if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOWNERDEAD\fR\fR
+.ad
+.RS 19n
+.rt  
+The last owner of this mutex died while holding the mutex. This mutex is now
+owned by the caller. The caller must now attempt to make the state protected by
+the mutex consistent. If it is able to clean up the state, then it should
+restore the state of the mutex by calling \fBmutex_consistent()\fR and unlock
+the mutex. Subsequent calls to \fBmutex_lock()\fR will behave normally, as
+before. If the caller is not able to clean up the state,
+\fBmutex_consistent()\fR should not be called but the mutex should be unlocked.
+Subsequent calls to \fBmutex_lock()\fR will fail to acquire the mutex,
+returning with the error value \fBENOTRECOVERABLE\fR. If the owner who acquired
+the lock with  \fBEOWNERDEAD\fR dies, the next owner will acquire the lock with
+\fBEOWNERDEAD\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTRECOVERABLE\fR\fR
+.ad
+.RS 19n
+.rt  
+The mutex trying to be acquired was protecting the state that has been left
+unrecoverable when the mutex's last owner could not make the state protected by
+the mutex consistent. The mutex has not been acquired. This condition occurs
+when the lock was previously acquired with \fBEOWNERDEAD\fR and the owner was
+not able to clean up the state and unlocked the mutex without calling
+\fBmutex_consistent()\fR.
+.RE
+
+.sp
+.LP
+The \fBmutex_consistent()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The caller does not own the mutex or the mutex is not a \fBLOCK_ROBUST\fR mutex
+having an inconsistent state (\fBEOWNERDEAD\fR).
+.RE
+
+.SH EXAMPLES
+.SS "Single Gate"
+.sp
+.LP
+The following example uses one global mutex as a gate-keeper to permit each
+thread exclusive sequential access to the code within the user-defined
+function "change_global_data." This type of synchronization will protect the
+state of shared data,  but it also prohibits parallelism.
+.sp
+.in +2
+.nf
+/* cc thisfile.c -lthread */
+#define _REENTRANT
+#include <stdio.h>
+#include <thread.h>
+#define NUM_THREADS 12
+void *change_global_data(void *);     /*  for thr_create()   */
+main(int argc,char * argv[])    {
+       int i=0;
+       for (i=0; i< NUM_THREADS; i++)	{
+               thr_create(NULL, 0, change_global_data, NULL, 0, NULL);
+       }
+       while ((thr_join(NULL, NULL, NULL) == 0));
+}
+
+void * change_global_data(void *null){
+       static mutex_t   Global_mutex;
+       static int       Global_data = 0;
+       mutex_lock(&Global_mutex);
+       Global_data++;
+       sleep(1);
+       printf("%d is global data\en",Global_data);
+       mutex_unlock(&Global_mutex);
+       return NULL;
+}
+.fi
+.in -2
+
+.SS "Multiple Instruction Single Data"
+.sp
+.LP
+The previous example, the mutex, the code it owns, and the data it protects was
+enclosed in one function. The next example uses C++ features to accommodate
+many functions that use just one mutex to protect one data:
+.sp
+.in +2
+.nf
+/* CC thisfile.c -lthread   use C++ to compile*/
+
+#define _REENTRANT
+#include <stdlib.h>
+#include <stdio.h>
+#include <thread.h>
+#include <errno.h>
+#include <iostream.h>
+#define NUM_THREADS 16
+void *change_global_data(void *);     /*  for thr_create()   */
+
+class Mutected {
+       private:
+               static mutex_t      Global_mutex;
+               static int          Global_data;
+       public:
+               static int          add_to_global_data(void);
+               static int          subtract_from_global_data(void);
+};
+
+int Mutected::Global_data = 0;
+mutex_t Mutected::Global_mutex;
+
+int Mutected::add_to_global_data()  {
+       mutex_lock(&Global_mutex);	
+       Global_data++;
+       mutex_unlock(&Global_mutex);	
+       return Global_data;
+}
+
+int Mutected::subtract_from_global_data()   {
+       mutex_lock(&Global_mutex);	
+       Global_data--;
+       mutex_unlock(&Global_mutex);
+       return Global_data;
+}
+
+void
+main(int argc,char * argv[])  {
+       int i=0;
+       for (i=0;i< NUM_THREADS;i++)  {
+            thr_create(NULL,0,change_global_data,NULL,0,NULL);
+       }
+       while ((thr_join(NULL,NULL,NULL) == 0));
+}
+
+void * change_global_data(void *)	{
+       static int switcher = 0;
+       if ((switcher++ % 3) == 0)   /* one-in-three threads subtracts */
+               cout << Mutected::subtract_from_global_data() << endl;	
+       else
+               cout << Mutected::add_to_global_data() << endl;		
+       return NULL;
+}
+.fi
+.in -2
+
+.SS "Interprocess Locking"
+.sp
+.LP
+A mutex can protect data that is shared among processes. The mutex would need
+to be initialized as  \fBUSYNC_PROCESS\fR. One process initializes the
+process-shared mutex and writes it to a file to be  mapped into memory by all
+cooperating processes (see \fBmmap\fR(2)). Afterwards, other independent
+processes can run the same program (whether concurrently or not) and share
+mutex-protected data.
+.sp
+.in +2
+.nf
+/* cc thisfile.c -lthread */
+/* To execute, run the command line "a.out 0 &; a.out 1" */
+
+#define _REENTRANT
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <thread.h>
+#define INTERPROCESS_FILE "ipc-sharedfile"
+#define NUM_ADDTHREADS 12
+#define NUM_SUBTRACTTHREADS 10
+#define INCREMENT '0'
+#define DECREMENT '1'
+typedef struct { 
+               mutex_t     Interprocess_mutex;
+               int         Interprocess_data;
+} buffer_t;
+buffer_t *buffer;
+
+void *add_interprocess_data(), *subtract_interprocess_data();
+void create_shared_memory(), test_argv();
+int zeroed[sizeof(buffer_t)];
+int ipc_fd, i=0;
+
+void
+main(int argc,char * argv[]){
+    test_argv(argv[1]);
+
+    switch (*argv[1])  {
+    case INCREMENT:
+         /* Initializes the process-shared mutex */
+         /* Should be run prior to running a DECREMENT process */
+         create_shared_memory();
+         ipc_fd = open(INTERPROCESS_FILE, O_RDWR);
+         buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+             PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+         buffer->Interprocess_data = 0;
+         mutex_init(&buffer->Interprocess_mutex, USYNC_PROCESS,0);
+         for (i=0; i< NUM_ADDTHREADS; i++)
+         thr_create(NULL, 0, add_interprocess_data, argv[1],
+             0, NULL);
+         break;
+
+    case DECREMENT:
+         /* Should be run after the INCREMENT process has run. */
+         while(ipc_fd = open(INTERPROCESS_FILE, O_RDWR)) == -1)
+             sleep(1);
+         buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+             PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+         for (i=0; i< NUM_SUBTRACTTHREADS; i++)
+         thr_create(NULL, 0, subtract_interprocess_data, argv[1],
+             0, NULL);
+         break;
+    } /* end switch */
+
+    while ((thr_join(NULL,NULL,NULL) == 0));
+} /* end main */
+
+void *add_interprocess_data(char argv_1[]){
+    mutex_lock(&buffer->Interprocess_mutex);
+    buffer->Interprocess_data++;
+    sleep(2);
+    printf("%d is add-interprocess data, and %c is argv1\en",
+        buffer->Interprocess_data, argv_1[0]);
+    mutex_unlock(&buffer->Interprocess_mutex);
+    return NULL;
+}
+
+void *subtract_interprocess_data(char argv_1[])	{
+    mutex_lock(&buffer->Interprocess_mutex);
+    buffer->Interprocess_data--;
+    sleep(2);
+    printf("%d is subtract-interprocess data, and %c is argv1\en",
+        buffer->Interprocess_data, argv_1[0]);
+    mutex_unlock(&buffer->Interprocess_mutex);
+    return NULL;
+}
+
+void create_shared_memory(){
+    int i;
+    ipc_fd = creat(INTERPROCESS_FILE, O_CREAT | O_RDWR );
+    for (i=0; i<sizeof(buffer_t); i++){
+        zeroed[i] = 0;
+        write(ipc_fd, &zeroed[i],2);
+    }
+    close(ipc_fd);
+    chmod(INTERPROCESS_FILE, S_IRWXU | S_IRWXG | S_IRWXO);
+}
+
+void test_argv(char argv1[])   {
+    if (argv1 == NULL)   {
+    printf("use 0 as arg1 for initial process\en \e
+    or use 1 as arg1 for the second process\en");
+    exit(NULL);
+    }
+}
+.fi
+.in -2
+
+.SS "Solaris Interprocess Robust Locking"
+.sp
+.LP
+A mutex can protect data that is shared among processes robustly. The mutex
+would need to be initialized as \fBUSYNC_PROCESS\fR | \fBLOCK_ROBUST\fR. One
+process initializes the robust process-shared mutex and writes it to a file to
+be mapped into memory by all cooperating processes (see \fBmmap\fR(2)).
+Afterwards, other independent processes can run the same program (whether
+concurrently or not) and share mutex-protected data.
+.sp
+.LP
+The following example shows how to use a \fBUSYNC_PROCESS\fR |
+\fBLOCK_ROBUST\fR type mutex.
+.sp
+.in +2
+.nf
+/* cc thisfile.c -lthread */
+ /* To execute, run the command line "a.out & a.out 1" */
+ #include <sys/types.h>
+ #include <sys/mman.h>
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <thread.h>
+ #define INTERPROCESS_FILE "ipc-sharedfile"
+ typedef struct {
+           mutex_t   Interprocess_mutex;
+           int       Interprocess_data;
+ } buffer_t;  
+ buffer_t *buffer;
+ int make_date_consistent();
+ void create_shared_memory();
+ int zeroed[sizeof(buffer_t)];
+ int ipc_fd, i=0;
+ main(int argc,char * argv[])  {
+     int rc;
+     if (argc > 1) {
+         while((ipc_fd = open(INTERPROCESS_FILE, O_RDWR)) == -1)
+             sleep(1);
+         buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+                   PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+         mutex_init(&buffer->Interprocess_mutex,
+                     USYNC_PROCESS | LOCK_ROBUST,0);
+     } else {
+         create_shared_memory();
+         ipc_fd = open(INTERPROCESS_FILE, O_RDWR);
+         buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+               PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+         buffer->Interprocess_data = 0;
+         mutex_init(&buffer->Interprocess_mutex,
+                     USYNC_PROCESS | LOCK_ROBUST,0);
+     }
+     for(;;) {
+         rc = mutex_lock(&buffer->Interprocess_mutex);
+         switch (rc) {
+             case EOWNERDEAD:
+               /*
+                * The lock is acquired.
+                * The last owner died holding the lock.
+                * Try to make the state associated with
+                * the mutex consistent.
+                * If successful, make the robust lock consistent.
+                */
+               if (make_data_consistent())
+                   mutex_consistent(&buffer->Interprocess_mutex);
+                   mutex_unlock(&buffer->Interprocess_mutex);
+                   break;
+             case ENOTRECOVERABLE:
+               /*
+                * The lock is not acquired.
+                * The last owner got the mutex with EOWNERDEAD
+                * and failed to make the data consistent.
+                * There is no way to recover, so just exit.
+                */
+               exit(1);
+             case 0:
+               /*
+                * There is no error - data is consistent.
+                * Do something with data.
+                */
+               mutex_unlock(&buffer->Interprocess_mutex);
+               break;
+        } 
+   }
+} /* end main */
+void create_shared_memory() {
+      int i;
+      ipc_fd = creat(INTERPROCESS_FILE, O_CREAT | O_RDWR );
+      for (i=0; i<sizeof(buffer_t); i++) {
+           zeroed[i] = 0;
+           write(ipc_fd, &zeroed[i],2);
+      } 
+      close(ipc_fd);
+      chmod(INTERPROCESS_FILE, S_IRWXU | S_IRWXG | S_IRWXO);
+ }
+
+ /* return 1 if able to make data consistent, otherwise 0. */
+ int make_data_consistent () {
+       buffer->Interprocess_data = 0;
+       return (1);
+ }
+.fi
+.in -2
+
+.SS "Dynamically Allocated Mutexes"
+.sp
+.LP
+The following example allocates and frees memory in which a mutex is embedded.
+.sp
+.in +2
+.nf
+struct record {
+        int field1;
+        int field2;
+        mutex_t m;
+} *r;
+r = malloc(sizeof(struct record));
+mutex_init(&r->m, USYNC_THREAD, NULL);
+/*
+  * The fields in this record are accessed concurrently
+  * by acquiring the embedded lock.
+  */
+.fi
+.in -2
+
+.sp
+.LP
+The thread execution in this example is as follows:
+.sp
+.in +2
+.nf
+\fIThread 1 executes:\fR                 \fIThread 2 executes:\fR
+
+\&...                                ...
+mutex_lock(&r->m);                 mutex_lock(&r->m);
+r->field1++;                       localvar = r->field1;
+mutex_unlock(&r->m);               mutex_unlock(&r->m);
+\&...                                ...
+.fi
+.in -2
+
+.sp
+.LP
+Later, when a thread decides to free the memory pointed to by  \fIr\fR, the
+thread  should call  \fBmutex_destroy\fR(\|) on the mutexes in this memory.
+.sp
+.LP
+In the following example, the main thread can do a  \fBthr_join\fR(\|) on both
+of the above threads. If there are no other threads using the memory in
+\fIr\fR, the main thread can now safely free \fIr\fR:
+.sp
+.in +2
+.nf
+for (i = 0; i < 2; i++)
+       thr_join(0, 0, 0);
+mutex_destroy(&r->m);   /* first destroy mutex */
+free(r);                /* then free memory */
+.fi
+.in -2
+
+.sp
+.LP
+If the mutex is not destroyed, the program could have memory leaks.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBshmop\fR(2), \fBpthread_mutexattr_getprioceiling\fR(3C),
+\fBpthread_mutexattr_getprotocol\fR(3C), \fBpthread_mutexattr_getrobust\fR(3C),
+\fBpthread_mutexattr_gettype\fR(3C), \fBpthread_mutex_getprioceiling\fR(3C),
+\fBpthread_mutex_init\fR(3C), \fBattributes\fR(5), \fBmutex\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Previous releases of Solaris provided the \fBUSYNC_PROCESS_ROBUST\fR mutex
+type. This type is now deprecated but is still supported for source and binary
+compatibility. When passed to \fBmutex_init()\fR, it is transformed into
+(\fBUSYNC_PROCESS\fR | \fBLOCK_ROBUST\fR). The former method for restoring a
+\fBUSYNC_PROCESS_ROBUST\fR mutex to a consistent state was to reinitialize it
+by calling \fBmutex_init()\fR. This method is still supported for source and
+binary compatibility, but the proper method is to call
+\fBmutex_consistent()\fR.
+.sp
+.LP
+The \fBUSYNC_PROCESS_ROBUST\fR type permitted an alternate error value,
+\fBELOCKUNMAPPED\fR, to be returned by \fBmutex_lock()\fR if the process
+containing a locked robust mutex unmapped the memory containing the mutex or
+performed one of the \fBexec\fR(2) functions. The \fBELOCKUNMAPPED\fR error
+value implies all of the consequences of the \fBEOWNERDEAD\fR error value and
+as such is just a synonym for \fBEOWNERDEAD\fR. For full source and binary
+compatibility, the \fBELOCKUNMAPPED\fR error value is still returned from
+\fBmutex_lock()\fR in these circumstances, but only if the mutex was
+initialized with the \fBUSYNC_PROCESS_ROBUST\fR type. Otherwise,
+\fBEOWNERDEAD\fR is returned in these circumstances.
+.sp
+.LP
+The \fBmutex_lock()\fR, \fBmutex_unlock()\fR, and \fBmutex_trylock()\fR
+functions do not validate the mutex type. An uninitialized mutex or a mutex
+with an invalid type does not return \fBEINVAL\fR. Interfaces for mutexes with
+an invalid type have unspecified behavior.
+.sp
+.LP
+Uninitialized mutexes that are allocated locally could contain junk data. Such
+mutexes need to be initialized using \fBmutex_init()\fR.
+.sp
+.LP
+By default, if multiple threads are waiting for a mutex, the order of
+acquisition is undefined.

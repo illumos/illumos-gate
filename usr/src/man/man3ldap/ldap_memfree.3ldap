@@ -1,0 +1,72 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_memfree 3LDAP "6 Jan 2003" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_memfree \- free memory allocated by LDAP API functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc \fR\fB-flag \&.\|.\|.\fR  \fIfile \fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR]
+#include < lber.h>
+#include < ldap.h>
+
+\fBvoid\fR \fBldap_memfree\fR(\fBvoid *\fR\fIp\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_memfree()\fR function frees the memory allocated by certain LDAP
+API functions that do not have corresponding functions to free memory. These
+functions include \fBldap_get_dn\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP),
+and \fBldap_next_attribute\fR(3LDAP).
+.sp
+.LP
+The \fBldap_memfree()\fR function takes one parameter, \fIp\fR, which is a
+pointer to the memory to be freed.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIp\fR\fR
+.ad
+.RS 5n
+.rt  
+A pointer to the memory to be freed.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+There are no return values for the \fBldap_memfree()\fR function.
+.SH ERRORS
+.sp
+.LP
+No errors are defined for the \fBldap_memfree()\fR function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP), \fBldap_get_dn\fR(3LDAP),
+\fBldap_next_attribute\fR(3LDAP), \fBattributes\fR(5)

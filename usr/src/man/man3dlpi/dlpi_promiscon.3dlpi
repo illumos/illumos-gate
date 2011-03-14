@@ -1,0 +1,148 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_promiscon 3DLPI "22 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_promiscon, dlpi_promiscoff \- enable or disable DLPI promiscuous mode
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldlpi\fR [ \fIlibrary\fR... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_promiscon\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fIlevel\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdlpi_promiscoff\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fIlevel\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_promiscon()\fR function enables promiscuous mode on a \fBDLPI\fR
+link instance associated with \fBDLPI\fR handle \fIdh\fR, at the specified
+\fIlevel\fR. After enabling promiscuous mode, the caller will be able to
+receive all messages destined for the \fBDLPI\fR link instance at the specified
+\fIlevel\fR. This operation can be performed in any \fBDLPI\fR state of a
+handle.
+.sp
+.LP
+The \fBdlpi_promiscoff()\fR function disables promiscuous mode on a \fBDLPI\fR
+link instance associated with \fBDLPI\fR handle \fIdh\fR, at the specified
+level. This operation can be performed in any \fBDLPI\fR state of a handle in
+which promiscuous mode is enabled at the specified \fIlevel\fR.
+.sp
+.LP
+The \fIlevel\fR modes are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDL_PROMISC_PHYS\fR\fR
+.ad
+.RS 20n
+.rt  
+Promiscuous mode at the physical level
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDL_PROMISC_SAP\fR\fR
+.ad
+.RS 20n
+.rt  
+Promiscuous mode at the \fBSAP\fR level
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDL_PROMISC_MULTI\fR\fR
+.ad
+.RS 20n
+.rt  
+Promiscuous mode for all multicast addresses
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is  returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or an error value listed
+in the following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EBADMSG\fR\fR
+.ad
+.RS 18n
+.rt  
+Bad DLPI message
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBDLPI\fR operation timed out
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

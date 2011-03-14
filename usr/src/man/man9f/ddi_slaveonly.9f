@@ -1,0 +1,75 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_slaveonly 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_slaveonly \- tell if a device is installed in a slave access only location
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_slaveonly\fR(\fBdev_info_t\fR \fI*dip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_slaveonly()\fR function tells the caller if the bus, or part of the
+bus that the device is installed on, does not permit the device to become a DMA
+master, that is, whether the device has been installed in a slave access only
+slot.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The device has been installed in a slave access only location.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+The device has not been installed in a slave access only location.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_slaveonly()\fR function can be called from user, interrupt, or
+kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR

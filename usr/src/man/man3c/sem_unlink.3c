@@ -1,0 +1,123 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sem_unlink 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sem_unlink \- remove a named semaphore
+.SH SYNOPSIS
+.LP
+.nf
+#include <semaphore.h>
+
+\fBint\fR \fBsem_unlink\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsem_unlink()\fR function removes the semaphore named by the string
+\fIname\fR. If the semaphore named by \fIname\fR is currently referenced by
+other processes, then \fBsem_unlink()\fR has no effect on the state of the
+semaphore.  If one or more processes have the semaphore open when
+\fBsem_unlink()\fR is called, destruction of the semaphore is postponed until
+all references to the semaphore have been destroyed by calls to
+\fBsem_close\fR(3C), \fB_Exit\fR(2), or one of the \fBexec\fR functions (see
+\fBexec\fR(2)) . Calls to \fBsem_open\fR(3C) to re-create or re-connect to the
+semaphore refer to a new semaphore after  \fBsem_unlink()\fR is called.  The
+\fBsem_unlink()\fR call does not block until all references have been
+destroyed; it returns immediately.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsem_unlink()\fR returns \fB0\fR. Otherwise, the
+semaphore is not changed and the function returns a value of \fB\(mi1\fR and
+sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBsem_unlink()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR \fR
+.ad
+.RS 17n
+.rt  
+Permission is denied to unlink the named semaphore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR \fR
+.ad
+.RS 17n
+.rt  
+The length of \fIname\fR string exceeds \fIPATH_MAX\fR, or a pathname component
+is longer than \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR \fR
+.ad
+.RS 17n
+.rt  
+The named semaphore does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 17n
+.rt  
+The \fBsem_unlink()\fR function is not supported by the system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBexit\fR(2), \fBsem_close\fR(3C), \fBsem_open\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Solaris 2.6 was the first release to support the Asynchronous Input and Output
+option. Prior to this release, this function always returned \fB\(mi1\fR and
+set \fBerrno\fR to \fBENOSYS\fR.

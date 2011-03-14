@@ -1,0 +1,196 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pctx_set_events 3CPC "13 May 2003" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+pctx_set_events \- associate callbacks with process events
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milpctx [ \fIlibrary\fR... ]
+#include <libpctx.h>
+
+typedef	enum {
+        PCTX_NULL_EVENT = 0,
+        PCTX_SYSC_EXEC_EVENT,
+        PCTX_SYSC_FORK_EVENT,
+        PCTX_SYSC_EXIT_EVENT,
+        PCTX_SYSC_LWP_CREATE_EVENT,
+        PCTX_INIT_LWP_EVENT,
+        PCTX_FINI_LWP_EVENT,
+        PCTX_SYSC_LWP_EXIT_EVENT
+} pctx_event_t;
+
+\fBtypedef int\fR \fBpctx_sysc_execfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBchar *\fR\fIcmd\fR, \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef void\fR \fBpctx_sysc_forkfn_t\fR(\fBpctx_t *\fR\fIpctx\fR,
+     \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR, \fBpid_t\fR \fIchild\fR, \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef void\fR \fBpctx_sysc_exitfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBpctx_sysc_lwp_createfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBpctx_init_lwpfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBpctx_fini_lwpfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBpctx_sysc_lwp_exitfn_t\fR(\fBpctx_t *\fR\fIpctx\fR, \fBpid_t\fR \fIpid\fR, \fBid_t\fR \fIlwpid\fR,
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpctx_set_events\fR(\fBpctx_t *\fR\fIpctx\fR...);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpctx_set_events()\fR function allows the caller (the controlling
+process) to express interest in various events in the controlled process.  See
+\fBpctx_capture\fR(3CPC) for information about how the controlling process is
+able to create, capture and manipulate the controlled process.
+.sp
+.LP
+The \fBpctx_set_events()\fR function takes a \fBpctx_t\fR handle, followed by a
+variable length list of pairs of \fBpctx_event_t\fR tags and their
+corresponding handlers, terminated by a \fBPCTX_NULL_EVENT\fR tag.
+.sp
+.LP
+Most of the events correspond closely to various classes of system calls,
+though two additional pseudo-events (\fIinit_lwp\fR and \fIfini_lwp\fR) are
+provided to allow callers to perform various housekeeping tasks.  The
+\fIinit_lwp\fR handler is called as soon as the library identifies a new
+\fBLWP\fR, while \fIfini_lwp\fR is called just before the \fBLWP\fR disappears.
+Thus the classic "hello world" program would see an \fIinit_lwp\fR event, a
+\fIfini_lwp\fR event and (process) \fIexit\fR event, in that order.   The table
+below displays the interactions between the states of the controlled process
+and the handlers executed by users of the library.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.02i) |cw(1.14i) |cw(3.34i) 
+cw(1.02i) |cw(1.14i) |cw(3.34i) 
+.
+System Calls and pctx Handlers
+_
+System callHandlerComments
+_
+\fBexec\fR,\fBexecve\fR\fIfini_lwp\fRT{
+Invoked serially on all lwps in the process.
+T}
+\fIexec\fRT{
+Only invoked if the \fBexec()\fR system call succeeded.
+T}
+\fIinit_lwp\fRT{
+If the exec succeeds, only invoked on lwp 1. If the exec fails, invoked serially on all lwps in the process.
+T}
+_
+\fBfork\fR, \fBvfork\fR, \fBfork1\fR\fIfork\fRT{
+Only invoked if the \fBfork()\fR system call succeeded.
+T}
+_
+\fBexit\fR\fIfini_lwp\fRInvoked on all lwps in the process.
+\fIexit\fRInvoked on the exiting lwp.
+.TE
+
+.sp
+.LP
+Each of the handlers is passed the caller's opaque handle, a \fBpctx_t\fR
+handle, the pid, and lwpid of the process and lwp generating the event. The
+\fIlwp_exit\fR, and (process) \fBexit\fR events are delivered \fIbefore\fR the
+underlying system calls begin, while the \fBexec\fR, \fIfork\fR, and
+\fIlwp_create\fR events are only delivered after the relevant system calls
+complete successfully. The \fBexec\fR handler is passed a string that describes
+the command being executed. Catching the \fIfork\fR event causes the calling
+process to \fBfork\fR(2), then capture the child of the controlled process
+using \fBpctx_capture\fR(\|) before handing control to the \fIfork\fR handler.
+The process is released on return from the handler.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpctx_set_events\fR(\|) returns 0.  Otherwise,
+the function returns -1.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRHandleExec example.
+.sp
+.LP
+This example captures an existing process whose process identifier is
+\fIpid\fR, and arranges to call the \fIHandleExec\fR routine when the process
+performs an \fBexec\fR(2).
+
+.sp
+.in +2
+.nf
+static void
+HandleExec(pctx_t *pctx, pid_t pid, id_t lwpid, char *cmd, void *arg)
+{
+     (void) printf("pid %d execed '%s'\en", (int)pid, cmd);
+}
+int
+main()
+{
+     ...
+     pctx = pctx_capture(pid, NULL, 1, NULL);
+     (void) pctx_set_events(pctx,
+           PCTX_SYSC_EXEC_EVENT, HandleExec,
+           ...
+           PCTX_NULL_EVENT);
+     (void) pctx_run(pctx, 0, 0, NULL);
+     pctx_release(pctx);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBvfork\fR(2), \fBfork1\fR(2),
+\fBcpc\fR(3CPC), \fBlibpctx\fR(3LIB), \fBproc\fR(4), \fBattributes\fR(5)

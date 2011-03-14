@@ -1,0 +1,405 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_device_acc_attr 9S "13 May 2007" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+ddi_device_acc_attr \- data access attributes structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_device_acc_attr\fR structure describes the data access
+characteristics and requirements of the device.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+ushort_t     devacc_attr_version;
+uchar_t      devacc_attr_endian_flags;
+uchar_t      devacc_attr_dataorder;
+uchar_t      devacc_attr_access;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdevacc_attr_version\fR member identifies the version number of  this
+structure.  The current version number is \fBDDI_DEVICE_ATTR_V0\fR.
+.sp
+.LP
+The \fBdevacc_attr_endian_flags\fR member describes the endian characteristics
+of the device. Specify one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_NEVERSWAP_ACC\fR\fR
+.ad
+.RS 24n
+.rt  
+Data access with no byte swapping
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_STRUCTURE_BE_ACC\fR\fR
+.ad
+.RS 24n
+.rt  
+Structural data access in big-endian format
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_STRUCTURE_LE_ACC\fR\fR
+.ad
+.RS 24n
+.rt  
+Structural data access in little endian format
+.RE
+
+.sp
+.LP
+\fBDDI_STRUCTURE_BE_ACC\fR and \fBDDI_STRUCTURE_LE_ACC\fR describe the endian
+characteristics of the device as big-endian or little-endian, respectively.
+Although most of the devices have the same endian characteristics as their
+buses, examples of devices that have opposite endian characteristics of the
+buses do exist. When \fBDDI_STRUCTURE_BE_ACC\fR or \fBDDI_STRUCTURE_LE_ACC\fR
+is set, byte swapping is automatically performed by the system if the host
+machine and the device data formats have opposite endian characteristics. The
+implementation can take advantage of hardware platform byte swapping
+capabilities.
+.sp
+.LP
+When you specify \fBDDI_NEVERSWAP_ACC\fR, byte swapping is not invoked in the
+data access functions.
+.sp
+.LP
+The \fBdevacc_attr_dataorder\fR member describes the order in which the
+\fBCPU\fR references data. Specify one of the following values.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_STRICTORDER_ACC\fR\fR
+.ad
+.RS 27n
+.rt  
+Data references must be issued by a \fBCPU\fR in program order. Strict ordering
+is the default behavior.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_UNORDERED_OK_ACC\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fBCPU\fR can reorder the data references. This includes all kinds of
+reordering. For example, a load followed by a store might be replaced by a
+store followed by a load.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_MERGING_OK_ACC\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fBCPU\fR can merge individual stores to consecutive locations. For
+example, the \fBCPU\fR can turn two consecutive byte stores into one half-word
+store. It can also batch individual loads. For example, the \fBCPU\fR might
+turn two consecutive byte loads into one half-word load.
+\fBDDI_MERGING_OK_ACC\fR also implies reordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_LOADCACHING_OK_ACC\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fBCPU\fR can cache the data it fetches and reuse it until another store
+occurs. The default behavior is to fetch new data on every load.
+\fBDDI_LOADCACHING_OK_ACC\fR also implies merging and reordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_STORECACHING_OK_ACC\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fBCPU\fR can keep the data in the cache and push it to the device, perhaps
+with other data, at a later time. The default behavior is to push the data
+right away. \fBDDI_STORECACHING_OK_ACC\fR also implies load caching, merging,
+and reordering.
+.RE
+
+.sp
+.LP
+These values are advisory, not mandatory. For example, data can be ordered
+without being merged, or cached, even though a driver requests unordered,
+merged, and cached together.
+.sp
+.LP
+The values defined for \fBdevacc_attr_access\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEFAULT_ACC\fR\fR
+.ad
+.RS 20n
+.rt  
+If an \fBI/O\fR fault occurs, the system will take the default action, which
+might be to panic.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FLAGERR_ACC\fR\fR
+.ad
+.RS 20n
+.rt  
+Using this value indicates that the driver is hardened: able to cope with the
+incorrect results of \fBI/O\fR operations that might result from an \fBI/O\fR
+fault. The value also indicates that the driver will use
+\fBddi_fm_acc_err_get\fR(9F) to check access handles for faults on a regular
+basis.
+.sp
+If possible, the system should not panic on such an \fBI/O\fR fault, but should
+instead mark the \fBI/O\fR handle through which the access was made as having
+faulted.
+.sp
+This value is advisory: it tells the system that the driver can continue in the
+face of \fBI/O\fR faults. The value does not guarantee that the system will not
+panic, as that depends on the nature of the fault and the capabilities of the
+system. It is quite legitimate for an implementation to ignore this flag and
+panic anyway.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_CAUTIOUS_ACC\fR\fR
+.ad
+.RS 20n
+.rt  
+This value indicates that an \fBI/O\fR fault is anticipated and should be
+handled as gracefully as possible. For example, the framework should not print
+a console message.
+.sp
+This value should be used when it is not certain that a device is physically
+present: for example, when probing. As such, it provides an alternative within
+the \fBDDI\fR access framework to the existing peek/poke functions, which don't
+use access handles and cannot be integrated easily into a more general
+\fBI/O\fR fault handling framework.
+.sp
+In order to guarantee safe recovery from an \fBI/O\fR fault, it might be
+necessary to acquire exclusive access to the parent bus, for example, or to
+synchronize across processors on an \fBMP\fR machine. "Cautious" access can be
+quite expensive and is only recommended for initial probing and possibly for
+additional fault-recovery code.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+The following examples illustrate the use of device register address mapping
+setup functions and different data access functions.
+.LP
+\fBExample 1 \fRUsing \fBddi_device_acc_attr()\fR in
+>\fBddi_regs_map_setup\fR(9F)
+.sp
+.LP
+This example demonstrates the use of the \fBddi_device_acc_attr()\fR structure
+in  \fBddi_regs_map_setup\fR(9F). It also shows the use of  \fBddi_getw\fR(9F)
+and  \fBddi_putw\fR(9F) functions in accessing the register contents.
+
+.sp
+.in +2
+.nf
+dev_info_t *dip;
+uint_t     rnumber;
+ushort_t  *dev_addr;
+offset_t   offset;
+offset_t   len;
+ushort_t   dev_command;
+ddi_device_acc_attr_t dev_attr;
+ddi_acc_handle_t handle;
+
+\&.\|.\|.
+
+/*
+ * setup the device attribute structure for little endian,
+ * strict ordering and 16-bit word access. 
+ */
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+/*
+ * set up the device registers address mapping 
+ */
+ddi_regs_map_setup(dip, rnumber, (caddr_t *)&dev_addr, offset, len, 
+        &dev_attr, &handle);
+
+/* read a 16-bit word command register from the device		*/
+dev_command = ddi_getw(handle, dev_addr);
+
+dev_command |= DEV_INTR_ENABLE;
+/* store a new value back to the device command register	*/
+ddi_putw(handle, dev_addr, dev_command);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRAccessing a Device with Different Apertures
+.sp
+.LP
+The following example illustrates the steps used to access a device  with
+different apertures. Several apertures are assumed to be grouped under one
+single "reg" entry. For example, the sample device has four different
+apertures, each 32 Kbyte in size.  The apertures represent \fBYUV\fR
+little-endian, \fBYUV\fR big-endian, \fBRGB\fR little-endian, and \fBRGB\fR
+big-endian. This sample device uses entry \fB1\fR of the "reg" property list
+for this purpose. The size of the address space is 128 Kbyte with each 32 Kbyte
+range as a separate aperture. In the register mapping setup function, the
+sample driver uses the \fIoffset\fR and \fIlen\fR parameters to specify one of
+the apertures.
+
+.sp
+.in +2
+.nf
+ulong_t	*dev_addr;
+ddi_device_acc_attr_t dev_attr;
+ddi_acc_handle_t handle;
+uchar_t buf[256];
+
+\&.\|.\|.
+
+/*
+ * setup the device attribute structure for never swap,
+ * unordered and 32-bit word access. 
+ */
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+dev_attr.devacc_attr_dataorder = DDI_UNORDERED_OK_ACC;
+
+/*
+ * map in the RGB big-endian aperture 
+ * while running in a big endian machine
+ *  - offset 96K and len 32K
+ */
+ddi_regs_map_setup(dip, 1, (caddr_t *)&dev_addr, 96*1024, 32*1024,
+        &dev_attr, &handle);
+
+/*
+ * Write to the screen buffer
+ *  first 1K bytes words, each size 4 bytes
+ */
+ddi_rep_putl(handle, buf, dev_addr, 256, DDI_DEV_AUTOINCR);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRFunctions That Call Out the Data Word Size
+.sp
+.LP
+The following example illustrates the use of the functions that explicitly call
+out the data word size to override the data size in the device attribute
+structure.
+
+.sp
+.in +2
+.nf
+struct device_blk {
+	ushort_t	d_command;	/* command register */
+	ushort_t	d_status;	/* status register */
+	ulong	    d_data;		/* data register */
+} *dev_blkp;
+dev_info_t *dip;
+caddr_t	dev_addr;
+ddi_device_acc_attr_t dev_attr;
+ddi_acc_handle_t handle;
+uchar_t buf[256];
+
+\&.\|.\|.
+
+/*
+ * setup the device attribute structure for never swap,
+ * strict ordering and 32-bit word access. 
+ */
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+dev_attr.devacc_attr_dataorder= DDI_STRICTORDER_ACC;
+
+ddi_regs_map_setup(dip, 1, (caddr_t *)&dev_blkp, 0, 0,
+        &dev_attr, &handle);
+
+/* write command to the 16-bit command register */
+ddi_putw(handle, &dev_blkp->d_command, START_XFER);
+
+/* Read the 16-bit status register */
+status = ddi_getw(handle, &dev_blkp->d_status);
+
+if (status & DATA_READY)
+        /* Read 1K bytes off the 32-bit data register */
+        ddi_rep_getl(handle, buf, &dev_blkp->d_data, 
+                256, DDI_DEV_NO_AUTOINCR);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_fm_acc_err_get\fR(9F), \fBddi_getw\fR(9F),
+\fBddi_putw\fR(9F), \fBddi_regs_map_setup\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

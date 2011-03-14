@@ -1,0 +1,288 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_hba_lookup_capstr 9F "13 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_hba_lookup_capstr \- return index matching capability string
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_hba_lookup_capstr\fR(\fBchar *\fR\fIcapstr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcapstr\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to a string
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_hba_lookup_capstr()\fR function attempts to match \fIcapstr\fR
+against a known set of capability strings. If found, the defined index for the
+matched capability is returned.
+.sp
+.LP
+The following indices are defined for the capability strings listed below.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_DMA_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBdma-max\fR" or "\fBdma_max\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_MSG_OUT\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBmsg-out\fR" or "\fBmsg_out\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_DISCONNECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBdisconnect\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_SYNCHRONOUS\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBsynchronous\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_WIDE_XFER\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBwide-xfer\fR" or "\fBwide_xfer\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_PARITY\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBparity\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_INITIATOR_ID\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBinitiator-id\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_UNTAGGED_QING\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBuntagged-qing\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_TAGGED_QING\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBtagged-qing\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_ARQ\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBauto-rqsense\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_LINKED_CMDS\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBlinked-cmds\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_SECTOR_SIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBsector-size\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_TOTAL_SECTORS\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBtotal-sectors\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_GEOMETRY\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBgeometry\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_RESET_NOTIFICATION\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBreset-notification\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_QFULL_RETRIES\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBqfull-retries\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_QFULL_RETRY_INTERVAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBqfull-retry-interval\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_LUN_RESET\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBlun-reset\fR"
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_CAP_CDB_LEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+"\fBmax-cdb-length\fR"
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_hba_lookup_capstr()\fR function returns a non-negative index value
+that corresponds to the capability string. If the string does not match a known
+capability, \fB-1\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_hba_lookup_capstr()\fR function can be called from user, interrupt,
+or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_getcap\fR(9E), \fBtran_setcap\fR(9E), \fBscsi_ifgetcap\fR(9F),
+\fBscsi_ifsetcap\fR(9F), \fBscsi_reset_notify\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

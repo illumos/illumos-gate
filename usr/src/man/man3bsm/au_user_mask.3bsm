@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH au_user_mask 3BSM "31 Mar 2005" "SunOS 5.11" "Security and Auditing Library Functions"
+.SH NAME
+au_user_mask \- get user's binary preselection mask
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR  [ \fIlibrary\fR... ]
+#include <bsm/libbsm.h>
+
+\fBint\fR \fBau_user_mask\fR(\fBchar *\fR\fIusername\fR, \fBau_mask_t *\fR\fImask_p\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBau_user_mask()\fR function reads the default, system wide audit classes
+from  \fBaudit_control\fR(4), combines them with the per-user audit classes
+from the \fBaudit_user\fR(4) database, and updates the binary preselection mask
+pointed to by \fImask_p\fR with the combined value.
+.sp
+.LP
+The audit flags in the \fIflags\fR field of the \fBaudit_control\fR(4) database
+and the \fIalways-audit-flags\fR and \fInever-audit-flags\fR from the
+\fBaudit_user\fR(4) database represent binary audit classes. These fields are
+combined by \fBau_preselect\fR(3BSM) as follows:
+.sp
+.LP
+mask = ( \fIflags\fR +  \fIalways-audit-flags\fR) \(mi  \fInever-audit-flags\fR
+.sp
+.LP
+The \fBau_user_mask()\fR function fails only if both the both the
+\fBaudit_control\fR(4) and the \fBaudit_user\fR(4) database entries could not
+be retrieved.  This allows for flexible configurations.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBau_user_mask()\fR returns 0. It fails and
+returns \(mi1 if both the  \fBaudit_control\fR(4) and the  \fBaudit_user\fR(4)
+database entries could not be retrieved.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/audit_control\fR\fR
+.ad
+.sp .6
+.RS 4n
+file containing default parameters read by the audit daemon, \fBauditd\fR(1M)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/audit_user\fR\fR
+.ad
+.sp .6
+.RS 4n
+file that stores per-user audit event mask
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlogin\fR(1), \fBbsmconv\fR(1M), \fBgetaudit\fR(2), \fBsetaudit\fR(2),
+\fBau_preselect\fR(3BSM), \fBgetacinfo\fR(3BSM), \fBgetauusernam\fR(3BSM),
+\fBaudit_control\fR(4), \fBaudit_user\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBau_user_mask()\fR function should be called by programs like
+\fBlogin\fR(1) which set a process's preselection mask with \fBsetaudit\fR(2).
+\fBgetaudit\fR(2) should be used to obtain audit characteristics for the
+current process.
+.sp
+.LP
+The functionality described on this manual page is available only if the
+Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

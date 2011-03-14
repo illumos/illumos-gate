@@ -1,0 +1,107 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vpfmt 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+vpfmt \- display error message in standard format and pass to logging and
+monitoring services
+.SH SYNOPSIS
+.LP
+.nf
+#include <pfmt.h>
+#include <stdarg.h>
+
+\fBint\fR \fBvpfmt\fR(\fBFILE *\fR\fIstream\fR, \fBlong\fR \fIflag\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvpfmt()\fR function is identical to \fBpfmt\fR(3C), except that it is
+called with an argument list as defined by <\fBstdarg.h\fR>.
+.sp
+.LP
+The <\fBstdarg.h\fR> header defines the type \fBva_list\fR and a set of macros
+for advancing through a list of arguments whose number and types may vary. The
+\fIap\fR argument is of type \fBva_list\fR. This argument is used with the
+<\fBstdarg.h\fR> macros \fBva_start()\fR, \fBva_arg()\fR, and \fBva_end()\fR.
+See \fBstdarg\fR(3EXT). The example in the \fBEXAMPLES\fR section below
+demonstrates their use with \fBvpfmt()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBvpfmt()\fR returns the number of bytes
+transmitted.  Otherwise, \fB\(mi1\fR is returned if there was a write error to
+\fIstream\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse of \fBvpfmt()\fR to write an error routine.
+.sp
+.LP
+The following example demonstrates how \fBvpfmt()\fR could be used to write an
+\fBerror()\fR routine. The \fBva_alist()\fR macro is used as the parameter list
+in a function definition. The \fBva_start(\fR\fIap\fR, .\|.\|.) call, where
+\fIap\fR is of type \fBva_list\fR, must be invoked before any attempt to
+traverse and access unnamed arguments. Calls to \fBva_arg(\fR\fIap\fR\fB,
+\fR\fIatype\fR\fB)\fR traverse the argument list. Each execution of
+\fBva_arg()\fR expands to an expression with the value and type of the next
+argument in the list \fIap\fR, which is the same object initialized by
+\fBva_start()\fR. The \fIatype\fR argument is the type that the returned
+argument is expected to be. The \fBva_end(\fR\fIap\fR\fB)\fR macro must be
+invoked when all desired arguments have been accessed. The argument list in
+\fIap\fR can be traversed again if \fBva_start()\fR is called again after
+\fBva_end()\fR. In the example below, \fBva_arg()\fR is executed first to
+retrieve the format string passed to \fBerror()\fR. The remaining \fBerror()\fR
+arguments (\fIarg1\fR, \fIarg2\fR, ...) are passed to \fBvpfmt()\fR in the
+argument \fIap\fR.
+
+.sp
+.in +2
+.nf
+#include <pfmt.h>
+#include <stdarg.h>
+/*
+ *   error should be called like
+ *         error(format, arg1, ...);
+ */
+void error(...)
+{
+        va_list ap;
+        char *format;
+        va_start(ap, );
+        format = va_arg(ap, char *);
+        (void) vpfmt(stderr, MM_ERROR, format, ap);
+        va_end(ap);
+        (void) abort();
+}
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+Since \fBvpfmt()\fR uses \fBgettxt\fR(3C), it is recommended that \fBvpfmt()\fR
+not be used.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgettxt\fR(3C), \fBpfmt\fR(3C), \fBattributes\fR(5), \fBstdarg\fR(3EXT)

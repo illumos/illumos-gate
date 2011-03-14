@@ -1,0 +1,266 @@
+'\" te
+.\"  Copyright (c) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_sm_chauthtok 3PAM "1 Mar 2005" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_sm_chauthtok \- service provider implementation for pam_chauthtok
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ...] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+#include <security/pam_modules.h> 
+
+\fBint\fR \fBpam_sm_chauthtok\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR, \fBint\fR \fIargc\fR,
+     \fBconst char **\fR\fIargv\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In response to a call to \fBpam_chauthtok()\fR the \fBPAM\fR framework calls
+pam_sm_chauthtok(3PAM) from the modules listed in the \fBpam.conf\fR(4) file.
+The password management provider supplies the back-end functionality for this
+interface function.
+.sp
+.LP
+The \fBpam_sm_chauthtok()\fR function changes the authentication token
+associated with a particular user referenced by the authentication handle
+\fIpamh\fR.
+.sp
+.LP
+The following flag may be passed to \fBpam_chauthtok()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should not generate any messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CHANGE_EXPIRED_AUTHTOK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should only update those passwords that have aged. If this
+flag is not passed, the password service should update all passwords.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PRELIM_CHECK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should only perform preliminary checks. No passwords
+should be updated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_NO_AUTHTOK_CHECK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should not perform conformance checks on the structure of
+the password. Conformance checks do not apply to verification that the same
+password was entered during both passes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_UPDATE_AUTHTOK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should update passwords.
+.RE
+
+.sp
+.LP
+Note that \fBPAM_PRELIM_CHECK\fR and \fBPAM_UPDATE_AUTHTOK\fR cannot be set at
+the same time.
+.sp
+.LP
+Upon successful completion of the call, the authentication token of the user
+will be ready for change or will be changed, depending upon the flag, in
+accordance with the authentication scheme configured within the system.
+.sp
+.LP
+The \fIargc\fR argument represents the number of module options passed in from
+the configuration file \fBpam.conf\fR(4). The \fIargv\fR argument specifies the
+module options, which are interpreted and processed by the password management
+service. Please refer to the specific module man pages for the various
+available \fIoptions\fR.
+.sp
+.LP
+It is the responsibility of \fBpam_sm_chauthtok()\fR to determine if the new
+password meets certain strength requirements. \fBpam_sm_chauthtok()\fR may
+continue to re-prompt the user (for a limited number of times) for a new
+password until the password entered meets the strength requirements.
+.sp
+.LP
+Before returning, \fBpam_sm_chauthtok()\fR should call  \fBpam_get_item()\fR
+and retrieve both \fBPAM_AUTHTOK\fR and \fBPAM_OLDAUTHTOK\fR. If both are
+\fINULL\fR, \fBpam_sm_chauthtok()\fR should set them to the new and old
+passwords as entered by the user.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBPAM_SUCCESS\fR must be returned. The following
+values may also be returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.RS 29n
+.rt  
+No permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_ERR\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token manipulation error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_RECOVERY_ERR\fR\fR
+.ad
+.RS 29n
+.rt  
+Old authentication token cannot be recovered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_LOCK_BUSY\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token lock busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_DISABLE_AGING\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token aging disabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 29n
+.rt  
+User unknown to password service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_TRY_AGAIN\fR\fR
+.ad
+.RS 29n
+.rt  
+Preliminary check by password service failed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBping\fR(1M), \fBpam\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
+\fBpam_get_data\fR(3PAM), \fBpam_get_item\fR(3PAM), \fBpam_set_data\fR(3PAM),
+\fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBPAM\fR framework invokes the password services twice. The first time the
+modules are invoked with the flag, \fBPAM_PRELIM_CHECK\fR. During this stage,
+the password modules should only perform preliminary checks. For example, they
+may \fBping\fR remote name services to see if they are ready for updates. If a
+password module detects a transient error such as a remote name service
+temporarily down, it should return \fBPAM_TRY_AGAIN\fR to the \fBPAM\fR
+framework, which will immediately return the error back to the application. If
+all password modules pass the preliminary check, the \fBPAM\fR framework
+invokes the password services again with the flag, \fBPAM_UPDATE_AUTHTOK\fR.
+During this stage, each password module should proceed to update the
+appropriate password. Any error will again be reported back to application.
+.sp
+.LP
+If a service module receives the flag \fBPAM_CHANGE_EXPIRED_AUTHTOK\fR, it
+should check whether the password has aged or expired. If the password has aged
+or expired, then the service module should proceed to update the password. If
+the status indicates that the password has not yet aged or expired, then the
+password module should return \fBPAM_IGNORE\fR.
+.sp
+.LP
+If a user's password has aged or expired, a \fBPAM\fR account module could save
+this information as state in the authentication handle, \fIpamh\fR, using
+\fBpam_set_data()\fR. The related password management module could retrieve
+this information using \fBpam_get_data()\fR to determine whether or not it
+should prompt the user to update the password for this particular module.
+.sp
+.LP
+The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.
+.sp
+.LP
+If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is set and a service module does
+not recognize the type, the service module does not process any information,
+and returns \fBPAM_IGNORE\fR. If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is
+not set, a service module performs its default action.

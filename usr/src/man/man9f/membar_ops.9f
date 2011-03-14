@@ -1,0 +1,111 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH membar_ops 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+membar_ops, membar_enter, membar_exit, membar_producer, membar_consumer \-
+memory access synchronization barrier operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/atomic.h>
+
+\fBvoid\fR \fBmembar_enter\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmembar_exit\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmembar_producer\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmembar_consumer\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmembar_enter()\fR function is a generic memory barrier used during lock
+entry. It is placed after the memory operation that acquires the lock to
+guarantee that the lock protects its data. No stores from after the memory
+barrier will reach visibility and no loads from after the barrier will be
+resolved before the lock acquisition reaches global visibility.
+.sp
+.LP
+The \fBmembar_exit()\fR function is a generic memory barrier used during lock
+exit. It is placed before the memory operation that releases the lock to
+guarantee that the lock protects its data. All loads and stores issued before
+the barrier will be resolved before the subsequent lock update reaches
+visibility.
+.sp
+.LP
+The \fBmembar_enter()\fR and \fBmembar_exit()\fR functions are used together to
+allow regions of code to be in relaxed store order and then ensure that the
+load or store order is maintained at a higher level. They are useful in the
+implementation of mutex exclusion locks.
+.sp
+.LP
+The \fBmembar_producer()\fR function arranges for all stores issued before this
+point in the code to reach global visibility before any stores that follow.
+This is useful in producer modules that update a data item, then set a flag
+that it is available. The memory barrier guarantees that the available flag is
+not visible earlier than the updated data, thereby imposing store ordering.
+.sp
+.LP
+The \fBmembar_consumer()\fR function arranges for all loads issued before this
+point in the code to be completed before any subsequent loads. This is useful
+in consumer modules that check if data is available and read the data. The
+memory barrier guarantees that the data is not sampled until after the
+available flag has been seen, thereby imposing load ordering.
+.SH RETURN VALUES
+.sp
+.LP
+No values are returned.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBatomic_add\fR(9F), \fBatomic_and\fR(9F), \fBatomic_bits\fR(9F),
+\fBatomic_cas\fR(9F), \fBatomic_dec\fR(9F), \fBatomic_inc\fR(9F),
+\fBatomic_ops\fR(9F), \fBatomic_or\fR(9F), \fBatomic_swap\fR(9F),
+\fBattributes\fR(5), \fBatomic_ops\fR(3C)
+.SH NOTES
+.sp
+.LP
+Atomic instructions (see \fBatomic_ops\fR(9F)) ensure global visibility of
+atomically-modified variables on completion. In a relaxed store order system,
+this does not guarantee that the visibility of other variables will be
+synchronized with the completion of the atomic instruction. If such
+synchronization is required, memory barrier instructions must be used.

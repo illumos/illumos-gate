@@ -1,0 +1,163 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH md5 3EXT "13 Nov 2007" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+md5, md5_calc, MD5Init, MD5Update, MD5Final \- MD5 digest functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lmd5\fR [ \fIlibrary\fR ... ]
+#include <md5.h>
+
+\fBvoid\fR \fBmd5_calc\fR(\fBunsigned char *\fR\fIoutput\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBMD5Init\fR(\fBMD5_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBMD5Update\fR(\fBMD5_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBMD5Final\fR(\fBunsigned char *\fR\fIoutput\fR, \fBMD5_CTX *\fR\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions implement the MD5 message-digest algorithm, which takes as
+input a message of arbitrary length and produces as output a 128-bit
+"fingerprint" or "message digest" of the input. It is intended for digital
+signature applications, where large file must be "compressed" in a secure
+manner before being encrypted with a private (secret) key under a public-key
+cryptosystem such as RSA.
+.SS "\fBmd5_calc()\fR"
+.sp
+.LP
+The \fBmd5_calc()\fR function computes an MD5 digest on a single message block.
+The \fIinlen\fR-byte block is pointed to by \fIinput\fR, and the 16-byte MD5
+digest is written to \fIoutput\fR.
+.SS "\fBMD5Init()\fR, \fBMD5Update()\fR, \fBMD5Final()\fR"
+.sp
+.LP
+The \fBMD5Init()\fR, \fBMD5Update()\fR, and \fBMD5Final()\fR functions allow an
+MD5 digest to be computed over multiple message blocks; between blocks, the
+state of the MD5 computation is held in an MD5 context structure, allocated by
+the caller. A complete digest computation consists of one call to
+\fBMD5Init()\fR, one or more calls to \fBMD5Update()\fR, and one call to
+\fBMD5Final()\fR, in that order.
+.sp
+.LP
+The \fBMD5Init()\fR function initializes the MD5 context structure pointed to
+by \fIcontext\fR.
+.sp
+.LP
+The \fBMD5Update()\fR function computes a partial MD5 digest on the
+\fIinlen\fR-byte message block pointed to by \fIinput\fR, and updates the MD5
+context structure pointed to by \fIcontext\fR accordingly.
+.sp
+.LP
+The \fBMD5Final()\fR function generates the final MD5 digest, using the MD5
+context structure pointed to by \fIcontext\fR; the 16-byte MD5 digest is
+written to \fIoutput\fR. After calling \fBMD5Final()\fR, the state of the
+context structure is undefined; it must be reinitialized with \fBMD5Init()\fR
+before being used again.
+.SH RETURN VALUES
+.sp
+.LP
+These functions do not return a value.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAuthenticate a message found in multiple buffers
+.sp
+.LP
+The following is a sample function that must authenticate a message that is
+found in multiple buffers. The calling function provides an authentication
+buffer that will contain the result of the MD5 digest.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <md5.h>
+
+int
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+                *messageIov, unsigned int num_buffers)
+{
+    MD5_CTX md5_context;
+    unsigned int i;
+
+    MD5Init(&md5_context);
+
+    for(i=0; i<num_buffers; i++)
+    {
+         MD5Update(&md5_context, messageIov->iov_base,
+                   messageIov->iov_len);
+         messageIov += sizeof(struct iovec);
+    }
+
+    MD5Final(auth_buffer, &md5_context);
+
+    return 0;
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUse \fBmd5_calc()\fR to generate the MD5 digest
+.sp
+.LP
+Since the buffer to be computed is contiguous, the \fBmd5_calc()\fR function
+can be used to generate the MD5 digest.
+
+.sp
+.in +2
+.nf
+int AuthenticateMsg(unsigned char *auth_buffer, unsigned
+                    char *buffer, unsigned int length)
+{
+    md5_calc(buffer, auth_buffer, length);
+
+    return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibmd5\fR(3LIB)
+.sp
+.LP
+Rivest, R., The MD5 Message-Digest Algorithm, RFC 1321, April 1992.

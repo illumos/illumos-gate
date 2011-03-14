@@ -1,0 +1,486 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uustat 1C "28 Mar 1995" "SunOS 5.11" "Communication Commands"
+.SH NAME
+uustat \- uucp status inquiry and job control
+.SH SYNOPSIS
+.LP
+.nf
+\fBuustat\fR 
+     [ [\fB-m\fR] | [\fB-p\fR] | [\fB-q\fR] | [\fB-k\fR \fIjobid\fR [\fB-n\fR]] | [\fB-r\fR \fIjobid\fR [\fB-n\fR]]]
+.fi
+
+.LP
+.nf
+\fBuustat\fR [\fB-a\fR] [\fB-s\fR \fIsystem\fR [\fB-j\fR]] [\fB-u\fR \fIuser\fR] [\fB-S\fR \fIqric\fR]
+.fi
+
+.LP
+.nf
+\fBuustat\fR \fB-t\fR \fIsystem\fR [\fB-c\fR] [\fB-d\fR \fInumber\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuustat\fR utility functions in the following three areas:
+.RS +4
+.TP
+1.
+Displays the general status of, or cancels, previously specified \fBuucp\fR
+commands.
+.RE
+.RS +4
+.TP
+2.
+Provides remote system performance information, in terms of average transfer
+rates or average queue times.
+.RE
+.RS +4
+.TP
+3.
+Provides general remote system-specific and user-specific status of
+\fBuucp\fR connections to other systems.
+.RE
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.SS "General Status"
+.sp
+.LP
+These options obtain general status of, or cancel, previously  specified
+\fBuucp\fR commands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 11n
+.rt  
+Lists all jobs in queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR\fR
+.ad
+.RS 11n
+.rt  
+Lists the total number of jobs displayed. The \fB-j\fR option can be used in
+conjunction with the \fB-a\fR or the \fB-s\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fIjobid\fR\fR
+.ad
+.RS 11n
+.rt  
+Kills the \fBuucp\fR request whose job identification is \fIjobid\fR. The
+killed \fBuucp\fR request must belong to the user  issuing the \fBuustat\fR
+command unless the user is the super-user or uucp administrator. If the job is
+killed by the super-user or uucp administrator, electronic mail is sent to the
+user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 11n
+.rt  
+Reports the status of accessibility of all machines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 11n
+.rt  
+Suppresses all standard output, but not standard error. The \fB-n\fR option is
+used in conjunction with the \fB-k\fR and \fB-r\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 11n
+.rt  
+Executes the command \fBps\fR \fB-flp\fR for all the process-ids that are in
+the lock files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 11n
+.rt  
+Lists the jobs queued for each machine. If a status file exists for the
+machine, its date, time and status information are reported. In addition, if a
+number appears in parentheses next to the number of \fBC\fR or \fBX\fR files,
+it is the age in days of the oldest \fBC.\fR/\fBX.\fR file for that system. The
+\fBRetry\fR field represents the number of hours until the next possible call.
+The \fBCount\fR is the number of failure attempts. \fBNote:\fR For systems with
+a moderate number of outstanding jobs, this could take 30 seconds or more of
+real-time to execute. An example of the output produced by the \fB-q\fR option
+is:
+.sp
+.in +2
+.nf
+eagle    3C      04/07-11:07     NO DEVICES AVAILABLE
+mh3bs3	2C	07/07-10:42	SUCCESSFUL
+.fi
+.in -2
+.sp
+
+This indicates the number of command files that are waiting for each system.
+Each command file may have zero or more files to be sent (zero means to call
+the system and see if work is to be done). The date and time refer to the
+previous interaction with the system followed by the status of the interaction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fIjobid\fR\fR
+.ad
+.RS 11n
+.rt  
+Rejuvenates \fIjobid\fR. The files associated with \fIjobid\fR are touched so
+that  their modification time is set to the current time. This prevents the
+cleanup daemon from deleting the job until the jobs' modification time reaches
+the limit imposed by the daemon.
+.RE
+
+.SS "Remote System Status"
+.sp
+.LP
+These options provide remote system performance information, in terms of
+average transfer rates or average queue times. The \fB-c\fR and \fB-d\fR
+options can only be used in conjunction with the \fB-t\fR option:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fIsystem\fR\fR
+.ad
+.RS 12n
+.rt  
+Reports the average transfer rate or average queue time for the past 60 minutes
+for the remote \fIsystem\fR. The following parameters can only be used with
+this option:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 12n
+.rt  
+Average queue time is calculated when the \fB-c\fR parameter is specified and
+average transfer rate when \fB-c\fR is not specified. For example, the command:
+.sp
+.in +2
+.nf
+example% \fBuustat -teagle -d50 -c\fR
+.fi
+.in -2
+.sp
+
+produces output in the following format:
+.sp
+.in +2
+.nf
+average queue time to eagle for last 50 minutes:
+     5 seconds
+.fi
+.in -2
+.sp
+
+The same command without the \fB-c\fR parameter produces output in the
+following format:
+.sp
+.in +2
+.nf
+average transfer rate with eagle for last 50 minutes:
+     2000.88 bytes/sec
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fInumber\fR\fR
+.ad
+.RS 12n
+.rt  
+\fInumber\fR is specified in minutes. Used to override the 60 minute default
+used for calculations. These calculations are based on information contained in
+the optional performance log and therefore may not be available. Calculations
+can only be made from the time that the performance log was last cleaned up.
+.RE
+
+.SS "User- or System-Specific Status"
+.sp
+.LP
+These options provide general remote system-specific and user-specific status
+of \fBuucp\fR connections to other systems. Either or both of the following
+options can be specified with \fBuustat\fR. The \fB-j\fR option can be used in
+conjunction with the \fB-s\fR option to list the total number of jobs
+displayed:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fIsystem\fR\fR
+.ad
+.RS 12n
+.rt  
+Reports the status of all \fBuucp\fR requests for remote system \fIsystem.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fIuser\fR\fR
+.ad
+.RS 12n
+.rt  
+Reports the status of all \fBuucp\fR requests issued by \fIuser\fR.
+.RE
+
+.sp
+.LP
+Output for both the \fB-s\fR and \fB-u\fR options has the following format:
+.sp
+.in +2
+.nf
+eagleN1bd7  4/07-11:07    S     eagle   dan     522     /home/dan/A
+eagleC1bd8  4/07-11:07    S     eagle   dan     59      D.3b2al2ce4924
+            4/07-11:07    S     eagle   dan     rmail   mike
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+With the above two options, the first field is the \fIjobid\fR of the job. This
+is followed by the date/time. The next field is an \fBS\fR if the job is
+sending a file or an \fBR\fR if the job is requesting a file. The next field is
+the machine where the file is to be transferred. This is followed by the
+user-id of the user who queued the job. The next field contains the size of the
+file, or in the case of a remote execution (\fBrmail\fR is the command used for
+remote mail), the name of the command. When the size appears in this field, the
+file name is also given. This can either be the name given by the user or an
+internal name (for example, \fBD.3b2alce4924\fR) that is created for data files
+associated with remote executions (\fBrmail\fR in this example).
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fIqric\fR\fR
+.ad
+.RS 10n
+.rt  
+Reports the job state:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.RS 5n
+.rt  
+for queued jobs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 5n
+.rt  
+for running jobs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 5n
+.rt  
+for interrupted jobs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.RS 5n
+.rt  
+for completed jobs
+.RE
+
+A job is queued if the transfer has not started. A job is running when the
+transfer has begun. A job is interrupted if the transfer began but was
+terminated before the file was completely  transferred. A completed job is a
+job that successfully transferred. The completed state information is
+maintained in the accounting log,  which is optional and therefore may be
+unavailable. The parameters can be used in any combination, but at least one
+parameter must be specified. The \fB-S\fR option can also be used with \fB-s\fR
+and \fB-u\fR options. The output for this option is exactly like the output for
+\fB-s\fR and \fB-u\fR except that the job states are appended as the last
+output word. Output for a completed job has the following format:
+.sp
+.in +2
+.nf
+eagleC1bd3 completed
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+When no options are given, \fBuustat\fR writes to standard output the status of
+all \fBuucp\fR requests issued by the current user.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBuustat\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR,
+\fBNLSPATH\fR, and \fBTZ\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/uucp/\fR*\fR
+.ad
+.RS 28n
+.rt  
+spool directories
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/uucp/.Admin/account\fR\fR
+.ad
+.RS 28n
+.rt  
+accounting log
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/uucp/.Admin/perflog\fR\fR
+.ad
+.RS 28n
+.rt  
+performance log
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPE ATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBuucp\fR(1C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+The \fB-t\fR option produces no message when the data needed for the
+calculations is not being recorded.
+.SH NOTES
+.sp
+.LP
+After the user has issued the \fBuucp\fR request, if the file to be transferred
+is moved, deleted or was not copied to the spool directory  (\fB-C\fR option)
+when the \fBuucp\fR request was made, \fBuustat\fR reports a file size of
+\fB\(mi99999\fR\&. This job will eventually fail because the file(s) to be
+transferred can not be found.

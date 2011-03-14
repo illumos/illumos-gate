@@ -1,0 +1,63 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sleep 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sleep \- suspend execution for an interval of time
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBunsigned int\fR \fBsleep\fR(\fBunsigned int\fR \fIseconds\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The caller is suspended from execution for the number of \fIseconds\fR
+specified by the argument. The actual suspension time may be less than that
+requested because any caught signal will terminate the \fBsleep()\fR following
+execution of that signal's catching routine. The suspension time may be longer
+than requested by an arbitrary amount because of the scheduling of other
+activity in the system. The value returned by \fBsleep()\fR will be the
+``unslept'' amount (the requested time minus the time actually slept) if the
+caller incurred premature arousal because of a caught signal.
+.sp
+.LP
+The use of the \fBsleep()\fR function has no effect on the action or blockage
+of any signal. In a multithreaded process, only the invoking thread is
+suspended from execution.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnanosleep\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

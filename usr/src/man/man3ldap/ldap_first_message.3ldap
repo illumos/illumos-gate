@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_first_message 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_first_message, ldap_count_messages, ldap_next_message, ldap_msgtype \-
+LDAP message processing functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_count_messages\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPMessage *\fR\fBldap_first_message\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPMessage *\fR\fBldap_next_message\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*msg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_msgtype\fR(\fBLDAPMessage\fR \fI*res\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBldap_count_messages()\fR is used to count the number of messages that remain
+in a chain of results if called with a  message, entry, or reference returned
+by  \fBldap_first_message()\fR, \fBldap_next_message()\fR,
+\fBldap_first_entry()\fR, \fBldap_next_entry()\fR,
+\fBldap_first_reference()\fR, and  \fBldap_next_reference()\fR
+.sp
+.LP
+\fBldap_first_message()\fR and   \fBldap_next_message()\fR functions are used
+to step through the list of messages in a result chain returned by
+\fBldap_result()\fR.
+.sp
+.LP
+\fBldap_msgtype()\fR function returns the type of an LDAP message.
+.SH RETURN VALUES
+.sp
+.LP
+\fBldap_first_message()\fR and  \fBldap_next_message()\fR return
+\fBLDAPMessage\fR which can include referral messages, entry messages and
+result messages.
+.sp
+.LP
+\fBldap_count_messages()\fR returns the number of messages contained in a chain
+of results.
+.SH ERRORS
+.sp
+.LP
+\fBldap_first_message()\fR and  \fBldap_next_message()\fR return  \fINULL\fR
+when no more messages exist.  \fINULL\fR is also returned if an error occurs
+while  stepping through the entries, in which case the error parameters in the
+session handle  \fIld\fR will be set to indicate the error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap_error\fR(3LDAP), \fBldap_result\fR(3LDAP), \fBattributes\fR(5)

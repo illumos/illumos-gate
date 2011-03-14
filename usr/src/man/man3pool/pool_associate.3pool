@@ -1,0 +1,339 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pool_associate 3POOL "18 Jul 2005" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.SH NAME
+pool_associate, pool_create, pool_destroy, pool_dissociate, pool_info,
+pool_query_pool_resources \- resource pool manipulation functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <pool.h>
+
+\fBint\fR \fBpool_associate\fR(\fBpool_conf_t *\fR\fIconf\fR, \fB pool_t *\fR\fIpool\fR,
+     \fBpool_resource_t *\fR\fIresource\fR);
+.fi
+
+.LP
+.nf
+\fBpool_t *\fR\fBpool_create\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_destroy\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_t *\fR\fIpool\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_dissociate\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_t *\fR\fIpool\fR,
+     \fBpool_resource_t *\fR\fIresource\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBpool_info\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_t *\fR\fIpool\fR,
+     \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBpool_resource_t **\fR\fBpool_query_pool_resources\fR(\fBpool_conf_t *\fR\fIconf\fR,
+     \fBpool_t *\fR\fIpool\fR, \fBuint_t *\fR\fInelem\fR, \fBpool_value_t **\fR\fIproperties\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide mechanisms for constructing and modifying pools entries
+within a target pools configuration.  The \fIconf\fR argument for each function
+refers to the target configuration to which the operation applies.
+.sp
+.LP
+The \fBpool_associate()\fR function associates the specified resource with
+\fIpool\fR. A resource can be associated with multiple pools at the same time.
+Any resource of this type that was formerly associated with this pool is no
+longer associated with the pool. The new association replaces the earlier one.
+.sp
+.LP
+The \fBpool_create()\fR function creates a new pool with the supplied name with
+its default properties initialized, and associated with the default resource of
+each type.
+.sp
+.LP
+The \fBpool_destroy function()\fR destroys the given pool association.
+Associated resources are not modified.
+.sp
+.LP
+The \fBpool_dissociate()\fR function removes the association between the given
+resource and pool. On successful completion, the pool is associated with the
+default resource of the same type.
+.sp
+.LP
+The \fBpool_info()\fR function returns a string describing the given pool. The
+string is allocated with \fBmalloc\fR(3C). The caller is reponsible for freeing
+the returned string. If the \fIflags\fR option is non-zero, the string returned
+also describes the associated resources of the pool.
+.sp
+.LP
+The \fBpool_query_pool_resources()\fR function returns a null-terminated array
+of resources currently associated with the pool that match the given list of
+properties. The return value must be freed by the caller. The \fInelem\fR
+argument is set to be the length of the array returned.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpool_create()\fR returns a new initialized pool.
+Otherwise it returns \fINULL\fR and \fBpool_error\fR(3POOL) returns the
+pool-specific error value.
+.sp
+.LP
+Upon successful completion, \fBpool_associate()\fR, \fBpool_destroy()\fR, and
+\fBpool_dissociate()\fR return 0. Otherwise, they return -1 and
+\fBpool_error()\fR returns the pool-specific error value.
+.sp
+.LP
+Upon successful completion, \fBpool_info()\fR returns a string describing the
+given pool. Otherwise it returns \fINULL\fR and \fBpool_error()\fR returns the
+pool-specific error value.
+.sp
+.LP
+Upon successful completion, \fBpool_query_pool_resources()\fR returns a
+null-terminated array of resources. Otherwise it returns \fINULL\fR and
+\fBpool_error()\fR returns the pool-specific error value.
+.SH ERRORS
+.sp
+.LP
+The \fBpool_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR or \fIname\fR is
+already in use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The pool element could not be created because the configuration would be
+invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_PUTPROP\fR\fR
+.ad
+.RS 20n
+.rt  
+One of the supplied properties could not be set.
+.RE
+
+.sp
+.LP
+The \fBpool_destroy()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.LP
+The \fBpool_associate()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR or the parameters
+are supplied from a different configuration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.LP
+The \fBpool_disassociate()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR or the parameters
+are supplied from a different configuration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+No resources could be located for the supplied configuration or the supplied
+configuration is not valid (for example, more than one default for a resource
+type was found.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.LP
+The \fBpool_info()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR or the \fIflags\fR
+paramter is neither 0 or 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The configuration is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.LP
+The \fBpool_query_pool_resources()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The configuration is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Pool names are unique across pools in a given configuration file. It is an
+error to attempt to create a pool with a name that is currently used by another
+pool within the same configuration.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityUnstable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

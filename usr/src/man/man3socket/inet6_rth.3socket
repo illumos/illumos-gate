@@ -1,0 +1,190 @@
+'\" te
+.\"  Copyright 2003 AT&T  
+.\" Copyright (C) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH inet6_rth 3SOCKET "15 Feb 2007" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+inet6_rth, inet6_rth_space, inet6_rth_init, inet6_rth_add, inet6_rth_reverse,
+inet6_rth_segments, inet6_rth_getaddr \- Routing header manipulation
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR [\fIlibrary\fR]
+#include <netinet/in.h>
+
+\fBsocklen_t\fR \fBinet6_rth_space\fR(\fBint\fR \fItype\fR, \fBint\fR \fIsegments\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBinet6_rth_init\fR(\fBvoid *\fR\fIbp\fR, \fBsocklen_t\fR \fIbp_len\fR, \fBint\fR \fItype\fR, \fBint\fR \fIsegments\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinet6_rth_add\fR(\fBvoid *\fR\fIbp\fR, \fBconst\fR \fIstruct\fR, \fBin6_addr *\fR\fIaddr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinet6_rth_reverse\fR(\fBconst void *\fR\fIin\fR, \fBvoid *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinet6_rth_segments\fR(\fBconst void *\fR\fIbp\fR);
+.fi
+
+.LP
+.nf
+\fBstruct in6_addr *\fR\fBinet6_rth_getaddr\fR(\fBconst void *\fR\fIbp\fR, \fBint\fR \fIindex\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinet6_rth\fR functions enable users to manipulate routing headers
+without having knowledge of their structure.
+.sp
+.LP
+The \fBiet6_rth_init()\fR function initializes the buffer pointed to by
+\fIbp\fR to contain a routing header of the specified type and sets
+\fBip6r_len\fR based on the segments parameter. The \fIbp_len\fR argument is
+used only to verify that the buffer is large enough. The \fBip6r_segleft\fR
+field is set to zero and \fBinet6_rth_add()\fR increments it. The caller
+allocates the buffer and its size can be determined by calling
+\fBinet6_rth_space()\fR.
+.sp
+.LP
+The \fBinet6_rth_add()\fR function adds the IPv6 address pointed to by
+\fIaddr\fR to the end of the routing header that is being constructed.
+.sp
+.LP
+The \fBinet6_rth_reverse()\fR function takes a routing header extension header
+pointed to by the first argument and writes a new routing header that sends
+datagrams along the reverse of the route. The function reverses the order of
+the addresses and sets the \fBsegleft\fR member in the new routing header to
+the number of segments. Both arguments can point to the same buffer (that is,
+the reversal can occur in place).
+.sp
+.LP
+The \fBinet6_rth_segments()\fR function returns the number of segments
+(addresses) contained in the routing header described by \fIbp\fR.
+.sp
+.LP
+The \fBinet6_rth_getaddr()\fR function returns a pointer to the IPv6 address
+specified by index, which must have a value between 0 and one less than the
+value returned by \fBinet6_rth_segments()\fR in the routing header described by
+\fIbp\fR. Applications should first call \fBinet6_rth_segments()\fR to obtain
+the number of segments in the routing header.
+.sp
+.LP
+The \fBinet6_rth_space()\fR function returns the size, but the function does
+not allocate the space required for the ancillary data routing header.
+.SH ROUTING HEADERS
+.sp
+.LP
+To receive a routing header, the application must enable the
+\fBIPV6_RECVRTHDR\fR socket option:
+.sp
+.in +2
+.nf
+int  on = 1;
+setsockopt (fd, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on));
+.fi
+.in -2
+
+.sp
+.LP
+Each received routing header is returned as one ancillary data object described
+by a \fBcmsghdr\fR structure with \fBcmsg_type\fR set to \fBIPV6_RTHDR\fR.
+.sp
+.LP
+To send a routing header, the application specifies it either as ancillary data
+in a call to \fBsendmsg()\fR or by using \fBsetsockopt()\fR. For the sending
+side, this \fBAPI\fR assumes the number of occurrences of the routing header as
+described in \fIRFC-2460\fR. Applications can specify no more than one outgoing
+routing header.
+.sp
+.LP
+The application can remove any sticky routing header by calling
+\fBsetsockopt()\fR for \fBIPV6_RTHDR\fR with a zero option length.
+.sp
+.LP
+When using ancillary data, a routing header is passed between the application
+and the kernel as follows: The \fBcmsg_level\fR member has a value of
+\fBIPPROTO_IPV6\fR and the \fBcmsg_type\fR member has a value of
+\fBIPV6_RTHDR\fR. The contents of the \fBcmsg_data\fR member is
+implementation-dependent and should not be accessed directly by the
+application, but should be accessed using the \fBinet6_rth\fR functions.
+.sp
+.LP
+The following constant is defined as a result of including the
+<\fBnetinet/in.h\fR>:
+.sp
+.in +2
+.nf
+#define IPV6_RTHDR_TYPE_0   0 /* IPv6 Routing header type 0 */
+.fi
+.in -2
+
+.SS "ROUTING HEADER OPTION"
+.sp
+.LP
+Source routing in IPv6 is accomplished by specifying a routing header as an
+extension header. There are a number of different routing headers, but IPv6
+currently defines only the Type 0 header. See \fIRFC-2460\fR. The Type 0 header
+supports up to 127 intermediate nodes, limited by the length field in the
+extension header. With this maximum number of intermediate nodes, a source, and
+a destination, there are 128 hops.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBinet6_rth_init()\fR function returns a pointer to the buffer (\fIbp\fR)
+upon success.
+.sp
+.LP
+For the \fBinet6_rth_add()\fR function, the \fBsegleft\fR member of the routing
+header is updated to account for the new address in the routing header. The
+function returns \fB0\fR upon success and \fB-1\fR upon failure.
+.sp
+.LP
+The \fBinet6_rth_reverse()\fR function returns \fB0\fR upon success or \fB-1\fR
+upon an error.
+.sp
+.LP
+The \fBinet6_rth_segments()\fR function returns \fB0\fR or greater upon success
+and \fB-1\fR upon an error.
+.sp
+.LP
+The \fBinet6_rth_getaddr()\fR function returns \fBNULL\fR upon an error.
+.sp
+.LP
+The \fBinet6_rth_space()\fR function returns the size of the buffer needed for
+the routing header.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+RFC 3542- \fIAdvanced Sockets Application Programming Interface (API) for
+IPv6\fR, The Internet Society. May 2003

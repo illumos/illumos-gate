@@ -1,0 +1,83 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tsol_getrhtype 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+tsol_getrhtype \- get trusted network host type
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsnet\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <libtsnet.h>
+
+\fBtsol_host_type_t\fR \fBtsol_getrhtype\fR(\fBchar *\fR\fIhostname\fR);
+.fi
+
+.LP
+.nf
+
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtsol_getrhtype()\fR function queries the kernel-level network
+information to determine the host type that is associated with the specified
+\fIhostname\fR. The \fIhostname\fR can be a regular hostname, an IP address, or
+a network wildcard address.
+.SH RETURN VALUES
+.sp
+.LP
+The returned value will be one of the enumerated types that is defined in the
+\fBtsol_host_type_t\fR typedef. Currently these types are \fBUNLABELED\fR and
+\fBSUN_CIPSO\fR.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/tsol/tnrhdb\fR\fR
+.ad
+.RS 29n
+.rt  
+Trusted network remote-host database
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.16i) |cw(3.34i) 
+lw(2.16i) |lw(3.34i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibtsnet\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fIObtaining the Remote Host Type\fR in \fISolaris Trusted Extensions
+Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

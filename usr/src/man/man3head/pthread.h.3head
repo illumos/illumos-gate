@@ -1,0 +1,118 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread.h 3HEAD "11 Nov 2008" "SunOS 5.11" "Headers"
+.SH NAME
+pthread.h, pthread \- threads
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBpthread.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBpthread.h\fR> header defines the following symbols:
+.sp
+.in +2
+.nf
+PTHREAD_BARRIER_SERIAL_THREAD
+PTHREAD_CANCEL_ASYNCHRONOUS
+PTHREAD_CANCEL_ENABLE
+PTHREAD_CANCEL_DEFERRED
+PTHREAD_CANCEL_DISABLE
+PTHREAD_CANCELED
+PTHREAD_COND_INITIALIZER
+PTHREAD_CREATE_DETACHED
+PTHREAD_CREATE_JOINABLE
+PTHREAD_EXPLICIT_SCHED
+PTHREAD_INHERIT_SCHED
+PTHREAD_MUTEX_DEFAULT
+PTHREAD_MUTEX_ERRORCHECK
+PTHREAD_MUTEX_INITIALIZER
+PTHREAD_MUTEX_NORMAL
+PTHREAD_MUTEX_RECURSIVE
+PTHREAD_MUTEX_ROBUST
+PTHREAD_MUTEX_STALLED
+PTHREAD_ONCE_INIT
+PTHREAD_PRIO_INHERIT
+PTHREAD_PRIO_NONE
+PTHREAD_PRIO_PROTECT
+PTHREAD_PROCESS_SHARED
+PTHREAD_PROCESS_PRIVATE
+PTHREAD_RWLOCK_INITIALIZER
+PTHREAD_SCOPE_PROCESS
+PTHREAD_SCOPE_SYSTEM
+.fi
+.in -2
+
+.sp
+.LP
+The types listed below are defined as described in <\fBsys/types.h\fR>. See
+\fBtypes.h\fR(3HEAD).
+.sp
+.in +2
+.nf
+pthread_attr_t
+pthread_barrier_t
+pthread_barrierattr_t
+pthread_cond_t
+pthread_condattr_t
+pthread_key_t
+pthread_mutex_t
+pthread_mutexattr_t
+pthread_once_t
+pthread_rwlock_t
+pthread_rwlockattr_t
+pthread_spinlock_t
+pthread_t
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsched.h\fR(3HEAD), \fBtime.h\fR(3HEAD), \fBtypes.h\fR(3HEAD),
+\fBpthread_attr_getguardsize\fR(3C), \fBpthread_attr_init\fR(3C),
+\fBpthread_attr_setscope\fR(3C), \fBpthread_cancel\fR(3C),
+\fBpthread_cleanup_pop\fR(3C), \fBpthread_cond_init\fR(3C),
+\fBpthread_cond_signal\fR(3C), \fBpthread_cond_wait\fR(3C),
+\fBpthread_condattr_init\fR(3C), \fBpthread_create\fR(3C),
+\fBpthread_detach\fR(3C), \fBpthread_equal\fR(3C), \fBpthread_exit\fR(3C),
+\fBpthread_getconcurrency\fR(3C), \fBpthread_getschedparam\fR(3C),
+\fBpthread_join\fR(3C), \fBpthread_key_create\fR(3C),
+\fBpthread_key_delete\fR(3C), \fBpthread_mutex_consistent\fR(3C),
+\fBpthread_mutex_init\fR(3C), \fBpthread_mutex_lock\fR(3C),
+\fBpthread_mutex_setprioceiling\fR(3C), \fBpthread_mutexattr_getrobust\fR(3C),
+\fBpthread_mutexattr_gettype\fR(3C), \fBpthread_mutexattr_getprotocol\fR(3C),
+\fBpthread_mutexattr_init\fR(3C), \fBpthread_once\fR(3C),
+\fBpthread_rwlock_init\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
+\fBpthread_rwlock_unlock\fR(3C), \fBpthread_rwlock_wrlock\fR(3C),
+\fBpthread_rwlockattr_getpshared\fR(3C), \fBpthread_rwlockattr_init\fR(3C),
+\fBpthread_self\fR(3C), \fBpthread_setcancelstate\fR(3C),
+\fBpthread_setspecific\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,570 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH papiPrintersList 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.SH NAME
+papiPrintersList, papiPrinterQuery, papiPrinterAdd, papiPrinterModify,
+papiPrinterRemove, papiPrinterDisable, papiPrinterEnable, papiPrinterPause,
+papiPrinterResume, papiPrinterPurgeJobs, papiPrinterListJobs,
+papiPrinterGetAttributeList, papiPrinterFree, papiPrinterListFree \- print
+object manipulation
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+
+\fBpapi_status_t\fR \fBpapiPrintersList\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar **\fR\fIrequested_attrs\fR, \fBpapi_filter_t *\fR\fIfilter\fR,
+     \fBpapi_printer_t **\fR\fIprinters\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterQuery\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBchar **\fR\fIrequested_attrs\fR, \fBpapi_attribute_t **\fR\fIjob_attributes\fR,
+     \fBpapi_printer_t *\fR\fIprinter\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterAdd\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBpapi_attribute_t **\fR\fIattributes\fR, \fBpapi_printer_t *\fR\fIprinter\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterModify\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBpapi_attribute_t **\fR\fIattributes\fR, \fBpapi_printer_t *\fR\fIprinter\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterRemove\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterDisable\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBchar *\fR\fImessage\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterEnable\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterPause\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBchar *\fR\fImessage\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterResume\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterPurgeJobs\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBpapi_job_t **\fR\fIjobs\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiPrinterListJobs\fR(\fBpapi_service_t\fR \fIhandle\fR, \fBchar *\fR\fIname\fR,
+     \fBchar **\fR\fIrequested_attrs\fR, \fBint\fR \fItype_mask\fR, \fBint\fR \fImax_num_jobs\fR,
+     \fBpapi_job_t **\fR\fIjobs\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_attribute_t **\fR\fBpapiPrinterGetAttributeList\fR(\fBpapi_printer_t\fR \fIprinter\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiPrinterFree\fR(\fBpapi_printer_t\fR \fIprinter\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiPrinterListFree\fR(\fBpapi_printer_t *\fR\fIprinters\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattributes\fR\fR
+.ad
+.RS 19n
+.rt  
+a set of attributes to be applied to a printer object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilter\fR\fR
+.ad
+.RS 19n
+.rt  
+a filter to be applied during printer enumeration
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a handle to be used for all PAPI operations, created by calling
+\fBpapiServiceCreate()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob_attributes\fR\fR
+.ad
+.RS 19n
+.rt  
+unused
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjobs\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a list to return job objects (initialized to \fINULL\fR)
+enumerated by \fBpapiPrinterGetJobs()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImax_num_jobs\fR\fR
+.ad
+.RS 19n
+.rt  
+the maximum number of jobs to return from a \fBpapiPrinterGetJobs()\fR request
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImessage\fR\fR
+.ad
+.RS 19n
+.rt  
+a message to be associated with a printer while disabled or paused
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 19n
+.rt  
+the name of the printer object being operated on
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprinter\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a printer object (initialized to \fINULL\fR) to be filled in by
+\fBpapiPrinterQuery()\fR, \fBpapiPrinterAdd()\fR, and \fBpapiPrinterModify()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprinters\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a list to return printer objects (initialized to \fINULL\fR)
+enumerated by \fBpapiPrintersList()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrequested_attrs\fR\fR
+.ad
+.RS 19n
+.rt  
+a null-terminated array of pointers to attribute names requested during printer
+enumeration (\fBpapiPrintersList()\fR), printer query
+(\fBpapiPrinterQuery()\fR), or job enumeration (\fBpapiPrinterListJobs()\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype_mask\fR\fR
+.ad
+.RS 19n
+.rt  
+a bit field indicating which type of jobs to return \fBPAPI_LIST_JOBS_OTHERS\fR
+include jobs submitted by others.  The default is to report only on your own
+jobs
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_LIST_JOBS_COMPLETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+include completed jobs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_LIST_JOBS_NOT_COMPLETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+include jobs not complete
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_LIST_JOBS_ALL\fR\fR
+.ad
+.sp .6
+.RS 4n
+report on all jobs
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpapiPrintersList()\fR function retrieves the requested attributes from
+the print service(s) for all available printers.  Because the Solaris
+implementation is name service-enabled, applications should retrieve only the
+\fBprinter-name\fR and \fBprinter-uri-supported\fR attributes using this
+function, thereby reducing the overhead involved in generating a printer list.
+Further integration of printer state and capabilities can be performed with
+\fBpapiPrinterQuery()\fR.
+.sp
+.LP
+The \fBpapiPrinterAdd()\fR, \fBpapiPrinterModify()\fR, and
+\fBpapiPrinterRemove()\fR functions allow for creation, modification, and
+removal of print queues.  Print queues are added or modified according to the
+attribute list passed into the call. A printer object is returned that reflects
+the configuration of the printer after the addition or modification has been
+applied.  At this time, they provide only minimal functionality and only for
+the LP print service.
+.sp
+.LP
+The \fBpapiPrinterDisable()\fR and \fBpapiPrinterEnable()\fR functions allow
+applications to turn off and on queueing (accepting print requests) for a print
+queue. The \fBpapiPrinterEnable()\fR and \fBpapiPrinterDisable()\fR functions
+allow applications to turn on and off print job processing for a print queue.
+.sp
+.LP
+The \fBpapiPrinterPause()\fR function stops queueing of print jobs on the named
+print queue.
+.sp
+.LP
+The \fBpapiPrinterResume()\fR function resumes queueing of print jobs on the
+named print queue.
+.sp
+.LP
+The \fBpapiPrinterPurgeJobs()\fR function allows applications to delete all
+print jobs that it has privilege to remove.  A list of cancelled jobs is
+returned in the jobs argument.
+.sp
+.LP
+The \fBpapiPrinterListJobs()\fR function enumerates print jobs on a particular
+queue. \fBpapiPrinterGetAttributeList()\fR retrieves an attribute list from a
+printer object.
+.sp
+.LP
+The \fBpapiPrinterGetAttributeList()\fR function retrieves an attribute list
+from a printer object returned from \fBpapiPrinterQuery()\fR,
+\fBpapiPrintersList()\fR, \fBpapiPrinterModify()\fR, and
+\fBpapiPrinterAdd()\fR.  This attribute list can be searched for various
+information about the printer object.
+.sp
+.LP
+The \fBpapiPrinterFree()\fR and \fBpapiPrinterListFree()\fR functions
+deallocate memory allocated for the return of printer object(s) from functions
+that return printer objects.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, all functions that return a value return
+\fBPAPI_OK\fR. Otherwise, they return an appropriate \fBpapi_status_t()\fR
+indicating the type of failure.
+.sp
+.LP
+Upon successful completion, \fBpapiPrinterGetAttributeList()\fR returns a
+pointer to the requested data. Otherwise, it returns \fINULL\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fREnumerate all available printers.
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
+#include <pwd.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user,
+                   svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    papi_status_t status;
+    papi_service_t svc = NULL;
+    papi_printer_t *printers = NULL;
+    char *attrs[] = { "printer-name", "printer-uri-supported", NULL };
+    char *svc_name = NULL;
+    int c;
+
+    while ((c = getopt(ac, av, "s:")) != EOF)
+        switch (c) {
+        case 's':
+            svc_name = optarg;
+            break;
+        }
+
+    status = papiServiceCreate(&svc, svc_name, NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        printf("papiServiceCreate(%s): %s\en", svc_name ? svc_name :
+                     "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    status = papiPrintersList(svc, attrs, NULL, &printers);
+    if (status != PAPI_OK) {
+        printf("papiPrintersList(%s): %s\en", svc_name ? svc_name :
+                     "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    if (printers != NULL) {
+        int i;
+
+        for (i = 0; printers[i] != NULL; i++) {
+            papi_attribute_t **list = 
+                papiPrinterGetAttributeList(printers[i]);
+
+            if (list != NULL) {
+                char *name = "unknown";
+                char *uri = "unknown";
+
+                (void) papiAttributeListGetString(list, NULL,
+                                    "printer-name", &name);
+
+                (void) papiAttributeListGetString(list, NULL,
+                                    "printer-uri-supported", &uri);
+                printf("%s is %s\n", name, uri);
+            }
+        }
+        papiPrinterListFree(printers);
+    }
+
+    papiServiceDestroy(svc);
+
+    exit(0);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRDump all printer attributes.
+.sp
+.in +2
+.nf
+/*
+ * program to query a printer for it's attributes via PAPI
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
+#include <pwd.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user,
+                    svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    papi_status_t status;
+    papi_service_t svc = NULL;
+    papi_printer_t printer = NULL;
+    char *svc_name = NULL;
+    char *pname = "unknown";
+    int c;
+
+    while ((c = getopt(ac, av, "s:p:")) != EOF)
+        switch (c) {
+        case 's':
+            svc_name = optarg;
+            break;
+        case 'p':
+            pname = optarg;
+            break;
+        }
+
+    status = papiServiceCreate(&svc, svc_name, NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        printf("papiServiceCreate(%s): %s\en", svc_name ? svc_name : 
+                    "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    status = papiPrinterQuery(svc, pname, NULL, NULL, &printer);
+    if ((status == PAPI_OK) && (printer != NULL)) {
+        papi_attribute_t **list = papiPrinterGetAttributeList(printer);
+        char *buffer = NULL;
+        size_t size = 0;
+
+        while (papiAttributeListToString(list, "\en\et", buffer, size)
+                    != PAPI_OK)
+            buffer = realloc(buffer, size += BUFSIZ);
+
+        printf("%s:\en\et%s\en", pname, buffer);
+    } else
+        printf("papiPrinterQuery(%s): %s\en", pname,
+                    papiStatusString(status));
+
+    papiPrinterFree(printer);
+    papiServiceDestroy(svc);
+
+    exit(0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpapi\fR(3LIB), \fBattributes\fR(5)

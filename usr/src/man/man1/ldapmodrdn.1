@@ -1,0 +1,580 @@
+'\" te
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldapmodrdn 1 "15 Jan 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+ldapmodrdn \- ldap modify entry RDN tool
+.SH SYNOPSIS
+.LP
+.nf
+\fBldapmodrdn\fR [\fB-r\fR] [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-E\fR] [\fB-H\fR] [\fB-?\fR] [\fB-M\fR] [\fB-R\fR] 
+     [\fB-Z\fR] [\fB-V\fR \fIversion\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-D\fR \fIbindDN\fR] 
+     [\fB-w\fR \fIpasswd\fR] [\fB-h\fR \fIldaphost\fR] [\fB-i\fR \fIlocale\fR] [\fB-j\fR \fIfilename\fR] 
+     [\fB-J\fR [:\fIcriticality\fR]] [\fB-k\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR] 
+     [\fB-O\fR \fIhopLimit\fR] [\fB-P\fR \fIpath\fR] [\fB-W\fR \fIpassword\fR] [\fB-p\fR \fIldapport\fR] 
+     [\fB-o\fR \fIattributename\fR=\fIvalue\fR] [\fB-f\fR \fIfile\fR] [\fB-Y\fR \fIproxyDN\fR] 
+     [\fIdn\fR \fIrdn\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBldapmodrdn\fR opens a connection to an LDAP server, binds, and modifies the
+RDN of entries. The entry information is read from standard input, from
+\fBfile\fR through the use of the \fB-f\fR option, or from the command-line
+pair \fIdn\fR and \fIrdn\fR.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Continuous operation mode. Errors are reported, but ldapmodify continues with
+modifications. The default is to exit after reporting an error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fI bindDN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the distinguished name \fIbinddn\fR to bind to the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI debuglevel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the LDAP debugging level. Useful values of \fIdebuglevel\fR for
+\fBldapmodrdn\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 8n
+.rt  
+Trace
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR \fR
+.ad
+.RS 8n
+.rt  
+Packets
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR \fR
+.ad
+.RS 8n
+.rt  
+Arguments
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB32\fR \fR
+.ad
+.RS 8n
+.rt  
+Filters
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB128\fR \fR
+.ad
+.RS 8n
+.rt  
+Access control
+.RE
+
+To request more than one category of debugging information, add the masks. For
+example, to request trace and filter information, specify a \fIdebuglevel\fR of
+33.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ask server to expose (report) bind identity by means of authentication response
+control.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fI file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Read the entry modification information from \fBfile\fR instead of from
+standard input or the command-line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the usage help text that briefly describes all options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the usage help text that briefly describes all options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fI ldaphost\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternate host on which the LDAP server is running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIlocale\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the character set to use for the \fB-f\fR \fILDIFfile\fR or standard
+input. The default is the character set specified in the \fBLANG\fR environment
+variable. You might choose to use this option to perform the conversion from
+the specified character set to UTF8, thus overriding the \fBLANG\fR setting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-J\fR [:\fIcriticality\fR[:\fIvalue\fR|::\fIb64value\fR|\fIb64value\fR|:\
+fIfileurl\fR]]\fR
+.ad
+.sp .6
+.RS 4n
+Criticality is a boolean value (default is \fBfalse\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR \fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify a file containing the password for the bind DN or the password for the
+SSL client's key database. To protect the password, use this option in scripts
+and place the password in a secure file. This option is mutually exclusive of
+the \fB-w\fR and \fB-W\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the path to a directory containing conversion routines. These routines
+are used if you want to specify a locale that is not supported by default by
+your directory server. This is for NLS support.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.sp .6
+.RS 4n
+Manage smart referrals. When they are the target of the operation, modify the
+entry containing the referral instead of the entry obtained by following the
+referral.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fR
+.ad
+.sp .6
+.RS 4n
+Previews modifications, but makes no changes to entries. Useful in conjunction
+with \fB-v\fR and \fB-d\fR for debugging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fIcertificate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the certificate name to use for certificate-based client
+authentication. For example: \fB-N\fR \fB"Directory-Cert"\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Show what would be done, but do not actually change entries. Useful in
+conjunction with \fB-v\fR for debugging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIattributename\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+For SASL mechanisms and other options such as security properties, mode of
+operation, authorization ID, authentication ID, and so forth.
+.sp
+The different attribute names and their values are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsecProp\fR=\fI"number"\fR\fR
+.ad
+.RS 20n
+.rt  
+For defining SASL security properties.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrealm\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specifies SASL realm (default is \fBrealm=none\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthzid\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specify the authorization ID name for SASL bind.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthid\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specify the authentication ID for SASL bind.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmech\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specifies the various SASL mechanisms.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR \fIhopLimit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the maximum number of referral hops to follow while finding an entry to
+modify. By default, there is no limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the path and filename of the client's certificate database. For
+example:
+.sp
+.in +2
+.nf
+-P /home/uid/.netscape/cert7.db
+.fi
+.in -2
+
+When using the command on the same host as the directory server, you can use
+the server's own certificate database. For example:
+.sp
+.in +2
+.nf
+-P \fIinstallDir\fR/lapd-serverID/alias/cert7.db
+.fi
+.in -2
+
+Use the \fB-P\fR option alone to specify server authentication only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI ldapport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternate TCP port where the secure LAPD server is listening.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not automatically follow referrals returned while searching.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove old RDN values from the entry. By default, old values are kept.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR \fIversion\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the LDAP protocol version number to be used for the delete operation,
+either 2 or 3. LDAP v3 is the default. Specify LDAP v2 when connecting to
+servers that do not support v3.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use verbose mode, with diagnostics written to standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR \fIpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the password for the client's key database given in the \fB-P\fR
+option. This option is required for certificate-based client authentication.
+Specifying \fIpassword\fR on the command line has security issues because the
+password can be seen by others on the system by means of the \fBps\fR command.
+Use the \fB-j\fR instead to specify the password from the file. This option is
+mutually exclusive of \fB-j\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fI passwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIpasswd\fR as the password for authentication to the directory. When you
+use \fB-w\fR\fI passwd\fR to specify the password to be used for
+authentication, the password is visible to other users of the system by means
+of the \fBps\fR command, in script files or in shell history. If you use the
+\fBldapmodrdn\fR command without this option, the command will prompt for the
+password and read it from standard in. When used without the \fB-w\fR option,
+the password will not be visible to other users.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Y\fR \fIproxyid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the proxy DN (proxied authorization id) to use for the modify
+operation, usually in double quotes ("") for the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Z\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify that SSL be used to provide certificate-based client authentication.
+This option requires the \fB-N\fR and SSL password and any other of the SSL
+options needed to identify the certificate and the key database.
+.RE
+
+.SS "Input Format"
+.sp
+.LP
+If the command-line arguments \fIdn\fR and \fIrdn\fR are given, \fIrdn\fR
+replaces the RDN of the entry specified by the DN, \fIdn\fR.
+.sp
+.LP
+Otherwise, the contents of \fBfile\fR (or standard input if the \fB-\fR \fBf\fR
+option is not specified) must consist of one or more pair of lines:
+.sp
+.in +2
+.nf
+    Distinguished Name (DN)
+    Relative Distinguished Name (RDN)
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Use one or more blank lines to separate each DN/RDN pair.
+.SH EXAMPLES
+.sp
+.LP
+The file \fB/tmp/entrymods\fR contains:
+.sp
+.in +2
+.nf
+cn=Modify Me, o=XYZ, c=US
+cn=The New Me
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command:
+.sp
+.in +2
+.nf
+example% ldapmodify -r -f /tmp/entrymods
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+changes the RDN of the "Modify Me" entry from "Modify Me" to "The New Me" and
+the old cn, "Modify Me" is removed.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Stability LevelEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldapadd\fR(1), \fBldapdelete\fR(1), \fBldapmodify\fR(1),
+\fBldapsearch\fR(1), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Exit status is \fB0\fR if no errors occur. Errors result in a non-zero exit
+status and a diagnostic message being written to standard error.

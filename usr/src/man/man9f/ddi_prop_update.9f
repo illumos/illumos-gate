@@ -1,0 +1,396 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_prop_update 9F "28 Aug 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_prop_update, ddi_prop_update_int_array, ddi_prop_update_int,
+ddi_prop_update_string_array, ddi_prop_update_int64,
+ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
+\- update properties
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_prop_update_int_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, 
+     \fBchar *\fR\fIname\fR, \fBint *\fR\fIdata\fR, \fBuint_t\fR \fInelements\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_int\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+     \fBint\fR \fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_int64_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
+     \fBint64_t *\fR\fIdata\fR, \fBuint_t\fR \fInelements\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_int64\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+     \fBint64_t\fR \fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_string_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
+     \fBchar **\fR\fIdata\fR, \fBuint_t\fR \fInelements\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_string\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+     \fBchar *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_prop_update_byte_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
+     \fBuchar_t *\fR\fIdata\fR, \fBuint_t\fR \fInelements\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 14n
+.rt  
+Device number associated with the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 14n
+.rt  
+Pointer to the device info node of device whose property list should be
+updated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR \fR
+.ad
+.RS 14n
+.rt  
+String containing the name of the property to be updated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInelements\fR \fR
+.ad
+.RS 14n
+.rt  
+The number of elements contained in the memory pointed at by \fIdata\fR.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_int_array()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+A pointer an integer array with which to update the property.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_int()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+An integer value with which to update the property.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_int64_array()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+An pointer to a 64-bit integer array with which to update the property.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_int64()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+A 64-bit integer value with which to update the property.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_string_array()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+A pointer to a string array with which to update the property. The array of
+strings is formatted as an array of pointers to \fBNULL \fRterminated strings,
+much like the \fIargv\fR argument to \fBexecve\fR(2).
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_string()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+A pointer to a string value with which to update the property.
+.RE
+
+.sp
+.LP
+\fBddi_prop_update_byte_array()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR \fR
+.ad
+.RS 9n
+.rt  
+A pointer to a byte array with which to update the property.
+.RE
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The property update routines search for and, if found, modify the value of a
+given property. Properties are searched for based on the \fIdip\fR, \fIname\fR,
+\fIdev\fR, and the type of the data (integer, string, or byte). The driver
+software properties list is searched. If the property is found, it is updated
+with the supplied value. If the property is not found on this list, a new
+property is created with the value supplied. For example, if a driver attempts
+to update the "foo" property, a property named "foo" is searched for on the
+driver's software property list. If "foo" is found, the value is updated. If
+"foo" is not found, a new property named "foo" is created on the driver's
+software property list with the supplied value even if a "foo" property exists
+on another property list (such as a \fBPROM \fRproperty list).
+.sp
+.LP
+Every property value has a data type associated with it: byte, integer, or
+string. A property should be updated using a function with the same
+corresponding data type as the property value. For example, an integer property
+must be updated using either \fBddi_prop_update_int_array()\fR or
+\fBddi_prop_update_int()\fR. For a 64-bit integer, you must use
+\fBddi_prop_update_int64_array()\fR or \fBddi_prop_update_int64()\fR. Attempts
+to update a property with a function that does not correspond to the property
+data type that was used to create it results in an undefined state.
+.sp
+.LP
+Usually, the \fIdev\fR argument should be set to the actual device number that
+this property is associated with. If the property is not associated with any
+particular \fIdev\fR, then the argument \fIdev\fR should be set to
+\fBDDI_DEV_T_NONE.\fR This property will then match a look up request (see
+\fBddi_prop_lookup\fR(9F)) with the \fImatch_dev\fR argument set to
+\fBDDI_DEV_T_ANY.\fR If no \fIdev\fR is available for the device (for example
+during \fBattach\fR(9E) time), one can be created using \fBmakedevice\fR(9F)
+with a major number of \fBDDI_MAJOR_T_UNKNOWN.\fR The update routines will then
+generate the correct \fIdev\fR when creating or updating the property.
+.sp
+.LP
+\fIname\fR must always be set to the name of the property being updated.
+.sp
+.LP
+For the routines \fBddi_prop_update_int_array\fR(\|),
+\fBddi_prop_lookup_int64_array()\fR, \fBddi_prop_update_string_array\fR(\|),
+\fBddi_prop_update_string\fR(\|), and \fBddi_prop_update_byte_array\fR(\|),
+\fIdata\fR is a pointer which points to memory containing the value of the
+property. In each case \fI*data\fR points to a different type of property
+value. See the individual descriptions of the routines below for details
+concerning the different values. \fInelements\fR is an unsigned integer which
+contains the number of integer, string, or byte elements accounted for in the
+memory pointed at by \fI*data\fR.
+.sp
+.LP
+For the routines \fBddi_prop_update_int()\fR and \fBddi_prop_update_int64()\fR,
+\fIdata\fR is the new value of the property.
+.sp
+.LP
+\fBddi_prop_update_int_array()\fR
+.sp
+.LP
+Updates or creates an array of integer property values. An array of integers is
+defined to be \fInelements\fR of 4 byte long integer elements. \fIdata\fR must
+be a pointer to an integer array with which to update the property.
+.sp
+.LP
+\fBddi_prop_update_int()\fR
+.sp
+.LP
+Update or creates a single integer value of a property. \fIdata\fR must be an
+integer value with which to update the property.
+.sp
+.LP
+\fBddi_prop_update_int64_array()\fR
+.sp
+.LP
+Updates or creates an array of 64-bit integer property values. An array of
+integers is defined to be \fBnelements\fR of \fBint64_t\fR integer elements.
+\fIdata\fR must be a pointer to a 64-bit integer array with which to update the
+property.
+.sp
+.LP
+\fBddi_prop_update_int64()\fR
+.sp
+.LP
+Updates or creates a single 64-bit integer value of a property. \fIdata\fR must
+be an \fBint64_t\fR value with which to update the property.
+.sp
+.LP
+\fBddi_prop_update_string_array()\fR
+.sp
+.LP
+Updates or creates a property that is an array of strings. \fIdata\fR must be a
+pointer to a string array with which to update the property. The array of
+strings is formatted as an array of pointers to \fBNULL\fRterminated strings,
+much like the \fIargv\fR argument to \fBexecve\fR(2).
+.sp
+.LP
+\fBddi_prop_update_string()\fR
+.sp
+.LP
+Updates or creates a property that is a single string value. \fIdata\fR must be
+a pointer to a string with which to update the property.
+.sp
+.LP
+\fBddi_prop_update_byte_array()\fR
+.sp
+.LP
+Updates or creates a property that is an array of bytes. \fIdata\fR should be a
+pointer to a byte array with which to update the property.
+.sp
+.LP
+The property update routines may block to allocate memory needed to hold the
+value of the property.
+.SH RETURN VALUES
+.sp
+.LP
+All of the property update routines return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_SUCCESS\fR \fR
+.ad
+.RS 27n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_INVAL_ARG\fR \fR
+.ad
+.RS 27n
+.rt  
+If an attempt is made to update a property with \fIname\fR set to \fINULL\fR or
+\fIname\fR set to the null string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_CANNOT_ENCODE\fR \fR
+.ad
+.RS 27n
+.rt  
+If the bytes of the property cannot be encoded.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can only be called from user or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUpdating Properties
+.sp
+.LP
+The following example demonstrates the use of
+\fBddi_prop_update_int_array()\fR.
+
+.sp
+.in +2
+.nf
+int	options[4];
+
+	/*
+	 * Create the "options" integer array with
+	 * our default values for these parameters
+	 */
+	options[0] = XX_OPTIONS0;
+	options[1] = XX_OPTIONS1;
+	options[2] = XX_OPTIONS2;
+	options[3] = XX_OPTIONS3;
+	i = ddi_prop_update_int_array(xx_dev, xx_dip, "options",
+		&options, sizeof (options) / sizeof (int));
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexecve\fR(2), \fBattach\fR(9E), \fBddi_prop_lookup\fR(9F),
+\fBddi_prop_remove\fR(9F), \fBmakedevice\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,771 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH papiJobSubmit 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.SH NAME
+papiJobSubmit, papiJobSubmitByReference, papiJobValidate, papiJobStreamOpen,
+papiJobStreamWrite, papiJobStreamClose, papiJobQuery, papiJobModify,
+papiJobMove, papiJobCancel, papiJobHold, papiJobRelease, papiJobRestart,
+papiJobPromote, papiJobGetAttributeList, papiJobGetPrinterName, papiJobGetId,
+papiJobGetJobTicket, papiJobFree, papiJobListFree \- job object manipulation
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+
+\fBpapi_status_t\fR \fBpapiJobSubmit\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBpapi_attribute_t **\fR\fIjob_attributes\fR,
+     \fBpapi_job_ticket_t *\fR\fIjob_ticket\fR, \fBchar **\fR\fIfiles\fR,
+     \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobSubmitByReference\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBpapi_attribute_t **\fR\fIjob_attributes\fR,
+     \fBpapi_job_ticket_t *\fR\fIjob_ticket\fR, \fBchar **\fR\fIfiles\fR,
+     \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobValidate\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBpapi_attribute_t **\fR\fIjob_attributes\fR,
+     \fBpapi_job_ticket_t *\fR\fIjob_ticket\fR, \fBchar **\fR\fIfiles\fR,
+     \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobStreamOpen\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBpapi_attribute_t **\fR\fIjob_attributes\fR,
+     \fBpapi_job_ticket_t *\fR\fIjob_ticket\fR, \fBpapi_stream_t *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobStreamWrite\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBpapi_stream_t\fR \fIstream\fR, \fBvoid *\fR\fIbuffer\fR, \fBsize_t\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobStreamClose\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBpapi_stream_t\fR \fIstream\fR, \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobQuery\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR, \fBchar **\fR\fIrequested_attrs\fR,
+     \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobModify\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR,
+     \fBpapi_attribute_t **\fR\fIattributes\fR, \fBpapi_job_t *\fR\fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobMove\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR, \fBchar *\fR\fIdestination\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobCancel\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobHold\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobRelease\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobRestart\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiJobPromote\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIprinter\fR, \fBint32_t\fR \fIjob_id\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_attribute_t **\fR\fBpapiJobGetAttributeList\fR(\fBpapi_job_t\fR \fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBpapiJobGetPrinterName\fR(\fBpapi_job_t\fR \fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBpapiJobGetId\fR(\fBpapi_job_t\fR \fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_job_ticket_t *\fR\fBpapiJobGetJobTicket\fR(\fBpapi_job_t\fR \fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiJobFree\fR(\fBpapi_job_t\fR \fIjob\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiJobListFree\fR(\fBpapi_job_t *\fR\fIjobs\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattributes\fR\fR
+.ad
+.RS 19n
+.rt  
+a set of attributes to be applied to a printer object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuffer\fR\fR
+.ad
+.RS 19n
+.rt  
+a buffer of data to be written to the job stream
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbufflen\fR\fR
+.ad
+.RS 19n
+.rt  
+the size of the supplied buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdestination\fR\fR
+.ad
+.RS 19n
+.rt  
+the name of the printer where a print job should be relocated, which must
+reside within the same print services as the job is currently queued
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfiles\fR\fR
+.ad
+.RS 19n
+.rt  
+files to use during job submission
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a handle to be used for all PAPI operations that is created by
+calling \fBpapiServiceCreate()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob\fR\fR
+.ad
+.RS 19n
+.rt  
+a pointer to a printer object (initialized to NULL) to be filled in by
+\fBpapiJobQuery()\fR, \fBpapiJobSubmit()\fR, \fBpapiJobSubmitByReference()\fR,
+\fBpapiJobValidate()\fR, \fBpapiJobStreamClose()\fR, and \fBpapiJobModify()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob_attributes\fR\fR
+.ad
+.RS 19n
+.rt  
+attributes to apply during job creation or modification
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob_id\fR\fR
+.ad
+.RS 19n
+.rt  
+ID number of the job reported on or manipulated
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob_ticket\fR\fR
+.ad
+.RS 19n
+.rt  
+unused
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjobs\fR\fR
+.ad
+.RS 19n
+.rt  
+a list of job objects returned by \fBpapiPrinterListJobs()\fR or
+\fBpapiPrinterPurgeJobs()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprinter\fR\fR
+.ad
+.RS 19n
+.rt  
+name of the printer where the job is or should reside
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrequested_attrs\fR\fR
+.ad
+.RS 19n
+.rt  
+a null-terminated array of pointers to attribute names requested during job
+enumeration (\fBpapiPrinterListJobs()\fR) or job query (\fBpapiJobQuery()\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstream\fR\fR
+.ad
+.RS 19n
+.rt  
+a communication endpoint for sending print job data
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpapiJobSubmit()\fR function creates a print job containing the passed in
+files with the supplied attributes.  When the function returns, the data in the
+passed files will have been copied by the print service. A job object is
+returned that reflects the state of the job.
+.sp
+.LP
+The \fBpapiJobSubmitByReference()\fR function creates a print job containing
+the passed in files with the supplied attributes.  When the function returns,
+the data in the passed files might have been copied by the print service. A job
+object is returned that reflects the state of the job.
+.sp
+.LP
+The \fBpapiJobStreamOpen()\fR, \fBpapiJobStreamWrite()\fR,
+\fBpapiJobStreamClose()\fR functions create a print job by opening a stream,
+writing to the stream, and closing it.
+.sp
+.LP
+The \fBpapiJobValidate()\fR function validates that the supplied attributes and
+files will result in a valid print job.
+.sp
+.LP
+The \fBpapiJobQuery()\fR function retrieves job information from the print
+service.
+.sp
+.LP
+The \fBpapiJobModify()\fR function modifies a queued job according to the
+attribute list passed into the call.  A job object is returned that reflects
+the state of the job after the modification has been applied.
+.sp
+.LP
+The \fBpapiJobMove()\fR function moves a job from its current queue to the
+named destination within the same print service.
+.sp
+.LP
+The \fBpapiJobCancel()\fR function removes a job from the queue.
+.sp
+.LP
+The \fBpapiJobHold()\fR and \fBpapiJobRelease()\fR functions set the job state
+to "held" or "idle" to indicate whether the job is eligible for processing.
+.sp
+.LP
+The \fBpapiJobRestart()\fR function restarts processing of a currently queued
+print job.
+.sp
+.LP
+The \fBpapiJobGetAttributeList()\fR function returns a list of attributes
+describing the job. This list can be searched and/or enumerated using
+\fBpapiAttributeList*()\fR calls. See \fBpapiAttributeListAddValue\fR(3PAPI).
+.sp
+.LP
+The \fBpapiJobGetPrinterName()\fR function returns the name of the queue where
+the job is currently queued.
+.sp
+.LP
+The \fBpapiJobGetId()\fR function returns a job identifier number from the job
+object passed in.
+.sp
+.LP
+The \fBpapiJobPromote()\fR function moves a job to the head of the print queue.
+.sp
+.LP
+The \fBpapiJobGetJobTicket()\fR function retrieves a pointer to a job ticket
+associated with the job object.
+.sp
+.LP
+The \fBpapiJobFree()\fR and \fBpapiJobListFree()\fR functions deallocate memory
+allocated for the return of printer object(s) from functions that return
+printer objects.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, all \fBpapiJob*()\fR functions that return a value
+return \fBPAPI_OK\fR. Otherwise, they return an appropriate \fBpapi_status_t\fR
+indicating the type of failure.
+.sp
+.LP
+Upon successful completion, \fBpapiJobGetAttributeList()\fR returns a pointer
+to the requested data. Otherwise, it returns \fINULL\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fREnumerate all jobs in a queue
+.sp
+.in +2
+.nf
+/*
+ * program to enumerate queued jobs using PAPI interfaces.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
+#include <pwd.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user, 
+                  svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    papi_status_t status;
+    papi_service_t svc = NULL;
+    papi_job_t *jobs = NULL;
+    char *svc_name = NULL;
+    char *pname = "unknown";
+    int c;
+
+    while ((c = getopt(ac, av, "s:p:")) != EOF)
+        switch (c) {
+        case 's':
+            svc_name = optarg;
+            break;
+        case 'p':
+            pname = optarg;
+            break;
+        }
+
+    status = papiServiceCreate(&svc, svc_name, NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name :
+                     "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    status = papiPrinterListJobs(svc, pname, NULL, 0, 0, &jobs);
+    if (status != PAPI_OK) {
+        printf("papiPrinterListJobs(%s): %s\n", pname,
+                    papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    if (jobs != NULL) {
+        int i;
+
+        for (i = 0; jobs[i] != NULL; i++) {
+            papi_attribute_t **list = papiJobGetAttributeList(jobs[i]);
+
+            if (list != NULL) {
+                char *name = "unknown";
+                            int32_t id = 0;
+                char *buffer = NULL;
+                size_t size = 0;
+
+               (void) papiAttributeListGetString(list, NULL,
+                                    "printer-name", &name);
+               (void) papiAttributeListGetInteger(list, NULL,
+                                    "job-id", &id);
+                while (papiAttributeListToString(list, "\n\t", buffer, 
+                            size) != PAPI_OK)
+                    buffer = realloc(buffer, size += BUFSIZ);
+
+                printf("%s-%d:\n\t%s\n", name, id, buffer);
+                free(buffer);
+            }
+        }
+        papiJobListFree(jobs);
+    }
+
+    papiServiceDestroy(svc);
+
+    exit(0);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRDump all job attributes.
+.sp
+.in +2
+.nf
+/*
+ * program to dump a queued job's attributes using PAPI interfaces.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
+#include <pwd.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user,
+                     svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    papi_status_t status;
+    papi_service_t svc = NULL;
+    papi_job_t job = NULL;
+    char *svc_name = NULL;
+    char *pname = "unknown";
+    int id = 0;
+    int c;
+
+    while ((c = getopt(ac, av, "s:p:j:")) != EOF)
+        switch (c) {
+        case 's':
+            svc_name = optarg;
+            break;
+        case 'p':
+            pname = optarg;
+            break;
+        case 'j':
+            id = atoi(optarg);
+            break;
+        }
+
+    status = papiServiceCreate(&svc, svc_name, NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name :
+                     "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    status = papiJobQuery(svc, pname, id, NULL, &job);
+    if ((status == PAPI_OK) && (job != NULL)) {
+        papi_attribute_t **list = papiJobGetAttributeList(job);
+
+        if (list != NULL) {
+            char *name = "unknown";
+            int32_t id = 0;
+            char *buffer = NULL;
+            size_t size = 0;
+
+            (void) papiAttributeListGetString(list, NULL,
+                                    "printer-name", &name);
+            (void) papiAttributeListGetInteger(list, NULL,
+                                    "job-id", &id);
+            while (papiAttributeListToString(list, "\n\t", buffer, size)
+                            != PAPI_OK)
+                buffer = realloc(buffer, size += BUFSIZ);
+
+            printf("%s-%d:\n\t%s\n", name, id, buffer);
+            free(buffer);
+        }
+    } else
+        printf("papiJobQuery(%s-%d): %s\n", pname, id,
+                    papiStatusString(status));
+
+    papiJobFree(job);
+    papiServiceDestroy(svc);
+
+    exit(0);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRSubmit a job (stream).
+.sp
+.in +2
+.nf
+/*
+ * program to submit a job from standard input.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
+#include <pwd.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user, 
+                    svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    papi_status_t status;
+    papi_service_t svc = NULL;
+    papi_stream_t stream = NULL;
+    papi_job_t job = NULL;
+    papi_attribute_t **attrs = NULL;
+    char *svc_name = NULL;
+    char *pname = "unknown";
+    int id = 0;
+    int c;
+    int rc;
+    char buf[BUFSIZ];
+
+    while ((c = getopt(ac, av, "s:p:")) != EOF)
+        switch (c) {
+        case 's':
+            svc_name = optarg;
+            break;
+        case 'p':
+            pname = optarg;
+            break;
+        }
+
+    status = papiServiceCreate(&svc, svc_name, NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name : 
+                    "NULL", papiStatusString(status));
+        papiServiceDestroy(svc);
+        exit(1);
+    }
+
+    papiAttributeListAddInteger(&attrs, PAPI_ATTR_EXCL, "copies", 1);
+    papiAttributeListAddString(&attrs, PAPI_ATTR_EXCL,
+                "document-format", "application/octet-stream");
+    papiAttributeListAddString(&attrs, PAPI_ATTR_EXCL,
+                "job-title", "Standard Input");
+
+    status = papiJobStreamOpen(svc, pname, attrs, NULL, &stream);
+    while ((status == PAPI_OK) && ((rc = read(0, buf, 
+                     sizeof (buf))) > 0))
+            status = papiJobStreamWrite(svc, stream, buf, rc);
+
+    if (status == PAPI_OK)
+            status = papiJobStreamClose(svc, stream, &job);
+
+
+    if ((status == PAPI_OK) && (job != NULL)) {
+        papi_attribute_t **list = papiJobGetAttributeList(job);
+
+        if (list != NULL) {
+            char *name = "unknown";
+            int32_t id = 0;
+            char *buffer = NULL;
+            size_t size = 0;
+
+            (void) papiAttributeListGetString(list, NULL,
+                                    "printer-name", &name);
+            (void) papiAttributeListGetInteger(list, NULL,
+                                    "job-id", &id);
+            while (papiAttributeListToString(list, "\n\t", buffer, size)
+                            != PAPI_OK)
+                buffer = realloc(buffer, size += BUFSIZ);
+
+            printf("%s-%d:\n\t%s\n", name, id, buffer);
+            free(buffer);
+        }
+    } else
+        printf("papiJobStream*(%s-%d): %s\n", pname, id,
+                    papiStatusString(status));
+
+    papiJobFree(job);
+    papiServiceDestroy(svc);
+
+    exit(0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpapi\fR(3LIB), \fBpapiAttributeListAddValue\fR(3PAPI),
+\fBattributes\fR(5)

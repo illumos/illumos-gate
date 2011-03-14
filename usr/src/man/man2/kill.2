@@ -1,0 +1,145 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kill 2 "22 Mar 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+kill \- send a signal to a process or a group of processes
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <signal.h>
+
+\fBint\fR \fBkill\fR(\fBpid_t\fR \fIpid\fR, \fBint\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkill()\fR function sends a signal to a process or a group of processes.
+The process or group of processes to which the signal is to be sent is
+specified by \fIpid\fR. The signal that is to be sent is specified by \fIsig\fR
+and is either one from the list given in \fBsignal\fR (see
+\fBsignal.h\fR(3HEAD)), or 0. If \fIsig\fR is 0 (the null signal), error
+checking is performed but no signal is actually sent. This can be used to check
+the validity of \fIpid\fR.
+.sp
+.LP
+The real or effective user ID of the sending process must match the real or
+saved (from one of functions in the \fBexec\fR(2) family) user ID of the
+receiving process, unless the privilege {\fBPRIV_PROC_OWNER\fR} is asserted in
+the effective set of the sending process (see \fBIntro\fR(2)), or \fIsig\fR is
+\fBSIGCONT\fR and the sending process has the same session \fBID\fR as the
+receiving process. A process needs the basic privilege
+{\fBPRIV_PROC_SESSION\fR} to send signals to a process with a different session
+ID. See \fBprivileges\fR(5).
+.sp
+.LP
+If \fIpid\fR is greater than 0, \fIsig\fR will be sent to the process whose
+process ID is equal to  \fIpid\fR.
+.sp
+.LP
+If \fIpid\fR is negative but not \fB(pid_t)\(mi1\fR, \fIsig\fR will be sent to
+all processes whose process group ID is equal to the absolute value of
+\fIpid\fR and for which the process has permission to send a signal.
+.sp
+.LP
+If \fIpid\fR is 0, \fIsig\fR will be sent to all processes excluding special
+processes (see \fBIntro\fR(2)) whose process group ID is equal to the process
+group ID of the sender.
+.sp
+.LP
+If \fIpid\fR is \fB(pid_t)\(mi1\fR and the {\fBPRIV_PROC_OWNER\fR} privilege is
+not asserted in the effective set of the sending process, \fIsig\fR will be
+sent to all processes excluding special processes whose real user ID is equal
+to the effective user \fBID\fR of the sender.
+.sp
+.LP
+If \fIpid\fR is \fB(pid_t)\(mi1\fR and the {\fBPRIV_PROC_OWNER\fR} privilege is
+asserted in the effective set of the sending process, \fIsig\fR will be sent to
+all processes excluding special processes.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise, \(mi1 is returned, no
+signal is sent, and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBkill()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsig\fR argument is not a valid signal number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsig\fR argument is \fBSIGKILL\fR and the \fIpid\fR argument is
+\fB(pid_t)-1\fR (that is, the calling process does not have permission to send
+the signal to any of the processes specified by \fIpid\fR).
+.sp
+The effective user of the calling process does not match the real or saved user
+and the calling process does not have the {\fBPRIV_PROC_OWNER\fR} privilege
+asserted in the effective set, and the calling process either is not sending
+\fBSIGCONT\fR to a process that shares the same session \fBID\fR or does not
+have the {\fBPRIV_PROC_SESSION\fR} privilege asserted and is trying to send a
+signal to a process with a different session ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+No process or process group can be found corresponding to that specified by
+\fIpid\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsigsend\fR(2) function provides a more versatile way to send signals to
+processes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBIntro\fR(2), \fBexec\fR(2), \fBgetpid\fR(2), \fBgetsid\fR(2),
+\fBsetpgrp\fR(2), \fBsigaction\fR(2), \fBsigsend\fR(2), \fBsignal\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBprivileges\fR(5),
+\fBstandards\fR(5)

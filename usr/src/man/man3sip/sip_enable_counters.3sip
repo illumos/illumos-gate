@@ -1,0 +1,173 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_enable_counters 3SIP "11 Jan 2008" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_enable_counters, sip_disable_counters, sip_get_counter_value \- counter
+operations
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -\fBlsip\fR [ \fIlibrary\fR... ]
+#include <sip.h>
+
+\fBint\fR \fBsip_enable_counters\fR(\fBint\fR \fIcounter_group\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_disable_counters\fR(\fBint\fR \fIcounter_group\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_get_counter_value\fR(\fBint\fR \fIgroup\fR, \fBint\fR \fIcounter\fR, \fBvoid *\fR\fIcounterval\fR,
+     \fBsize_t\fR \fIcounterlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_enable_counters()\fR function enables the measurement and counting
+of the selected counter group. The only allowed value for the
+\fIcounter_group\fR is \fBSIP_TRAFFIC_COUNTERS\fR, which is defined in
+\fB<sip.h>\fR. Once enabled, the SIP stack starts measuring end-to-end SIP
+traffic. The SIP stack keeps track of:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the number of SIP requests sent and received (broken down by methods),
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the number of SIP responses sent and received (broken down by response codes),
+and
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the number of bytes sent and received.
+.RE
+.sp
+.LP
+The following counters are defined in \fB<sip.h>\fR for the
+\fBSIP_TRAFFIC_COUNTERS\fR group. These counter values are retrieved using the
+\fBsip_get_counter_value()\fR function.
+.sp
+.in +2
+.nf
+SIP_TOTAL_BYTES_RCVD
+SIP_TOTAL_BYTES_SENT
+SIP_TOTAL_REQ_RCVD
+SIP_TOTAL_REQ_SENT
+SIP_TOTAL_RESP_RCVD
+SIP_TOTAL_RESP_SENT
+SIP_ACK_REQ_RCVD
+SIP_ACK_REQ_SENT
+SIP_BYE_REQ_RCVD
+SIP_BYE_REQ_SENT
+SIP_CANCEL_REQ_RCVD
+SIP_CANCEL_REQ_SENT
+SIP_INFO_REQ_RCVD
+SIP_INFO_REQ_SENT
+SIP_INVITE_REQ_RCVD
+SIP_INVITE_REQ_SENT
+SIP_NOTIFY_REQ_RCVD
+SIP_NOTIFY_REQ_SENT
+SIP_OPTIONS_REQ_RCVD
+SIP_OPTIONS_REQ_SENT
+SIP_PRACK_REQ_RCVD
+SIP_PRACK_REQ_SENT
+SIP_REFER_REQ_RCVD
+SIP_REFER_REQ_SENT
+SIP_REGISTER_REQ_RCVD
+SIP_REGISTER_REQ_SENT
+SIP_SUBSCRIBE_REQ_RCVD
+SIP_SUBSCRIBE_REQ_SENT
+SIP_UPDATE_REQ_RCVD
+SIP_UPDATE_REQ_SENT
+SIP_1XX_RESP_RCVD
+SIP_1XX_RESP_SENT
+SIP_2XX_RESP_RCVD
+SIP_2XX_RESP_SENT
+SIP_3XX_RESP_RCVD
+SIP_3XX_RESP_SENT
+SIP_4XX_RESP_RCVD
+SIP_4XX_RESP_SENT
+SIP_5XX_RESP_RCVD
+SIP_5XX_RESP_SENT
+SIP_6XX_RESP_RCVD
+SIP_6xx_RESP_SENT
+SIP_COUNTER_START_TIME  /* records time when counting was enabled */
+SIP_COUNTER_STOP_TIME   /* records time when counting was disabled */
+.fi
+.in -2
+
+.sp
+.LP
+All of the above counters are defined to be \fBuint64_t\fR, except for
+\fBSIP_COUNTER_START_TIME\fR and \fBSIP_COUNTER_STOP_TIME\fR, which are defined
+to be \fBtime_t\fR.
+.sp
+.LP
+The \fBsip_disable_counters()\fR function disables measurement and counting for
+the specified \fIcounter_group\fR. When disabled, the counter values are not
+reset and are retained until the measurement is enabled again. Calling
+\fBsip_enable_counters()\fR again would reset all counter values to zero and
+counting would start afresh.
+.sp
+.LP
+The \fBsip_get_counter_value()\fR function retrieves the value of the specified
+counter within the specified counter group. The value is copied to the user
+provided buffer, \fIcounterval\fR, of length \fIcounterlen\fR. For example,
+after the following call, \fIinvite_rcvd\fR would have the correct value.
+.sp
+.in +2
+.nf
+uint64_t invite_rcvd;
+
+sip_get_counter_value(SIP_TRAFFIC_COUNTERS, SIP_INVITE_REQ_RCVD,
+        &invite_rcvd, sizeof (uint64_t));
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsip_enable_counters()\fR and
+\fBsip_disable_counters()\fR return 0. They will return \fBEINVAL\fR if an
+incorrect group is specified.
+.sp
+.LP
+Upon successful completion, \fBsip_get_counter_value()\fR returns 0. It
+returns \fBEINVAL\fR if an incorrect counter name or counter size is specified,
+or if \fIcounterval\fR is \fINULL\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_get_dn 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_get_dn, ldap_explode_dn, ldap_dn2ufn, ldap_is_dns_dn, ldap_explode_dns,
+ldap_dns_to_dn \- LDAP DN handling functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBchar *\fR\fBldap_get_dn\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*entry\fR);
+.fi
+
+.LP
+.nf
+\fBchar **\fR\fBldap_explode_dn\fR(\fBchar\fR \fI*dn\fR, \fBint\fR \fInotypes\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBldap_dn2ufn\fR(\fBchar\fR \fI*dn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_is_dns_dn\fR(\fBchar\fR \fI*dn\fR);
+.fi
+
+.LP
+.nf
+\fBchar **\fR\fBldap_explode_dns\fR(\fBchar\fR \fI*dn\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBldap_dns_to_dn\fR(\fBchar\fR \fI*dns_name\fR, \fBint\fR \fI*nameparts\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions allow LDAP entry names (Distinguished Names, or DNs) to be
+obtained, parsed, converted to a user-friendly form, and tested. A DN has the
+form described in RFC 1779  \fIA String Representation of Distinguished
+Names\fR, unless it is an experimental DNS-style DN which takes the form of an
+\fIRFC 822\fR mail address.
+.sp
+.LP
+The \fBldap_get_dn()\fR function takes an \fIentry\fR as returned by
+\fBldap_first_entry\fR(3LDAP) or \fBldap_next_entry\fR(3LDAP) and returns a
+copy of the entry's DN.  Space for the DN will have been obtained by means of
+\fBmalloc\fR(3C), and should be freed by the caller by a call to
+\fBfree\fR(3C).
+.sp
+.LP
+The \fBldap_explode_dn()\fR function takes a DN as returned by
+\fBldap_get_dn()\fR and breaks it up into its component parts.  Each part is
+known as a Relative Distinguished Name, or RDN. \fBldap_explode_dn()\fR returns
+a null-terminated array, each component of which contains an RDN from the DN.
+The \fInotypes\fR parameter is used to request that only the RDN values be
+returned, not their types.  For example, the DN "cn=Bob, c=US" would return as
+either { "cn=Bob", "c=US", NULL } or { "Bob", "US", NULL }, depending on
+whether notypes was 0 or 1, respectively. The result can be freed by calling
+\fBldap_value_free\fR(3LDAP).
+.sp
+.LP
+\fBldap_dn2ufn()\fR is used to turn a DN as returned by \fBldap_get_dn()\fR
+into a more user-friendly form, stripping off type names.  See \fIRFC 1781\fR
+"Using the Directory to Achieve User Friendly Naming" for more details on the
+UFN format.  The space for the UFN returned is obtained by a call to
+\fBmalloc\fR(3C), and the user is responsible for freeing it by means of a call
+to \fBfree\fR(3C).
+.sp
+.LP
+\fBldap_is_dns_dn()\fR returns non-zero if the dn string is an experimental
+DNS-style DN (generally in the form of an \fIRFC 822\fR e-mail address).  It
+returns zero if the dn appears to be an \fIRFC 1779\fR format DN.
+.sp
+.LP
+\fBldap_explode_dns()\fR takes a DNS-style DN and breaks it up into its
+component parts. \fBldap_explode_dns()\fR returns a null-terminated array. For
+example, the DN "mcs.umich.edu" will return { "mcs", "umich", "edu", NULL }.
+The result can be freed by calling \fBldap_value_free\fR(3LDAP).
+.sp
+.LP
+\fBldap_dns_to_dn()\fR converts a DNS domain name into an X.500 distinguished
+name. A string distinguished name and the number of nameparts is returned.
+.SH ERRORS
+.sp
+.LP
+If an error occurs in \fBldap_get_dn()\fR, \fINULL\fR is returned and the
+\fBld_errno\fR field in the \fIld\fR parameter is set to indicate the error.
+See \fBldap_error\fR(3LDAP) for a description of possible error codes.
+\fBldap_explode_dn()\fR, \fBldap_explode_dns()\fR and \fBldap_dn2ufn()\fR will
+return  \fINULL\fR with \fBerrno\fR(3C) set appropriately in case of trouble.
+.sp
+.LP
+If an error in \fBldap_dns_to_dn()\fR is encountered zero is returned. The
+caller should free the returned string if it is non-zero.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_first_entry\fR(3LDAP), \fBldap_error\fR(3LDAP),
+\fBldap_value_free\fR(3LDAP)
+.SH NOTES
+.sp
+.LP
+These functions allocate memory that the caller must free.

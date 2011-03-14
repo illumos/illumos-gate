@@ -1,0 +1,433 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH read 1 "18 Dec 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+read \- read a line from standard input
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/read\fR [\fB-r\fR] \fIvar\fR...
+.fi
+
+.SS "sh"
+.LP
+.nf
+\fBread\fR \fIname\fR...
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBset\fR \fIvariable\fR= $<
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBread\fR [\fB-prsu\fR [\fIn\fR]] [\fIname\fR ? \fIprompt\fR] [\fIname\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBread\fR [\fB-Aprs\fR] [\fB-d\fR \fIdelim\fR] [\fB-n\fR \fInsize\fR] [\fB-N\fR \fInsize\fR] [\fB-t\fR \fItimeout\fR][\fB-u\fR \fIunit\fR] [\fIvname\fR\fB?\fR\fIprompt\fR] [\fIvname\fR... ]
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/read"
+.sp
+.LP
+The \fBread\fR utility reads a single line from standard input.
+.sp
+.LP
+By default, unless the \fB-r\fR option is specified, backslash (\fB\e\fR) acts
+as an escape character. If standard input is a terminal device and the invoking
+shell is interactive, \fBread\fR prompts for a continuation line when:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The shell reads an input line ending with a backslash, unless the \fB-r\fR
+option is specified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A here-document is not terminated after a \fBNEWLINE\fR character is entered.
+.RE
+.sp
+.LP
+The line is split into fields as in the shell. The first field is assigned to
+the first variable \fIvar\fR, the second field to the second variable
+\fIvar\fR, and so forth. If there are fewer \fIvar\fR operands specified than
+there are fields, the leftover fields and their intervening separators is
+assigned to the last \fIvar\fR. If there are fewer fields than \fIvar\fRs, the
+remaining \fIvar\fRs is set to empty strings.
+.sp
+.LP
+The setting of variables specified by the \fIvar\fR operands affects the
+current shell execution environment. If it is called in a sub-shell or separate
+utility execution environment, such as one of the following:
+.sp
+.in +2
+.nf
+\fB(read foo)
+nohup read ...
+find . -exec read ... \e;\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+it does not affect the shell variables in the caller's environment.
+.sp
+.LP
+The standard input must be a text file.
+.SS "sh"
+.sp
+.LP
+One line is read from the standard input and, using the internal field
+separator, \fBIFS\fR (normally space or tab), to delimit word boundaries, the
+first word is assigned to the first \fIname\fR, the second word to the second
+\fIname\fR, and so on, with leftover words assigned to the last \fIname\fR.
+Lines can be continued using \fB\enewline\fR\&. Characters other than
+\fBNEWLINE\fR can be quoted by preceding them with a backslash. These
+backslashes are removed before words are assigned to \fInames\fR, and no
+interpretation is done on the character that follows the backslash. The return
+code is \fB0\fR, unless an end-of-file is encountered.
+.SS "csh"
+.sp
+.LP
+The notation:
+.sp
+.in +2
+.nf
+set \fIvariable\fR \fB= $<\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+loads one line of standard input as the value for \fIvariable\fR. (See
+\fBcsh\fR(1)).
+.SS "ksh"
+.sp
+.LP
+The shell input mechanism. One line is read and is broken up into fields using
+the characters in \fBIFS\fR as separators. The escape character, \fB(\e)\fR, is
+used to remove any special meaning for the next character and for line
+continuation. In raw mode, the \fB-r\fR, the \fB,\fR and the \fB\e\fR character
+are not treated specially. The first field is assigned to the first \fIname\fR,
+the second field to the second \fIname\fR, and so on, with leftover fields
+assigned to the last \fIname\fR. The \fB-p\fR option causes the input line to
+be taken from the input pipe of a process spawned by the shell using \fB|&\fR.
+If the \fB-s\fR flag is present, the input is saved as a command in the history
+file. The flag \fB-u\fR can be used to specify a one digit file descriptor unit
+\fIn\fR to read from. The file descriptor can be opened with the \fBexec\fR
+special command. The default value of \fIn\fR is \fB0\fR. If \fIname\fR is
+omitted, \fBREPLY\fR is used as the default \fIname\fR. The exit status is
+\fB0\fR unless the input file is not open for reading or an end-of-file is
+encountered. An end-of-file with the \fB-p\fR option causes cleanup for this
+process so that another can be spawned. If the first argument contains a
+\fB?\fR, the remainder of this word is used as a \fIprompt\fR on standard error
+when the shell is interactive. The exit status is \fB0\fR unless an end-of-file
+is encountered.
+.SS "ksh93"
+.sp
+.LP
+\fBread\fR reads a line from standard input and breaks it into fields using the
+characters in the value of the \fBIFS\fR variable as separators. The escape
+character, \fB\e\fR, is used to remove any special meaning for the next
+character and for line continuation unless the \fB-r\fR option is specified.
+.sp
+.LP
+If there are more variables than fields, the remaining variables are set to
+empty strings. If there are fewer variables than fields, the leftover fields
+and their intervening separators are assigned to the last variable. If no
+\fIvar\fR is specified, the variable \fBREPLY\fR is used.
+.sp
+.LP
+When \fIvar\fR has the binary attribute and \fB-n\fR or \fB-N\fR is specified,
+the bytes that are read are stored directly into \fIvar\fR.
+.sp
+.LP
+If you specify \fB?\fR\fIprompt\fR after the first \fIvar\fR, \fBread\fR
+displays a prompt on standard error when standard input is a terminal or pipe.
+.SH OPTIONS
+.SS "/usr/bin/read, ksh"
+.sp
+.LP
+The following option is supported by \fB/usr/bin/read\fR and \fBksh\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not treat a backslash character in any special way. Considers each backslash
+to be part of the input line.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.RS 14n
+.rt  
+Unset \fIvar\fR, and create an indexed array containing each field in the line
+starting at index \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdelim\fR\fR
+.ad
+.RS 14n
+.rt  
+Read until delimiter \fIdelim\fR instead of to the end of line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fInsize\fR\fR
+.ad
+.RS 14n
+.rt  
+Read at most \fInsize\fR bytes. Binary field size is in bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fInsize\fR\fR
+.ad
+.RS 14n
+.rt  
+Read exactly \fInsize\fR bytes. Binary field size is in bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 14n
+.rt  
+Read from the current co-process instead of standard input. An end of file
+causes \fBread\fR to disconnect the co-process so that another can be created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 14n
+.rt  
+Do not treat \fB\e\fR specially when processing the input line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 14n
+.rt  
+Save a copy of the input as an entry in the shell history file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItimeout\fR\fR
+.ad
+.RS 14n
+.rt  
+Specify a \fItimeout\fR in seconds when reading from a terminal or pipe.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIfd\fR\fR
+.ad
+.RS 14n
+.rt  
+Read from file descriptor number \fIfd\fR instead of standard input. The
+default value is \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 14n
+.rt  
+When reading from a terminal, display the value of the first variable and use
+it as a default value.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvar\fR\fR
+.ad
+.RS 7n
+.rt  
+The name of an existing or non-existing shell variable.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBread\fR Command
+.sp
+.LP
+The following example for \fB/usr/bin/read\fR prints a file with the first
+field of each line moved to the end of the line:
+
+.sp
+.in +2
+.nf
+example% \fBwhile read -r xx yy
+do
+        printf "%s %s\en" "$yy" "$xx"
+done < input_file\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBread\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIFS\fR\fR
+.ad
+.RS 7n
+.rt  
+Determines the internal field separators used to delimit fields.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS2\fR\fR
+.ad
+.RS 7n
+.rt  
+Provides the prompt string that an interactive shell writes to standard error
+when a line ending with a backslash is read and the \fB-r\fR option was not
+specified, or if a here-document is not terminated after a NEWLINE character is
+entered.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+End-of-file was detected or an error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/read, csh, ksh, sh"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBline\fR(1), \fBset\fR(1),
+\fBsh\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

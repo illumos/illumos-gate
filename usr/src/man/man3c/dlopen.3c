@@ -1,0 +1,401 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlopen 3C "4 Feb 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+dlopen, dlmopen \- gain access to an executable object file
+.SH SYNOPSIS
+.LP
+.nf
+#include <dlfcn.h>
+#include <link.h>
+
+\fBvoid *\fR \fBdlopen\fR(\fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR \fBdlmopen\fR(\fBLmid_t\fR \fIlmid\fR, \fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlopen()\fR function makes an executable object file available to a
+running process. \fBdlopen()\fR returns to the process a \fIhandle\fR that the
+process can use on subsequent calls to \fBdlsym\fR(3C), \fBdladdr\fR(3C),
+\fBdlinfo\fR(3C), and \fBdlclose\fR(3C). The value of this \fIhandle\fR should
+not be interpreted in any way by the process. The \fIpathname\fR argument is
+the path name of the object to be opened. A path name containing an embedded
+\fB\&'/'\fR is interpreted as an absolute path or relative to the current
+directory. Otherwise, the set of search paths currently in effect by the
+runtime linker are used to locate the specified file. See \fBNOTES\fR.
+.sp
+.LP
+The \fBdlopen()\fR function also loads any dependencies recorded within
+\fIpathname\fR. These dependencies are searched in the order in which the
+dependencies were loaded to locate any additional dependencies. This process
+continues until all the dependencies of \fIpathname\fR are loaded. This
+dependency tree is referred to as a group.
+.sp
+.LP
+If the value of \fIpathname\fR is \fB0\fR, \fBdlopen()\fR provides a
+\fIhandle\fR on a set of global symbol objects. These objects consist of the
+original program image file, any dependencies loaded at program startup, and
+any objects loaded using \fBdlopen()\fR with the \fBRTLD_GLOBAL\fR flag.
+Because the latter set of objects can change during process execution, the set
+identified by \fIhandle\fR can also change dynamically.
+.sp
+.LP
+The \fImode\fR argument describes how \fBdlopen()\fR operates on \fIpathname\fR
+with respect to the processing of reference relocations. The \fImode\fR also
+affects the scope of visibility of the symbols provided by \fIpathname\fR and
+its dependencies. This visibility can affect how the resulting \fIhandle\fR is
+used.
+.sp
+.LP
+When an object is loaded, the object can contain references to symbols whose
+addresses are not known until the object is loaded. These references must be
+relocated before the symbols can be accessed. References are categorized as
+either \fBimmediate\fR or \fBlazy\fR. Immediate references are typically
+references to data items used by the object code. Immediate references include
+pointers to functions and calls to functions made from position-dependent
+shared objects. Lazy references are typically calls to global functions that
+are made from position-independent shared objects. The \fImode\fR argument
+governs when these references take place. The \fImode\fR argument can be one of
+the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_LAZY\fR\fR
+.ad
+.RS 13n
+.rt  
+Only immediate symbol references are relocated when the object is first loaded.
+Lazy references are not relocated until a given function is called for the
+first time. This value for \fImode\fR should improve performance, since a
+process might not require all lazy references in any given object. This
+behavior mimics the normal loading of dependencies during process
+initialization. See \fBNOTES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_NOW\fR\fR
+.ad
+.RS 13n
+.rt  
+All necessary relocations are performed when the object is first loaded. This
+process might waste some processing if relocations are performed for lazy
+references that are never used. However, this mode ensures that when an object
+is loaded, all symbols referenced during execution are available. This behavior
+mimics the loading of dependencies when the environment variable
+\fBLD_BIND_NOW\fR is in effect.
+.RE
+
+.sp
+.LP
+See the \fILinker and Libraries Guide\fR for more information about symbol
+references.
+.sp
+.LP
+The visibility of symbols that are available for relocation can be affected by
+\fImode\fR. To specify the scope of visibility for symbols that are loaded with
+a \fBdlopen()\fR call, \fImode\fR should be a bitwise-inclusive OR with one of
+the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_GLOBAL\fR\fR
+.ad
+.RS 15n
+.rt  
+The object's global symbols are made available for the relocation processing of
+any other object. In addition, symbol lookup using \fBdlopen(0,\fR
+\fImode\fR\fB)\fR and an associated \fBdlsym()\fR allows objects that are
+loaded with \fBRTLD_GLOBAL\fR to be searched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_LOCAL\fR\fR
+.ad
+.RS 15n
+.rt  
+The object's globals symbols are only available for the relocation processing
+of other objects that include the same group.
+.RE
+
+.sp
+.LP
+The program image file and any objects loaded at program startup have the mode
+\fBRTLD_GLOBAL\fR. The mode \fBRTLD_LOCAL\fR is the default mode for any
+objects that are acquired with \fBdlopen()\fR. A local object can be a
+dependency of more then one group. Any object of mode \fBRTLD_LOCAL\fR that is
+referenced as a dependency of an object of mode \fBRTLD_GLOBAL\fR is promoted
+to \fBRTLD_GLOBAL\fR. In other words, the \fBRTLD_LOCAL\fR mode is ignored.
+.sp
+.LP
+Any object loaded by \fBdlopen()\fR that requires relocations against global
+symbols can reference the symbols in any \fBRTLD_GLOBAL\fR object. Objects of
+this mode are at least the program image file and any objects loaded at program
+startup. A loaded object can also reference symbols from itself, and from any
+dependencies the object references. However, the \fImode\fR parameter can also
+be a bitwise-inclusive \fBOR\fR with one of the following values to affect the
+scope of symbol availability:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_GROUP\fR\fR
+.ad
+.RS 15n
+.rt  
+Only symbols from the associated group are made available for relocation. A
+group is established from the defined object and all the dependencies of that
+object. A group must be completely self-contained. All dependency relationships
+between the members of the group must be sufficient to satisfy the relocation
+requirements of each object that defines the group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_PARENT\fR\fR
+.ad
+.RS 15n
+.rt  
+The symbols of the object initiating the \fBdlopen()\fR call are made available
+to the objects obtained by \fBdlopen()\fR. This option is useful when
+hierarchical \fBdlopen()\fR families are created. Although the parent object
+can supply symbols for the relocation of this object, the parent object is not
+available to \fBdlsym()\fR through the returned \fIhandle\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_WORLD\fR\fR
+.ad
+.RS 15n
+.rt  
+Only symbols from \fBRTLD_GLOBAL\fR objects are made available for relocation.
+.RE
+
+.sp
+.LP
+The default modes for \fBdlopen()\fR are both \fBRTLD_WORLD\fR and
+\fBRTLD_GROUP\fR. If an object is requires additional modes, the \fImode\fR
+parameter can be the bitwise-inclusive OR of the required modes together with
+the default modes.
+.sp
+.LP
+The following modes provide additional capabilities outside of relocation
+processing:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_NODELETE\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified object is tagged to prevent its deletion from the address space
+as part of a \fBdlclose()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_NOLOAD\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified object is not loaded as part of the \fBdlopen()\fR. However, a
+valid \fIhandle\fR is returned if the object already exists as part of the
+process address space. Additional modes can be specified as a bitwise-inclusive
+OR with the present mode of the object and its dependencies. The
+\fBRTLD_NOLOAD\fR mode provides a means of querying the presence or promoting
+the modes of an existing dependency.
+.RE
+
+.sp
+.LP
+The default use of a \fIhandle\fR with \fBdlsym()\fR allows a symbol search to
+inspect all objects that are associated with the group of objects that are
+loaded from \fBdlopen()\fR. The \fImode\fR parameter can also be a
+bitwise-inclusive OR with the following value to restrict this symbol search:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_FIRST\fR\fR
+.ad
+.RS 14n
+.rt  
+Use of this \fIhandle\fR with \fBdlsym()\fR, restricts the symbol search to the
+first object associated with the \fIhandle\fR.
+.RE
+
+.sp
+.LP
+An object can be accessed from a process both with and without
+\fBRTLD_FIRST\fR. Although the object will only be loaded once, two different
+\fIhandle\fRs are created to provide for the different \fBdlsym()\fR
+requirements.
+.sp
+.LP
+The \fBdlmopen()\fR function is identical to \fBdlopen()\fR, except that an
+identifying link-map ID \fI(lmid)\fR is provided. This link-map ID informs the
+dynamic linking facilities upon which link-map list to load the object. See the
+\fILinker and Libraries Guide\fR for details about link-maps.
+.sp
+.LP
+The \fIlmid\fR passed to \fBdlmopen()\fR identifies the link-map list on which
+the object is loaded. This parameter can be any valid \fBLmid_t\fR returned by
+\fBdlinfo()\fR or one of the following special values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLM_ID_BASE\fR\fR
+.ad
+.RS 15n
+.rt  
+Load the object on the applications link-map list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLM_ID_LDSO\fR\fR
+.ad
+.RS 15n
+.rt  
+Load the object on the dynamic linkers (\fBld.so.1\fR) link-map list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLM_ID_NEWLM\fR\fR
+.ad
+.RS 15n
+.rt  
+Cause the object to create a new link-map list as part of loading. Objects that
+are opened on a new link-map list must express all of their dependencies.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdlopen()\fR function returns \fINULL\fR if \fIpathname\fR cannot be
+found, cannot be opened for reading, or is not a shared object or a relocatable
+object. \fBdlopen()\fR also returns \fINULL\fR if an error occurs during the
+process of loading \fIpathname\fR or relocating its symbolic references. See
+\fBNOTES\fR. Additional diagnostic information is available through
+\fBdlerror()\fR.
+.SH USAGE
+.sp
+.LP
+The \fBdlopen()\fR and \fBdlmopen()\fR functions are members of a family of
+functions that give the user direct access to the dynamic linking facilities.
+This family of functions is available only to dynamically-linked processes. See
+the \fILinker and Libraries Guide\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT\(miLevelMT\(miSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld\fR(1), \fBld.so.1\fR(1), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
+\fBdldump\fR(3C), \fBdlerror\fR(3C), \fBdlinfo\fR(3C), \fBdlsym\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH NOTES
+.sp
+.LP
+If \fIpathname\fR has dependencies on other objects, these objects are
+automatically loaded by \fBdlopen()\fR. The directory search path used to find
+\fIpathname\fR and any dependencies can be affected by setting the environment
+variable \fBLD_LIBRARY_PATH\fR. Any \fBLD_LIBRARY_PATH\fR variable is analyzed
+once at process startup. The search path can also be affected from a runpath
+setting within the object from which the call to \fBdlopen()\fR originates.
+These search rules will only be applied to path names that do not contain an
+embedded \fB\&'/'\fR. Objects whose names resolve to the same absolute path
+name or relative path name can be opened any number of times using
+\fBdlopen()\fR. However, the object that is referenced will only be loaded once
+into the address space of the current process.
+.sp
+.LP
+When loading shared objects, the application should open a specific version of
+the shared object. Do not rely on the version of the shared object pointed to
+by the symbolic link.
+.sp
+.LP
+When building objects to be loaded on a new link-map list, some precautions
+need to be taken. In general, all dependencies must be included when building
+an object. Also, include \fB/usr/lib/libmapmalloc.so.1\fR before
+\fB/lib/libc.so.1\fR when building an object.
+.sp
+.LP
+When an object is loaded on a new link-map list, the object is isolated from
+the main running program. Certain global resources are only usable from one
+link-map list. A few examples are the \fBsbrk()\fR based \fBmalloc()\fR,
+\fBlibthread()\fR, and the signal vectors. Care must be taken not to use any of
+these resources other than from the primary link-map list. These issues are
+discussed in further detail in the \fILinker and Libraries Guide\fR.
+.sp
+.LP
+Some symbols defined in dynamic executables or shared objects can not be
+available to the runtime linker. The symbol table created by \fBld\fR for use
+by the runtime linker might contain only a subset of the symbols that are
+defined in the object.
+.sp
+.LP
+As part of loading a new object, initialization code within the object is
+called \fBbefore\fR the \fBdlopen()\fR returns. This initialization is user
+code, and as such, can produce errors that can not be caught by \fBdlopen()\fR.
+For example, an object loaded using \fBRTLD_LAZY\fR that attempts to call a
+function that can not be located results in process termination. Erroneous
+programming practices within the initialization code can also result in process
+termination. The runtime linkers debugging facility can offer help identifying
+these types of error. See the \fBLD_DEBUG\fR environment variable of
+\fBld.so.1\fR(1).
+.sp
+.LP
+Loading relocatable objects is an expensive operation that requires converting
+the relocatable object into a shared object memory image. This capability may
+be useful in a debugging environment, but is not recommended for production
+software.

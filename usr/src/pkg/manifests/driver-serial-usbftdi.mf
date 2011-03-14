@@ -37,6 +37,8 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=usbftdi perms="* 0666 root sys" \
     alias=usb403,6001 \
     alias=usb403,cc48 \
@@ -66,6 +68,7 @@ file path=kernel/drv/$(ARCH64)/usbftdi group=sys
 $(i386_ONLY)file path=kernel/drv/usbftdi group=sys
 file path=kernel/drv/usbftdi.conf group=sys \
     original_name=SUNWuftdi:kernel/drv/usbftdi.conf preserve=true
+file path=usr/share/man/man7d/usbftdi.7d
 legacy pkg=SUNWuftdi desc="FTDI FT232R USB serial driver" \
     name="FT232R USB UART"
 license cr_Sun license=cr_Sun

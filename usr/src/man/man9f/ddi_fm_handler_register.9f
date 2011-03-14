@@ -1,0 +1,214 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_fm_handler_register 9F "14 May 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_fm_handler_register, ddi_fm_handler_unregister \- register or unregister an
+error handling callback
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddifm.h>
+
+\fBvoid\fR \fBddi_fm_handler_register\fR(\fBdev_info_t\fR *\fIdip\fR,
+     \fBddi_err_func_t\fR \fIerror_handler\fR, \fBvoid\fR *\fIimpl_data\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_fm_handler_unregister\fR(\fBdev_info_t\fR *\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to the \fBdev_info\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerror_handler\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to an error handler callback function
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIimpl_data\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to private data for use by the caller
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_fm_handler_register()\fR function registers an error handler
+callback routine with the \fBI/O\fR Fault Management framework. The error
+handler callback, \fIerror_handler\fR, is called to process error conditions
+detected by the system. In addition to its device instance, \fIdip\fR, the
+error handler is called with a pointer to a fault management error status
+structure, \fBddi_fm_error_t\fR. For example:
+.sp
+.in +2
+.nf
+int (*ddi_err_func_t)(dev_info_t *dip, ddi_fm_error_t *error_status);
+.fi
+.in -2
+
+.sp
+.LP
+A driver error handling callback is passed the following arguments:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a pointer to the device instance registered for this callback.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a data structure containing common fault management data and status for error
+handling.
+.RE
+.sp
+.LP
+The primary responsibilities of the error handler include:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to check for outstanding hardware or software errors.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+where possible, to isolate the device that might have caused the errors.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to report errors that were detected.
+.RE
+.sp
+.LP
+During the invocation of an error handler, a device driver  might need to
+quiesce or suspend all \fBI/O\fR activities in order to check for error
+conditions or status in:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+hardware control and status registers.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+outstanding \fBI/O\fR transactions.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+access or \fBDMA\fR handles.
+.RE
+.sp
+.LP
+For each error detected, the driver must formulate and post an error report via
+\fBddi_fm_ereport_post()\fR for problem analysis by the Solaris Fault Manager
+\fBfmd\fR(1M).
+.sp
+.LP
+For a \fBPCI\fR, \fBPCI/X\fR, or \fBPCI Express\fR leaf device, the
+\fBpci_ereport_post()\fR function is provided to carry out reporting
+responsibilities on behalf of the driver. In many cases, an error handler
+callback function of the following form can be used:
+.sp
+.in +2
+.nf
+xxx_err_cb(dev_info_t *dip, ddi_fm_error_t *errp) {
+      pci_ereport_post(dip, errp, NULL);
+      return (errp->fme_status);
+}
+.fi
+.in -2
+
+.sp
+.LP
+In addition, the driver might be able to carry out further device specific
+checks within the error handler.
+.sp
+.LP
+Error handlers can be called from kernel, interrupt, or high-level interrupt
+context. The interrupt block cookie returned from \fBddi_fm_init()\fR should be
+used to allocate and initialize any synchronization variables and locks that
+might be used within the error handler callback function. Such locks may not be
+held by the driver when a device register is accessed with functions such as
+\fBddi_get8\fR(9F) and \fBddi_put8\fR(9F).
+.sp
+.LP
+The data structure, \fBddi_fm_error_t\fR, contains an \fBFMA\fR protocol
+(format 1) \fBENA\fR for the current error propagation chain, the status of the
+error handler callback, an error expectation flag, and any potential access or
+\fBDMA\fR handles associated with an error detected by the parent nexus.
+.sp
+.LP
+The \fBddi_fm_handler_unregister()\fR function removes a previously registered
+error handling callback for the device instance specified by the \fIdip\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_fm_handler_register()\fR and \fBddi_fm_handler_unregister()\fR
+functions must be called from kernel context in an \fBattach\fR(9E) or
+\fBdetach\fR(9E) entry point. The registered error handler,
+\fIerror_handler\fR, callback can be called from kernel, interrupt, or high
+level interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfmd\fR(1M), \fBattributes\fR(5), \fBattach\fR(9E), \fBdetach\fR(9E),
+\fBddi_fm_ereport_post\fR(9F), \fBddi_fm_init\fR(9F), \fBddi_get8\fR(9F),
+\fBddi_put8\fR(9F), \fBpci_ereport_post\fR(9F), \fBddi_fm_error\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,170 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_finalize 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_finalize \- propagate disposition of a state change event
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBvoid\fR \fBldi_ev_finalize\fR(\fIdev_info_t *dip\fR, \fIminor_t minor\fR, \fIint spec_type\fR, 
+     \fIint ldi_result\fR, \fIldi_ev_cookie_t cookie\fR, \fIvoid *ev_data\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev_info_t *dip\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBdevinfo\fR node of the layered consumer exporting the minor device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_t minor\fR\fR
+.ad
+.sp .6
+.RS 4n
+The minor number of the exported minor device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIint spec_type\fR\fR
+.ad
+.sp .6
+.RS 4n
+The type of minor device (\fBS_IFCHR\fR or \fBS_IFBLK\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIint ldi_result\fR\fR
+.ad
+.sp .6
+.RS 4n
+The final disposition of the state change.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_cookie_t cookie\fR\fR
+.ad
+.sp .6
+.RS 4n
+An opaque event cookie for the event type returned by a previous call to
+\fBldi_ev_get_cookie\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvoid *ev_data\fR\fR
+.ad
+.sp .6
+.RS 4n
+Event specific data.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_finalize()\fR function propagates the final disposition of an
+event up the software stack. It may result in two actions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invocation of "finalize" \fBLDI\fR callback handlers registered by layered
+drivers up the software stack.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Device contract "negotiation end" (\fBCT_EV_NEGEND\fR) events generated on
+minors exported to \fBuserland\fR.
+.RE
+.sp
+.LP
+The event propagated up the software stack may be different than the event
+received by the layered driver invoking \fBldi_ev_finalize()\fR. For example, a
+volume manager may receive an "offline" event on one of it's \fBLDI\fR opened
+disks, but may choose to propagate a "degraded" event on minors it exports to
+\fBuserland\fR (since  it  may have more than one copy of the data). The event
+cookie argument to \fBldi_ev_notify\fR(9F) may be different from the event
+cookie currently possessed by the layered driver. If that is the case, the
+layered driver must generate another event cookie via a new
+\fBldi_ev_get_cookie\fR(9F) call.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel contexts only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInvoking ldi_ev_finalize(9F) from widget's finalize callback
+.sp
+.LP
+The following example shows how the \fBldi_ev_finalize()\fR function is invoked
+from a widget's finalize callback:
+
+.sp
+.in +2
+.nf
+static void
+widget_finalize(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie,
+    int ldi_result, void *arg, void *ev_data)
+
+{
+         ASSERT(strcmp(ldi_ev_get_type(foo_cookie), LDI_EV_FOO) == 0);
+
+         /* Map imported minor to exported minors */
+         widget_map(lh, &minor, &spec_type);
+
+         if (ldi_result == LDI_EV_SUCCESS) {
+                 ldi_ev_finalize(dip, minor, spec_type,
+                     LDI_EV_SUCCESS, foo_cookie, ev_data);
+          }
+
+          /*
+           * The event foo failed. Reconfigure yourself
+           * *before* propagating
+           */
+          widget_reconfigure(lh, LDI_EV_FOO, REACQUIRE);
+
+          ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE,
+              foo_cookie, ev_data);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
+\fBldi_ev_remove_callbacks\fR(9F)

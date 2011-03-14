@@ -1,0 +1,124 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_getscn 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_getscn, elf_ndxscn, elf_newscn, elf_nextscn \- get section information
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf_Scn *\fR\fBelf_getscn\fR(\fBElf *\fR\fIelf\fR, \fBsize_t\fR \fIindex\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBelf_ndxscn\fR(\fBElf_Scn *\fR\fIscn\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Scn *\fR\fBelf_newscn\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Scn *\fR\fBelf_nextscn\fR(\fBElf *\fR\fIelf\fR, \fBElf_Scn *\fR\fIscn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide indexed and sequential access to the sections
+associated with the \fBELF\fR descriptor \fIelf\fR. If the program is building
+a new file, it is responsible for creating the file's \fBELF\fR header before
+creating sections; see \fBelf32_getehdr\fR(3ELF).
+.sp
+.LP
+The \fBelf_getscn()\fR function returns a section descriptor, given an
+\fIindex\fR into the file's section header table. Note that the first ``real''
+section has an index of \fB1\fR. Although a program can get a section
+descriptor for the section whose \fIindex\fR is \fB0\fR (\fBSHN_UNDEF\fR, the
+undefined section), the section has no data and the section header is ``empty''
+(though present). If the specified section does not exist, an error occurs, or
+\fIelf\fR is \fINULL\fR, \fBelf_getscn()\fR returns a null pointer.
+.sp
+.LP
+The \fBelf_newscn()\fR function creates a new section and appends it to the
+list for \fIelf\fR. Because the \fBSHN_UNDEF\fR section is required and not
+``interesting'' to applications, the library creates it automatically. Thus the
+first call to \fBelf_newscn()\fR for an \fBELF\fR descriptor with no existing
+sections returns a descriptor for section 1. If an error occurs or \fIelf\fR is
+\fINULL\fR, \fBelf_newscn()\fR returns a null pointer.
+.sp
+.LP
+After creating a new section descriptor, the program can use
+\fBelf32_getshdr()\fR to retrieve the newly created, ``clean'' section header.
+The new section descriptor will have no associated data (see
+\fBelf_getdata\fR(3ELF)). When creating a new section in this way, the library
+updates the \fBe_shnum\fR member of the \fBELF\fR header and sets the
+\fBELF_F_DIRTY\fR bit for the section (see \fBelf_flagdata\fR(3ELF)). If the
+program is building a new file, it is responsible for creating the file's
+\fBELF\fR header (see \fBelf32_getehdr\fR(3ELF)) before creating new sections.
+.sp
+.LP
+The \fBelf_nextscn()\fR function takes an existing section descriptor,
+\fIscn\fR, and returns a section descriptor for the next higher section. One
+may use a null \fIscn\fR to obtain a section descriptor for the section whose
+index is \fB1\fR (skipping the section whose index is \fBSHN_UNDEF\fR). If no
+further sections are present or an error occurs, \fBelf_nextscn()\fR returns a
+null pointer.
+.sp
+.LP
+The \fBelf_ndxscn()\fR function takes an existing section descriptor,
+\fIscn\fR, and returns its section table index. If \fIscn\fR is null or an
+error occurs, \fBelf_ndxscn()\fR returns \fBSHN_UNDEF\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample of calling \fBelf_getscn()\fR function.
+.sp
+.LP
+An example of sequential access appears below. Each pass through the loop
+processes the next section in the file; the loop terminates when all sections
+have been processed.
+
+.sp
+.in +2
+.nf
+\fBscn = 0;
+while ((scn = elf_nextscn(elf, scn)) != 0)
+{
+	/* process section */
+}\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf32_getshdr\fR(3ELF),
+\fBelf_begin\fR(3ELF), \fBelf_flagdata\fR(3ELF), \fBelf_getdata\fR(3ELF),
+\fBlibelf\fR(3LIB), \fBattributes\fR(5)

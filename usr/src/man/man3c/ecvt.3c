@@ -1,0 +1,120 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited,  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ecvt 3C "18 May 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ecvt, fcvt, gcvt \- convert floating-point number to string
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBchar *\fR\fBecvt\fR(\fBdouble\fR \fIvalue\fR, \fBint\fR \fIndigit\fR, \fBint *restrict\fR \fIdecpt\fR, \fBint *restrict\fR \fIsign\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBfcvt\fR(\fBdouble\fR \fIvalue\fR, \fBint\fR \fIndigit\fR, \fBint *restrict\fR \fIdecpt\fR, \fBint *restrict\fR \fIsign\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBgcvt\fR(\fBdouble\fR \fIvalue\fR, \fBint\fR \fIndigit\fR, \fBchar *\fR\fIbuf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBecvt()\fR, \fBfcvt()\fR and \fBgcvt()\fR functions convert
+floating-point numbers to null-terminated strings.
+.SS "\fBecvt()\fR"
+.sp
+.LP
+The \fBecvt()\fR function converts \fIvalue\fR to a null-terminated string of
+\fIndigit\fR digits (where \fIndigit\fR is reduced to an unspecified limit
+determined by the precision of a \fBdouble\fR) and returns a pointer to the
+string.  The high-order digit is non-zero, unless the value is 0.  The
+low-order digit is rounded.  The position of the radix character relative to
+the beginning of the string is stored in the integer pointed to by \fIdecpt\fR
+(negative means to the left of the returned digits). The radix character is not
+included in the returned string. If the sign of the result is negative, the
+integer pointed to by \fIsign\fR is non-zero, otherwise it is 0.
+.sp
+.LP
+If the converted value is out of range or is not representable, the contents of
+the returned string are unspecified.
+.SS "\fBfcvt()\fR"
+.sp
+.LP
+The \fBfcvt()\fR function is identical to \fBecvt()\fR except that \fIndigit\fR
+specifies the number of digits desired after the radix point.  The total number
+of digits in the result string is restricted to an unspecified limit as
+determined by the precision of a \fBdouble\fR.
+.SS "\fBgcvt()\fR"
+.sp
+.LP
+The \fBgcvt()\fR function converts \fIvalue\fR to a null-terminated string
+(similar to that of the \fB%g\fR format of \fBprintf\fR(3C)) in the array
+pointed to by \fIbuf\fR and returns \fIbuf\fR. It produces \fIndigit\fR
+significant digits (limited to an unspecified value determined by the precision
+of a \fBdouble\fR) in \fB%f\fR if possible, or \fB%e\fR (scientific notation)
+otherwise.  A minus sign is included in the returned string if \fIvalue\fR is
+less than 0.  A radix character is included in the returned string if
+\fIvalue\fR is not a whole number.  Trailing zeros are suppressed where
+\fIvalue\fR is not a whole number.  The radix character is determined by the
+current locale. If \fBsetlocale\fR(3C) has not been called successfully, the
+default locale, POSIX, is used.  The default locale specifies a period
+(\fB\&.\fR) as the radix character.  The \fBLC_NUMERIC\fR category determines
+the value of the radix character within the current locale.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBecvt()\fR and \fBfcvt()\fR functions return a pointer to a
+null-terminated string of digits.
+.sp
+.LP
+The \fBgcvt()\fR function returns \fIbuf\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+The return values from \fBecvt()\fR and \fBfcvt()\fR might point to
+thread-specific data that can be overwritten by subsequent calls to these
+functions by the same thread.
+.sp
+.LP
+For portability to implementations conforming to earlier versions of Solaris,
+\fBsprintf\fR(3C) is preferred over this function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBprintf\fR(3C), \fBsetlocale\fR(3C), \fBsprintf\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,284 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_intr_alloc 9F "23 Apr 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_intr_alloc, ddi_intr_free \- allocate or free interrupts for a given
+interrupt type
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_intr_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_intr_handle_t *\fR\fIh_array\fR, \fBint\fR \fItype\fR,
+     \fBint\fR \fIinum\fR, \fBint\fR \fIcount\fR, \fBint *\fR\fIactualp\fR, \fBint\fR \fIbehavior\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_free\fR(\fBddi_intr_handle_t\fR \fIh\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+\fBddi_intr_alloc()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBdev_info\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh_array\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to an array of DDI interrupt handles
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 12n
+.rt  
+Interrupt type
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinum\fR\fR
+.ad
+.RS 12n
+.rt  
+Interrupt number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 12n
+.rt  
+Number of interrupts requested. The \fIcount\fR should not exceed the total
+number of interrupts supported by the device, as returned by a call to
+\fBddi_intr_get_nintrs\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIactualp\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the number of interrupts actually allocated
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbehavior\fR\fR
+.ad
+.RS 12n
+.rt  
+Flag to determine the allocation algorithm
+.RE
+
+.sp
+.LP
+\fBddi_intr_free()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 5n
+.rt  
+DDI interrupt handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_intr_alloc()\fR function allocates interrupts of the interrupt type
+given by the \fItype\fR argument beginning at the interrupt number \fIinum\fR.
+If \fBddi_intr_alloc()\fR allocates any interrupts, it returns the actual
+number of interrupts allocated in the integer pointed to by the \fIactualp\fR
+argument and returns the number of interrupt handles in the interrupt handle
+array pointed to by the \fIh_array\fR argument.
+.sp
+.LP
+Specific interrupts are always specified by the combination of interrupt
+\fItype\fR and \fIinum\fR. For legacy devices, \fIinum\fR refers to the nth
+interrupt, typically as defined by the devices \fBinterrupts\fR property. For
+PCI fixed interrupts, \fIinum\fR refers to the interrupt number. The \fIinum\fR
+is the relative interrupt vector number, from \fB0\fR to \fB31\fR for MSI, from
+\fB0\fR to \fB2047\fR for MSI-X. The first interrupt vector is \fB0\fR. The
+last relative vector is \fB31\fR for MSI or \fB2047\fR for MSI-X.
+.sp
+.LP
+The \fIh_array\fR must be pre-allocated by the caller as a \fIcount\fR sized
+array of ddi_intr_handle_t's.
+.sp
+.LP
+If MSI interrupts are being allocated, the \fIcount\fR argument passed should
+be a number between \fB1\fR and \fB32\fR, specified as a power of two. If
+\fIcount\fR is not specified as a power of two, the error \fBDDI_EINVAL\fR is
+returned.
+.sp
+.LP
+The behavior flag controls the interrupt allocation algorithm. It takes one of
+two input values: \fBDDI_INTR_ALLOC_NORMAL\fR or \fBDDI_INTR_ALLOC_STRICT\fR.
+If the \fIcount\fR value used is greater than \fBNINTRs\fR, then the call fails
+with \fBDDI_EINVAL\fR unconditionally. When set to \fBDDI_INTR_ALLOC_STRICT\fR,
+the call succeeds if and only if \fIcount\fR interrupts are allocated.
+Otherwise, the call fails, and the number of available interrupts is returned
+in \fIactualp\fR. When set to \fBDDI_INTR_ALLOC_NORMAL\fR, the call succeeds if
+at least one interrupt is allocated, and the number of allocated interrupts is
+returned in actualp.
+.sp
+.LP
+The handle for each allocated interrupt, if any, is returned in the array of
+handles given by the \fIh_array\fR argument.
+.sp
+.LP
+The \fBddi_intr_free()\fR function releases the system resources and interrupt
+vectors associated with the ddi_intr_handle_t \fIh\fR, including any resources
+associated with the handle \fIh\fR itself. Once freed, the handle \fIh\fR
+should not be used in any further calls.
+.sp
+.LP
+The \fBddi_intr_free()\fR function should be called once for each handle in the
+handle array.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_intr_alloc()\fR and \fBddi_intr_free()\fR functions return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 21n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EAGAIN\fR\fR
+.ad
+.RS 21n
+.rt  
+Not enough interrupt resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EINVAL\fR\fR
+.ad
+.RS 21n
+.rt  
+On encountering invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_INTR_NOTFOUND\fR\fR
+.ad
+.RS 21n
+.rt  
+On failure to find the interrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 21n
+.rt  
+On any implementation specific failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_intr_alloc()\fR and \fBddi_intr_free()\fR functions can be called
+from kernel non-interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_intr_add_handler\fR(9F),
+\fBddi_intr_block_enable\fR(9F), \fBddi_intr_disable\fR(9F),
+\fBddi_intr_enable\fR(9F), \fBddi_intr_get_cap\fR(9F),
+\fBddi_intr_get_nintrs\fR(9F), \fBddi_intr_get_pri\fR(9F),
+\fBddi_intr_get_supported_types\fR(9F), \fBddi_intr_remove_handler\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Consumers of these interfaces should verify that the return value is not equal
+to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
+inconsistent behavior among platforms.
+.sp
+.LP
+If a device driver that uses \fBMSI\fR and \fBMSI-X\fR interrupts resets the
+device, the device might reset its configuration space modifications. Such a
+reset could cause a device driver to lose any \fBMSI\fR and \fBMSI-X\fR
+interrupt usage settings that have been applied.

@@ -1,0 +1,85 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH issetugid 2 "19 Feb 2003" "SunOS 5.11" "System Calls"
+.SH NAME
+issetugid \- determine if current executable is running setuid or setgid
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBissetugid\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBissetugid()\fR function enables library functions (in \fBlibtermlib\fR,
+\fBlibc\fR, or other libraries) to guarantee safe behavior when used in
+\fBsetuid\fR or \fBsetgid\fR programs or programs that run with more privileges
+after a succesful \fBexec\fR(2). Some library functions might be passed
+insufficient information and not know whether the current program was started
+\fBsetuid\fR or \fBsetgid\fR because a higher level calling code might have
+made changes to the \fBuid\fR, \fBeuid\fR, \fBgid\fR, or \fBegid\fR. These
+low-level library functions are therefore unable to determine if they are being
+run with elevated or normal privileges.
+.sp
+.LP
+The \fBissetugid()\fR function should be used to determine if a path name
+returned from a \fBgetenv\fR(3C) call can be used safely to open the specified
+file. It is often not safe to open such a file because the status of the
+effective \fBuid\fR is not known.
+.sp
+.LP
+The result of a call to \fBissetugid()\fR is unaffected by calls to
+\fBsetuid()\fR, \fBsetgid()\fR, or other such calls.  In case of a call to
+\fBfork\fR(2), the child process inherits the same status.
+.sp
+.LP
+The status of \fBissetugid()\fR is affected only by \fBexecve()\fR (see
+\fBexec\fR(2)). If a child process executes a new executable file, a new
+\fBissetugid()\fR status will be based on the existing process's \fBuid\fR,
+\fBeuid\fR, \fBgid\fR, and \fBegid\fR permissions and on the modes of the
+executable file. If the new executable file modes are \fBsetuid\fR or
+\fBsetgid\fR, or if the existing process is executing the new image with
+\fBuid\fR != \fBeuid\fR or \fBgid\fR != \fBegid\fR, or if the permitted set
+before the call to the \fBexec\fR function is not a superset of the inheritable
+set at that time, \fBissetugid()\fR returns 1 in the new process.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBissetugid()\fR function returns 1 if the process was made \fBsetuid\fR
+or \fBsetgid\fR as the result of the last or a previous call to \fBexecve()\fR.
+Otherwise it returns 0.
+.SH ERRORS
+.sp
+.LP
+The \fBissetugid()\fR function is always successful. No return value is
+reserved to indicate an error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBfork\fR(2), \fBsetuid\fR(2), \fBgetenv\fR(3C),
+\fBattributes\fR(5), \fBprivileges\fR(5)

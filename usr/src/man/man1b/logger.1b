@@ -1,0 +1,121 @@
+'\" te
+.\"  Copyright (c) 1988 Sun Microsystems, Inc. - All Rights Reserved.  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software
+.\" License Agreement  specifies the terms and conditions for redistribution.
+.TH logger 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+logger \- add entries to the system log
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/logger\fR [\fB-f\fR \fIfilename\fR] [\fB-i\fR] [\fB-p\fR \fIpriority\fR] [\fB-t\fR \fItag\fR] mm 
+     [\fImessage\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlogger\fR utility provides a method for adding one-line entries to the
+system log file from the command line. One or more \fImessage\fR arguments can
+be given on the command line, in which case each is logged immediately. If
+\fImessage\fR is unspecified, either the file indicated with \fB-f\fR or the
+standard input is added to the log. Otherwise, a \fIfilename\fR can be
+specified, in which case each line in the file is logged. If neither is
+specified, \fBlogger\fR reads and logs messages on a line-by-line basis from
+the standard input.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 15n
+.rt  
+Log the process \fBID\fR of the \fBlogger\fR process with each line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Use the contents of \fIfilename\fR as the message to log.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpriority\fR\fR
+.ad
+.RS 15n
+.rt  
+Enter the message with the specified \fIpriority\fR. The message priority can
+be specified numerically, or as a \fIfacility.level\fR pair. For example,
+\fB`\fR\fB-p\fR \fBlocal3.info'\fR assigns the message priority to the
+\fBinfo\fR level in the \fBlocal3\fR facility. The default priority is
+\fBuser.notice\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItag\fR\fR
+.ad
+.RS 15n
+.rt  
+Mark each line added to the log with the specified \fItag\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRLogging a message
+.sp
+.LP
+The command:
+
+.sp
+.in +2
+.nf
+example% \fBlogger System rebooted\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will log the message `\fBSystem rebooted\fR' to the facility at priority
+\fBnotice\fR to be treated by \fBsyslogd\fR as other messages to the facility
+\fBnotice\fR are.
+
+.LP
+\fBExample 2 \fRLogging messages from a file
+.sp
+.LP
+The command:
+
+.sp
+.in +2
+.nf
+example% \fBlogger \fR\fB-p\fR\fB local0.notice \fR\fB-t\fR\fB HOSTIDM \fR\fB-f\fR\fB /dev/idmc\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will read from the file \fB/dev/idmc\fR and will log each line in that file as
+a message with the tag `\fBHOSTIDM\fR' at priority \fBnotice\fR to be treated
+by \fBsyslogd\fR as other messages to the facility \fBlocal0\fR are.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsyslogd\fR(1M), \fBsyslog\fR(3C), \fBattributes\fR(5)

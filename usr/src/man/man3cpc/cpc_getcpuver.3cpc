@@ -1,0 +1,147 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_getcpuver 3CPC "28 Mar 2005" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_getcpuver, cpc_getcciname, cpc_getcpuref, cpc_getusage, cpc_getnpic,
+cpc_walk_names \- determine CPU performance counter configuration
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_getcpuver\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpc_getcciname\fR(\fBint\fR \fIcpuver\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpc_getcpuref\fR(\fBint\fR \fIcpuver\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpc_getusage\fR(\fBint\fR \fIcpuver\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBcpc_getnpic\fR(\fBint\fR \fIcpuver\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_names\fR(\fBint\fR \fIcpuver\fR, \fBint\fR \fIregno\fR, \fBvoid *\fR\fIarg\fR,
+     \fBvoid (*\fR\fIaction\fR)(void *\fIarg\fR, int \fIregno\fR,  const char *\fIname\fR,
+     uint8_t \fIbits\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpc_getcpuver()\fR function returns an abstract integer that corresponds
+to the distinguished version of the underlying processor.  The library
+distinguishes between processors solely on the basis of their support for
+performance counters, so the version returned should not be interpreted in any
+other way. The set of values returned by the library is unique across all
+processor implementations.
+.sp
+.LP
+The \fBcpc_getcpuver()\fR function returns \(mi1 if the library cannot support
+CPU performance counters on the current architecture.  This may be because the
+processor has no such counter hardware, or because the library is unable to
+recognize it. Either way, such a return value indicates that the configuration
+functions described on this manual page cannot be used.
+.sp
+.LP
+The \fBcpc_getcciname()\fR function returns a printable description of the
+processor performance counter interfaces-for example, the string \fIUltraSPARC
+I&II\fR. Note that this name should not be assumed to be the same as the name
+the manufacturer might otherwise ascribe to the processor.  It simply names the
+performance counter interfaces as understood by the library, and thus names the
+set of performance counter events that can be described by that interface. If
+the \fIcpuver\fR argument is unrecognized, the function returns \fINULL\fR.
+.sp
+.LP
+The \fBcpc_getcpuref()\fR function returns a string that describes a reference
+work that should be consulted to (allow a human to) understand the semantics of
+the performance counter events that are known to the library. If the
+\fIcpuver\fR argument is unrecognized, the function returns \fINULL\fR. The
+string returned might be substantially longer than 80 characters. Callers
+printing to a terminal might want to insert line breaks as appropriate.
+.sp
+.LP
+The \fBcpc_getusage()\fR function returns a compact description of the
+\fBgetsubopt()\fR-oriented syntax that is consumed by
+\fBcpc_strtoevent\fR(3CPC). It is returned as a space-separated set of tokens
+to allow the caller to wrap lines at convenient boundaries. If the \fIcpuver\fR
+argument is unrecognized, the function returns \fINULL\fR.
+.sp
+.LP
+The \fBcpc_getnpic()\fR function returns the number of valid fields in the
+\fBce_pic\fR[] array of a \fBcpc_event_t\fR data structure.
+.sp
+.LP
+The library maintains a list of events that it believes the processor capable
+of measuring, along with the bit patterns that must be set in the corresponding
+control register, and which counter the result will appear in.  The
+\fBcpc_walk_names()\fR function calls the \fIaction\fR(\|) function on each
+element of the list so that an application can print appropriate help on the
+set of events known to the library.  The \fIarg\fR parameter is passed
+uninterpreted from the caller on each invocation of the \fIaction\fR(\|)
+function.
+.sp
+.LP
+If the parameters specify an invalid or unknown CPU or register number, the
+function silently returns without invoking the action function.
+.SH USAGE
+.sp
+.LP
+Prior to calling any of these functions, applications should call
+\fBcpc_access\fR(3CPC) to determine if the counters are accessible on the
+system.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc\fR(3CPC), \fBcpc_access\fR(3CPC), \fBcpc_cciname\fR(3CPC),
+\fBcpc_cpuref\fR(3CPC), \fBcpc_npic\fR(3CPC),
+\fBcpc_walk_events_all\fR(3CPC)\fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_getcpuver()\fR, \fBcpc_getcciname()\fR, \fBcpc_getcpuref()\fR,
+\fBcpc_getusage()\fR, \fBcpc_getnpic()\fR, and \fBcpc_walk_names()\fR functions
+exist for binary compatibility only. Source containing these functions will not
+compile. These functions are obsolete and might be removed in a future release.
+Applications should use \fBcpc_cciname\fR(3CPC), \fBcpc_cpuref\fR(3CPC),
+\fBcpc_npic\fR(3CPC), and \fBcpc_npic\fR(3CPC) instead.
+.sp
+.LP
+Only SPARC processors are described by the SPARC version of the library, and
+only x86 processors are described by the x86 version of the library.

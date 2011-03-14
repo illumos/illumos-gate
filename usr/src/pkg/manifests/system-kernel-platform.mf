@@ -355,6 +355,10 @@ $(sparc_ONLY)dir path=platform/sun4v/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/sun4v/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/sun4v/kernel/sys group=sys
 $(sparc_ONLY)dir path=platform/sun4v/kernel/sys/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=usr/share/man
+dir path=usr/share/man/man4
+$(sparc_ONLY)dir path=usr/share/man/man7d
+$(sparc_ONLY)dir path=usr/share/man/man7m
 $(sparc_ONLY)driver name=ac
 $(i386_ONLY)driver name=acpinex alias=acpivirtnex
 $(i386_ONLY)driver name=acpippm
@@ -1149,6 +1153,37 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/platmod group=sys \
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/wanboot group=sys reboot-needed=true
+$(i386_ONLY)file path=usr/share/man/man4/isa.4
+$(sparc_ONLY)file path=usr/share/man/man4/sbus.4
+$(i386_ONLY)file path=usr/share/man/man4/sysbus.4
+$(sparc_ONLY)file path=usr/share/man/man7d/bbc_beep.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/ctsmc.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/dr.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/drmach.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/fd.7d
+file path=usr/share/man/man7d/fdc.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/gpio_87317.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/grbeep.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/mc-opl.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/n2rng.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/ncp.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/ngdr.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/ngdrmach.7d
+$(i386_ONLY)file path=usr/share/man/man7d/npe.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/ntwdt.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/oplmsu.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/oplpanel.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/pcicmu.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/pcipsy.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/pcisch.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/schpc.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/smbus.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/su.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/todopl.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/tsalarm.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/zs.7d
+$(sparc_ONLY)file path=usr/share/man/man7d/zsh.7d
+$(sparc_ONLY)file path=usr/share/man/man7m/kb.7m
 $(i386_ONLY)hardlink \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
     target=cpu_ms.GenuineIntel.6.46

@@ -1,0 +1,75 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_can_receive_sig 9F "15 Dec 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_can_receive_sig \- Test for ability to receive signals
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBboolean_t\fR ddi_can_receive_sig(\fBvoid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+None.
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_can_receive_sig()\fR function returns a boolean value
+indicating whether the current thread can receive signals sent by
+\fBkill\fR(2). If the return value is  \fBB_FALSE\fR, then the calling  thread
+cannot receive  signals, and any call to \fBqwait_sig\fR(9F),
+\fBcv_wait_sig\fR(9F), or  \fBcv_timedwait_sig\fR(9F) implicitly becomes
+\fBqwait\fR(9F), \fBcv_wait\fR(9F), or  \fBcv_timedwait\fR(9F), respectively.
+Drivers that can block indefinitely awaiting an event should use this function
+to determine if additional means (such as \fBtimeout\fR(9F)) may be necessary
+to avoid creating unkillable threads.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBB_FALSE\fR \fR
+.ad
+.RS 12n
+.rt  
+The  calling thread is in a state in which signals            cannot be
+received. For  example, the thread is not associated with a user process or is
+in the midst of \fBexit\fR(2) handling.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBB_TRUE\fR \fR
+.ad
+.RS 12n
+.rt  
+The calling thread may receive a signal while blocked            on a condition
+variable. Note that this function does not check to  determine whether signals
+are blocked (see \fBsigprocmask\fR(2)).
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_can_receive_sig()\fR function  may be called from user, kernel, or
+interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(9E), \fBcv_wait\fR(9F), \fBqwait\fR(9F)

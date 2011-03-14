@@ -1,0 +1,77 @@
+'\" te
+.\"  Copyright 2006 Sun Microsystems.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qunbufcall 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qunbufcall \- cancel a pending qbufcall request
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+ #include <sys/ddi.h>
+ 
+
+\fBvoid\fR \fBqunbufcall\fR(\fBqueue_t *\fR\fIq\fR, \fBbufcall_id_t\fR \fIid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to \fBSTREAMS\fR queue_t structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIid\fR\fR
+.ad
+.RS 6n
+.rt  
+Identifier returned from \fBqbufcall\fR(9F).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqunbufcall()\fR function cancels a pending \fBqbufcall()\fR request. The
+argument \fIid\fR is a non-zero identifier of the request to be cancelled.
+\fIid\fR is returned from the \fBqbufcall()\fR function used to issue the
+cancel request.
+.sp
+.LP
+The \fBqunbufcall()\fR function is tailored to be used with the enhanced
+\fBSTREAMS \fRframework interface which is based on the concept of perimeters.
+(See \fBmt-streams\fR(9F).) \fBqunbufcall()\fR returns when the bufcall has
+been cancelled or finished executing. The bufcall will be cancelled even if it
+is blocked at the perimeters associated with the queue. All outstanding
+timeouts and bufcalls must be cancelled before a driver close routine can block
+and before the close  routine calls \fBqprocsoff\fR(9F).
+.SH CONTEXT
+.sp
+.LP
+The \fBqunbufcall()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBmt-streams\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F),
+\fBquntimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

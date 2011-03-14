@@ -1,0 +1,427 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH edit "1has" "11 Jun 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+edit \- text editor (variant of ex for casual users)
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+     [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+     [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+     [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBedit\fR utility is a variant of the text editor \fBex\fR recommended for
+new or casual users who wish to use a command-oriented editor. It operates
+precisely as \fBex\fR with the following options automatically set:
+.sp
+.ne 2
+.mk
+.na
+\fBnovice\fR
+.ad
+.RS 12n
+.rt  
+\fBON\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBreport\fR
+.ad
+.RS 12n
+.rt  
+\fBON\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBshowmode\fR
+.ad
+.RS 12n
+.rt  
+\fBON\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmagic\fR
+.ad
+.RS 12n
+.rt  
+\fBOFF\fR
+.RE
+
+.sp
+.LP
+The following brief introduction should help you get started with \fBedit\fR.
+If you are using a \fBCRT\fR terminal you might want to learn about the display
+editor \fBvi\fR.
+.sp
+.LP
+To edit the contents of an existing file you begin with the command \fBedit
+\fR\fIname\fR to the shell. \fBedit\fR makes a copy of the file that you can
+then edit, and tells you how many lines and characters are in the file. To
+create a new file, you also begin with the command \fBedit\fR with a filename:
+\fBedit \fR\fIname\fR; the editor tells you it is a \fB[New File]\fR.
+.sp
+.LP
+The \fBedit\fR command prompt is the colon (\fB:\fR), which you should see
+after starting the editor. If you are editing an existing file, then you have
+some lines in \fBedit\fR's buffer (its name for the copy of the file you are
+editing). When you start editing, \fBedit\fR makes the last line of the file
+the current line. Most commands to \fBedit\fR use the current line if you do
+not tell them which line to use. Thus if you say \fBprint\fR (which can be
+abbreviated \fBp\fR) and type carriage return (as you should after all
+\fBedit\fR commands), the current line is printed. If you \fBdelete\fR
+(\fBd\fR) the current line, \fBedit\fR prints the new current line, which is
+usually the next line in the file. If you \fBdelete\fR the last line, then the
+new last line becomes the current one.
+.sp
+.LP
+If you start with an empty file or wish to add some new lines, then the
+\fBappend\fR (\fBa\fR) command can be used. After you execute this command
+(typing a carriage return after the word \fBappend\fR), \fBedit\fR reads lines
+from your terminal until you type a line consisting of just a dot (\fB\&.\fR);
+it places these lines after the current line. The last line you type then
+becomes the current line. The \fBinsert\fR (\fBi\fR) command is like
+\fBappend\fR, but places the lines you type before, rather than after, the
+current line.
+.sp
+.LP
+The \fBedit\fR utility numbers the lines in the buffer, with the first line
+having number 1. If you execute the command \fB1\fR, then \fBedit\fR types the
+first line of the buffer. If you then execute the command \fBd\fR, \fBedit\fR
+deletes the first line, line 2 becomes line 1, and \fBedit\fR prints the
+current line (the new line 1) so you can see where you are. In general, the
+current line is always the last line affected by a command.
+.sp
+.LP
+You can make a change to some text within the current line by using the
+\fBsubstitute\fR (\fBs\fR) command: \fBs\fR/\fIold\fR\|/\fInew\fR/ where
+\fIold\fR is the string of characters you want to replace and \fInew\fR is the
+string of characters you want to replace \fIold\fR with.
+.sp
+.LP
+The \fBfilename\fR (\fBf\fR) command tells you how many lines there are in the
+buffer you are editing and says \fB[Modified]\fR if you have changed the
+buffer. After modifying a file, you can save the contents of the file by
+executing a \fBwrite\fR (\fBw\fR) command. You can leave the editor by issuing
+a \fBquit\fR (\fBq\fR) command. If you run \fBedit\fR on a file, but do not
+change it, it is not necessary (but does no harm) to \fBwrite\fR the file back.
+If you try to \fBquit\fR from \fBedit\fR after modifying the buffer without
+writing it out, you receive the message \fBNo write since last change (:quit!
+overrides)\fR, and \fBedit\fR waits for another command. If you do not want to
+write the buffer out, issue the \fBquit\fR command followed by an exclamation
+point (\fBq!\fR). The buffer is then irretrievably discarded and you return to
+the shell.
+.sp
+.LP
+By using the \fBd\fR and \fBa\fR commands and giving line numbers to see lines
+in the file, you can make any changes you want. You should learn at least a few
+more things, however, if you use \fBedit\fR more than a few times.
+.sp
+.LP
+The \fBchange\fR (\fBc\fR) command changes the current line to a sequence of
+lines you supply (as in \fBappend\fR, you type lines up to a line consisting of
+only a dot (\fB\&.\fR). You can tell \fBchange\fR to change more than one line
+by giving the line numbers of the lines you want to change, that is,
+\fB3,5c\fR. You can print lines this way too: \fB1,23p\fR prints the first 23
+lines of the file.
+.sp
+.LP
+The \fBundo\fR (\fBu\fR) command reverses the effect of the last command you
+executed that changed the buffer. Thus if you execute a \fBsubstitute\fR
+command that does not do what you want, type \fBu\fR and the old contents of
+the line are restored. You can also \fBundo\fR an \fBundo\fR command.
+\fBedit\fR gives you a warning message when a command affects more than one
+line of the buffer. Note that commands such as \fBwrite\fR and \fBquit\fR
+cannot be undone.
+.sp
+.LP
+To look at the next line in the buffer, type carriage return. To look at a
+number of lines, type \fB^D\fR (while holding down the control key, press
+\fBd\fR) rather than carriage return. This shows you a half-screen of lines on
+a \fBCRT\fR or 12 lines on a hardcopy terminal. You can look at nearby text by
+executing the \fBz\fR command. The current line appears in the middle of the
+text displayed, and the last line displayed becomes the current line; you can
+get back to the line where you were before you executed the \fBz\fR command by
+typing \fB\&''\fR. The \fBz\fR command has other options: \fBz\(mi\fR prints a
+screen of text (or 24 lines) ending where you are; \fBz+\fR prints the next
+screenful. If you want less than a screenful of lines, type \fBz.11\fR to
+display five lines before and  five lines after the current line. (Typing
+\fBz.\fR\fIn\fR, when \fIn\fR is an odd number, displays a total of \fIn\fR
+lines, centered about the current line; when \fIn\fR is an even number, it
+displays \fIn\fR\fB-1\fR lines, so that the lines displayed are centered around
+the current line.) You can give counts after other commands; for example, you
+can delete 5 lines starting with the current line with the command \fBd5\fR.
+.sp
+.LP
+To find things in the file, you can use line numbers if you happen to know
+them; since the line numbers change when you insert and delete lines this is
+somewhat unreliable. You can search backwards and forwards in the file for
+strings by giving commands of the form /\fItext\fR/ to search forward for
+\fItext\fR or ?\fItext\fR? to search backward for \fItext\fR. If a search
+reaches the end of the file without finding \fItext\fR, it wraps around and
+continues to search back to the line where you are. A useful feature here is a
+search of the form /^\fItext\fR/ which searches for \fItext\fR at the beginning
+of a line. Similarly /\fItext\fR$/ searches for \fItext\fR at the end of a
+line. You can leave off the trailing \fB/\fR or \fB?\fR in these commands.
+.sp
+.LP
+The current line has the symbolic name dot (\fB\&.\fR); this is most useful in
+a range of lines as in \fB\&.,$p\fR which prints the current line plus the rest
+of the lines in the file. To move to the last line in the file, you can refer
+to it by its symbolic name $. Thus the command \fB$d\fR deletes the last line
+in the file, no matter what the current line is. Arithmetic with line
+references is also possible. Thus the line \fB$\fR\fB-5\fR is the fifth before
+the last and \fB\&.+20\fR is 20 lines after the current line.
+.sp
+.LP
+You can find out the current line by typing \fB`.='\fR\|. This is useful if you
+wish to move or copy a section of text within a file or between files. Find the
+first and last line numbers you wish to copy or move. To move lines 10 through
+20, type \fB10,20d a\fR to delete these lines from the file and place them in a
+buffer named \fBa\fR. \fBedit\fR has 26 such buffers named \fBa\fR through
+\fBz\fR. To put the contents of buffer \fBa\fR after the current line, type
+\fBput a\fR. If you want to move or copy these lines to another file, execute
+an \fBedit\fR (\fBe\fR) command after copying the lines; following the \fBe\fR
+command with the name of the other file you wish to edit, that is, \fBedit
+chapter2\fR. To copy lines without deleting them, use \fByank\fR (\fBy\fR) in
+place of \fBd\fR. If the text you wish to move or copy is all within one file,
+it is not necessary to use named buffers. For example, to move lines 10 through
+20 to the end of the file, type \fB10,20m $\fR.
+.SH OPTIONS
+.sp
+.LP
+These options can be turned on or off using the \fBset\fR command in
+\fBex\fR(1).
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 26n
+.rt  
+Encryption option; same as the \fB-x\fR option, except that \fBvi\fR simulates
+the \fBC\fR command of \fBex\fR. The \fBC\fR command is like the \fBX\fR
+command of \fBex\fR, except that all text read in is assumed to have been
+encrypted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 26n
+.rt  
+Set up for editing LISP programs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 26n
+.rt  
+List the name of all files saved as the result of an editor or system crash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 26n
+.rt  
+\fBReadonly\fR mode; the \fBreadonly\fR flag is set, preventing accidental
+overwriting of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fI filename\fR\fR
+.ad
+.RS 26n
+.rt  
+Edit \fIfilename\fR after an editor or system crash. (Recovers the version of
+\fIfilename\fR that was in the buffer when the crash occurred.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fI tag\fR \fR
+.ad
+.RS 26n
+.rt  
+Edit the file containing the \fItag\fR and position the editor at its
+definition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 26n
+.rt  
+Start up in display editing state using \fBvi\fR. You can achieve the same
+effect by simply typing the \fBvi\fR command itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 26n
+.rt  
+Verbose. When \fBex\fR commands are read by means of standard input, the input
+is echoed to standard error. This can be useful when processing \fBex\fR
+commands within shell scripts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 26n
+.rt  
+Encryption option; when used, \fBedit\fR simulates the \fBX\fR command of
+\fBex\fR and prompts the user for a key. This key is used to encrypt and
+decrypt text using the algorithm of the \fBcrypt\fR command. The \fBX\fR
+command makes an educated guess to determine whether text read in is encrypted
+or not. The temporary buffer file is encrypted also, using a transformed
+version of the key typed in for the \fB-x\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fIn\fR\fR
+.ad
+.RS 26n
+.rt  
+Set the default window size to \fIn\fR. This is useful when using the editor
+over a slow speed line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIcommand\fR | \fB-c\fR\fI  command\fR\fR
+.ad
+.RS 26n
+.rt  
+Begin editing by executing the specified editor \fBcommand\fR (usually a search
+or positioning command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR | \fB-s\fR \fR
+.ad
+.RS 26n
+.rt  
+Suppress all interactive user feedback.  This is useful when processing editor
+scripts.
+.RE
+
+.sp
+.LP
+The \fIfilename\fR argument indicates one or more files to be edited.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/edit"
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+CSIEnabled
+.TE
+
+.SS "/usr/xpg4/bin/edit"
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+CSIEnabled
+.TE
+
+.SS "/usr/xpg6/bin/edit"
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBex\fR(1), \fBvi\fR(1), \fBattributes\fR(5), \fBXPG4\fR(5)
+.SH NOTES
+.sp
+.LP
+The encryption options are provided with the Security Administration Utilities
+package, which is available only in the United States.

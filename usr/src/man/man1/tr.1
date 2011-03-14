@@ -1,0 +1,561 @@
+'\" te
+.\" Copyright 1989 AT&T Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tr 1 "3 Mar 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+tr \- translate characters
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/tr\fR [\fB-cds\fR] [\fIstring1\fR [\fIstring2\fR]]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/tr\fR [\fB-cs\fR] \fIstring1\fR \fIstring2\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/tr\fR \fB-s\fR | \fB-d\fR [\fB-c\fR] \fIstring1\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/tr\fR \fB-ds\fR [\fB-c\fR] \fIstring1\fR \fIstring2\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/tr\fR [\fB-c\fR | \fB-C\fR] [\fB-s\fR] \fIstring1\fR \fIstring2\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/tr\fR \fB-s\fR [\fB-c\fR | \fB-C\fR] \fIstring1\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/tr\fR \fB-d\fR [\fB-c\fR | \fB-C\fR] \fIstring1\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/tr\fR \fB-ds\fR [\fB-c\fR | \fB-C\fR] \fIstring1\fR \fIstring2\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtr\fR utility copies the standard input to the standard output with
+substitution or deletion of selected characters. The options specified and the
+\fIstring1\fR and \fIstring2\fR operands control translations that occur while
+copying characters and single-character collating elements.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Complements the set of values specified by \fIstring1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 6n
+.rt  
+Complements the set of characters specified by \fIstring1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Deletes all occurrences of input characters that are specified by
+\fIstring1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Replaces instances of repeated characters with a single character.
+.RE
+
+.sp
+.LP
+When the \fB-d\fR option is not specified:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each input character found in the array specified by \fIstring1\fR is replaced
+by the character in the same relative position in the array specified by
+\fIstring2\fR. When the array specified by \fIstring2\fR is shorter than the
+one specified by \fIstring1\fR, the results are unspecified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB-c\fR option is specified, the complements of the values specified by
+\fIstring1\fR are placed in the array in ascending order by binary value.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB-C\fR option is specified, the complements of the characters
+specified by \fIstring1\fR (the set of all characters in the current character
+set, as defined by the current setting of \fBLC_CTYPE\fR, except for those
+actually specified in the \fIstring1\fR operand) are placed in the array in
+ascending collation sequence, as defined by the current setting of
+\fBLC_COLLATE\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Because the order in which characters specified by character class expressions
+or equivalence class expressions is undefined, such expressions should only be
+used if the intent is to map several characters into one. An exception is case
+conversion, as described previously.
+.RE
+.sp
+.LP
+When the \fB-d\fR option is specified:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Input characters found in the array specified by \fIstring1\fR are deleted.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When the \fB-C\fR option is specified with \fB-d\fR, all values except those
+specified by \fIstring1\fR are deleted. The contents of \fIstring2\fR are
+ignored, unless the \fB-s\fR option is also specified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB-c\fR option is specified, the complements of the values specified by
+\fIstring1\fR are placed in the array in ascending order by binary value.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The same string cannot be used for both the \fB-d\fR and the \fB-s\fR option.
+When both options are specified, both \fIstring1\fR (used for deletion) and
+\fIstring2\fR (used for squeezing) are required.
+.RE
+.sp
+.LP
+When the \fB-s\fR option is specified, after any deletions or translations have
+taken place, repeated sequences of the same character is replaced by one
+occurrence of the same character, if the character is found in the array
+specified by the last operand. If the last operand contains a character class,
+such as the following example:
+.sp
+.in +2
+.nf
+\fBtr -s '[:space:]'\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+the last operand's array contains all of the characters in that character
+class. However, in a case conversion, as described previously, such as
+.sp
+.in +2
+.nf
+\fBtr -s '[:upper:]' '[:lower:]'\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+the last operand's array contains only those characters defined as the second
+characters in each of the \fBtoupper\fR or \fBtolower\fR character pairs, as
+appropriate. (See \fBtoupper\fR(3C) and \fBtolower\fR(3C)).
+.sp
+.LP
+An empty string used for \fIstring1\fR or \fIstring2\fR produces undefined
+results.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring1\fR\fR
+.ad
+.br
+.na
+\fB\fIstring2\fR\fR
+.ad
+.RS 11n
+.rt  
+Translation control strings. Each string represents a set of characters to be
+converted into an array of characters used for the translation.
+.RE
+
+.sp
+.LP
+The operands \fIstring1\fR and \fIstring2\fR (if specified) define two arrays
+of characters. The constructs in the following list can be used to specify
+characters or single-character collating elements. If any of the constructs
+result in multi-character collating elements, \fBtr\fR excludes, without a
+diagnostic, those multi-character elements from the resulting array.
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcharacter\fR\fR
+.ad
+.RS 15n
+.rt  
+Any character not described by one of the conventions below represents itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e\fR\fIoctal\fR\fR
+.ad
+.RS 15n
+.rt  
+Octal sequences can be used to represent characters with specific coded values.
+An octal sequence consists of a backslash followed by the longest sequence of
+one-, two-, or three-octal-digit characters (01234567). The sequence causes the
+character whose encoding is represented by the one-, two- or three-digit octal
+integer to be placed into the array. Multi-byte characters require multiple,
+concatenated escape sequences of this type, including the leading \e for each
+byte.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e\fR\fIcharacter\fR\fR
+.ad
+.RS 15n
+.rt  
+The backslash-escape sequences \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
+\fB\er\fR, \fB\et\fR, and \fB\ev\fR are supported. The results of using any
+other character, other than an octal digit, following the backslash are
+unspecified.
+.RE
+
+.SS "/usr/xpg4/bin/tr"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc-c\fR\fR
+.ad
+.RS 7n
+.rt  
+ 
+.RE
+
+.SS "/usr/bin/tr"
+.sp
+.ne 2
+.mk
+.na
+\fB[\fIc-c\fR]\fR
+.ad
+.RS 13n
+.rt  
+In the POSIX locale, this construct represents the range of collating elements
+between the range endpoints (as long as neither endpoint is an octal sequence
+of the form \fB\e\fR\fIoctal\fR), inclusively, as defined by the collation
+sequence. The characters or collating elements in the range are placed in the
+array in ascending collation sequence. If the second endpoint precedes the
+starting endpoint in the collation sequence, it is unspecified whether the
+range of collating elements is empty, or this construct is treated as invalid.
+In locales other than the POSIX locale, this construct has unspecified
+behavior.
+.sp
+If either or both of the range endpoints are octal sequences of the form
+\fB\e\fR\fIoctal\fR, represents the range of specific coded binary values
+between two range endpoints, inclusively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[:\fR\fIclass\fR\fB:]\fR\fR
+.ad
+.RS 13n
+.rt  
+Represents all characters belonging to the defined character class, as defined
+by the current setting of the \fBLC_CTYPE\fR locale category. The following
+character class names are accepted when specified in \fIstring1\fR:
+.sp
+.in +2
+.nf
+alnum  blank  digit  lower  punct  upper
+alpha  cntrl  graph  print  space  xdigit
+.fi
+.in -2
+.sp
+
+In addition, character class expressions of the form \fB[:\fR\fIname\fR\fB:]\fR
+are recognized in those locales where the \fIname\fR keyword has been given a
+\fBcharclass\fR definition in the \fBLC_CTYPE\fR category.
+.sp
+When both the \fB-d\fR and \fB-s\fR options are specified, any of the character
+class names are accepted in \fIstring2\fR. Otherwise, only character class
+names \fBlower\fR or \fBupper\fR are valid in \fIstring2\fR and then only if
+the corresponding character class \fBupper\fR and \fBlower\fR, respectively, is
+specified in the same relative position in \fIstring1\fR. Such a specification
+is interpreted as a request for case conversion. When \fB[:lower:]\fR appears
+in \fIstring1\fR and \fB[:upper:]\fR appears in \fIstring2,\fR the arrays
+contain the characters from the \fBtoupper\fR mapping in the \fBLC_CTYPE\fR
+category of the current locale. When \fB[:upper:]\fR appears in \fIstring1\fR
+and \fB[:lower:]\fR appears in \fIstring2,\fR the arrays contain the characters
+from the \fBtolower\fR mapping in the \fBLC_CTYPE\fR category of the current
+locale. The first character from each mapping pair is in the array for
+\fIstring1\fR and the second character from each mapping pair is in the array
+for \fIstring2\fR in the same relative position.
+.sp
+Except for case conversion, the characters specified by a character class
+expression are placed in the array in an unspecified order.
+.sp
+If the name specified for \fIclass\fR does not define a valid character class
+in the current locale, the behavior is undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[=\fR\fIequiv\fR\fB=]\fR\fR
+.ad
+.RS 13n
+.rt  
+Represents all characters or collating elements belonging to the same
+equivalence class as \fIequiv\fR, as defined by the current setting of the
+\fBLC_COLLATE\fR locale category. An equivalence class expression is allowed
+only in \fIstring1\fR, or in \fIstring2\fR when it is being used by the
+combined \fB-d\fR and \fB-s\fR options. The characters belonging to the
+equivalence class are placed in the array in an unspecified order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fIx*n\fR]\fR
+.ad
+.RS 13n
+.rt  
+Represents \fIn\fR repeated occurrences of the character \fIx\fR. Because this
+expression is used to map multiple characters to one, it is only valid when it
+occurs in \fIstring2\fR. If \fIn\fR has a leading \fB0\fR, it is interpreted
+as an octal value. Otherwise, it is interpreted as a decimal value.
+.sp
+If \fIn\fR is omitted or is \fB0\fR, \fB/usr/bin/tr\fR interprets this as huge;
+\fB/usr/xpg4/bin/tr\fR and \fB/usr/xpg6/bin/tr\fR interprets this as large
+enough to extend the\fIstring2\fR-based sequence to the length of the
+\fIstring1\fR-based sequence.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBtr\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a list of words
+.sp
+.LP
+The following example creates a list of all words in \fIfile1\fR, one per line
+in \fIfile2\fR, where a word is taken to be a maximal string of letters.
+
+.sp
+.in +2
+.nf
+\fBtr \(mics "[:alpha:]" "[\en*]" <file1 >file2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRTranslating characters
+.sp
+.LP
+This example translates all lower-case characters in \fBfile1\fR to upper-case
+and writes the results to standard output.
+
+.sp
+.in +2
+.nf
+\fBtr "[:lower:]" "[:upper:]" <file1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that the caveat expressed in the corresponding example in XPG3 is no
+longer in effect. This case conversion is now a special case that employs the
+\fBtolower\fR and \fBtoupper\fR classifications, ensuring that proper mapping
+is accomplished (when the locale is correctly defined).
+
+.LP
+\fBExample 3 \fRIdentifying equivalent characters
+.sp
+.LP
+This example uses an equivalence class to identify accented variants of the
+base character \fBe\fR in \fBfile1\fR, which are stripped of diacritical marks
+and written to \fBfile2\fR.
+
+.sp
+.in +2
+.nf
+\fBtr "[=e=]" e <file1 >file2\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBtr\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All input was processed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/tr"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SS "/usr/xpg4/bin/tr"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "/usr/xpg6/bin/tr"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBsed\fR(1), \fBsh\fR(1), \fBtolower\fR(3C), \fBtoupper\fR(3C),
+\fBascii\fR(5), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5),
+\fBregex\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Unlike some previous versions, \fB/usr/xpg4/bin/tr\fR correctly processes
+\fBNUL\fR characters in its input stream. \fBNUL\fR characters can be stripped
+by using \fBtr\fR \fB-d\fR \fB\&'\e000'\fR.

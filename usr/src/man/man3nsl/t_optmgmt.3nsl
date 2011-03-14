@@ -1,0 +1,544 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_optmgmt 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_optmgmt \- manage options for a transport endpoint
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h> 
+
+
+
+\fBint\fR \fBt_optmgmt\fR(\fBint\fR \fIfd\fR, \fBconst struct t_optmgmt *\fR\fIreq\fR, \fBstruct t_optmgmt *\fR\fIret\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This routine is part of the \fBXTI\fR interfaces which evolved from the
+\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
+interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
+using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
+\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
+\fBCOMPATIBILITY\fR section for a description of differences between the two
+interfaces.
+.sp
+.LP
+The \fBt_optmgmt()\fR function enables a transport user to retrieve, verify or
+negotiate protocol options with the transport provider. The argument \fIfd\fR
+identifies a transport endpoint.
+.sp
+.LP
+The \fIreq\fR and \fIret\fR arguments point to a \fBt_optmgmt\fR structure
+containing the following members:
+.sp
+.in +2
+.nf
+\fBstruct netbuf opt;
+t_scalar_t    flags;\fR
+.fi
+.in -2
+
+.sp
+.LP
+The \fIopt\fR field identifies protocol options and the \fIflags\fR field is
+used to specify the action to take with those options.
+.sp
+.LP
+The options are represented by a \fBnetbuf\fR structure in a manner similar to
+the address in \fBt_bind\fR(3NSL). The argument \fIreq\fR is used to request a
+specific action of the provider and to send options to the provider.  The
+argument \fIlen\fR specifies the number of bytes in the options, \fIbuf\fR
+points to the options buffer, and \fImaxlen\fR has no meaning for the \fIreq\fR
+argument. The transport provider may return options and flag values to the user
+through \fIret\fR. For \fIret\fR, \fImaxlen\fR specifies the maximum size of
+the options buffer and \fIbuf\fR points to the buffer where the options are to
+be placed. If  \fImaxlen\fR in  \fIret\fR is set to zero, no options values are
+returned. On return, \fIlen\fR specifies the number of bytes of options
+returned. The value in \fImaxlen\fR has no meaning for the \fIreq\fR argument,
+but must be set in the \fIret\fR argument to specify the maximum number of
+bytes the options buffer can hold.
+.sp
+.LP
+Each option in the options buffer is of the form \fBstruct t_opthdr\fR possibly
+followed by an option value.
+.sp
+.LP
+The \fIlevel\fR field of \fBstruct t_opthdr\fR identifies the XTI level or a
+protocol of the transport provider. The \fIname\fR field identifies the option
+within the level, and \fIlen\fR contains its total length; that is, the length
+of the option header \fBt_opthdr\fR plus the length of the option value.  If
+\fBt_optmgmt()\fR is called with the action  \fBT_NEGOTIATE\fR set, the
+\fIstatus\fR field of the returned options contains information about the
+success or failure of a negotiation.
+.sp
+.LP
+Several options can be concatenated. The option user has, however to ensure
+that each options header and value part starts at a boundary appropriate for
+the architecture\(hyspecific alignment rules. The macros
+\fBT_OPT_FIRSTHDR\fR(nbp), \fBT_OPT_NEXTHDR\fR (nbp,tohp),
+\fBT_OPT_DATA\fR(tohp) are provided for that purpose.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_OPT_DATA(nhp)\fR \fR
+.ad
+.RS 29n
+.rt  
+If argument is a pointer to a \fBt_opthdr\fR structure, this macro returns an
+unsigned character pointer to the data associated with the \fBt_opthdr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_OPT_NEXTHDR(nbp,\fR \fBtohp)\fR \fR
+.ad
+.RS 29n
+.rt  
+If the first argument is a pointer to a netbuf structure associated with an
+option buffer and second argument is a pointer to a \fBt_opthdr\fR structure
+within that option buffer, this macro returns a pointer to the next
+\fBt_opthdr\fR structure or a null pointer if this \fBt_opthdr\fR is the last
+\fBt_opthdr\fR in the option buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_OPT_FIRSTHDR(tohp)\fR \fR
+.ad
+.RS 29n
+.rt  
+If the argument is a pointer to a \fBnetbuf\fR structure associated with an
+option buffer, this macro returns the pointer to the first \fBt_opthdr\fR
+structure in the associated option buffer, or a null pointer if there is no
+option buffer associated with this \fBnetbuf\fR or if it is not possible or the
+associated option buffer is too small to accommodate even the first aligned
+option header.
+.sp
+\fBT_OPT_FIRSTHDR\fR is useful for finding an appropriately aligned start of
+the option buffer. \fBT_OPT_NEXTHDR\fR is useful for moving to the start of the
+next appropriately aligned option in the option buffer. Note that
+\fBOPT_NEXTHDR\fR is also available for backward compatibility requirements.
+\fBT_OPT_DATA\fR is useful for finding the start of the data part in the option
+buffer where the contents of its values start on an appropriately aligned
+boundary.
+.sp
+If the transport user specifies several options on input, all options must
+address the same level.
+.sp
+If any option in the options buffer does not indicate the same level as the
+first option, or the level specified is unsupported, then the \fBt_optmgmt()\fR
+request will fail with \fBTBADOPT\fR. If the error is detected, some options
+have possibly been successfully negotiated. The transport user can check the
+current status by calling \fBt_optmgmt()\fR with the  \fBT_CURRENT\fR flag set.
+.sp
+The \fIflags\fR field of \fIreq\fR must specify one of the following actions:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_NEGOTIATE\fR \fR
+.ad
+.RS 29n
+.rt  
+This action enables the transport user to negotiate option values.
+.sp
+The user specifies the options of interest and their values in the buffer
+specified by \fIreq\(->opt.buf\fR and \fIreq\(->opt.len\fR. The negotiated
+option values are returned in the buffer pointed to by \fIret->opt.buf\fR. The
+\fIstatus\fR field of each returned option is set to indicate the result of the
+negotiation. The value is  \fBT_SUCCESS\fR if the proposed value was
+negotiated, \fBT_PARTSUCCESS\fR if a degraded value was negotiated,
+\fBT_FAILURE\fR if the negotiation failed (according to the negotiation rules),
+\fBT_NOTSUPPORT\fR if the transport provider does not support this option or
+illegally requests negotiation of a privileged option, and  \fBT_READONLY\fR if
+modification of a read-only option was requested. If the status is
+\fBT_SUCCESS,\fR \fBT_FAILURE,\fR \fBT_NOTSUPPORT\fR or  \fBT_READONLY,\fR the
+returned option value is the same as the one requested on input.
+.sp
+The overall result of the negotiation is returned in \fIret\(->flags\fR.
+.sp
+This field contains the worst single result, whereby the rating is done
+according to the order  \fBT_NOTSUPPORT,\fR \fBT_READONLY,\fR \fBT_FAILURE,\fR
+\fBT_PARTSUCCESS,\fR \fBT_SUCCESS.\fR The value  \fBT_NOTSUPPORT\fR is the
+worst result and  \fBT_SUCCESS\fR is the best.
+.sp
+For each level, the option  \fBT_ALLOPT\fR can be requested on input. No value
+is given with this option; only the \fBt_opthdr\fR part is specified. This
+input requests to negotiate all supported options of this level to their
+default values. The result is returned option by option in
+\fIret\(->opt.buf\fR. Note that depending on the state of the transport
+endpoint, not all requests to negotiate the default value may be successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_CHECK\fR \fR
+.ad
+.RS 29n
+.rt  
+This action enables the user to verify whether the options specified in
+\fIreq\fR are supported by the transport provider.If an option is specified
+with no option value (it consists only of a \fBt_opthdr\fR structure), the
+option is returned with its \fIstatus\fR field set to  \fBT_SUCCESS\fR if it is
+supported,  \fBT_NOTSUPPORT\fR if it is not or needs additional user
+privileges, and  \fBT_READONLY\fR if it is read-only (in the current XTI
+state). No option value is returned.
+.sp
+If an option is specified with an option value, the \fIstatus\fR field of the
+returned option has the same value, as if the user had tried to negotiate this
+value with  \fBT_NEGOTIATE.\fR If the status is  \fBT_SUCCESS\fR,
+\fBT_FAILURE\fR, \fBT_NOTSUPPORT\fR or  \fBT_READONLY\fR, the returned option
+value is the same as the one requested on input.
+.sp
+The overall result of the option checks is returned in \fIret\(->flags\fR. This
+field contains the worst single result of the option checks, whereby the rating
+is the same as for  \fBT_NEGOTIATE\fR .
+.sp
+Note that no negotiation takes place. All currently effective option values
+remain unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_DEFAULT\fR \fR
+.ad
+.RS 29n
+.rt  
+This action enables the transport user to retrieve the default option values.
+The user specifies the options of interest in \fIreq\(->opt.buf\fR. The option
+values are irrelevant and will be ignored; it is sufficient to specify the
+\fBt_opthdr\fR part of an option only. The default values are then returned in
+\fIret\(->opt.buf\fR.
+.sp
+The \fIstatus\fR field returned is  \fBT_NOTSUPPORT\fR if the protocol level
+does not support this option or the transport user illegally requested a
+privileged option,  \fBT_READONLY\fR if the option is read-only, and set to
+\fBT_SUCCESS\fR in all other cases. The overall result of the request is
+returned in \fIret\(->flags\fR. This field contains the worst single result,
+whereby the rating is the same as for  \fBT_NEGOTIATE.\fR
+.sp
+For each level, the option  \fBT_ALLOPT\fR can be requested on input. All
+supported options of this level with their default values are then returned. In
+this case, \fIret\(->opt.maxlen\fR must be given at least the value
+\fIinfo\(->options\fR before the call. See \fBt_getinfo\fR(3NSL) and
+\fBt_open\fR(3NSL).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_CURRENT\fR\fR
+.ad
+.RS 29n
+.rt  
+This action enables the transport user to retrieve the currently effective
+option values. The user specifies the options of interest in
+\fIreq\(->opt.buf\fR. The option values are irrelevant and will be ignored; it
+is sufficient to specifiy the \fBt_opthdr\fR part of an option only. The
+currently effective values are then returned in \fIreq\(->opt.buf\fR.
+.sp
+The \fIstatus\fR field returned is  \fBT_NOTSUPPORT\fR if the protocol level
+does not support this option or the transport user illegally requested a
+privileged option, T_READONLY if the option is read-only, and set to
+\fBT_SUCCESS\fR in all other cases. The overall result of the request is
+returned in \fIret\(->flags\fR. This field contains the worst single result,
+whereby the rating is the same as for  \fBT_NEGOTIATE.\fR
+.sp
+For each level, the option  \fBT_ALLOPT\fR can be requested on input. All
+supported options of this level with their currently effective values are then
+returned.
+.sp
+The option  \fBT_ALLOPT\fR can only be used with \fBt_optmgmt()\fR and the
+actions  \fBT_NEGOTIATE,\fR \fBT_DEFAULT\fR and  \fBT_CURRENT.\fR It can be
+used with any supported level and addresses all supported options of this
+level.  The option has no value; it consists of a \fBt_opthdr\fR only.  Since
+in a \fBt_optmgmt()\fR call only options of one level may be addressed, this
+option should not be requested together with other options. The function
+returns as soon as this option has been processed.
+.sp
+Options are independently processed in the order they appear in the input
+option buffer. If an option is multiply input, it depends on the implementation
+whether it is multiply output or whether it is returned only once.
+.sp
+Transport providers may not be able to provide an interface capable of
+supporting  \fBT_NEGOTIATE\fR and/or  \fBT_CHECK\fR functionalities. When this
+is the case, the error \fBTNOTSUPPORT\fR is returned.
+.sp
+The function \fBt_optmgmt()\fR may block under various circumstances and
+depending on the implementation. The function will block, for instance, if the
+protocol addressed by the call resides on a separate controller. It may also
+block due to flow control constraints; that is, if data sent previously across
+this transport endpoint has not yet been fully processed. If the function is
+interrupted by a signal, the option negotiations that have been done so far may
+remain valid. The behavior of the function is not changed if  \fBO_NONBLOCK\fR
+is set.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a value of  \fB0\fR is returned. Otherwise, a value
+of \(mi1 is returned and \fBt_errno\fR is set to indicate an error.
+.SH VALID STATES
+.sp
+.LP
+ALL - apart from \fBT_UNINIT\fR.
+.SH ERRORS
+.sp
+.LP
+On failure, \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADFLAG\fR\fR
+.ad
+.RS 15n
+.rt  
+An invalid flag was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADOPT\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified options were in an incorrect format or contained illegal
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBUFOVFLW\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of bytes allowed for an incoming argument \fI(maxlen)\fR is greater
+than  \fB0\fR but not sufficient to store the value of that argument. The
+information to be returned in \fIret\fR will be discarded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNOTSUPPORT\fR\fR
+.ad
+.RS 15n
+.rt  
+This action is not supported by the transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTOUTSTATE\fR\fR
+.ad
+.RS 15n
+.rt  
+The communications endpoint referenced by  \fIfd\fR is not in one of the states
+in which a call to this function is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 15n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 15n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
+different header files. This, and other semantic differences between the two
+interfaces are described in the subsections below.
+.SS "Interface Header"
+.sp
+.LP
+The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
+should \fInot\fR use this header.  They should use the header:
+.sp
+.in +2
+.nf
+#include <tiuser.h>
+.fi
+.in -2
+
+.SS "Error Description Values"
+.sp
+.LP
+The \fBt_errno\fR value \fBTPROTO\fR can be set by the \fBXTI\fR interface but
+not by the \fBTLI\fR interface.
+.sp
+.LP
+The \fBt_errno\fR values that this routine can return under different
+circumstances than its \fBXTI\fR counterpart are \fBTACCES\fR and
+\fBTBUFOVFLW\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTACCES\fR \fR
+.ad
+.RS 14n
+.rt  
+can be returned to indicate that the user does not have permission to negotiate
+the specified options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBUFOVFLW\fR \fR
+.ad
+.RS 14n
+.rt  
+can be returned even when the \fBmaxlen\fR field of the corresponding buffer
+has been set to zero.
+.RE
+
+.SS "Option Buffers"
+.sp
+.LP
+The format of the options in an \fBopt\fR buffer is dictated by the transport
+provider. Unlike the \fBXTI\fR interface, the \fBTLI\fR interface does not fix
+the buffer format. The macros \fBT_OPT_DATA,\fR \fBT_OPT_NEXTHDR,\fR and
+\fBT_OPT_FIRSTHDR\fR described for \fBXTI\fR are not available for use by TLI
+interfaces.
+.SS "Actions"
+.sp
+.LP
+The semantic meaning of various action values for the \fBflags\fR field of
+\fIreq\fR differs between the \fBTLI\fR and \fBXTI\fR interfaces. \fBTLI\fR
+interface users should heed the following descriptions of the actions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_NEGOTIATE\fR \fR
+.ad
+.RS 16n
+.rt  
+This action enables the user to negotiate the values of the options specified
+in \fIreq\fR with the transport provider. The provider will evaluate the
+requested options and negotiate the values, returning the negotiated values
+through \fIret\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_CHECK\fR \fR
+.ad
+.RS 16n
+.rt  
+This action enables the user to verify whether the options specified in
+\fIreq\fR are supported by the transport provider. On return, the \fBflags\fR
+field of \fIret\fR will have either \fBT_SUCCESS\fR or \fBT_FAILURE\fR set to
+indicate to the user whether the options are supported. These flags are only
+meaningful for the \fBT_CHECK\fR request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_DEFAULT\fR \fR
+.ad
+.RS 16n
+.rt  
+This action enables a user to retrieve the default options supported by the
+transport provider into the \fBopt\fR field of \fIret\fR. In \fIreq\fR, the
+\fBlen\fR field of \fBopt\fR must be zero and the \fBbuf\fR field may be
+\fINULL\fR.
+.RE
+
+.SS "Connectionless Mode"
+.sp
+.LP
+If issued as part of the connectionless mode service, \fBt_optmgmt()\fR may
+block due to flow control constraints. The function will not complete until the
+transport provider has processed all previously sent data units.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBpoll\fR(2), \fBselect\fR(3C), \fBt_accept\fR(3NSL),
+\fBt_alloc\fR(3NSL), \fBt_bind\fR(3NSL), \fBt_close\fR(3NSL),
+\fBt_connect\fR(3NSL), \fBt_getinfo\fR(3NSL), \fBt_listen\fR(3NSL),
+\fBt_open\fR(3NSL), \fBt_rcv\fR(3NSL), \fBt_rcvconnect\fR(3NSL),
+\fBt_rcvudata\fR(3NSL), \fBt_snddis\fR(3NSL), \fBattributes\fR(5)

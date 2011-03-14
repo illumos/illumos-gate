@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_version 3LGRP "16 Apr 2003" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_version \- coordinate library and application versions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <sys/lgrp_user.h>
+
+\fBint\fR \fBlgrp_version\fR(\fBconst int\fR \fIversion\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_version()\fR function takes an interface version number,
+\fIversion\fR, as an argument and returns an lgroup interface version.  The
+\fIversion\fR argument should be the value of \fBLGRP_VER_CURRENT\fR bound to
+the application when it was compiled or \fBLGRP_VER_NONE\fR to find out the
+current lgroup interface version on the running system.
+.SH RETURN VALUES
+.sp
+.LP
+If \fIversion\fR is still supported by the implementation, then
+\fBlgrp_version()\fR returns the requested version. If \fBLGRP_VER_NONE\fR is
+returned, the implementation cannot support the requested version. The
+application should be recompiled and might require further changes.
+.sp
+.LP
+If \fIversion\fR is \fBLGRP_VER_NONE\fR, \fBlgrp_version()\fR returns the
+current version of the library.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTest whether the version of the interface used by the caller is
+supported.
+.sp
+.LP
+The following example tests whether the version of the interface used by the
+caller is supported:
+
+.sp
+.in +2
+.nf
+#include <sys/lgrp_user.h>
+ 
+if (lgrp_version(LGRP_VER_CURRENT) != LGRP_VER_CURRENT) {
+    fprintf(stderr, "Built with unsupported lgroup interface %d\en",
+        LGRP_VER_CURRENT);
+    exit (1);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_init\fR(3LGRP), \fBliblgrp\fR(3LIB), \fBattributes\fR(5)

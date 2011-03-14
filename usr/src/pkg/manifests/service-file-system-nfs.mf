@@ -51,6 +51,9 @@ dir path=usr/lib/nfs group=sys
 dir path=usr/lib/reparse group=bin
 dir path=usr/lib/reparse/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man5
 file path=etc/default/nfslogd group=sys \
     original_name=SUNWnfss:etc/default/nfslogd preserve=true
 file path=etc/init.d/nfs.server group=sys mode=0744 \
@@ -72,6 +75,13 @@ file path=usr/lib/reparse/$(ARCH64)/libnfs_basic.so.1
 file path=usr/lib/reparse/libnfs_basic.so.1
 file path=usr/sbin/exportfs mode=0555
 file path=usr/sbin/nfsref mode=0555
+file path=usr/share/man/man1m/mountd.1m
+file path=usr/share/man/man1m/nfsd.1m
+file path=usr/share/man/man1m/nfslogd.1m
+file path=usr/share/man/man1m/rquotad.1m
+file path=usr/share/man/man4/nfslog.conf.4
+file path=usr/share/man/man4/rmtab.4
+file path=usr/share/man/man5/nfssec.5
 legacy pkg=SUNWnfsskr \
     desc="Network File System (NFS) server kernel support (Root)" \
     name="Network File System (NFS) server kernel support (Root)"

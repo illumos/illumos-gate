@@ -1,0 +1,260 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH exit 2 "5 Feb 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+exit, _Exit, _exit \- terminate process
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid\fR \fBexit\fR(\fBint\fR \fIstatus\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fB_Exit\fR(\fBint\fR \fIstatus\fR);
+.fi
+
+.LP
+.nf
+#include <unistd.h>
+
+\fBvoid\fR \fB_exit\fR(\fBint\fR \fIstatus\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBexit()\fR function first calls all functions registered by
+\fBatexit\fR(3C), in the reverse order of their registration, except that a
+function is called after any previously registered functions that had already
+been called at the time it was registered. Each function is called as many
+times as it was registered. If, during the call to any such function, a call to
+the \fBlongjmp\fR(3C) function is made that would terminate the call to the
+registered function, the behavior is undefined.
+.sp
+.LP
+If a function registered by a call to \fBatexit\fR(3C) fails to return, the
+remaining registered functions are not called and the rest of the \fBexit()\fR
+processing is not completed. If \fBexit()\fR is called more than once, the
+effects are undefined.
+.sp
+.LP
+The \fBexit()\fR function then flushes all open streams with unwritten buffered
+data, closes all open streams, and removes all files created by
+\fBtmpfile\fR(3C).
+.sp
+.LP
+The \fB_Exit()\fR and \fB_exit()\fR functions are functionally equivalent. They
+do not call functions registered with \fBatexit()\fR, do not call any
+registered signal handlers, and do not flush open streams.
+.sp
+.LP
+The \fB_exit()\fR, \fB_Exit()\fR, and \fBexit()\fR functions terminate the
+calling process with the following consequences:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All of the file descriptors, directory streams, conversion descriptors and
+message catalogue descriptors open in the calling process are closed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the parent process of the calling process is executing a \fBwait\fR(3C),
+\fBwait3\fR(3C), \fBwaitid\fR(2), or \fBwaitpid\fR(3C), and has neither set its
+\fBSA_NOCLDWAIT\fR flag nor set \fBSIGCHLD\fR to \fBSIG_IGN\fR, it is notified
+of the calling process's termination and the low-order eight bits (that is,
+bits 0377) of \fIstatus\fR are made available to it.  If the parent is not
+waiting, the child's status will be made available to it when the parent
+subsequently executes \fBwait()\fR, \fBwait3()\fR, \fBwaitid()\fR, or
+\fBwaitpid()\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the parent process of the calling process is not executing a \fBwait()\fR,
+\fBwait3()\fR, \fBwaitid()\fR, or \fBwaitpid()\fR, and has not set its
+\fBSA_NOCLDWAIT\fR flag, or set \fBSIGCHLD\fR to \fBSIG_IGN\fR, the calling
+process is transformed into a \fIzombie process\fR. A \fIzombie process\fR is
+an inactive process and it will be deleted at some later time when its parent
+process executes \fBwait()\fR, \fBwait3()\fR, \fBwaitid()\fR, or
+\fBwaitpid()\fR. A zombie process only occupies a slot in the process table; it
+has no other space allocated either in user or kernel space. The process table
+slot that it occupies is partially overlaid with time accounting information
+(see \fB<sys/proc.h>\fR) to be used by the \fBtimes\fR(2) function.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Termination of a process does not directly terminate its children. The sending
+of a \fBSIGHUP\fR signal as described below indirectly terminates children in
+some circumstances.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A \fBSIGCHLD\fR will be sent to the parent process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The parent process \fBID\fR of all of the calling process's existing child
+processes and zombie processes is set to 1. That is, these processes are
+inherited by the initialization process (see \fBIntro\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each mapped memory object is unmapped.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each attached shared-memory segment is detached and the value of
+\fBshm_nattch\fR (see \fBshmget\fR(2)) in the data structure associated with
+its shared memory \fBID\fR is decremented by 1.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For each semaphore for which the calling process has set a \fBsemadj\fR value
+(see \fBsemop\fR(2)), that value is added to the \fBsemval\fR of the specified
+semaphore.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the process is a controlling process, the \fBSIGHUP\fR signal will be sent
+to each process in the foreground process group of the controlling terminal
+belonging to the calling process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the process is a controlling process, the controlling terminal associated
+with the session is disassociated from the session, allowing it to be acquired
+by a new controlling process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the exit of the process causes a process group to become orphaned, and if
+any member of the newly-orphaned process group is stopped, then a \fBSIGHUP\fR
+signal followed by a \fBSIGCONT\fR signal will be sent to each process in the
+newly-orphaned process group.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the parent process has set its \fBSA_NOCLDWAIT\fR flag, or set \fBSIGCHLD\fR
+to \fBSIG_IGN\fR, the status will be discarded, and the lifetime of the calling
+process will end immediately.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the process has process, text or data locks, an \fBUNLOCK\fR is performed
+(see \fBplock\fR(3C) and \fBmemcntl\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All open named semaphores in the process are closed as if by appropriate calls
+to \fBsem_close\fR(3C). All open message queues in the process are closed as if
+by appropriate calls to \fBmq_close\fR(3C). Any outstanding asynchronous I/O
+operations may be cancelled.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An accounting record is written on the accounting file if the system's
+accounting routine is enabled (see \fBacct\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An extended accounting record is written to the extended process accounting
+file if the system's extended process accounting facility is enabled (see
+\fBacctadm\fR(1M)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the current process is the last process within its task and if the system's
+extended task accounting facility is enabled (see \fBacctadm\fR(1M)), an
+extended accounting record is written to the extended task accounting file.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+These functions do not return.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+Normally applications should use \fBexit()\fR rather than \fB_exit()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSee below.
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.sp
+.LP
+The \fB_exit()\fR and \fB_Exit()\fR functions are Async-Signal-Safe.
+.SH SEE ALSO
+.sp
+.LP
+\fBacctadm\fR(1M), \fBIntro\fR(2), \fBacct\fR(2), \fBclose\fR(2),
+\fBmemcntl\fR(2), \fBsemop\fR(2), \fBshmget\fR(2), \fBsigaction\fR(2),
+\fBtimes\fR(2), \fBwaitid\fR(2), \fBatexit\fR(3C), \fBfclose\fR(3C),
+\fBmq_close\fR(3C), \fBplock\fR(3C), \fBsignal.h\fR(3HEAD), \fBtmpfile\fR(3C),
+\fBwait\fR(3C), \fBwait3\fR(3C), \fBwaitpid\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,315 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_mem_alloc 9F "05 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_mem_alloc \- allocate memory for DMA transfer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBddi_dma_mem_alloc\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBsize_t\fR \fIlength\fR, 
+     \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR, \fBuint_t\fR \fIflags\fR, 
+     \fBint (*\fR\fIwaitfp\fR) (caddr_t), \fBcaddr_t\fR \fIarg\fR, \fBcaddr_t *\fR\fIkaddrp\fR,
+     \fBsize_t *\fR\fIreal_length\fR, \fBddi_acc_handle_t *\fR\fIhandlep\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fBDMA\fR handle previously allocated by a call to
+\fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlength\fR\fR
+.ad
+.RS 15n
+.rt  
+The length in bytes of the desired allocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaccattrp\fR\fR
+.ad
+.RS 15n
+.rt  
+Pointer to a \fBddi_device_acc_attr()\fR structure of the device. See
+\fBddi_device_acc_attr\fR(9S). The value in \fBdevacc_attr_dataorder\fR is
+ignored in the current release. The value in \fBdevacc_attr_endian_flags\fR is
+meaningful on the SPARC architecture only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 15n
+.rt  
+Used to determine the data transfer mode and/or the cache attribute.
+.sp
+Possible values of the data transfer are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_STREAMING\fR\fR
+.ad
+.RS 22n
+.rt  
+Sequential, unidirectional, block-sized, and block-aligned transfers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_CONSISTENT\fR\fR
+.ad
+.RS 22n
+.rt  
+Nonsequential transfers of small objects.
+.RE
+
+Possible values of the cache attribute are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIOMEM_DATA_CACHED\fR\fR
+.ad
+.RS 28n
+.rt  
+The CPU can cache the data it fetches and push it to memory at a later time.
+This is the default attribute that is used if no cache attributes are
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIOMEM_DATA_UC_WR_COMBINE\fR\fR
+.ad
+.RS 28n
+.rt  
+The CPU never caches the data, but writes can occur out of order or can be
+combined. Reordering is implied.
+.sp
+If \fBIOMEM_DATA_UC_WR_COMBINE\fR is specified but not supported,
+\fBIOMEM_DATA_UNCACHED\fR is used instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIOMEM_DATA_UNCACHED\fR\fR
+.ad
+.RS 28n
+.rt  
+The CPU never caches data, but has uncacheable access to memory. Strict
+ordering is implied.
+.RE
+
+The cache attributes are mutually exclusive. Any combination of the values
+leads to a failure. On the SPARC architecture, only \fBIOMEM_DATA_CACHED\fR is
+meaningful. Others lead to a failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwaitfp\fR\fR
+.ad
+.RS 15n
+.rt  
+The address of a function to call back later if resources are not available
+now. The callback function indicates how a caller wants to handle the
+possibility of resources not being available. If callback is set to
+\fBDDI_DMA_DONTWAIT\fR, the caller does not care if the allocation fails, and
+can handle an allocation failure appropriately. If callback is set to
+\fBDDI_DMA_SLEEP\fR, the caller wishes to have the allocation routines wait for
+resources to become available. If any other value is set and a DMA resource
+allocation fails, this value is assumed to be the address of a function to be
+called when resources become available. When the specified function is called,
+\fIarg\fR is passed to it as an argument. The specified callback function must
+return either \fBDDI_DMA_CALLBACK_RUNOUT\fR or \fBDDI_DMA_CALLBACK_DONE\fR.
+\fBDDI_DMA_CALLBACK_RUNOUT\fR indicates that the callback function attempted to
+allocate DMA resources but failed. In this case, the callback function is put
+back on a list to be called again  later. \fBDDI_DMA_CALLBACK_DONE\fR indicates
+that either the allocation of DMA resources was successful or the driver no
+longer wishes to retry. The callback function is called in interrupt context.
+Therefore, only system functions accessible from interrupt context are
+available.
+.sp
+The callback function must take whatever steps are necessary to protect its
+critical resources, data structures, queues, and so on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 15n
+.rt  
+Argument to be passed to the callback function, if such a function is
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIkaddrp\fR\fR
+.ad
+.RS 15n
+.rt  
+On successful return, \fIkaddrp\fR points to the allocated memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreal_length\fR\fR
+.ad
+.RS 15n
+.rt  
+The amount of memory, in bytes, allocated. Alignment and padding requirements
+may require \fBddi_dma_mem_alloc()\fR to allocate more memory than requested in
+\fIlength\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandlep\fR\fR
+.ad
+.RS 15n
+.rt  
+Pointer to a data access handle.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_dma_mem_alloc()\fR function allocates memory for \fBDMA\fR transfers
+to or from a device. The allocation will obey the alignment, padding
+constraints and device granularity as specified by the \fBDMA\fR attributes
+(see \fBddi_dma_attr\fR(9S)) passed to \fBddi_dma_alloc_handle\fR(9F) and the
+more restrictive attributes imposed by the system.
+.sp
+.LP
+The \fIflags\fR parameter should be set to \fBDDI_DMA_STREAMING\fR if the
+device is doing sequential, unidirectional, block-sized, and block-aligned
+transfers to or from memory. The alignment and padding constraints specified by
+the \fBminxfer\fR and \fBburstsizes\fR fields in the \fBDMA\fR attribute
+structure, \fBddi_dma_attr\fR(9S) (see \fBddi_dma_alloc_handle\fR(9F)) will be
+used to allocate the most effective hardware support for large transfers. For
+example, if an I/O transfer can be sped up by using an I/O cache, which has a
+minimum transfer of one cache line, \fBddi_dma_mem_alloc()\fR will align the
+memory at a cache line boundary and it will round up \fIreal_length\fR to a
+multiple of the cache line size.
+.sp
+.LP
+The \fIflags\fR parameter should be set to \fBDDI_DMA_CONSISTENT\fR if the
+device accesses memory randomly, or if synchronization steps using
+\fBddi_dma_sync\fR(9F) need to be as efficient as possible. I/O parameter
+blocks used for communication between a device and a driver should be allocated
+using \fBDDI_DMA_CONSISTENT\fR.
+.sp
+.LP
+The device access attributes are specified in the location pointed by the
+\fIaccattrp\fR argument (see \fBddi_device_acc_attr\fR(9S)).
+.sp
+.LP
+The data access handle is returned in \fIhandlep\fR. \fIhandlep\fR is opaque -
+drivers may not attempt to interpret its value. To access the data content, the
+driver must invoke \fBddi_get8\fR(9F) or \fBddi_put8\fR(9F) (depending on the
+data transfer direction) with the data access handle.
+.sp
+.LP
+\fBDMA\fR resources must be established before performing a \fBDMA\fR transfer
+by passing \fIkaddrp\fR and \fIreal_length\fR as returned from
+\fBddi_dma_mem_alloc()\fR and the flag \fBDDI_DMA_STREAMING\fR or
+\fBDDI_DMA_CONSISTENT\fR to \fBddi_dma_addr_bind_handle\fR(9F). In addition, to
+ensure the consistency of a memory object shared between the \fBCPU\fR and the
+device after a \fBDMA\fR transfer, explicit synchronization steps using
+\fBddi_dma_sync\fR(9F) or \fBddi_dma_unbind_handle\fR(9F) are required.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_dma_mem_alloc()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Memory successfully allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+Memory allocation failed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_dma_mem_alloc()\fR function can be called from user, interrupt, or
+kernel context except when \fIwaitfp\fR is set to \fBDDI_DMA_SLEEP\fR, in which
+case it cannot be called from interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
+\fBddi_dma_mem_free\fR(9F), \fBddi_dma_sync\fR(9F),
+\fBddi_dma_unbind_handle\fR(9F), \fBddi_get8\fR(9F), \fBddi_put8\fR(9F),
+\fBddi_device_acc_attr\fR(9S), \fBddi_dma_attr\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+If \fBDDI_NEVERSWAP_ACC\fR is specified, memory can be used for any purpose;
+but if either endian mode is specified, you must use \fBddi_get/put*\fR and
+never anything else.

@@ -1,0 +1,265 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_memseg_import_connect 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_memseg_import_connect, rsm_memseg_import_disconnect \- create or break
+logical commection between import and export segments
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_memseg_import_connect\fR(
+     \fBrsmapi_controller_handle_t\fR \fIcontroller\fR,
+     \fBrsm_node_id_t\fR \fInodeid\fR, \fBrsm_memseg_id_t\fR \fIsegment_id\fR,
+     \fBrsm_permission_t\fR \fIperm\fR, \fBrsm_memseg_import_handle_t *\fR\fImemseg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_disconnect\fR(
+     \fBrsm_memseg_import_handle_t\fR \fImemseg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrsm_memseg_import_connect()\fR function provides a means of creating an
+import segment called \fImemseg\fR and establishing a logical connection with
+an export segment identified by the \fIsegment_id\fR on the node specified by
+\fInode_id\fR. The controller specified by \fIcontroller\fR must have a
+physical connection with the controller (see
+\fBrsm_get_interconnect_topology\fR(3RSM)) used while exporting the segment
+identified by \fIsegment_id\fR on node specified by \fInode_id\fR. The
+\fIperm\fR argument specifies the mode of access that the importer is
+requesting for this connection. In the connection process, the mode of access
+and the importers userid and groupid are compared with the access permissions
+specified by the exporter. If the request mode is not valid, the connection
+request is denied. The \fIperm\fR argument is limited to the following octal
+values:
+.sp
+.ne 2
+.mk
+.na
+\fB0400\fR
+.ad
+.RS 8n
+.rt  
+read mode
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB0200\fR
+.ad
+.RS 8n
+.rt  
+write mode
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB0600\fR
+.ad
+.RS 8n
+.rt  
+read/write mode
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_import_disconnect()\fR function breaks the logical connection
+between the import segment and the exported segment and deallocates the
+resources associated with the import segment handle \fImemseg\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_memseg_import_connect()\fR and \fBrsm_memseg_import_disconnect()\fR
+functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
+.ad
+.RS 24n
+.rt  
+Invalid segment handle.
+.RE
+
+.sp
+.LP
+The  \fBrsm_memseg_import_connect()\fR function can return the following
+errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid controller handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_CTLR_NOT_PRESENT\fR \fR
+.ad
+.sp .6
+.RS 4n
+Controller not present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_PERM_DENIED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEG_NOT_PUBLISHED_TO_NODE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Segment not published to node.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEG_NOT_PUBLISHED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Segment not published at all.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Bad address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_REMOTE_NODE_UNREACHABLE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Remote not not reachable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INTERRUPTED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Connection interrupted.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_import_disconnect()\fR function can return the following
+errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEG_STILL_MAPPED\fR \fR
+.ad
+.RS 28n
+.rt  
+Segment still mapped, need to unmap before disconnect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_POLLFD_IN_USE\fR \fR
+.ad
+.RS 28n
+.rt  
+Poll file descriptor in use.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_memseg_import_map\fR(3RSM), \fBattributes\fR(5)

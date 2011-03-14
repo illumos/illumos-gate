@@ -1,0 +1,219 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priocntlset 2 "1 Apr 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+priocntlset \- generalized process scheduler control
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/procset.h>
+#include <sys/priocntl.h>
+#include <sys/rtpriocntl.h>
+#include <sys/tspriocntl.h>
+#include <sys/iapriocntl.h>
+#include <sys/fsspriocntl.h>
+#include <sys/fxpriocntl.h>
+
+\fBlong\fR \fBpriocntlset\fR(\fBprocset_t *\fR\fIpsp\fR, \fBint\fR \fIcmd\fR, \fB/*\fR \fIarg\fR */ ...);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpriocntlset()\fR function changes the scheduling properties of running
+processes. \fBpriocntlset()\fR has the same functions as the \fBpriocntl()\fR
+function, but a more general way of specifying the set of processes whose
+scheduling properties are to be changed.
+.sp
+.LP
+\fIcmd\fR specifies the function to be performed. \fIarg\fR is a pointer to a
+structure whose type depends on \fIcmd\fR. See \fBpriocntl\fR(2) for the valid
+values of \fIcmd\fR and the corresponding \fIarg\fR structures.
+.sp
+.LP
+\fIpsp\fR is a pointer to a \fBprocset\fR structure, which \fBpriocntlset()\fR
+uses to specify the set of processes whose scheduling properties are to be
+changed. The \fBprocset\fR structure contains the following members:
+.sp
+.in +2
+.nf
+idop_t    p_op;        /* operator connecting left/right sets */
+idtype_t  p_lidtype;   /* left set ID type */
+id_t      p_lid;       /* left set ID */
+idtype_t  p_ridtype;   /* right set ID type */
+id_t      p_rid;       /* right set ID */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBp_lidtype\fR and \fBp_lid\fR members specify the \fBID\fR type and
+\fBID\fR of one ("left") set of processes; the \fBp_ridtype\fR and \fBp_rid\fR
+members specify the \fBID\fR type and \fBID\fR of a second ("right") set of
+processes. \fBID\fR types and \fBID\fRs are specified just as for the
+\fBpriocntl()\fR function. The \fBp_op\fR member specifies the operation to be
+performed on the two sets of processes to get the set of processes the function
+is to apply to. The valid values for \fBp_op\fR and the processes they specify
+are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOP_DIFF\fR\fR
+.ad
+.RS 12n
+.rt  
+Set difference: processes in left set and not in right set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOP_AND\fR\fR
+.ad
+.RS 12n
+.rt  
+Set intersection: processes in both left and right sets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOP_OR\fR\fR
+.ad
+.RS 12n
+.rt  
+Set union: processes in either left or right sets or both.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOP_XOR\fR\fR
+.ad
+.RS 12n
+.rt  
+Set exclusive-or: processes in left or right set but not in both.
+.RE
+
+.sp
+.LP
+The following macro, which is defined in <\fBprocset.h\fR>, offers a convenient
+way to initialize a \fBprocset\fR structure:
+.sp
+.in +2
+.nf
+#define  setprocset(psp, op, ltype, lid, rtype, rid) \e
+(psp)->p_op       = (op), \e
+(psp)->p_lidtype  = (ltype), \e
+(psp)->p_lid      = (lid), \e
+(psp)->p_ridtype  = (rtype), \e
+(psp)->p_rid      = (rid),
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Unless otherwise noted above, \fBpriocntlset()\fR returns \fB0\fR on success.
+Otherwise, it returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpriocntlset()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt to change the class of a process failed because of insufficient
+resources other than memory (for example, class-specific kernel data
+structures).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the arguments points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The argument \fIcmd\fR was invalid, an invalid or unconfigured class was
+specified, or one of the parameters specified was invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt to change the class of a process failed because of insufficient
+memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_PRIOCNTL\fR} privilege is not asserted in the effective set
+of the calling LWP.
+.sp
+The calling LWP does not have sufficient privileges to affect the target LWP.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested time quantum is out of range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+None of the specified processes exist.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpriocntl\fR(1), \fBpriocntl\fR(2)

@@ -1,0 +1,405 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ctstat 1 "16 Jun 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+ctstat \- display active system contracts
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/ctstat\fR [\fB-a\fR] [\fB-i\fR \fIcontractid...\fR] [\fB-t\fR \fItype...\fR] [\fB-v\fR] 
+     [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBctstat\fR utility allows a user to observe the contracts active on a
+system.
+.sp
+.LP
+Unless you specify the \fB-i\fR or \fB-t\fR option, \fBctstat\fR displays
+statistics on all contracts in the system.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display all contracts regardless of state. By default, only those contracts
+which are in the owned, inherited, or orphan states are displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIcontractid\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Request status on the specified contracts, identified by their numeric contract
+identifier (\fIcontract_id\fR).
+.sp
+This option accepts lists as arguments . Items in the list can be separated by
+commas, or enclosed in quotes and separated by commas or spaces.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fBu\fR | \fBd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display a time stamp.
+.sp
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItype\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Request status on contracts of the specified type (\fItype\fR).
+.sp
+This option accepts lists as arguments. Items in the list can be separated by
+commas, or enclosed in quotes and separated by commas or spaces.
+.sp
+The following types are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprocess\fR\fR
+.ad
+.sp .6
+.RS 4n
+Process contracts
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose output.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinterval\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report once each \fIinterval\fR seconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print only \fIcount\fR reports.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+The following list defines the column headings and the meanings of a
+\fBctstat\fR report:
+.sp
+.ne 2
+.mk
+.na
+\fBCTID\fR
+.ad
+.sp .6
+.RS 4n
+The contract \fBID\fR of the contract.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBZONEID\fR
+.ad
+.sp .6
+.RS 4n
+The zone ID of the contract's creator.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTYPE\fR
+.ad
+.sp .6
+.RS 4n
+The contract type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTATE\fR
+.ad
+.sp .6
+.RS 4n
+The state of the contract:
+.sp
+.ne 2
+.mk
+.na
+\fBowned\fR
+.ad
+.sp .6
+.RS 4n
+Contract is owned by a process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinherited\fR
+.ad
+.sp .6
+.RS 4n
+The contract owner has exited abnormally and the contract has been inherited by
+the owner's process contract.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBorphan\fR
+.ad
+.sp .6
+.RS 4n
+The contract owner has abandoned the contract, the contract owner exited
+abnormally and the contract was not inherited by the owner's process contract,
+or the process contract which had inherited the contract was abandoned by its
+owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdead\fR
+.ad
+.sp .6
+.RS 4n
+The contract is no longer active. It is removed from the system automatically
+when all references to it (open file descriptors, contract templates, and
+events) have been released.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBHOLDER\fR
+.ad
+.sp .6
+.RS 4n
+If the contract is in the \fBowned\fR state, the pid of the process that owns
+the contract. If the contract is in the \fBinherited\fR state, the id of the
+regent process contract.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBEVENTS\fR
+.ad
+.sp .6
+.RS 4n
+The number of unacknowledged critical events pending.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBQTIME\fR
+.ad
+.sp .6
+.RS 4n
+The time until quantum ends, or \fB-\fR if no negotiation is in progress.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNTIME\fR
+.ad
+.sp .6
+.RS 4n
+The time until negotiation ends, or \fB-\fR if no negotiation is in progress.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReporting on all Contracts in the System
+.sp
+.LP
+The following example reports on all contracts in the system:
+
+.sp
+.in +2
+.nf
+example% ctstat -a
+
+CTID    TYPE    STATE   HOLDER  EVENTS  QTIME   NTIME
+1       process owned   100579  0       -       -
+2       process dead    -       1       -       -
+3       process inherit 1       3       -       -
+4       process orphan  -       0       -       -
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRObtaining a Verbose Report of All Contracts in the System
+.sp
+.LP
+The following example obtains a verbose report of all contracts in the system:
+
+.sp
+.in +2
+.nf
+example% ctstat -av
+
+CTID    TYPE    STATE   HOLDER  EVENTS  QTIME   NTIME
+1       process owned   100579  0       -       -
+        informative event set: none
+        critical event set:    hwerr core
+        fatal event set:       hwerr
+        parameter set:         none
+        member processes:      100600 100601
+        inherited ctids:       none
+        service fmri:          svc:/system/init:default
+        svc_fmri ctid:         1
+        creator:               sched
+        aux:
+
+2       process dead    -       1       -       -
+        informative event set: none
+        critical event set:    none
+        fatal event set:       hwerr core
+        parameter set:         pgrponly
+        member processes:      none
+        inherited ctids:       none
+        service fmri:          svc:/system/power:default
+        svc_fmri ctid:         19
+        creator:               svc.startd
+        aux:                   start
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Invalid arguments.
+.RE
+
+.SH FILES
+.sp
+.LP
+\fB/system/contract/*\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The human readable output is Uncommitted. The invocation is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBctrun\fR(1), \fBctwatch\fR(1), \fBcontract\fR(4), \fBprocess\fR(4),
+\fBattributes\fR(5)

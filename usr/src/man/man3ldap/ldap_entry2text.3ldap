@@ -1,0 +1,234 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_entry2text 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_entry2text, ldap_entry2text_search, ldap_entry2html,
+ldap_entry2html_search, ldap_vals2html, ldap_vals2text \- LDAP entry display
+functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_entry2text\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*buf\fR, \fBLDAPMessage\fR \fI*entry\fR,
+     \fBstruct ldap_disptmpl\fR \fI*tmpl\fR, \fBchar\fR \fI**defattrs\fR, \fBchar\fR \fI***defvals\fR,
+     \fBint (\fR\fI*writeproc\fR)(), \fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR, \fBint\fR \fIrdncount\fR,
+     \fBunsigned long\fR \fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_entry2text_search\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*dn\fR, \fBchar\fR \fI*base\fR,
+     \fBLDAPMessage\fR \fI*entry\fR, \fBstruct ldap_disptmpl\fR \fI*tmpllist\fR,
+     \fBchar\fR \fI**defattrs\fR, \fBchar\fR \fI***defvals\fR, \fBint (\fR\fI*writeproc\fR)(),
+     \fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR,\fBint\fR \fIrdncount\fR,
+     \fBunsigned long\fR \fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_vals2text\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*buf\fR, \fBchar\fR \fI**vals\fR, \fBchar\fR \fI*label\fR,
+     \fBint\fR \fIlabelwidth\fR, \fBunsigned long\fR\fIsyntaxid\fR, \fBint (\fR\fI*writeproc\fR)(),
+     \fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR, \fBint\fR \fIrdncount\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_entry2html\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*buf\fR, \fBLDAPMessage\fR \fI*entry\fR,
+     \fBstruct ldap_disptmpl\fR \fI*tmpl\fR, \fBchar\fR \fI**defattrs\fR, \fBchar\fR \fI***defvals\fR,
+     \fBint (\fR\fI*writeproc\fR)(),\fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR, \fBint\fR \fIrdncount\fR,
+     \fBunsigned long\fR \fIopts\fR, \fBchar\fR \fI*urlprefix\fR, \fBchar\fR \fI*base\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_entry2html_search\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*dn\fR, \fBLDAPMessage\fR \fI*entry\fR,
+     \fBstruct ldap_disptmpl\fR \fI*tmpllist\fR, \fBchar\fR \fI**defattrs\fR, \fBchar\fR \fI***defvals\fR,
+     \fBint (\fR\fI*writeproc\fR)(), \fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR, \fBint\fR \fIrdncount\fR,
+     \fBunsigned long\fR \fIopts\fR, \fBchar\fR \fI*urlprefix\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_vals2html\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*buf\fR, \fBchar\fR \fI**vals\fR,
+     \fBchar\fR \fI*label\fR, \fBint\fR \fIlabelwidth\fR, \fBunsigned long\fR \fIsyntaxid\fR,
+     \fBint (\fR\fI*writeproc\fR)(), \fBvoid\fR \fI*writeparm\fR, \fBchar\fR \fI*eol\fR, \fBint\fR \fIrdncount\fR,
+     \fBchar\fR \fI*urlprefix\fR);
+.fi
+
+.LP
+.nf
+#define LDAP_DISP_OPT_AUTOLABELWIDTH 0x00000001
+.fi
+
+.LP
+.nf
+#define LDAP_DISP_OPT_HTMLBODYONLY      0x00000002
+.fi
+
+.LP
+.nf
+#define LDAP_DTMPL_BUFSIZ  2048
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions use the LDAP display template functions (see
+\fBldap_disptmpl\fR(3LDAP) and  \fBldap_templates.conf(4))\fR to produce a
+plain text or an HyperText Markup Language (HTML) display of an entry or a set
+of values.  Typical plain text output produced for an entry might look like:
+.sp
+.in +2
+.nf
+    "Barbara J Jensen, Information Technology Division"
+     Also Known As:
+     Babs Jensen
+     Barbara Jensen
+     Barbara J Jensen
+     E-Mail Address:
+     bjensen@terminator.rs.itd.umich.edu
+     Work Address: 
+     535 W. William 
+     Ann Arbor, MI 48103
+     Title:        
+     Mythical Manager, Research Systems
+     ...
+.fi
+.in -2
+
+.sp
+.LP
+The exact output produced will depend on the display template configuration.
+HTML output is similar to the plain text output, but more richly formatted.
+.sp
+.LP
+\fBldap_entry2text()\fR produces a text representation of \fIentry\fR and
+writes the text by calling the \fIwriteproc\fR function.  All of the attributes
+values to be displayed must be present in \fIentry;\fR no interaction with the
+LDAP server will be performed within \fBldap_entry2text\fR. \fBld\fR is the
+LDAP pointer obtained by a previous call to \fBldap_open.\fR \fIwriteproc\fR
+should be declared as:
+.sp
+.in +2
+.nf
+int writeproc( writeparm, p, len )
+ void  *writeparm;
+ char  *p;
+ int  len;
+.fi
+.in -2
+
+.sp
+.LP
+where \fIp\fR is a pointer to text to be written and \fIlen\fR is the length of
+the text. \fIp\fR is guaranteed to be zero-terminated.  Lines of text are
+terminated with the string \fIeol.\fR \fIbuf\fR is a pointer to a buffer of
+size \fBLDAP_DTMPL_BUFSIZ\fR or larger.  If \fIbuf\fR \fIis\fR \fINULL\fR then
+a buffer is allocated and freed internally. \fItmpl\fR is a pointer to the
+display template to be used (usually obtained by calling
+\fBldap_oc2template\fR). If \fItmpl\fR is \fINULL\fR, no template is used and a
+generic display is produced. \fIdefattrs\fR is a NULL-terminated array of LDAP
+attribute names which you wish to provide default values for (only used if
+\fIentry\fR contains no values for the attribute).  An array of NULL-terminated
+arrays of default values corresponding to the attributes should be passed in
+\fIdefvals.\fR \fIThe\fR \fIrdncount\fR parameter is used to limit the number
+of Distinguished Name (DN) components that are actually displayed for DN
+attributes.  If \fIrdncount\fR is zero, all components are shown. \fIopts\fR is
+used to specify output options.  The only values currently allowed are zero
+(default output), \fBLDAP_DISP_OPT_AUTOLABELWIDTH\fR which causes the width for
+labels to be determined based on the longest label in \fItmpl,\fR \fIand\fR
+\fBLDAP_DISP_OPT_HTMLBODYONLY\fR. The \fBLDAP_DISP_OPT_HTMLBODYONLY\fR option
+instructs the library not to include <HTML>, <HEAD>, <TITLE>, and <BODY> tags.
+In other words, an HTML fragment is generated, and the caller is responsible
+for prepending and appending the appropriate HTML tags to construct a correct
+HTML document.
+.sp
+.LP
+\fBldap_entry2text_search()\fR is similar to \fBldap_entry2text\fR, and all of
+the like-named parameters have the same meaning except as noted below.   If
+\fIbase\fR is not \fINULL\fR, it is the search base to use when executing
+search actions.  If it is \fINULL\fR, search action template items are ignored.
+If \fIentry\fR is not \fINULL\fR, it should contain the \fIobjectClass\fR
+attribute values for the entry to be displayed.  If \fIentry\fR is \fINULL\fR,
+\fIdn\fR must not be \fINULL\fR, and  \fBldap_entry2text_search\fR will
+retrieve the  \fBobjectClass\fR values itself by calling \fBldap_search_s.\fR
+\fBldap_entry2text_search\fR will determine the appropriate display template to
+use by calling \fBldap_oc2template\fR, and will call \fBldap_search_s\fR to
+retrieve any attribute values to be displayed.  The \fItmpllist\fR parameter is
+a pointer to the entire list of templates available (usually obtained by
+calling \fBldap_init_templates\fR or \fBldap_init_templates_buf\fR). If
+\fItmpllist\fR is \fINULL\fR, \fBldap_entry2text_search\fR will attempt to read
+a load templates from the default template configuration file
+\fBETCDIR/ldaptemplates.conf\fR
+.sp
+.LP
+\fBldap_vals2text\fR produces a text representation of a single set of LDAP
+attribute values.  The \fIld,\fR \fIbuf,\fR \fIwriteproc,\fR \fIwriteparm,\fR
+\fIeol,\fR and \fIrdncount\fR parameters are the same as the like-named
+parameters for \fBldap_entry2text\fR. \fIvals\fR is a NULL-terminated list of
+values, usually obtained by a call to \fBldap_get_values\fR. \fIlabel\fR is a
+string shown next to the values (usually a friendly form of an LDAP attribute
+name). \fIlabelwidth\fR specifies the label margin, which is the number of
+blank spaces displayed to the left of the values. If zero is passed, a default
+label width is used. \fIsyntaxid\fR is a display template attribute syntax
+identifier (see  \fBldap_disptmpl\fR(3LDAP) for a list of the pre-defined
+\fBLDAP_SYN_...\fR values).
+.sp
+.LP
+\fBldap_entry2html\fR produces an HTML representation of \fIentry.\fR It
+behaves exactly like ldap_entry2text(3LDAP), except for the formatted output
+and the addition of two parameters. \fIurlprefix\fR is the starting text to use
+when constructing an LDAP URL.  The default is the string \fIldap:///\fR The
+second additional parameter, \fIbase,\fR the search base to use when executing
+search actions.  If it is  \fINULL\fR, search action template items are
+ignored.
+.sp
+.LP
+\fBldap_entry2html_search\fR behaves exactly like
+\fBldap_entry2text_search\fR(3LDAP), except HTML output is produced and one
+additional parameter is required. \fIurlprefix\fR is the starting text to use
+when constructing an LDAP URL.  The default is the string \fIldap:///\fR
+.sp
+.LP
+\fBldap_vals2html\fR behaves exactly like
+\fBldap_vals2text\fR,\fBexcept\fRHTML\fBoutput\fRis and one additional
+parameter is required. \fIurlprefix\fR is the starting text to use when
+constructing an LDAP URL. The default is the string \fIldap:///\fR
+.SH ERRORS
+.sp
+.LP
+These functions all return an LDAP error code. \fBLDAP_SUCCESS\fR is returned
+if no error occurs. See \fBldap_error\fR(3LDAP) for details. The \fIld_errno\fR
+field of the \fIld\fR parameter is also set to indicate the error.
+.SH FILES
+.sp
+.LP
+\fBETCDIR/ldaptemplates.conf\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_disptmpl\fR(3LDAP), \fBldaptemplates.conf\fR(4) ,
+\fBattributes\fR(5)

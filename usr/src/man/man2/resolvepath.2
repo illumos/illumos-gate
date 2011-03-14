@@ -1,0 +1,132 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH resolvepath 2 "12 May 1997" "SunOS 5.11" "System Calls"
+.SH NAME
+resolvepath \- resolve all symbolic links of a path name
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBresolvepath\fR(\fBconst char *\fR\fIpath\fR, \fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbufsiz\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBresolvepath()\fR function fully resolves all symbolic links in the path
+name \fIpath\fR into a resulting path name free of symbolic links and places
+the resulting path name in the buffer \fIbuf\fR which has size \fIbufsiz\fR.
+The resulting path name names the same file or directory as the original path
+name. All ``\fB\&.\fR'' components are eliminated and every non-leading
+``\fB\&..\fR'' component is eliminated together with its preceding directory
+component. If leading ``\fB\&..\fR'' components reach to the root directory,
+they are replaced by ``\fB/\fR''. If the number of bytes in the resulting path
+name is less than \fIbufsiz\fR, the contents of the remainder of \fIbuf\fR are
+unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBresolvepath()\fR returns the count of bytes
+placed in the buffer. Otherwise, it returns  \fB\(mi1\fR, leaves the buffer
+unchanged, and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBresolvepath()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied for a component of the path prefix of \fIpath\fR or
+for a path prefix component resulting from the resolution of a symbolic link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR or \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error occurred while reading from the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument is an empty string or a component of \fIpath\fR or a
+path name component produced by resolving a symbolic link does not name an
+existing file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in resolving \fIpath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of \fIpath\fR exceeds \fIPATH_MAX\fR, or a path name component is
+longer than \fINAME_MAX\fR. Path name resolution of a symbolic link produced an
+intermediate result whose length exceeds \fIPATH_MAX\fR or a component whose
+length exceeds \fINAME_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix of \fIpath\fR or of a path prefix component
+resulting from the resolution of a symbolic link is not a directory.
+.RE
+
+.SH USAGE
+.sp
+.LP
+No more than \fIPATH_MAX\fR bytes will be placed in the buffer. Applications
+should not assume that the returned contents of the buffer are null-terminated.
+.SH SEE ALSO
+.sp
+.LP
+\fBreadlink\fR(2), \fBrealpath\fR(3C)

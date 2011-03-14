@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH semids 2 "8 Mar 2000" "SunOS 5.11" "System Calls"
+.SH NAME
+semids \- discover all semaphore identifiers
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sem.h>
+
+\fBint\fR \fBsemids\fR(\fBint *\fR\fIbuf\fR, \fBuint_t\fR \fInids\fR, \fBuint_t *\fR\fIpnids\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsemids()\fR function copies all active semaphore identifiers from the
+system into the user-defined buffer specified by \fIbuf\fR, provided that the
+number of such identifiers is not greater than the number of integers the
+buffer can contain, as specified by \fInids\fR.  If the size of the buffer is
+insufficient to contain all of the active semaphore identifiers in the system,
+none are copied.
+.sp
+.LP
+Whether or not the size of the buffer is sufficient to contain all of them, the
+number of active semaphore identifiers in the system is copied into the
+unsigned integer pointed to by \fIpnids\fR.
+.sp
+.LP
+If \fInids\fR is 0 or less than the number of active semaphore identifiers in
+the system, \fIbuf\fR is ignored.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsemids()\fR returns \fB0\fR.  Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsemids()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR or \fIpnids\fR argument points to an illegal address.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsemids()\fR function returns a snapshot of all the active semaphore
+identifiers in the system.  More may be added and some may be removed before
+they can be used by the caller.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBsemids()\fR example
+.sp
+.LP
+This is sample C code indicating how to use the \fBsemids()\fR function.
+
+.sp
+.in +2
+.nf
+void
+examine_semids()
+{
+     int *ids = NULL;
+     uint_t nids = 0;
+     uint_t n;
+     int i;
+
+     for (;;) {
+          if (semids(ids, nids, &n) != 0) {
+               perror("semids");
+               exit(1);
+          }
+          if (n <= nids)     /* we got them all */
+               break;
+          /* we need a bigger buffer */
+          ids = realloc(ids, (nids = n) * sizeof (int));
+     }   
+
+     for (i = 0; i < n; i++)
+          process_semid(ids[i]);
+
+     free(ids);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBipcrm\fR(1), \fBipcs\fR(1), \fBIntro\fR(2), \fBsemctl\fR(2),
+\fBsemget\fR(2), \fBsemop\fR(2), \fBattributes\fR(5)

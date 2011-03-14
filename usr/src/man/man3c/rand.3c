@@ -1,0 +1,89 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rand 3C "19 May 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+rand, srand, rand_r \- simple random-number generator
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBint\fR \fBrand\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsrand\fR(\fBunsigned int\fR \fIseed\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrand_r\fR(\fBunsigned int *\fR\fIseed\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrand()\fR function uses a multiplicative congruential random-number
+generator with period 2^32 that returns successive pseudo-random numbers in the
+range of 0 to \fBRAND_MAX\fR (defined in <\fBstdlib.h\fR>).
+.sp
+.LP
+The  \fBsrand()\fR function uses the argument \fIseed\fR as a seed for a new
+sequence of pseudo-random numbers to be returned by subsequent calls to
+\fBrand()\fR. If \fBsrand()\fR is then called with the same \fIseed\fR value,
+the sequence of pseudo-random numbers will be repeated.  If \fBrand()\fR is
+called before any calls to \fBsrand()\fR have been made, the same sequence will
+be generated as when \fBsrand()\fR is first called with a \fIseed\fR value of
+1.
+.sp
+.LP
+The \fBrand_r()\fR function has the same functionality as \fBrand()\fR except
+that a pointer to a seed  \fIseed\fR must be supplied by the caller. If
+\fBrand_r()\fR is called with the same initial value for the object pointed to
+by seed and that object is not modified between successive calls to
+\fBrand_r()\fR, the same sequence as that produced by calls to \fBrand()\fR
+will be generated.
+.sp
+.LP
+The \fBrand()\fR and \fBsrand()\fR functions provide per-process pseudo-random
+streams shared by all threads. The same effect can be achieved if all threads
+call \fBrand_r()\fR with a pointer to the same seed object. The \fBrand_r()\fR
+function allows a thread to generate a private pseudo-random stream by having
+the seed object be private to the thread.
+.SH USAGE
+.sp
+.LP
+The spectral properties of \fBrand()\fR are limited.  The \fBdrand48\fR(3C)
+function provides a better, more elaborate random-number generator.
+.sp
+.LP
+When compiling multithreaded applications, the  \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should be used only in multithreaded
+applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdrand48\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

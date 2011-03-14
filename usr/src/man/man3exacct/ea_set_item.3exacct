@@ -1,0 +1,221 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ea_set_item 3EXACCT "28 Nov 2001" "SunOS 5.11" "Extended Accounting File Access Library Functions"
+.SH NAME
+ea_set_item, ea_alloc, ea_strdup, ea_set_group, ea_match_object_catalog,
+ea_attach_to_object, ea_attach_to_group, ea_free, ea_strfree, ea_free_item,
+ea_free_object \- create, destroy and manipulate exacct objects
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <exacct.h>
+
+\fBint\fR \fBea_set_item\fR(\fBea_object_t *\fR\fIobj\fR, \fBea_catalog_t\fR \fItag\fR, \fBvoid *\fR\fIvalue\fR,
+     \fBsize_t\fR \fIvalsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBea_alloc\fR(\fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBea_strdup\fR(\fBchar *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBea_set_group\fR(\fBea_object_t *\fR\fIobj\fR, \fBea_catalog_t\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBea_match_object_catalog\fR(\fBea_object_t *\fR\fIobj\fR, \fBea_catalog_t\fR \fIcatmask\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBea_attach_to_object\fR(\fBea_object_t *\fR\fIhead_obj\fR, \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBea_attach_to_group\fR(\fBea_object_t *\fR\fIgroup_obj\fR, \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBea_free\fR(\fBvoid *\fR\fIptr\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBea_strfree\fR(\fBchar *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBea_free_item\fR(\fBea_object_t *\fR\fIobj\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBea_free_object\fR(\fBea_object_t *\fR\fIobj\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBea_alloc()\fR function allocates a block of memory of the requested
+size. This block can be safely passed to \fBlibexacct\fR functions, and can be
+safely freed by any of the \fBea_free()\fR functions.
+.sp
+.LP
+The \fBea_strdup()\fR function can be used to duplicate a string that is to be
+stored inside an \fBea_object_t\fR structure.
+.sp
+.LP
+The \fBea_set_item()\fR function  assigns the given \fBexacct\fR object to be a
+data item with \fIvalue\fR set according to the remaining arguments.  For
+buffer-based data values (\fBEXT_STRING\fR, \fBEXT_EXACCT_OBJECT\fR, and
+\fBEXT_RAW\fR), a copy of the passed buffer is taken. In the case of
+\fBEXT_EXACCT_OBJECT\fR, the passed buffer should be a packed \fBexacct\fR
+object as returned by \fBea_pack_object\fR(3EXACCT). Any item assigned with
+\fBea_set_item()\fR should be freed with \fBea_free_item()\fR specifying a flag
+value of \fBEUP_ALLOC\fR when the item is no longer needed.
+.sp
+.LP
+The \fBea_match_object_catalog()\fR function returns \fBTRUE\fR if the
+\fBexacct\fR object specified by \fIobj\fR has a catalog tag that matches the
+mask specified by \fIcatmask\fR.
+.sp
+.LP
+The \fBea_attach_to_object()\fR function attaches an object to the given
+object. The \fBea_attach_to_group()\fR function attaches a chain of objects as
+member items of the given group. Objects are inserted at the end of the list of
+any previously attached objects.
+.sp
+.LP
+The \fBea_free()\fR function frees a block of memory previously allocated by
+\fBea_alloc()\fR.
+.sp
+.LP
+The \fBea_strfree()\fR function frees a string previously copied by
+\fBea_strdup()\fR.
+.sp
+.LP
+The \fBea_free_item()\fR function frees the \fIvalue\fR fields in the
+\fBea_object_t\fR indicated by \fIobj\fR, if \fBEUP_ALLOC\fR is specified. The
+object itself is not freed. The \fBea_free_object()\fR function frees the
+specified object and any attached hierarchy of objects. If the \fIflag\fR
+argument is set to \fBEUP_ALLOC\fR, \fBea_free_object()\fR will also free any
+variable-length data in the object hierarchy; if set to \fBEUP_NOALLOC\fR,
+\fBea_free_object()\fR will not free variable-length data.  In particular,
+these flags should correspond to those specified in calls to
+\fBea_unpack_object\fR(3EXACCT).
+.SH RETURN VALUES
+.sp
+.LP
+The \fBea_match_object_catalog()\fR function returns 0 if the object's catalog
+tag does not match the given mask, and 1 if there is a match.
+.sp
+.LP
+Other integer-valued functions return 0 if successful. Otherwise these
+functions return -1 and set the extended accounting error code appropriately.
+Pointer-valued functions return a valid pointer if successful and NULL
+otherwise, setting the extended accounting error code appropriately. The
+extended accounting error code can be examined with \fBea_error\fR(3EXACCT).
+.SH ERRORS
+.sp
+.LP
+The \fBea_set_item()\fR, \fBea_set_group()\fR, and
+\fBea_match_object_catalog()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXR_SYSCALL_FAIL\fR\fR
+.ad
+.RS 22n
+.rt  
+A system call invoked by the function failed. The \fBerrno\fR variable contains
+the error value set by the underlying call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXR_INVALID_OBJECT\fR\fR
+.ad
+.RS 22n
+.rt  
+The passed object is of an incorrect type, for example passing a group object
+to \fBea_set_item()\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBexacct\fR file format can be used to represent data other than that in
+the extended accounting format.  By using a unique creator type in the file
+header, application writers can develop their own format suited to the needs of
+their application.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fROpen and close \fBexacct\fR file.
+.sp
+.LP
+Construct an exacct file consisting of a single object containing the current
+process ID.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <unistd.h>
+#include <exacct.h>
+
+\&...
+
+ea_file_t ef;
+ea_object_t obj;
+pid_t my_pid;
+
+my_pid = getpid();
+ea_set_item(&obj, EXT_UINT32 | EXC_DEFAULT | EXT_PROC_PID,
+       &my_pid, sizeof(my_pid));
+
+\&...
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBea_error\fR(3EXACCT), \fBea_open\fR(3EXACCT),
+\fBea_pack_object\fR(3EXACCT), \fBlibexacct\fR(3LIB), \fBattributes\fR(5)

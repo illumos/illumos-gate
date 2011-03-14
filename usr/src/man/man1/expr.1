@@ -1,0 +1,422 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH expr 1 "29 Aug 2003" "SunOS 5.11" "User Commands"
+.SH NAME
+expr \- evaluate arguments as an expression
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/expr\fR \fIargument\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/expr\fR \fIargument\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/expr\fR \fIargument\fR...
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/expr, /usr/xpg4/bin/expr"
+.sp
+.LP
+The \fBexpr\fR utility evaluates the expression and writes the result to
+standard output. The character \fB0\fR is written to indicate a zero value and
+nothing is written to indicate a null string.
+.SS "/usr/xpg6/bin/expr"
+.sp
+.LP
+The \fBexpr\fR utility evaluates the expression and writes the result to
+standard output followed by a NEWLINE. If there is no result from \fBexpr\fR
+processing, a NEWLINE is written to standard output.
+.SH OPERANDS
+.sp
+.LP
+The \fIargument\fR operand is evaluated as an expression. Terms of the
+expression must be separated by blanks. Characters special to the shell must be
+escaped (see \fBsh\fR(1)). Strings containing blanks or other special
+characters should be quoted. The length of the expression is limited to
+\fBLINE_MAX\fR (2048 characters).
+.sp
+.LP
+The operators and keywords are listed below. The list is in order of increasing
+precedence, with equal precedence operators grouped within \fB{\|}\fR symbols.
+All of the operators are left-associative.
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR \fB\e|\fR \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the evaluation of the first \fIexpr\fR if it is neither \fINULL\fR nor
+\fB0\fR; otherwise, returns the evaluation of the second \fIexpr\fR if it is
+not \fINULL\fR; otherwise, \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR \fB\e&\fR \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the first \fIexpr\fR if neither \fIexpr\fR is \fINULL\fR or \fB0\fR,
+otherwise returns \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR{ \fB=\fR, \fB\e>\fR, \fB\e>=\fR, \fB\e<\fR, \fB\e<=\fR, \fB!=\fR}
+\fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the result of an integer comparison if both arguments are integers,
+otherwise returns the result of a string comparison using the locale-specific
+coalition sequence. The result of each comparison will be \fB1\fR if the
+specified relationship is \fBTRUE\fR, \fB0\fR if the relationship is
+\fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr \fR{ \fB+\fR, \fB\(mi \fR} \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Addition or subtraction of integer-valued arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr \fR{ \fB\e*\fR, \fB/\fR, \fB%\fR} \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Multiplication, division, or remainder of the integer-valued arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR \fB:\fR \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+The matching operator \fB:\fR (colon) compares the first argument with the
+second argument, which must be an internationalized basic regular expression
+(BRE), except that all patterns are anchored to the beginning of the string.
+That is, only sequences starting at the first character of a string are matched
+by the regular expression. See \fBregex\fR(5) and NOTES. Normally, the
+\fB/usr/bin/expr\fR matching operator returns the number of bytes matched and
+the \fB/usr/xpg4/bin/expr\fR matching operator returns the number of characters
+matched (\fB0\fR on failure). If the second argument contains at least one BRE
+sub-expression [\e(...\e)], the matching operator returns the string
+corresponding to \e1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinteger\fR \fR
+.ad
+.sp .6
+.RS 4n
+An argument consisting only of an (optional) unary minus followed by digits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR \fR
+.ad
+.sp .6
+.RS 4n
+A string argument that cannot be identified as an \fIinteger\fR argument or as
+one of the expression operator symbols.
+.RE
+
+.SS "Compatibility Operators (x86 only)"
+.sp
+.LP
+The following operators are included for compatibility with INTERACTIVE UNIX
+System only and are not intended to be used by non- INTERACTIVE UNIX System
+scripts:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBindex\fR \fIstring character-list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report the first position in which any one of the bytes in \fIcharacter-list\fR
+matches a byte in \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlength\fR \fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the length (that is, the number of bytes) of \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsubstr\fR \fIstring integer-1 integer-2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Extract the substring of \fIstring\fR starting at position \fIinteger-1\fR and
+of length \fIinteger-2\fR bytes.  If \fIinteger-1\fR has a value greater than
+the number of bytes in \fIstring\fR, \fBexpr\fR returns a null string.  If you
+try to extract more bytes than there are in string, \fBexpr\fR returns all the
+remaining bytes from \fIstring\fR. Results are unspecified if either
+\fIinteger-1\fR or \fIinteger-2\fR is a negative value.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAdding an integer to a shell variable
+.sp
+.LP
+Add 1 to the shell variable \fBa\fR:
+
+.sp
+.in +2
+.nf
+example$ \fBa=`expr\| $a\| +\| 1`\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRReturning a path name segment
+.sp
+.LP
+The following example emulates \fBbasename\fR(1), returning the last segment of
+the path name \fB$a\fR. For \fB$a\fR equal to either \fB/usr/abc/file\fR or
+just \fBfile\fR, the example returns \fBfile\fR. (Watch out for \fB/\fR alone
+as an argument: \fBexpr\fR takes it as the division operator. See NOTES below.)
+
+.sp
+.in +2
+.nf
+example$ \fBexpr $a : '.*/\e(.*\e)' \e| $a\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing // characters to simplify the expression
+.sp
+.LP
+Here is a better version of the previous example. The addition of the \fB//\fR
+characters eliminates any ambiguity about the division operator and simplifies
+the whole expression.
+
+.sp
+.in +2
+.nf
+example$ \fBexpr //$a : '.*/\e(.*\e)'\fR
+.fi
+.in -2
+.sp
+
+.SS "/usr/bin/expr"
+.LP
+\fBExample 4 \fRReturning the number of bytes in a variable
+.sp
+.in +2
+.nf
+example$ \fBexpr "$VAR" : '.*'\fR
+.fi
+.in -2
+.sp
+
+.SS "/usr/xpg4/bin/expr"
+.LP
+\fBExample 5 \fRReturning the number of characters in a variable
+.sp
+.in +2
+.nf
+example$ \fBexpr "$VAR" : '.*'\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBexpr\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+As a side effect of expression evaluation, \fBexpr\fR returns the following
+exit values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+If the expression is neither \fINULL\fR nor \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 7n
+.rt  
+If the expression is either \fINULL\fR or \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR \fR
+.ad
+.RS 7n
+.rt  
+For invalid expressions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>2\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIenabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbasename\fR(1), \fBed\fR(1), \fBsh\fR(1), \fBIntro\fR(3),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBregex\fR(5), \fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsyntax error\fR\fR
+.ad
+.RS 24n
+.rt  
+Operator and operand errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-numeric argument\fR\fR
+.ad
+.RS 24n
+.rt  
+Arithmetic is attempted on such a string.
+.RE
+
+.SH NOTES
+.sp
+.LP
+After argument processing by the shell, \fBexpr\fR cannot tell the difference
+between an operator and an operand except by the value. If \fB$a\fR is an
+\fB=\fR, the command:
+.sp
+.in +2
+.nf
+example$ \fBexpr $a = '='\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+looks like:
+.sp
+.in +2
+.nf
+example$ \fBexpr = = =\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+as the arguments are passed to \fBexpr\fR (and they are all taken as the
+\fB=\fR operator). The following works:
+.sp
+.in +2
+.nf
+example$ \fBexpr X$a = X=\fR
+.fi
+.in -2
+.sp
+
+.SS "Regular Expressions"
+.sp
+.LP
+Unlike some previous versions, \fBexpr\fR uses Internationalized Basic Regular
+Expressions for all system-provided locales. Internationalized Regular
+Expressions are explained on the \fBregex\fR(5) manual page.

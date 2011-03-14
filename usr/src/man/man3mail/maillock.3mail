@@ -1,0 +1,121 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH maillock 3MAIL "29 Mar 1999" "SunOS 5.11" "User Mailbox Library Functions"
+.SH NAME
+maillock, mailunlock, touchlock \- functions to manage lockfile(s) for user's
+mailbox
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lmail\fR [ \fIlibrary\fR ... ]
+#include <maillock.h>
+
+
+
+\fBint\fR \fBmaillock\fR(\fBconst char *\fR\fIuser\fR, \fBint\fR \fIretrycnt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmailunlock\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtouchlock\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmaillock()\fR function attempts to create a lockfile for the user's
+mailfile. If a lockfile already exists, and it has not been modified in the
+last 5 minutes, \fBmaillock()\fR will remove the lockfile and set its own
+lockfile.
+.sp
+.LP
+It is crucial that programs locking mail files refresh their locks  at least
+every three minutes to maintain the lock. Refresh the lockfile by calling the
+\fBtouchlock()\fR function with no arguments.
+.sp
+.LP
+The algorithm used to determine the age of the lockfile takes into account
+clock drift between machines using a network file system. A zero is written
+into the lockfile so that the lock will  be respected by systems running the
+standard version of System V.
+.sp
+.LP
+If the lockfile has been modified in the last 5 minutes  the process will sleep
+until the lock is available. The sleep algorithm is to sleep for 5 seconds
+times the attempt number. That is, the first sleep will be for 5 seconds, the
+next sleep will be for 10 seconds, etc. until the number of attempts reaches
+\fIretrycnt\fR.
+.sp
+.LP
+When the lockfile is no longer needed, it should be removed by calling
+\fBmailunlock()\fR.
+.sp
+.LP
+The \fIuser\fR argument is the login name of the user for whose mailbox the
+lockfile will be created. \fBmaillock()\fR assumes that user's mailfiles are in
+the ``standard'' place as defined in  <\fBmaillock.h\fR>.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, .\fBmaillock()\fR returns \fB0\fR. Otherwise it
+returns \fB\(mi1\fR\&.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/mail/*\fR\fR
+.ad
+.RS 20n
+.rt  
+user mailbox files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/mail/*.lock\fR\fR
+.ad
+.RS 20n
+.rt  
+user mailbox lockfiles
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibmail\fR(3LIB),\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBmailunlock()\fR function will only remove the lockfile created from the
+most previous call to \fBmaillock()\fR. Calling \fBmaillock()\fR for different
+users without intervening calls to \fBmailunlock()\fR will cause the initially
+created lockfile(s) to remain, potentially blocking subsequent message delivery
+until the current process finally terminates.

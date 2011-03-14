@@ -1,0 +1,136 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_termattrs 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_termattrs, baudrate, erasechar, has_ic, has_il, killchar, longname,
+termattrs, termname \- curses environment query routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBbaudrate\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar\fR \fBerasechar\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhas_ic\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhas_il\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar\fR \fBkillchar\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBlongname\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchtype\fR \fBtermattrs\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtermname\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbaudrate()\fR routine returns the output speed of the terminal. The
+number returned is in bits per second, for example \fB9600\fR, and is an
+integer.
+.sp
+.LP
+With the \fBerasechar()\fR routine, the user's current erase character is
+returned.
+.sp
+.LP
+The \fBhas_ic()\fR routine is true if the terminal has insert- and
+delete-character capabilities.
+.sp
+.LP
+The \fBhas_il()\fR routine is true if the terminal has insert- and delete-line
+capabilities, or can simulate them using scrolling regions. This might be used
+to determine if it would be appropriate to turn on physical scrolling using
+\fBscrollok()\fR.
+.sp
+.LP
+With the \fBkillchar()\fR routine, the user's current line kill character is
+returned.
+.sp
+.LP
+The \fBlongname()\fR routine returns a pointer to a static area containing a
+verbose description of the current terminal. The maximum length of a verbose
+description is 128 characters. It is defined only after the call to
+\fBinitscr()\fR or \fBnewterm()\fR. The area is overwritten by each call to
+\fBnewterm()\fR and is not restored by \fBset_term()\fR, so the value should be
+saved between calls to \fBnewterm()\fR if \fBlongname()\fR is going to be used
+with multiple terminals.
+.sp
+.LP
+If a given terminal doesn't support a video attribute that an application
+program is trying to use, \fBcurses\fR may substitute a different video
+attribute for it. The \fBtermattrs()\fR function returns a logical OR of all
+video attributes supported by the terminal. This information is useful when a
+\fBcurses\fR program needs complete control over the appearance of the screen.
+.sp
+.LP
+The \fBtermname()\fR routine returns the value of the environment variable
+\fBTERM\fR (truncated to 14 characters).
+.SH RETURN VALUES
+.sp
+.LP
+\fBlongname()\fR and \fBtermname()\fR return \fINULL\fR on error.
+.sp
+.LP
+Routines that return an integer return \fBERR\fR upon failure and an integer
+value other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_initscr\fR(3CURSES), \fBcurs_outopts\fR(3CURSES),
+\fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBtermattrs()\fR may be a macro.

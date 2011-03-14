@@ -66,6 +66,8 @@ dir path=usr/share/lib/java/javadoc/dtrace/api/resources group=other
 dir path=usr/share/lib/java/javadoc/dtrace/examples group=other
 dir path=usr/share/lib/java/javadoc/dtrace/html group=other
 dir path=usr/share/lib/java/javadoc/dtrace/images group=other
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man3lib
 file path=usr/demo/dtrace/applicat.d
 file path=usr/demo/dtrace/badopen.d
 file path=usr/demo/dtrace/begin.d
@@ -627,6 +629,11 @@ file path=usr/share/lib/java/javadoc/dtrace/html/JavaDTraceAPI.html \
 file path=usr/share/lib/java/javadoc/dtrace/html/fast.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/images/JavaDTraceAPI.gif \
     group=other
+file path=usr/share/man/man1m/dtrace.1m
+file path=usr/share/man/man1m/intrstat.1m
+file path=usr/share/man/man1m/lockstat.1m
+file path=usr/share/man/man1m/plockstat.1m
+file path=usr/share/man/man3lib/libdtrace.3lib
 hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
 hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec

@@ -1,0 +1,131 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_get_devstate 9F "13 August 1999" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_get_devstate \- Check device state
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+\fBddi_devstate_t\fR \fBddi_get_devstate\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to the device's \fBdev_info\fR structure
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_get_devstate()\fR function returns a value indicating the state of
+the device specified by \fB dip\fR, as derived from the configuration
+operations that have been performed on it (or on the bus on which it resides)
+and any fault reports relating to it.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEVSTATE_OFFLINE\fR\fR
+.ad
+.RS 25n
+.rt  
+The device is offline.  In this state, the device driver is not attached, nor
+will it be attached automatically. The device cannot be used until it is
+brought online.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEVSTATE_DOWN\fR\fR
+.ad
+.RS 25n
+.rt  
+ The device is online but unusable due to a fault.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEVSTATE_QUIESCED\fR\fR
+.ad
+.RS 25n
+.rt  
+ The bus on which the device resides has been quiesced. This is not a fault,
+but no operations on the device should be performed while the bus remains
+quiesced.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEVSTATE_DEGRADED\fR\fR
+.ad
+.RS 25n
+.rt  
+ The device is online but only able to provide a partial or degraded service,
+due to a fault.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DEVSTATE_UP\fR\fR
+.ad
+.RS 25n
+.rt  
+ The device is online and fully operational.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_get_devstate()\fR function may be called from user, kernel, or
+interrupt context.
+.SH NOTES
+.sp
+.LP
+A device driver should call this function to check its own state at each major
+entry point, and before committing resources to a requested operation.  If a
+driver discovers that its device is already down, it should perform required
+cleanup actions and return as soon as possible.  If appropriate, it should
+return an error to its caller, indicating that the device has failed (for
+example, a driver's \fBread\fR(9E) routine would return \fBEIO\fR).
+.sp
+.LP
+Depending on the driver, some non-I/O operations (for example, calls to the
+driver's \fBioctl\fR(9E) routine) may still succeed; only functions which would
+require fully accessible and operational hardware will necessarily fail. If the
+bus on which the device resides is quiesced, the driver may return a value
+indicating the operation should be retried later (for example, \fBEAGAIN\fR).
+Alternatively, for some classes of device, it may be appropriate for the driver
+to enqueue the operation and service it once the bus has been unquiesced.  Note
+that not all busses support the quiesce/unquiesce operations, so this value may
+never be seen by some drivers.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E),  \fBioctl\fR(9E), \fBopen\fR(9E), \fBread\fR(9E),
+\fBstrategy\fR(9E), \fBwrite\fR(9E), \fBddi_dev_report_fault\fR(9F)

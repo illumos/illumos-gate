@@ -1,0 +1,79 @@
+'\" te
+.\"  Copyright (c) 1985 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.TH lptest 1B "9 Sep 1996" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+lptest \- generate line printer ripple pattern
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/lptest\fR [\fIlength\fR [\fIcount\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlptest\fR utility writes the traditional \fIripple test\fR pattern to
+the standard output. In 96 lines, the ripple test pattern prints all 96
+printable \fBASCII\fR characters in each position. The ripple test pattern was
+originally created to test printers.  It is also useful for testing terminals,
+driving terminal ports, debugging, and performing tasks that require a quick
+supply of random data.
+.sp
+.LP
+This command is obsolete.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlength\fR\fR
+.ad
+.RS 10n
+.rt  
+Specifies the length of the output line in characters. \fB79\fR characters is
+the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 10n
+.rt  
+Specifies the number of output lines. \fB200\fR lines is the default. If
+\fIcount\fR is specified, \fIlength\fR must also be specified.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

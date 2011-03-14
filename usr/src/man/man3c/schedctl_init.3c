@@ -1,0 +1,133 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH schedctl_init 3C "28 May 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+schedctl_init, schedctl_lookup, schedctl_exit, schedctl_start, schedctl_stop \-
+preemption control
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR...  [ \fIlibrary\fR... ]
+#include <schedctl.h>
+
+\fBschedctl_t *\fR\fBschedctl_init\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBschedctl_t *\fR\fBschedctl_lookup\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBschedctl_exit\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBschedctl_start\fR(\fBschedctl_t *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBschedctl_stop\fR(\fBschedctl_t *\fR\fIptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide limited control over the scheduling of a thread (see
+\fBthreads\fR(5)). They allow a running thread to give a hint to the kernel
+that preemptions of that thread should be avoided. The most likely use for
+these functions is to block preemption while holding a spinlock. Improper use
+of this facility, including attempts to block preemption for sustained periods
+of time, may result in reduced performance.
+.sp
+.LP
+The \fBschedctl_init()\fR function initializes preemption control for the
+calling thread and returns a pointer used to refer to the data. If
+\fBschedctl_init()\fR is called more than once by the same thread, the most
+recently returned pointer is the only valid one.
+.sp
+.LP
+The \fBschedctl_lookup()\fR function returns the currently allocated preemption
+control data associated with the calling thread that was previously returned by
+\fBschedctl_init()\fR. This can be useful in programs where it is difficult to
+maintain local state for each thread.
+.sp
+.LP
+The \fBschedctl_exit()\fR function removes the preemption control data
+associated with the calling thread.
+.sp
+.LP
+The \fBschedctl_start()\fR macro gives a hint to the kernel scheduler that
+preemption should be avoided on the current thread. The pointer passed to the
+macro must be the same as the pointer returned by the call to
+\fBschedctl_init()\fR by the current thread. The behavior of the program when
+other values are passed is undefined.
+.sp
+.LP
+The \fBschedctl_stop()\fR macro removes the hint that was set by
+\fBschedctl_start()\fR. As with \fBschedctl_start()\fR, the pointer passed to
+the macro must be the same as the pointer returned by the call to
+\fBschedctl_init()\fR by the current thread.
+.sp
+.LP
+The \fBschedctl_start()\fR and \fBschedctl_stop()\fR macros are intended to be
+used to bracket short critical sections, such as the time spent holding a
+spinlock. Other uses, including the failure to call \fBschedctl_stop()\fR soon
+after calling \fBschedctl_start()\fR, might result in poor performance.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBschedctl_init()\fR function returns a pointer to a \fBschedctl_t\fR
+structure if the initialization was successful, or \fINULL\fR otherwise. The
+\fBschedctl_lookup()\fR function returns a pointer to a \fBschedctl_t\fR
+structure if the data for that thread was found, or \fINULL\fR otherwise.
+.SH ERRORS
+.sp
+.LP
+No errors are returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpriocntl\fR(1), \fBexec\fR(2), \fBfork\fR(2), \fBpriocntl\fR(2),
+\fBattributes\fR(5), \fBthreads\fR(5)
+.SH NOTES
+.sp
+.LP
+Preemption control is intended for use by threads belonging to the time-sharing
+(TS), interactive (IA), fair-share (FSS), and fixed-priority (FX) scheduling
+classes. If used by threads in other scheduling classes, such as real-time
+(RT), no errors will be returned but \fBschedctl_start()\fR and
+\fBschedctl_stop()\fR will not have any effect.
+.sp
+.LP
+The data used for preemption control are not copied in the child of a
+\fBfork\fR(2). Thus, if a process containing threads using preemption control
+calls \fBfork\fR and the child does not immediately call \fBexec\fR(2), each
+thread in the child must call \fBschedctl_init()\fR again prior to any future
+uses of \fBschedctl_start()\fR and \fBschedctl_stop()\fR. Failure to do so will
+result in undefined behavior.

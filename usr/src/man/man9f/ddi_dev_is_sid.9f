@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dev_is_sid 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dev_is_sid \- tell whether a device is self-identifying
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_dev_is_sid\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_dev_is_sid()\fR function tells the caller whether the device
+described by \fIdip\fR is self-identifying, that is, a device that can
+unequivocally tell the system that it exists. This is useful for drivers that
+support both a self-identifying as well as a non-self-identifying variants of a
+device (and therefore must be probed).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Device is self-identifying.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+Device is not self-identifying.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_dev_is_sid()\fR function can be called from user, interrupt, or
+kernel context.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+1   ...
+2   int
+3   bz_probe(dev_info_t *dip)
+4   {
+5   	...
+6   	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
+7   		/*
+8   		 * This is the self-identifying version (OpenBoot).
+9   		 * No need to probe for it because we know it is there.
+10  		 * The existence of dip && ddi_dev_is_sid() proves this.
+11  		 */
+12  			return (DDI_PROBE_DONTCARE);
+13  	}
+14  	/*
+15  	 * Not a self-identifying variant of the device. Now we have to
+16  	 * do some work to see whether it is really attached to the
+17  	 * system.
+18  	 */
+19  ...
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBprobe\fR(9E) \fIWriting Device Drivers\fR

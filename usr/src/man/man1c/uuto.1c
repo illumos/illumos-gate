@@ -1,0 +1,313 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uuto 1C "28 Mar 1995" "SunOS 5.11" "Communication Commands"
+.SH NAME
+uuto, uupick \- public UNIX-to-UNIX system file copy
+.SH SYNOPSIS
+.LP
+.nf
+\fBuuto\fR [\fB-mp\fR] \fIsource-file\fR... \fIdestination\fR
+.fi
+
+.LP
+.nf
+\fBuupick\fR [\fB-s\fR \fIsystem\fR]
+.fi
+
+.SH DESCRIPTION
+.SS "uuto"
+.sp
+.LP
+\fBuuto\fR sends \fIsource-file\fR to \fIdestination\fR. \fBuuto\fR uses the
+\fBuucp\fR(1C) facility to send files, while it allows the local system to
+control the file access. A source-file name is a path name on your machine.
+Destination has the form:
+.sp
+.LP
+\fBsystem\fR[\fI!system\fR]\fI ... !user\fR
+.sp
+.LP
+where \fBsystem\fR is taken from a list of system names that \fBuucp\fR knows
+about.  \fIUser\fR is the login name of someone on the specified system.
+.sp
+.LP
+The files (or sub-trees if directories are specified) are sent to \fBPUBDIR\fR
+on \fBsystem\fR, where \fBPUBDIR\fR is a public directory defined in the
+\fBuucp\fR source. By default, this directory is \fB/var/spool/uucppublic\fR.
+Specifically the files are sent to
+.sp
+.LP
+\fBPUBDIR/receive/\fR\fIuser\fR/\fImysystem\fR/files.
+.sp
+.LP
+The recipient is notified by \fBmail\fR(1) of the arrival of files.
+.SS "uupick"
+.sp
+.LP
+\fBuupick\fR accepts or rejects the files transmitted to the user.
+Specifically, \fBuupick\fR searches \fBPUBDIR\fR for files destined for the
+user. For each entry (file or directory) found, the following message is
+printed on standard output:
+.sp
+.LP
+\fBfrom system \fR\fIsysname\fR\fB:\fR [file \fIfile-name\fR] [dir
+\fBdirname\fR] \fB?\fR
+.sp
+.LP
+\fBuupick\fR then reads a line from standard input to determine the disposition
+of the file:
+.sp
+.ne 2
+.mk
+.na
+\fB<new-line>\fR
+.ad
+.RS 19n
+.rt  
+Go to next entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fR\fR
+.ad
+.RS 19n
+.rt  
+Delete the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fR [ \fIdir\fR ]\fR
+.ad
+.RS 19n
+.rt  
+Move the entry to named directory \fIdir.\fR If \fIdir\fR is not specified as a
+complete path name (in which  \fB$\fR\fBHOME\fR is legitimate), a destination
+relative to the current directory is assumed.  If no destination is given, the
+default is the current directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR [ \fIdir\fR ]\fR
+.ad
+.RS 19n
+.rt  
+Same as \fBm\fR above, except it moves all the files sent from \fBsystem\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 19n
+.rt  
+Print the content of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.RS 19n
+.rt  
+Stop.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBEOT (control-d)\fR
+.ad
+.RS 19n
+.rt  
+Same as \fBq\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fBcommand\fR\fR
+.ad
+.RS 19n
+.rt  
+Escape to the shell to do \fBcommand\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 19n
+.rt  
+Print a command summary.
+.RE
+
+.SH OPTIONS
+.SS "uuto"
+.sp
+.LP
+The following options are supported by \fBuuto\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Send mail to the sender when the copy is complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Copy the source file into the spool directory before transmission.
+.RE
+
+.SS "uupick"
+.sp
+.LP
+The following option is supported by \fBuupick\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI system\fR\fR
+.ad
+.RS 13n
+.rt  
+Search only the \fBPUBDIR\fR for files sent from \fBsystem\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported for  \fBuuto\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdestination\fR\fR
+.ad
+.RS 15n
+.rt  
+A string of the form:
+.sp
+\fIsystem-name\fR\fB\|!\|\fR\fIuser\fR
+.sp
+where \fIsystem-name\fR is taken from a list of system names that \fBuucp\fR
+knows about; see \fBuuname\fR. The argument \fIuser\fR is the login name of
+someone on the specified system. The destination \fIsystem-name\fR can also be
+a list of names such as
+.sp
+\fIsystem-name\fR\|\fB!\fR\|\fIsystem-name\|\fR\fB!\|\fR.\|.\|.\fB
+\|!\|\fR\fIsystem-name\|\fR\fB!\fR\fI\|user\fR
+.sp
+in which case, an attempt is made to send the file via the specified route to
+the destination. Care should be taken to ensure that intermediate nodes in the
+route are willing to forward information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsource-file\fR\fR
+.ad
+.RS 15n
+.rt  
+A pathname of a file on the local system to be copied to \fIdestination\fR.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBuuto\fR and \fBuupick\fR: \fBLC_TYPE\fR,
+\fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPUBDIR\fR\fR
+.ad
+.RS 10n
+.rt  
+\fB/var/spool/uucppublic\fR public directory
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmail\fR(1), \fBuucp\fR(1C), \fBuustat\fR(1C), \fBuux\fR(1C),
+\fBuucleanup\fR(1M), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+In order to send files that begin with a dot (for instance, \fB\&.profile\fR),
+the files must  be qualified with a dot.  For example, the following files are
+correct:
+.sp
+.LP
+\fB\|          .profile        .prof*       .profil?\fR
+.sp
+.LP
+The following files are incorrect:
+.sp
+.LP
+\fB          *prof*        ?profile\fR

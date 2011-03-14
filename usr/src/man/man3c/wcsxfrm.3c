@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wcsxfrm 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wcsxfrm, wsxfrm \- wide character string transformation
+.SH SYNOPSIS
+.LP
+.nf
+#include <wchar.h> 
+
+\fBsize_t\fR \fBwcsxfrm\fR(\fBwchar_t *\fR\fIws1\fR, \fBconst wchar_t *\fR\fIws2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBwsxfrm\fR(\fBwchar_t *\fR\fIws1\fR, \fBconst wchar_t *\fR\fIws2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwcsxfrm()\fR and \fBwcsxfrm()\fR functions transform the wide character
+string pointed to by \fIws2\fR and place the resulting wide character string
+into the array pointed to by \fIws1\fR. The transformation is such that if
+either the \fBwcscmp\fR(3C) or \fBwscmp\fR(3C) functions are applied to two
+transformed wide strings, they return a value greater than, equal to, or less
+than 0, corresponding to the result of the  \fBwcscoll\fR(3C) or
+\fBwscoll\fR(3C) function applied to the same two original wide character
+strings. No more than  \fIn\fR wide-character codes are placed into the
+resulting array pointed to by \fIws1\fR, including the terminating null
+wide-character code. If \fIn\fR is 0, \fIws1\fR is permitted to be a null
+pointer. If copying takes place between objects that overlap, the behavior is
+undefined.
+.sp
+.LP
+The \fBwcsxfrm()\fR and \fBwsxfrm()\fR functions do not change the setting of
+\fBerrno\fR if successful.
+.sp
+.LP
+Since no return value is reserved to indicate an error, an application wishing
+to check for error situations should set \fBerrno\fR to 0, then call
+\fBwcsxfrm()\fR or \fBwsxfrm()\fR, then check \fBerrno\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBwcsxfrm()\fR and \fBwsxfrm()\fR functions return the length of the
+transformed wide character string (not including the terminating null
+wide-character code). If the value returned is \fIn\fR or more, the contents of
+the array pointed to by \fIws1\fR are indeterminate.
+.sp
+.LP
+On error, \fBwcsxfrm()\fR and \fBwsxfrm()\fR may set \fBerrno\fR but no return
+value is reserved to indicate an error.
+.SH ERRORS
+.sp
+.LP
+The \fBwcsxfrm()\fR and \fBwsxfrm()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The wide character string pointed to by \fIws2\fR contains wide-character codes
+outside the domain of the collating sequence.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The transformation function is such that  two transformed wide character
+strings can be ordered by the \fBwcscmp()\fR or \fBwscmp()\fR functions as
+appropriate to collating sequence information in the program's locale (category
+\fBLC_COLLATE\fR).
+.sp
+.LP
+The fact that when  \fIn\fR is 0, \fIws1\fR is permitted to be a null pointer,
+is useful to determine the size of the  \fIws1\fR array prior to making the
+transformation.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface Stability\fBwcsxfrm()\fR is Standard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.sp
+.LP
+The \fBwcsxfrm()\fR and \fBwsxfrm()\fR functions can be used safely in
+multithreaded applications as long as \fBsetlocale\fR(3C) is not being called
+to change the locale.
+.SH SEE ALSO
+.sp
+.LP
+\fBsetlocale\fR(3C), \fBwcscmp\fR(3C), \fBwcscoll\fR(3C), \fBwscmp\fR(3C),
+\fBwscoll\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

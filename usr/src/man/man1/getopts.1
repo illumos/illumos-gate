@@ -1,0 +1,954 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright 1992, X/Open Company Limited All Rights Reserved
+.\" Copyright (c) 2007 Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getopts 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+getopts \- parse utility options
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/getopts\fR \fIoptstring\fR \fIname\fR [\fIarg\fR...]
+.fi
+
+.SS "sh"
+.LP
+.nf
+\fBgetopts\fR \fIoptstring\fR \fIname\fR [\fIargument\fR]...
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBgetopts\fR \fIoptstring\fR \fIname\fR [\fIarg\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBgetopts\fR [\fB-a\fR \fIname\fR] \fIoptstring\fR \fIname\fR [\fIarg\fR]...
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/getopts"
+.sp
+.LP
+The \fBgetopts\fR utility can be used to retrieve options and option-arguments
+from a list of parameters.
+.sp
+.LP
+Each time it is invoked, the \fBgetopts\fR utility places the value of the next
+option in the shell variable specified by the \fIname\fR operand and the index
+of the next argument to be processed in the shell variable \fBOPTIND\fR.
+Whenever the shell is invoked, \fBOPTIND\fR is initialized to \fB1\fR.
+.sp
+.LP
+When the option requires an option-argument, the \fBgetopts\fR utility places
+it in the shell variable \fBOPTARG\fR. If no option was found, or if the option
+that was found does not have an option-argument, \fBOPTARG\fR is unset.
+.sp
+.LP
+If an option character not contained in the \fIoptstring\fR operand is found
+where an option character is expected, the shell variable specified by
+\fIname\fR is set to the question-mark \fB(\fR \fB?\fR \fB)\fR character. In
+this case, if the first character in \fIoptstring\fR is a colon (\fB:\fR, the
+shell variable \fBOPTARG\fR is set to the option character found, but no output
+is written to standard error; otherwise, the shell variable \fBOPTARG\fR is
+unset and a diagnostic message is written to standard error. This condition is
+considered to be an error detected in the way arguments were presented to the
+invoking application, but is not an error in \fBgetopts\fR processing.
+.sp
+.LP
+If an option-argument is missing:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the first character of \fIoptstring\fR is a colon, the shell variable
+specified by \fIname\fR is set to the colon character and the shell variable
+\fBOPTARG\fR is set to the option character found.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, the shell variable specified by \fIname\fR is set to the
+question-mark character (\fB?\fR), the shell variable \fBOPTARG\fR is unset,
+and a diagnostic message is written to standard error. This condition is
+considered to be an error detected in the way arguments were presented to the
+invoking application, but is not an error in \fBgetopts\fR processing; a
+diagnostic message is written as stated, but the exit status is zero.
+.RE
+.sp
+.LP
+When the end of options is encountered, the \fBgetopts\fR utility exits with a
+return value greater than zero; the shell variable \fBOPTIND\fR is set to the
+index of the first non-option-argument, where the first \fB\(mi\|\(mi\fR
+argument is considered to be an option-argument if there are no other
+non-option-arguments appearing before it, or the value \fB$#\fR + 1 if there
+are no non-option-arguments; the \fIname\fR variable is set to the
+question-mark character. Any of the following identifies the end of options:
+the special option \fB\(mi\|\(mi\fR, finding an argument that does not begin
+with a \fB\(mi\fR, or encountering an error.
+.sp
+.LP
+The shell variables \fBOPTIND\fR and \fBOPTARG\fR are local to the caller of
+\fBgetopts\fR and are not exported by default.
+.sp
+.LP
+The shell variable specified by the \fIname\fR operand, \fBOPTIND\fR and
+\fBOPTARG\fR affect the current shell execution environment.
+.sp
+.LP
+If the application sets \fBOPTIND\fR to the value 1, a new set of parameters
+can be used: either the current positional parameters or new \fIarg\fR values.
+Any other attempt to invoke \fBgetopts\fR multiple times in a single shell
+execution environment with parameters (positional parameters or \fIarg\fR
+operands) that are not the same in all invocations, or with an \fBOPTIND\fR
+value modified to be a value other than 1, produces unspecified results.
+.SS "sh"
+.sp
+.LP
+\fBgetopts\fR is a built-in Bourne shell command used to parse positional
+parameters and to check for valid options. See \fBsh\fR(1). It supports all
+applicable rules of the command syntax standard (see Rules 3-10,
+\fBIntro\fR(1)). It should be used in place of the \fBgetopt\fR command.
+.sp
+.LP
+\fIoptstring\fR must contain the option letters the command using \fBgetopts\fR
+recognizes. If a letter is followed by a colon, the option is expected to have
+an argument, or group of arguments, which must be separated from it by white
+space.
+.sp
+.LP
+Each time it is invoked, \fBgetopts\fR places the next option in the shell
+variable \fIname\fR and the index of the next argument to be processed in the
+shell variable \fBOPTIND\fR. Whenever the shell or a shell script is invoked,
+\fBOPTIND\fR is initialized to \fB1\fR.
+.sp
+.LP
+When an option requires an option-argument, \fBgetopts\fR places it in the
+shell variable \fBOPTARG\fR.
+.sp
+.LP
+If an illegal option is encountered, \fB?\fR is placed in \fIname\fR.
+.sp
+.LP
+When the end of options is encountered, \fBgetopts\fR exits with a non-zero
+exit status. The special option \fB-\fR can be used to delimit the end of the
+options.
+.sp
+.LP
+By default, \fBgetopts\fR parses the positional parameters. If extra arguments
+(\fIargument\fR .\|.\|.) are specified on the \fBgetopts\fR command line,
+\fBgetopts\fR parses them instead.
+.sp
+.LP
+\fB/usr/lib/getoptcvt\fR reads the shell script in \fIfilename\fR, converts it
+to use \fBgetopts\fR instead of \fBgetopt\fR, and writes the results on the
+standard output.
+.sp
+.LP
+So that all new commands adhere to the command syntax standard described in
+\fBIntro\fR(1), they should use \fBgetopts\fR or \fBgetopt\fR to parse
+positional parameters and check for options that are valid for that command.
+.sp
+.LP
+\fBgetopts\fR prints an error message on the standard error when it encounters
+an option letter not included in \fIoptstring\fR.
+.sp
+.LP
+Although the following command syntax rule (see \fBIntro\fR(1)) relaxations are
+permitted under the current implementation, they should not be used because
+they can not be supported in future releases of the system. As in the EXAMPLES
+section below, \fB-a\fR and \fB-b\fR are options, and the option \fB-o\fR
+requires an option-argument.
+.sp
+.LP
+The following example violates Rule 5: options with option-arguments must not
+be grouped with other options:
+.sp
+.in +2
+.nf
+example% \fBcmd -aboxxx filename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example violates Rule 6: there must be white space after an
+option that takes an option-argument:
+.sp
+.in +2
+.nf
+example% \fBcmd -ab oxxx filename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Changing the value of the shell variable \fBOPTIND\fR or parsing different sets
+of arguments can lead to unexpected results.
+.SS "ksh"
+.sp
+.LP
+Checks \fIarg\fR for legal options. If \fIarg\fR is omitted, the positional
+parameters are used. An option argument begins with a \fB+\fR or a
+\fB\(mi\fR\&. An option not beginning with \fB+\fR or \fB\(mi\fR or the
+argument \fB-\fR ends the options. \fIoptstring\fR contains the letters that
+\fBgetopts\fR recognizes. If a letter is followed by a \fB:\fR, that option is
+expected to have an argument. The options can be separated from the argument by
+blanks.
+.sp
+.LP
+\fBgetopts\fR places the next option letter it finds inside variable \fIname\fR
+each time it is invoked with a \fB+\fR prepended when \fIarg\fR begins with a
+\fB+\fR. The index of the next \fIarg\fR is stored in \fBOPTIND\fR. The option
+argument, if any, gets stored in \fBOPTARG\fR.
+.sp
+.LP
+A leading \fB:\fR in \fIoptstring\fR causes \fBgetopts\fR to store the letter
+of an invalid option in \fBOPTARG\fR, and to set \fIname\fR to \fB?\fR for an
+unknown option and to \fB:\fR when a required option is missing. Otherwise,
+\fBgetopts\fR prints an error message. The exit status is \fBnon-zero\fR when
+there are no more options.
+.sp
+.LP
+\fBgetopts\fR supports both traditional single-character short options and long
+options defined by Sun's Command Line Interface Paradigm (\fBCLIP\fR).
+.sp
+.LP
+Each long option is an alias for a short option and is specified in parentheses
+following its equivalent short option. For example, you can specify the long
+option \fBfile\fR as an alias for the short option \fBf\fR using the following
+script line:
+.sp
+.in +2
+.nf
+getopts "f(file)" opt
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Precede long options on the command line with \fB--\fR or \fB++\fR. In the
+example above, \fB--file\fR on the command line would be the equivalent of
+\fB-f\fR, and \fB++file\fR on the command line would be the equivalent of
+\fB+f\fR.
+.sp
+.LP
+Each short option can have multiple long option equivalents, although this is
+in violation of the CLIP specification and should be used with caution. You
+must enclose each long option equivalent parentheses, as follows:
+.sp
+.in +2
+.nf
+getopts "f:(file)(input-file)o:(output-file)"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In the above example, both \fB--file\fR and \fB--input-file\fR are the
+equivalent of \fB-f\fR, and \fB--output-file\fR is the equivalent of \fB-o\fR.
+.sp
+.LP
+The variable name is always set to a short option. When a long option is
+specified on the command line, name is set to the short-option equivalent.
+.sp
+.LP
+For a further discussion of the Korn shell's \fBgetopts\fR built-in command,
+see the previous discussion in the Bourne shell (\fBsh\fR) section of this
+manpage.
+.SS "ksh93"
+.sp
+.LP
+The \fBgetopts\fR utility can be used to retrieve options and arguments from a
+list of arguments specified by \fIarg\fRs or the positional parameters if
+\fIarg\fR is omitted. It can also generate usage messages and a manual page for
+the command based on the information in \fIoptstring\fR.
+.sp
+.LP
+Each time it is invoked, the \fBgetopts\fR utility places the value of the next
+option in the shell variable specified by the \fIname\fR operand and the index
+of the next argument to be processed in the shell variable \fBOPTIND\fR. When
+the shell is invoked \fBOPTIND\fR is initialized to \fB1\fR. When an option
+requires or permits an option argument, \fBgetopts\fR places the option
+argument in the shell variable \fBOPTARG\fR. Otherwise \fBOPTARG\fR is set to
+\fB1\fR when the option is set and \fB0\fR when the option is \fBunset\fR.
+.sp
+.LP
+The \fIoptstring\fR string consists of alphanumeric characters, the special
+characters \fB+\fR, \fB-\fR, \fB?\fR, \fB:\fR, and SPACE or character groups
+enclosed in \fB[...]\fR. Character groups can be nested in \fB{...}\fR. Outside
+of a \fB[...]\fR group, a single NEWLINE followed by zero or more blanks is
+ignored. One or more blank lines separate the options from the command argument
+synopsis.
+.sp
+.LP
+Each \fB[...]\fR group consists of an optional label, optional attributes
+separated by \fB:\fR, and an optional description string following \fB?\fR. The
+characters from the \fB?\fR to the end of the next \fB]\fR are ignored for
+option parsing and short usage messages. They are used for generating verbose
+help or man pages. The \fB:\fR character can not appear in the label. The
+\fB?\fR character must be specified as \fB??\fR in the label and the \fB]\fR
+character must be specified as \fB]]\fR in the description string. Text between
+two \fB\eb\fR (backspace) characters indicates that the text should be
+emboldened when displayed. Text between two \fB\ea\fR (bell) characters
+indicates that the text should be emphasized or italicized when displayed. Text
+between two \fB\ev\fR (vertical tab) characters indicates that the text should
+displayed in a fixed-width font. Text between two \fB\ef\fR (form feed)
+characters is replaced by the output from the shell function whose name is that
+of the enclosed text.
+.sp
+.LP
+All output from this interface is written to the standard error.
+.sp
+.LP
+There are several group types:
+.RS +4
+.TP
+1.
+A group of the form
+.sp
+.in +2
+.nf
+\fB[-[\fR\fIversion\fR][\fIflag\fR[\fInumber\fR\fB]]...[?\fR\fItext\fR\fB]]\fR
+.fi
+.in -2
+.sp
+
+which appears as the first group enables the extended interface.
+.sp
+\fIversion\fR specifies the interface version, currently 1. The latest version
+is assumed if version is omitted. Future enhancements can increment
+\fIversion\fR, but all versions are supported. \fItext\fR typically specifies
+an SCCS or CVS identification string. Zero or more flags with optional number
+values can be specified to control option parsing. The flags are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.RS 5n
+.rt  
+Cache this \fIoptstring\fR for multiple passes. Used to optimize built-ins that
+can be called many times within the same process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 5n
+.rt  
+Ignore this \fIoptstring\fR when generating help. Used when combining
+\fIoptstring\fR values from multiple passes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.RS 5n
+.rt  
+Display only long option names in help messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 5n
+.rt  
+The \fB-\fR option character prefix is optional. This supports the obsolete
+\fBps\fR(1) option syntax.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 5n
+.rt  
+The number specifies the number of \fB-\fR characters that must prefix long
+option names. The default is \fB2\fR. \fB0\fR, \fB1\fR or \fB2\fR are accepted,
+for example \fBp0\fR for \fBdd\fR(1M) and \fBp1\fR for \fBfind\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.RS 5n
+.rt  
+The number specifies the manual page section number, \fB1\fR by default.
+.RE
+
+.RE
+.RS +4
+.TP
+2.
+An option specification of the form
+\fB[\fR\fIoption\fR\fB[!][=\fR\fInumber\fR\fB][:\fR\fIlongname\fR\fB][?\fR\fItext\fR\fB]]\fR.
+In this case the first field is the option character, which is the value
+returned in the name operand when the option is matched. If there is no option
+character then a two or more digit number should be specified. This number is
+returned as the value of the name operand if the long option is matched. If
+option is followed by a \fB!\fR then the option character sense is the inverse
+of the \fIlongname\fR sense. For options that do not take values \fBOPTARG\fR
+is set to \fB0\fR for \fB!\fR inverted option characters and \fB1\fR
+otherwise. \fI=number\fR optionally specifies a number to be returned in the
+\fIname\fR operand instead of the option character. A \fIlongname\fR is
+specified by \fB--longname\fR and is matched by the shortest non-ambiguous
+prefix of all long options. An \fB*\fR in the \fBlongname\fR field indicates
+that only characters up to that point need to match, provided any additional
+characters match exactly. The enclosing \fB[\fR and \fB]\fR can be omitted for
+an option that does not have a \fBlongname\fR or descriptive text.
+.RE
+.RS +4
+.TP
+3.
+An option argument specification. Options that take arguments can be
+followed by \fB:\fR, indicating a string value or \fB#\fR, indicating a numeric
+value, and an option argument specification. An option argument specification
+consists of the option argument name as field 1. The remaining : separated
+fields are a type name and zero or more of the special attribute words
+\fBlistof\fR, \fBoneof\fR, and \fBignorecase\fR. A default option value can be
+specified in the final field as :=default. The option argument specification
+can be followed by a list of option value descriptions enclosed in braces. A
+long option that takes an argument is specified as
+\fB--longname=\fR\fIvalue\fR. If the \fB:\fR or \fB#\fR is followed by \fB?\fR,
+the option argument is optional. If only the option character form is specified
+then the optional argument value is not set if the next argument starts with
+\fB-\fR or \fB+\fR.
+.RE
+.RS +4
+.TP
+4.
+An option value description.
+.RE
+.RS +4
+.TP
+5.
+An argument specification. A list of valid option argument values can be
+specified by enclosing them inside a \fB{...}\fR following the option argument
+specification. Each of the permitted values can be specified with a \fB[...]\fR
+containing the value followed by a description.
+.RE
+.RS +4
+.TP
+6.
+A group of the form \fB[+\fR\fB\e\fR\fIn\fR\fB\&...]\fR displays the
+characters representing \fB\&...\fR in fixed-width font without adding line
+breaks.
+.RE
+.RS +4
+.TP
+7.
+A group of the form \fB[+\fR\fIname\fR\fB?\fR\fItext\fR\fB]\fR specifies a
+section name with descriptive text. If \fIname\fR is omitted, \fItext\fR is
+placed in a new paragraph.
+.RE
+.RS +4
+.TP
+8.
+A group of the form \fB[-\fR\fIname\fR\fB?\fR\fItext\fR\fB]\fR specifies
+entries for the \fBIMPLEMENTATION\fR section.
+.RE
+.sp
+.LP
+If the leading character of \fIoptstring\fR is \fB+\fR, arguments beginning
+with \fB+\fR are also be considered options.
+.sp
+.LP
+A leading \fB:\fR character or a : following a leading \fB+\fR in
+\fIoptstring\fR affects the way errors are handled. If an option character or
+\fBlongname\fR argument not specified in \fIoptstring\fR is encountered when
+processing options, the shell variable whose name is name is set to the \fB?\fR
+character. The shell variable \fBOPTARG\fR is set to the character found. If an
+option argument is missing or has an invalid value, then name is set to the
+\fB:\fR character and the shell variable \fBOPTARG\fR is set to the option
+character found. Without the leading \fB:\fR, \fIname\fR is set to the \fB?\fR
+character, \fBOPTARG\fR is unset, and an error message is written to standard
+error when errors are encountered.
+.sp
+.LP
+The end of options occurs when:
+.RS +4
+.TP
+1.
+The special argument \fB--\fR is encountered.
+.RE
+.RS +4
+.TP
+2.
+An argument that does not begin with a \fB-\fR is encountered.
+.RE
+.RS +4
+.TP
+3.
+A help argument is specified.
+.RE
+.RS +4
+.TP
+4.
+An error is encountered.
+.RE
+.sp
+.LP
+If \fBOPTIND\fR is set to the value \fB1\fR, a new set of arguments can be
+used.
+.sp
+.LP
+\fBgetopts\fR can also be used to generate help messages containing command
+usage and detailed descriptions. Specify \fIargs\fR as:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate a usage synopsis.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate a verbose usage message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??man\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate a formatted manual page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??api\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate an easy to parse usage message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??html\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate a man page in \fBhtml\fR format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??nroff\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to generate a man page in \fBnroff\fR format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--??usage\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to list the current \fBoptstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--???name\fR\fR
+.ad
+.RS 13n
+.rt  
+Use this to list \fBversion=\fR\fIn\fR, where \fIn\fR is greater than \fB0\fR,
+if the option \fIname\fR is recognized by \fBgetopts\fR.
+.RE
+
+.sp
+.LP
+When the end of options is encountered, \fBgetopts\fR exits with a
+\fBnon-zero\fR return value and the variable \fBOPTIND\fR is set to the index
+of the first non-option argument.
+.SH OPTIONS
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+Use \fIname\fR instead of the command name in usage messages.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoptstring\fR\fR
+.ad
+.RS 13n
+.rt  
+A string containing the option characters recognised by the utility invoking
+\fBgetopts\fR. If a character is followed by a colon, the option is expected to
+have an argument, which should be supplied as a separate argument. Applications
+should specify an option character and its option-argument as separate
+arguments, but \fBgetopts\fR interprets the characters following an option
+character requiring arguments as an argument whether or not this is done. An
+explicit null option-argument need not be recognised if it is not supplied as a
+separate argument when \fBgetopts\fR is invoked; see \fBgetopt\fR(3C). The
+characters question-mark (\fB?\fR) and colon (\fB:\fR) must not be used as
+option characters by an application. The use of other option characters that
+are not alphanumeric produces unspecified results. If the option-argument is
+not supplied as a separate argument from the option character, the value in
+\fBOPTARG\fR is stripped of the option character and the \fB\(mi\fR\&. The
+first character in \fIoptstring\fR determines how \fBgetopts\fR behaves if an
+option character is not known or an option-argument is missing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 13n
+.rt  
+The name of a shell variable that is set by the \fBgetopts\fR utility to the
+option character that was found.
+.RE
+
+.sp
+.LP
+The \fBgetopts\fR utility by default parses positional parameters passed to the
+invoking shell procedure. If \fIarg\fRs are specified, they are parsed instead
+of the positional parameters.
+.SH USAGE
+.sp
+.LP
+Since \fBgetopts\fR affects the current shell execution environment, it is
+generally provided as a shell regular built-in. If it is called in a subshell
+or separate utility execution environment, such as one of the following:
+.sp
+.in +2
+.nf
+      (getopts abc value "$@")
+       nohup getopts ...
+       find . -exec getopts ... \e;
+.fi
+.in -2
+
+.sp
+.LP
+it does not affect the shell variables in the caller's environment.
+.sp
+.LP
+Notice that shell functions share \fBOPTIND\fR with the calling shell even
+though the positional parameters are changed. Functions that want to use
+\fBgetopts\fR to parse their arguments usually want to save the value of
+\fBOPTIND\fR on entry and restore it before returning. However, there are cases
+when a function wants to change \fBOPTIND\fR for the calling shell.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRParsing and Displaying Arguments
+.sp
+.LP
+The following example script parses and displays its arguments:
+
+.sp
+.in +2
+.nf
+aflag=
+bflag=
+while getopts ab: name
+do
+     case $name in
+     a)      aflag=1;;
+     b)      bflag=1
+             bval="$OPTARG";;
+     ?)     printf "Usage: %s: [-a] [-b value] args\en"  $0
+            exit 2;;
+     esac
+done
+if [ ! -z "$aflag" ]; then
+   printf "Option -a specified\en"
+fi
+if [ ! -z "$bflag" ]; then
+     printf 'Option -b "%s" specified\en' "$bval"
+fi
+shift $(($OPTIND - 1))
+printf "Remaining arguments are: %s\en" "$*"
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRProcessing Arguments for a Command with Options
+.sp
+.LP
+The following fragment of a shell program processes the arguments for a command
+that can take the options \fB-a\fR or \fB-b\fR. It also processes the option
+\fB-o\fR, which requires an option-argument:
+
+.sp
+.in +2
+.nf
+while getopts abo: c
+do
+      case $c in
+     a | b)   FLAG=$c;;
+     o)       OARG=$OPTARG;;
+     \e?)      echo $USAGE
+        exit 2;;
+     esac
+done
+shift `expr $OPTIND \(mi 1`
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fREquivalent Code Expressions
+.sp
+.LP
+This code example accepts any of the following as equivalent:
+
+.sp
+.in +2
+.nf
+cmd -a -b -o "xxx z yy" filename
+cmd -a -b -o "xxx z yy" -- filename
+cmd -ab -o xxx,z,yy filename
+cmd -ab -o "xxx z yy" filename
+cmd -o xxx,z,yy -b -a filename
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBgetopts\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOPTIND\fR\fR
+.ad
+.RS 10n
+.rt  
+This variable is used by \fBgetopts\fR as the index of the next argument to be
+processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOPTARG\fR\fR
+.ad
+.RS 10n
+.rt  
+This variable is used by \fBgetopts\fR to store the argument if an option is
+using arguments.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+An option, specified or unspecified by \fIoptstring\fR, was found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+The end of options was encountered or an error occurred.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following exit values are returned by \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+A specified option was found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+An end of options was encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+A usage or information message was generated.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/getopts, sh, ksh"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(1), \fBgetoptcvt\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBps\fR(1),
+\fBsh\fR(1), \fBgetopt\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Whenever an error is detected and the first character in the \fIoptstring\fR
+operand is not a colon (\fB:\fR), a diagnostic message is written to standard
+error with the following information in an unspecified format:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The invoking program name is identified in the message. The invoking program
+name is the value of the shell special parameter \fB0\fR at the time the
+\fBgetopts\fR utility is invoked. A name equivalent to
+.sp
+.in +2
+.nf
+\fIbasename\fR "$0"
+.fi
+.in -2
+
+can be used.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an option is found that was not specified in \fIoptstring\fR, this error is
+identified and the invalid option character is identified in the message.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an option requiring an option-argument is found, but an option-argument is
+not found, this error is identified and the invalid option character is
+identified in the message.
+.RE

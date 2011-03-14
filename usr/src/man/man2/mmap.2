@@ -1,0 +1,954 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mmap 2 "4 Feb 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+mmap \- map pages of memory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/mman.h>
+
+\fBvoid *\fR\fBmmap\fR(\fBvoid *\fR\fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIprot\fR, \fBint\fR \fIflags\fR,
+     \fBint\fR \fIfildes\fR, \fBoff_t\fR \fIoff\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmmap()\fR function establishes a mapping between a process's address
+space and a file or shared memory object. The format of the call is as follows:
+.sp
+.LP
+\fIpa\fR = \fBmmap(\fR\fIaddr\fR\fB, \fR\fIlen\fR\fB, \fR\fIprot\fR\fB,
+\fR\fIflags\fR\fB, \fR\fIfildes\fR\fB, \fR\fIoff\fR\fB);\fR
+.sp
+.LP
+The \fBmmap()\fR function establishes a mapping between the address space of
+the process at an address \fIpa\fR for \fIlen\fR bytes to the memory object
+represented by the file descriptor \fIfildes\fR at offset \fIoff\fR for
+\fIlen\fR bytes. The value of \fIpa\fR is a function of the  \fIaddr\fR
+argument and values of \fIflags\fR, further described below. A successful
+\fBmmap()\fR call returns \fIpa\fR as its result. The address range starting at
+\fIpa\fR and continuing for \fIlen\fR bytes will be legitimate for the possible
+(not necessarily current) address space of the process. The range of bytes
+starting at \fIoff\fR and continuing for \fIlen\fR bytes will be legitimate for
+the possible (not necessarily current) offsets in the file or shared memory
+object represented by \fIfildes\fR.
+.sp
+.LP
+The \fBmmap()\fR function allows [\fIpa, pa + len\fR) to extend beyond the end
+of the object both at the time of the \fBmmap()\fR and while the mapping
+persists, such as when the file is created prior to the \fBmmap()\fR call and
+has no contents, or when the file is truncated. Any reference to addresses
+beyond the end of the object, however, will result in the delivery of a
+\fBSIGBUS\fR or \fBSIGSEGV\fR signal. The \fBmmap()\fR function cannot be used
+to implicitly extend the length of files.
+.sp
+.LP
+The mapping established by \fBmmap()\fR replaces any previous mappings for
+those whole pages containing any part of the address space of the process
+starting at \fIpa\fR and continuing for \fIlen\fR bytes.
+.sp
+.LP
+If the size of the mapped file changes after the call to \fBmmap()\fR as a
+result of some other operation on the mapped file, the effect of references to
+portions of the mapped region that correspond to added or removed portions of
+the file is unspecified.
+.sp
+.LP
+The \fBmmap()\fR function is supported for regular files and shared memory
+objects. Support for any other type of file is unspecified.
+.sp
+.LP
+The  \fIprot\fR argument determines whether read, write, execute, or some
+combination of accesses are permitted to the data being mapped. The \fIprot\fR
+argument should be either \fBPROT_NONE\fR or the bitwise inclusive \fBOR\fR of
+one or more of the other flags in the following table, defined in the header
+<\fBsys/mman.h\fR>.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_READ\fR\fR
+.ad
+.RS 14n
+.rt  
+Data can be read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_WRITE\fR\fR
+.ad
+.RS 14n
+.rt  
+Data can be written.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_EXEC\fR\fR
+.ad
+.RS 14n
+.rt  
+Data can be executed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_NONE\fR\fR
+.ad
+.RS 14n
+.rt  
+Data cannot be accessed.
+.RE
+
+.sp
+.LP
+If an implementation of \fBmmap()\fR for a specific platform cannot support the
+combination of access types specified by \fIprot\fR, the call to \fBmmap()\fR
+fails. An implementation may permit accesses other than those specified by
+\fIprot\fR; however, the implementation will not permit a write to succeed
+where \fBPROT_WRITE\fR has not been set or permit any access where
+\fBPROT_NONE\fR alone has been set. Each platform-specific implementation of
+\fBmmap()\fR supports the following values of \fIprot\fR: \fBPROT_NONE\fR,
+\fBPROT_READ\fR, \fBPROT_WRITE\fR, and the inclusive \fBOR\fR of
+\fBPROT_READ\fR and \fBPROT_WRITE\fR. On some platforms, the \fBPROT_WRITE\fR
+protection option is implemented as \fBPROT_READ|PROT_WRITE\fR and
+\fBPROT_EXEC\fR as \fBPROT_READ|PROT_EXEC\fR. The file descriptor \fIfildes\fR
+is opened with read permission, regardless of the protection options specified.
+If \fBPROT_WRITE\fR is specified, the application must have opened the file
+descriptor \fIfildes\fR with write permission unless \fBMAP_PRIVATE\fR is
+specified in the \fIflags\fR argument as described below.
+.sp
+.LP
+The  \fIflags\fR argument provides other information about the handling of the
+mapped data. The value of \fIflags\fR is the bitwise inclusive \fBOR\fR of
+these options, defined in <\fBsys/mman.h\fR>:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_SHARED\fR\fR
+.ad
+.RS 17n
+.rt  
+Changes are shared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_PRIVATE\fR\fR
+.ad
+.RS 17n
+.rt  
+Changes are private.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_FIXED\fR\fR
+.ad
+.RS 17n
+.rt  
+Interpret \fIaddr\fR exactly.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_NORESERVE\fR\fR
+.ad
+.RS 17n
+.rt  
+Do not reserve swap space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_ANON\fR\fR
+.ad
+.RS 17n
+.rt  
+Map anonymous memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_ALIGN\fR\fR
+.ad
+.RS 17n
+.rt  
+Interpret \fIaddr\fR as required aligment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_TEXT\fR\fR
+.ad
+.RS 17n
+.rt  
+Map text.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_INITDATA\fR\fR
+.ad
+.RS 17n
+.rt  
+Map initialized data segment.
+.RE
+
+.sp
+.LP
+The \fBMAP_SHARED\fR and \fBMAP_PRIVATE\fR options describe the disposition of
+write references to the underlying object. If \fBMAP_SHARED\fR is specified,
+write references will change the memory object. If \fBMAP_PRIVATE\fR is
+specified, the initial write reference will create a private copy of the memory
+object page and redirect the mapping to the copy. The private copy is not
+created until the first write; until then, other users who have the object
+mapped \fBMAP_SHARED\fR can change the object. Either \fBMAP_SHARED\fR or
+\fBMAP_PRIVATE\fR must be specified, but not both. The mapping type is retained
+across \fBfork\fR(2).
+.sp
+.LP
+When \fBMAP_FIXED\fR is set in the \fIflags\fR argument, the system is informed
+that the value of \fIpa\fR must be \fIaddr\fR, exactly. If \fBMAP_FIXED\fR is
+set, \fBmmap()\fR may return (\fBvoid *\fR)\(mi1 and set \fBerrno\fR to
+\fBEINVAL\fR.  If a \fBMAP_FIXED\fR request is successful, the mapping
+established by \fBmmap()\fR replaces any previous mappings for the process's
+pages in the range [\fIpa, pa + len\fR). The use of \fBMAP_FIXED\fR is
+discouraged, since it may prevent a system from making the most effective use
+of its resources.
+.sp
+.LP
+When \fBMAP_FIXED\fR is set and the requested address is the same as previous
+mapping, the previous address is unmapped and the new mapping is created on top
+of the old one.
+.sp
+.LP
+When \fBMAP_FIXED\fR is not set, the system uses \fIaddr\fR to arrive at
+\fIpa\fR. The \fIpa\fR so chosen will be an area of the address space that the
+system deems suitable for a mapping of \fIlen\fR bytes to the file. The
+\fBmmap()\fR function interprets an \fIaddr\fR value of 0 as granting the
+system complete freedom in selecting \fIpa\fR, subject to constraints described
+below. A non-zero value of \fIaddr\fR is taken to be a suggestion of a process
+address near which the mapping should be placed. When the system selects a
+value for \fIpa\fR, it will never place a mapping at address 0, nor will it
+replace any extant mapping, nor map into areas considered part of the potential
+data or stack "segments".
+.sp
+.LP
+When \fBMAP_ALIGN\fR is set, the system is informed that the alignment of
+\fIpa\fR must be the same as \fIaddr\fR. The alignment value in \fIaddr\fR must
+be 0 or some power of two multiple of page size as returned by
+\fBsysconf\fR(3C). If addr is 0, the system will choose a suitable  alignment.
+.sp
+.LP
+The \fBMAP_NORESERVE\fR option specifies that no swap space be reserved for a
+mapping. Without this flag, the creation of a writable \fBMAP_PRIVATE\fR
+mapping reserves swap space equal to the size of the mapping; when the mapping
+is written into, the reserved space is employed to hold private copies of the
+data. A write into a \fBMAP_NORESERVE\fR mapping produces results which depend
+on the current availability of swap  space in the system.  If space is
+available, the write succeeds and a  private copy of the written page is
+created; if space is not available, the write fails and a \fBSIGBUS\fR or
+\fBSIGSEGV\fR signal is delivered to the writing process.  \fBMAP_NORESERVE\fR
+mappings are inherited across  \fBfork()\fR; at the time of the \fBfork()\fR,
+swap space is reserved in the child for all private pages that currently exist
+in the parent; thereafter the child's mapping behaves as described above.
+.sp
+.LP
+When \fBMAP_ANON\fR is set in \fIflags\fR, and \fIfildes\fR is set to -1,
+\fBmmap()\fR provides a direct path to return anonymous pages to the caller.
+This operation is equivalent to passing \fBmmap()\fR an open file descriptor on
+\fB/dev/zero\fR with \fBMAP_ANON\fR elided from the \fIflags\fR argument.
+.sp
+.LP
+The \fBMAP_TEXT\fR option informs the system that the mapped region will be
+used primarily for executing instructions. This information can help the system
+better utilize MMU resources on some platforms. This flag is always passed by
+the dynamic linker when it maps text segments of shared objects. When the
+\fBMAP_TEXT\fR option is used for regular file mappings on some platforms, the
+system can choose a mapping size larger than the page size returned by
+\fBsysconf\fR(3C). The specific page sizes that are used depend on the platform
+and the alignment of the addr and len arguments. Several diffrent mapping sizes
+can be used to map the region with larger page sizes used in the parts of the
+region that meet alignment and size requirements for those page sizes.
+.sp
+.LP
+The \fBMAP_INITDATA\fR option informs the system that the mapped region is an
+initialized data segment of an executable or shared object. When the
+\fBMAP_INITDATA\fR option is used for regular file mappings on some platforms,
+the system can choose a mapping size larger than the page size returned by
+\fBsysconf()\fR. The \fBMAP_INITDATA\fR option should be used only by the
+dynamic linker for mapping initialized data of shared objects.
+.sp
+.LP
+The \fIoff\fR argument is constrained to be aligned and sized according to the
+value returned by \fBsysconf()\fR when passed \fB_SC_PAGESIZE\fR or
+\fB_SC_PAGE_SIZE\fR. When \fBMAP_FIXED\fR is specified, the \fIaddr\fR argument
+must also meet these constraints. The system performs mapping operations over
+whole pages. Thus, while the  \fIlen\fR argument need not meet a size or
+alignment constraint, the system will include, in any mapping operation, any
+partial page specified by the range [\fIpa, pa + len\fR).
+.sp
+.LP
+The system will always zero-fill any partial page at the end of an object.
+Further, the system will never write out any modified portions of the last page
+of an object which are beyond its end. References to whole pages following the
+end of an object will result in the delivery of a \fBSIGBUS\fR or \fBSIGSEGV\fR
+signal. \fBSIGBUS\fR signals may also be delivered on various file system
+conditions, including quota exceeded errors.
+.sp
+.LP
+The \fBmmap()\fR function adds an extra reference to the file associated with
+the file descriptor \fIfildes\fR which is not removed by a subsequent
+\fBclose\fR(2) on that file descriptor.  This reference is removed when there
+are no more mappings to the file by a call to the \fBmunmap\fR(2) function.
+.sp
+.LP
+The \fBst_atime\fR field of the mapped file may be marked for update at any
+time between the \fBmmap()\fR call and the corresponding \fBmunmap\fR(2) call.
+The initial read or write reference to a mapped region will cause the file's
+\fBst_atime\fR field to be marked for update if it has not already been marked
+for update.
+.sp
+.LP
+The \fBst_ctime\fR and \fBst_mtime\fR fields of a file that is mapped with
+\fBMAP_SHARED\fR and \fBPROT_WRITE\fR, will be marked for update at some point
+in the interval between a write reference to the mapped region and the next
+call to \fBmsync\fR(3C) with \fBMS_ASYNC\fR or \fBMS_SYNC\fR for that portion
+of the file by any process.  If there is no such call, these fields may be
+marked for update at any time after a write reference if the underlying file is
+modified as a result.
+.sp
+.LP
+If the process calls \fBmlockall\fR(3C) with the \fBMCL_FUTURE\fR flag, the
+pages mapped by all future calls to \fBmmap()\fR will be locked in memory. In
+this case, if not enough memory could be locked, \fBmmap()\fR fails and sets
+\fBerrno\fR to \fBEAGAIN\fR.
+.sp
+.LP
+The \fBmmap()\fR function aligns based on the length of the mapping. When
+determining the amount of space to add to the address space, \fBmmap()\fR
+includes two 8-Kbyte pages, one at each end of the mapping that are not mapped
+and are therefore used as "red-zone" pages. Attempts to reference these pages
+result in access violations.
+.sp
+.LP
+The size requested is incremented by the 16 Kbytes for these pages and is then
+subject to rounding constraints. The constraints are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For 32-bit processes:
+.sp
+.in +2
+.nf
+If length > 4 Mbytes
+        round to 4-Mbyte multiple
+elseif length > 512 Kbytes
+        round to 512-Kbyte multiple
+else 
+        round to 64-Kbyte multiple
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For 64-bit processes:
+.sp
+.in +2
+.nf
+If length > 4 Mbytes
+        round to 4-Mbyte multiple
+else
+        round to 1-Mbyte multiple
+.fi
+.in -2
+
+.RE
+.sp
+.LP
+The net result is that for a 32-bit process:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an \fBmmap()\fR request is made for 4 Mbytes, it results in 4 Mbytes + 16
+Kbytes and is rounded up to 8 Mbytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an \fBmmap()\fR request is made for 512 Kbytes, it results in 512 Kbytes +
+16 Kbytes and is rounded up to 1 Mbyte.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an \fBmmap()\fR request is made for 1 Mbyte, it results in 1 Mbyte + 16
+Kbytes and is rounded up to 1.5 Mbytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each 8-Kbyte mmap request "consumes" 64 Kbytes of virtual address space.
+.RE
+.sp
+.LP
+To obtain maximal address space usage for a 32-bit process:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Combine 8-Kbyte requests up to a limit of 48 Kbytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Combine amounts over 48 Kbytes into 496-Kbyte chunks.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Combine amounts over 496 Kbytes into 4080-Kbyte chunks.
+.RE
+.sp
+.LP
+To obtain maximal address space usage for a 64-bit process:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Combine amounts < 1008 Kbytes into chunks <= 1008 Kbytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Combine amounts over 1008 Kbytes into 4080-Kbyte chunks.
+.RE
+.sp
+.LP
+The following is the output from a 32-bit program demonstrating this:
+.sp
+.ne 2
+.mk
+.na
+\fBmap 8192 bytes: \fB0xff390000\fR\fR
+.ad
+.br
+.na
+\fBmap 8192 bytes: \fB0xff380000\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-Kbyte delta between starting addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 512 Kbytes: \fB0xff180000\fR\fR
+.ad
+.br
+.na
+\fBmap 512 Kbytes: \fB0xff080000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 496 Kbytes: \fB0xff000000\fR\fR
+.ad
+.br
+.na
+\fBmap 496 Kbytes: \fB0xfef80000\fR\fR
+.ad
+.sp .6
+.RS 4n
+512-Kbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 1 Mbyte: \fB0xfee00000\fR\fR
+.ad
+.br
+.na
+\fBmap 1 Mbyte: \fB0xfec80000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1536-Kbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 1008 Kbytes: \fB0xfeb80000\fR\fR
+.ad
+.br
+.na
+\fBmap 1008 Kbytes: \fB0xfea80000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 4 Mbytes: \fB0xfe400000\fR\fR
+.ad
+.br
+.na
+\fBmap 4 Mbytes: \fB0xfdc00000\fR\fR
+.ad
+.sp .6
+.RS 4n
+8-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 4080 Kbytes: \fB0xfd800000\fR\fR
+.ad
+.br
+.na
+\fBmap 4080 Kbytes: \fB0xfd400000\fR\fR
+.ad
+.sp .6
+.RS 4n
+4-Mbyte delta between starting addresses
+.RE
+
+.sp
+.LP
+The following is the output of the same program compiled as a 64-bit
+application:
+.sp
+.ne 2
+.mk
+.na
+\fBmap 8192 bytes: \fB0xffffffff7f000000\fR\fR
+.ad
+.br
+.na
+\fBmap 8192 bytes: \fB0xffffffff7ef00000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 512 Kbytes: \fB0xffffffff7ee00000\fR\fR
+.ad
+.br
+.na
+\fBmap 512 Kbytes: \fB0xffffffff7ed00000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 496 Kbytes: \fB0xffffffff7ec00000\fR\fR
+.ad
+.br
+.na
+\fBmap 496 Kbytes: \fB0xffffffff7eb00000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 1 Mbyte: \fB0xffffffff7e900000\fR\fR
+.ad
+.br
+.na
+\fBmap 1 Mbyte: \fB0xffffffff7e700000\fR\fR
+.ad
+.sp .6
+.RS 4n
+2-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 1008 Kbytes: \fB0xffffffff7e600000\fR\fR
+.ad
+.br
+.na
+\fBmap 1008 Kbytes: \fB0xffffffff7e500000\fR\fR
+.ad
+.sp .6
+.RS 4n
+1-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 4 Mbytes: \fB0xffffffff7e000000\fR\fR
+.ad
+.br
+.na
+\fBmap 4 Mbytes: \fB0xffffffff7d800000\fR\fR
+.ad
+.sp .6
+.RS 4n
+8-Mbyte delta between starting addresses
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmap 4080 Kbytes: \fB0xffffffff7d400000\fR\fR
+.ad
+.br
+.na
+\fBmap 4080 Kbytes: \fB0xffffffff7d000000\fR\fR
+.ad
+.sp .6
+.RS 4n
+4-Mbyte delta between starting addresses
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBmmap()\fR function returns the address at
+which the mapping was placed (\fIpa\fR); otherwise, it returns a value of
+\fBMAP_FAILED\fR and sets \fBerrno\fR to indicate the error. The symbol
+\fBMAP_FAILED\fR is defined in the header <\fBsys/mman.h\fR>. No successful
+return from \fBmmap()\fR will return the value \fBMAP_FAILED\fR.
+.sp
+.LP
+If \fBmmap()\fR fails for reasons other than \fBEBADF\fR, \fBEINVAL\fR or
+\fBENOTSUP\fR, some of the mappings in the address range starting at \fIaddr\fR
+and continuing for \fIlen\fR bytes may have been unmapped.
+.SH ERRORS
+.sp
+.LP
+The \fBmmap()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIfildes\fR file descriptor is not open for read, regardless of the
+protection specified; or \fIfildes\fR is not open for write and
+\fBPROT_WRITE\fR was specified for a \fBMAP_SHARED\fR type mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 13n
+.rt  
+The mapping could not be locked in memory.
+.sp
+There was insufficient room to reserve swap space for the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIfildes\fR file descriptor is not open (and \fBMAP_ANON\fR was not
+specified).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The arguments \fIaddr\fR (if \fBMAP_FIXED\fR was specified) or \fIoff\fR are
+not multiples of the page size as returned by \fBsysconf()\fR.
+.sp
+The argument \fIaddr\fR (if \fBMAP_ALIGN\fR was specified) is not 0 or some
+power of two multiple of page size as returned by \fBsysconf\fR(3C).
+.sp
+\fBMAP_FIXED\fR and \fBMAP_ALIGN\fR are both specified.
+.sp
+The field in \fIflags\fR is invalid (neither \fBMAP_PRIVATE\fR or
+\fBMAP_SHARED\fR is set).
+.sp
+The argument \fIlen\fR has a value equal to 0.
+.sp
+\fBMAP_ANON\fR was specified, but the file descriptor was not \(mi1.
+.sp
+\fBMAP_TEXT\fR was specified but \fBPROT_EXEC\fR was not.
+.sp
+\fBMAP_TEXT\fR and \fBMAP_INITDATA\fR were both specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of mapped regions would exceed an implementation-dependent limit
+(per process or per system).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIfildes\fR argument refers to an object for which \fBmmap()\fR is
+meaningless, such as a terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fBMAP_FIXED\fR option was specified and the range [\fIaddr, addr + len\fR)
+exceeds that allowed for the address space of a process.
+.sp
+The \fBMAP_FIXED\fR option was \fInot\fR specified and there is insufficient
+room in the address space to effect the mapping.
+.sp
+The mapping could not be locked in memory, if required by \fBmlockall\fR(3C),
+because it would require more space than the system is able to supply.
+.sp
+The composite size of \fIlen\fR plus the lengths obtained from all previous
+calls to \fBmmap()\fR exceeds \fBRLIMIT_VMEM\fR (see  \fBgetrlimit\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 13n
+.rt  
+The system does not support the combination of accesses requested in the
+\fIprot\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 13n
+.rt  
+Addresses in the range [\fIoff, off + len\fR) are invalid for the object
+specified by \fIfildes\fR.
+.sp
+The \fBMAP_FIXED\fR option was specified in \fIflags\fR and the combination of
+\fIaddr\fR, \fIlen\fR and \fIoff\fR is invalid for the object specified by
+\fIfildes\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The file is a regular file and the value of \fIoff\fR plus \fIlen\fR exceeds
+the offset maximum establish in the open file description associated with
+\fIfildes\fR.
+.RE
+
+.sp
+.LP
+The \fBmmap()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The file to be mapped is already locked using advisory or mandatory record
+locking. See \fBfcntl\fR(2).
+.RE
+
+.SH USAGE
+.sp
+.LP
+Use of \fBmmap()\fR may reduce the amount of memory available to other memory
+allocation functions.
+.sp
+.LP
+\fBMAP_ALIGN\fR is useful to assure a properly aligned value of \fIpa\fR for
+subsequent use with \fBmemcntl\fR(2) and the \fBMC_HAT_ADVISE\fR command. This
+is best used for large, long-lived, and heavily referenced regions.
+\fBMAP_FIXED\fR and \fBMAP_ALIGN\fR are always mutually-exclusive.
+.sp
+.LP
+Use of \fBMAP_FIXED\fR may result in unspecified behavior in further use of
+\fBbrk\fR(2), \fBsbrk\fR(2), \fBmalloc\fR(3C), and \fBshmat\fR(2). The use of
+\fBMAP_FIXED\fR is discouraged, as it may prevent an implementation from making
+the most effective use of resources.
+.sp
+.LP
+The application must ensure correct synchronization when using \fBmmap()\fR in
+conjunction with any other file access method, such as \fBread\fR(2) and
+\fBwrite\fR(2), standard input/output, and \fBshmat\fR(2).
+.sp
+.LP
+The \fBmmap()\fR function has a transitional interface for 64-bit file offsets.
+See \fBlf64\fR(5).
+.sp
+.LP
+The \fBmmap()\fR function allows access to resources using address space
+manipulations instead of the \fBread()\fR/\fBwrite()\fR interface. Once a file
+is mapped, all a process has to do to access it is use the data at the address
+to which the object was mapped.
+.sp
+.LP
+Consider the following pseudo-code:
+.sp
+.in +2
+.nf
+fildes = open(\|.\|.\|.)
+lseek(fildes, offset, whence)
+read(fildes, buf, len)
+/* use data in buf */
+.fi
+.in -2
+
+.sp
+.LP
+The following is a rewrite using  \fBmmap()\fR:
+.sp
+.in +2
+.nf
+fildes = open(\|.\|.\|.)
+address = mmap((caddr_t) 0, len, (PROT_READ | PROT_WRITE),
+          MAP_PRIVATE, fildes, offset)
+/* use data at address */
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBexec\fR(2), \fBfcntl\fR(2), \fBfork\fR(2),
+\fBgetrlimit\fR(2), \fBmemcntl\fR(2), \fBmmapobj\fR(2), \fBmprotect\fR(2),
+\fBmunmap\fR(2), \fBshmat\fR(2), \fBlockf\fR(3C), \fBmlockall\fR(3C),
+\fBmsync\fR(3C), \fBplock\fR(3C), \fBsysconf\fR(3C), \fBattributes\fR(5),
+\fBlf64\fR(5), \fBstandards\fR(5), \fBnull\fR(7D), \fBzero\fR(7D)

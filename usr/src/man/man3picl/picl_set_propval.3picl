@@ -1,0 +1,188 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH picl_set_propval 3PICL "28 Mar 2000" "SunOS 5.11" "PICL Library Functions"
+.SH NAME
+picl_set_propval, picl_set_propval_by_name \- set the value of a property to
+the specified value
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicl\fR [ \fIlibrary\fR... ]
+#include <picl.h>
+
+\fBint\fR \fBpicl_set_propval\fR(\fBpicl_prophdl_t\fR \fIproph\fR, \fBvoid *\fR\fIvalbuf\fR,
+     \fBsize_t\fR \fInbytes\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpicl_set_propval_by_name\fR(\fBpicl_nodehdl_t\fR \fInodeh\fR,
+     \fBconst char *\fR\fIpname\fR, \fBvoid *\fR\fIvalbuf\fR, \fBsize_t\fR \fInbytes\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpicl_set_propval()\fR function sets the value of the property specified
+by the handle \fIproph\fR to the value contained in the buffer \fIvalbuf\fR.
+The argument \fInbytes\fR specifies the size of the buffer \fIvalbuf\fR.
+.sp
+.LP
+The \fBpicl_set_propval_by_name()\fR function sets the value of the property
+named \fIpname\fR of the node specified by the handle \fInodeh\fR to the value
+contained in the buffer \fIvalbuf\fR. The argument \fInbytes\fR specifies the
+size of the buffer \fIvalbuf\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a non-negative
+integer is returned to indicate an error.
+.sp
+.LP
+\fBPICL_PERMDENIED\fR is returned if the client does not have sufficient
+permission to access the property.
+.sp
+.LP
+\fBPICL_STALEHANDLE\fR is returned if the handle is no longer valid. This
+occurs if the PICL tree was refreshed or reinitialized.
+.sp
+.LP
+\fBPICL_INVALIDHANDLE\fR is returned if the specified handle never existed.
+This error may be returned for a previously valid handle if the daemon was
+brought down and restarted. When this occurs a client must revalidate any saved
+handles.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTINITIALIZED\fR\fR
+.ad
+.RS 23n
+.rt  
+Session not initialized
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NORESPONSE\fR\fR
+.ad
+.RS 23n
+.rt  
+Daemon not responding
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_PERMDENIED\fR\fR
+.ad
+.RS 23n
+.rt  
+Insufficient permission
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTWRITABLE\fR\fR
+.ad
+.RS 23n
+.rt  
+Property is read-only
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_VALUETOOBIG\fR\fR
+.ad
+.RS 23n
+.rt  
+Value too big
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTPROP\fR\fR
+.ad
+.RS 23n
+.rt  
+Not a property
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTNODE\fR\fR
+.ad
+.RS 23n
+.rt  
+Not a node
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDHANDLE\fR\fR
+.ad
+.RS 23n
+.rt  
+Invalid handle specified
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_STALEHANDLE\fR\fR
+.ad
+.RS 23n
+.rt  
+Stale handle specified
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 23n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

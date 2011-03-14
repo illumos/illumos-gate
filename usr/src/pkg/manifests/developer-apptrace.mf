@@ -35,9 +35,12 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/abi
 dir path=usr/lib/abi/$(ARCH64)
+dir path=usr/share/man
+dir path=usr/share/man/man1
 file path=usr/bin/apptrace mode=0555
 file path=usr/lib/abi/$(ARCH64)/apptrace.so.1
 file path=usr/lib/abi/apptrace.so.1
+file path=usr/share/man/man1/apptrace.1
 legacy pkg=SUNWcstl \
     desc="Apptrace utility for application tracing, including shared objects" \
     name="Apptrace Utility"

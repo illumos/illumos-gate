@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH papiStatusString 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.SH NAME
+papiStatusString \- return the string equivalent of a papi_status_t
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+
+\fBchar *\fR\fBpapiStatusString\fR(\fBpapi_status_t\fR \fIstatus\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstatus\fR\fR
+.ad
+.RS 10n
+.rt  
+a \fBpapi_status_t\fR returned from most \fBpapi*()\fR functions
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpapiStatusString()\fR function takes a \fIstatus\fR value and returns a
+localized human-readable version of the supplied status.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpapiStatusString()\fR function always returns a text string.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPrint status.
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <papi.h>
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+
+    printf("status: %s\en", papiStatusString(PAPI_OK));
+    printf("status: %s\en", papiStatusString(PAPI_DEVICE_ERROR));
+    printf("status: %s\en", papiStatusString(PAPI_DOCUMENT_ACCESS_ERROR));
+
+    exit(0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpapi\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,439 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH posix_spawn 3C "20 Feb 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+posix_spawn, posix_spawnp \- spawn a process
+.SH SYNOPSIS
+.LP
+.nf
+#include <spawn.h>
+
+\fBint\fR \fBposix_spawn\fR(\fBpid_t *restrict\fR \fIpid\fR, \fBconst char *restrict\fR \fIpath\fR,
+     \fBconst posix_spawn_file_actions_t *\fR\fIfile_actions\fR,
+     \fBconst posix_spawnattr_t *restrict\fR \fIattrp\fR,
+     \fBchar *const\fR \fIargv\fR[restrict], \fBchar *const\fR \fIenvp\fR[restrict]);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBposix_spawnp\fR(\fBpid_t *restrict\fR \fIpid\fR, \fBconst char *restrict\fR \fIfile\fR,
+     \fBconst posix_spawn_file_actions_t *\fR\fIfile_actions\fR,
+     \fBconst posix_spawnattr_t *restrict\fR \fIattrp\fR,
+     \fBchar *const\fR \fIargv\fR[restrict], \fBchar *const\fR \fIenvp\fR[restrict]);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions create a new process
+(child process) from the specified process image. The new process image is
+constructed from a regular executable file called the new process image file.
+.sp
+.LP
+When a C program is executed as the result of this call, it is entered as a C
+language function call as follows:
+.sp
+.in +2
+.nf
+int main(int \fIargc\fR, char *\fIargv\fR[]);
+.fi
+.in -2
+
+.sp
+.LP
+where \fIargc\fR is the argument count and \fIargv\fR is an array of character
+pointers to the arguments themselves. In addition, the following variable
+.sp
+.in +2
+.nf
+extern char **environ;
+.fi
+.in -2
+
+.sp
+.LP
+is initialized as a pointer to an array of character pointers to the
+environment strings.
+.sp
+.LP
+The argument \fIargv\fR is an array of character pointers to null-terminated
+strings. The last member of this array is a null pointer and is not counted in
+\fIargc\fR. These strings constitute the argument list available to the new
+process image. The value in \fIargv\fR[0] should point to a filename that is
+associated with the process image being started by the \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR function.
+.sp
+.LP
+The argument \fIenvp\fR is an array of character pointers to null-terminated
+strings. These strings constitute the environment for the new process image.
+The environment array is terminated by a null pointer.
+.sp
+.LP
+The number of bytes available for the child process's combined argument and
+environment lists is {\fBARG_MAX\fR}, counting all character pointers, the
+strings they point to, the trailing null bytes in the strings, and the
+list-terminating null pointers. There is no additional system overhead included
+in this total.
+.sp
+.LP
+The \fIpath\fR argument to \fBposix_spawn()\fR is a pathname that identifies
+the new process image file to execute.
+.sp
+.LP
+The \fIfile\fR parameter to \fBposix_spawnp()\fR is used to construct a
+pathname that identifies the new process image file. If the file parameter
+contains a slash character, the file parameter is used as the pathname for the
+new process image file. Otherwise, the path prefix for this file is obtained by
+a search of the directories passed as the environment variable \fBPATH\fR. If
+this environment variable is not defined, the results of the search are
+implementation-defined.
+.sp
+.LP
+If \fIfile_actions\fR is a null pointer, then file descriptors open in the
+calling process remain open in the child process, except for those whose
+close-on-exec flag \fBFD_CLOEXEC\fR is set (see \fBfcntl\fR(2)).  For those
+file descriptors that remain open, all attributes of the corresponding open
+file descriptions, including file locks (see \fBfcntl\fR(2)), remain unchanged.
+.sp
+.LP
+If \fIfile_actions\fR is not \fINULL\fR, then the file descriptors open in the
+child process are those open in the calling process as modified by the spawn
+file actions object pointed to by \fIfile_actions\fR and the \fBFD_CLOEXEC\fR
+flag of each remaining open file descriptor after the spawn file actions have
+been processed. The effective order of processing the spawn file actions are:
+.RS +4
+.TP
+1.
+The set of open file descriptors for the child process are initially the
+same set as is open for the calling process. All attributes of the
+corresponding open file descriptions, including file locks (see
+\fBfcntl\fR(2)), remain unchanged.
+.RE
+.RS +4
+.TP
+2.
+The signal mask, signal default or ignore actions, and the effective user
+and group IDs for the child process are changed as specified in the attributes
+object referenced by \fIattrp\fR.
+.RE
+.RS +4
+.TP
+3.
+The file actions specified by the spawn file actions object are performed in
+the order in which they were added to the spawn file actions object.
+.RE
+.RS +4
+.TP
+4.
+Any file descriptor that has its \fBFD_CLOEXEC\fR flag set (see
+\fBfcntl\fR(2)) is closed.
+.RE
+.sp
+.LP
+The \fBposix_spawnattr_t\fR spawn attributes object type is defined in
+<\fBspawn.h\fR>. It contains at least the attributes defined below.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, and the \fIspawn-pgroup\fR
+attribute of the same object is non-zero, then the child's process group is as
+specified in the \fIspawn-pgroup\fR attribute of the object referenced by
+\fIattrp\fR.
+.sp
+.LP
+As a special case, if the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the
+\fIspawn-flags\fR attribute of the object referenced by \fIattrp\fR, and the
+\fIspawn-pgroup\fR attribute of the same object is set to zero, then the child
+will be in a new process group with a process group ID equal to its process ID.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETPGROUP\fR flag is not set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, the new child process
+inherits the parent's process group.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSCHEDPARAM\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, but
+\fBPOSIX_SPAWN_SETSCHEDULER\fR is not set, the new process image initially has
+the scheduling policy of the calling process with the scheduling parameters
+specified in the \fIspawn-schedparam\fR attribute of the object referenced by
+\fIattrp\fR.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSCHEDULER\fR flag is set in \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR (regardless of the setting of
+the \fBPOSIX_SPAWN_SETSCHEDPARAM\fR flag), the new process image initially has
+the scheduling policy specified in the \fIspawn-schedpolicy\fR attribute of the
+object referenced by \fIattrp\fR and the scheduling parameters specified in the
+\fIspawn-schedparam\fR attribute of the same object.
+.sp
+.LP
+The \fBPOSIX_SPAWN_RESETIDS\fR flag in the \fIspawn-flags\fR attribute of the
+object referenced by \fIattrp\fR governs the effective user ID of the child
+process. If this flag is not set, the child process inherits the parent
+process's effective user ID. If this flag is set, the child process's effective
+user ID is reset to the parent's real user ID. In either case, if the
+set-user-ID mode bit of the new process image file is set, the effective user
+ID of the child process becomes that file's owner ID before the new process
+image begins execution. If this flag is set, the child process's effective user
+ID is reset to the parent's real user ID. In either case, if the set-user-ID
+mode bit of the new process image file is set, the effective user ID of the
+child process becomes that file's owner ID before the new process image begins
+execution.
+.sp
+.LP
+The \fBPOSIX_SPAWN_RESETIDS\fR flag in the \fIspawn-flags\fR attribute of the
+object referenced by \fIattrp\fR also governs the effective group ID of the
+child process. If this flag is not set, the child process inherits the parent
+process's effective group ID. If this flag is set, the child process's
+effective group ID is reset to the parent's real group ID. In either case, if
+the set-group-ID mode bit of the new process image file is set, the effective
+group ID of the child process becomes that file's group ID before the new
+process image begins execution.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSIGMASK\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, the child process initially
+has the signal mask specified in the \fIspawn-sigmask\fR attribute of the
+object referenced by \fIattrp\fR.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSIGDEF\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, the signals specified in the
+\fIspawn-sigdefault\fR attribute of the same object is set to their default
+actions in the child process.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag is set in the spawn-flags attribute
+of the object referenced by \fIattrp\fR, the signals specified in the
+\fIspawn-sigignore\fR attribute of the same object are set to be ignored in the
+child process.
+.sp
+.LP
+If both \fBPOSIX_SPAWN_SETSIGDEF\fR and \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flags
+are set in the spawn-flags attribute of the object referenced by \fIattrp\fR,
+the actions for \fBPOSIX_SPAWN_SETSIGDEF\fR take precedence over the actions
+for \fBPOSIX_SPAWN_SETSIGIGN_NP\fR.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_NOSIGCHLD_NP\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, no \fBSIGCHLD\fR signal will
+be posted to the parent process when the child process terminates, regardless
+of the disposition of the \fBSIGCHLD\fR signal in the parent.  \fBSIGCHLD\fR
+signals are still possible for job control stop and continue actions if the
+parent has requested them.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_WAITPID_NP\fR flag is set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR, no wait-for-multiple-pids
+operation by the parent, as in \fBwait()\fR, \fBwaitid\fR(\fBP_ALL\fR), or
+\fBwaitid\fR(\fBP_PGID\fR), will succeed in reaping the child, and the child
+will not be reaped automatically due the disposition of the \fBSIGCHLD\fR
+signal being set to be ignored in the parent.  Only a specific wait for the
+child, as in \fBwaitid\fR(\fBP_PID\fR, \fBpid\fR), is allowed and it is
+required, else when the child exits it will remain a zombie until the parent
+exits.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_NOEXECERR_NP\fR flag is set in the spawn-flags attribute
+of the object referenced by \fIattrp\fR, and if the specified process image
+file cannot be executed, then the \fBposix_spawn()\fR and \fBposix_spawnp()\fR
+functions do not fail with one of the \fBexec\fR(2) error codes, as is normal,
+but rather return successfully having created a child process that exits
+immediately with exit status 127. This flag permits \fBsystem\fR(3C) and
+\fBpopen\fR(3C) to be implemented with \fBposix_spawn()\fR and still conform
+strictly to their POSIX specifications.
+.sp
+.LP
+Signals set to be caught or set to the default action in the calling process
+are set to the default action in the child process, unless the
+\fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag is set in the spawn-flags attribute of the
+object referenced by \fIattrp\fR and the signals are specified in the
+\fIspawn-sigignore\fR attribute of the same object.
+.sp
+.LP
+Except for \fBSIGCHLD\fR, signals set to be ignored by the calling process
+image are set to be ignored by the child process, unless otherwise specified by
+the \fBPOSIX_SPAWN_SETSIGDEF\fR flag being set in the \fIspawn-flags\fR
+attribute of the object referenced by \fIattrp\fR and the signals being
+indicated in the \fIspawn-sigdefault\fR attribute of the object referenced by
+\fIattrp\fR.
+.sp
+.LP
+If the \fBSIGCHLD\fR signal is set to be ignored by the calling process, it is
+unspecified whether the \fBSIGCHLD\fR signal is set to be ignored or to the
+default action in the child process, unless otherwise specified by the
+\fBPOSIX_SPAWN_SETSIGDEF\fR flag being set in the \fIspawn-flags\fR attribute
+of the object referenced by \fIattrp\fR and the \fBSIGCHLD\fR signal being
+indicated in the \fIspawn-sigdefault\fR attribute of the object referenced by
+\fIattrp\fR.
+.sp
+.LP
+If the value of the \fIattrp\fR pointer is \fINULL\fR, then the default values
+are used.
+.sp
+.LP
+All process attributes, other than those influenced by the attributes set in
+the object referenced by \fIattrp\fR as specified above or by the file
+descriptor manipulations specified in \fIfile_actions\fR appear in the new
+process image as though \fBfork()\fR had been called to create a child process
+and then a member of the \fBexec\fR family of functions had been called by the
+child process to execute the new process image.
+.sp
+.LP
+The fork handlers are not run when \fBposix_spawn()\fR or \fBposix_spawnp()\fR
+is called.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBposix_spawn()\fR and \fBposix_spawnp()\fR return
+the process ID of the child process to the parent process in the variable
+pointed to by a non-null \fIpid\fR argument, and return zero as the function
+return value. Otherwise, no child process is created, the value stored into the
+variable pointed to by a non-null \fIpid\fR is unspecified, and an error number
+is returned as the function return value to indicate the error. If the
+\fIpid\fR argument is a null pointer, the process ID of the child is not
+returned to the caller.
+.SH ERRORS
+.sp
+.LP
+The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIfile_actions\fR or \fIattrp\fR is invalid.
+.RE
+
+.sp
+.LP
+If \fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any of the reasons
+that would cause \fBfork()\fR or one of the \fBexec\fR family of functions to
+fail, an error value is returned as described by \fBfork\fR(2) and
+\fBexec\fR(2), respectively
+.sp
+.LP
+If \fBPOSIX_SPAWN_SETPGROUP\fR is set in the \fIspawn-flags\fR attribute of the
+object referenced by \fIattrp\fR, and \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR fails while changing the child's process group, an error
+value is returned as described by \fBsetpgid\fR(2).
+.sp
+.LP
+If \fBPOSIX_SPAWN_SETSCHEDPARAM\fR is set and \fBPOSIX_SPAWN_SETSCHEDULER\fR is
+not set in the \fIspawn-flags\fR attribute of the object referenced by
+\fIattrp\fR, then if \fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any
+of the reasons that would cause \fBsched_setparam()\fR to fail, an error value
+is returned as described by \fBsched_setparam\fR(3C).
+.sp
+.LP
+If \fBPOSIX_SPAWN_SETSCHEDULER\fR is set in the \fIspawn-flags\fR attribute of
+the object referenced by \fIattrp\fR, and if \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR fails for any of the reasons that would cause
+\fBsched_setscheduler()\fR to fail, an error value is returned as described by
+\fBsched_setscheduler\fR(3C).
+.sp
+.LP
+If the \fIfile_actions\fR argument is not \fINULL\fR and specifies any
+\fBclose()\fR, \fBdup2()\fR, or \fBopen()\fR actions to be performed, and if
+\fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any of the reasons that
+would cause \fBclose()\fR, \fBdup2()\fR, or \fBopen()\fR to fail, an error
+value is returned as described by \fBclose\fR(2), \fBdup2\fR(3C), or
+\fBopen\fR(2), respectively. An open file action might, by itself, result in
+any of the errors described by \fBclose()\fR or \fBdup2()\fR, in addition to
+those described by \fBopen()\fR.
+.sp
+.LP
+If a \fBclose\fR(2) operation is specified to be performed for a file
+descriptor that is not open at the time of the call to \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR, the action does not cause \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR to fail.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBalarm\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBdup\fR(2), \fBexec\fR(2),
+\fBexit\fR(2), \fBfcntl\fR(2), \fBfork\fR(2), \fBkill\fR(2), \fBopen\fR(2),
+\fBsetpgid\fR(2), \fBsetuid\fR(2), \fBstat\fR(2), \fBtimes\fR(2),
+\fBdup2\fR(3C), \fBpopen\fR(3C), \fBposix_spawn_file_actions_addclose\fR(3C),
+\fBposix_spawn_file_actions_adddup2\fR(3C),
+\fBposix_spawn_file_actions_addopen\fR(3C),
+\fBposix_spawn_file_actions_destroy\fR(3C),
+\fBposix_spawn_file_actions_init\fR(3C), \fBposix_spawnattr_destroy\fR(3C),
+\fBposix_spawnattr_getflags\fR(3C), \fBposix_spawnattr_getpgroup\fR(3C),
+\fBposix_spawnattr_getschedparam\fR(3C),
+\fBposix_spawnattr_getschedpolicy\fR(3C),
+\fBposix_spawnattr_getsigdefault\fR(3C),
+\fBposix_spawnattr_getsigignore_np\fR(3C),
+\fBposix_spawnattr_getsigmask\fR(3C), \fBposix_spawnattr_init\fR(3C),
+\fBposix_spawnattr_setflags\fR(3C), \fBposix_spawnattr_setpgroup\fR(3C),
+\fBposix_spawnattr_setschedparam\fR(3C),
+\fBposix_spawnattr_setschedpolicy\fR(3C),
+\fBposix_spawnattr_setsigdefault\fR(3C),
+\fBposix_spawnattr_setsigignore_np\fR(3C),
+\fBposix_spawnattr_setsigmask\fR(3C), \fBsched_setparam\fR(3C),
+\fBsched_setscheduler\fR(3C), \fBsystem\fR(3C), \fBwait\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The SUSv3 POSIX standard (The Open Group Base Specifications Issue 6, IEEE Std
+1003.1-2001) permits the \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions
+to return successfully before some of the above-described errors are detected,
+allowing the child process to fail instead:
+.sp
+.in +2
+.nf
+\&... if the error occurs after the calling process
+successfully returns, the child process exits with
+exit status 127.
+.fi
+.in -2
+
+.sp
+.LP
+With the one exception of when the \fBPOSIX_SPAWN_NOEXECERR_NP\fR flag is
+passed in the attributes structure, this behavior is not present in the Solaris
+implementation. Any error that occurs before the new process image is
+successfully constructed causes the \fBposix_spawn()\fR and
+\fBposix_spawnp()\fR functions to return the corresponding non-zero error value
+without creating a child process.
+.sp
+.LP
+The \fBPOSIX_SPAWN_NOSIGCHLD_NP\fR, \fBPOSIX_SPAWN_WAITPID_NP\fR,
+\fBPOSIX_SPAWN_NOEXECERR_NP\fR, and \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flags and
+the \fBposix_spawnattr_getsigignore_np()\fR and
+\fBposix_spawnattr_setsigignore_np()\fR functions are non-portable Solaris
+extensions to the \fBposix_spawn()\fR and \fBposix_spawnp()\fR interfaces.

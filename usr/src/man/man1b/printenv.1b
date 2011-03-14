@@ -1,0 +1,29 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH printenv 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+printenv \- display environment variables currently set
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/printenv\fR [\fIvariable\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBprintenv\fR prints out the values of the variables in the environment. If a
+\fIvariable\fR is specified, only its value is printed.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBecho\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBtset\fR(1B),
+\fBattributes\fR(5), \fBenviron\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+If a \fIvariable\fR is specified and it is not defined in the environment,
+\fBprintenv\fR returns an exit status of \fB1\fR.

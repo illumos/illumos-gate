@@ -1,0 +1,64 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_getenvlist 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_getenvlist \- returns a list of all the PAM environment variables
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+
+\fBchar **\fR\fBpam_getenvlist\fR(\fBpam_handle_t *\fR\fIpamh\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_getenvlist()\fR function returns a list of all the \fBPAM\fR
+environment variables stored in the \fBPAM\fR handle \fIpamh\fR. The list is
+returned as a null-terminated array of pointers to strings. Each string
+contains a single \fBPAM\fR environment variable of the form
+\fIname\fR\fB=\fR\fIvalue\fR. The list returned is a duplicate copy of all the
+environment variables stored in \fIpamh\fR. It is the responsibility of the
+calling application to free the memory returned by \fBpam_getenvlist()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBpam_getenvlist()\fR returns in a null-terminated array a copy
+of all the \fBPAM\fR environment variables stored in \fIpamh\fR. Otherwise,
+\fBpam_getenvlist()\fR returns a null pointer.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_getenv\fR(3PAM), \fBpam_putenv\fR(3PAM),
+\fBlibpam\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

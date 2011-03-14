@@ -1,0 +1,376 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bootadm 1M "25 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+bootadm \- manage bootability of GRUB-enabled operating system
+.SH SYNOPSIS
+.LP
+.nf
+\fB/sbin/bootadm\fR update-archive [\fB-vn\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+.fi
+
+.LP
+.nf
+\fB/sbin/bootadm\fR list-archive [\fB-vn\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+.fi
+
+.LP
+.nf
+ x86 only
+.fi
+
+.LP
+.nf
+\fB/sbin/bootadm\fR set-menu [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]] \fIkey\fR=\fIvalue\fR
+.fi
+
+.LP
+.nf
+\fB/sbin/bootadm\fR list-menu [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbootadm\fR command manages the boot archive and, with x86 boot
+environments, the GRUB (GRand Unified Bootloader) menu. The
+\fBupdate-archive\fR option provides a way for user to update the boot archive
+as a preventative measure or as part of a recovery procedure. The
+\fBset-menu\fR subcommand allows you to switch the \fBauto-boot\fR timeout and
+default boot entry in the GRUB menu.
+.sp
+.LP
+The \fBlist-menu\fR subcommand displays the location of the GRUB menu and the
+current GRUB menu entries. While the typical location of the GRUB menu is
+\fB/boot/grub/menu.lst\fR, depending on the install method used the active GRUB
+menu might be located somewhere else. Use the \fBlist-menu\fR subcommand to
+locate the active GRUB menu. See the EXAMPLES section for typical output from
+the \fBlist-menu\fR option.
+.sp
+.LP
+Note that OpenBoot PROM (OBP)-based machines, such as SPARC systems, do not use
+GRUB and have no boot menu manageable by \fBbootadm\fR.
+.sp
+.LP
+The \fBbootadm\fR command determines dynamically the options supported by the
+image to be managed, so that \fBbootadm\fR invoked on one platform can be used
+to manage diskless clients of a different platform type.
+.SH SUBCOMMANDS
+.sp
+.LP
+The \fBbootadm\fR command has the following subcommands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBupdate-archive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Updates current boot archive if required. Applies to both SPARC and x86
+platforms.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-archive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the files and directories to be included in the boot archive. Applies to
+both SPARC and x86 platforms.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBset-menu\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maintain the GRUB menu. The current GRUB menu is \fBboot/grub/menu.lst\fR,
+relative to root. Do not depend on this location, because it is subject to
+change. Applies to x86 platforms only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-menu\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the location of the active GRUB menu, as well as the current GRUB menu
+entries. This includes the autoboot-timeout, the default entry number, and the
+title of each entry. Applies to x86 platforms only.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The \fBbootadm\fR command has the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+In an \fBupdate-archive\fR operation, stale files are displayed on stderr.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+In an \fBupdate-archive\fR operation, archive content is checked but not
+updated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIplatform\fR\fR
+.ad
+.sp .6
+.RS 4n
+The platform, or machine hardware class, of the client. The platform type can
+only be specified together with \fB-R\fR, and is generally useful only for
+managing a diskless client where the client is of a different platform class
+than the server. Platform must be one of \fBi86pc\fR, \fBsun4u\fR, or
+\fBsun4v\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\ \fIaltroot\fR\fR
+.ad
+.sp .6
+.RS 4n
+Operation is applied to an alternate root path.
+.LP
+Note -
+.sp
+.RS 2
+The root file system of any non-global zones must not be referenced with the
+\fB-R\fR option. Doing so might damage the global zone's file system, might
+compromise the security of the global zone, and might damage the non-global
+zone's file system. See \fBzones\fR(5).
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIkey\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdefault=\fR\fIentrynum\fR\fR
+.ad
+.sp .6
+.RS 4n
+The item number (for example, 0, 1, or 2) in the GRUB menu designating the
+operating system to boot when the timer expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtimeout=\fR\fIseconds\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of seconds before the operating system designated by the default
+item number is booted. If the value is -1, auto boot is disabled.
+.RE
+
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUpdating the Current Boot Archive
+.sp
+.LP
+The following command updates the current boot archive:
+
+.sp
+.in +2
+.nf
+# bootadm update-archive
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUpdating the Boot Archive on an Alternate Root
+.sp
+.LP
+The following command updates the boot archive on an alternate root:
+
+.sp
+.in +2
+.nf
+# bootadm update-archive -R /a
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRListing Installed OS Instances
+.sp
+.LP
+The following command lists the installed operating system instances in a GRUB
+menu:
+
+.sp
+.in +2
+.nf
+# bootadm list-menu
+
+default=0
+timeout=10
+(0) Solaris10
+(1) Solaris10 Failsafe
+(2) Linux
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRSwitching Default Boot Entry
+.sp
+.LP
+The following command refers to the menu displayed in the previous example. The
+user selects Linux (item 2).
+
+.sp
+.in +2
+.nf
+# bootadm set-menu default=2
+.fi
+.in -2
+
+.LP
+\fBExample 5 \fRListing GRUB Menu Entries and Location of GRUB Menu
+.sp
+.LP
+The following command lists the GRUB menu entries and the location of the GRUB
+menu:
+
+.sp
+.in +2
+.nf
+# bootadm list-menu
+The location for the active GRUB menu is: /stubboot/boot/grub/menu.lst
+default 0
+timeout 10
+0 Solaris10
+1 Solaris10 failsafe
+2 Linux
+.fi
+.in -2
+
+.LP
+\fBExample 6 \fRDisplaying Location of GRUB Menu
+.sp
+.LP
+The following command displays the location of the GRUB menu:
+
+.sp
+.in +2
+.nf
+# bootadm list-menu
+The location for the active GRUB menu is: /dev/dsk/c0t1d0s0 (not mounted)
+The filesystem type of the menu device is <ufs>
+default 2
+timeout 10
+0 c0t1d0s3
+1 c0t1d0s3 failsafe
+2 Solaris10
+3 Solaris10 failsafe
+.fi
+.in -2
+
+.sp
+.LP
+In this example, the active GRUB menu is located on a device which is \fBnot\fR
+mounted. To access the GRUB menu, mount the device and access the GRUB menu at
+\fB\fI<mountpoint>\fR/boot/grub/menu.lst\fR.
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command exited due to an error.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBboot\fR(1M), \fBinstallgrub\fR(1M), \fBattributes\fR(5)
+.sp
+.LP
+Consult the GRUB home page, under:
+.sp
+.in +2
+.nf
+http://www.gnu.org/
+.fi
+.in -2
+

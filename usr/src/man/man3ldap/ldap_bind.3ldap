@@ -1,0 +1,245 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_bind 3LDAP "14 Jan 2004" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_bind, ldap_bind_s, ldap_sasl_bind, ldap_sasl_bind_s, ldap_simple_bind,
+ldap_simple_bind_s, ldap_unbind, ldap_unbind_s, ldap_unbind_ext,
+ldap_set_rebind_proc, ldap_sasl_interactive_bind_s \- LDAP bind functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lldap [ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_bind\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIwho\fR, \fBchar *\fR\fIcred\fR, \fBint\fR \fImethod\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_bind_s\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIwho\fR, \fBchar *\fR\fIcred\fR, \fBint\fR \fImethod\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_simple_bind\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIwho\fR, \fBchar *\fR\fIpasswd\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_simple_bind_s\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIwho\fR, \fBchar *\fR\fIpasswd\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_unbind\fR(\fBLDAP *\fR\fIld\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_unbind_s\fR(\fBLDAP *\fR\fIld\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_unbind_ext\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPControl **\fR\fIserverctrls\fR,
+     \fBLDAPControl **\fR\fIclientctrls\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_set_rebind_proc\fR(\fBLDAP\fR \fI*ld\fR, \fBint (*\fR\fIrebindproc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_sasl_bind\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIdn\fR, \fBchar *\fR\fImechanism\fR,
+     \fBstruct berval **\fR\fIserverctrls\fR, \fBLDAPControl **\fR\fIclientctrls\fR,
+     \fBint *\fR\fImsgidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_sasl_bind_s\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIdn\fR, \fBchar *\fR\fImechanism\fR,
+     \fBstruct berval *\fR\fIcred\fR, \fBLDAPControl **\fR\fIserverctrls\fR,
+     \fBLDAPControl **\fR\fIclientctrls\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_sasl_interactive_bind_s\fR(\fBLDAP *\fR\fIld\fR, \fBchar *\fR\fIdn\fR,
+     \fBchar *\fR\fIsaslMechanism\fR, \fBLDAPControl **\fR\fIsctrl\fR, \fBLDAPControl **\fR\fIcctrl\fR,
+     \fBLDAPControl **\fR\fIunsigned flags\fR, \fBLDAP_SASL_INTERACT_PROC *\fR\fIcallback\fR,
+     \fBvoid *\fR\fIdefaults\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide various interfaces to the LDAP bind operation. After a
+connection is made to an LDAP server, the \fBldap_bind()\fR function returns
+the message ID of the request initiated. The \fBldap_bind_s()\fR function
+returns an LDAP error code.
+.SS "Simple Authentication"
+.sp
+.LP
+The simplest form of the bind call is \fBldap_simple_bind_s()\fR. The function
+takes the DN (Distinguished Name) of the \fIdn\fR parameter and the
+\fBuserPassword\fR associated with the entry in \fIpasswd\fR to return an LDAP
+error code. See \fBldap_error\fR(3LDAP).
+.sp
+.LP
+The \fBldap_simple_bind()\fR call is asynchronous. The function takes the same
+parameters as \fBldap_simple_bind_s()\fR but initiates the bind operation and
+returns the message ID of the request sent. The result of the operation can be
+obtained by a subsequent call to \fBldap_result\fR(3LDAP).
+.SS "General Authentication"
+.sp
+.LP
+The \fBldap_bind()\fR and \fBldap_bind_s()\fR functions are used to select the
+authentication method at runtime. Both functions take an extra \fImethod\fR
+parameter to set the authentication method. For simple authentication, the
+\fImethod\fR parameter is set to \fBLDAP_AUTH_SIMPLE\fR. The \fBldap_bind()\fR
+function returns the message id of the request initiated. The
+\fBldap_bind_s()\fR function returns an LDAP error code.
+.SS "SASL Authentication"
+.sp
+.LP
+The \fBldap_sasl_bind()\fR and \fBldap_sasl_bind_s()\fR functions are used for
+general and extensible authentication over LDAP through the use of the Simple
+Authentication Security Layer. The routines both take the \fBDN\fR to bind as
+the authentication method. A dotted-string representation of an OID identifies
+the method, and the \fBberval\fR structure holds the credentials. The special
+constant value \fBLDAP_SASL_SIMPLE\fR ("") can be passed to request simple
+authentication. Otherwise, the \fBldap_simple_bind()\fR function or the
+\fBldap_simple_bind_s()\fR function can be used.
+.sp
+.LP
+The \fBldap_sasl_interactive_bind_s()\fR helper function takes its data and
+performs the necessary \fBldap_sasl_bind()\fR and associated SASL library
+authentication sequencing with the LDAP server that uses the provided
+connection (\fIld\fR).
+.sp
+.LP
+Upon a successful bind, the \fBldap_sasl_bind()\fR function will, if negotiated
+by the SASL interface, install the necessary internal \fBlibldap\fR plumbing to
+enable SASL integrity and privacy (over the wire encryption) with the LDAP
+server.
+.sp
+.LP
+The \fBLDAP_SASL_INTERACTIVE\fR option flag is passed to the libldap API
+through the flags argument of the API. The flag tells the API to use the SASL
+interactive mode and to have the API request SASL authentication data through
+the \fBLDAP_SASL_INTERACTIVE_PROC\fR callback as needed. The callback provided
+is in the form:
+.sp
+.in +2
+.nf
+typedef int (LDAP_SASL_INTERACT_PROC)
+    (LDAP *ld, unsigned flags, void* defaults, void *interact);
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The user-provided SASL callback is passed to the current LDAP connection
+pointer, the current flags field, an optional pointer to user-defined data, and
+the list of \fBsasl_interact_t\fR authentication values requested by
+\fBlibsasl\fR(3LIB) to complete authentication.
+.sp
+.LP
+The user-defined callback collects and returns the authentication information
+in the \fBsasl_interact_t\fR array according to \fBlibsasl\fR rules. The
+authentication information can include user IDs, passwords, realms, or other
+information defined by SASL. The SASL library uses this date during sequencing
+to complete authentication.
+.SS "Unbinding"
+.sp
+.LP
+The \fBldap_unbind()\fR call is used to unbind from a directory, to terminate
+the current association, and to free the resources contained in the \fIld\fR
+structure. Once the function is called, the connection to the LDAP server is
+closed and the \fIld\fR structure is invalid. The \fBldap_unbind_s()\fR and
+\fBldap_unbind()\fR calls are identical and synchronous in nature.
+.sp
+.LP
+The \fBldap_unbind_ext()\fR function is used to unbind from a directory, to
+terminate the current association, and to free the resources contained in the
+LDAP structure. Unlike \fBldap_unbind()\fR and \fBldap_unbind_s()\fR, both
+server and client controls can be explicitly included with
+\fBldap_unbind_ext()\fR requests. No server response is made to an unbind
+request and responses should not be expected from server controls included with
+unbind requests.
+.SS "Rebinding While Following Referral"
+.sp
+.LP
+The \fBldap_set_rebind_proc()\fR call is used to set a function called back to
+obtain bind credentials. The credentials are used when a new server is
+contacted after an LDAP referral. If \fBldap_set_rebind_proc()\fR is never
+called, or if it is called with a \fBNULL\fR \fIrebindproc\fR parameter, an
+unauthenticated simple LDAP bind is always done when chasing referrals.
+.sp
+.LP
+The \fBrebindproc()\fR function is declared as shown below:
+.sp
+.in +2
+.nf
+int rebindproc(LDAP *ld, char **whop, char **credp,
+    int *methodp, int freeit);
+.fi
+.in -2
+
+.sp
+.LP
+The LDAP library first calls the \fBrebindproc()\fR to obtain the referral bind
+credentials. The \fIfreeit\fR parameter is zero. The \fIwhop\fR, \fIcredp\fR,
+and \fImethodp\fR parameters should be set as appropriate. If
+\fBrebindproc()\fR returns \fBLDAP_SUCCESS\fR, referral processing continues.
+The \fBrebindproc()\fR is called a second time with a non-zero \fIfreeit\fR
+value to give the application a chance to free any memory allocated in the
+previous call.
+.sp
+.LP
+If anything but \fBLDAP_SUCCESS\fR is returned by the first call to
+\fBrebindproc()\fR, referral processing is stopped and the error code is
+returned for the original LDAP operation.
+.SH RETURN VALUES
+.sp
+.LP
+Make a call to \fBldap_result\fR(3LDAP) to obtain the result of a bind
+operation.
+.SH ERRORS
+.sp
+.LP
+Asynchronous functions will return \fB\(mi1\fR in case of error. See
+\fBldap_error\fR(3LDAP) for more information on error codes returned. If no
+credentials are returned, the result parameter is set to \fINULL\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP), \fBldap_open\fR(3LDAP),
+\fBldap_result\fR(3LDAP), \fBlibsasl\fR(3LIB), \fBattributes\fR(5)

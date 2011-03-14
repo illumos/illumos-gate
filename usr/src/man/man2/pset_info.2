@@ -1,0 +1,117 @@
+'\" te
+.\" Copyright (c) 20034, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pset_info 2 "28 Jun 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+pset_info \- get information about a processor set
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pset.h>
+
+\fBint\fR \fBpset_info\fR(\fBpsetid_t\fR \fIpset\fR, \fBint *\fR\fItype\fR, \fBuint_t *\fR\fInumcpus\fR,
+     \fBprocessorid_t *\fR\fIcpulist\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpset_info()\fR function returns information on the processor set
+\fIpset\fR.
+.sp
+.LP
+If \fItype\fR is non-null, then on successful completion the type of the
+processor set will be stored in the location pointed to by \fItype\fR. The only
+type supported for active processor sets is \fBPS_PRIVATE\fR.
+.sp
+.LP
+If \fInumcpus\fR is non-null, then on successful completion the number of
+processors in the processor set will be stored in the location pointed to by
+\fInumcpus\fR.
+.sp
+.LP
+If \fInumcpus\fR and \fIcpulist\fR are both non-null, then \fIcpulist\fR points
+to a buffer where a list of processors assigned to the processor set is to be
+stored, and \fInumcpus\fR points to the maximum number of processor IDs the
+buffer can hold. On successful completion, the list of processors up to the
+maximum buffer size is stored in the buffer pointed to by \fIcpulist\fR.
+.sp
+.LP
+If \fIpset\fR is \fBPS_NONE\fR, the list of processors not assigned to any
+processor set will be stored in the buffer pointed to by \fIcpulist\fR, and the
+number of such processors will be stored in the location pointed to by
+\fInumcpus\fR. The location pointed to by \fItype\fR will be set to
+\fBPS_NONE\fR.
+.sp
+.LP
+If \fIpset\fR is \fBPS_MYID\fR, the processor list and number of processors
+returned will be those of the processor set to which the caller is bound. If
+the caller is not bound to a processor set, the result will be equivalent to
+setting pset to \fBPS_NONE\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpset_info()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The location pointed to by \fItype\fR, \fInumcpus\fR, or \fIcpulist\fR was not
+null and not writable by the user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An invalid processor set \fBID\fR was specified.
+.sp
+The caller is in a non-global zone, the pools facility is active, and the
+processor is not a member of the zone's pool's processor set.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M), \fBzoneadm\fR(1M),
+\fBprocessor_info\fR(2), \fBpset_assign\fR(2), \fBpset_bind\fR(2),
+\fBpset_create\fR(2), \fBpset_destroy\fR(2), \fBpset_getloadavg\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The processor set of type \fBPS_SYSTEM\fR is no longer supported.

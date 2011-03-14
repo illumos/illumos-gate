@@ -1,0 +1,291 @@
+'\" te
+.\" Copyright (c) 2003. Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH string_to_decimal 3C "1 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+string_to_decimal, file_to_decimal, func_to_decimal \- parse characters into
+decimal record
+.SH SYNOPSIS
+.LP
+.nf
+#include <floatingpoint.h>
+
+\fBvoid\fR \fBstring_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR, 
+     \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
+     \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfunc_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR, 
+     \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
+     \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR,
+     \fBint (*\fR\fIpget\fR)(void), \fBint *\fR\fIpnread\fR, \fBint (*\fR\fIpunget\fR)(int \fIc\fR));
+.fi
+
+.LP
+.nf
+#include <stdio.h>
+
+\fBvoid\fR \fBfile_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR,
+     \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
+     \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR,
+     \fBFILE *\fR\fIpf\fR, \fBint *\fR\fIpnread\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions attempt to parse a numeric token from at most \fInmax\fR
+characters read from a string **\fIpc\fR, a file *\fIpf\fR, or function
+(*\fIpget\fR). They set the decimal record *\fIpd\fR to reflect the value of
+the numeric token recognized and set *\fIpform\fR and *\fIpechar\fR to indicate
+its form.
+.sp
+.LP
+The accepted forms for the numeric token consist of an initial, possibly empty,
+sequence of white-space characters, as defined by \fBisspace\fR(3C), followed
+by a subject sequence representing a numeric value, infinity, or NaN.  The
+subject sequence consists of an optional plus or minus sign followed by one of
+the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a non-empty sequence of decimal digits optionally containing a decimal point
+character, then an optional exponent part
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+one of INF or INFINITY, ignoring case
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+one of NAN or NAN(\fIstring\fR), ignoring case in the NAN part; \fIstring\fR
+can be any sequence of characters not containing ')' (right parenthesis)
+or '\e0' (null).
+.RE
+.sp
+.LP
+The \fIfortran_conventions\fR argument provides additional control over the set
+of accepted forms. It must be one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB0\fR
+.ad
+.RS 5n
+.rt  
+no Fortran conventions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1\fR
+.ad
+.RS 5n
+.rt  
+Fortran list-directed input conventions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB2\fR
+.ad
+.RS 5n
+.rt  
+Fortran formatted input conventions, blanks are ignored
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB3\fR
+.ad
+.RS 5n
+.rt  
+Fortran formatted input conventions, blanks are interpreted as zeroes
+.RE
+
+.sp
+.LP
+When \fIfortran_conventions\fR is zero, the decimal point character is the
+current locale's decimal point character, and the exponent part consists of the
+letter \fBE\fR or \fBe\fR followed by an optional sign and a non-empty string
+of decimal digits.
+.sp
+.LP
+When \fIfortran_conventions\fR is non-zero, the decimal point character is "."
+(period), and the exponent part consists of either a sign or one of the letters
+\fBE\fR, \fBe\fR, \fBD\fR, \fBd\fR, \fBQ\fR, or \fBq\fR followed by an optional
+sign, then a non-empty string of decimal digits.
+.sp
+.LP
+When \fIfortran_conventions\fR is \fB2\fR or \fB3\fR, blanks can appear in the
+digit strings for the integer, fraction, and exponent parts, between the
+exponent delimiter and optional exponent sign, and after an INF, INFINITY, NAN,
+or NAN(\fIstring\fR).  When \fIfortran_conventions\fR is \fB2\fR, all blanks
+are ignored.  When \fIfortran_conventions\fR is \fB3\fR, blanks in digit
+strings are interpreted as zeros and other blanks are ignored.
+.sp
+.LP
+The following table summarizes the accepted forms and shows the corresponding
+values to which *\fIpform\fR and \fIpd\fR->\fBfpclass\fR are set. Here
+\fIdigits\fR represents any string of decimal digits, "." (period) stands for
+the decimal point character, and \fIexponent\fR represents the exponent part as
+defined above.  Numbers in brackets refer to the notes following the table.
+.sp
+
+.sp
+.TS
+tab();
+cw(1.63i) cw(2.02i) cw(1.85i) 
+lw(1.63i) lw(2.02i) lw(1.85i) 
+.
+form*\fIpform\fRpd->\fBfpclass\fR
+_
+all white space [1]\fBwhitespace_form\fR\fBfp_zero\fR
+\fIdigits\fR\fBfixed_int_form\fR\fBfp_normal\fR [2]
+\fIdigits\fR.\fBfixed_intdot_form\fR\fBfp_normal\fR [2]
+\&.\fIdigits\fR\fBfixed_dotfrac_form\fR\fBfp_normal\fR [2]
+\fIdigits\fR.\fIdigits\fR\fBfixed_intdotfrac_form\fR\fBfp_normal\fR [2]
+\fIdigits\fR \fIexponent\fR\fBfloating_int_form\fR\fBfp_normal\fR [2]
+\fIdigits\fR. \fIexponent\fR\fBfloating_intdot_form\fR\fBfp_normal\fR [2]
+\&.digits \fIexponent\fR\fBfloating_dotfrac_form\fR\fBfp_normal\fR [2]
+\fIdigits\fR.\fIdigits\fR \fIexponent\fR\fBfloating_intdotfrac_form\fR\fBfp_normal\fR [2]
+INF\fBinf_form\fR\fBfp_infinity\fR
+INFINITY\fBinfinity_form\fR\fBfp_infinity\fR
+NAN\fBnan_form\fR\fBfp_quiet\fR
+NAN(\fIstring\fR)\fBnanstring_form\fR\fBfp_quiet\fR
+none of the above\fBinvalid_form\fR\fBfp_signaling\fR
+.TE
+
+.sp
+.LP
+Notes:
+.RS +4
+.TP
+1.
+The \fBwhitespace_form\fR is accepted only when \fIfortran_conventions\fR is
+2 or 3 and is interpreted as zero.
+.RE
+.RS +4
+.TP
+2.
+For all numeric forms, \fIpd\fR->\fBfpclass\fR is set to \fBfp_normal\fR if
+any non-zero digits appear in the integer or fraction parts, and otherwise
+\fIpd\fR->\fBfpclass\fR is set to \fBfp_zero\fR.
+.RE
+.sp
+.LP
+If the accepted token has one of the numeric forms and represents a non-zero
+number \fIx\fR, its significant digits are stored in \fIpd\fR->\fBds\fR.
+Leading and trailing zeroes and the radix point are omitted.
+\fIpd\fR->\fBsign\fR and \fIpd\fR->\fBexponent\fR are set so that if \fIm\fR is
+the integer represented by pd->\fBds\fR,
+.sp
+.in +2
+.nf
+\(mi1**(pd->sign) * m * 10**(pd->exponent)
+.fi
+.in -2
+
+.sp
+.LP
+approximates \fIx\fR to at least 511 significant digits.  \fIpd\fR->\fBmore\fR
+is set to 1 if this approximation is not exact (that is, the accepted token
+contains additional non-zero digits beyond those copied to \fIpd\fR->\fBds\fR)
+and to 0 otherwise.
+.sp
+.LP
+If the accepted token has the NAN(\fIstring\fR) form, up to 511 characters from
+the string part are copied to \fIpd\fR->\fBds\fR.
+.sp
+.LP
+\fIpd\fR->\fBds\fR is always terminated by a null byte, and
+\fIpd\fR->\fBndigits\fR is set to the length of the string stored in
+\fIpd\fR->\fBds\fR.
+.sp
+.LP
+On entry, *\fIpc\fR points to the beginning of a character string buffer.  The
+\fBstring_to_decimal()\fR function reads characters from this buffer until
+either enough characters are read to delimit the accepted token (for example, a
+null character marking the end of the string is found) or the limit of
+\fInmax\fR characters is reached. The \fBfile_to_decimal()\fR function reads
+characters from the file *\fIpf\fR and stores them in the buffer. The
+\fBfunc_to_decimal()\fR function reads characters one at a time by calling the
+function (*\fIpget\fR)() and stores them in the buffer; (*\fIpget\fR)() must
+return integer values in the range \(mi1 to 255, where \(mi1 is interpreted as
+EOF and 0, ..., 255 are interpreted as \fBunsigned char\fR values. Both
+\fBfile_to_decimal()\fR and \fBfunc_to_decimal()\fR read characters until
+either enough characters are read to delimit the accepted token, EOF is
+encountered, or the limit of \fInmax\fR characters is reached. These functions,
+therefore, typically read one or more additional characters beyond the end of
+the accepted token and attempt to push back any excess characters read.
+Provided that the \fIpunget\fR argument is not \fINULL\fR,
+\fBfunc_to_decimal()\fR pushes back characters one at a time by calling
+(*\fIpunget\fR)(\fIc\fR), where \fIc\fR is an integer in the range 0 to 255
+corresponding to a value previously read via (*\fIpget\fR)(). After pushing
+back as many excess characters as possible, \fBfile_to_decimal()\fR and
+\fBfunc_to_decimal()\fR store a null byte in the buffer following the last
+character read and not pushed back and set *\fIpnread\fR to the number of
+characters stored in the buffer prior to this null byte. Since these functions
+can read up to \fInmax\fR characters, the buffer must be large enough to hold
+\fInmax\fR + 1.
+.sp
+.LP
+On exit, *\fIpc\fR points to the next character in the buffer past the last one
+that was accepted as part of the numeric token.  If no valid token is found,
+*\fIpc\fR is unchanged.  If \fBfile_to_decimal()\fR and \fBfunc_to_decimal()\fR
+successfully push back all unused characters, *\fIpc\fR points to the null byte
+stored in the buffer following the last character read and not pushed back.
+.sp
+.LP
+If the accepted token contains an exponent part, *\fIpechar\fR is set to point
+to the position in the buffer where the first character of the exponent field
+is stored.  If the accepted token does not contain an exponent part,
+*\fIpechar\fR is set to \fINULL\fR.
+.SH USAGE
+.sp
+.LP
+If the \fB_IOWRT\fR flag is set in *\fIpf\fR, \fBfile_to_decimal()\fR reads
+characters directly from the file buffer until a null character is found.  (The
+\fB_IOWRT\fR flag should only be set when \fBfile_to_decimal()\fR is called
+from \fBsscanf\fR(3C).)  Otherwise, \fBfile_to_decimal()\fR uses
+\fBgetc_unlocked\fR(3C), so it is not MT-safe unless the caller holds the
+stream lock.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBctype\fR(3C), \fBdecimal_to_floating\fR(3C), \fBgetc_unlocked\fR(3C),
+\fBisspace\fR(3C), \fBlocaleconv\fR(3C), \fBscanf\fR(3C), \fBsetlocale\fR(3C),
+\fBstrtod\fR(3C), \fBungetc\fR(3C), \fBattributes\fR(5)

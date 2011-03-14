@@ -47,12 +47,15 @@ dir path=usr/platform group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/platform/sun4u/dcs.xml group=sys mode=0444
 file path=lib/svc/manifest/platform/sun4u/oplhpd.xml group=sys mode=0444
 file path=lib/svc/method/svc-dcs mode=0555
 file path=lib/svc/method/svc-oplhpd mode=0555
 file path=usr/lib/dcs mode=0755
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)/oplhpd mode=0755
+file path=usr/share/man/man1m/dcs.1m
+file path=usr/share/man/man1m/oplhpd.1m
 legacy pkg=SUNWdcsr desc="Domain Configuration Server, (Root)" \
     name="Domain Configuration Server, (Root)"
 legacy pkg=SUNWdcsu desc="Domain Configuration Server" \

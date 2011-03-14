@@ -1,0 +1,230 @@
+'\" te
+.\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getrpcbyname 3NSL "20 Feb 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+getrpcbyname, getrpcbyname_r, getrpcbynumber, getrpcbynumber_r, getrpcent,
+getrpcent_r, setrpcent, endrpcent \- get RPC entry
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lnsl\fR [ \fIlibrary\fR ... ]
+#include <rpc/rpcent.h>
+
+
+
+\fBstruct rpcent *\fR\fBgetrpcbyname\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpcent *\fR\fBgetrpcbyname_r\fR(\fBconst char *\fR\fIname\fR, \fBstruct rpcent *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpcent *\fR\fBgetrpcbynumber\fR(\fBconst int\fR \fInumber\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpcent *\fR\fBgetrpcbynumber_r\fR(\fBconst int\fR \fInumber\fR, \fBstruct rpcent *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpcent *\fR\fBgetrpcent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpcent *\fR\fBgetrpcent_r\fR(\fBstruct rpcent *\fR\fIresult\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetrpcent\fR(\fBconst int\fR \fIstayopen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBendrpcent\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to obtain entries for RPC (Remote Procedure Call)
+services.  An entry may come from any of the sources for \fBrpc\fR specified in
+the \fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+.sp
+.LP
+\fBgetrpcbyname()\fR searches for an entry with the RPC service name specified
+by the parameter \fIname\fR.
+.sp
+.LP
+\fBgetrpcbynumber()\fR searches for an entry with the RPC program number
+\fInumber\fR.
+.sp
+.LP
+The functions \fBsetrpcent()\fR, \fBgetrpcent()\fR, and \fBendrpcent()\fR are
+used to enumerate RPC entries from the database.
+.sp
+.LP
+\fBsetrpcent()\fR sets (or resets) the enumeration to the beginning of the set
+of RPC entries.  This function should be called before the first call to
+\fBgetrpcent()\fR. Calls to \fBgetrpcbyname()\fR and \fBgetrpcbynumber()\fR
+leave the enumeration position in an indeterminate state.   If the
+\fIstayopen\fR flag is non-zero, the system may keep allocated resources such
+as open file descriptors until a subsequent call to \fBendrpcent()\fR.
+.sp
+.LP
+Successive calls to \fBgetrpcent()\fR return either successive entries or
+\fBNULL,\fR indicating the end of the enumeration.
+.sp
+.LP
+\fBendrpcent()\fR may be called to indicate that the caller expects to do no
+further RPC entry retrieval operations; the system may then  deallocate
+resources it was using.  It is still allowed, but possibly less efficient, for
+the process to call more RPC entry retrieval functions after calling
+\fBendrpcent()\fR.
+.SS "Reentrant Interfaces"
+.sp
+.LP
+The functions \fBgetrpcbyname()\fR, \fBgetrpcbynumber()\fR, and
+\fBgetrpcent()\fR use static storage that is re-used in each call, making these
+routines unsafe for use in multithreaded applications.
+.sp
+.LP
+The functions \fBgetrpcbyname_r()\fR, \fBgetrpcbynumber_r()\fR, and
+\fBgetrpcent_r()\fR provide reentrant interfaces for these operations.
+.sp
+.LP
+Each reentrant interface performs the same operation as its non-reentrant
+counterpart, named by removing the  ``\fB_r\fR'' suffix.  The reentrant
+interfaces, however, use buffers supplied by the caller to store returned
+results, and  are safe for use in both single-threaded and multithreaded
+applications.
+.sp
+.LP
+Each reentrant interface takes the same parameters as its non-reentrant
+counterpart, as well as the following additional parameters.  The parameter
+\fIresult\fR must be a pointer to a \fBstruct rpcent\fR structure allocated by
+the caller.  On successful completion, the function returns the RPC entry in
+this structure. The parameter \fIbuffer\fR must be a pointer to a buffer
+supplied by the caller.  This buffer is used as storage space for the RPC entry
+data.  All of the pointers within the returned \fBstruct rpcent\fR \fIresult\fR
+point to data stored within this buffer (see \fBRETURN VALUES\fR). The buffer
+must be large enough to hold all of the data associated with the RPC entry. The
+parameter \fIbuflen\fR should give the size in bytes of the buffer indicated by
+\fIbuffer\fR.
+.sp
+.LP
+For enumeration in multithreaded applications, the position within the
+enumeration is a process-wide property shared by all threads. \fBsetrpcent()\fR
+may be used in a multithreaded application but resets the enumeration position
+for all threads.  If multiple threads interleave calls to \fBgetrpcent_r()\fR,
+the threads will enumerate disjoint subsets of the RPC entry database.
+.sp
+.LP
+Like their non-reentrant counterparts, \fBgetrpcbyname_r()\fR and
+\fBgetrpcbynumber_r()\fR leave the enumeration position in an indeterminate
+state.
+.SH RETURN VALUES
+.sp
+.LP
+RPC entries are represented by the \fBstruct rpcent\fR structure defined in
+\fB<rpc/rpcent.h>\fR:
+.sp
+.in +2
+.nf
+struct rpcent {
+   char *r_name;       /* name of this rpc service  
+   char **r_aliases;   /* zero-terminated list of alternate names */
+   int r_number;       /* rpc program number */
+};
+.fi
+.in -2
+
+.sp
+.LP
+The functions \fBgetrpcbyname()\fR, \fBgetrpcbyname_r(\|)\fR,
+\fBgetrpcbynumber(\|)\fR, and \fBgetrpcbynumber_r()\fR each return a pointer to
+a \fBstruct rpcent\fR if they successfully locate the requested entry;
+otherwise they return \fBNULL.\fR
+.sp
+.LP
+The functions \fBgetrpcent()\fR and \fBgetrpcent_r()\fR each return a pointer
+to a \fBstruct rpcent\fR if they successfully enumerate an entry; otherwise
+they return \fBNULL,\fR indicating the end of the enumeration.
+.sp
+.LP
+The functions \fBgetrpcbyname()\fR, \fBgetrpcbynumber()\fR, and
+\fBgetrpcent()\fR use static storage, so returned data must be copied before a
+subsequent call to any of these functions if the data is to be saved.
+.sp
+.LP
+When the pointer returned by the reentrant functions \fBgetrpcbyname_r()\fR,
+\fBgetrpcbynumber_r()\fR, and \fBgetrpcent_r()\fR is non-NULL, it is always
+equal to the \fIresult\fR pointer that was supplied by the caller.
+.SH ERRORS
+.sp
+.LP
+The reentrant functions  \fBgetrpcyname_r()\fR, \fBgetrpcbynumber_r(\|)\fR and
+\fBgetrpcent_r()\fR will return \fBNULL\fR and set \fBerrno\fR to \fBERANGE\fR
+if the length of the buffer supplied by caller is not large enough to store the
+result. See \fBIntro\fR(2) for the proper usage and interpretation of
+\fBerrno\fR in multithreaded applications.
+.SH FILES
+.sp
+.LP
+\fB/etc/rpc\fR
+.sp
+.LP
+\fB/etc/nsswitch.conf\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelT{
+See "Reentrant Interfaces" in \fBDESCRIPTION\fR.
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrpcinfo\fR(1M), \fBrpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBrpc\fR(4),
+\fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+The reentrant interfaces \fBgetrpcbyname_r()\fR, \fBgetrpcbynumber_r()\fR, and
+\fBgetrpcent_r()\fR are included in this release on an uncommitted basis only,
+and are subject to change or removal in future minor releases.
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded applications, see  \fBIntro\fR(3), \fINotes On
+Multithreaded Applications\fR, for information about the use of the
+\fB_REENTRANT\fR flag.
+.sp
+.LP
+Use of the enumeration interfaces \fBgetrpcent()\fR and \fBgetrpcent_r()\fR is
+discouraged; enumeration may not be supported for all database sources.  The
+semantics of enumeration are discussed further in \fBnsswitch.conf\fR(4).

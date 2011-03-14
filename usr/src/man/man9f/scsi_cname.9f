@@ -1,0 +1,172 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_cname 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_cname, scsi_dname, scsi_mname, scsi_rname, scsi_sname \- decode a SCSI
+name
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBchar *\fR\fBscsi_cname\fR(\fBuchar_t\fR \fIcmd\fR, \fBchar **\fR\fIcmdvec\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscsi_dname\fR(\fBint\fR \fIdtype\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscsi_mname\fR(\fBuchar_t\fR \fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscsi_rname\fR(\fBuchar_t\fR \fIreason\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscsi_sname\fR(\fBuchar_t\fR \fIsense_key\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 13n
+.rt  
+A \fBSCSI\fR command value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdvec\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to an array of command strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdtype\fR\fR
+.ad
+.RS 13n
+.rt  
+Device type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsg\fR\fR
+.ad
+.RS 13n
+.rt  
+A message value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreason\fR\fR
+.ad
+.RS 13n
+.rt  
+A packet reason value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsense_key\fR\fR
+.ad
+.RS 13n
+.rt  
+A \fBSCSI\fR sense key value.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_cname()\fR function decodes \fBSCSI\fR commands. \fIcmdvec\fR is a
+pointer to an array of strings. The first byte of the string is the command
+value, and the remainder is the name of the command.
+.sp
+.LP
+The \fBscsi_dname()\fR function decodes the peripheral device type (for
+example, direct access or sequential access) in the inquiry data.
+.sp
+.LP
+The \fBscsi_mname()\fR function decodes \fBSCSI \fRmessages.
+.sp
+.LP
+The \fBscsi_rname()\fR function decodes packet completion reasons.
+.sp
+.LP
+The \fBscsi_sname()\fR function decodes \fBSCSI\fR sense keys.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return a pointer to a string. If an argument is invalid, they
+return a string to that effect.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDecoding SCSI tape commands.
+.sp
+.LP
+The \fBscsi_cname()\fR function decodes \fBSCSI \fRtape commands as follows:
+
+.sp
+.in +2
+.nf
+static char *st_cmds[] = {
+            "\e000test unit ready",
+            "\e001rewind",	
+            "\e003request sense",
+            "\e010read",
+            "\e012write",
+            "\e020write file mark",
+            "\e021space",
+            "\e022inquiry",
+            "\e025mode select",
+            "\e031erase tape",
+            "\e032mode sense",
+            "\e033load tape",
+            NULL
+    };
+    ..
+    cmn_err(CE_CONT, "st: cmd=%s", scsi_cname(cmd, st_cmds));
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR

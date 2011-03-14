@@ -1,0 +1,108 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree_walk_tree_by_class 3PICLTREE "1 Aug 2000" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+ptree_walk_tree_by_class \- walk subtree by class
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicltree\fR [ \fIlibrary\fR... ]
+#include <picltree.h>
+
+\fBint\fR \fBptree_walk_tree_by_class\fR(\fBpicl_nodehdl_t\fR \fIrooth\fR,
+     \fBconst char *\fR\fIclassname\fR, \fBvoid *\fR\fIc_args\fR,
+     \fBint (*\fR\fIcallback\fR)(picl_nodehdl_t \fInodeh\fR, void *\fIc_args\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree_walk_tree_by_class()\fR function visits all the nodes of the
+subtree under the node specified by \fIrooth\fR. The PICL class name of the
+visited node is compared with the class name specified by \fIclassname\fR. If
+the class names match, the callback function specified by \fIcallback\fR is
+called with the matching node handle and the argument provided in \fIc_args\fR.
+If the class name specified in \fIclassname\fR is \fINULL\fR, then the callback
+function is invoked for all the nodes.
+.sp
+.LP
+The return value from the callback function is used to determine whether to
+continue or terminate the tree walk. The callback function returns
+\fBPICL_WALK_CONTINUE\fR or \fBPICL_WALK_TERMINATE\fR to continue or terminate
+the tree walk.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a non-negative
+integer is returned to indicate an error.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTNODE\fR\fR
+.ad
+.RS 22n
+.rt  
+Not a node
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Invalid handle specified
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_STALEHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Stale handle specified
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 22n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBptree_get_propval_by_name\fR(3PICLTREE), \fBattributes\fR(5)

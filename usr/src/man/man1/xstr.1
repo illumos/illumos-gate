@@ -1,0 +1,236 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH xstr 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+xstr \- extract strings from C programs to implement shared strings
+.SH SYNOPSIS
+.LP
+.nf
+\fBxstr\fR \fB-c\fR \fIfilename\fR [\fB-v\fR] [\fB-l\fR \fIarray\fR]
+.fi
+
+.LP
+.nf
+\fBxstr\fR [\fB-l\fR \fIarray\fR]
+.fi
+
+.LP
+.nf
+\fBxstr\fR \fIfilename\fR [\fB-v\fR] [\fB-l\fR \fIarray\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBxstr\fR maintains a file called \fBstrings\fR into which strings in
+component parts of a large program are hashed. These strings are replaced with
+references to this common area. This serves to implement shared constant
+strings, which are most useful if they are also read-only.
+.sp
+.LP
+The command:
+.sp
+.in +2
+.nf
+\fBexample% xstr \(mic \fR\fIfilename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+extracts the strings from the C source in name, replacing string references by
+expressions of the form \fB&xstr[\fR\fInumber\fR\fB]\fR for some number. An
+appropriate declaration of \fBxstr\fR is prepended to the file.  The resulting
+C text is placed in the file \fBx.c\fR, to then be compiled.  The strings from
+this file are placed in the \fBstrings\fR data base if they are not there
+already. Repeated strings and strings which are suffixes of existing strings do
+not cause changes to the data base.
+.sp
+.LP
+After all components of a large program have been compiled, a file declaring
+the common \fBxstr\fR space called \fBxs.c\fR can be created by a command of
+the form:
+.sp
+.in +2
+.nf
+\fBexample%\fR \fBxstr\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This \fBxs.c\fR file should then be compiled and loaded with the rest of the
+program.  If possible, the array can be made read-only (shared) saving space
+and swap overhead.
+.sp
+.LP
+\fBxstr\fR can also be used on a single file.  A command:
+.sp
+.LP
+\fBexample% xstr \fR\fIfilename\fR
+.sp
+.LP
+creates files \fBx.c\fR and \fBxs.c\fR as before, without using or affecting
+any \fBstrings\fR file in the same directory.
+.sp
+.LP
+It may be useful to run \fBxstr\fR after the C preprocessor if any macro
+definitions yield strings or if there is conditional code which contains
+strings which may not, in fact, be needed. \fBxstr\fR reads from the standard
+input when the argument `\fB\(mi\fR\&' is given. An appropriate command
+sequence for running \fBxstr\fR after the C preprocessor is:
+.sp
+.in +2
+.nf
+\fBexample% cc \(miE name.c | xstr \(mic \(mi
+example% cc \(mic x.c
+example% mv x.o name.o\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBxstr\fR does not touch the file \fBstrings\fR unless new items are added;
+thus \fBmake\fR(1S) can avoid remaking \fBxs.o\fR unless truly necessary.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mic \fR\fIfilename\fR\fR
+.ad
+.RS 18n
+.rt  
+Take C source text from \fIfilename\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 18n
+.rt  
+Verbose: display a progress report indicating where new or duplicate strings
+were found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mil \fR\fIarray\fR\fR
+.ad
+.RS 18n
+.rt  
+Specify the named  \fIarray\fR in program references to abstracted strings.
+The default array name is \fBxstr\fR.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstrings\fR\fR
+.ad
+.RS 12n
+.rt  
+data base of strings
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx.c\fR\fR
+.ad
+.RS 12n
+.rt  
+massaged C source
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxs.c\fR\fR
+.ad
+.RS 12n
+.rt  
+C source for definition of array "xstr*(rq
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/xs*\fR\fR
+.ad
+.RS 12n
+.rt  
+temp file when \fBxstr \fR\fIfilename\fR doesn't touch \fBstrings\fR
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmake\fR(1S), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+If a string is a suffix of another string in the data base, but the shorter
+string is seen first by \fBxstr\fR both strings will be placed in the data
+base, when just placing the longer one there would do.
+.SH NOTES
+.sp
+.LP
+Be aware that \fBxstr\fR indiscriminately replaces all strings with expressions
+of the form \fB&xstr[\fR\fInumber\fR\fB]\fR regardless of the way the original
+C code might have used the string.  For example, you will encounter a problem
+with  code that uses \fBsizeof()\fR to determine the length of a literal string
+because \fBxstr\fR will replace the literal string with a pointer that most
+likely will have a different size than the string's. To circumvent this
+problem:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+use \fBstrlen()\fR instead of  \fBsizeof()\fR; note that  \fBsizeof()\fR
+returns the size of the array (including the null byte at the end), whereas
+\fBstrlen()\fR doesn't count the null byte. The equivalent of
+\fBsizeof("\fR\fIxxx\fR\fB")\fR really is \fB(strlen("\fR\fIxxx\fR\fB"))+1\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+use \fB#define\fR for operands of \fBsizeof()\fR and use the \fBdefine\fR'd
+version. \fBxstr\fR ignores \fB#define\fR statements.  Make sure you run
+\fBxstr\fR on \fIfilename\fR before you run it on the preprocessor.
+.RE
+.sp
+.LP
+You will also encounter a problem when declaring an initialized character array
+of the form
+.sp
+.in +2
+.nf
+\fBchar x[] = "\fR\fIxxx\fR\fB";\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBxstr\fR will replace  \fIxxx\fR with an expression of the form
+\fB&xstr[\fR\fInumber\fR\fB]\fR which will not compile.  To circumvent this
+problem, use \fBstatic char *x = "xxx"\fR instead of \fBstatic char x[] =
+"xxx"\fR.

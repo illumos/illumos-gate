@@ -1,0 +1,98 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stmfDevidFromIscsiName 3STMF "9 Jun 2008" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.SH NAME
+stmfDevidFromIscsiName \- convert an iSCSI name to a stmfDevid structure
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lstmf\fR [ \fIlibrary\fR... ]
+#include <libstmf.h>
+
+\fBint\fR \fBstmfDevidFromIscsiName\fR(\fBchar *\fR\fIiscsiName\fR, \fBstmfDevid *\fR\fIdevid\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiscsiName\fR\fR
+.ad
+.RS 13n
+.rt  
+A character string of UTF-8 encoded Unicode characters representing the iSCSI
+name terminated with the Unicode nul character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevid\fR\fR
+.ad
+.RS 13n
+.rt  
+A pointer to a \fBstmfDevid\fR structure allocated by the caller. On successful
+return, this will contain the converted device identifier. On error, the value
+of this parameter is undefined.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstmfDevidFromIscsiName()\fR function converts an iSCSI name to a
+\fBstmfDevid\fR structure. It returns the \fIdevid\fR as a SCSI name string
+identifier.
+.SH RETURN VALUES
+.sp
+.LP
+The following values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value of \fIiscsiName\fR was not valid iSCSI name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_STATUS_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The API call was successful.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibstmf\fR(3LIB), \fBattributes\fR(5)

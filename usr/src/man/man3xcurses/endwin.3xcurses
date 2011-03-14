@@ -1,0 +1,77 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH endwin 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+endwin, isendwin \- restore initial terminal environment
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBendwin\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBbool\fR \fBisendwin\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBendwin()\fR function restores the terminal after Curses activity by at
+least restoring the saved shell terminsl mode, flushing any output to the
+terminal, and  moving the cursor to the first column of the last line of the
+screen. Refreshing a window resumes program mode. The application must call
+\fBendwin()\fR for each terminal being used before exiting. If
+\fBnewterm\fR(3XCURSES) is called more than once for the same terminal, the
+first screen created must be the last one for which \fBendwin()\fR is called.
+.sp
+.LP
+The \fBisendiwin()\fR function indicates whether or not a screen has been
+refreshed since the last call to \fBendwin()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBendwin()\fR function returns \fBOK\fR.
+Otherwise, it returns \fBERR\fR.
+.sp
+.LP
+The \fBisendwin()\fR function returns \fBTRUE\fR if \fBendwin()\fR has been
+called without any subsequent refresh. Otherwise, it returns \fBFALSE\fR.
+.SH ERRORS
+.sp
+.LP
+Non errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoupdate\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBnewterm\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,103 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_abort 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_abort \- abort a SCSI command
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR\fBscsi_abort\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBscsi_address\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_abort()\fR function terminates a command that has been transported
+to the host adapter driver. A \fINULL\fR \fIpkt\fR causes all outstanding
+packets to be aborted. On a successful abort, the \fBpkt_reason\fR is set to
+\fBCMD_ABORTED\fR and \fBpkt_statistics\fR is \fBOR\fR'ed with
+\fBSTAT_ABORTED\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_abort()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+on success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+on failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_abort()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTerminating a command.
+.sp
+.in +2
+.nf
+\fBif (scsi_abort(&devp->sd_address, pkt) == 0) {
+        (void) scsi_reset(&devp->sd_address, RESET_ALL);
+}\fR
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_abort\fR(9E), \fBscsi_reset\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

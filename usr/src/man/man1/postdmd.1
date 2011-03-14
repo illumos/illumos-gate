@@ -1,0 +1,208 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH postdmd 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+postdmd \- PostScript translator for DMD bitmap files
+.SH SYNOPSIS
+.LP
+.nf
+\fBpostdmd\fR [\fB-b\fR \fInum\fR] [\fB-c\fR \fInum\fR] [\fB-f\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR] [\fB-o\fR \fIlist\fR] 
+     [\fB-p\fR \fImode\fR] [\fB-x\fR \fInum\fR] [\fB-y\fR \fInum\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/lib/lp/postscript/postdmd\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpostdmd\fR translates DMD bitmap \fIfiles\fR, as produced by \fIdmdps\fR, or
+\fIfiles\fR written in the Ninth Edition \fBbitfile\fR(9.5) format into
+PostScript and writes the results on the standard output. If no \fIfiles\fR are
+specified, or if \(mi is one of the input \fIfiles\fR, the standard input is
+read.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Pack the bitmap in the output file using \fInum\fR byte patterns. A value of
+\fB0\fR turns off all packing of the output file. By default, \fInum\fR is
+\fB6\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fInum\fR copies of each page. By default only one copy is printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 11n
+.rt  
+Flip the sense of the bits in \fIfiles\fR before printing the bitmaps.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
+about the origin, which by default is located at the center of each page. The
+default magnification is  \fB1.0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
+any positive integer. By default \fInum\fR is set to  \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fI list\fR\fR
+.ad
+.RS 11n
+.rt  
+Print pages whose numbers are given in the comma-separated \fIlist\fR. The list
+contains single numbers \fIN\fR and ranges \fIN1 \fR\(mi \fIN2\fR. A missing
+\fIN1\fR means the lowest numbered page, a missing \fIN2\fR means the highest.
+The page range is an expression of logical pages rather than physical sheets of
+paper. For example, if you are printing two logical pages to a sheet, and you
+specified a range of \fB4\fR, then two sheets of paper would print, containing
+four page layouts. If you specified a page range of \fB3-4\fR, when requesting
+two logical pages to a sheet; then \fIonly\fR page 3 and page 4 layouts would
+print, and they would appear on one physical sheet of paper.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI mode\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fIfiles\fR in either portrait or landscape \fImode\fR. Only the first
+character of \fImode\fR is significant. The default \fImode\fR is portrait.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Translate the origin \fInum\fR inches along the positive x axis. The default
+coordinate system has the origin fixed at the center of the page, with positive
+x to the right and positive y up the page. Positive \fInum\fR moves everything
+right. The default offset is  \fB0\fR inches.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Translate the origin \fInum\fR inches along the positive y axis. Positive
+\fInum\fR moves everything up the page. The default offset is  \fB0\fR.
+.RE
+
+.sp
+.LP
+Only one bitmap is printed on each logical page, and each of the input
+\fIfiles\fR must contain complete descriptions of at least one bitmap.
+Decreasing the pattern size using the \fB-b\fR option may help throughput on
+printers with fast processors (such as PS-810s), while increasing the pattern
+size will often be the right move on older models (such as PS-800s).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/forms.ps\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/ps.requests\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdownload\fR(1), \fBdpost\fR(1), \fBpostdaisy\fR(1), \fBpostio\fR(1),
+\fBpostmd\fR(1), \fBpostprint\fR(1), \fBpostreverse\fR(1), \fBposttek\fR(1),
+\fBattributes\fR(5)

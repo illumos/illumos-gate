@@ -1,0 +1,132 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_error 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_error \- retrieve errors status for an asynchronous I/O operation
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_error\fR(\fBconst struct aiocb *\fR\fIaiocbp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_error()\fR function returns the error status associated with the
+\fBaiocb\fR structure referenced by the \fIaiocbp\fR argument. The error status
+for an asynchronous I/O operation is the \fBerrno\fR value that would be set by
+the corresponding \fBread\fR(2), \fBwrite\fR(2), or \fBfsync\fR(3C) operation.
+If the operation has not yet completed, then the error status will be equal to
+\fBEINPROGRESS\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If the asynchronous I/O operation has completed successfully, then \fB0\fR is
+returned. If the asynchronous operation has completed unsuccessfully, then the
+error status, as described for \fBread\fR(2), \fBwrite\fR(2), and
+\fBfsync\fR(3C), is returned. If the asynchronous I/O operation has not yet
+completed, then \fBEINPROGRESS\fR is returned.
+.SH ERRORS
+.sp
+.LP
+The \fBaio_error()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaiocbp\fR argument does not refer to an asynchronous operation whose
+return status has not yet been retrieved.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaio_error()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe following is an example of an error handling routine using
+the \fBaio_error()\fR function.
+.sp
+.in +2
+.nf
+#include <aio.h>
+#include <errno.h>
+#include <signal.h>
+struct aiocb      my_aiocb;
+struct sigaction  my_sigaction;
+void              my_aio_handler(int, siginfo_t *, void *);
+\|.\|.\|.
+my_sigaction.sa_flags = SA_SIGINFO;
+my_sigaction.sa_sigaction = my_aio_handler;
+sigemptyset(&my_sigaction.sa_mask);
+(void) sigaction(SIGRTMIN, &my_sigaction, NULL);
+\|.\|.\|.
+my_aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+my_aiocb.aio_sigevent.sigev_signo = SIGRTMIN;
+my_aiocb.aio_sigevent.sigev_value.sival_ptr = &myaiocb;
+\|.\|.\|.
+(void) aio_read(&my_aiocb);
+\|.\|.\|.
+void
+my_aio_handler(int signo, siginfo_t *siginfo, void *context) {
+int	my_errno;
+struct aiocb	*my_aiocbp;
+
+my_aiocbp = siginfo->si_value.sival_ptr;
+    if ((my_errno = aio_error(my_aiocb)) != EINPROGRESS) {
+        int my_status = aio_return(my_aiocb);
+            if (my_status >= 0){ /* start another operation */
+                    \|.\|.\|.
+            } else        { /* handle I/O error */
+                     \|.\|.\|.
+            }
+    }
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fB_Exit\fR(2), \fBclose\fR(2), \fBfork\fR(2), \fBlseek\fR(2), \fBread\fR(2),
+\fBwrite\fR(2), \fBaio.h\fR(3HEAD), \fBaio_cancel\fR(3C), \fBaio_fsync\fR(3C),
+\fBaio_read\fR(3C), \fBaio_return\fR(3C), \fBaio_write\fR(3C),
+\fBlio_listio\fR(3C), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
+\fBlf64\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,197 @@
+'\" te
+.\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH getitimer 2 "15 Jun 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+getitimer, setitimer \- get or set value of interval timer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/time.h>
+
+\fBint\fR \fBgetitimer\fR(\fBint\fR \fIwhich\fR, \fBstruct itimerval *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetitimer\fR(\fBint\fR \fIwhich\fR, \fBconst struct itimerval *\fR\fIvalue\fR,
+     \fBstruct itimerval *\fR\fIovalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The system provides each process with four interval timers, defined in
+<\fBsys/time.h\fR>. The \fBgetitimer()\fR function stores the current value of
+the timer specified by \fIwhich\fR into the structure pointed to by
+\fIvalue\fR. The \fBsetitimer()\fR function call sets the value of the timer
+specified by \fIwhich\fR to the value specified in the structure pointed to by
+\fIvalue\fR, and if \fIovalue\fR is not \fINULL\fR, stores the previous value
+of the timer in the structure pointed to by \fIovalue\fR.
+.sp
+.LP
+A timer value is defined by the \fBitimerval\fR structure (see
+\fBgettimeofday\fR(3C)) for the definition of \fBtimeval\fR), which includes
+the following members:
+.sp
+.in +2
+.nf
+struct timeval    it_interval;         /* timer interval */
+struct timeval    it_value;            /* current value */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBit_value\fR member indicates the time to the next timer expiration. The
+\fBit_interval\fR member specifies a value to be used in reloading
+\fBit_value\fR when the timer expires. Setting \fBit_value\fR to 0 disables a
+timer, regardless of the value of \fBit_interval\fR. Setting \fBit_interval\fR
+to 0 disables a timer after its next expiration (assuming \fBit_value\fR is
+non-zero).
+.sp
+.LP
+Time values smaller than the resolution of the system clock are rounded up to
+the resolution of the system clock, except for  \fBITIMER_REALPROF\fR, whose
+values are rounded up to the resolution of the profiling clock. The four timers
+are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBITIMER_REAL\fR\fR
+.ad
+.RS 19n
+.rt  
+Decrements in real time.  A \fBSIGALRM\fR signal is delivered to the process
+when this timer expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBITIMER_VIRTUAL\fR\fR
+.ad
+.RS 19n
+.rt  
+Decrements in lightweight process (lwp) virtual time. It runs only when the
+calling lwp is executing. A \fBSIGVTALRM\fR signal is delivered to the calling
+lwp when it expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBITIMER_PROF\fR\fR
+.ad
+.RS 19n
+.rt  
+Decrements both in lightweight process (lwp) virtual time and when the system
+is running on behalf of the lwp.  It is designed to be used by interpreters in
+statistically profiling the execution of interpreted programs. Each time the
+\fBITIMER_PROF\fR timer expires, the \fBSIGPROF\fR signal is delivered to the
+calling lwp. Because this signal may interrupt in-progress functions, programs
+using this timer must be prepared to restart interrupted functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBITIMER_REALPROF\fR\fR
+.ad
+.RS 19n
+.rt  
+Decrements in real time. It is designed to be used for real-time profiling of
+multithreaded programs. Each time the \fBITIMER_REALPROF\fR timer expires, one
+counter in a set of counters maintained by the system for each lightweight
+process (lwp) is incremented. The counter corresponds to the state of the lwp
+at the time of the timer tick. All lwps executing in user mode when the timer
+expires are interrupted into system mode. When each lwp resumes execution in
+user mode, if any of the elements in its set of counters are non-zero, the
+\fBSIGPROF\fR signal is delivered to the lwp. The \fBSIGPROF\fR signal is
+delivered before any other signal except \fBSIGKILL\fR. This signal does not
+interrupt any in-progress function. A  \fBsiginfo\fR structure, defined in
+\fB<sys/siginfo.h>\fR, is associated with the delivery of the \fBSIGPROF\fR
+signal, and includes the following members:
+.sp
+.in +2
+.nf
+si_tstamp;      /* high resolution timestamp */
+si_syscall;     /* current syscall */
+si_nsysarg;     /* number of syscall arguments */
+si_sysarg[\|];     /* actual syscall arguments */
+si_fault;       /* last fault type */
+si_faddr;       /* last fault address */
+si_mstate[\|];     /* ticks in each microstate */
+.fi
+.in -2
+
+The enumeration of microstates (indices into  \fBsi_mstate\fR) is defined in
+\fB<sys/msacct.h>\fR.
+.sp
+Unlike the other interval timers, the \fBITIMER_REALPROF\fR interval timer is
+not inherited across a call to one of the \fBexec\fR(2) family of functions.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetitimer()\fR and \fBsetitimer()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified number of seconds is greater than 100,000,000, the number of
+microseconds is greater than or equal to 1,000,000, or the \fIwhich\fR argument
+is unrecognized.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBalarm\fR(2), \fBexec\fR(2), \fBgettimeofday\fR(3C), \fBsleep\fR(3C),
+\fBsysconf\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBsetitimer()\fR function is independent of the \fBalarm\fR(2) and
+\fBsleep\fR(3C) functions.
+.sp
+.LP
+The \fBITIMER_PROF\fR and \fBITIMER_REALPROF\fR timers deliver the same signal
+and have different semantics. They cannot be used together.
+.sp
+.LP
+The granularity of the resolution of alarm time is platform-dependent.

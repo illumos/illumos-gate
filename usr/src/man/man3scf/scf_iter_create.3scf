@@ -1,0 +1,587 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_iter_create 3SCF "4 Dec 2008" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_iter_create, scf_iter_handle, scf_iter_destroy, scf_iter_reset,
+scf_iter_handle_scopes, scf_iter_scope_services, scf_iter_service_instances,
+scf_iter_service_pgs, scf_iter_service_pgs_typed, scf_iter_instance_snapshots,
+scf_iter_snaplevel_pgs, scf_iter_snaplevel_pgs_typed, scf_iter_instance_pgs,
+scf_iter_instance_pgs_typed, scf_iter_instance_pgs_composed,
+scf_iter_instance_pgs_typed_composed, scf_iter_pg_properties,
+scf_iter_property_values, scf_iter_next_scope, scf_iter_next_service,
+scf_iter_next_instance, scf_iter_next_snapshot, scf_iter_next_pg,
+scf_iter_next_property, scf_iter_next_value \- iterate through the Service
+Configuration Facility repository
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBscf_iter_t *\fR\fBscf_iter_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBscf_handle_t *\fR\fBscf_iter_handle\fR(\fBscf_iter_t *\fR\fIiter\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_iter_destroy\fR(\fBscf_iter_t *\fR\fIiter\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_iter_reset\fR(\fBscf_iter_t *\fR\fIiter\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_handle_scopes\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBconst scf_handle_t *\fR\fIh\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_scope_services\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBconst scf_scope_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_service_instances\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_service_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_service_pgs\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBconst scf_service_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_service_pgs_typed\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_service_t *\fR\fIparent\fR, \fBconst char *\fR\fIpgtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_instance_snapshots\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_instance_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_snaplevel_pgs\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_snaplevel_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_snaplevel_pgs_typed\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_snaplevel_t *\fR\fIparent\fR, \fBconst char *\fR\fIpgtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_instance_pgs\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_instance_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_instance_pgs_typed\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBscf_instance_t *\fR\fIparent\fR, \fBconst char *\fR\fIpgtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_instance_pgs_composed\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_instance_t *\fR\fIinstance\fR, \fBconst scf_snapshot_t *\fR\fIsnapshot\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_instance_pgs_typed_composed\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_instance_t *\fR\fIinstance\fR, \fBconst scf_snapshot_t *\fR\fIsnapshot\fR,
+     \fBconst char *\fR\fIpgtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_pg_properties\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_propertygroup_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_property_values\fR(\fBscf_iter_t *\fR\fIiter\fR,
+     \fBconst scf_property_t *\fR\fIparent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_scope\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_scope_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_service\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_service_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_instance\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_instance_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_snapshot\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_snapshot_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_pg\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_propertygroup_t  *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_property\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_property_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_iter_next_value\fR(\fBscf_iter_t *\fR\fIiter\fR, \fBscf_value_t *\fR\fIout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_iter_create()\fR function creates a new iterator associated with
+\fIhandle\fR. The \fBscf_iter_destroy()\fR function destroys an iteration.
+.sp
+.LP
+The \fBscf_iter_reset()\fR function releases any resources involved with an
+active iteration and returns the iterator to its initial state.
+.sp
+.LP
+The \fBscf_iter_handle_scopes()\fR, \fBscf_iter_scope_services()\fR,
+\fBscf_iter_service_instances()\fR, \fBscf_iter_instance_snapshots()\fR,
+\fBscf_iter_service_pgs()\fR, \fBscf_iter_instance_pgs()\fR,
+\fBscf_iter_snaplevel_pgs()\fR, \fBscf_iter_pg_properties()\fR, and
+\fBscf_iter_property_values()\fR functions set up a new iteration of all the
+children \fIparent\fR of a particular type. The
+\fBscf_iter_property_values()\fR function will iterate over values in the order
+in which they were specified with \fBscf_entry_add_value\fR(3SCF).
+.sp
+.LP
+The \fBscf_iter_service_pgs_typed()\fR, \fBscf_iter_instance_pgs_typed()\fR,
+and \fBscf_iter_snaplevel_pgs_typed()\fR functions iterate over the child
+property groups of \fIparent\fR, but restrict them to a particular property
+group type.
+.sp
+.LP
+The \fBscf_iter_instance_pgs_composed()\fR function sets up a new iteration of
+the composed view of instance's children at the time \fIsnapshot\fR was taken.
+If \fIsnapshot\fR is \fINULL\fR, the current properties are used. The composed
+view of an instance's properties is the union of the properties of the instance
+and its ancestors. Properties of the instance take precedence over properties
+of the service with the same name, including property group name. Property
+groups retrieved with this iterator might not have \fIinstance\fR as their
+parent and properties retrieved from such property groups might not have the
+indicated property group as their parent. If \fIinstance\fR and its parent have
+property groups with the same name but different types, the properties in the
+property group of the parent are excluded. The
+\fBscf_iter_instance_pgs_typed_composed()\fR function behaves as
+\fBscf_iter_instance_pgs_composed()\fR, except the property groups of the type
+\fIpgtype\fR are returned.
+.sp
+.LP
+The \fBscf_iter_next_scope()\fR, \fBscf_iter_next_service()\fR,
+\fBscf_iter_next_instance()\fR, \fBscf_iter_next_snapshot()\fR,
+\fBscf_iter_next_pg()\fR, \fBscf_iter_next_property()\fR, and
+\fBscf_iter_next_value()\fR functions retrieve the next element of the
+iteration.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_iter_create()\fR returns a pointer to a new
+iterator. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_iter_handle()\fR returns the handle
+associated with \fIiter\fR. Otherwise it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_iter_handle_scopes()\fR,
+\fBscf_iter_scope_services()\fR, \fBscf_iter_service_instances()\fR,
+\fBscf_iter_instance_snapshots()\fR, \fBscf_iter_service_pgs()\fR,
+\fBscf_iter_instance_pgs()\fR, \fBscf_iter_snaplevel_pgs()\fR,
+\fBscf_iter_pg_properties()\fR, \fBscf_iter_property_values()\fR,
+\fBscf_iter_service_pgs_typed()\fR, \fBscf_iter_instance_pgs_composed()\fR,
+\fBscf_iter_instance_pgs_typed()\fR,
+\fBscf_iter_instance_pgs_typed_composed()\fR, and
+\fBscf_iter_snaplevel_pgs_typed()\fR return 0. Otherwise, they return -1.
+.sp
+.LP
+Upon successful completion, \fBscf_iter_next_scope()\fR,
+\fBscf_iter_next_service()\fR, \fBscf_iter_next_instance()\fR,
+\fBscf_iter_next_snapshot()\fR, \fBscf_iter_next_pg()\fR,
+\fBscf_iter_next_property()\fR, and \fBscf_iter_next_value()\fR return 1. If
+the iterator is complete, they return 0. Otherwise, they return -1.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_iter_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle argument is NULL.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.RS 30n
+.rt  
+There is no memory available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The server does not have adequate resources for a new iteration.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_handle()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle associated with \fIiter\fR has been destroyed.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_next_value()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value could not be read due to access restrictions.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_handle_scopes()\fR, \fBscf_iter_scope_services()\fR,
+\fBscf_iter_service_instances()\fR, \fBscf_iter_instance_snapshots()\fR,
+\fBscf_iter_service_pgs()\fR, \fBscf_iter_instance_pgs()\fR,
+\fBscf_iter_instance_pgs_composed()\fR, \fBscf_iter_snaplevel_pgs()\fR,
+\fBscf_iter_pg_properties()\fR, \fBscf_iter_property_values()\fR,
+\fBscf_iter_service_pgs_typed()\fR, \fBscf_iter_instance_pgs_typed()\fR,
+\fBscf_iter_instance_pgs_typed_composed()\fR, and
+\fBscf_iter_snaplevel_pgs_typed()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_DELETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The parent has been deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+The parent is not set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIiter\fR and \fIparent\fR arguments are not derived from the same handle.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_service_pgs_typed()\fR, \fBscf_iter_instance_pgs_typed()\fR,
+\fBscf_iter_instance_pgs_typed_composed()\fR, and
+\fBscf_iter_snaplevel_pgs_typed()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIpgtype\fR argument is not a valid property group type.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_next_service()\fR, \fBscf_iter_next_instance()\fR,
+\fBscf_iter_next_snapshot()\fR, \fBscf_iter_next_pg()\fR,
+\fBscf_iter_next_property()\fR, and \fBscf_iter_next_value()\fR functions will
+fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_DELETED\fR\fR
+.ad
+.RS 21n
+.rt  
+The parent the iterator is attached to has been deleted.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_next_scope()\fR, \fBscf_iter_next_service()\fR,
+\fBscf_iter_next_instance()\fR, \fBscf_iter_next_snapshot()\fR,
+\fBscf_iter_next_pg()\fR,\fBscf_iter_next_property()\fR, and
+\fBscf_iter_next_value()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+The iterator is not set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The requested object type does not match the type the iterator is walking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIiter\fR and \fIparent\fR arguments are not derived from the same handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.LP
+The \fBscf_iter_scope_services()\fR, \fBscf_iter_service_instances()\fR,
+\fBscf_iter_service_pgs()\fR, \fBscf_iter_instance_snapshots()\fR,
+\fBscf_iter_instance_pgs()\fR, \fBscf_iter_instance_pgs_composed()\fR,
+\fBscf_iter_snaplevel_pgs()\fR, \fBscf_iter_pg_properties()\fR,
+\fBscf_iter_property_values()\fR, \fBscf_iter_service_pgs_typed()\fR,
+\fBscf_iter_instance_pgs_typed()\fR,
+\fBscf_iter_instance_pgs_typed_composed()\fR,
+\fBscf_iter_snaplevel_pgs_typed()\fR, \fBscf_iter_next_service()\fR,
+\fBscf_iter_next_instance()\fR, \fBscf_iter_next_snapshot()\fR,
+\fBscf_iter_next_pg()\fR, and \fBscf_iter_next_property()\fR functions will
+fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
+.ad
+.RS 26n
+.rt  
+The server does not have the resources to complete the request.
+.RE
+
+.sp
+.LP
+The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRIterate over all instances under a service.
+.sp
+.in +2
+.nf
+scf_iter_t *iter = scf_iter_create(handle);
+
+if (iter == NULL || scf_iter_service_instances(iter, parent) == -1) {
+     /* failure */
+}
+while ((r = scf_iter_next_instance(iter, child)) > 0) {
+     /* process child */
+}
+if (r < 0) {
+     /* failure */
+}
+scf_iter_destroy(iter);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRConnect to the repository, walk all services and instances and
+print their FMRIs.
+.sp
+.in +2
+.nf
+scf_handle_t *handle = scf_handle_create(SCF_VERSION);
+scf_scope_t *scope = scf_scope_create(handle);
+scf_service_t *svc = scf_service_create(handle);
+scf_instance_t *inst = scf_instance_create(handle);
+scf_iter_t *svc_iter = scf_iter_create(handle);
+scf_iter_t *inst_iter = scf_iter_create(handle);
+
+size_t sz = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH) + 1;
+char *fmri = malloc(sz + 1);
+
+int r;
+
+if (handle == NULL || scope == NULL || svc == NULL ||
+     inst == NULL || svc_iter == NULL || inst_iter == NULL ||
+     fmri == NULL) {
+         /* failure */
+}
+if (scf_handle_bind(handle) == -1 ||
+     scf_handle_get_scope(handle, SCF_SCOPE_LOCAL, scope) == -1 ||
+     scf_iter_scope_services(svc_iter, scope) == -1) {
+          /* failure */
+}
+while ((r = scf_iter_next_service(svc_iter, svc)) > 0) {
+     if (scf_service_to_fmri(svc, fmri, sz) < 0) {
+          /* failure */
+     }   
+     puts(fmri);
+     if (scf_iter_service_instances(inst_iter, svc) < 0) {
+          /* failure */
+     }   
+     while ((r = scf_iter_next_instance(inst_iter, inst)) > 0) {
+          if (scf_instance_to_fmri(inst, fmri, sz) < 0) {
+               /* failure */
+          }
+          puts(fmri);
+     }   
+     if (r < 0)
+          break;
+}
+if (r < 0) {
+     /* failure */
+}
+
+scf_handle_destroy(handle);
+scf_scope_destroy(scope);
+scf_service_destroy(svc);
+scf_instance_destroy(inst);
+scf_iter_destroy(svc_iter);
+scf_iter_destroy(inst_iter);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_entry_add_value\fR(3SCF), \fBscf_error\fR(3SCF),
+\fBscf_handle_create\fR(3SCF), \fBattributes\fR(5)

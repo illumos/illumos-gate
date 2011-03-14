@@ -1,0 +1,113 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 1997, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH write 9E "28 Mar 1997" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+write \- write data to a device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBwrite\fR(\fBdev_t\fR \fIdev\fR, \fBstruct uio *\fR\fIuio_p\fR, \fBcred_t *\fR\fIcred_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is optional.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 11n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuio_p\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to the  \fBuio\fR(9S) structure that describes where the data is to be
+stored in user space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcred_p\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to the  user credential structure for the \fBI/O \fRtransaction.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Used for character or raw data \fBI/O, \fRthe driver  \fBwrite()\fR routine is
+called indirectly through  \fBcb_ops\fR(9S) by the  \fBwrite\fR(2) system call.
+The  \fBwrite()\fR routine supervises the data transfer from user space to a
+device described by the  \fBuio\fR(9S) structure.
+.sp
+.LP
+The  \fBwrite()\fR routine should check the validity of the minor number
+component of  \fIdev\fR and the user credentials pointed to by \fIcred_p\fR, if
+pertinent.
+.SH RETURN VALUES
+.sp
+.LP
+The  \fBwrite()\fR routine should return \fB0\fR for success, or the
+appropriate error number.
+.SH EXAMPLES
+.sp
+.LP
+The following is an example of a \fBwrite()\fR routine using \fBphysio\fR(9F)
+to perform writes to a seekable device:
+.sp
+.in +2
+.nf
+static int
+xxwrite(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+      int	instance;
+      xx_t	xx;
+
+      instance = getminor(dev);
+      xx = ddi_get_soft_state(xxstate, instance);
+      if (xx == NULL)
+             return (ENXIO);
+      return (physio(xxstrategy, NULL, dev, B_WRITE,
+             xxmin, uiop));
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBwrite\fR(2), \fBread\fR(9E), \fBphysio\fR(9F),
+\fBcb_ops\fR(9S), \fBuio\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

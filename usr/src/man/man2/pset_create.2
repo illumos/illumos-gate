@@ -1,0 +1,189 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pset_create 2 "22 Feb 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+pset_create, pset_destroy, pset_assign \- manage sets of processors
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pset.h>
+
+\fBint\fR \fBpset_create\fR(\fBpsetid_t *\fR\fInewpset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpset_destroy\fR(\fBpsetid_t\fR \fIpset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpset_assign\fR(\fBpsetid_t\fR \fIpset\fR, \fBprocessorid_t\fR \fIcpu\fR, \fBpsetid_t *\fR\fIopset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions control the creation and management of sets of processors.
+Processor sets allow a subset of the system's processors to be set aside for
+exclusive use by specified \fBLWP\fRs and processes. The binding of \fBLWP\fRs
+and processes to processor sets is controlled by \fBpset_bind\fR(2).
+.sp
+.LP
+The \fBpset_create()\fR function creates an empty processor set that contains
+no processors.  On successful return, \fInewpset\fR will contain the \fBID\fR
+of the new processor set.
+.sp
+.LP
+The \fBpset_destroy()\fR function destroys the processor set \fIpset\fR,
+releasing its constituent processors and processes. If \fIpset\fR is
+\fBPS_MYID\fR, the processor set to which the caller is bound is destroyed.
+.sp
+.LP
+The \fBpset_assign()\fR function assigns the processor \fIcpu\fR to the
+processor set \fIpset\fR. A processor that has been assigned to a processor set
+will run only \fBLWP\fRs and processes that have been explicitly bound to that
+processor set, unless another \fBLWP\fR requires a resource that is only
+available on that processor.
+.sp
+.LP
+On successful return, if \fIopset\fR is non-null, \fIopset\fR will contain the
+processor set \fBID\fR of the former processor set of the processor.
+.sp
+.LP
+If \fIpset\fR is \fBPS_NONE\fR, \fBpset_assign()\fR releases processor
+\fIcpu\fR from its current processor set.
+.sp
+.LP
+If \fIpset\fR is \fBPS_QUERY\fR, \fBpset_assign()\fR makes no change to
+processor sets, but returns the current processor set \fBID\fR of processor
+\fIcpu\fR in \fIopset\fR.
+.sp
+.LP
+If \fIpset\fR is \fBPS_MYID\fR, processor \fIcpu\fR is assigned to the
+processor set to which the caller belongs. If the caller does not belong to a
+processor set, processor \fIcpu\fR is released from its current processor set.
+.sp
+.LP
+These functions are restricted to privileged processes, except for
+\fBpset_assign()\fR when \fIpset\fR is \fBPS_QUERY\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return \fB0\fR. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 11n
+.rt  
+The processor could not be moved to the specified processor set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 11n
+.rt  
+The location pointed to by \fInewpset\fR was not writable by the user, or the
+location pointed to by \fIopset\fR was not \fINULL\fR and not writable by the
+user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The specified processor does not exist, the specified processor  is not
+on-line, or an invalid processor set was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+There was insufficient space for \fBpset_create\fR to create a new processor
+set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The pools facility is active. See \fBpooladm\fR(1M) and
+\fBpool_set_status\fR(3POOL) for information about enabling and disabling the
+pools facility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 11n
+.rt  
+The {\fBPRIV_SYS_RES_CONFIG\fR} privilege is not asserted in the effective set
+of the calling process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M),
+\fBp_online\fR(2), \fBprocessor_bind\fR(2), \fBpset_bind\fR(2),
+\fBpset_info\fR(2), \fBpool_set_status\fR(3POOL), \fBpset_getloadavg\fR(3C),
+\fBattributes\fR(5), \fBprivileges\fR(5)
+.SH NOTES
+.sp
+.LP
+The processor set type of \fBPS_SYSTEM\fR is no longer supported.
+.sp
+.LP
+Processors with \fBLWP\fRs bound to them using \fBprocessor_bind\fR(2) cannot
+be assigned to a new processor set. If  this is attempted, \fBpset_assign()\fR
+will fail and set \fBerrno\fR to \fBEBUSY\fR.

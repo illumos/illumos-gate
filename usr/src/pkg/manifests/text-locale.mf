@@ -39,6 +39,7 @@ dir path=usr/lib/iconv/$(ARCH64)
 dir path=usr/lib/iconv/geniconvtbl
 dir path=usr/lib/iconv/geniconvtbl/binarytables
 dir path=usr/lib/iconv/geniconvtbl/srcs
+dir path=usr/share/man/man1
 file path=usr/bin/gencat mode=0555
 file path=usr/bin/genmsg mode=0555
 file path=usr/bin/gettxt mode=0555
@@ -59,6 +60,15 @@ file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_ISO646.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_UTF-8.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/UTF-8_to_ISO8859-1.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/eucJP_to_ISO-2022-JP.src mode=0444
+file path=usr/share/man/man1/gencat.1
+file path=usr/share/man/man1/genmsg.1
+file path=usr/share/man/man1/gettxt.1
+file path=usr/share/man/man1/locale.1
+file path=usr/share/man/man1/mkmsgs.1
+file path=usr/share/man/man1/msgfmt.1
+file path=usr/share/man/man1/printf.1
+file path=usr/share/man/man1/srchtxt.1
+file path=usr/share/man/man1/xgettext.1
 legacy pkg=SUNWloc \
     desc="localization utilities and C locale (POSIX default) definitions" \
     name="System Localization"

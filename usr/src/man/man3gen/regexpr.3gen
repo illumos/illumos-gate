@@ -1,0 +1,216 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH regexpr 3GEN "29 Dec 1996" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+regexpr, compile, step, advance \- regular expression compile and match
+routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR  [\fIflag\fR]... [\fIfile\fR]... \fB-lgen\fR [\fIlibrary\fR]...
+.fi
+
+.LP
+.nf
+#include <regexpr.h>
+
+\fBchar *\fR\fBcompile\fR(\fBchar *\fR\fIinstring\fR, \fBchar *\fR\fIexpbuf\fR, \fBconst char *\fR\fIendbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR
+\fBstep\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fIexpbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR
+\fBadvance\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fIexpbuf\fR);
+.fi
+
+.LP
+.nf
+\fBextern char *\fRloc1\fB, \fRloc2\fB, \fRlocs\fB;\fR
+.fi
+
+.LP
+.nf
+\fBextern int \fRnbra\fB, \fRregerrno\fB, \fRreglength\fB;\fR
+.fi
+
+.LP
+.nf
+\fBextern char *\fRbraslist\fB[], *\fRbraelist\fB[];\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines are used to compile regular expressions and match the compiled
+expressions against lines.  The regular expressions compiled are in the form
+used by \fBed\fR(1).
+.sp
+.LP
+The parameter \fIinstring\fR is a null-terminated string representing the
+regular expression.
+.sp
+.LP
+The parameter \fIexpbuf\fR points to the place where the compiled regular
+expression is to be placed.  If \fIexpbuf\fR is \fINULL\fR, \fBcompile()\fR
+uses \fBmalloc\fR(3C) to allocate the space for the compiled regular
+expression.  If an error occurs, this space is freed.  It is the user's
+responsibility to free unneeded space after the compiled regular expression is
+no longer needed.
+.sp
+.LP
+The parameter \fIendbuf\fR is one more than the highest address where the
+compiled regular expression may be placed.  This argument is ignored if
+\fIexpbuf\fR is \fINULL\fR. If the compiled expression cannot fit in
+(\fIendbuf\fR\(mi\fIexpbuf\fR) bytes, \fBcompile()\fR returns \fINULL\fR and
+\fBregerrno\fR (see below) is set to 50.
+.sp
+.LP
+The parameter  \fIstring\fR is a pointer to a string of characters to be
+checked for a match. This string should be null-terminated.
+.sp
+.LP
+The parameter \fIexpbuf\fR is the compiled regular expression obtained by a
+call of the function \fBcompile()\fR.
+.sp
+.LP
+The function \fBstep()\fR returns non-zero if the given string matches the
+regular expression, and zero if the expressions do not match.  If there is a
+match, two external character pointers are set as a side effect to the call to
+\fBstep()\fR. The variables set in \fBstep()\fR are  \fIloc1\fR and \fIloc2\fR.
+\fIloc1\fR is a pointer to the first character that matched the regular
+expression. The variable \fIloc2\fR points to the character after the last
+character that matches the regular expression.  Thus if the regular expression
+matches the entire line, \fIloc1\fR points to the first character of
+\fIstring\fR and \fIloc2\fR points to the null at the end of \fIstring\fR.
+.sp
+.LP
+The purpose of \fBstep()\fR is to step through the \fIstring\fR argument until
+a match is found or until the end of \fIstring\fR is reached. If the regular
+expression begins with \fB^\fR, \fBstep()\fR tries to match the regular
+expression at the beginning of the string only.
+.sp
+.LP
+The  \fBadvance()\fR function is similar to \fBstep()\fR; but, it only sets the
+variable \fIloc2\fR and always restricts  matches to the beginning of the
+string.
+.sp
+.LP
+If one is looking for successive matches in the same string of characters,
+\fBlocs\fR should be set equal to \fIloc2\fR, and \fBstep()\fR should be called
+with \fIstring\fR equal to \fIloc2\fR.  \fIlocs\fR is used by commands like
+\fBed\fR and \fBsed\fR so that global substitutions like \fBs/y*//g\fR do not
+loop forever, and is \fINULL\fR by default.
+.sp
+.LP
+The external variable \fBnbra\fR is used to determine the number of
+subexpressions in the compiled regular expression.  \fBbraslist\fR and
+\fBbraelist\fR are arrays of character pointers that point to the start and end
+of the \fBnbra\fR subexpressions in the matched string.   For example, after
+calling \fBstep()\fR or \fBadvance()\fR with string \fBsabcdefg\fR and regular
+expression \fB\e(abcdef\e)\fR, \fBbraslist[0]\fR  will point at \fBa\fR and
+\fBbraelist[0]\fR will point at \fBg\fR. These arrays are used by commands like
+\fBed\fR  and \fBsed\fR for substitute replacement patterns that contain the
+\fB\e\fR\fIn\fR notation for subexpressions.
+.sp
+.LP
+Note that it is not necessary to use the external variables \fBregerrno\fR,
+\fBnbra\fR, \fBloc1\fR, \fBloc2\fR \fBlocs\fR, \fBbraelist\fR, and
+\fBbraslist\fR if one is only checking whether or not a string matches a
+regular expression.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe following is similar to the regular expression code from
+\fBgrep\fR:
+.sp
+.in +2
+.nf
+#include<regexpr.h>
+ . . . 
+if(compile(*argv, (char *)0, (char *)0) == (char *)0)
+ 	regerr(regerrno);
+ . . . 
+if (step(linebuf, expbuf)) 	
+   succeed(\|);
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+If \fBcompile()\fR succeeds, it returns a non-\fINULL\fR pointer whose value
+depends on \fIexpbuf\fR.  If \fIexpbuf\fR is non-\fINULL\fR, \fBcompile()\fR
+returns a pointer to  the byte after the last byte in the compiled regular
+expression.   The length of the compiled regular expression is stored in
+\fBreglength\fR. Otherwise, \fBcompile()\fR returns a pointer to the space
+allocated by \fBmalloc\fR(3C).
+.sp
+.LP
+The functions \fBstep()\fR and \fBadvance()\fR return non-zero if the given
+string matches the regular expression, and zero if the expressions do not
+match.
+.SH ERRORS
+.sp
+.LP
+If an error is detected when compiling the regular expression, a \fINULL\fR
+pointer is returned from \fBcompile()\fR and \fBregerrno\fR is set to one of
+the non-zero error numbers indicated below:
+.sp
+
+.sp
+.TS
+tab();
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+ERRORMEANING
+11Range endpoint too large.
+16Bad Number.
+25"\edigit" out or range.
+36Illegal or missing delimiter.
+41No remembered string search.
+42\e(~\e) imbalance.
+43Too many \e(.
+44More than 2 numbers given in \e[~\e}.
+45} expected after \e.
+46First number exceeds second in \e{~\e}.
+49[] imbalance.
+50 Regular expression overflow.
+.TE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBgrep\fR(1), \fBsed\fR(1), \fBmalloc\fR(3C),
+\fBattributes\fR(5), \fBregexp\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multi-threaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multi-threaded
+applications.

@@ -1,0 +1,349 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nvlist_add_boolean 3NVPAIR "15 Sep 2009" "SunOS 5.11" "Name-value Pair Library Functions"
+.SH NAME
+nvlist_add_boolean, nvlist_add_boolean_value, nvlist_add_byte, nvlist_add_int8,
+nvlist_add_uint8, nvlist_add_int16, nvlist_add_uint16, nvlist_add_int32,
+nvlist_add_uint32, nvlist_add_int64, nvlist_add_uint64, nvlist_add_double,
+nvlist_add_string, nvlist_add_nvlist, nvlist_add_nvpair,
+nvlist_add_boolean_array, nvlist_add_byte_array, nvlist_add_int8_array,
+nvlist_add_uint8_array, nvlist_add_int16_array, nvlist_add_uint16_array,
+nvlist_add_int32_array, nvlist_add_uint32_array, nvlist_add_int64_array,
+nvlist_add_uint64_array, nvlist_add_string_array, nvlist_add_nvlist_array \-
+add new name-value pair to nvlist_t
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnvpair\fR [ \fIlibrary\fR... ]
+#include <libnvpair.h>
+
+\fBint\fR \fBnvlist_add_boolean\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_boolean_value\fR(\fBnvlist_t *\fR\fInvl\fR,
+     \fBconst char *\fR\fIname\fR, \fBboolean_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_byte\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuchar_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int8\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint8_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint8\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint8_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int16\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint16_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint16\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint16_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int32\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint32_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint32\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint32_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int64\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint64_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint64\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint64_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_double\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBdouble\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_string\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBconst char *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_nvlist\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBnvlist_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_nvpair\fR(\fBnvlist_t *\fR\fInvl\fR, \fBnvpair_t *\fR\fInvp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_boolean_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBboolean_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_byte_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuchar_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint8_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint8_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int16_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint16_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint16_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint16_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int32_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint32_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint32_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint32_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_int64_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBint64_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_uint64_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint64_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_string_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBchar *const *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_add_nvlist_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
+     \fBnvlist_t **\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInvl\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fBnvlist_t\fR (name-value pair list) to be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInvp\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fBnvpair_t\fR (name-value pair) to be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 9n
+.rt  
+Name of the \fBnvpair\fR (name-value pair).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInelem\fR\fR
+.ad
+.RS 9n
+.rt  
+Number of elements in value (that is, array size).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIval\fR\fR
+.ad
+.RS 9n
+.rt  
+Value or starting address of the array value.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions add a new name-value pair to an \fBnvlist_t\fR. The uniqueness
+of \fBnvpair\fR name and data types follows the \fInvflag\fR argument specified
+for \fBnvlist_alloc()\fR. See \fBnvlist_alloc\fR(3NVPAIR).
+.sp
+.LP
+If \fBNV_UNIQUE_NAME\fR was specified for \fInvflag\fR, existing \fBnvpair\fRs
+with matching names are removed before the new \fBnvpair\fR is added.
+.sp
+.LP
+If \fBNV_UNIQUE_NAME_TYPE\fR was specified for \fInvflag\fR, existing
+\fBnvpair\fRs with matching names and data types are removed before the new
+\fBnvpair\fR is added.
+.sp
+.LP
+If neither was specified for \fInvflag\fR, the new \fBnvpair\fR is
+unconditionally added at the end of the list. The library preserves the order
+of the name-value pairs across packing, unpacking, and duplication.
+.sp
+.LP
+Multiple threads can simultaneously read the same \fBnvlist_t\fR, but only one
+thread can actively change a given \fBnvlist_t\fR at a time. The caller is
+responsible for the synchronization.
+.sp
+.LP
+The list that is added to the parent \fBnvlist_t\fR by calling
+\fBnvlist_add_nvlist()\fR is copied and thus is not freed when
+\fBnvlist_free()\fR is called on the parent list. To prevent memory leaks, your
+code needs to look like the following (error handling elided for clarity):
+.sp
+.in +2
+.nf
+nvlist_t *parent_nvl;
+nvlist_t *child_nvl;
+
+/* create parent list, add an entry */
+(void) nvlist_alloc(&parent_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+(void) nvlist_add_boolean(parent_nvl, "parent_bool", 0);
+
+/* create child list, add an entry */
+(void) nvlist_alloc(&child_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+(void) nvlist_add_boolean(child_nvl, "child_bool", 0);
+
+/* add the child to the parent */
+(void) nvlist_add_nvlist(parent_nvl, "child_nvlist", child_nvl);
+
+/* do stuff .. */
+
+/* free nvlist(s) */
+(void) nvlist_free(child_nvl); /* required, but not obvious */
+(void) nvlist_free(parent_nvl);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBnvlist_add_boolean()\fR function is deprecated. The
+\fBnvlist_add_boolean_value()\fR function should be used instead.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return 0 on success and an error value on failure.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+There is an invalid argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient memory.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.69i) |cw(2.81i) 
+lw(2.69i) |lw(2.81i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBattributes\fR(5)

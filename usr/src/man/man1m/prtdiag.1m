@@ -1,0 +1,131 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH prtdiag 1M "2 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+prtdiag \- display system diagnostic information
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/prtdiag\fR [\fB-v\fR] [\fB-l\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBprtdiag\fR displays system configuration and diagnostic information on
+\fBsun4u\fR, \fBsun4v\fR, and x86 systems.
+.sp
+.LP
+The diagnostic information lists any failed field replaceable units
+(\fBFRU\fRs) in the system.
+.sp
+.LP
+The interface, output, and location in the directory hierarchy for
+\fBprtdiag\fR are uncommitted and subject to change in future releases.
+.sp
+.LP
+\fBprtdiag\fR does not display diagnostic information and environmental status
+when executed on the Sun Enterprise 10000 server. See the
+\fB/var/opt/SUNWssp/adm/${SUNW_HOSTNAME}/messages\fR file on the system service
+processor (SSP) to obtain such information for this server.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Log output. If failures or errors exist in the system, output this information
+to \fBsyslogd\fR(1M) only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Verbose mode. Displays the time of the most recent \fBAC\fR Power failure, and
+the most recent hardware fatal error information, and (if applicable)
+environmental status. The hardware fatal error information is useful to repair
+and manufacturing for detailed diagnostics of \fBFRU\fRs.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+No failures or errors are detected in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Failures or errors are detected in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+An internal \fBprtdiag\fR error occurred, for example, out of memory.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUnstable*
+.TE
+
+.sp
+.LP
+*The output is unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBmodinfo\fR(1M), \fBprtconf\fR(1M), \fBpsrinfo\fR(1M), \fBsysdef\fR(1M),
+\fBsyslogd\fR(1M), \fBattributes\fR(5), \fBopenprom\fR(7D)
+.SH NOTES
+.sp
+.LP
+Not all diagnostic and system information is available on every Solaris
+platform, and therefore cannot be displayed by \fBprtdiag\fR. On those
+platforms, further information can be obtained from the System Controller.

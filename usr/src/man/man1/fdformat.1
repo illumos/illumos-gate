@@ -1,0 +1,534 @@
+'\" te
+.\"  Copyright 2001, Sun Microsystems, Inc All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fdformat 1 "28 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+fdformat \- format floppy diskette or PCMCIA memory card
+.SH SYNOPSIS
+.LP
+.nf
+\fBfdformat\fR [\fB-dDeEfHlLmMUqvx\fR] [\fB-b\fR \fIlabel\fR] [\fB-B\fR \fIfilename\fR] 
+     [\fB-t\fR \fIdostype\fR] [\fIdevname\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfdformat\fR utility has been superseded by \fBrmformat\fR(1), which
+provides most but not all of \fBfdformat\fR's functionality.
+.sp
+.LP
+\fBfdformat\fR is used to format diskettes and \fBPCMCIA\fR memory cards. All
+new blank diskettes or \fBPCMCIA\fR memory cards must be formatted before they
+can be used.
+.sp
+.LP
+\fBfdformat\fR formats and verifies the media and indicates whether any bad
+sectors were encountered. All existing data on the diskette or \fBPCMCIA\fR
+memory card, if any, is destroyed by formatting. If no device name is given,
+\fBfdformat\fR uses the diskette as a default.
+.sp
+.LP
+By default, \fBfdformat\fR uses the configured capacity of the drive to format
+the diskette. A \fB3.5\fR inch high-density drive uses diskettes with a
+formatted capacity of \fB1.44MB\fR. A \fB5.25\fR inch high-density drive uses
+diskettes with a formatted capacity of \fB1.2MB\fR. In either case, a density
+option does not have to be specified to \fBfdformat\fR. However, a density
+option must be specified when using a diskette with a lower capacity than the
+drive's default. Use the \fB-H\fR option to format high-density diskettes
+(\fB1.44MB\fR capacity) in an extra-high-density (\fBED\fR) drive. Use the
+\fB-D\fR option, the \fB-l\fR option, or the \fB-L\fR option to format double-
+density (or low-density) diskettes (\fB720KB\fR capacity) in an \fBHD\fR or
+\fBED\fR drive. To format medium-density diskettes (\fB1.2MB\fR capacity), use
+the \fB-M\fR option with \fB-t\fR \fBnec\fR (this is the same as using the
+\fB-m\fR option with \fB-t\fR \fBnec\fR).
+.sp
+.LP
+Extended density uses double-sided, extended-density or extra-high-density
+(\fBDS\fR/\fBED\fR) diskettes. Medium and high densities use the same media:
+double-sided, high-density (\fBDS\fR/\fBHD\fR) diskettes. Double (low) density
+uses double-sided, double-density (\fBDS\fR/\fBDD\fR
+.sp
+.LP
+\fBD\fR) diskettes. Substituting diskettes of one density for diskettes of
+either a higher or lower density generally does not work. Data integrity cannot
+be assured whenever a diskette is formatted to a capacity not matching its
+density.
+.sp
+.LP
+A \fBPCMCIA\fR memory card with densities from \fB512KB\fR to \fB64MB\fR may be
+formatted.
+.sp
+.LP
+\fBfdformat\fR writes new identification and data fields for each sector on all
+tracks unless the \fB-x\fR option is specified. For diskettes, each sector is
+verified if the \fB-v\fR option is specified.
+.sp
+.LP
+After formatting and verifying, \fBfdformat\fR writes an operating-system label
+on block \fB0\fR. Use the \fB-t\fR \fBdos\fR option (same as the \fB-d\fR
+option) to put an \fBMS-DOS\fR file system on the diskette or \fBPCMCIA\fR
+memory card after the format is done. Use the \fB-t\fR \fBnec\fR option with
+the \fB-M\fR option (same as the \fB-m\fR option) to put an \fBNEC-DOS\fR file
+system on a diskette. Otherwise, \fBfdformat\fR writes a \fBSunOS\fR label in
+block \fB0\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIlabel\fR\fR
+.ad
+.RS 15n
+.rt  
+Labels the media with volume label. A SunOS volume label is restricted to 8
+characters. A \fBDOS\fR volume label is restricted to 11 upper-case characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Installs special boot loader in filename on an \fBMS-DOS\fR diskette. This
+option is only meaningful when the \fB-d\fR option (or \fB-t\fR \fBdos\fR) is
+also specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 15n
+.rt  
+Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
+diskette (same as the \fB-l\fR or \fB-L\fR options). This is the default for
+double-density type drives. It is needed if the drive is a high- or
+extended-density type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 15n
+.rt  
+Ejects the diskette when done. This feature is not available on all systems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.RS 15n
+.rt  
+Formats a \fB2.88MB\fR (3.5 inch) extended-density diskette. This is the
+default for extended-density type drives.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 15n
+.rt  
+Forces formatting, that is, this option does not ask for confirmation before
+starting format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 15n
+.rt  
+Formats a \fB1.44MB\fR (3.5 inch) or \fB1.2MB\fR (5.25 inch) high-density
+diskette. This is the default for high-density type drives; it is needed if the
+drive is the extended-density type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.RS 15n
+.rt  
+Writes a \fB1.2MB\fR (3.5 inch) medium-density format on a high-density
+diskette (use only with the -t nec option). This is the same as using \fB-m\fR.
+.sp
+This feature is not available on all systems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 15n
+.rt  
+Quiet; does not print status messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fBdos\fR\fR
+.ad
+.RS 15n
+.rt  
+Installs an \fBMS-DOS\fR file system and boot sector formatting. This is
+equivalent to the \fBDOS\fR format command or the \fB-d\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fBnec\fR\fR
+.ad
+.RS 15n
+.rt  
+Installs an \fBNEC-DOS\fR file system and boot sector on the disk after
+formatting. This should be used only with the \fB-M\fR option. This feature is
+not available on all systems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 15n
+.rt  
+Performs \fBumount\fR on any file systems and then formats. See
+\fBmount\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 15n
+.rt  
+Verifies each block of the diskette after the format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 15n
+.rt  
+Skips the format and only writes a SunOS label or an \fBMS-DOS\fR file system.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevname\fR\fR
+.ad
+.RS 11n
+.rt  
+Replaces \fIdevname\fR with \fBrdiskette0\fR (systems without volume
+management) or \fBfloppy0\fR (systems with volume management) to use the first
+drive or rdiskette1 (systems without volume management) or \fBfloppy1\fR
+(systems with volume management) to use the second drive. If \fIdevname\fR is
+omitted, the first drive, if one exists, is used. For \fBPCMCIA\fR memory
+cards, replace \fIdevname\fR with the device name for the \fBPCMCIA\fR memory
+card which resides in \fB/dev/rdsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR or
+/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR. If \fIdevname\fR is omitted, the
+default diskette drive, if one exists, is used.
+.sp
+If devname is omitted, the default diskette drive, if one exists, will be used.
+\fIN\fR represents a decimal number and can be specified as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBc\fIN\fR\fR
+.ad
+.RS 6n
+.rt  
+Controller \fIN\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBt\fIN\fR\fR
+.ad
+.RS 6n
+.rt  
+Technology type \fIN\fR:
+.sp
+.in +2
+.nf
+ 
+0x1       ROM
+0x2       OTPROM
+0x3       EPROM
+0x4       EEPROM
+0x5       FLASH
+0x6       SRAM
+0x7       DRAM
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBd\fIN\fR\fR
+.ad
+.RS 6n
+.rt  
+Technology region in type \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBs\fIN\fR\fR
+.ad
+.RS 6n
+.rt  
+Slice \fIN\fR.
+.RE
+
+The following options are provided for compatibility with previous versions of
+\fBfdformat\fR. Their use is discouraged.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Formats an \fBMS-DOS\fR floppy diskette or \fBPCMCIA\fR memory card (same as
+\fB-t\fR \fBdos\fR). This is equivalent to the \fBMS-DOS FORMAT\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
+diskette (same as \fB-D\fR or \fB-L\fR). This is the default for double-density
+type drives; it is needed if the drive is the high- or extended-density type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 6n
+.rt  
+Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
+diskette (same as \fB-l\fR or \fB-D\fR). This is the default for double-density
+type drives.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Writes a \fB1.2 MB\fR (3.5 inch) medium- density format on a high-density
+diskette (use only with the \fB-t\fR \fBnec\fR option). This is the same as
+using \fB-M\fR. This feature is not available on all systems.
+.RE
+
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/diskette0\fR
+.ad
+.RS 24n
+.rt  
+Directory providing block device access for the media in floppy drive \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/diskette0\fR
+.ad
+.RS 24n
+.rt  
+Directory providing character device access for the media in floppy drive
+\fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/aliases/floppy0\fR
+.ad
+.RS 24n
+.rt  
+Symbolic link to the character device for the media in floppy drive \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/rdiskette\fR
+.ad
+.RS 24n
+.rt  
+Directory providing character device access for the media in the primary floppy
+drive, usually drive \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
+.ad
+.RS 24n
+.rt  
+Directory providing block device access for the \fBPCMCIA\fR memory card. See
+OPERANDS for a description of \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/rdsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
+.ad
+.RS 24n
+.rt  
+Directory providing character device access for the \fBPCMCIA\fR memory card.
+See OPERANDS for a description of \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/aliases/pcmem\fIS\fR\fR
+.ad
+.RS 24n
+.rt  
+Symbolic link to the character device for the \fBPCMCIA\fR memory card in
+socket \fIS\fR where \fIS\fR represents a \fBPCMCIA\fR socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/rdsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
+.ad
+.RS 24n
+.rt  
+Directory providing character device access for the \fBPCMCIA\fR memory card.
+See OPERANDS for a description of \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
+.ad
+.RS 24n
+.rt  
+Directory providing block device access for the \fBPCMCIA\fR memory card. See
+OPERANDS for a description of \fIN\fR.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpio\fR(1), \fBeject\fR(1), \fBrmformat\fR(1), \fBtar\fR(1),
+\fBvolcheck\fR(1), \fBvolrmmount\fR(1), \fBmount\fR(1M), \fBnewfs\fR(1M),
+\fBprtvtoc\fR(1M), \fBattributes\fR(5), \fBpcfs\fR(7FS)
+.SS "x86 Only"
+.sp
+.LP
+\fBfd\fR(7D)
+.SH NOTES
+.sp
+.LP
+A diskette or \fBPCMCIA\fR memory card containing a \fBufs\fR file system
+created on a SPARC based system (by using \fBfdformat\fR and \fBnewfs\fR(1M)),
+is not identical to a diskette or \fBPCMCIA\fR memory card containing a ufs
+file system created on an x86 based system. Do not interchange ufs diskettes or
+memory cards between these platforms. Use \fBcpio\fR(1) or \fBtar\fR(1) to
+transfer files on diskettes or memory cards between them. A diskette or
+\fBPCMCIA\fR memory card formatted using the \fB-t\fR \fBdos\fR option (or
+\fB-d\fR) for \fBMS-DOS\fR does not have the necessary system files, and is
+therefore not bootable. Trying to boot from it on a \fBPC\fR produces the
+following message:
+.sp
+.in +2
+.nf
+Non-System disk or disk error. 
+Replace and strike any key when ready 
+.fi
+.in -2
+.sp
+
+.SH BUGS
+.sp
+.LP
+Currently, bad sector mapping is not supported on floppy diskettes or
+\fBPCMCIA\fR memory cards. Therefore, a diskette or memory card is unusable if
+\fBfdformat\fR finds an error (bad sector).

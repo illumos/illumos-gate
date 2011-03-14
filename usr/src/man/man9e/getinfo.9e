@@ -1,0 +1,175 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getinfo 9E "16 Jan 2008" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+getinfo \- get device driver information
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBgetinfo\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_info_cmd_t\fR \fIcmd\fR, 
+     \fBvoid *\fR\fIarg\fR, \fBvoid **\fR\fIresultp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). This entry point is \fBrequired\fR for
+drivers which export \fBcb_ops\fR(9S) entry points.
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 11n
+.rt  
+Do not use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 11n
+.rt  
+Command argument - valid command values are \fBDDI_INFO_DEVT2DEVINFO\fR and
+\fBDDI_INFO_DEVT2INSTANCE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 11n
+.rt  
+Command specific argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIresultp\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to where the requested information is stored.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+When \fIcmd\fR is set to \fBDDI_INFO_DEVT2DEVINFO\fR, \fBgetinfo()\fR should
+return the \fBdev_info_t\fR pointer associated with the \fBdev_t\fR \fIarg\fR.
+The \fBdev_info_t\fR pointer should be returned in the field pointed to by
+\fIresultp\fR.
+.sp
+.LP
+When \fIcmd\fR is set to \fBDDI_INFO_DEVT2INSTANCE\fR, \fBgetinfo()\fR should
+return the instance number associated with the \fBdev_t\fR \fIarg\fR. The
+instance number should be returned in the field pointed to by \fIresultp\fR.
+.sp
+.LP
+Drivers which do not export \fBcb_ops\fR(9S) entry points are not required to
+provide a \fBgetinfo()\fR entry point, and may use \fBnodev\fR(9F) in the
+\fBdevo_getinfo\fR field of the \fBdev_ops\fR(9S) structure. A \fBSCSI HBA
+\fRdriver is an example of a driver which is not required to provide
+\fBcb_ops\fR(9S) entry points.
+.SH RETURN VALUES
+.sp
+.LP
+\fBgetinfo()\fR should return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+on success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+on failure.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBgetinfo()\fR implementation
+.sp
+.in +2
+.nf
+/*ARGSUSED*/ 
+static int
+rd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, \e
+void **resultp)
+{
+       /* Note that in this simple example
+        * the minor number is the instance
+        * number. 	 */
+         
+     devstate_t *sp;
+     int error = DDI_FAILURE;
+     switch (infocmd) {
+     case DDI_INFO_DEVT2DEVINFO:
+          if ((sp = ddi_get_soft_state(statep,
+              getminor((dev_t) arg))) != NULL) {
+                 *resultp = sp->devi;
+                 error = DDI_SUCCESS;
+          } else
+                 *result = NULL;
+          break;
+
+     case DDI_INFO_DEVT2INSTANCE:
+          *resultp = (void *) (uintptr_t) getminor((dev_t) arg);
+          error = DDI_SUCCESS;
+          break;
+     }
+
+     return (error);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_no_info\fR(9F), \fBnodev\fR(9F), \fBcb_ops\fR(9S), \fBdev_ops\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Non-\fBgld\fR(7D)-based DLPI network streams drivers are encouraged to switch
+to \fBgld\fR(7D). Failing this, a driver that creates DLPI style-2   minor
+nodes must specify CLONE_DEV for its style-2 \fBddi_create_minor_node\fR(9F)
+nodes and use \fBqassociate\fR(9F). A driver that supports both style-1 and
+style-2 minor nodes should return DDI_FAILURE for DDI_INFO_DEVT2INSTANCE and
+DDI_INFO_DEVT2DEVINFO \fBgetinfo()\fR calls to style-2 minor nodes. (The
+correct association is already established by \fBqassociate\fR(9F)). A driver
+that only supports style-2 minor nodes can use \fBddi_no_info\fR(9F) for its
+\fBgetinfo()\fR implementation. For drivers that do not follow these rules, the
+results of a \fBmodunload\fR(1M) of the driver or a \fBcfgadm\fR(1M) remove of
+hardware controlled by the driver are undefined.

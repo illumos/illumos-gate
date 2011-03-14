@@ -1,0 +1,203 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_shared_open 3CPC "28 Mar 2005" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_shared_open, cpc_shared_bind_event, cpc_shared_take_sample,
+cpc_shared_rele, cpc_shared_close \- use CPU performance counters on processors
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_shared_open\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_shared_bind_event\fR(\fBint\fR \fIfd\fR, \fBcpc_event_t *\fR\fIevent\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_shared_take_sample\fR(\fBint\fR \fIfd\fR, \fBcpc_event_t *\fR\fIevent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_shared_rele\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_shared_close\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpc_shared_open()\fR function allows the caller to access the hardware
+counters in such a way that the performance of the currently bound CPU can be
+measured. The function returns a file descriptor if successful. Only one such
+open can be active at a time on any CPU.
+.sp
+.LP
+The \fBcpc_shared_bind_event()\fR, \fBcpc_shared_take_sample()\fR, and
+\fBcpc_shared_rele()\fR functions are directly analogous to the corresponding
+\fBcpc_bind_event()\fR, \fBcpc_take_sample()\fR, and \fBcpc_rele()\fR functions
+described on the \fBcpc_bind_event\fR(3CPC)manual page, except that they
+operate on the counters of a particular processor.
+.SH USAGE
+.sp
+.LP
+If a thread wishes to access the counters using this interface, it \fBmust\fR
+do so using a thread bound to an lwp, (see the \fBTHR_BOUND\fR flag to
+\fBthr_create\fR(3C)), that has in turn bound itself to a processor using
+\fBprocessor_bind\fR(2).
+.sp
+.LP
+Unlike the \fBcpc_bind_event\fR(3CPC) family of functions, no counter context
+is attached to those lwps, so the performance counter samples from the
+processors reflects the system-wide usage, instead of per-lwp usage.
+.sp
+.LP
+The first successful invocation of \fBcpc_shared_open()\fR will immediately
+\fBinvalidate\fR \fIall\fR existing performance counter context on the system,
+and \fBprevent\fR \fIall\fR subsequent attempts to bind counter context to lwps
+from succeeding anywhere on the system until the last caller invokes
+\fBcpc_shared_close()\fR.
+.sp
+.LP
+This is because it is impossible to simultaneously use the counters to
+accurately measure per-lwp and system-wide events, so there is an exclusive
+interlock between these uses.
+.sp
+.LP
+Access to the shared counters is mediated by file permissions on a \fBcpc\fR
+pseudo device.  Only a user with the {\fBPRIV_SYS_CONFIG\fR} privilege is
+allowed to access the shared device. This control prevents use of the counters
+on a per-lwp basis to other users.
+.sp
+.LP
+The \fBCPC_BIND_LWP_INHERIT\fR and \fBCPC_BIND_EMT_OVF\fR flags are invalid for
+the shared interface.
+.SH RETURN VALUES
+.sp
+.LP
+On success, the functions (except for \fBcpc_shared_close()\fR) return 0.  On
+failure, the functions return -1 and set \fBerrno\fR to indicate the reason.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 11n
+.rt  
+The caller does not have appropriate privilege to access the CPU performance
+counters system-wide.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+For cpc_shared_open(\|), this value implies that the counters on the bound cpu
+are busy because they are already being used to measure system-wide events by
+some other caller.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+Otherwise, this return value implies that the counters are not available
+because the thread has been unbound from the processor it was bound to at open
+time. Robust programs should be coded to expect this behavior, and should
+invoke \fBcpc_shared_close\fR(\|), before retrying the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The counters cannot be accessed on the current CPU because the calling thread
+is not bound to that CPU using \fBprocessor_bind\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The caller has attempted an operation that is illegal or not supported on the
+current platform.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The current machine either has no performance counters, or has been configured
+to disallow access to them system-wide.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBprocessor_bind\fR(2), \fBcpc\fR(3CPC), \fBcpc_bind_cpu\fR(3CPC),
+\fBcpc_bind_event\fR(3CPC), \fBcpc_set_sample\fR(3CPC), \fBcpc_unbind\fR(3CPC),
+\fBlibcpc\fR(3LIB), \fBthr_create\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_shared_open()\fR, \fBcpc_shared_bind_event()\fR,
+\fBcpc_shared_take_sample()\fR, \fBcpc_shared_rele()\fR, and
+\fBcpc_shared_close()\fR functions exist for binary compatibility only. Source
+containing these functions will not compile. These functions are obsolete and
+might be removed in a future release. Applications should use
+\fBcpc_bind_cpu\fR(3CPC), \fBcpc_set_sample\fR(3CPC), and
+\fBcpc_unbind\fR(3CPC) instead.

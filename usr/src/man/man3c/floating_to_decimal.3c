@@ -1,0 +1,128 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH floating_to_decimal 3C "7 Jun 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+floating_to_decimal, single_to_decimal, double_to_decimal, extended_to_decimal,
+quadruple_to_decimal \- convert floating-point value to decimal record
+.SH SYNOPSIS
+.LP
+.nf
+#include <floatingpoint.h>
+
+\fBvoid\fR \fBsingle_to_decimal\fR(\fBsingle *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdouble_to_decimal\fR(\fBdouble *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBextended_to_decimal\fR(\fBextended *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBquadruple_to_decimal\fR(\fBquadruple *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfloating_to_decimal\fR functions convert the floating-point value at
+\fI*px\fR into a decimal record at *\fIpd\fR, observing the modes specified in
+*\fIpm\fR and setting exceptions in *\fIps\fR. If there are no IEEE exceptions,
+*\fIps\fR will be zero.
+.sp
+.LP
+If *\fIpx\fR is zero, infinity, or NaN, then only \fIpd\fR\(->\fIsign\fR and
+\fIpd\fR\(->\fIfpclass\fR are set. Otherwise \fIpd\fR\(->\fIexponent\fR and
+\fIpd\fR\(->\fIds\fR are also set so that
+.sp
+.in +2
+.nf
+(sig)*(pd->ds)*10**(pd->exponent)
+.fi
+.in -2
+
+.sp
+.LP
+is a correctly rounded approximation to *\fIpx\fR, where \fIsig\fR is +1 or
+\(mi1, depending upon whether \fIpd\fR\(->\fIsign\fR is  0 or \(mi1.
+\fIpd\fR\(->\fIds\fR has at least one and no more than
+\fBDECIMAL_STRING_LENGTH\fR-1 significant digits because one character is used
+to terminate the string with a null.
+.sp
+.LP
+\fIpd\fR\(->\fIds\fR is correctly rounded according to the IEEE rounding modes
+in \fIpm\fR\(->\fIrd\fR. *\fIps\fR has \fIfp_inexact\fR set if the result was
+inexact, and has \fIfp_overflow\fR set if the string result does not fit in
+\fIpd\fR\(->\fIds\fR because of the limitation \fBDECIMAL_STRING_LENGTH\fR.
+.sp
+.LP
+If \fIpm\fR\(->\fIdf\fR == \fIfloating_form\fR, then \fIpd\fR\(->\fIds\fR
+always contains \fIpm\fR\(->\fIndigits\fR significant digits. Thus if *\fIpx\fR
+== 12.34 and \fIpm\fR\(->\fIndigits\fR == 8, then \fIpd\fR\(->\fIds\fR will
+contain 12340000 and \fIpd\fR\(->\fIexponent\fR will contain \(mi6.
+.sp
+.LP
+If \fIpm\fR\(->\fIdf\fR == \fIfixed_form\fR and \fIpm\fR\(->\fIndigits\fR >= 0,
+then the decimal value is rounded at \fIpm\fR\(->\fIndigits\fR digits to the
+right of the decimal point. For example, if *\fIpx\fR == 12.34 and
+\fIpm\fR\(->\fIndigits\fR == 1, then \fIpd\fR\(->\fIds\fR will contain 123 and
+\fIpd\fR\(->\fIexponent\fR will be set to \(mi1.
+.sp
+.LP
+If \fIpm\fR\(->\fIdf\fR == \fIfixed_form\fR and \fIpm\fR\(->\fIndigits\fR< 0,
+then the decimal value is rounded at \(mi\fIpm\fR\(->\fIndigits\fR digits to
+the left of the decimal point, and \fIpd\fR\(->\fIds\fR is padded with trailing
+zeros up to the decimal point. For example, if *\fIpx\fR == 12.34 and
+\fIpm\fR\(->\fIn\fR digits == \(mi1, then \fIpd\fR\(->\fIds\fR will contain 10
+and \fIpd\fR\(->\fIexponent\fR will be set to 0.
+.sp
+.LP
+When \fIpm\fR\(->\fIdf\fR == \fIfixed_form\fR and the value to be converted is
+large enough that the  resulting string would contain more than
+\fBDECIMAL_STRING_LENGTH\fR\(mi1 digits, then the string placed in
+\fIpd\fR\(->\fIds\fR is limited to exactly \fBDECIMAL_STRING_LENGTH\fR-1 digits
+(by moving the place at which the value is rounded further left if need be),
+\fIpd\fR\(->\fIexponent\fR is adjusted accordingly and the overflow flag is set
+in *\fIps\fR.
+.sp
+.LP
+\fIpd->more\fR is not used.
+.sp
+.LP
+The \fBeconvert\fR(3C), \fBfconvert\fR(3C), \fBgconvert\fR(3C),
+\fBprintf\fR(3C), and \fBsprintf\fR(3C) functions all use
+\fBdouble_to_decimal()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBeconvert\fR(3C), \fBfconvert\fR(3C), \fBgconvert\fR(3C), \fBprintf\fR(3C),
+\fBsprintf\fR(3C), \fBattributes\fR(5)

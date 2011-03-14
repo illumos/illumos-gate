@@ -39,10 +39,13 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=fcoei perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/fcoei group=sys
 $(i386_ONLY)file path=kernel/drv/fcoei group=sys
 file path=kernel/drv/fcoei.conf group=sys
+file path=usr/share/man/man7d/fcoei.7d
 legacy pkg=SUNWfcoei \
     desc="Sun FCoE (Fibre Channel over Ethernet) Initiator Driver" \
     name="Sun FCoE Initiator Driver"

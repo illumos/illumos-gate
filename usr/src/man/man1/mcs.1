@@ -1,0 +1,238 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mcs 1 "5 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+mcs \- manipulate the comment section of an object file
+.SH SYNOPSIS
+.LP
+.nf
+\fBmcs\fR [\fB-cdpVz\fR] [\fB-a\fR \fIstring\fR] [\fB-n\fR \fIname\fR] \fIfile\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmcs\fR command is used to manipulate a section, by default the
+\fB\&.comment\fR section, in an \fBELF\fR object file. It is used to add to,
+delete, print, and compress the contents of a section in an \fBELF\fR object
+file, and print only the contents of a section in a \fBCOFF\fR object file.
+\fBmcs\fR cannot add, delete, or compress the contents of a section that is
+contained within a segment.
+.sp
+.LP
+If the input file is an archive (see \fBar.h\fR(3HEAD)), the archive is treated
+as a set of individual files. For example, if the \fB-a\fR option is specified,
+the string is appended to the comment section of each \fBELF\fR object file in
+the archive; if the archive member is not an \fBELF\fR object file, then it is
+left unchanged.
+.sp
+.LP
+\fBmcs\fR must be given one or more of the options described below. It applies,
+in order, each of the specified options to each file.
+.sp
+.LP
+For operations other than delete, if the object does not already contain a
+section with the specified name, \fBmcs\fR will create a new empty section with
+that name before performing the specified operation.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIstring\fR\fR
+.ad
+.RS 13n
+.rt  
+Appends \fIstring\fR to the comment section of the \fBELF\fR object files. If
+\fIstring\fR contains embedded blanks, it must be enclosed in quotation marks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 13n
+.rt  
+Compresses the contents of the comment section of the \fBELF\fR object files.
+All duplicate entries are removed. The ordering of the remaining entries is not
+disturbed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 13n
+.rt  
+Deletes the contents of the specified section from the \fBELF\fR object files.
+The section header for the comment section is also removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fIname\fR\fR
+.ad
+.RS 13n
+.rt  
+Specifies the name of the section to access if other than \fB\&.comment\fR. By
+default, \fBmcs\fR deals with the section named \fB\&.comment\fR. This option
+can be used to specify another section. \fBmcs\fR can take multiple \fB-n\fR
+options to allow for specification of  multiple sections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 13n
+.rt  
+Prints the contents of the comment section on the standard output. Each section
+printed is tagged by the name of the file from which it was extracted, using
+the format \fIfile\fR\fB[\fR\fImember_name\fR\fB]:\fR for archive files and
+\fIfile\fR\fB:\fR for other files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 13n
+.rt  
+Prints on standard error the version number of \fBmcs\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 13n
+.rt  
+Replaces any \fBSHT_PROGBITS\fR sections with zeros while retaining the
+original attributes of the sections.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPrinting a file's comment section
+.sp
+.LP
+The following entry
+
+.sp
+.in +2
+.nf
+example% \fBmcs -p elf.file\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+prints the comment section of the file \fBelf.file\fR.
+
+.LP
+\fBExample 2 \fRAppending a string to a comment section
+.sp
+.LP
+The following entry
+
+.sp
+.in +2
+.nf
+example% \fBmcs -a  xyz elf.file\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+appends string \fBxyz\fR to \fBelf.file\fR's comment section.
+
+.LP
+\fBExample 3 \fRStripping a specified non-allocable section
+.sp
+.LP
+Although used primarily with comment sections, \fBmcs\fR can operate on any
+non-allocable section. In contrast to the \fBstrip\fR command, which removes a
+predefined selection of non-allocable sections, \fBmcs\fR can be used to delete
+a specific section. The following entry
+
+.sp
+.in +2
+.nf
+example% \fBmcs -d -n .annotate elf.file\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+removes the section named \fB\&.annotate\fR from the file \fBelf.file\fR.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/mcs*\fR\fR
+.ad
+.RS 13n
+.rt  
+temporary files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBas\fR(1), \fBld\fR(1), \fBstrip\fR(1), \fBar.h\fR(3HEAD),
+\fBelf\fR(3ELF), \fBtmpnam\fR(3C), \fBa.out\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+When \fBmcs\fR deletes a section using the \fB-d\fR option, it tries to bind
+together sections of type \fBSHT_REL\fR and target sections pointed to by the
+\fBsh_info\fR section header field. If one is to be deleted, \fBmcs\fR attempts
+to delete the other of the pair.
+.sp
+.LP
+By using the \fB-z\fR option, it is possible to make an object file by removing
+the contents of \fBSHT_PROGBITS\fR sections while retaining the object file's
+original structure as an \fBELF\fR file. The need for use of the \fB-z\fR
+option is limited. However, the option can be used to deliver an object file
+when the contents of \fBSHT_PROGBITS\fR sections are not relevant.

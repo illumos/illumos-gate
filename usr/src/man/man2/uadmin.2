@@ -1,0 +1,424 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uadmin 2 "25 Mar 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+uadmin \- administrative control
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/uadmin.h>
+
+\fBint\fR \fBuadmin\fR(\fBint\fR \fIcmd\fR, \fBint\fR \fIfcn\fR, \fBuintptr_t\fR \fImdep\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuadmin()\fR function provides control for basic administrative
+functions. This function is tightly coupled to the system administrative
+procedures and is not intended for general use. The argument \fImdep\fR is
+provided for machine-dependent use and is not defined here. It should be
+initialized to \fINULL\fR if not used.
+.sp
+.LP
+As specified by \fIcmd\fR, the following commands are available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SHUTDOWN\fR\fR
+.ad
+.RS 14n
+.rt  
+The system is shut down. All user processes are killed, the buffer cache is
+flushed, and the root file system is unmounted. The action to be taken after
+the system has been shut down is specified by \fIfcn\fR. The functions are
+generic; the hardware capabilities vary on  specific machines.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_HALT\fR\fR
+.ad
+.RS 17n
+.rt  
+Halt the processor(s).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_POWEROFF\fR\fR
+.ad
+.RS 17n
+.rt  
+Halt the processor(s) and turn off the power.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_BOOT\fR\fR
+.ad
+.RS 17n
+.rt  
+Reboot the system, using the kernel file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_IBOOT\fR\fR
+.ad
+.RS 17n
+.rt  
+Interactive reboot; user is prompted for bootable program name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_FASTREBOOT\fR\fR
+.ad
+.RS 17n
+.rt  
+Bypass BIOS and boot loader
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_REBOOT\fR\fR
+.ad
+.RS 14n
+.rt  
+The system stops immediately without any further processing. The action to be
+taken next is specified by \fIfcn\fR as above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_DUMP\fR\fR
+.ad
+.RS 14n
+.rt  
+The system is forced to panic immediately without any further processing and a
+crash dump is written to the dump device (see \fBdumpadm\fR(1M)).  The action
+to be taken next is specified by \fIfcn\fR, as above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_REMOUNT\fR\fR
+.ad
+.RS 14n
+.rt  
+The root file system is mounted again after having been fixed. This should be
+used only during the startup process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_FREEZE\fR\fR
+.ad
+.RS 14n
+.rt  
+Suspend the whole system.  The system state is preserved in the state file. The
+following subcommands, specified by \fIfcn\fR, are available.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_SUSPEND_TO_DISK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the system state to the state file. This subcommand is equivalent to ACPI
+state S4.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_CHECK_SUSPEND_TO_DISK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check if your system supports suspend to disk. Without performing a system
+suspend/resume, this subcommand checks if this feature is currently available
+on your system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_SUSPEND_TO_RAM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the system state to memory This subcommand is equivalent to ACPI state S3.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_CHECK_SUSPEND_TO_RAM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check if your system supports suspend to memory. Without performing a system
+suspend/resume, this subcommand checks if this feature is currently available
+on your system.
+.RE
+
+The following subcommands, specified by \fIfcn\fR, are obsolete and might be
+removed in a subsequent release:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_COMPRESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the system state to the state file with compression of data. This
+subcommand has been replaced by \fBAD_SUSPEND_TO_DISK\fR, which should be used
+instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_CHECK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check if your system supports suspend and resume.  Without performing a  system
+suspend/resume, this command checks if this feature is currently available on
+your system. This subcommand has been replaced by
+\fBAD_CHECK_SUSPEND_TO_DISK\fR, which should be used instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAD_FORCE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Force \fBAD_COMPRESS\fR even when threads of user applications are not
+suspendable. This subcommand should never be used, as it might result in
+undefined behavior.
+.RE
+
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the value returned depends on \fIcmd\fR as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SHUTDOWN\fR\fR
+.ad
+.RS 14n
+.rt  
+Never returns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_REBOOT\fR\fR
+.ad
+.RS 14n
+.rt  
+Never returns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_FREEZE\fR\fR
+.ad
+.RS 14n
+.rt  
+\fB0\fR upon resume.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_REMOUNT\fR\fR
+.ad
+.RS 14n
+.rt  
+\fB0\fR.
+.RE
+
+.sp
+.LP
+Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBuadmin()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 11n
+.rt  
+Suspend is already in progress.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIcmd\fR argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+Suspend/resume ran out of physical memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 11n
+.rt  
+Suspend/resume could not allocate enough space on the root file system to store
+system information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+Suspend/resume is not supported on this platform or the command specified by
+\fIcmd\fR is not allowed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+Unable to successfully suspend system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 11n
+.rt  
+The {\fBPRIV_SYS_CONFIG\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBA_FREEZE\fR command and its subcommands are Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBdumpadm\fR(1M), \fBhalt\fR(1M), \fBkernel\fR(1M), \fBreboot\fR(1M),
+\fBuadmin\fR(1M), \fBattributes\fR(5), \fBprivileges\fR(5)
+.SH WARNINGS
+.sp
+.LP
+Shutting down or halting the system by means of \fBuadmin\fR(1M) does not
+update the  boot  archive.  Avoid  using  this command after
+.RS +4
+.TP
+.ie t \(bu
+.el o
+editing of files such as \fB/etc/system\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+installing new driver binaries or kernel binaries
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+updating existing driver binaries or kernel binaries.
+.RE
+.sp
+.LP
+Use \fBreboot\fR(1M) or \fBhalt\fR(1M) instead.

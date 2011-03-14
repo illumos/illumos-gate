@@ -1,0 +1,329 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fdio 7I "26 April 2001" "SunOS 5.11" "Ioctl Requests"
+.SH NAME
+fdio \- floppy disk control operations
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/fdio.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The Solaris floppy driver supports a set of \fBioctl\fR(2) requests for getting
+and setting the floppy drive characteristics. Basic to these  \fBioctl\fR(\|)
+requests are the definitions in \fB<sys/fdio.h>\fR\&.
+.SH IOCTLS
+.sp
+.LP
+The following \fBioctl\fR(\|) requests are available on the Solaris floppy
+driver.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDDEFGEOCHAR\fR\fR
+.ad
+.RS 16n
+.rt  
+x86 based systems:  This \fBioctl\fR(\|) forces the floppy driver to restore
+the diskette and drive characteristics and geometry, and partition information
+to default values based on the device configuration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDGETCHANGE\fR\fR
+.ad
+.RS 16n
+.rt  
+The argument is a pointer to an \fBint.\fR This \fBioctl\fR(\|) returns the
+status of the diskette-changed signal from the floppy interface. The following
+defines are provided for cohesion.
+.RE
+
+.sp
+.LP
+Note: For x86 based systems, use \fBFDGC_DETECTED\fR (which is available only
+on x86 based systems) instead of \fBFDGC_HISTORY.\fR
+.sp
+.in +2
+.nf
+/*
+ * Used by FDGETCHANGE, returned state of the sense disk change bit.
+ */
+#define FDGC_HISTORY  0x01	 /* disk has changed since insertion or 
+                                  last FDGETCHANGE call */
+#define FDGC_CURRENT  0x02	 /* if set, indicates drive has floppy,
+>                                 otherwise, drive is empty */
+#define FDGC_CURWPROT 0x10	 /* current state of write protect */
+#define FDGC_DETECTED 0x20	 /* previous state of DISK CHANGE */
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDIOGCHAR\fR\fR
+.ad
+.RS 13n
+.rt  
+The argument is a pointer to an \fBfd_char\fR structure (described below). This
+\fBioctl\fR(\|) gets the characteristics of the floppy diskette from the floppy
+controller.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDIOSCHAR\fR\fR
+.ad
+.RS 13n
+.rt  
+The argument is a pointer to an \fBfd_char\fR structure (described below). This
+\fBioctl\fR(\|) sets the characteristics of the floppy diskette for the floppy
+controller. Typical values in the  \fBfd_char\fR structure for a high density
+diskette:
+.sp
+.in +2
+.nf
+field value
+fdc_medium	0
+fdc_transfer_rate	500
+fdc_ncyl	80
+fdc_nhead	2
+fdc_sec_size	512
+fdc_secptrack	18
+fdc_steps	-1	{ This field doesn't apply. }
+.fi
+.in -2
+
+.RE
+
+.sp
+.in +2
+.nf
+/*
+ * Floppy characteristics
+ */
+struct fd_char {
+ uchar_t fdc_medium;     /* equals 1 if floppy is medium density format */
+ int fdc_transfer_rate;  /* transfer rate */
+ int fdc_ncyl;           /* number of cylinders */
+ int fdc_nhead;          /* number of heads */
+ int fdc_sec_size;       /* sector size */
+ int fdc_secptrack;      /* sectors per track */
+ int fdc_steps;          /* no. of steps per data track */
+};
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDGETDRIVECHAR\fR\fR
+.ad
+.RS 18n
+.rt  
+The argument to this \fBioctl\fR(\|) is a pointer to an \fBfd_drive\fR
+structure (described below). This \fBioctl\fR(\|) gets the characteristics of
+the floppy drive from the floppy controller.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDSETDRIVECHAR\fR\fR
+.ad
+.RS 18n
+.rt  
+x86 based systems:  The argument to this \fBioctl\fR(\|) is a pointer to an
+\fBfd_drive\fR structure (described below). This \fBioctl\fR(\|) sets the
+characteristics of the floppy drive for the floppy controller. Only
+\fBfdd_steprate\fR, \fBfdd_headsettle\fR, \fBfdd_motoron\fR, and
+\fBfdd_motoroff\fR are actually used by the floppy disk driver.
+.RE
+
+.sp
+.in +2
+.nf
+/*
+ * Floppy Drive characteristics
+ */
+struct fd_drive {
+	int	fdd_ejectable;    /* does the drive support eject? */
+	int	fdd_maxsearch;    /* size of per-unit search table */
+	int	fdd_writeprecomp; /* cyl to start write precompensation */
+	int	fdd_writereduce;  /* cyl to start recucing write current */
+	int	fdd_stepwidth;    /* width of step pulse in 1 us units */
+	int	fdd_steprate;     /* step rate in 100 us units */
+	int	fdd_headsettle;   /* delay, in 100 us units */
+	int	fdd_headload;     /* delay, in 100 us units */
+	int	fdd_headunload;   /* delay, in 100 us units */
+	int	fdd_motoron;      /* delay, in 100 ms units */
+	int	fdd_motoroff;     /* delay, in 100 ms units */
+	int	fdd_precomplevel; /* bit shift, in nano-secs */
+	int	fdd_pins;         /* defines meaning of pin 1, 2, 4 and 34 */
+	int	fdd_flags;        /* TRUE READY, Starting Sector #, & Motor On */
+};
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDGETSEARCH\fR\fR
+.ad
+.RS 15n
+.rt  
+Not available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDSETSEARCH\fR\fR
+.ad
+.RS 15n
+.rt  
+Not available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDEJECT\fR\fR
+.ad
+.RS 15n
+.rt  
+SPARC:  This \fBioctl\fR(\|) requests the floppy drive to eject the diskette.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDIOCMD\fR\fR
+.ad
+.RS 15n
+.rt  
+The argument is a pointer to an \fBfd_cmd\fR structure (described below). This
+\fBioctl\fR(\|) allows access to the floppy diskette using the floppy device
+driver.  Only the \fBFDCMD_WRITE\fR, \fBFDCMD_READ\fR, and
+\fBFDCMD_FORMAT_TRACK\fR commands are currently available.
+.RE
+
+.sp
+.in +2
+.nf
+struct fd_cmd {
+	ushort_t fdc_cmd;      /* command to be executed */
+	int      fdc_flags;    /* execution flags (x86 only) */
+	daddr_t  fdc_blkno;    /* disk address for command */
+	int      fdc_secnt;    /* sector count for command */
+	caddr_t  fdc_bufaddr;  /* user's buffer address */
+	uint_t   fdc_buflen;   /* size of user's buffer */
+};
+.fi
+.in -2
+
+.sp
+.LP
+Please note that the \fBfdc_buflen\fR field is currently unused. The
+\fBfdc_secnt\fR field is used to calculate the transfer size, and the buffer is
+assumed to be large enough to accommodate the transfer.
+.sp
+.in +2
+.nf
+{
+/* 
+* Floppy commands
+ */
+#define	FDCMD_WRITE	1
+#define	FDCMD_READ	2
+#define	FDCMD_SEEK	3
+#define	FDCMD_REZERO	4
+#define	FDCMD_FORMAT_UNIT	5
+#define	FDCMD_FORMAT_TRACK	6
+};
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFDRAW\fR\fR
+.ad
+.RS 9n
+.rt  
+The argument is a pointer to an \fBfd_raw\fR structure (described below).
+This \fBioctl\fR(\|) allows direct control of the floppy drive using the floppy
+controller. Refer to the appropriate floppy-controller data sheet for full
+details on required command bytes and returned result bytes. The following
+commands are supported.
+.RE
+
+.sp
+.in +2
+.nf
+/*
+* Floppy raw commands
+*/
+#define FDRAW_SPECIFY	0x03
+#define FDRAW_READID	0x0a	(x86 only)
+#define FDRAW_SENSE_DRV	0x04
+#define FDRAW_REZERO	0x07
+#define FDRAW_SEEK	0x0f
+#define FDRAW_SENSE_INT	0x08	(x86 only)
+#define FDRAW_FORMAT	0x0d
+#define FDRAW_READTRACK	0x02
+#define FDRAW_WRCMD	0x05
+#define FDRAW_RDCMD	0x06
+#define FDRAW_WRITEDEL	0x09
+#define FDRAW_READDEL   0x0c
+.fi
+.in -2
+
+.sp
+.LP
+Please note that when using  \fBFDRAW_SEEK\fR or  \fBFDRAW_REZERO,\fR the
+driver automatically issues a  \fBFDRAW_SENSE_INT\fR command to clear the
+interrupt from the  \fBFDRAW_SEEK\fR or the  \fBFDRAW_REZERO.\fR The result
+bytes returned by these commands are the results from the
+\fBFDRAW_SENSE_INT\fR command.  Please see the floppy-controller data sheet for
+more details on \fBFDRAW_SENSE_INT.\fR
+.sp
+.in +2
+.nf
+/*
+ * Used by FDRAW
+ */
+struct    fd_raw {
+ char     fdr_cmd[10];     /* user-supplied command bytes */
+ short    fdr_cnum;        /* number of command bytes */
+ char     fdr_result[10];  /* controller-supplied result bytes */
+ ushort_t fdr_nbytes;      /* number to transfer if read/write command */
+ char     *fdr_addr;       /* where to transfer if read/write command */
+};
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBioctl\fR(2), \fBdkio\fR(7I), \fBfd\fR(7D), \fBhdio\fR(7I)

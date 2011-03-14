@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH door_return 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+door_return \- return from a door invocation
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <door.h>
+
+\fBint\fR \fBdoor_return\fR(\fBchar *\fR\fIdata_ptr\fR, \fBsize_t\fR \fIdata_size\fR, \fBdoor_desc_t *\fR\fIdesc_ptr\fR,
+     \fBuint_t\fR \fInum_desc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdoor_return()\fR function returns from a door invocation. It returns
+control to the thread that issued the associated \fBdoor_call()\fR and blocks
+waiting for the next door invocation. See \fBdoor_call\fR(3C). Results, if any,
+from the door invocation are passed back  to the client in the buffers pointed
+to by \fIdata_ptr\fR and \fIdesc_ptr\fR. If there is not a client associated
+with the \fBdoor_return()\fR, the calling thread discards the results, releases
+any passed descriptors with the \fBDOOR_RELEASE\fR attribute, and blocks
+waiting for the next door invocation.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdoor_return()\fR does not return to the calling
+process. Otherwise, \fBdoor_return()\fR returns \fB\(mi1\fR to the calling
+process and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBdoor_return()\fR function fails and returns to the calling process if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 10n
+.rt  
+Arguments were too big for client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The address of \fIdata_ptr\fR or \fIdesc_ptr\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Invalid \fBdoor_return()\fR arguments were passed or a thread is bound to a
+door that no longer exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The client has too many open descriptors.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityStable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoor_call\fR(3C),\fBattributes\fR(5)

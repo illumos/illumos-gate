@@ -1,0 +1,181 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH timer_settime 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+timer_settime, timer_gettime, timer_getoverrun \- per-process timers
+.SH SYNOPSIS
+.LP
+.nf
+#include <time.h>
+
+\fBint\fR \fBtimer_settime\fR(\fBtimer_t\fR \fItimerid\fR, \fBint\fR \fIflags\fR,
+     \fBconst struct itimerspec *restrict\fR \fIvalue\fR,
+     \fBstruct itimerspec *restrict\fR \fIovalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtimer_gettime\fR(\fBtimer_t\fR \fItimerid\fR, \fBstruct itimerspec *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtimer_getoverrun\fR(\fBtimer_t\fR \fItimerid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtimer_settime()\fR function sets the time until the next expiration of
+the timer specified by \fItimerid\fR from the \fBit_value\fR member of the
+\fIvalue\fR argument and arm the timer if the \fBit_value\fR member of
+\fIvalue\fR is non-zero. If the specified timer was already armed when
+\fBtimer_settime()\fR is called, this call resets the time until next
+expiration to the \fIvalue\fR specified. If the \fBit_value\fR member of
+\fIvalue\fR is 0, the timer is disarmed. The effect of disarming or resetting a
+timer on pending expiration notifications is unspecified.
+.sp
+.LP
+If the flag \fBTIMER_ABSTIME\fR is not set in the argument \fIflags\fR,
+\fBtimer_settime()\fR behaves as if the time until next expiration is set to be
+equal to the interval specified by the \fBit_value\fR member of \fIvalue\fR.
+That is, the timer expires in \fBit_value\fR nanoseconds from when the call is
+made. If the flag \fBTIMER_ABSTIME\fR is set in the argument \fIflags\fR,
+\fBtimer_settime()\fR behaves as if the time until next expiration is set to be
+equal to the difference between the absolute time specified by the
+\fBit_value\fR member of \fIvalue\fR and the current value of the clock
+associated with \fItimerid\fR. That is, the timer expires when the clock
+reaches the value specified by the \fBit_value\fR member of \fIvalue\fR. If the
+specified time has already passed, the function succeeds and the expiration
+notification is made.
+.sp
+.LP
+The reload value of the timer is set to the value specified by the
+\fBit_interval\fR member of \fIvalue\fR. When a timer is armed with a non-zero
+\fBit_interval\fR, a periodic (or repetitive) timer is specified.
+.sp
+.LP
+Time values that are between two consecutive non-negative integer multiples of
+the resolution of the specified timer will be rounded up to the larger multiple
+of the resolution. Quantization error will not cause the timer to expire
+earlier than the rounded time value.
+.sp
+.LP
+If the argument \fIovalue\fR is not \fINULL\fR, the function
+\fBtimer_settime()\fR stores, in the location referenced by \fIovalue\fR, a
+value representing the previous amount of time before the timer would have
+expired or 0 if the timer was disarmed, together with the previous timer reload
+value. The members of \fIovalue\fR are subject to the resolution of the timer,
+and they are the same values that would be returned by a \fBtimer_gettime()\fR
+call at that point in time.
+.sp
+.LP
+The \fBtimer_gettime()\fR function stores the amount of time until the
+specified timer, \fItimerid\fR, expires and the reload value of the timer into
+the space pointed to by the \fIvalue\fR argument. The \fBit_value\fR member of
+this structure contains the amount of time before the timer expires, or 0 if
+the timer is disarmed. This value is returned as the interval until timer
+expiration, even if the timer was armed with absolute time. The
+\fBit_interval\fR member of \fIvalue\fR contains the reload value last set by
+\fBtimer_settime()\fR.
+.sp
+.LP
+Only a single signal will be queued to the process for a given timer at any
+point in time. When a timer for which a signal is still pending expires, no
+signal will be queued, and a timer overrun occurs. When a timer expiration
+signal is delivered to or accepted by a process, the \fBtimer_getoverrun()\fR
+function returns the timer expiration overrun count for the specified timer.
+The overrun count returned contains the number of extra timer expirations that
+occurred between the time the signal was generated (queued) and when it was
+delivered or accepted, up to but not including an implementation-dependent
+maximum of \fBDELAYTIMER_MAX\fR. If the number of such extra expirations is
+greater than or equal to \fBDELAYTIMER_MAX\fR, then the overrun count will be
+set to \fBDELAYTIMER_MAX\fR. The value returned by \fBtimer_getoverrun()\fR
+applies to the most recent expiration signal delivery or acceptance for the
+timer. If no expiration signal has been delivered for the timer, the meaning of
+the overrun count returned is undefined.
+.SH RETURN VALUES
+.sp
+.LP
+If the \fBtimer_settime()\fR or \fBtimer_gettime()\fR functions succeed,
+\fB0\fR is returned. If an error occurs for either of these functions,
+\fB\(mi1\fR is returned, and \fBerrno\fR is set to indicate the error. If the
+\fBtimer_getoverrun()\fR function succeeds, it returns the timer expiration
+overrun count as explained above.
+.SH ERRORS
+.sp
+.LP
+The \fBtimer_settime()\fR, \fBtimer_gettime()\fR and \fBtimer_getoverrun()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fItimerid\fR argument does not correspond to a timer returned by
+\fBtimer_create\fR(3C) but not yet deleted by \fBtimer_delete\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fBtimer_settime()\fR, \fBtimer_gettime()\fR, and \fBtimer_getoverrun()\fR
+functions are not supported by the system. The \fBtimer_settime()\fR function
+will fail if:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+A \fIvalue\fR structure specified a nanosecond value less than zero or greater
+than or equal to 1000 million.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtime.h\fR(3HEAD), \fBclock_settime\fR(3C), \fBtimer_create\fR(3C),
+\fBtimer_delete\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

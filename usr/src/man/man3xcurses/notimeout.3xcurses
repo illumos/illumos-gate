@@ -1,0 +1,126 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH notimeout 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+notimeout, timeout, wtimeout \- set timed blocking or non-blocking read
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBnotimeout\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtimeout\fR(\fBint\fR \fIdelay\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwtimeout\fR(\fBWINDOW\fR \fIwin\fR, \fBint\fR \fIdelay\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window in which to set the timed blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbf\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a Boolean expression.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdelay\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the number of milliseconds to block or wait for input.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+If \fIbool\fR is \fBTRUE\fR, the \fBnotimeout()\fR function disables a  timer
+used by \fBgetch\fR(3XCURSES) when handling multibyte function key sequences.
+.sp
+.LP
+When \fIbool\fR is \fBFALSE\fR and keypad handling is enabled, a timer is  set
+by \fBgetch()\fR to handle bytes received that could be the beginning of a
+function key (for example, ESC). If the remainder of the sequence is not
+received before the time expires, the  first byte is returned; otherwise, the
+value of the function key is returned. Subsequent calls to the \fBgetch()\fR
+function will return the other bytes received for the incomplete key sequence.
+.sp
+.LP
+The \fBtimeout()\fR and \fBwtimeout()\fR functions set the length of time
+\fBgetch()\fR waits for input for windows \fBstdscr\fR and \fIwin\fR,
+respectively.  These functions are similar to \fBnodelay\fR(3XCURSES) except
+the time to block  or wait for input can be specified.
+.sp
+.LP
+A negative \fIdelay\fR causes the program to wait indefinitely for input; a
+\fIdelay\fR of \fB0\fR returns \fBERR\fR if no input is ready; and  a positive
+\fIdelay\fR blocks until input arrives or the time specified expires, (in which
+case, \fBERR\fR is returned).
+.SH RETURN VALUES
+.sp
+.LP
+On success, the \fBnotimeout()\fR function returns \fBOK\fR. Otherwise, it
+returns \fBERR\fR.
+.sp
+.LP
+The \fBtimeout()\fR and \fBwtimeout()\fR functions do not return a value.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetch\fR(3XCURSES), \fBhalfdelay\fR(3XCURSES), \fBlibcurses\fR(3XCURSES),
+\fBnodelay\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

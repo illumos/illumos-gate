@@ -1,0 +1,221 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_key_create 3C "2 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_key_create, pthread_key_create_once_np \- create thread-specific data
+key
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_key_create\fR(\fBpthread_key_t *\fR\fIkey\fR,
+     \fBvoid\fR (*\fIdestructor\fR)(\fBvoid*\fR));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_key_create_once_np\fR(\fBpthread_key_t *\fR\fIkey\fR,
+     \fBvoid\fR (*\fIdestructor\fR)(\fBvoid*\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_key_create()\fR function creates a thread-specific data key
+visible to all threads in the process. Key values provided by
+\fBpthread_key_create()\fR are opaque objects used to locate thread-specific
+data. Although the same key value may be used by different threads, the values
+bound to the key by \fBpthread_setspecific()\fR are maintained on a per-thread
+basis and persist for the life of the calling thread.
+.sp
+.LP
+Upon key creation, the value  \fINULL\fR is associated with the new key in all
+active threads. Upon thread creation, the value  \fINULL\fR is associated with
+all defined keys in the new thread.
+.sp
+.LP
+An optional destructor function may be associated with each key value. At
+thread exit, if a key value has a non-\fINULL\fR  destructor pointer, and the
+thread has a non-\fINULL\fR value associated with that key, the function
+pointed to is called with the current associated value as its sole argument.
+Destructors can be called in any order.
+.sp
+.LP
+If, after all the destructors have been  called for all keys with
+non-\fINULL\fR values,  there are still some keys with non-\fINULL\fR values,
+the process will be repeated. If, after at least
+\fBPTHREAD_DESTRUCTOR_ITERATIONS\fR iterations of destructor calls for
+outstanding non-\fINULL\fR values, there are still some keys with
+non-\fINULL\fR values, the process is continued, even though this might result
+in an infinite loop.
+.sp
+.LP
+An exiting thread runs with all signals blocked. All thread termination
+functions, including thread-specific data destructor functions, are called with
+all signals blocked.
+.sp
+.LP
+The \fBpthread_key_create_once_np()\fR function is identical to the
+\fBpthread_key_create()\fR function except that the key referred to by
+*\fIkey\fR must be statically initialized with the value
+\fBPTHREAD_ONCE_KEY_NP\fR before calling \fBpthread_key_create_once_np()\fR,
+and the key is created exactly once. This function call is equivalent to using
+\fBpthread_once\fR(3C) to call a onetime initialization function that calls
+\fBpthread_key_create()\fR to create the data key.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_key_create()\fR and
+\fBpthread_key_create_once_np()\fR functions store the newly created key value
+at *\fIkey\fR and return \fB0\fR. Otherwise, an error number is returned to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_key_create()\fR and \fBpthread_key_create_once_np()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The system lacked the necessary resources to create another thread-specific
+data key, or the system-imposed limit on the total number of keys per process
+\fBPTHREAD_KEYS_MAX\fR has been exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient memory exists to create the key.
+.RE
+
+.sp
+.LP
+The \fBpthread_key_create()\fR and \fBpthread_key_create_once_np()\fR functions
+will not return an error value of \fBEINTR\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCall thread-specific data in the function from more than one
+thread without special initialization.
+.sp
+.LP
+In the following example, the thread-specific data in the function can be
+called from more than one thread without special initialization. For each
+argument passed to the executable, a thread is created and privately bound to
+the string-value of that argument.
+
+.sp
+.in +2
+.nf
+/* cc -mt thisfile.c */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+static void *thread_function(void *);
+static void show_tsd(void);
+static void cleanup(void*);
+
+#define MAX_THREADS 20
+
+static pthread_key_t tsd_key = PTHREAD_ONCE_KEY_NP;
+
+int
+main(int argc, char *argv[])
+{
+     pthread_t tid[MAX_THREADS];
+     int num_threads;
+     int i;
+
+     if ((num_threads = argc - 1) > MAX_THREADS)
+          num_threads = MAX_THREADS;
+     for (i = 0; i < num_threads; i++)
+          pthread_create(&tid[i], NULL, thread_function, argv[i+1]);
+     for (i = 0; i < num_threads; i++)
+          pthread_join(tid[i], NULL);
+     return (0);
+}
+
+static void *
+thread_function(void *arg)
+{
+     char *data;
+
+     pthread_key_create_once_np(&tsd_key, cleanup);
+     data = malloc(strlen(arg) + 1);
+     strcpy(data, arg);
+     pthread_setspecific(tsd_key, data);
+     show_tsd();
+     return (NULL);
+}
+
+static void
+show_tsd()
+{
+     void *tsd = pthread_getspecific(tsd_key);
+ 
+     printf("tsd for %d = %s\en", pthread_self(), (char *)tsd);
+}
+
+/* application-specific clean-up function */
+static void
+cleanup(void *tsd)
+{
+     printf("freeing tsd for %d = %s\en", pthread_self(), (char *)tsd);
+     free(tsd);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted.
+_
+MT-LevelMT-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBpthread_key_create()\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_once\fR(3C), \fBpthread_getspecific\fR(3C),
+\fBpthread_setspecific\fR(3C), \fBpthread_key_delete\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

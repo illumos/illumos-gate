@@ -1,0 +1,257 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_setup_pkt 9E "29 Jan 2009" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor \-
+SCSI HBA packet allocation and deallocation
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+\fBstruct scsi_pkt *\fR\fBprefix_tran_setup_pkt\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
+     \fBint (*\fR\fIcallback\fR) (\fIcaddr_t\fR), \fBcaddr_t\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBprefix_tran_teardown_pkt\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_tran_pkt_constructor\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
+     \fBscsi_hba_tran_t *\fR\fItranp\fR, \fBint\fR \fIkmflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBprefix_tran_pkt_destructor\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
+     \fBstruct scsi_hba_tran_t *\fR\fItranp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 12n
+.rt  
+Flags for associating DMA resources with the packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to either \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 12n
+.rt  
+Always \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIkmflags\fR\fR
+.ad
+.RS 12n
+.rt  
+Either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_setup_pkt()\fR and \fBtran_destroy_pkt()\fR vectors in the
+\fBscsi_hba_tran\fR(9S) structure are alternatives to the \fBtran_init_pkt()\fR
+and \fBtran_destroy_pkt()\fR entry points. They are initialized during the
+\fBHBA\fR driver's \fBattach\fR(9E) and they are used when a target driver
+calls \fBscsi_init_pkt\fR(9F) and \fBscsi_destroy_pkt\fR(9F).
+.SS "tran_setup_pkt(\|)"
+.sp
+.LP
+The \fBtran_setup_pkt()\fR vector is the entry point into the \fBHBA\fR which
+is used to initialize \fBHBA\fR specific information in a \fBscsi_pkt\fR
+structure on behalf of a SCSI target driver. All fields documented in
+\fBscsi_pkt\fR(9S) are initialized.
+.sp
+.LP
+If the \fBHBA\fR driver chose not to preallocate memory for \fBpkt_cdbp\fR
+and/or \fBpkt_scbp\fR, it must allocate the requested memory at this time and
+point \fBpkt_cdbp\fR and \fBpkt_scbp\fR to the allocated memory.
+.sp
+.LP
+An \fBHBA\fR driver which provides a \fBtran_setup_pkt\fR entry point inspects
+the \fBpkt_numcookies\fR and \fBpkt_cookies\fR fields at \fBtran_start\fR time
+to set up the transfer. If \fBpkt_numcookies\fR is zero, there are no \fBDMA\fR
+resources associated with this packet. If \fBpkt_numcookies\fR is not zero, it
+indicates the number of \fBDMA\fR cookies that \fBpkt_cookies\fR points to.
+.sp
+.LP
+The \fBpkt_tgtlen\fR field contains the length of the packet private area
+pointed to by \fBpkt_private\fR, allocated on behalf of the SCSI target driver.
+.sp
+.LP
+The \fBpkt_scblen\fR field contains the length of the SCSI status completion
+block pointed to by \fBpkt_scbp\fR. If the status length is greater than or
+equal to sizeof (\fBstruct\fR \fBscsi_arq_status\fR) and the
+\fBauto_rqsensecapability\fR has been set, automatic request sense (\fBARS\fR)
+is enabled for this packet. If the status \fBlengthislessthansizeof\fR
+(\fBstruct\fR \fBscsi_arq_status\fR), automatic request sense should be
+disabled for this pkt if the \fBHBA\fR driver is capable of disabling \fBARQ\fR
+on a per-packet basis.
+.sp
+.LP
+The \fBpkt_cdblen\fR field contains the length of the SCSI command descriptor
+block.
+.sp
+.LP
+The \fIcallback\fR argument indicates what the allocator routines should do
+when resources are not available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR\fR
+.ad
+.RS 14n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR\fR
+.ad
+.RS 14n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.SS "tran_teardown_pkt(\|)"
+.sp
+.LP
+The \fBtran_teardown_pkt()\fR is the entry point into the \fBHBA\fR that must
+free all of the resources that were allocated to the \fBscsi_pkt\fR(9S)
+structure during \fBtran_setup_pkt()\fR.
+.SS "tran_pkt_constructor(\|) tran_pkt_destructor(\|)"
+.sp
+.LP
+When using \fBtran_pkt_setup()\fR and \fBtran_pkt_teardown()\fR,
+\fBtran_pkt_constructor()\fR and \fBtran_pkt_destructor()\fR are additional
+optional entry points that perform the actions of a constructor and destructor.
+The constructor is called after the following fields in the \fBscsi_pkt\fR
+structure have been initialized:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_address\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_ha_private\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_cdbp\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_private\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_scbp\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_cdblen\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_tgtlen\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpkt_scblen\fR
+.RE
+.sp
+.LP
+Allocating and freeing a \fBDMA\fR handle are examples of something that could
+be done in the constructor and destructor. See \fBkmem_cache_create\fR(9F) for
+additional restrictions on what actions can be performed in a constructor and
+destructor.
+.sp
+.LP
+HBA drivers that implement \fBtran_setup_pkt()\fR must signal
+\fBscsi_pkt\fR(9S) completion by calling \fBscsi_hba_pkt_comp\fR(9F). Direct
+use of  the \fBscsi_pkt\fR \fIpkt_comp\fR field is not permitted and results in
+undefined behavior.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_setup_pkt()\fR must return zero on success, and \fB-1\fR on failure.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBtran_sync_pkt\fR(9E), \fBbioerror\fR(9F),
+\fBddi_dma_buf_bind_handle\fR(9F), \fBkmem_cache_create\fR(9F),
+\fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),
+\fBscsi_hba_attach\fR(9F), \fBscsi_hba_pkt_alloc\fR(9F),
+\fBscsi_hba_pkt_comp\fR(9F), \fBscsi_hba_pkt_free\fR(9F),
+\fBscsi_init_pkt\fR(9F), \fBbuf\fR(9S), \fBscsi_address\fR(9S),
+\fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

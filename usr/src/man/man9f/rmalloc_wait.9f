@@ -1,0 +1,70 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmalloc_wait 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+rmalloc_wait \- allocate space from a resource map, wait if necessary
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/map.h>
+#include <sys/ddi.h>
+
+
+
+\fBunsigned long\fR \fBrmalloc_wait\fR(\fBstruct map *\fR\fImp\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (\fBDDI/DKI\fR).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to the resource map from which space is to be allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 8n
+.rt  
+Number of units of space to allocate.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrmalloc_wait()\fR function requests an allocation of space from a
+resource map. \fBrmalloc_wait()\fR is similar to the \fBrmalloc\fR(9F) function
+with the exception that it will wait for space to become available if
+necessary.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBrmalloc_wait()\fR function returns the base of the allocated space.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, interrupt, or kernel context. However,
+in most cases \fBrmalloc_wait()\fR should not be called from interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBrmalloc\fR(9F), \fBrmallocmap\fR(9F), \fBrmfree\fR(9F), \fBrmfreemap\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

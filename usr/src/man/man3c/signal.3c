@@ -1,0 +1,173 @@
+'\" te
+.\" Copyright (c) 2007 Sun Microsystems, Inc.  All Rights Reserved.
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH signal 3C "6 Sep 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+signal, sigset, sighold, sigrelse, sigignore, sigpause \- simplified signal
+management for application processes
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBvoid\fR \fB\fR(\fB*signal(int\fR \fIsig\fR, \fBvoid (*\fR\fIdisp\fR)(int)))(int);
+.fi
+
+.LP
+.nf
+\fBvoid (*\fR\fBsigset\fR(\fBint\fR \fIsig\fR, \fBvoid (*\fR\fIdisp\fR)(int)))(int);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsighold\fR(\fBint\fR \fIsig\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsigrelse\fR(\fBint\fR \fIsig\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsigignore\fR(\fBint\fR \fIsig\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsigpause\fR(\fBint\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide simplified signal management for application processes.
+See \fBsignal.h\fR(3HEAD) for an explanation of general signal concepts.
+.sp
+.LP
+The \fBsignal()\fR and \fBsigset()\fR functions modify signal dispositions. The
+\fIsig\fR argument specifies the signal, which may be any signal except
+\fBSIGKILL\fR and  \fBSIGSTOP.\fR The \fIdisp\fR argument specifies the
+signal's disposition, which may be \fBSIG_DFL,\fR \fBSIG_IGN,\fR or the address
+of a signal handler. If \fBsignal()\fR is used, \fIdisp\fR is the address of a
+signal handler, and \fIsig\fR is not  \fBSIGILL,\fR \fBSIGTRAP\fR, or
+\fBSIGPWR\fR, the system first sets the signal's disposition to  \fBSIG_DFL\fR
+before executing the signal handler. If \fBsigset()\fR is used and \fIdisp\fR
+is the address of a signal handler, the system adds \fIsig\fR to the calling
+process's signal  mask before executing the signal handler; when the signal
+handler returns, the system restores the calling process's signal mask to its
+state prior to the delivery of the signal. In addition, if \fBsigset()\fR is
+used and \fIdisp\fR is equal to  \fBSIG_HOLD\fR, \fIsig\fR is added to the
+calling process's signal mask and the signal's disposition remains unchanged.
+.sp
+.LP
+The \fBsighold()\fR function adds \fIsig\fR to the calling process's signal
+mask.
+.sp
+.LP
+The \fBsigrelse()\fR function removes \fIsig\fR from the calling process's
+signal mask.
+.sp
+.LP
+The \fBsigignore()\fR function sets the disposition of \fIsig\fR to
+\fBSIG_IGN.\fR
+.sp
+.LP
+The \fBsigpause()\fR function removes \fIsig\fR from the calling process's
+signal mask  and suspends the calling process until a signal is received.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsignal()\fR returns the signal's previous
+disposition. Otherwise, it returns  \fBSIG_ERR\fR and sets \fBerrno\fR to
+indicate the error.
+.sp
+.LP
+Upon successful completion, \fBsigset()\fR returns \fBSIG_HOLD\fR if the signal
+had been blocked or the signal's previous disposition if it had not been
+blocked. Otherwise, it returns  \fBSIG_ERR\fR and sets \fBerrno\fR to indicate
+the error.
+.sp
+.LP
+Upon successful completion, \fBsighold()\fR, \fBsigrelse()\fR,
+\fBsigignore()\fR, and \fBsigpause()\fR, return  \fB0\fR. Otherwise, they
+return  \fB\(mi1\fR and set  \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was caught during the execution \fBsigpause()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIsig\fR argument is not a valid signal or is equal to
+\fBSIGKILL\fR or  \fBSIGSTOP\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsighold()\fR function used in conjunction with \fBsigrelse()\fR or
+\fBsigpause()\fR may be used to establish critical regions of code that require
+the delivery of a signal to be temporarily deferred.
+.sp
+.LP
+If \fBsignal()\fR or \fBsigset()\fR is used to set  \fBSIGCHLD\fR's disposition
+to a signal handler, \fBSIGCHLD\fR will not be sent when the calling process's
+children are stopped or continued.
+.sp
+.LP
+If any of the above functions are used to set \fBSIGCHLD\fR's disposition to
+\fBSIG_IGN,\fR the calling process's child processes will not create zombie
+processes when they terminate (see \fBexit\fR(2)). If the calling process
+subsequently waits for its children, it blocks until all of its children
+terminate; it then returns \fB\(mi1\fR with \fBerrno\fR set to \fBECHILD\fR
+(see \fBwait\fR(3C) and \fBwaitid\fR(2)).
+.sp
+.LP
+The system guarantees that if more than one instance of the same signal is
+generated to a process, at least one signal will be received.  It does not
+guarantee the reception of every generated signal.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBkill\fR(2), \fBpause\fR(2), \fBsigaction\fR(2),
+\fBsigsend\fR(2), \fBwaitid\fR(2), \fBsignal.h\fR(3HEAD), \fBwait\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

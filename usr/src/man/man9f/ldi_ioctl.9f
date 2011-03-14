@@ -1,0 +1,195 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ioctl 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ioctl \- send an ioctl to a device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+
+
+\fBint\fR \fBldi_ioctl\fR(\fBldi_handle_t\fR \fIlh\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR, 
+     \fBcred_t  *\fR\fIcr\fR, \fBint *\fR\fIrvalp\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR\fR
+.ad
+.RS 9n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcr\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to a credential structure used to open a device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrvalp\fR\fR
+.ad
+.RS 9n
+.rt  
+Caller return value. (May be set by driver and is valid only if the
+\fBioctl()\fR succeeds).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 9n
+.rt  
+Command argument. Interpreted by driver \fBioctl()\fR as the operation to be
+performed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 9n
+.rt  
+Driver parameter. Argument interpretation is driver dependent and usually
+depends on the command type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImode\fR\fR
+.ad
+.RS 9n
+.rt  
+Bit field that contains:
+.sp
+.ne 2
+.mk
+.na
+\fBFKIOCTL\fR
+.ad
+.RS 11n
+.rt  
+Inform the target device that the ioctl originated from within the kernel.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ioctl()\fR function passes an ioctl request to the device entry
+point for the device specified by the layered handle. This operation is
+supported for block, character, and streams devices.
+.sp
+.LP
+If \fIarg\fR is interpreted  as a pointer (that is, as not an immediate value)
+and the data pointed to by \fIarg\fR is in the kernels address space, the
+\fBFKIOCTL\fR flag should be set. This indicates to the target driver that no
+data model conversion is necessary.
+.sp
+.LP
+If the caller of \fBldi_ioctl()\fR is not the originator of the ioctl data
+pointed to by \fIarg\fR, (for example, when passing on an ioctl request from a
+user process), the caller must pass on the mode parameter from the original
+ioctl. This is because the mode parameter contains the contains the
+\fBFMODELS\fR bits that enable the target driver to determine the data model of
+the process which originated the ioctl and perform any necessary conversions.
+See \fBddi_model_convert_from\fR(9F) for more information.
+.SH STREAM IOCTLS
+.sp
+.LP
+For a general description of streams ioctls see \fBstreamio\fR(7I).
+\fBldi_ioctl()\fR supports a number of streams ioctls, using layered handles in
+the place of file descriptors. When issuing streams ioctls the \fBFKIOCTL\fR
+parameter should be specified. The possible return values for supported ioctl
+commands are also documented in \fBstreamio\fR(7I).
+.sp
+.LP
+The following streams ioctls are supported:
+.sp
+.ne 2
+.mk
+.na
+\fBI_PLINK\fR
+.ad
+.RS 13n
+.rt  
+Behaves as documented in \fBstreamio\fR(7I). The layered handle \fIlh\fR should
+point to the streams multiplexer. The \fIarg\fR parameter should point to a
+layered handle for another streams driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBI_UNPLINK\fR
+.ad
+.RS 13n
+.rt  
+Behaves as documented in \fBstreamio\fR(7I)).  The layered handle \fIlh\fR
+should point to the streams multiplexer. The \fIarg\fR parameter is the
+multiplexor ID number returned by \fBI_PLINK\fR when the streams were linked.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_ioctl()\fR function returns \fB0\fR upon success. If a failure
+occurs before the request is passed on to the device, possible return values
+are shown below. Otherwise any other error number may be returned by the
+device.
+.sp
+.ne 2
+.mk
+.na
+\fBEINVAL\fR
+.ad
+.RS 11n
+.rt  
+Invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBENOTSUP\fR
+.ad
+.RS 11n
+.rt  
+Operation is not supported for this device.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBstreamio\fR(7I), \fBddi_model_convert_from\fR(9F)

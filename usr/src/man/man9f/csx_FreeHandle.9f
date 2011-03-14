@@ -1,0 +1,77 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_FreeHandle 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_FreeHandle \- free access handle
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_FreeHandle\fR(\fBacc_handle_t *\fR\fIhandle\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 11n
+.rt  
+The access handle returned from \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestWindow\fR(9F), or \fBcsx_DupHandle\fR(9F).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function frees the handle, \fIhandle\fR. If the handle was created by the
+\fBcsx_DupHandle\fR(9F) function, this function will free the storage
+associated with this handle, but will not modify any resources that the
+original handle refers to. If the handle was created by a common access setup
+function, this function will release the resources associated with this handle.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_DupHandle\fR(9F), \fBcsx_RequestIO\fR(9F), \fBcsx_RequestWindow\fR(9F)
+.sp
+.LP
+\fIPC Card95 Standard, PCMCIA/JEIDA\fR

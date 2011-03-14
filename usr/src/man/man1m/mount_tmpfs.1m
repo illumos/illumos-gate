@@ -1,0 +1,115 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mount_tmpfs 1M "24 Nov 2003" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+mount_tmpfs \- mount tmpfs file systems
+.SH SYNOPSIS
+.LP
+.nf
+\fBmount\fR [\fB-F\fR tmpfs] [\fB-o\fR \fIspecific_options\fR] [\fB-O\fR] \fIspecial\fR \fImount_point\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBtmpfs\fR is a memory based file system which uses kernel resources relating
+to the \fBVM\fR system and page cache as a file system.
+.sp
+.LP
+\fBmount\fR attaches a \fBtmpfs\fR file system to the file system hierarchy at
+the pathname location \fImount_point\fR, which must already exist. If
+\fImount_point\fR has any contents prior to the \fBmount\fR operation, these
+remain hidden until the file system is once again unmounted. The attributes
+(mode, owner, and group) of the root of the \fBtmpfs\fR filesystem are
+inherited from the underlying \fImount_point\fR, provided that those attributes
+are determinable. If not, the root's attributes are set to their default
+values.
+.sp
+.LP
+The \fIspecial\fR argument is usually specified as \fBswap\fR but is in fact
+disregarded and assumed to be the virtual memory resources within the system.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIspecific_options\fR\fR
+.ad
+.RS 23n
+.rt  
+Specify \fBtmpfs\fR file system specific options in a comma-separated list with
+no intervening spaces. If invalid options are specified, a warning  message is
+printed and the invalid options are ignored. The following options are
+available:
+.sp
+.ne 2
+.mk
+.na
+\fBsize=\fIsz\fR\fR
+.ad
+.RS 19n
+.rt  
+The \fIsz\fR argument controls the size of this particular \fBtmpfs\fR file
+system. If the argument is has a `k' suffix, the number will be interpreted as
+a number of kilobytes. An `m' suffix will be interpreted as a number of
+megabytes. No suffix is interpreted as bytes. In all cases, the actual size of
+the file system is the number of bytes specified, rounded up to the physical
+pagesize of the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxattr\fR | \fBnoxattr\fR\fR
+.ad
+.RS 19n
+.rt  
+Allow or disallow the creation and manipulation of extended attributes. The
+default is \fBxattr\fR. See \fBfsattr\fR(5) for a description of extended
+attributes.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR\fR
+.ad
+.RS 23n
+.rt  
+Overlay  mount. Allow the file system to be mounted over an existing mount
+point, making the underlying file system inaccessible. If a mount is attempted
+on a pre-existing mount point without setting this flag, the mount will fail,
+producing the error\f(CWdevice busy\fR.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.RS 15n
+.rt  
+Table of mounted file systems
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmount\fR(1M), \fBmkdir\fR(2), \fBmount\fR(2), \fBopen\fR(2),
+\fBumount\fR(2), \fBmnttab\fR(4), \fBattributes\fR(5), \fBfsattr\fR(5),
+\fBtmpfs\fR(7FS)
+.SH NOTES
+.sp
+.LP
+If the directory on which a file system is to be mounted is a symbolic link,
+the file system is mounted on the directory to which the symbolic link refers,
+rather than on top of the symbolic link itself.

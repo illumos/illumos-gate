@@ -1,0 +1,313 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libdevinfo 3LIB "15 May 2008" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libdevinfo \- device information library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
+#include <libdevinfo.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library access device configuration information.
+.sp
+.LP
+Device configuration data is organized as a tree of device nodes, defined as
+\fBdi_node_t\fR in the \fBlibdevinfo\fR interfaces. Each \fBdi_node_t\fR
+represents a physical or logical (pseudo) device. The types of data associated
+with device nodes are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+data defined for all device nodes (attributes)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+data defined for all multipath path nodes
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+data defined for all minor node data
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+properties specific to nodes
+.RE
+.sp
+.LP
+All device nodes have a set of common attributes, such as a node name, an
+instance number, and a driver binding name. Common device node attributes are
+accessed by calling interfaces listed on the \fBdi_binding_name\fR(3DEVINFO)
+manual page. Each device node also has a physical path, which is accessed by
+calling \fBdi_devfs_path\fR(3DEVINFO).
+.sp
+.LP
+Properties provide device specific information for device configuration and
+usage. Properties can be defined by software (\fBdi_prop_t\fR) or by firmware
+(\fBdi_prom_prop_t\fR). One way to access each \fBdi_prop_t\fR is to make
+successive calls to \fBdi_prop_next\fR(3DEVINFO) until \fBDI_PROP_NIL\fR is
+returned. For each \fBdi_prop_t\fR, use interfaces on the
+\fBdi_prop_bytes\fR(3DEVINFO) manual page to obtain property names and values.
+Another way to access these properties is to call
+\fBdi_prop_lookup_bytes\fR(3DEVINFO) to find the value of a property with a
+given name. Accessing a \fBdi_prom_prop_t\fR is similar to accessing a
+\fBdi_prop_t\fR, except that the interface names start with \fBdi_prom_prop\fR
+and additional calls to \fBdi_prom_init\fR(3DEVINFO) and
+\fBdi_prom_fini\fR(3DEVINFO) are required.
+.sp
+.LP
+Minor nodes contain information exported by the device for creating special
+files for the device. Each device node has 0 or more minor nodes associated
+with it. A list of minor nodes (\fBdi_minor_t\fR) can be obtained by making
+successive calls to \fBdi_minor_next\fR(3DEVINFO) until \fBDI_MINOR_NIL\fR is
+returned. For each minor node, \fBdi_minor_devt\fR(3DEVINFO) and related
+interfaces are called to get minor node data.
+.sp
+.LP
+In some configurations, multipath device access via a virtual host controller
+interface (vHCI) abstraction is possible. An example of a driver using this
+abstraction is \fBscsi_vhci\fR(7D). In such cases, devices are not directly
+represented as children of their physical host controller interface (pHCI) bus
+adapter. Instead, devices have an identity-oriented representation as a child
+of a vHCI. All paths leading to the same identity are represented by a common
+child endpoint of the vHCI called the "client" device node. The vHCI
+virtualizes access among the underlying pHCI physical paths. The underlying
+connection between vHCI-managed client endpoints and the pHCI paths to that
+endpoint is represented by a class of nodes called "path" nodes
+(\fBdi_path_t\fR).
+.sp
+.LP
+Each path node is associated with two device nodes: its pHCI device node, and
+its client device node. A list of paths associated with a specific pHCI device
+node can be obtained using \fBdi_path_phci_next_path\fR(3DEVINFO), and a list
+of paths associated with a specific client device node can be obtained using
+\fBdi_path_client_next_path\fR(3DEVINFO). These functions return
+\fBDI_PATH_NIL\fR when the end of the list of path nodes is reached.
+.sp
+.LP
+For each path node, \fBdi_path_state\fR(3DEVINFO) and related interfaces are
+called to get path node data.
+.sp
+.LP
+Using \fBlibdevinfo\fR involves three steps:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Creating a snapshot of the device tree
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Traversing the device tree to get information of interest
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Destroying the snapshot of the device tree
+.RE
+.sp
+.LP
+A snapshot of the device tree is created by calling \fBdi_init\fR(3DEVINFO) and
+destroyed by calling \fBdi_fini\fR(3DEVINFO). An application can specify the
+data to be included in the snapshot (full or partial tree, include or exclude
+properties and minor nodes) and get a handle to the root of the device tree.
+See \fBdi_init\fR(3DEVINFO) for details. The application then traverses the
+device tree in the snapshot to obtain device configuration data.
+.sp
+.LP
+The device tree is normally traversed through parent-child-sibling linkage.
+Each device node contains references to its parent, its next sibling, and the
+first of its children. Given the \fBdi_node_t\fR returned from \fBdi_init()\fR,
+one can find all children by first calling \fBdi_child_node\fR(3DEVINFO),
+followed by successive calls to \fBdi_sibling_node\fR(3DEVINFO) until
+\fBDI_NODE_NIL\fR is returned. By following this procedure recursively, an
+application can visit all device nodes contained in the snapshot. Two
+interfaces,The \fBdi_walk_node\fR(3DEVINFO) and \fBdi_walk_minor\fR(3DEVINFO)
+functions are provided to facilitate device tree traversal. The
+\fBdi_walk_node()\fR function visits all device nodes and executes a
+user-supplied callback function for each node visited. The
+\fBdi_walk_minor()\fR function does the same for each minor node in the device
+tree.
+.sp
+.LP
+An alternative way to traverse the device tree is through the per-driver device
+node linkage. Device nodes contain a reference to the next device node bound to
+the same driver. Given the \fBdi_node_t\fR returned from \fBdi_init()\fR, an
+application can find all device nodes bound to a driver by first calling
+\fBdi_drv_first_node\fR(3DEVINFO), followed by successive calls to
+\fBdi_drv_next_node\fR(3DEVINFO) until \fBDI_NODE_NIL\fR is returned.
+Traversing the per-driver device node list works only when the snapshot
+includes all device nodes.
+.sp
+.LP
+See \fBdi_init\fR(3DEVINFO) for examples of \fBlibdevinfo\fR usage. See
+\fIWriting Device Drivers\fR for information about Solaris device
+configuration.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibdevinfo.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBdi_binding_name\fR\fBdi_bus_addr\fR
+\fBdi_child_node\fR\fBdi_compatible_names\fR
+\fBdi_devfs_minor_path\fR\fBdi_devfs_path\fR
+\fBdi_devfs_path_free\fR\fBdi_devid\fR
+\fBdi_driver_major\fR\fBdi_driver_name\fR
+\fBdi_driver_ops\fR\fBdi_drv_first_node\fR
+\fBdi_drv_next_node\fR\fBdi_fini\fR
+\fBdi_init\fR\fBdi_instance\fR
+\fBdi_link_next_by_lnode\fR\fBdi_link_next_by_node\fR
+\fBdi_link_private_get\fR\fBdi_link_private_set\fR
+\fBdi_link_spectype\fR\fBdi_link_to_lnode\fR
+\fBdi_lnode_devinfo\fR\fBdi_lnode_devt\fR
+\fBdi_lnode_name\fR\fBdi_lnode_next\fR
+\fBdi_lnode_private_get\fR\fBdi_lnode_private_set\fR
+\fBdi_minor_devt\fR\fBdi_minor_name\fR
+\fBdi_minor_next\fR\fBdi_minor_nodetype\fR
+\fBdi_minor_private_get\fR\fBdi_minor_private_set\fR
+\fBdi_minor_spectype\fR\fBdi_minor_type\fR
+\fBdi_node_name\fR\fBdi_node_private_get\fR
+\fBdi_node_private_set\fR\fBdi_nodeid\fR
+\fBdi_parent_node\fR\fBdi_path_bus_addr\fR
+\fBdi_path_client_devfs_path\fR\fBdi_path_client_next_path\fR
+\fBdi_path_client_node\fR\fBdi_path_devfs_path\fR
+\fBdi_path_instance\fR\fBdi_path_node_name\fR
+\fBdi_path_phci_next_path\fR\fBdi_path_phci_node\fR
+\fBdi_path_prop_bytes\fR\fBdi_path_prop_int64s\fR
+\fBdi_path_prop_ints\fR\fBdi_path_prop_len\fR
+\fBdi_path_prop_lookup_bytes\fR\fBdi_path_prop_lookup_int64s\fR
+\fBdi_path_prop_lookup_ints\fR\fBdi_path_prop_lookup_strings\fR
+\fBdi_path_prop_name\fR\fBdi_path_prop_strings\fR
+\fBdi_path_prop_next\fR\fBdi_path_prop_type\fR
+\fBdi_path_state\fR\fBdi_prom_fini\fR
+\fBdi_prom_init\fR\fBdi_prom_prop_data\fR
+\fBdi_prom_prop_lookup_bytes\fR\fBdi_prom_prop_lookup_ints\fR
+\fBdi_prom_prop_lookup_strings\fR\fBdi_prom_prop_name\fR
+\fBdi_prom_prop_next\fR\fBdi_prop_bytes\fR
+\fBdi_prop_devt\fR\fBdi_prop_int64\fR
+\fBdi_prop_ints\fR\fBdi_prop_lookup_bytes\fR
+\fBdi_prop_lookup_int64\fR\fBdi_prop_lookup_ints\fR
+\fBdi_prop_lookup_strings\fR\fBdi_prop_name\fR
+\fBdi_prop_next\fR\fBdi_prop_strings\fR
+\fBdi_prop_type\fR\fBdi_sibling_node\fR
+\fBdi_state\fR\fBdi_walk_link\fR
+\fBdi_walk_lnode\fR\fBdi_walk_minor\fR
+\fBdi_walk_node\fR
+.TE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInformation accessible through \fBlibdevinfo\fR interfaces
+.sp
+.LP
+The following example illustrates the kind of information accessible through
+\fBlibdevinfo\fR interfaces for a device node representing a hard disk (sd2):
+
+.sp
+.in +2
+.nf
+Attributes
+    node name:  sd
+    instance:   2
+    physical path:  /sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@2,0
+
+Properties
+    target=2
+    lun=0
+
+Minor nodes
+    (disk partition /dev/dsk/c0t2d0s0)
+        name:       a
+        dev_t:      0x0080010 (32/16)
+        spectype:   IF_BLK (block special)
+    (disk partition /dev/rdsk/c0t2d0s2)
+        name:       c,raw
+        dev_t:      0x0080012 (32/18)
+        spectype:   IF_CHR (character special)
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/libdevinfo.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/64/libdevinfo.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpvs\fR(1), \fBdevlinks\fR(1M), \fBprtconf\fR(1M), \fBIntro\fR(3),
+\fBdi_binding_name\fR(3DEVINFO), \fBdi_child_node\fR(3DEVINFO),
+\fBdi_devfs_path\fR(3DEVINFO), \fBdi_init\fR(3DEVINFO),
+\fBdi_minor_devt\fR(3DEVINFO), \fBdi_minor_next\fR(3DEVINFO),
+\fBdi_path_bus_addr\fR(3DEVINFO), \fBdi_path_client_next_path\fR(3DEVINFO),
+\fBdi_path_prop_bytes\fR(3DEVINFO), \fBdi_path_prop_lookup_bytes\fR(3DEVINFO),
+\fBdi_path_prop_next\fR(3DEVINFO), \fBdi_prom_init\fR(3DEVINFO),
+\fBdi_prop_bytes\fR(3DEVINFO), \fBdi_prop_lookup_bytes\fR(3DEVINFO),
+\fBdi_prop_next\fR(3DEVINFO), \fBdi_walk_minor\fR(3DEVINFO),
+\fBdi_walk_node\fR(3DEVINFO), \fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

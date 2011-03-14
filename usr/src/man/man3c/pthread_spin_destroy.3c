@@ -1,0 +1,146 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_spin_destroy 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_spin_destroy, pthread_spin_init \- destroy or initialize a spin lock
+object
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_spin_destroy\fR(\fBpthread_spinlock_t *\fR\fIlock\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_spin_init\fR(\fBpthread_spinlock_t *\fR\fIlock\fR, \fBint\fR \fIpshared\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_spin_destroy()\fR function destroys the spin lock referenced by
+\fIlock\fR and release any resources used by the lock. The effect of subsequent
+use of the lock is undefined until the lock is reinitialized by another call to
+\fBpthread_spin_init()\fR. The results are undefined if
+\fBpthread_spin_destroy()\fR is called when a thread holds the lock, or if this
+function is called with an uninitialized thread spin lock.
+.sp
+.LP
+The \fBpthread_spin_init()\fR function allocates any resources required to use
+the spin lock referenced by \fIlock\fR and initialize the lock to an unlocked
+state.
+.sp
+.LP
+If the Thread Process-Shared Synchronization option is supported and the value
+of \fIpshared\fR is \fBPTHREAD_PROCESS_SHARED\fR, the spin lock can be operated
+upon by any thread that has access to the memory where the spin lock is
+allocated, even if it is allocated in memory that is shared by multiple
+processes.
+.sp
+.LP
+If the Thread Process-Shared Synchronization option is supported and the value
+of \fIpshared\fR is \fBPTHREAD_PROCESS_PRIVATE\fR, or if the option is not
+supported, the spin lock can only be operated upon by threads created within
+the same process as the thread that initialized the spin lock. If threads of
+differing processes attempt to operate on such a spin lock, the behavior is
+undefined.
+.sp
+.LP
+The results are undefined if \fBpthread_spin_init()\fR is called specifying an
+already initialized spin lock. The results are undefined if a spin lock is used
+without first being initialized.
+.sp
+.LP
+If the \fBpthread_spin_init()\fR function fails, the lock is not initialized
+and the contents of \fIlock\fR are undefined.
+.sp
+.LP
+Only the object referenced by \fIlock\fR can be used for performing
+synchronization.
+.sp
+.LP
+The result of referring to copies of that object in calls to
+\fBpthread_spin_destroy()\fR, \fBpthread_spin_lock\fR(3C),
+\fBpthread_spin_trylock\fR(3C), or \fBpthread_spin_unlock\fR(3C) is undefined.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions returns 0. Otherwise, an error
+number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_spin_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The system lacks the necessary resources to initialize another spin lock.
+.RE
+
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+The system has detected an attempt to initialize or destroy a spin lock while
+it is in use (for example, while being used in a \fBpthread_spin_lock()\fR
+call) by another thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIlock\fR is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_spin_lock\fR(3C), \fBpthread_spin_unlock\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

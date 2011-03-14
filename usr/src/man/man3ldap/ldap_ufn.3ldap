@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_ufn 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_ufn, ldap_ufn_search_s, ldap_ufn_search_c, ldap_ufn_search_ct,
+ldap_ufn_setfilter, ldap_ufn_setprefix, ldap_ufn_timeout \- LDAP user friendly
+search functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_ufn_search_c\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*ufn\fR, \fBchar\fR \fI**attrs\fR,
+     \fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR, \fBint (\fR\fI*cancelproc\fR)(),
+     \fBvoid\fR \fI*cancelparm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_ufn_search_ct\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*ufn\fR, \fBchar\fR \fI**attrs\fR,
+     \fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR,\fBint (\fR\fI*cancelproc\fR)(),
+     \fBvoid\fR \fI*cancelparm\fR,\fBchar\fR \fI*tag1\fR, \fBchar\fR \fI*tag2\fR,
+     \fBchar\fR \fI*tag3\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_ufn_search_s\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*ufn\fR, \fBchar\fR \fI**attrs\fR,
+     \fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPFiltDesc *\fR\fBldap_ufn_setfilter\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*fname\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_ufn_setprefix\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*prefix\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_ufn_timeout\fR(\fBvoid\fR \fI*tvparam\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to perform LDAP user friendly search operations.
+\fBldap_ufn_search_s()\fR is the simplest form.  It does the search
+synchronously.  It takes \fIld\fR to identify the the LDAP connection. The
+\fIufn\fR parameter is the user friendly name for which to search. The
+\fIattrs\fR, \fIattrsonly\fR and \fIres\fR parameters are the same as for
+\fBldap_search\fR(3LDAP).
+.sp
+.LP
+The \fBldap_ufn_search_c()\fR function functions the same as
+\fBldap_ufn_search_s()\fR, except that it takes \fIcancelproc\fR, a function to
+call periodicly during the search.  It should be a function taking a single
+void * argument, given by \fIcalcelparm\fR.  If \fIcancelproc\fR returns a
+non-zero result, the search will be abandoned and no results returned. The
+purpose of this function is to provide a way for the search to be cancelled,
+for example, by a user or because some other condition occurs.
+.sp
+.LP
+The \fBldap_ufn_search_ct()\fR function is like \fBldap_ufn_search_c()\fR,
+except that it takes three extra parameters.  \fItag1\fR is passed to the
+\fBldap_init_getfilter\fR(3LDAP) function when resolving the first component of
+the UFN.  \fItag2\fR is used when resolving intermediate components. \fItag3\fR
+is used when resolving the last component. By default, the tags used by the
+other UFN search functions during these three phases of the search are "ufn
+first", "ufn intermediate", and "ufn last".
+.sp
+.LP
+The \fBldap_ufn_setfilter()\fR function is used to set the
+\fBldapfilter.conf\fR(4) file for use with the \fBldap_init_getfilter\fR(3LDAP)
+function to \fIfname\fR.
+.sp
+.LP
+The \fBldap_ufn_setprefix()\fR function is used to set the default prefix
+(actually, it's a suffix) appended to UFNs before searhing.  UFNs with fewer
+than three components have the prefix appended first, before searching.  If
+that fails, the UFN is tried with progressively shorter versions of the prefix,
+stripping off components.  If the UFN has three or more components, it is tried
+by itself first.  If that fails, a similar process is applied with the prefix
+appended.
+.sp
+.LP
+The \fBldap_ufn_timeout()\fR function is used to set the timeout associated
+with \fBldap_ufn_search_s()\fR searches.  The \fItimeout\fR parameter should
+actually be a pointer to a struct timeval. This is so \fBldap_ufn_timeout()\fR
+can be used as a cancelproc in the above functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgettimeofday\fR(3C), \fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP),
+\fBldap_getfilter\fR(3LDAP), \fBldapfilter.conf\fR(4), \fBldap_error\fR(3LDAP),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+These functions may allocates memory.  Return values are contained in
+<\fBldap.h\fR>.

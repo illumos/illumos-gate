@@ -1,0 +1,303 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lio_listio 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+lio_listio \- list directed I/O
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBlio_listio\fR(\fBint\fR \fImode\fR, \fBstruct aiocb *restrict const\fR \fIlist\fR[],
+     \fBint\fR \fInent\fR, \fBstruct sigevent *restrict\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlio_listio()\fR function allows the calling process, LWP, or thread, to
+initiate a list of I/O requests within a single function call.
+.sp
+.LP
+The \fImode\fR argument takes one of the values \fBLIO_WAIT\fR or
+\fBLIO_NOWAIT\fR declared in <\fBaio.h\fR> and determines whether the function
+returns when the I/O operations have been completed, or as soon as the
+operations have been queued. If the \fImode\fR argument is \fBLIO_WAIT\fR, the
+function waits until all I/O is complete and the \fIsig\fR argument is ignored.
+.sp
+.LP
+If the \fImode\fR argument is \fBLIO_NOWAIT\fR, the function returns
+immediately, and asynchronous notification occurs, according to the \fIsig\fR
+argument, when all the I/O operations complete. If \fIsig\fR is \fINULL\fR, no
+asynchronous notification occurs. If \fIsig\fR is not \fINULL\fR, asynchronous
+notification occurs as specified in \fBsignal.h\fR(3HEAD) when all the requests
+in \fIlist\fR have completed.
+.sp
+.LP
+The I/O requests enumerated by \fIlist\fR are submitted in an unspecified
+order.
+.sp
+.LP
+The \fIlist\fR argument is an array of pointers to \fBaiocb\fR structures. The
+array contains \fInent\fR elements. The array may contain null elements, which
+are ignored.
+.sp
+.LP
+The \fIaio_lio_opcode\fR field of each \fBaiocb\fR structure specifies the
+operation to be performed. The supported operations are \fBLIO_READ\fR,
+\fBLIO_WRITE\fR, and \fBLIO_NOP\fR; these symbols are defined in <\fBaio.h\fR>.
+The \fBLIO_NOP\fR operation causes the list entry to be ignored. If the
+\fIaio_lio_opcode\fR element is equal to \fBLIO_READ,\fR then an I/O operation
+is submitted as if by a call to \fBaio_read\fR(3C) with the \fIaiocbp\fR equal
+to the address of the \fBaiocb\fR structure. If the \fIaio_lio_opcode\fR
+element is equal to \fBLIO_WRITE\fR, then an I/O operation is submitted as if
+by a call to \fBaio_write\fR(3C) with the \fIaiocbp\fR equal to the address of
+the \fBaiocb\fR structure.
+.sp
+.LP
+The \fIaio_fildes\fR member specifies the file descriptor on which the
+operation is to be performed.
+.sp
+.LP
+The \fIaio_buf\fR member specifies the address of the buffer to or from which
+the data is to be transferred.
+.sp
+.LP
+The \fIaio_nbytes\fR member specifies the number of bytes of data to be
+transferred.
+.sp
+.LP
+The members of the \fIaiocb\fR structure further describe the I/O operation to
+be performed, in a manner identical to that of the corresponding \fBaiocb\fR
+structure when used by the \fBaio_read\fR(3C) and \fBaio_write\fR(3C)
+functions.
+.sp
+.LP
+The \fInent\fR argument specifies how many elements are members of the list,
+that is, the length of the array.
+.sp
+.LP
+The behavior of this function is altered according to the definitions of
+synchronized I/O data integrity completion and synchronized I/O file integrity
+completion if synchronized I/O is enabled on the file associated with
+\fBaio_fildes\fR. See \fBfcntl.h\fR(3HEAD) definitions of \fBO_DSYNC\fR and
+\fBO_SYNC\fR.
+.sp
+.LP
+For regular files, no data transfer will occur past the offset maximum
+established in the open file description associated with
+\fIaiocbp\fR\(->\fBaio_fildes\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If the \fImode\fR argument has the value  \fBLIO_NOWAIT\fR, and the I/O
+operations are successfully queued, \fBlio_listio()\fR returns \fB0\fR;
+otherwise, it returns \fB\(mi1\fR, and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+If the   \fImode\fR argument has the value \fBLIO_WAIT\fR, and all the
+indicated I/O has completed successfully, \fBlio_listio()\fR returns   \fB0\fR;
+otherwise, it returns  \fB\(mi1\fR, and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+In either case, the return value only indicates the success or failure of the
+\fBlio_listio()\fR call itself, not the status of the individual I/O requests.
+In some cases, one or more of the I/O requests contained in the list may fail.
+Failure of an individual request does not prevent completion of any other
+individual request.  To determine the outcome of each I/O request, the
+application must examine the error status associated with each \fIaiocb\fR
+control block.  Each error status so returned is identical to that returned as
+a result of an \fBaio_read\fR(3C) or \fBaio_write\fR(3C) function.
+.SH ERRORS
+.sp
+.LP
+The \fBlio_listio()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The resources necessary to queue all the I/O requests were not available. The
+error status for each request is recorded in the \fBaio_error\fR member of the
+corresponding \fBaiocb\fR structure, and can be retrieved using
+\fBaio_error\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The number of entries indicated by \fInent\fR would cause the system-wide limit
+\fBAIO_MAX\fR to be exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImode\fR argument is an improper value, or the value of \fInent\fR is
+greater than \fBAIO_LISTIO_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was delivered while waiting for all I/O requests to complete during an
+\fBLIO_WAIT\fR operation. Note that, since each I/O operation invoked by
+\fBlio_listio()\fR may possibly provoke a signal when it completes, this error
+return may be caused by the completion of one (or more) of the very I/O
+operations being awaited. Outstanding I/O requests are not canceled, and the
+application can use \fBaio_fsync\fR(3C) to determine if any request was
+initiated; \fBaio_return\fR(3C) to determine if any request has completed; or
+\fBaio_error\fR(3C) to determine if any request was canceled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+One or more of the individual I/O operations failed. The application can use
+\fBaio_error\fR(3C) to check the error status for each \fBaiocb\fR structure to
+determine the individual request(s) that failed.
+.RE
+
+.sp
+.LP
+In addition to the errors returned by the \fBlio_listio()\fR function, if the
+\fBlio_listio()\fR function succeeds or fails with errors of \fBEAGAIN\fR,
+\fBEINTR\fR, or \fBEIO\fR, then some of the I/O specified by the list may have
+been initiated. If the \fBlio_listio()\fR function fails with an error code
+other than \fBEAGAIN\fR, \fBEINTR\fR, or \fBEIO\fR, no operations from the list
+have been initiated. The I/O operation indicated by each list element can
+encounter errors specific to the individual read or write function being
+performed. In this event, the error status for each \fBaiocb\fR control block
+contains the associated error code. The error codes that can be set are the
+same as would be set by a \fBread\fR(2) or \fBwrite\fR(2) function, with the
+following additional error codes possible:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 15n
+.rt  
+The requested I/O operation was not queued due to resource limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECANCELED\fR\fR
+.ad
+.RS 15n
+.rt  
+The requested I/O was canceled before the I/O completed due to an explicit
+\fBaio_cancel\fR(3C) request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIaiocbp\fR\(->\fBaio_lio_opcode\fR is \fBLIO_WRITE\fR, the file is a
+regular file, \fIaiocbp\fR\(->\fBaio_nbytes\fR is greater than 0, and the
+\fIaiocbp\fR\(->\fBaio_offset\fR is greater than or equal to the offset maximum
+in the open file description associated with \fIaiocbp\fR\(->\fBaio_fildes.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINPROGRESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The requested I/O is in progress.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIaiocbp\fR\(->\fBaio_lio_opcode\fR is \fBLIO_READ\fR, the file is a
+regular file, \fIaiocbp\fR\(->\fBaio_nbytes\fR is greater than 0, and the
+\fIaiocbp\fR\(->\fBaio_offset\fR is before the end-of-file and is greater than
+or equal to the offset maximum in the open file description associated with
+\fIaiocbp\fR\(->\fBaio_fildes.\fR
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBlio_listio()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBlseek\fR(2),
+\fBread\fR(2), \fBwrite\fR(2), \fBaio_cancel\fR(3C), \fBaio_error\fR(3C),
+\fBaio_fsync\fR(3C), \fBaio_read\fR(3C), \fBaio_return\fR(3C),
+\fBaio_write\fR(3C), \fBaio.h\fR(3HEAD), \fBfcntl.h\fR(3HEAD),
+\fBsiginfo.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
+\fBlf64\fR(5), \fBstandards\fR(5)

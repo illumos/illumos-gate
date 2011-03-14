@@ -1,0 +1,54 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH umask 2 "28 Dec 1996" "SunOS 5.11" "System Calls"
+.SH NAME
+umask \- set and get file creation mask
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+
+\fBmode_t\fR \fBumask\fR(\fBmode_t\fR \fIcmask\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBumask()\fR function sets the  process's file mode creation mask to
+\fIcmask\fR and returns the previous value of the mask. Only the access
+permission bits of \fIcmask\fR and the file mode creation mask are used. The
+mask is inherited by child processes. See \fBIntro\fR(2) for more information
+on masks.
+.SH RETURN VALUES
+.sp
+.LP
+The previous value of the file mode creation mask is returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmkdir\fR(1), \fBsh\fR(1), \fBIntro\fR(2), \fBchmod\fR(2), \fBcreat\fR(2),
+\fBmknod\fR(2), \fBopen\fR(2), \fBstat.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)

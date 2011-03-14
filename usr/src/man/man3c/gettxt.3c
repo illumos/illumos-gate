@@ -1,0 +1,139 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gettxt 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+gettxt \- retrieve a text string
+.SH SYNOPSIS
+.LP
+.nf
+#include <nl_types.h>
+
+\fBchar *\fR\fBgettxt\fR(\fBconst char *\fR\fImsgid\fR, \fBconst char *\fR\fIdflt_str\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgettxt()\fR function retrieves a text string from a message file. The
+arguments to the function are a message identification \fImsgid\fR and a
+default string \fIdflt_str\fR to be used if the retrieval fails.
+.sp
+.LP
+The text strings are in files created by the \fBmkmsgs\fR utility (see
+\fBmkmsgs\fR(1)) and installed in directories in
+\fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR.
+.sp
+.LP
+The directory \fBlocale\fR can be viewed as the language in which the text
+strings are written. The user can request that messages be displayed in a
+specific language by setting the environment variable \fBLC_MESSAGES\fR. If
+\fBLC_MESSAGES\fR is not set, the environment variable \fBLANG\fR will be used.
+If \fBLANG\fR is not set, the files containing the strings are in
+\fB/usr/lib/locale/C/LC_MESSAGES/*\fR.
+.sp
+.LP
+The user can also change the language in which the messages are displayed by
+invoking the \fBsetlocale\fR(3C) function with the appropriate arguments.
+.sp
+.LP
+If \fBgettxt()\fR fails to retrieve a message in a specific language it will
+try to retrieve the same message in U.S. English. On failure, the processing
+depends on what the second argument \fIdflt_str\fR points to. A pointer to the
+second argument is returned if the second argument is not the null string. If
+\fIdflt_str\fR points to the null string, a pointer to the U.S. English text
+string \fB"Message not found!!\en"\fR is returned.
+.sp
+.LP
+The following depicts the acceptable syntax of \fImsgid\fR for a call to
+\fBgettxt()\fR.
+.sp
+.LP
+\fI<msgid>\fR\fB = \fR\fI<msgfilename>\fR\fB:\fR\fI<msgnumber>\fR
+.sp
+.LP
+The first field is used to indicate the file that contains the text strings and
+must be limited to 14 characters. These characters must be selected from the
+set of all character values excluding \e0 (null) and the \fBASCII\fR code for
+\fB/\fR (slash) and \fB:\fR (colon). The names of message files must be the
+same as the names of files created by \fBmkmsgs\fR and installed in
+\fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES/*\fR. The numeric field indicates
+the sequence number of the string in the file. The strings are numbered from 1
+to \fIn\fR where \fIn\fR is the number of strings in the file.
+.SH RETURN VALUES
+.sp
+.LP
+Upon failure to pass either the correct \fImsgid\fR or a valid message number
+to  \fBgettxt()\fR, a pointer to the text string \fB"Message not found!!\en"\fR
+is returned.
+.SH USAGE
+.sp
+.LP
+It is recommended that \fBgettext\fR(3C) be used in place of this function.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBgettxt()\fR function.
+.sp
+.LP
+In the following example,
+
+.sp
+.in +2
+.nf
+gettxt("UX:10", "hello world\en")
+gettxt("UX:10", "")
+.fi
+.in -2
+
+.sp
+.LP
+\fBUX\fR is the name of the file that contains the messages and \fB10\fR is the
+message number.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/C/LC_MESSAGES/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+contains  default message files created by \fBmkmsgs\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+contains message files for different languages created by \fBmkmsgs\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexstr\fR(1), \fBmkmsgs\fR(1), \fBsrchtxt\fR(1), \fBgettext\fR(3C),
+\fBfmtmsg\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5)

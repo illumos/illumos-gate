@@ -1,0 +1,114 @@
+'\" te
+.\" Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fread 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fread \- binary input
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBsize_t\fR \fBfread\fR(\fBvoid *\fR\fIptr\fR, \fBsize_t\fR \fIsize\fR, \fBsize_t\fR \fInitems\fR, \fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfread()\fR function reads into the array pointed to by \fIptr\fR up to
+\fInitems\fR elements whose size is specified by \fIsize\fR in bytes, from the
+stream pointed to by \fIstream\fR. For each object, \fIsize\fR calls are made
+to the \fBfgetc\fR(3C) function and the results stored, in the order read, in
+an array of \fBunsigned char\fR exactly overlaying the object. The
+file-position indicator for the stream (if defined) is advanced by the number
+of bytes successfully read. If an error occurs, the resulting value of the
+file-position indicator for the stream is unspecified. If a partial element is
+read, its value is unspecified.
+.sp
+.LP
+The \fBfread()\fR function may mark the \fBst_atime\fR field of the file
+associated with \fIstream\fR for update. The \fBst_atime\fR field will be
+marked for update by the first successful execution of \fBfgetc\fR(3C),
+\fBfgets\fR(3C), \fBfgetwc\fR(3C), \fBfgetws\fR(3C), \fBfread()\fR,
+\fBfscanf\fR(3C), \fBgetc\fR(3C), \fBgetchar\fR(3C), \fBgets\fR(3C), or
+\fBscanf\fR(3C) using \fIstream\fR that returns data not supplied by a prior
+call to \fBungetc\fR(3C) or \fBungetwc\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBfread()\fR returns the number of elements
+successfully read, which is less than \fInitems\fR only if a read error or
+end-of-file is encountered. If \fIsize\fR or \fInitems\fR is 0, \fBfread()\fR
+returns 0 and the contents of the array and the state of the stream remain
+unchanged.  Otherwise, if a read error occurs, the error indicator for the
+stream is set and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+Refer to \fBfgetc\fR(3C).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReading from a Stream
+.sp
+.LP
+The following example reads a single element from the \fIfp\fR stream into the
+array pointed to by \fIbuf\fR.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+\&...
+size_t bytes_read;
+char buf[100];
+FILE *fp;
+\&...
+bytes_read = fread(buf, sizeof(buf), 1, fp);
+\&...
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+The \fBferror()\fR or \fBfeof()\fR functions must be used to distinguish
+between an error condition and end-of-file condition. See \fBferror\fR(3C).
+.sp
+.LP
+Because of possible differences in element length and byte ordering, files
+written using \fBfwrite\fR(3C) are application-dependent, and possibly cannot
+be read using \fBfread()\fR by a different application or by the same
+application on a different processor.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBfclose\fR(3C), \fBferror\fR(3C), \fBfopen\fR(3C),
+\fBgetc\fR(3C), \fBgets\fR(3C), \fBprintf\fR(3C), \fBputc\fR(3C),
+\fBputs\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

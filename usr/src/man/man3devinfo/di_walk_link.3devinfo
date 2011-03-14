@@ -1,0 +1,151 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_walk_link 3DEVINFO "22 Mar 2004" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_walk_link \- traverse libdevinfo links
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldevinfo\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libdevinfo.h>
+
+\fBint\fR \fBdi_walk_link\fR(\fBdi_node_t\fR \fIroot\fR, \fBuint_t\fR \fIflag\fR, \fBuint_t\fR \fIendpoint\fR, \fBvoid *\fR\fIarg\fR,
+     \fBint (*\fR\fIlink_callback\fR)(di_link_t \fIlink\fR, void *\fIarg\fR));
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIroot\fR\fR
+.ad
+.RS 17n
+.rt  
+The handle to the root node of the subtree to visit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 17n
+.rt  
+Specify 0. Reserved for future use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIendpoint\fR\fR
+.ad
+.RS 17n
+.rt  
+Specify if the current node being visited should be the target or source of an
+link, either \fBDI_LINK_TGT\fR or \fBDI_LINK_SRC\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 17n
+.rt  
+A pointer to caller-specific data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlink_callback\fR\fR
+.ad
+.RS 17n
+.rt  
+The caller-supplied callback function.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdi_walk_link()\fR function visits all nodes in the subtree rooted at
+\fIroot\fR.  For each node found, the caller-supplied function
+\fIlink_callback\fR() is invoked for each link associated with that node where
+that node is the specified \fIendpoint\fR of the link.  The return value of
+\fIlink_callback\fR() specifies subsequent walking behavior. See RETURN VALUES.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdi_walk_link()\fR returns 0.  Otherwise, -1 is
+returned and \fBerrno\fR is set to indicate the error.
+.sp
+.LP
+The callback function, \fIlink_callback\fR(), can return one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_WALK_CONTINUE\fR\fR
+.ad
+.RS 21n
+.rt  
+Continue walking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_WALK_TERMINATE\fR\fR
+.ad
+.RS 21n
+.rt  
+Terminate the walk immediately.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The \fBdi_walk_link()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An argument is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)

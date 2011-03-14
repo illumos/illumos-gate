@@ -1,0 +1,232 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_srq_create 3DAT "11 Sep 2006" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_srq_create \- create an instance of a shared receive queue
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_srq_create (
+        IN      DAT_IA_HANDLE       ia_handle,
+        IN      DAT_PZ_HANDLE       pz_handle,
+        IN      DAT_SRQ_ATTR        *srq_attr,
+        OUT     DAT_SRQ_HANDLE      *srq_handle
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIia_handle\fR\fR
+.ad
+.RS 14n
+.rt  
+A handle for an open instance of the IA to which the created SRQ belongs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpz_handle\fR\fR
+.ad
+.RS 14n
+.rt  
+A handle for an instance of the Protection Zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrq_attr\fR\fR
+.ad
+.RS 14n
+.rt  
+A pointer to a structure that contains Consumer-requested SRQ attributes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrq_handle\fR\fR
+.ad
+.RS 14n
+.rt  
+A handle for the created instance of a Shared Receive Queue.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_srq_create()\fR function creates an instance of a Shared Receive
+Queue (SRQ) that is provided to the Consumer as \fIsrq_handle\fR. If the value
+of \fBDAT_RETURN\fR is not \fBDAT_SUCCESS\fR, the value of \fIsrq_handle\fR is
+not defined.
+.sp
+.LP
+The created SRQ is unattached to any Endpoints.
+.sp
+.LP
+The Protection Zone \fIpz_handle\fR allows Consumers to control what local
+memory can be used for the Recv DTO buffers posted to the SRQ. Only memory
+referred to by LMRs of the posted Recv buffers that match the SRQ Protection
+Zone can be accessed by the SRQ.
+.sp
+.LP
+The \fIsrq_attributes\fR argument specifies the initial attributes of the
+created SRQ. If the operation is successful, the created SRQ will have the
+queue size at least \fImax_recv_dtos\fR and the number of entries on the posted
+Recv scatter list of at lease \fImax_recv_iov\fR. The created SRQ can have the
+queue size and support number of entries on post Recv buffers larger than
+requested. Consumer can query SRQ to find out the actual supported queue size
+and maximum Recv IOV.
+.sp
+.LP
+The Consumer must set \fIlow_watermark\fR to \fBDAT_SRQ_LW_DEFAULT\fR to ensure
+that an asynchronous event will not be generated immediately, since there are
+no buffers in the created SRQ. The Consumer should set the Maximum Receive DTO
+attribute and the Maximum number of elements in IOV for posted buffers as
+needed.
+.sp
+.LP
+When an associated EP tries to get a buffer from SRQ and there are no buffers
+available, the behavior of the EP is the same as when there are no buffers on
+the EP Recv Work Queue.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation failed due to resource limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 30n
+.rt  
+Either \fIia_handle\fR or \fIpz_handle\fR is an invalid DAT handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 30n
+.rt  
+One of the parameters is invalid. Either one of the requested SRQ attributes
+was invalid or a combination of attributes is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
+.ad
+.RS 30n
+.rt  
+The requested Model was not supported by the Provider.
+.RE
+
+.SH USAGE
+.sp
+.LP
+SRQ is created by the Consumer prior to creation of the EPs that will be using
+it.  Some Providers might restrict whether multiple EPs that share a SRQ can
+have different Protection Zones. Check the \fIsrq_ep_pz_difference_support\fR
+Provider attribute. The EPs that use SRQ might or might not use the same
+\fIrecv_evd\fR.
+.sp
+.LP
+Since a Recv buffer of SRQ can be used by any EP that is using SRQ, the
+Consumer should ensure that the posted Recv buffers are large enough to receive
+an incoming message on any of the EPs.
+.sp
+.LP
+If Consumers do not want to receive an asynchronous event when the number of
+buffers in SRQ falls below the Low Watermark, they should leave its value as
+\fBDAT_SRQ_LW_DEFAULT\fR. If Consumers do want to receive a notification, they
+can set the value to the desired one by calling \fBdat_srq_set_lw\fR(3DAT).
+.sp
+.LP
+SRQ allows the Consumer to use fewer Recv buffers then posting the maximum
+number of buffers for each connection. If the Consumer can upper bound the
+number of incoming messages over all connections whose local EP is using SRQ,
+then instead of posting this maximum for each connection the Consumer can post
+them for all connections on SRQ. For example, the maximum utilized link
+bandwidth divided over the message size can be used for an upper bound.
+.sp
+.LP
+Depending on the underlying Transport, one or more messages can arrive
+simultaneously on an EP that is using SRQ. Thus, the same EP can have multiple
+Recv buffers in its possession without these buffers being on SRQ or
+\fIrecv_evd\fR.
+.sp
+.LP
+Since Recv buffers can be used by multiple connections of the local EPs that
+are using SRQ, the completion order of the Recv buffers is no longer guaranteed
+even when they use of the same \fIrecv_evd\fR. For each connection the Recv
+buffers completion order is guaranteed to be in the order of the posted
+matching Sends to the other end of the connection.  There is no ordering
+guarantee that Receive buffers will be returned in the order they were posted
+even if there is only a single connection (Endpoint) associated with the SRQ.
+There is no ordering guarantee between different connections or between
+different \fIrecv_evd\fRs.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.2
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdat_srq_free\fR(3DAT), \fBdat_srq_post_recv\fR(3DAT),
+\fBdat_srq_query\fR(3DAT), \fBdat_srq_resize\fR(3DAT),
+\fBdat_srq_set_lw\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)

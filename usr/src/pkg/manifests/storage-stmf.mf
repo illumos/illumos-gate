@@ -52,6 +52,10 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man3lib
+dir path=usr/share/man/man3stmf
 driver name=fct perms="* 0666 root sys"
 driver name=pppt perms="* 0666 root sys"
 driver name=qlt perms="* 0666 root sys"
@@ -105,6 +109,52 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/stmf.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/stmf_sbd.so group=sys mode=0555
 file path=usr/sbin/sbdadm mode=0555
 file path=usr/sbin/stmfadm mode=0555
+file path=usr/share/man/man1m/sbdadm.1m
+file path=usr/share/man/man1m/stmfadm.1m
+file path=usr/share/man/man3lib/libstmf.3lib
+file path=usr/share/man/man3stmf/stmfAddToHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfAddToTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfAddViewEntry.3stmf
+file path=usr/share/man/man3stmf/stmfClearProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfCreateHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfCreateLu.3stmf
+file path=usr/share/man/man3stmf/stmfCreateLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfCreateTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteLu.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDevidFromIscsiName.3stmf
+file path=usr/share/man/man3stmf/stmfDevidFromWwn.3stmf
+file path=usr/share/man/man3stmf/stmfFreeLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfFreeMemory.3stmf
+file path=usr/share/man/man3stmf/stmfGetHostGroupList.3stmf
+file path=usr/share/man/man3stmf/stmfGetHostGroupMembers.3stmf
+file path=usr/share/man/man3stmf/stmfGetLogicalUnitList.3stmf
+file path=usr/share/man/man3stmf/stmfGetLogicalUnitProperties.3stmf
+file path=usr/share/man/man3stmf/stmfGetLuProp.3stmf
+file path=usr/share/man/man3stmf/stmfGetLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfGetPersistMethod.3stmf
+file path=usr/share/man/man3stmf/stmfGetProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfGetProviderDataProt.3stmf
+file path=usr/share/man/man3stmf/stmfGetState.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetGroupList.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetGroupMembers.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetList.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetProperties.3stmf
+file path=usr/share/man/man3stmf/stmfGetViewEntryList.3stmf
+file path=usr/share/man/man3stmf/stmfModifyLu.3stmf
+file path=usr/share/man/man3stmf/stmfModifyLuByFname.3stmf
+file path=usr/share/man/man3stmf/stmfOfflineLogicalUnit.3stmf
+file path=usr/share/man/man3stmf/stmfOfflineTarget.3stmf
+file path=usr/share/man/man3stmf/stmfOnlineLogicalUnit.3stmf
+file path=usr/share/man/man3stmf/stmfOnlineTarget.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveFromHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveFromTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveViewEntry.3stmf
+file path=usr/share/man/man3stmf/stmfSetLuProp.3stmf
+file path=usr/share/man/man3stmf/stmfSetPersistMethod.3stmf
+file path=usr/share/man/man3stmf/stmfSetProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfSetProviderDataProt.3stmf
 legacy pkg=SUNWstmf desc="Sun Common Multiprotocol SCSI Target device drivers" \
     name="Sun Common Multiprotocol SCSI Target"
 legacy pkg=SUNWstmfu \

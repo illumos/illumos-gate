@@ -1,0 +1,229 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_write 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_write \- asynchronous write to a file
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_write\fR(\fBstruct aiocb *\fR\fIaiocbp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_write()\fR function allows the calling process to write
+\fIaiocbp\fR\(->\fBaio_nbytes\fR to the file associated with
+\fIaiocbp\fR\(->\fBaio_fildes\fR from the buffer pointed to by
+\fIaiocbp\fR\(->\fBaio_buf\fR. The function call returns when the write request
+has been initiated or, at a minimum, queued to the file or device. If
+\fB_POSIX_PRIORITIZED_IO\fR is defined and prioritized I/O is supported for
+this file, then the asynchronous operation is submitted at a priority equal to
+the scheduling priority of the process minus \fIaiocbp\fR\(->\fBaio_reqprio\fR.
+The \fIaiocbp\fR may be used as an argument to \fBaio_error\fR(3C) and
+\fBaio_return\fR(3C) in order to determine the error status and return status,
+respectively, of the asynchronous operation while it is proceeding.
+.sp
+.LP
+The \fIaiocbp\fR argument points to an \fBaiocb\fR structure. If the buffer
+pointed to by \fIaiocbp\fR\(->\fBaio_buf\fR or the control block pointed to by
+\fIaiocbp\fR becomes an illegal address prior to asynchronous I/O completion,
+then the behavior is undefined.
+.sp
+.LP
+If \fBO_APPEND\fR is not set for the file descriptor \fIaio_fildes\fR, then the
+requested operation takes place at the absolute position in the file as given
+by \fIaio_offset\fR, as if \fBlseek\fR(2) were called immediately prior to the
+operation with an \fIoffset\fR equal to \fIaio_offset\fR and a \fIwhence\fR
+equal to \fBSEEK_SET\fR. If \fBO_APPEND\fR is set for the file descriptor,
+write operations append to the file in the same order as the calls were made.
+After a successful call to enqueue an asynchronous I/O operation, the value of
+the file offset for the file is unspecified.
+.sp
+.LP
+The \fIaiocbp\fR\(->\fBaio_sigevent\fR structure defines what asynchronous
+notification is to occur when the asynchronous operation completes, as
+specified in \fBsignal.h\fR(3HEAD).
+.sp
+.LP
+The \fIaiocbp\fR\(->\fBaio_lio_opcode\fR field is ignored by \fBaio_write()\fR.
+.sp
+.LP
+Simultaneous asynchronous operations using the same \fIaiocbp\fR produce
+undefined results.
+.sp
+.LP
+If \fB_POSIX_SYNCHRONIZED_IO\fR is defined and synchronized I/O is enabled on
+the file associated with \fIaiocbp\fR\(->\fBaio_fildes\fR, the behavior of this
+function shall be according to the definitions of synchronized I/O data
+integrity completion and synchronized I/O file integrity completion.
+.sp
+.LP
+For any system action that changes the process memory space while an
+asynchronous I/O is outstanding to the address range being changed, the result
+of that action is undefined.
+.sp
+.LP
+For regular files, no data transfer will occur past the offset maximum
+established in the open file description associated with
+\fIaiocbp\fR\(->\fBaio_fildes\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBaio_write()\fR function returns \fB0\fR to the calling process if the
+I/O operation is successfully queued; otherwise, the function returns
+\fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBaio_write()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested asynchronous I/O operation was not queued due to system resource
+limitations.
+.RE
+
+.sp
+.LP
+Each of the following conditions may be detected synchronously at the time of
+the call to \fBaio_write()\fR, or asynchronously. If any of the conditions
+below are detected synchronously, the \fBaio_write()\fR function returns
+\fB\(mi1\fR and sets \fBerrno\fR to the corresponding value. If any of the
+conditions below are detected asynchronously, the return status of the
+asynchronous operation is set to \fB\(mi1\fR, and the error status of the
+asynchronous operation will be set to the corresponding value.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaiocbp\fR\(->\fBaio_fildes\fR argument is not a valid file descriptor
+open for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The file offset value implied by \fIaiocbp\fR->\fBaio_offset\fR would be
+invalid, \fIaiocbp->\fR\fBaio_reqprio\fR is not a valid value, or
+\fIaiocbp\fR\(->\fBaio_nbytes\fR is an invalid value.
+.RE
+
+.sp
+.LP
+In the case that the \fBaio_write()\fR successfully queues the I/O operation,
+the return status of the asynchronous operation will be one of the values
+normally returned by the \fBwrite\fR(2) function call. If the operation is
+successfully queued but is subsequently canceled or encounters an error, the
+error status for the asynchronous operation contains one of the values normally
+set by the \fBwrite()\fR function call, or one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIaiocbp\fR\(->\fBaio_fildes\fR argument is not a valid file descriptor
+open for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The file offset value implied by \fIaiocbp\fR->\fBaio_offset\fR would be
+invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECANCELED\fR\fR
+.ad
+.RS 13n
+.rt  
+The requested I/O was canceled before the I/O completed due to an explicit
+\fBaio_cancel\fR(3C) request.
+.RE
+
+.sp
+.LP
+The following condition may be detected synchronously or asynchronously:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 9n
+.rt  
+The file is a regular file, \fIaiobcp\fR\(->\fBaio_nbytes\fR is greater than 0
+and the starting offset in \fIaiobcp\fR\(->\fBaio_offset\fR is at or beyond the
+offset maximum in the open file description associated with
+\fIaiocbp\fR\(->\fBaio_fildes\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaio_write()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaio_cancel\fR(3C), \fBaio_error\fR(3C), \fBaio_read\fR(3C),
+\fBaio_return\fR(3C), \fBlio_listio\fR(3C), \fBclose\fR(2), \fB_Exit\fR(2),
+\fBfork\fR(2), \fBlseek\fR(2), \fBwrite\fR(2), \fBaio.h\fR(3HEAD),
+\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

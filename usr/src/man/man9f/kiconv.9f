@@ -1,0 +1,326 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kiconv 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+kiconv \- buffer-based code conversion function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+
+
+
+\fBsize_t\fR \fBkiconv\fR(\fBkiconv_t\fR \fIcd\fR, \fBchar **\fR\fIinbuf\fR, \fBsize_t *\fR\fIinbytesleft\fR, 
+     \fBchar **\fR\fIoutbuf\fR, \fBsize_t *\fR\fIoutbytesleft\fR, \fBint *\fR\fIerrno\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+The parameters for the \fBkiconv\fR function are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcd\fR\fR
+.ad
+.RS 16n
+.rt  
+Code conversion descriptor indicating the code conversion and conversion state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinbuf\fR\fR
+.ad
+.RS 16n
+.rt  
+Points to an address of a buffer containing a sequence of character bytes in
+\fBfromcode\fR codeset to be converted. After the conversion, the variable is
+updated to point to the byte following the last byte that was successfully used
+in the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinbytesleft\fR\fR
+.ad
+.RS 16n
+.rt  
+As an input parameter, the number of bytes to be converted in \fIinbuf\fR. As
+an output parameter, the number of bytes in \fIinbuf\fR still not converted
+after the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutbuf\fR\fR
+.ad
+.RS 16n
+.rt  
+Points to an address of a buffer where converted character bytes in
+\fBtocode\fR codeset can be saved. After the conversion, the variable is
+updated to point to the byte following the last byte of converted output data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutbytesleft\fR\fR
+.ad
+.RS 16n
+.rt  
+As an input parameter, the number of available bytes at \fIoutbuf\fR where
+converted character bytes can be saved. As an output parameter, the number of
+bytes still available at \fIoutbuf\fR after the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrno\fR\fR
+.ad
+.RS 16n
+.rt  
+Indicates the error when conversion is not completed or failed. The following
+are possible values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to an input byte that does not belong to
+the input codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to lack of space in the output buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to an incomplete character or shift
+sequence at the end of the input buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIcd\fR input parameter is not a valid open code conversion descriptor.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkiconv()\fR function converts the sequence of characters from one
+\fBcodeset\fR, in the array specified by \fIinbuf\fR, into a sequence of
+corresponding characters in another \fBcodeset\fR, in the array specified by
+\fIoutbuf\fR. The \fBcodesets\fR are those specified in the \fBkiconv_open()\fR
+call that returned the code conversion descriptor, \fIcd\fR. The \fIinbuf\fR
+parameter points to a variable that points to the first character in the input
+buffer and \fIinbytesleft\fR indicates the number of bytes to the end of the
+buffer to be converted. The \fIoutbuf\fR parameter points to a variable that
+points to the first available byte in the output buffer and \fIoutbytesleft\fR
+indicates the number of the available bytes to the end of the buffer.
+.sp
+.LP
+For state-dependent encodings, the conversion descriptor \fIcd\fR is placed
+into its initial shift state by a call for which \fIinbuf\fR is a null pointer,
+or for which \fIinbuf\fR points to a null pointer. When \fBkiconv()\fR is
+called in this way, and if \fIoutbuf\fR is not a null pointer or a pointer to a
+null pointer, and \fIoutbytesleft\fR points to a positive value, \fBkiconv()\fR
+places, if any, into the output buffer, the byte sequence to change the output
+buffer to its initial shift state. If the output buffer is not large enough to
+hold the entire reset sequence, \fBkiconv()\fR fails and sets \fIerrno\fR to
+\fBE2BIG\fR. Subsequent calls with \fIinbuf\fR as other than a null pointer or
+a pointer to a null pointer cause the conversion to take place from the current
+state of the conversion descriptor.
+.sp
+.LP
+If a sequence of input bytes does not form a valid character in the specified
+\fBcodeset\fR, conversion stops after the previous successfully converted
+character. If the input buffer ends with an incomplete character or shift
+sequence, conversion stops after the previous successfully converted bytes. If
+the output buffer is not large enough to hold the entire converted input,
+conversion stops just prior to the input bytes that would cause the output
+buffer to overflow. The variable pointed to by \fIinbuf\fR is updated to point
+to the byte following the last byte that was successfully used in the
+conversion. The value pointed to by \fIinbytesleft\fR is decremented to reflect
+the number of bytes still not converted in the input buffer. The variable
+pointed to by \fIoutbuf\fR is updated to point to the byte following the last
+byte of converted output data. The value pointed to by \fIoutbytesleft\fR is
+decremented to reflect the number of bytes still available in the output
+buffer. For state-dependent encodings, the conversion descriptor is updated to
+reflect the shift state in effect at the end of the last successfully converted
+byte sequence.
+.sp
+.LP
+If \fBkiconv()\fR encounters a character in the input buffer that is legal, but
+for which an identical character does not exist in the target \fBcodeset\fR,
+\fBkiconv()\fR performs an implementation-defined conversion (that is, a
+non-identical conversion) on this character.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBkiconv()\fR function updates the variables pointed to by the parameters
+to reflect the extent of the conversion and returns the number of non-identical
+conversions performed. If the entire string in the input buffer is converted,
+the value pointed to by \fIinbytesleft\fR is 0. If the input conversion is
+stopped due to any conditions mentioned above, the value pointed to by
+\fIinbytesleft\fR is non-zero and \fIerrno\fR is set to indicate the condition.
+If such and other error occurs, \fBkiconv()\fR returns (\fBsize_t\fR)-1 and
+sets \fIerrno\fR to indicate the error.
+.SH CONTEXT
+.sp
+.LP
+\fBkiconv()\fR can be called from user or interrupt context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPerforming a Simple Conversion
+.sp
+.LP
+The following example shows how to perform a simple conversion using
+\fBkiconv()\fR with a limited size of output buffer:
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+
+int
+doconversion(char *fromcode, char *tocode, char *inbuf, char *outbuf,
+                size_t inlen, size_t *outlen)
+{
+        kiconv_t cd;
+        size_t ileft, ret;
+        int err;
+
+        cd = kiconv_open((const char *)tocode, (const char *)fromcode);
+        if (cd == (kiconv_t)-1) {
+               /* Cannot open conversion. */
+               return (-1);
+        }
+
+        ret = kiconv(cd, &inbuf, &inlen, &outbuf, outlen, &err);
+        if (ret == (size_t)-1)
+                goto doconv_error_return;
+
+        /*
+         * Reset the conversion descriptor. This will also
+         * make sure to write to output buffer any saved bytes
+         * in the conversion descriptor state.
+         */
+        ileft = 0;
+        ret = kiconv(cd, (char *)NULL, &ileft, &outbuf, outlen, &err);
+        if (ret == (size_t)-1)
+                goto doconv_error_return;
+
+        (void) kiconv_close(cd);
+
+        return (0);
+
+doconv_error_return:
+        (void) kiconv_close(cd);
+
+        /* Need more output buffer. */
+        if (err == E2BIG)
+                return (-2);
+
+        /* Illegal sequence? */
+        if (err == EILSEQ)
+                return (-3);
+
+        /* Incomplete character? */
+        if (err == EINVAL)
+                return (-4);
+
+        /*
+         * Bad code conversion descriptor or any other unknown error.
+         */
+        return (-5);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBiconv_open\fR(3C),
+\fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
+\fBuconv_u16tou32\fR(3C), \fBuconv_u16tou8\fR(3C), \fBuconv_u32tou16\fR(3C),
+\fBuconv_u32tou8\fR(3C), \fBuconv_u8tou16\fR(3C), \fBuconv_u8tou32\fR(3C),
+\fBattributes\fR(5), \fBkiconvstr\fR(9F), \fBkiconv_close\fR(9F),
+\fBkiconv_open\fR(9F), \fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F),
+\fBu8_validate\fR(9F), \fBuconv_u16tou32\fR(9F), \fBuconv_u16tou8\fR(9F),
+\fBuconv_u32tou16\fR(9F), \fBuconv_u32tou8\fR(9F), \fBuconv_u8tou16\fR(9F),
+\fBuconv_u8tou32\fR(9F)
+.sp
+.LP
+The Unicode Standard:
+.sp
+.LP
+http://www.unicode.org/standard/standard.html
+.SH NOTES
+.sp
+.LP
+The \fBiconv\fR(3C) man page also has a good example code that can be
+referenced.

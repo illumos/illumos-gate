@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH net_kstat_delete 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+net_kstat_delete \- remove a kstat for a specific instance of IP from the
+system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/neti.h>
+
+\fBvoid\fR \fBnet_kstat_delete\fR(\fBnetid_t\fR \fInetid\fR, \fBkstat_t\fR *\fIksp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInetid\fR\fR
+.ad
+.RS 9n
+.rt  
+\fBIP\fR instance identifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIksp\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to a currently installed \fBkstat\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnet_kstat_delete()\fR function removes \fIksp\fR from the \fBkstat\fR
+chain and frees all associated system resources. See \fBkstat_delete\fR(9F) for
+a complete discussion of this function.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBnet_kstat_delete()\fR returns a pointer to the allocated
+\fBkstat\fR. \fINULL\fR is returned upon failure.
+.SH CONTEXT
+.sp
+.LP
+The \fBnet_kstat_delete()\fR function may be called from user,  kernel, or
+interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F), \fBkstat_delete\fR(9F), \fBnet_kstat_create\fR(9F),
+\fBhook_t\fR(9S), \fBkstat_named\fR(9S)

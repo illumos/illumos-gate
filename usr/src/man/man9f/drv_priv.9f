@@ -1,0 +1,65 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH drv_priv 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+drv_priv \- determine driver privilege
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+
+
+
+\fBint\fR \fBdrv_priv\fR(\fBcred_t *\fR\fIcr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcr\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the user credential structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdrv_priv()\fR function provides a general interface to the system
+privilege policy. It determines whether the credentials supplied by the user
+credential structure pointed to by \fIcr\fR identify a process that has the
+\fB{PRIV_SYS_DEVICES}\fR privilege asserted in its effective set. This function
+should be used only when file access modes, special minor device numbers, and
+the device policy (see \fBprivileges\fR(5), \fBadd_drv\fR(1M)) are insufficient
+to provide protection for the requested driver function. It is intended to
+replace all calls to \fBsuser()\fR and any explicit checks for effective user
+ID = 0 in driver code.
+.SH RETURN VALUES
+.sp
+.LP
+This routine returns \fB0\fR if it succeeds, \fBEPERM\fR if it fails.
+.SH CONTEXT
+.sp
+.LP
+The \fBdrv_priv()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBadd_drv\fR(1M), \fBupdate_drv\fR(1M), \fBprivileges\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

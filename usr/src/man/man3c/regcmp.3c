@@ -1,0 +1,225 @@
+'\" te
+.\" Copyright 1989 AT&T Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH regcmp 3C "14 Nov 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+regcmp, regex \- compile and execute regular expression
+.SH SYNOPSIS
+.LP
+.nf
+#include <libgen.h>
+
+\fBchar *\fR\fBregcmp\fR(\fBconst char *\fR\fIstring1\fR, /* \fBchar *\fR\fIstring2\fR */ ...,
+     \fBint\fR /*(\fBchar*\fR)0*/);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBregex\fR(\fBconst char *\fR\fIre\fR, \fBconst char *\fR\fIsubject\fR,
+     /* \fBchar *\fR\fIret0\fR */ ...);
+.fi
+
+.LP
+.nf
+extern char *__loc1;
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBregcmp()\fR function compiles a regular expression (consisting of the
+concatenated arguments) and returns a pointer to the compiled form.  The
+\fBmalloc\fR(3C) function is used to create space for the compiled form. It is
+the user's responsibility to free unneeded space so allocated. A \fINULL\fR
+return from \fBregcmp()\fR indicates an incorrect argument. \fBregcmp\fR(1) has
+been written to generally preclude the need for this routine at execution time.
+.sp
+.LP
+The \fBregex()\fR function executes a compiled pattern against the subject
+string. Additional arguments are passed to receive values back.  The
+\fBregex()\fR function returns \fINULL\fR on failure or a pointer to the next
+unmatched character on success. A global character pointer \fB__loc1\fR points
+to where the match began.  The \fBregcmp()\fR and \fBregex()\fR functions were
+mostly borrowed from the editor \fBed\fR(1); however, the syntax and semantics
+have been changed slightly. The following are the valid symbols and associated
+meanings.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\|]\|*\|.^\fR\fR
+.ad
+.RS 18n
+.rt  
+This group of symbols retains its meaning as described on the \fBregexp\fR(5)
+manual page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fR
+.ad
+.RS 18n
+.rt  
+Matches the end of the string; \fB\en\fR matches a newline.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 18n
+.rt  
+Within brackets the minus means \fIthrough\fR. For example, \fB[a\(miz]\fR is
+equivalent to \fB[abcd\|.\|.\|.xyz]\fR. The \fB\(mi\fR can appear as itself
+only if used as the first or last character. For example, the character class
+expression \fB[]\(mi]\fR matches the characters \fB]\fR and \fB\(mi\fR\&.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 18n
+.rt  
+A regular expression followed by \fB+\fR means \fIone or more times\fR. For
+example, \fB[0\(mi9]+\fR is equivalent to \fB[0\(mi9][0\(mi9]*.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB{\fR\fIm\fR} {\fIm,\fR} {\fIm,u\fR}\fR
+.ad
+.RS 18n
+.rt  
+Integer values enclosed in \fB{\|}\fR indicate the number of times the
+preceding regular expression is to be applied. The value \fIm\fR is the minimum
+number and \fIu\fR is a number, less than 256, which is the maximum. If only
+\fIm\fR is present (that is, \fB{\fR\fIm\fR\fB}\fR), it indicates the exact
+number of times the regular expression is to be applied. The value
+\fB{\fR\fIm\fR\fB,}\fR is analogous to \fB{\fR\fIm,infinity\fR\fB}\fR. The plus
+(\fB+\fR) and star (\fB*\fR) operations are equivalent to \fB{1,}\fR and
+\fB{0,}\fR respectively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB( ... )$\fR\fIn\fR\fR
+.ad
+.RS 18n
+.rt  
+The value of the enclosed regular expression is to be returned. The value will
+be stored in the (\fIn\fR+1)th argument following the subject argument. At
+most, ten enclosed regular expressions are allowed. The \fBregex()\fR function
+makes its assignments unconditionally.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB( ... )\fR\fR
+.ad
+.RS 18n
+.rt  
+Parentheses are used for grouping. An operator, for example, \fB*\fR, \fB+\fR,
+\fB{\|}\fR, can work on a single character or a regular expression enclosed in
+parentheses. For example, \fB(a*(cb+)*)$0\fR. By necessity, all the above
+defined symbols are special. They must, therefore, be escaped with a \fB\e\fR
+(backslash)  to be used as themselves.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample matching a leading newline in the subject string.
+.sp
+.LP
+The following example matches a leading newline in the subject string pointed
+at by cursor.
+
+.sp
+.in +2
+.nf
+char *cursor, *newcursor, *ptr;
+	.\|.\|.
+newcursor = regex((ptr = regcmp("^\en", (char *)0)), cursor);
+free(ptr);
+.fi
+.in -2
+
+.sp
+.LP
+The following example matches through the string \fBTesting3\fR and returns the
+address of the character after the last matched character  (the ``\fB4\fR'').
+The string \fBTesting3\fR is copied to the character array \fBret0\fR.
+
+.sp
+.in +2
+.nf
+char ret0[9];
+char *newcursor, *name;
+	.\|.\|.
+name = regcmp("([A\(miZa\(miz][A\(miza\(miz0\(mi9]{0,7})$0", (char *)0);
+newcursor = regex(name, "012Testing345", ret0);
+.fi
+.in -2
+
+.sp
+.LP
+The following example applies a precompiled regular expression in \fBfile.i\fR
+(see \fBregcmp\fR(1)) against \fIstring\fR.
+
+.sp
+.in +2
+.nf
+\fB#include "file.i"
+char *string, *newcursor;
+	.\|.\|.
+newcursor = regex(name, string);\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBregcmp\fR(1), \fBmalloc\fR(3C), \fBattributes\fR(5),
+\fBregexp\fR(5)
+.SH NOTES
+.sp
+.LP
+The user program may run out of memory if \fBregcmp()\fR is called iteratively
+without freeing the vectors no longer required.
+.sp
+.LP
+When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multithreaded
+applications.

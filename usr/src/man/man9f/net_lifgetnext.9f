@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH net_lifgetnext 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+net_lifgetnext \- search through a list of logical network interfaces
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/neti.h>
+
+\fBnet_if_t\fR \fBnet_lifgetnext\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBconst\fR \fBphy_if_t\fR \fIifp\fR, 
+     \fBnet_if_t\fR \fIlif\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInet\fR\fR
+.ad
+.RS 7n
+.rt  
+value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIifp\fR\fR
+.ad
+.RS 7n
+.rt  
+value returned from a successful call to \fBnet_phylookup\fR(9F) or
+\fBnet_phygetnext\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlif\fR\fR
+.ad
+.RS 7n
+.rt  
+value returned from a successful call to this function.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnet_lifgetnext()\fR function is used to search through all of the
+logical interfaces that are associated with a physical network interface. To
+start searching through this list, a value of 0 should be passed through as the
+value of \fBlif\fR. When 0 is returned by this function, the last of the
+interfaces owned by this protocol has been reached.
+.sp
+.LP
+When called successfully, the value returned represents a logical interface
+that exists, at the time of the call, within the scope of the network interface
+and its assigned network protocol. This value is only guaranteed to be unique
+for a name within the scope of the network interface and its assigned protocol.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+   net_data_t net;
+    phy_if_t ifp;
+    net_if_t lif;
+    char buffer[32];
+    net_ifaddr_t atype[1];
+    struct sockaddr_in sin[1];
+
+    net = net_protocol_lookup("inet");
+
+    if (net != NULL) {
+         atype[0] = NA_ADDRESS;
+         ifp = net_phylookup(net, "hme0");
+         for (lif = net_lifgetnext(net, 0); lif != 0;
+               lif = net_lifgetnext(net, lif)) {
+               /* Do something with lif */
+               if (net_getlifaddr(net, ifp, lif, 1, atype, sin) == 0)
+                     printf("hme0:%d %x0, lif,
+                         ntohl(sin[0].sin_addr.s_addr));
+          }
+      }
+.fi
+.in -2
+.sp
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBnet_lifgetnext()\fR function returns a value of -1 if it is not
+supported by the network protocol and a value of 0 if an attempt to go beyond
+the last network interface is made. Otherwise, it returns a value representing
+a network interface.
+.SH CONTEXT
+.sp
+.LP
+The \fBnet_lifgetnext()\fR function may be called from user,  kernel, or
+interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnet_phygetnext\fR(9F), \fBnet_phylookup\fR(9F)

@@ -1,0 +1,442 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_value_create 3SCF "28 May 2009" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_value_create, scf_value_handle, scf_value_reset, scf_value_destroy,
+scf_value_type, scf_value_base_type, scf_value_is_type, scf_type_base_type,
+scf_value_get_boolean, scf_value_get_count, scf_value_get_integer,
+scf_value_get_time, scf_value_get_astring, scf_value_get_ustring,
+scf_value_get_opaque, scf_value_get_as_string, scf_value_get_as_string_typed,
+scf_value_set_boolean, scf_value_set_count, scf_value_set_integer,
+scf_value_set_time, scf_value_set_from_string, scf_value_set_astring,
+scf_value_set_ustring, scf_value_set_opaque \- manipulate values in the Service
+Configuration Facility
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBscf_value_t *\fR\fBscf_value_create\fR(\fBscf_handle_t *\fR\fIh\fR);
+.fi
+
+.LP
+.nf
+\fBscf_handle_t *\fR\fBscf_value_handle\fR(\fBscf_value_t *\fR\fIv\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_value_reset\fR(\fBscf_value_t *\fR\fIv\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_value_destroy\fR(\fBscf_value_t *\fR\fIv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_type\fR(\fBscf_value_t *\fR\fIv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_base_type\fR(\fBscf_value_t *\fR\fIv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_is_type\fR(\fBscf_value_t *\fR\fIv\fR, \fBscf_type_t\fR \fItype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_type_base_type\fR(\fBscf_type_t\fR \fItype\fR, \fBscf_type_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_get_boolean\fR(\fBscf_value_t *\fR\fIv\fR, \fBuint8_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_get_count\fR(\fBscf_value_t *\fR\fIv\fR, \fBuint64_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_get_integer\fR(\fBscf_value_t *\fR\fIv\fR, \fBint64_t *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_get_time\fR(\fBscf_value_t *\fR\fIv\fR, \fBint64_t *\fR\fIseconds\fR,
+     \fBint32_t *\fR\fIns\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_value_get_astring\fR(\fBscf_value_t *\fR\fIv\fR, \fBchar *\fR\fIbuf\fR,
+     \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_value_get_ustring\fR(\fBscf_value_t *\fR\fIv\fR, \fBchar *\fR\fIbuf\fR,
+     \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_value_get_opaque\fR(\fBscf_value_t *\fR\fIv\fR, \fBchar *\fR\fIout\fR,
+     \fBsize_t\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_value_get_as_string\fR(\fBscf_value_t *\fR\fIv\fR, \fBchar *\fR\fIbuf\fR,
+     \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_value_get_as_string_typed\fR(\fBscf_value_t *\fR\fIv\fR,
+     \fBscf_type_t\fR \fItype\fR, \fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_value_set_boolean\fR(\fBscf_value_t *\fR\fIv\fR, \fBuint8_t\fR \fIin\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_value_set_count\fR(\fBscf_value_t *\fR\fIv\fR, \fBuint64_t\fR \fIin\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_value_set_integer\fR(\fBscf_value_t *\fR\fIv\fR, \fBint64_t\fR \fIin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_set_time\fR(\fBscf_value_t *\fR\fIv\fR, \fBint64_t\fR \fIseconds\fR,
+     \fBint32_t\fR \fIns\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_set_from_string\fR(\fBscf_value_t *\fR\fIv\fR, \fBscf_type_t\fR \fItype\fR,
+     \fBchar *\fR\fIin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_set_astring\fR(\fBscf_value_t *\fR\fIv\fR, \fBconst char *\fR\fIin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_set_ustring\fR(\fBscf_value_t *\fR\fIv\fR, \fBconst char *\fR\fIin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_value_set_opaque\fR(\fBscf_value_t *\fR\fIv\fR, \fBvoid *\fR\fIin\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_value_create()\fR function creates a new, reset \fBscf_value_t\fR
+that holds a single typed value. The value can be used only with the handle
+specified by \fIh\fR and objects associated with \fIh\fR.
+.sp
+.LP
+The \fBscf_value_reset()\fR function resets the value to the uninitialized
+state. The \fBscf_value_destroy()\fR function deallocates the object.
+.sp
+.LP
+The \fBscf_value_type()\fR function retrieves the type of the contents of
+\fIv\fR. The \fBscf_value_is_type()\fR function determines if a value is of a
+particular type or any of its subtypes. The \fBscf_type_base_type()\fR function
+returns the base type of \fItype\fR. The \fBscf_value_base_type()\fR function
+returns the true base type of the value (the highest type reachable from the
+value's type).
+.sp
+
+.sp
+.TS
+tab();
+cw(1.8i) cw(.84i) cw(2.86i) 
+lw(1.8i) lw(.84i) lw(2.86i) 
+.
+Type IdentifierBase TypeType Description
+_
+\fBSCF_TYPE_INVALID\fRreserved invalid type
+\fBSCF_TYPE_BOOLEAN\fRsingle bit
+\fBSCF_TYPE_COUNT\fRunsigned 64-bit quantity
+\fBSCF_TYPE_INTEGER\fRsigned 64-bit quantity
+\fBSCF_TYPE_TIME\fRT{
+signed 64-bit seconds, signed 32-bit nanoseconds in the range 0 <= \fIns\fR < 1,000,000,000
+T}
+\fBSCF_TYPE_ASTRING\fR8-bit NUL-terminated string
+\fBSCF_TYPE_OPAQUE\fRopaque 8-bit data
+\fBSCF_TYPE_USTRING\fR\fBASTRING\fR8-bit UTF-8 string
+\fBSCF_TYPE_URI\fR\fBUSTRING\fRa URI string
+\fBSCF_TYPE_FMRI\fR\fBURI\fRa Fault Management Resource Identifier
+\fBSCF_TYPE_HOST\fR\fBUSTRING\fRT{
+either a hostname, IPv4 address, or IPv6 address
+T}
+\fBSCF_TYPE_HOSTNAME\fR\fBHOST\fRa fully-qualified domain name
+\fBSCF_TYPE_NET_ADDR_V4\fR\fBHOST\fRT{
+a dotted-quad IPv4 address with optional network portion
+T}
+\fBSCF_TYPE_NET_ADDR_V6\fR\fBHOST\fRlegal IPv6 address
+.TE
+
+.sp
+.LP
+The \fBscf_value_get_boolean()\fR, \fBscf_value_get_count()\fR,
+\fBscf_value_get_integer()\fR, \fBscf_value_get_time()\fR,
+\fBscf_value_get_astring()\fR, \fBscf_value_get_ustring()\fR, and
+\fBscf_value_get_opaque()\fR functions read a particular type of value from
+\fIv\fR.
+.sp
+.LP
+The \fBscf_value_get_as_string()\fR and \fBscf_value_get_as_string_typed()\fR
+functions convert the value to a string form. For
+\fBscf_value_get_as_string_typed()\fR, the value must be a reachable subtype of
+\fItype\fR.
+.sp
+.LP
+The \fBscf_value_set_boolean()\fR, \fBscf_value_set_count()\fR,
+\fBscf_value_set_integer()\fR, \fBscf_value_set_time()\fR,
+\fBscf_value_set_astring()\fR, \fBscf_value_set_ustring()\fR, and
+\fBscf_value_set_opaque()\fR functions set \fIv\fR to a particular value of a
+particular type.
+.sp
+.LP
+The \fBscf_value_set_from_string()\fR function is the inverse of
+\fBscf_value_get_as_string()\fR. It sets \fIv\fR to the value encoded in
+\fIbuf\fR of type \fItype\fR.
+.sp
+.LP
+The \fBscf_value_set_*()\fR functions will succeed on \fBscf_value_t\fR objects
+that have already been set.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_value_create()\fR returns a new, reset
+\fBscf_value_t\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_value_handle()\fR returns the handle
+associated with \fIv\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+The \fBscf_value_base_type()\fR function returns the base type of the value, or
+\fBSCF_TYPE_INVALID\fR on failure.
+.sp
+.LP
+Upon successful completion, \fBscf_value_type()\fR returns the type of the
+value. Otherwise, it returns \fBSCF_TYPE_INVALID\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_value_is_type()\fR,
+\fBscf_value_get_boolean()\fR, \fBscf_value_get_count()\fR,
+\fBscf_value_get_integer()\fR, \fBscf_value_get_time()\fR,
+\fBscf_value_set_time()\fR, \fBscf_value_set_from_string()\fR,
+\fBscf_value_set_astring()\fR, \fBscf_value_set_ustring()\fR, and
+\fBscf_value_set_opaque()\fR return 0. Otherwise, they return -1.
+.sp
+.LP
+Upon successful completion, \fBscf_value_get_astring()\fR,
+\fBscf_value_get_ustring()\fR, \fBscf_value_get_as_string()\fR, and
+\fBscf_value_get_as_string_typed()\fR return the length of the source string,
+not including the terminating null byte. Otherwise, they return -1.
+.sp
+.LP
+Upon successful completion, \fBscf_value_get_opaque()\fR returns the number of
+bytes written. Otherwise, it returns -1.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_value_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle associated with \fIh\fR has been destroyed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.RS 30n
+.rt  
+There is not enough memory to allocate an \fBscf_value_t\fR.
+.RE
+
+.sp
+.LP
+The \fBscf_value_handle()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle associated with \fIv\fR has been destroyed.
+.RE
+
+.sp
+.LP
+The \fBscf_value_set_time()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The nanoseconds field is not in the range 0 <= \fIns\fR < 1,000,000,000.
+.RE
+
+.sp
+.LP
+The \fBscf_type_base_type()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fItype\fR argument is not a valid type.
+.RE
+
+.sp
+.LP
+The \fBscf_value_set_astring()\fR, \fBscf_value_set_ustring()\fR,
+\fBscf_value_set_opaque()\fR, and \fBscf_value_set_from_string()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIin\fR argument is not a valid value for the specified type or is longer
+than the maximum supported value length.
+.RE
+
+.sp
+.LP
+The \fBscf_type_base_type()\fR, \fBscf_value_is_type()\fR, and
+\fBscf_value_get_as_string_typed()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fItype\fR argument is not a valid type.
+.RE
+
+.sp
+.LP
+The \fBscf_value_type()\fR, \fBscf_value_base_type()\fR,
+\fBscf_value_get_boolean()\fR, \fBscf_value_get_count()\fR,
+\fBscf_value_get_integer()\fR, \fBscf_value_get_time()\fR,
+\fBscf_value_get_astring()\fR, \fBscf_value_get_ustring()\fR,
+\fBscf_value_get_as_string()\fR, and\fBscf_value_get_as_string_typed()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 21n
+.rt  
+The \fIv\fR argument has not been set to a value.
+.RE
+
+.sp
+.LP
+The \fBscf_value_get_boolean()\fR, \fBscf_value_get_count()\fR,
+\fBscf_value_get_integer()\fR, \fBscf_value_get_time()\fR,
+\fBscf_value_get_astring()\fR, \fBscf_value_get_ustring()\fR, and
+\fBscf_value_get_as_string_typed()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
+.ad
+.RS 27n
+.rt  
+The requested type is not the same as the value's type and is not in the
+base-type chain.
+.RE
+
+.sp
+.LP
+The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_entry_add_value\fR(3SCF), \fBscf_error\fR(3SCF),
+\fBattributes\fR(5)

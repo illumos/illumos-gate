@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libpctx 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libpctx \- process context library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpctx\fR [ \fIlibrary\fR... ] 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library provide a simple means to access the underlying
+facilities of \fBproc\fR(4) to allow a controlling process to manipulate the
+state of a controlled process.
+.sp
+.LP
+This library is primarily for use in conjunction with the \fBlibcpc\fR(3LIB)
+library.  Used together, these libraries allow developers to construct tools
+that can manipulate CPU performance counters in other processes. The
+\fBcputrack\fR(1) utility is an example of such a tool.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibpctx.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpctx_capture\fR\fBpctx_create\fR
+\fBpctx_release\fR\fBpctx_run\fR
+\fBpctx_set_events\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libpctx.so.1\fR \fR
+.ad
+.RS 29n
+.rt  
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/64/libpctx.so.1\fR \fR
+.ad
+.RS 29n
+.rt  
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcputrack\fR(1), \fBIntro\fR(3), \fBcpc\fR(3CPC), \fBlibcpc\fR(3LIB),
+\fBproc\fR(4), \fBattributes\fR(5)

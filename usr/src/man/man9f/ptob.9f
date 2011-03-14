@@ -1,0 +1,61 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptob 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ptob \- convert size in pages to size in bytes
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+
+
+
+\fBunsigned long\fR \fBptob\fR(\fBunsigned long\fR \fInumpages\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInumpages\fR\fR
+.ad
+.RS 12n
+.rt  
+Size in number of pages to convert to size in bytes.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function returns the number of bytes that are contained in the specified
+number of pages. For example, if the page size is 2048, then \fBptob(2)\fR
+returns \fB4096\fR. \fBptob(0)\fR returns \fB0\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The return value is always the number of bytes in the specified number of
+pages. There are no invalid input values, and no checking will be performed for
+overflow in the case of a page count whose corresponding byte count cannot be
+represented by an \fBunsigned long\fR. Rather, the higher order bits will be
+ignored.
+.SH CONTEXT
+.sp
+.LP
+The \fBptob()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbtop\fR(9F), \fBbtopr\fR(9F), \fBddi_ptob\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

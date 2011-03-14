@@ -1,0 +1,122 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ps_pread 3PROC "12 Oct 2007" "SunOS 5.11" "Process Control Library Functions"
+.SH NAME
+ps_pread, ps_pwrite, ps_pdread, ps_pdwrite, ps_ptread, ps_ptwrite \- interfaces
+in libthread_db that target process memory access
+.SH SYNOPSIS
+.LP
+.nf
+#include <proc_service.h>
+
+\fBps_err_e\fR \fBps_pread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pdread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pdwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_ptread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_ptwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines copy data between the target process's address space and the
+controlling process. \fBps_pread()\fR copies \fIsize\fR bytes from address
+\fIaddr\fR in the target process into \fIbuf\fR in the controlling process.
+\fBpr_pwrite()\fR is like \fBps_pread()\fR except that the direction of the
+copy is reversed; data is copied from the controlling process to the target
+process.
+.sp
+.LP
+\fBps_pdread()\fR and \fBps_ptread()\fR behave identically to \fBps_pread()\fR.
+\fBps_pdwrite()\fR and \fBps_ptwrite()\fR behave identically to
+\fBps_pwrite()\fR. These functions can be implemented as simple aliases for the
+corresponding primary functions. They are artifacts of history that must be
+maintained.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_OK\fR\fR
+.ad
+.RS 14n
+.rt  
+The call returned successfully. \fIsize\fR bytes were copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_BADADDR\fR\fR
+.ad
+.RS 14n
+.rt  
+Some part of the address range from \fIaddr\fR through
+\fIaddr\fR+\fIsize\fR\(mi\fB1\fR is not part of the target process's address
+space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_ERR\fR\fR
+.ad
+.RS 14n
+.rt  
+The function did not return successfully.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB), \fBproc_service\fR(3PROC),
+\fBrtld_db\fR(3EXT), \fBattributes\fR(5), \fBthreads\fR(5)

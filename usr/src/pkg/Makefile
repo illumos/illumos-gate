@@ -161,8 +161,9 @@ sparc_ARCH64= sparcv9
 # complete reprocessing of all manifests because they'll fail command
 # dependency checking.
 #
-PM_TRANSFORMS= common_actions publish restart_fmri defaults extract_metadata
-PM_INC= transforms
+PM_TRANSFORMS= common_actions publish restart_fmri facets defaults \
+	extract_metadata
+PM_INC= transforms manifests
 
 PKGMOG_DEFINES= \
 	i386_ONLY=$(POUND_SIGN) \

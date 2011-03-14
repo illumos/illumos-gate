@@ -1,0 +1,619 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dd 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+dd \- convert and copy a file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/dd\fR [\fIoperand=value\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdd\fR utility copies the specified input file to the specified output
+with possible conversions. The standard input and output are used by default.
+The input and output block sizes may be specified to take advantage of raw
+physical I/O. Sizes are specified in bytes; a number may end with \fBk\fR,
+\fBb\fR, or \fBw\fR to specify multiplication by 1024, 512, or 2, respectively.
+Numbers may also be separated by \fBx\fR to indicate multiplication.
+.sp
+.LP
+The \fBdd\fR utility reads the input one block at a time, using the specified
+input block size. \fBdd\fR then processes the block of data actually returned,
+which could be smaller than the requested block size. \fBdd\fR applies any
+conversions that have been specified and writes the resulting data to the
+output in blocks of the specified output block size.
+.sp
+.LP
+\fBcbs\fR is used only if \fBascii\fR, \fBasciib\fR, \fBunblock\fR,
+\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, \fBibmb\fR, or \fBblock\fR conversion
+is specified. In the first two cases, \fBcbs\fR characters are copied into the
+conversion buffer, any specified character mapping is done, trailing blanks are
+trimmed, and a \fBNEWLINE\fR is added before sending the line to output. In the
+last three cases, characters up to \fBNEWLINE\fR are read into the conversion
+buffer and blanks are added to make up an output record of size \fBcbs\fR.
+\fBASCII\fR files are presumed to contain \fBNEWLINE\fR characters. If
+\fBcbs\fR is unspecified or \fB0\fR, the \fBascii\fR, \fBasciib\fR,
+\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, and \fBibmb\fR options convert the
+character set without changing the input file's block structure. The
+\fBunblock\fR and \fBblock\fR options become a simple file copy.
+.sp
+.LP
+After completion, \fBdd\fR reports the number of whole and partial input and
+output blocks.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif=\fR\fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the input path. Standard input is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBof=\fR\fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output path. Standard output is the default. If the
+\fBseek=\fR\fBexpr\fR conversion is not also specified, the output file will be
+truncated before the copy begins, unless \fBconv=notrunc\fR is specified. If
+\fBseek=\fR\fBexpr\fR is specified, but \fBconv=notrunc\fR is not, the effect
+of the copy will be to preserve the blocks in the output file over which
+\fBdd\fR seeks, but no other portion of the output file will be preserved. (If
+the size of the seek plus the size of the input file is less than the previous
+size of the output file, the output file is shortened by the copy.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBibs=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the input block size in \fIn\fR bytes (default is \fB512\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBobs=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output block size in \fIn\fR bytes (default is \fB512\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbs=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets both input and output block sizes to \fIn\fR bytes, superseding \fBibs=\fR
+and \fBobs=\fR. If no conversion other than \fBsync\fR,\fB noerror\fR, and
+\fBnotrunc\fR is specified, each input block is copied to the output as a
+single block without aggregating short blocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcbs=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the conversion block size for \fBblock\fR and \fBunblock\fR in bytes
+by \fIn\fR (default is \fB0\fR). If \fBcbs=\fR is omitted or given a value of
+\fB0\fR, using \fBblock\fR or \fBunblock\fR produces unspecified results.
+.sp
+This option is used only if \fBASCII\fR or \fBEBCDIC\fR conversion is
+specified. For the \fBascii\fR and \fBasciib\fR operands, the input is handled
+as described for the \fBunblock\fR operand except that characters are converted
+to \fBASCII\fR before the trailing \fBSPACE\fR characters are deleted. For the
+\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, and \fBibmb\fR operands, the input is
+handled as described for the \fBblock\fR operand except that the characters are
+converted to \fBEBCDIC\fR or IBM \fBEBCDIC\fR after the trailing \fBSPACE\fR
+characters are added.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfiles=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Copies and concatenates \fIn\fR input files before terminating (makes sense
+only where input is a magnetic tape or similar device).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBskip=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Skips \fIn\fR input blocks (using the specified input block size) before
+starting to copy. On seekable files, the implementation reads the blocks or
+seeks past them. On non-seekable files, the blocks are read and the data is
+discarded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBiseek=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Seeks \fIn\fR blocks from beginning of input file before copying (appropriate
+for disk files, where \fBskip\fR can be incredibly slow).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoseek=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Seeks \fIn\fR blocks from beginning of output file before copying.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBseek=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Skips \fIn\fR blocks (using the specified output block size) from beginning of
+output file before copying. On non-seekable files, existing blocks are read and
+space from the current end-of-file to the specified offset, if any, is filled
+with null bytes. On seekable files, the implementation seeks to the specified
+offset or reads the blocks as described for non-seekable files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcount=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Copies only \fIn\fR input blocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBconv=\fR\fIvalue\fR[\fB,\fR\fIvalue\fR.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+Where \fIvalue\fRs are comma-separated symbols from the following list:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBascii\fR\fR
+.ad
+.RS 11n
+.rt  
+Converts \fBEBCDIC\fR to \fBASCII\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBasciib\fR\fR
+.ad
+.RS 11n
+.rt  
+Converts \fBEBCDIC\fR to \fBASCII\fR using \fBBSD\fR-compatible character
+translations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBebcdic\fR\fR
+.ad
+.RS 11n
+.rt  
+Converts \fBASCII\fR to \fBEBCDIC\fR. If converting fixed-length \fBASCII\fR
+records without NEWLINEs, sets up a pipeline with \fBdd conv=unblock\fR
+beforehand.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBebcdicb\fR\fR
+.ad
+.RS 11n
+.rt  
+Converts \fBASCII\fR to \fBEBCDIC\fR using \fBBSD\fR-compatible character
+translations. If converting fixed-length \fBASCII\fR records without
+\fBNEWLINE\fRs, sets up a pipeline with \fBdd conv=unblock\fR beforehand.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBibm\fR\fR
+.ad
+.RS 11n
+.rt  
+Slightly different map of \fBASCII\fR to \fBEBCDIC\fR. If converting
+fixed-length \fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline
+with \fBdd conv=unblock\fR beforehand.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBibmb\fR\fR
+.ad
+.RS 11n
+.rt  
+Slightly different map of \fBASCII\fR to \fBEBCDIC\fR using
+\fBBSD\fR-compatible character translations. If converting fixed-length
+\fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline with \fBdd
+conv=unblock\fR beforehand.
+.RE
+
+The \fBascii\fR (or \fBasciib\fR), \fBebcdic\fR (or \fBebcdicb\fR), and
+\fBibm\fR (or \fBibmb\fR) values are mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBblock\fR\fR
+.ad
+.RS 11n
+.rt  
+Treats the input as a sequence of \fBNEWLINE\fR-terminated or
+\fBEOF\fR-terminated variable-length records independent of the input block
+boundaries. Each record is converted to a record with a fixed length specified
+by the conversion block size. Any \fBNEWLINE\fR character is removed from the
+input line. \fBSPACE\fR characters are appended to lines that are shorter than
+their conversion block size to fill the block. Lines that are longer than the
+conversion block size are truncated to the largest number of characters that
+will fit into that size. The number of truncated lines is reported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunblock\fR\fR
+.ad
+.RS 11n
+.rt  
+Converts fixed-length records to variable length. Reads a number of bytes equal
+to the conversion block size (or the number of bytes remaining in the input, if
+less than the conversion block size), delete all trailing \fBSPACE\fR
+characters, and append a \fBNEWLINE\fR character.
+.RE
+
+The  \fBblock\fR and \fBunblock\fR values are mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlcase\fR\fR
+.ad
+.RS 9n
+.rt  
+Maps upper-case characters specified by the \fBLC_CTYPE\fR keyword
+\fBtolower\fR to the corresponding lower-case character. Characters for which
+no mapping is specified are not modified by this conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBucase\fR\fR
+.ad
+.RS 9n
+.rt  
+Maps lower-case characters specified by the \fBLC_CTYPE\fR keyword
+\fBtoupper\fR to the corresponding upper-case character. Characters for which
+no mapping is specified are not modified by this conversion.
+.RE
+
+The \fBlcase\fR and \fBucase\fR symbols are mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBswab\fR\fR
+.ad
+.RS 11n
+.rt  
+Swaps every pair of input bytes. If the current input record is an odd number
+of bytes, the last byte in the input record is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnoerror\fR\fR
+.ad
+.RS 11n
+.rt  
+Does not stop processing on an input error. When an input error occurs, a
+diagnostic message is written on standard error, followed by the current input
+and output block counts in the same format as used at completion. If the
+\fBsync\fR conversion is specified, the missing input is replaced with null
+bytes and processed normally. Otherwise, the input block will be omitted from
+the output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnotrunc\fR\fR
+.ad
+.RS 11n
+.rt  
+Does not truncate the output file. Preserves blocks in the output file not
+explicitly written by this invocation of \fBdd\fR. (See also the preceding
+\fBof=\fR\fIfile\fR operand.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsync\fR\fR
+.ad
+.RS 11n
+.rt  
+Pads every input block to the size of the \fBibs=\fR buffer, appending null
+bytes. (If either \fBblock\fR or \fBunblock\fR is also specified, appends
+\fBSPACE\fR characters, rather than null bytes.)
+.RE
+
+.RE
+
+.sp
+.LP
+If operands other than \fBconv=\fR are specified more than once, the last
+specified \fBoperand=\fR\fIvalue\fR is used.
+.sp
+.LP
+For the \fBbs=\fR, \fBcbs=\fR, \fBibs=\fR, and \fBobs=\fR operands, the
+application must supply an expression specifying a size in bytes. The
+expression, \fBexpr\fR, can be:
+.RS +4
+.TP
+1.
+a positive decimal number
+.RE
+.RS +4
+.TP
+2.
+a positive decimal number followed by \fBk\fR, specifying multiplication by
+1024
+.RE
+.RS +4
+.TP
+3.
+a positive decimal number followed by \fBb\fR, specifying multiplication by
+512
+.RE
+.RS +4
+.TP
+4.
+two or more positive decimal numbers (with or without \fBk\fR or \fBb\fR)
+separated by \fBx\fR, specifying the product of the indicated values.
+.RE
+.sp
+.LP
+All of the operands will be processed before any input is read.
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBdd\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCopying from one tape drive to another
+.sp
+.LP
+The following example copies from tape drive \fB0\fR to tape drive \fB1\fR,
+using a common historical device naming convention.
+
+.sp
+.in +2
+.nf
+example% \fBdd if=/dev/rmt/0h  of=/dev/rmt/1h\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRStripping the first 10 bytes from standard input
+.sp
+.LP
+The following example strips the first 10 bytes from standard input:
+
+.sp
+.in +2
+.nf
+example% \fBdd ibs=10  skip=1\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRReading a tape into an ASCII file
+.sp
+.LP
+This example reads an \fBEBCDIC\fR tape blocked ten 80-byte \fBEBCDIC\fR card
+images per block into the \fBASCII\fR file \fBx\fR:
+
+.sp
+.in +2
+.nf
+example% \fBdd if=/dev/tape of=x ibs=800 cbs=80 conv=ascii,lcase\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRUsing conv=sync to write to tape
+.sp
+.LP
+The following example uses \fBconv=sync\fR when writing to a tape:
+
+.sp
+.in +2
+.nf
+example% \fBtar cvf - . | compress | dd obs=1024k of=/dev/rmt/0 conv=sync\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBdd\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The input file was copied successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+If an input error is detected and the \fBnoerror\fR conversion has not been
+specified, any partial output block will be written to the output file, a
+diagnostic message will be written, and the copy operation will be
+discontinued. If some other error is detected, a diagnostic message will be
+written and the copy operation will be discontinued.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcp\fR(1), \fBsed\fR(1), \fBtr\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf+p records in(out)\fR\fR
+.ad
+.RS 23n
+.rt  
+numbers of full and partial blocks read(written)
+.RE
+
+.SH NOTES
+.sp
+.LP
+Do not use \fBdd\fR to copy files between file systems having different block
+sizes.
+.sp
+.LP
+Using a  blocked device to copy a file will result in extra nulls being added
+to the file to pad the final block to the block boundary.
+.sp
+.LP
+When  \fBdd\fR reads from a pipe, using the  \fBibs=X\fR and  \fBobs=Y\fR
+operands, the output will always be blocked in chunks of size Y. When
+\fBbs=Z\fR is used, the output blocks will be whatever was available to be read
+from the pipe at the time.
+.sp
+.LP
+When using \fBdd\fR to copy files to a tape device, the file size must be a
+multiple of the device sector size (for example, 512 Kbyte).  To  copy files of
+arbitrary size to a tape device, use  \fBtar\fR(1) or  \fBcpio\fR(1).
+.sp
+.LP
+For \fBSIGINT\fR, \fBdd\fR writes status information to standard error before
+exiting. It takes the standard action for all other signals.

@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_get_lang_values 3LDAP "25 Oct 2001" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_get_lang_values, ldap_get_lang_values_len \- return an attribute's  values
+that matches a specified language subtype
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-flag \&.\|.\|.\fR \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR] 
+#include <ldap.h>
+
+\fBchar **\fR\fBldap_get_lang_values\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMessage *\fR\fIentry\fR,
+     \fBconst char *\fR\fItarget\fR,\ \fBchar **\fR\fItype\fR
+.fi
+
+.LP
+.nf
+\fBstruct berval **\fR\fBldap_get_lang_values_len\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMessage *\fR\fIentry\fR,
+     \fBconst char *\fR\fItarget\fR, \fBchar **\fR\fItype\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_get_lang_values()\fR function returns an array of an attribute's
+string values that matches a specified language subtype. To retrieve the binary
+data from an attribute, call the \fBldap_get_lang_values_len()\fR function
+instead.
+.sp
+.LP
+\fBldap_get_lang_values()\fR should be called to retrieve a null-terminated
+array of an attribute's string values that match a specified language  subtype.
+The \fIentry\fR parameter is the entry retrieved from the directory.   The
+\fItarget\fR parameter should contain the attribute type the values that are
+required, including the optional language subtype. The \fItype\fR  parameter
+points to a buffer that returns the attribute type retrieved by  this function.
+Unlike the \fBldap_get_values()\fR function, if a language subtype is
+specified, this function first attempts to find and return      values that
+match that subtype, for example, \fBcn;lang-en\fR.
+.sp
+.LP
+\fBldap_get_lang_values_len()\fR returns a null-terminated array of pointers
+to \fBberval\fR structures, each containing the length and pointer to a binary
+value of an attribute for a given entry. The \fIentry\fR parameter is the
+result returned by \fBldap_result()\fR or \fBldap_search_s()\fR functions. The
+\fItarget\fR parameter is the attribute returned by the call to
+\fBldap_first_attribute()\fR or \fBldap_next_attribute()\fR, or the attribute
+as a  literal string, such as \fBjpegPhoto\fR or \fBaudio\fR.
+.sp
+.LP
+These functions are deprecated. Use \fBldap_get_values()\fR or
+\fBldap_get_values_len()\fR instead.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBldap_get_lang_values()\fR returns a null-terminated array of
+the attribute's values. If the call is unsuccessful, or if no such attribute
+exists in the \fIentry\fR, it returns a \fINULL\fR and sets the appropriate
+error code in the LDAP structure.
+.sp
+.LP
+The \fBldap_get_lang_values_len()\fR function returns a null-terminated array
+of pointers to \fBberval\fR structures, which in turn, if successful, contain
+pointers to the  attribute's binary values. If the call is unsuccessful, or if
+no such attribute exists in the \fIentry\fR, it returns a \fINULL\fR and sets
+the appropriate error code in the LDAP structure.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap_first_attribute\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP),
+\fBldap_get_values\fR(3LDAP), \fBldap_result\fR(3LDAP),
+\fBldap_search\fR(3LDAP), \fBattributes\fR(5)

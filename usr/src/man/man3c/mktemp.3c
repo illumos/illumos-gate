@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mktemp 3C "15 Sep 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mktemp \- make a unique file name  from a template
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBchar *\fR\fBmktemp\fR(\fBchar *\fR\fItemplate\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmktemp()\fR function replaces the contents of the string pointed to by
+\fItemplate\fR with a unique file name, and returns \fItemplate\fR. The string
+in \fItemplate\fR should look like a file name with six trailing 'X's;
+\fBmktemp()\fR will replace the 'X's with a character string that can be used
+to create a unique file name. Only 26 unique file names per thread can be
+created for each unique \fItemplate\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBmktemp()\fR function returns the pointer \fItemplate\fR. If a unique
+name cannot be created, \fItemplate\fR points to a null string.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGenerate a filename.
+.sp
+.LP
+The following example replaces the contents of the "template" string with a
+10-character filename beginning with the characters "file" and returns a
+pointer to the "template" string that contains the new filename.
+
+.sp
+.in +2
+.nf
+#include <stdlib.h>
+\&...
+char *template = "/tmp/fileXXXXXX";
+char *ptr;
+ptr = mktemp(template);
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+Between the time a pathname is created and the file opened, it is possible for
+some other process to create a file with the same name. The \fBmkstemp\fR(3C)
+function avoids this problem and is preferred over this function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmkstemp\fR(3C), \fBtmpfile\fR(3C), \fBtmpnam\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

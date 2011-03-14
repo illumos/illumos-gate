@@ -1,0 +1,146 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_srq_set_lw 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_srq_set_lw \- set low watermark on shared receive queue
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_srq_set_lw (
+        IN      DAT_SRQ_HANDLE      srq_handle,
+        IN      DAT_COUNT           low_watermark
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrq_handle\fR\fR
+.ad
+.RS 17n
+.rt  
+A handle for an instance of a Shared Receive Queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlow_watermark\fR\fR
+.ad
+.RS 17n
+.rt  
+The low watermark for the number of Recv buffers on SRQ.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_srq_set_lw()\fR function sets the low watermark value for the SRQ
+and arms the SRQ for generating an asynchronous event for the low watermark. An
+asynchronous event will be generated when the number of buffers on the SRQ is
+below the low watermark for the first time. This can occur during the current
+call or when an associated EP takes a buffer from the SRQ.
+.sp
+.LP
+The asynchronous event will be generated only once per setting of the low
+watermark. Once an event is generated, no new asynchronous events for the
+number of buffers inthe SRQ below the specified value will be generated until
+the SRQ is again set for the Low Watermark. If the Consumer is again interested
+in the event, the Consumer should set the low watermark again.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fIsrq_handle\fR argument is an invalid DAT handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 27n
+.rt  
+Invalid parameter; the value of \fIlow_watermark\fR is exceeds the value of
+\fImax_recv_dtos\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
+.ad
+.RS 27n
+.rt  
+The requested Model was not supported by the Provider. The Provider does not
+support SRQ Low Watermark.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Upon receiving the asynchronous event for the SRQ low watermark, the Consumer
+can replenish Recv buffers on the SRQ or take any other action that is
+appropriate.
+.sp
+.LP
+Regardless of whether an asynchronous event for the low watermark has been
+generated, this operation will set the generation of an asynchronous event with
+the Consumer-provided low watermark value. If the new low watermark value is
+below the current number of free Receive DTOs posted to the SRQ, an
+asynchronous event will be generated immediately. Otherwise the old low
+watermark value is simply replaced with the new one.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.2
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdat_srq_create\fR(3DAT), \fBdat_srq_free\fR(3DAT),
+\fBdat_srq_post_recv\fR(3DAT), \fBdat_srq_query\fR(3DAT),
+\fBdat_srq_resize\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)

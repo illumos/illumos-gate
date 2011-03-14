@@ -1,0 +1,306 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_extended_sense 9S "30 Aug 1995" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_extended_sense \- SCSI extended sense structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_extended_sense\fR structure for error codes \fB0x70\fR (current
+errors) and \fB0x71\fR (deferred errors) is returned on a successful \fBREQUEST
+SENSE\fR command. \fBSCSI-2 \fRcompliant targets are required to return at
+least the first 18 bytes of this structure. This structure is part of
+\fBscsi_device\fR(9S) structure.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+uchar_t  es_valid   :1;     /* Sense data is valid */
+uchar_t  es_class   :3;     /* Error Class- fixed at 0x7 */
+uchar_t  es_code    :4;     /* Vendor Unique error code */
+uchar_t  es_segnum;         /* Segment number: for COPY cmd only */
+uchar_t  es_filmk   :1;     /* File Mark Detected */
+uchar_t  es_eom     :1;     /* End of Media */
+uchar_t  es_ili     :1;     /* Incorrect Length Indicator */
+uchar_t  es_key     :4;     /* Sense key */
+uchar_t  es_info_1;         /* Information byte 1 */
+uchar_t  es_info_2;         /* Information byte 2 */
+uchar_t  es_info_3;         /* Information byte 3 */
+uchar_t  es_info_4;         /* Information byte 4 */
+uchar_t  es_add_len;        /* Number of additional bytes */
+uchar_t  es_cmd_info[4];    /* Command specific information */
+uchar_t  es_add_code;       /* Additional Sense Code */
+uchar_t  es_qual_code;      /* Additional Sense Code Qualifier */
+uchar_t  es_fru_code;       /* Field Replaceable Unit Code */
+uchar_t  es_skey_specific[3]; /* Sense Key Specific information */
+.fi
+.in -2
+
+.sp
+.LP
+\fBes_valid\fR, if set, indicates that the information field contains valid
+information.
+.sp
+.LP
+\fBes_class\fR should be  \fB0x7\fR.
+.sp
+.LP
+\fBes_code\fR is either  \fB0x0\fR or \fB0x1\fR.
+.sp
+.LP
+\fBes_segnum\fR contains the number of the current segment descriptor if the
+\fBREQUEST SENSE \fRcommand is in response to a \fBCOPY\fR, \fBCOMPARE\fR, and
+\fBCOPY AND VERIFY\fR command.
+.sp
+.LP
+\fBes_filmk\fR, if set, indicates that the current command had read a file mark
+or set mark (sequential access devices only).
+.sp
+.LP
+\fBes_eom\fR, if set, indicates that an end-of-medium condition exists
+(sequential access and printer devices only).
+.sp
+.LP
+\fBes_ili\fR, if set, indicates that the requested logical block length did not
+match the logical block length of the data on the medium.
+.sp
+.LP
+\fBes_key\fR indicates generic information describing an error or exception
+condition. The following sense keys are defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_NO_SENSE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that there is no specific sense key information to be reported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_RECOVERABLE_ERROR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the last command completed successfully with some recovery
+action performed by the target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_NOT_READY\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the logical unit addressed cannot be accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_MEDIUM_ERROR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the command terminated with a non-recovered error condition that
+was probably caused by a flaw on the medium or an error in the recorded data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_HARDWARE_ERROR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the target detected a non-recoverable hardware failure while
+performing the command or during a self test.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_ILLEGAL_REQUEST\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that there was an illegal parameter in the \fBCDB\fR or in the
+additional parameters supplied as data for some commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_UNIT_ATTENTION\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the removable medium might have been changed or the target has
+been reset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_WRITE_PROTECT/KEY_DATA_PROTECT\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a command that reads or writes the medium was attempted on a
+block that is protected from this operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_BLANK_CHECK\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a write-once device or a sequential access device encountered
+blank medium or format-defined end-of-data indication while reading or a
+write-once device encountered a non-blank medium while writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_VENDOR_UNIQUE\fR \fR
+.ad
+.sp .6
+.RS 4n
+This sense key is available for reporting vendor-specific conditions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_COPY_ABORTED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a \fBCOPY\fR, \fBCOMPARE\fR, and \fBCOPY AND VERIFY\fR  command
+was aborted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_ABORTED_COMMAND\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the target aborted the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_EQUAL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a  \fBSEARCH\fR \fBDATA\fR command has satisfied an equal
+comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_VOLUME_OVERFLOW\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a buffered peripheral device has reached the end-of-partition
+and data might remain in the buffer that has not been written to the medium.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_MISCOMPARE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the source data did not match the data read from the medium.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKEY_RESERVE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the target is currently reserved by a different initiator.
+.RE
+
+.sp
+.LP
+\fBes_info_{1,2,3,4}\fR is device-type or command specific.
+.sp
+.LP
+\fBes_add_len\fR indicates the number of additional sense bytes to follow.
+.sp
+.LP
+\fBes_cmd_info\fR contains information that depends on the command that was
+executed.
+.sp
+.LP
+\fBes_add_code\fR (\fBASC\fR) indicates further information related to the
+error or exception condition reported in the sense key field.
+.sp
+.LP
+\fBes_qual_code\fR (\fBASCQ)\fR indicates detailed information related to the
+additional sense code.
+.sp
+.LP
+\fBes_fru_code\fR (\fBFRU\fR) indicates a device-specific mechanism to unit
+that has failed.
+.sp
+.LP
+\fBes_skey_specific\fR is defined when the value of the sense-key specific
+valid bit (bit 7) is \fB1\fR. This field is reserved for sense keys not defined
+above.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_device\fR(9S)
+.sp
+.LP
+\fIANSI Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR

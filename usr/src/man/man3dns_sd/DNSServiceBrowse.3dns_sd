@@ -1,0 +1,107 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceBrowse 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceBrowse \- browse service instances with DNS
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceBrowse\fR(\fBDNSServiceRef\fR *\fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBconst char\fR *\fIregtype\fR, \fBconst char\fR *\fIdomain\fR,
+     \fBDNSServiceServiceBrowseReply\fR \fIcallBack\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceBrowseReply\fR)(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBDNSServiceErrorType\fR \fIerrorCode\fR, \fBconst char\fR *\fIserviceName\fR,
+     \fBconst char\fR *\fIregtype\fR, \fBconst char\fR *\fIreplyDomain\fR,
+     \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceBrowse()\fR function is used to browse for service instances
+of a particular service and protocol type. The \fIsdRef\fR argument points to
+an uninitialized \fIDNSServiceRef\fR. If the call to \fBDNSServiceBrowse\fR
+succeeds \fIsdRef\fR is initialized. The \fIflags\fR argument to
+\fBDNSServiceBrowse()\fR is currently unused and reserved for future use. A
+nonzero value to \fIinterfaceIndex\fR indicates \fBDNSServiceBrowse()\fR should
+do a browse on all interfaces. Most applications will use an
+\fIinterfaceIndex\fR value of \fB0\fR to perform a browse on all interfaces.
+See the section "Constants for specifying an interface index" in
+\fB<dns_sd.h>\fR for more details.
+.sp
+.LP
+The callback function is invoked for every service instance found matching the
+service type and protocol. The \fIcallback\fR argument points to a function of
+type \fBDNSServiceBrowseReply\fR listed above. The \fBDNSServiceBrowse()\fR
+call returns browse results asynchronously. The service browse call can be
+terminated by applications with a call to \fBDNSServiceRefDeallocate()\fR.
+.sp
+.LP
+The \fIregtype\fR parameter is used to specify the service type and protocol
+(e.g. \fB_ftp\fR.\fB_tcp\fR). The protocol type must be \fBTCP\fR or \fBUDP\fR.
+The \fIdomain\fR argument to \fBDNSServiceBrowse()\fR specifies the domain on
+which to browse for services. Most applications will not specify a domain and
+will perform a browse on the default domain(s). The \fIcontext\fR argument can
+be \fINULL\fR and points to a value passed to the callback function.
+.sp
+.LP
+The \fIsdRef\fR argument passed to the callback function is initialized by
+\fBDNSServiceBrowse()\fR call. The possible values passed to \fIflags\fR in the
+callback function are: \fBkDNSServiceFlagsMoreComing\fR and
+\fBkDNSServiceFlagsAdd\fR. The \fBkDNSServiceFlagsMoreComing\fR value indicates
+to a callback that at least one more result is immediately available. The
+\fBkDNSServiceFlagsAdd\fR value indicates that a service instance was found.
+The \fIerrorCode\fR argument will be \fBkDNSServiceErr_NoError\fR on success.
+Otherwise, failure is indicated. The discovered service name is returned to the
+\fIcallback\fR via the \fIserviceName\fR argument. The \fIregtype\fR argument
+in the callback holds the service type of the found service instance. The
+discovered service type can be different from the requested service type in the
+browse request when the discovered service type has subtypes. The domain
+argument to the callback holds the domain name of the discovered service
+instance. The service type and the domain name must be stored and passed along
+with the service name to resolve a service instance using
+\fBDNSServiceResolve()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceBrowse\fR function returns \fBkDNSServiceErr_NoError\fR on
+success. Otherwise, an error code defined in \fB<dns_sd.h>\fR is returned to
+indicate an error has occurred. When an error is returned by
+\fBDNSServiceBrowse\fR, the callback function is not invoked and the
+\fIDNSServiceRef\fR argument is not initialized.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBDNSServiceResolve\fR(3DNS_SD),
+\fBattributes\fR(5)

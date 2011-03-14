@@ -1,0 +1,115 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH checknr 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+checknr \- check nroff and troff input files; report possible errors
+.SH SYNOPSIS
+.LP
+.nf
+\fBchecknr\fR [\fB-fs\fR] [\fB-a\fR . \fIx1\fR . \fIy1\fR . \fIx2\fR . \fIy2\fR ... .\fIxn\fR .\fIyn\fR] 
+     [\fB-c\fR . \fIx1\fR . \fIx2\fR . \fIx3\fR ... .\fIxn\fR] [\fIfilename\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBchecknr\fR checks a list of \fBnroff\fR(1) or \fBtroff\fR(1) input files for
+certain kinds of errors involving mismatched opening and closing delimiters and
+unknown commands. If no files are specified, \fBchecknr\fR checks the standard
+input. Delimiters checked are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Font changes using \fB\ef\fR\fIx \fR.\|.\|. \fB\efP\fR\&.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Size changes using \fB\es\fR\fIx \fR.\|.\|. \fB\es0\fR\&.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Macros that come in open .\|.\|. close forms, for example, the \fB\&.TS\fR and
+\fB\&.TE\fR macros which must always come in pairs.
+.RE
+.sp
+.LP
+\fBchecknr\fR knows about the \fBms\fR(5) and \fBme\fR(5) macro packages.
+.sp
+.LP
+\fBchecknr\fR is intended to be used on documents that are prepared with
+\fBchecknr\fR in mind.  It expects a certain document writing style for
+\fB\ef\fR and \fB\es\fR commands, in that each \fB\ef\fR\fIx\fR must be
+terminated with \fB\efP\fR and each \fB\es\fR\fIx\fR must be terminated with
+\fB\es0\fR\&. While it will work to directly go into the next font or
+explicitly specify the original font or point size, and many existing documents
+actually do this, such a practice will produce complaints from \fBchecknr\fR.
+Since it is probably better to use the \fB\efP\fR and \fB\es0\fR forms anyway,
+you should think of this as a contribution to your document preparation style.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fR
+.ad
+.RS 24n
+.rt  
+Ignore \fB\ef\fR font changes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 24n
+.rt  
+Ignore \fB\es\fR size changes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-a\fR\fB .\fR\fIx1 \fR\fB\&.\fR\fIy1.\|.\|.\fR \fR
+.ad
+.RS 24n
+.rt  
+Add pairs of macros to the list. The pairs of macros are assumed to be those
+(such as \fB\&.DS\fR and \fB\&.DE\fR) that should be checked for balance.  The
+\fB-a\fR option must be followed by groups of six characters, each group
+defining a pair of macros. The six characters are a period, the first macro
+name, another period, and the second macro name. For example, to define a pair
+\fB\&.BS\fR and \fB\&.ES\fR, use `\fB-a.BS.ES\fR'
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-c\fR\fB .\fR\fIx1\|.\|.\|.\fR \fR
+.ad
+.RS 24n
+.rt  
+Define commands which \fBchecknr\fR would otherwise complain about as
+undefined.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBeqn\fR(1), \fBnroff\fR(1), \fBtroff\fR(1), \fBattributes\fR(5), \fBme\fR(5),
+\fBms\fR(5)
+.SH BUGS
+.sp
+.LP
+There is no way to define a one-character macro name using the \fB-a\fR option.

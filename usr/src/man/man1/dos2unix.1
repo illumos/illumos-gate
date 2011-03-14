@@ -1,0 +1,219 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dos2unix 1 "14 Sep 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+dos2unix \- convert text file from DOS format to ISO format
+.SH SYNOPSIS
+.LP
+.nf
+\fBdos2unix\fR [\fB-ascii\fR] [\fB-iso\fR] [\fB-7\fR] 
+     [\fB-437\fR | \fB-850\fR | \fB-860\fR | \fB-863\fR | \fB-865\fR] \fIoriginalfile\fR \fIconvertedfile\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdos2unix\fR utility converts characters in the \fBDOS\fR extended
+character set to the corresponding \fBISO\fR standard characters.
+.sp
+.LP
+This command can be invoked from either \fBDOS\fR or SunOS. However, the
+filenames must conform to the conventions of the environment in which the
+command is invoked.
+.sp
+.LP
+If the original file and the converted file are the same,  \fBdos2unix\fR will
+rewrite the original file after converting it.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-ascii\fR\fR
+.ad
+.RS 10n
+.rt  
+Removes extra carriage returns and converts end of file characters in \fBDOS\fR
+format text files to conform to SunOS requirements.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-iso\fR\fR
+.ad
+.RS 10n
+.rt  
+This is the default. It converts characters in the \fBDOS\fR extended character
+set to the corresponding  \fBISO\fR standard characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-7\fR\fR
+.ad
+.RS 10n
+.rt  
+Converts 8 bit \fBDOS\fR graphics characters to 7 bit space characters so that
+SunOS can read the file.
+.RE
+
+.sp
+.LP
+On non-i386 systems, \fBdos2unix\fR will attempt to obtain the keyboard type to
+determine which code page to use. Otherwise, the default is US. The user may
+override the code page with one of the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-437\fR\fR
+.ad
+.RS 8n
+.rt  
+Use US code page
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-850\fR\fR
+.ad
+.RS 8n
+.rt  
+Use multilingual code page
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-860\fR\fR
+.ad
+.RS 8n
+.rt  
+Use Portuguese code page
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-863\fR\fR
+.ad
+.RS 8n
+.rt  
+Use French Canadian code page
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-865\fR\fR
+.ad
+.RS 8n
+.rt  
+Use Danish code page
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are required:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoriginalfile\fR \fR
+.ad
+.RS 18n
+.rt  
+The original file in \fBDOS\fR format that is being converted to \fBISO\fR
+format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconvertedfile\fR \fR
+.ad
+.RS 18n
+.rt  
+The new file in \fBISO\fR format that has been converted from the original
+\fBDOS\fR file format.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBunix2dos\fR(1), \fBls\fR(1), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFile \fIfilename\fR not found, or no read permission\fR\fR
+.ad
+.sp .6
+.RS 4n
+The input file you specified does not exist, or you do not have read
+permission. Check with the SunOS command, \fBls\fR \fB-l\fR (see \fBls\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBad output filename \fIfilename\fR, or no write permission\fR\fR
+.ad
+.sp .6
+.RS 4n
+The output file you specified is either invalid, or you do not have write
+permission for that file or the directory that contains it.  Check also that
+the drive or diskette  is not write-protected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBError while writing to temporary file\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred while converting your file, possibly because  there is not
+enough space on the current drive. Check the amount of space on the current
+drive using the \fBDIR\fR command. Also be certain that the default diskette or
+drive is write-enabled (not write-protected). Notice that when this error
+occurs, the original file remains intact.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTranslated temporary file name =\fR \fIfilename\fR.\fR
+.ad
+.br
+.na
+\fB\fBCould not rename temporary file to \fIfilename\fR.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The program could not perform the final step in converting your file. Your
+converted file is stored under the name indicated on the second line of this
+message.
+.RE
+

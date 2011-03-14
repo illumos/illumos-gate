@@ -1,0 +1,141 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH atomic_and 3C "13 May 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+atomic_and, atomic_and_8, atomic_and_uchar, atomic_and_16, atomic_and_ushort,
+atomic_and_32, atomic_and_uint, atomic_and_ulong, atomic_and_64,
+atomic_and_8_nv, atomic_and_uchar_nv, atomic_and_16_nv, atomic_and_ushort_nv,
+atomic_and_32_nv, atomic_and_uint_nv, atomic_and_ulong_nv, atomic_and_64_nv \-
+atomic AND operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <atomic.h>
+
+\fBvoid\fR \fBatomic_and_8\fR(\fBvolatile uint8_t *\fR\fItarget\fR, \fBuint8_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_uchar\fR(\fBvolatile uchar_t *\fR\fItarget\fR, \fBuchar_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_16\fR(\fBvolatile uint16_t *\fR\fItarget\fR, \fBuint16_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_ushort\fR(\fBvolatile ushort_t *\fR\fItarget\fR, \fBushort_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_32\fR(\fBvolatile uint32_t *\fR\fItarget\fR, \fBuint32_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_uint\fR(\fBvolatile uint_t *\fR\fItarget\fR, \fBuint_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_ulong\fR(\fBvolatile ulong_t *\fR\fItarget\fR, \fBulong_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBatomic_and_64\fR(\fBvolatile uint64_t *\fR\fItarget\fR, \fBuint64_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuint8_t\fR \fBatomic_and_8_nv\fR(\fBvolatile uint8_t *\fR\fItarget\fR, \fBuint8_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuchar_t\fR \fBatomic_and_uchar_nv\fR(\fBvolatile uchar_t *\fR\fItarget\fR, \fBuchar_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuint16_t\fR \fBatomic_and_16_nv\fR(\fBvolatile uint16_t *\fR\fItarget\fR, \fBuint16_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBushort_t\fR \fBatomic_and_ushort_nv\fR(\fBvolatile ushort_t *\fR\fItarget\fR, \fBushort_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuint32_t\fR \fBatomic_and_32_nv\fR(\fBvolatile uint32_t *\fR\fItarget\fR, \fBuint32_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBatomic_and_uint_nv\fR(\fBvolatile uint_t *\fR\fItarget\fR, \fBuint_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBulong_t\fR \fBatomic_and_ulong_nv\fR(\fBvolatile ulong_t *\fR\fItarget\fR, \fBulong_t\fR \fIbits\fR);
+.fi
+
+.LP
+.nf
+\fBuint64_t\fR \fBatomic_and_64_nv\fR(\fBvolatile uint64_t *\fR\fItarget\fR, \fBuint64_t\fR \fIbits\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions enable the bitwise AND of \fIbits\fR to the value stored in
+\fItarget\fR to occur in an atomic manner.
+.SH RETURN VALUES
+.sp
+.LP
+The *\fB_nv()\fR variants of these functions return the new value of
+\fItarget\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBatomic_add\fR(3C), \fBatomic_bits\fR(3C), \fBatomic_cas\fR(3C),
+\fBatomic_dec\fR(3C), \fBatomic_inc\fR(3C), \fBatomic_or\fR(3C),
+\fBatomic_swap\fR(3C), \fBmembar_ops\fR(3C), \fBattributes\fR(5),
+\fBatomic_ops\fR(9F)
+.SH NOTES
+.sp
+.LP
+The *\fB_nv()\fR variants are substantially more expensive on some platforms
+than the versions that do not return values. Do not use them unless you need to
+know the new value \fBatomically\fR.

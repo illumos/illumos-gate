@@ -1,0 +1,197 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPReg 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPReg \- register an SLP advertisement
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBSLPError\fR \fBSLPReg\fR(\fBSLPHandle\fR \fIhSLP\fR, \fBconst char *\fR\fIpcSrvURL\fR,
+     \fBconst unsigned short\fR \fIusLifetime\fR, \fBconst char *\fR\fIpcSrvType\fR,
+     \fBconst char *\fR\fIpcAttrs\fR, \fBSLPBoolean\fR \fIfresh\fR,
+     \fBSLPRegReport\fR \fIcallback\fR, \fBvoid *\fR\fIpvCookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPReg()\fR function registers the  \fBURL\fR  in \fIpcSrvURL\fR  having
+the  lifetime  \fIusLifetime\fR with  the attribute  list in  \fIpcAttrs\fR.
+The  \fIpcAttrs\fR list is  a comma-separated list of  attribute  assignments
+in on-the-wire format (including  escaping  of  reserved  characters).   The
+\fIsLifetime\fR  parameter  must  be  nonzero  and less than or equal to
+\fBSLP_LIFETIME_MAXIMUM\fR. If the fresh  flag is  \fBSLP_TRUE\fR, then the
+registration is  new, the \fBSLP\fR protocol  \fIfresh\fR  flag is set, and the
+registration replaces any existing registrations.
+.sp
+.LP
+The \fIpcSrvType\fR parameter is a service type name and can be included for
+service \fBURL\fRs that are not in the service:  scheme.  If the \fBURL\fR is
+in the service:  scheme, the \fIpcSrvType\fR parameter is ignored.  If the
+fresh flag is \fBSLP_FALSE\fR, then an existing registration is updated. Rules
+for new and updated registrations, and the format for \fIpcAttrs\fR and
+\fIpcScopeList\fR, can be found in \fIRFC 2608\fR. Registrations and updates
+take place in the language locale of the \fIhSLP\fR handle.
+.sp
+.LP
+The \fBAPI\fR library is required to perform the operation in all scopes
+obtained through configuration.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhSLP\fR\fR
+.ad
+.RS 14n
+.rt  
+The language specific  \fBSLPHandle\fR on which to  register the advertisement.
+\fIhSLP\fR cannot be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcSrvURL\fR\fR
+.ad
+.RS 14n
+.rt  
+The \fBURL\fR  to register.  The value of \fIpcSrvURL\fR cannot be \fINULL\fR
+or the  empty  string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIusLifetime\fR\fR
+.ad
+.RS 14n
+.rt  
+An \fBunsigned short\fR giving the life time of the service advertisement, in
+seconds.  The value must be an unsigned integer less than or equal to
+\fBSLP_LIFETIME_MAXIMUM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcSrvType\fR\fR
+.ad
+.RS 14n
+.rt  
+The service type. If \fIpURL\fR is  a service: URL, then this parameter is
+ignored. \fIpcSrvType\fR cannot be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcAttrs\fR\fR
+.ad
+.RS 14n
+.rt  
+A  comma-separated   list  of  attribute   assignment expressions for the
+attributes of the  advertisement. \fIpcAttrs\fR  cannot  be \fINULL\fR.  Use
+the empty  string,  \fB""\fR,  to indicate no attributes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfresh\fR\fR
+.ad
+.RS 14n
+.rt  
+An \fBSLPBoolean\fR that is \fBSLP_TRUE\fR if the registration is new or
+\fBSLP_FALSE\fR if it is a reregistration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 14n
+.rt  
+A callback to report the operation completion  status. \fIcallback\fR cannot be
+\fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvCookie\fR\fR
+.ad
+.RS 14n
+.rt  
+Memory passed to the callback code from the client.  \fIpvCookie\fR can be
+\fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn Initial Registration
+.sp
+.LP
+The following example shows an initial registration for the
+"\fBservice:video://bldg15\fR" camera service for three hours:
+
+.sp
+.in +2
+.nf
+SLPError err;
+SLPHandle hSLP;
+SLPRegReport regreport;
+err = SLPReg(hSLP, "service:video://bldg15",
+     10800, "", "(location=B15-corridor),
+     (scan-rate=100)", SLP_TRUE,
+     regRpt, NULL);
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Guttman, E.,  Perkins, C., Veizades, J., and Day, M.,\fIRFC 2608, Service
+Location Protocol, Version 2\fR. The Internet Society. June 1999.
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

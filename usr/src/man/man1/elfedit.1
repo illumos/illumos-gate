@@ -1,0 +1,1142 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All
+.\" Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elfedit 1 "28 Jan 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+elfedit \- examine or edit ELF files
+.SH SYNOPSIS
+.LP
+.nf
+\fBelfedit\fR [\fB-adr\fR] [\fB-e\fR \fIcmd\fR] [\fB-L\fR \fIpath\fR] [\fB-o\fR \fBdefault\fR | \fBsimple\fR | \fBnum\fR]
+     [\fIinfile\fR] [\fIoutfile\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBelfedit\fR is a tool for examining or modifying the contents of an existing
+ELF object. Specifically, \fBelfedit\fR is used to modify the ELF metadata
+contained in the object. Access is provided to most of the ELF data contained
+in an object, including the ELF header, section header table, program header
+table, dynamic section, hardware and software capabilities, string tables, and
+symbol tables.
+.SS "Syntax"
+.sp
+.LP
+\fBelfedit\fR processes commands from the command line (\fB-e\fR option) or
+from standard input. If standard input is a terminal, \fBelfedit\fR provides
+terminal editing capabilities, as well as extensive command completion. ELF
+uses many standard symbolic names for special integer values and bit masks.
+\fBelfedit\fR is aware of most possible completions for such names. You can
+press TAB at any point while entering an \fBelfedit\fR command to cause
+\fBelfedit\fR to display a usage message and any known completions for the text
+at the current cursor.
+.sp
+.LP
+\fBelfedit\fR functionality is organized in the form of modules. Each module
+delivers a set of commands, focused on related functionality. A command is
+specified by combining the module and command names with a colon (\fB:\fR)
+delimiter, with no intervening white space. For example, \fBdyn:runpath\fR
+refers to the \fBrunpath\fR command provided by the \fBdyn\fR module. Module
+names must be unique. The command names within a given module are unique within
+that module, but the same command names can be used in more than one module.
+.sp
+.LP
+Some modules designate one of their commands to be the default command for that
+module. This command is run when the user specifies only a module name. Most
+\fBelfedit\fR modules supply a command named dump, which produces the same
+information displayed by the \fBelfdump\fR utility for the part of the ELF file
+covered by the module. It is common for a module to specify dump as its default
+command.
+.sp
+.LP
+The syntax used to execute an \fBelfedit\fR command is intended to be familiar
+to anyone who uses UNIX command line utilities. It consists of white space
+delimited tokens. The first token is the command name. Options, which are
+arguments that start with the hyphen (\fB-\fR) character follow the command.
+Plain arguments (operands) follow the options. There can be \fB0\fR or more
+options and operands for a given command, but if they are present, options
+always precede plain arguments. The special option, \fB--\fR, (two hyphens) can
+be used to delimit the end of the options. When it is encountered, any
+remaining arguments are considered to be plain arguments even if they start
+with a \fB-\fR.
+.sp
+.LP
+The interpretation of the characters in an \fBelfedit\fR token depends on the
+style of quoting used:
+.sp
+.ne 2
+.mk
+.na
+\fBUnquoted\fR
+.ad
+.RS 17n
+.rt  
+Outside of single (') or double (") quotes, backslash (\) acts as an escape
+character. When a backslash character is seen, \fBelfedit\fR ignores it, and
+treats the character following it literally (even if the following character is
+itself a backslash). This feature can be used to insert a white space character
+into a string argument to a command without having it split the string into two
+separate tokens. Similarly, it can be used to insert a quote or backslash as a
+literal character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSingle Quotes\fR
+.ad
+.RS 17n
+.rt  
+Within single quotes ('), white space characters do not delimit tokens, and are
+interpreted as literal characters within the token. Double quote (") and
+backslash (\) characters are interpreted as literal characters, and have no
+special meaning.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDouble Quotes\fR
+.ad
+.RS 17n
+.rt  
+Within double quotes ("), white space characters do not delimit tokens. Single
+quote characters are interpreted literally and do not have a quoting function.
+Backslash (\) is an escape character which operates similarly to the way it is
+used in the C programming language within a string literal:
+.sp
+.ne 2
+.mk
+.na
+\fB\a\fR
+.ad
+.RS 8n
+.rt  
+alert (bell)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\b\fR
+.ad
+.RS 8n
+.rt  
+backspace
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\f\fR
+.ad
+.RS 8n
+.rt  
+form feed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\n\fR
+.ad
+.RS 8n
+.rt  
+newline
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\r\fR
+.ad
+.RS 8n
+.rt  
+return
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\t\fR
+.ad
+.RS 8n
+.rt  
+horizontal tab
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\v\fR
+.ad
+.RS 8n
+.rt  
+vertical tab
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\\\fR
+.ad
+.RS 8n
+.rt  
+backslash
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\'\fR
+.ad
+.RS 8n
+.rt  
+single quote
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\"\fR
+.ad
+.RS 8n
+.rt  
+double quote
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\ooo\fR
+.ad
+.RS 8n
+.rt  
+An octal constant, where ooo is one to three octal digits (0...7)
+.RE
+
+Any other character following a backslash is an error.
+.RE
+
+.sp
+.LP
+The core commands belong to an internal module named \fBsys\fR. All other
+modules are packaged as dynamically loadable sharable objects. \fBelfedit\fR
+loads modules on demand, when a command that requires it is executed, or as the
+result of executing the \fBsys:load\fR command. Due to its special built in
+status, and because its commands are used heavily, \fBelfedit\fR allows you to
+specify commands from the \fBsys\fR module without including the \fBsys:\fR
+prefix, for example, \fBload\fR rather than \fBsys:load\fR. To access a command
+from any other module, you must specify the full \fImodule\fR\fB:\fR\fIcmd\fR
+form.
+.sp
+.LP
+\fBelfedit\fR is delivered with the following standard modules:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcap\fR\fR
+.ad
+.RS 11n
+.rt  
+Capabilities Section
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdyn\fR\fR
+.ad
+.RS 11n
+.rt  
+Dynamic Section
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBehdr\fR\fR
+.ad
+.RS 11n
+.rt  
+ELF Header
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBphdr\fR\fR
+.ad
+.RS 11n
+.rt  
+Program Header Array
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshdr\fR\fR
+.ad
+.RS 11n
+.rt  
+Section Header Array
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstr\fR\fR
+.ad
+.RS 11n
+.rt  
+String Table Section
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsym\fR\fR
+.ad
+.RS 11n
+.rt  
+Symbol Table Section
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsyminfo\fR\fR
+.ad
+.RS 11n
+.rt  
+\fBSyminfo\fR Section
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsys\fR\fR
+.ad
+.RS 11n
+.rt  
+Core built in \fBelfedit\fR commands
+.RE
+
+.SS "Status And Command Documentation"
+.sp
+.LP
+Status And Command Documentation
+.sp
+.LP
+The status (\fBsys:status\fR) command displays information about the current
+\fBelfedit\fR session:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Input and output files
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Option setting
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Module search path
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Modules loaded
+.RE
+.sp
+.LP
+Included with every \fBelfedit\fR module is extensive online documentation for
+every command, in a format similar to UNIX manual pages. The \fBhelp\fR
+(\fBsys:help\fR) command is used to display this information. To learn more
+about \fBelfedit\fR, start \fBelfedit\fR and use the help command without
+arguments:
+.sp
+.in +2
+.nf
+% elfedit
+> help
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBelfedit\fR displays a welcome message with more information about
+\fBelfedit\fR, and on how to use the help system.
+.sp
+.LP
+To obtain summary information for a module:
+.sp
+.in +2
+.nf
+> help module
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To obtain the full documentation for a specific command provided by a module:
+.sp
+.in +2
+.nf
+> help module:command
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Using the \fBdyn\fR module and \fBdyn:runpath\fR commands as examples:
+.sp
+.in +2
+.nf
+> help dyn
+> help dyn:runpath
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+help (\fBsys:help\fR) can be used to obtain help on itself:
+.sp
+.in +2
+.nf
+> help help
+.fi
+.in -2
+.sp
+
+.SS "Module Search Path"
+.sp
+.LP
+\fBelfedit\fR modules are implemented as sharable objects which are loaded on
+demand. When a module is required, \fBelfedit\fR searches a module path in
+order to locate the sharable object that implements the module. The path is a
+sequence of directory names delimited by colon (\fB:\fR) characters. In
+addition to normal characters, the path can also contain any of the following
+tokens:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%i\fR\fR
+.ad
+.RS 6n
+.rt  
+Expands to the current instruction set architecture (ISA) name (\fBsparc\fR,
+\fBsparcv9\fR, \fBi386\fR, \fBamd64\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%I\fR\fR
+.ad
+.RS 6n
+.rt  
+Expands to the 64-bit ISA. This is the same thing as \fB%i\fR for 64-bit
+versions of \fBelfedit\fR, but expands to the empty string for 32-bit versions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%o\fR\fR
+.ad
+.RS 6n
+.rt  
+Expands to the old value of the path being modified. This is useful for
+appending or prepending directories to the default path.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%r\fR\fR
+.ad
+.RS 6n
+.rt  
+Root of file system tree holding the \fBelfedit\fR program, assuming that
+\fBelfedit\fR is installed as \fBusr/bin/elfedi\fRt within the tree. On a
+standard system, this is simply the standard system root directory (\fB/\fR).
+On a development system, where the copy of \fBelfedit\fR can be installed
+elsewhere, the use of \fB%r\fR can be used to ensure that the matching set of
+modules are used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+Expands to a single \fB%\fR character
+.RE
+
+.sp
+.LP
+The default module search path for \fBelfedit\fR is:
+.sp
+.in +2
+.nf
+%r/usr/lib/elfedit/%I
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Expanding the tokens, this is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/elfedit\fR\fR
+.ad
+.RS 28n
+.rt  
+32-bit \fBelfedit\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/elfedit/sparcv9\fR\fR
+.ad
+.RS 28n
+.rt  
+64-bit \fBelfedit\fR (\fBsparc\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/elfedit/amd64\fR\fR
+.ad
+.RS 28n
+.rt  
+64-bit \fBelfedit\fR (\fBx86\fR)
+.RE
+
+.sp
+.LP
+The default search path can be changed by setting the \fBELFEDIT_PATH\fR
+environment variable, or by using the \fB-L\fR command line option. If you
+specify both, the \fB-L\fR option supersedes the environment variable.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 29n
+.rt  
+Enable \fBautoprint\fR mode. When \fBautoprint\fR is enabled, \fBelfedit\fR
+prints the modified values that result when the ELF file is modified. This
+output is shown in the current output style, which can be changed using the
+\fB-o\fR option. The default output style is the style used by the
+\fBelfdump\fR(1) utility. \fBautoprint\fR mode is the default when
+\fBelfedit\fR is used interactively (when \fBstdin\fR and \fBstdout\fR are
+terminals). Therefore, the \fB-a\fR option only has meaning when \fBelfedit\fR
+is used in non-interactive contexts. To disable \fBautoprint\fR in an
+interactive session, use the \fBelfedit\fR command:
+.sp
+.in +2
+.nf
+> set a off
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 29n
+.rt  
+If set, this option causes \fBelfedit\fR to issue informational messages
+describing its internal operations and details of the ELF object being
+processed. This can be useful when a deep understanding of the operation being
+carried out is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIcmd\fR\fR
+.ad
+.RS 29n
+.rt  
+Specifies an edit command. Multiple \fB-e\fR options can be specified. If edit
+commands are present on the command line, \fBelfedit\fR operates in batch mode.
+After opening the file, \fBelfedit\fR executes each command in the order given,
+after which the modified file is saved and \fBelfedit\fR exits. Batch mode is
+useful for performing simple operations from shell scripts and makefiles.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR \fIpath\fR\fR
+.ad
+.RS 29n
+.rt  
+Sets default path for locating \fBelfedit\fR modules. Modules are described in
+\fBModule Search Path\fR section of this manual page..
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fBdefault\fR | \fBsimple\fR | \fBnum\fR\fR
+.ad
+.RS 29n
+.rt  
+The style used to display ELF data. This option establishes the current style
+for the session. It can be changed from within the \fBelfedit\fR session by
+using the set (\fBsys:set\fR) command, or by providing \fB-o\fR options to the
+individual commands executed within the session.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdefault\fR\fR
+.ad
+.RS 11n
+.rt  
+The default style is to display output in a format intended for human viewing.
+This style is similar to that used by the \fBelfdump\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnum\fR\fR
+.ad
+.RS 11n
+.rt  
+Integer values are always shown in integer form. Strings are shown as the
+integer offset into the containing string table.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsimple\fR\fR
+.ad
+.RS 11n
+.rt  
+When displaying strings from within the ELF file, only the string is displayed.
+Integer values are displayed as symbolic constants if possible, and in integer
+form otherwise. No titles, headers, or other supplemental output is shown.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 29n
+.rt  
+Read-only mode. The input file is opened for read-only access, and the results
+of the edit session are not saved. \fBelfedit\fR does not allow the
+\fIoutfile\fR argument when \fB-r\fR is specified. Read-only mode is highly
+recommended when there is no intention to modify the file. In addition to
+providing extra protection against accidental modification, it allows for the
+examination of files for which the user does not have write permission.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinfile\fR\fR
+.ad
+.RS 11n
+.rt  
+Input file containing an ELF object to process.
+.sp
+This can be an executable (\fBET_EXEC\fR), shared object (\fBET_DYN\fR), or
+relocatable object file, (\fBET_REL\fR). Archives are not directly supported.
+To edit an object in an archive, you must extract the object, edit the copy,
+and then insert it back into the archive.
+.sp
+If no \fIinfile\fR is present, \fBelfedit\fR runs in a limited mode that only
+allows executing commands from the \fBsys:\fR module. This mode is primarily to
+allow access to the command documentation available from the help
+(\fBsys:help\fR) command.
+.sp
+If \fIinfile\fR is present, and no \fIoutfile\fR is given, \fBelfedit\fR edits
+the file in place, and writes the results into the same file, causing the
+original file contents to be overwritten. It is usually recommended that
+\fBelfedit\fR not be used in this mode, and that an output file be specified.
+Once the resulting file has been tested and validated, it can be moved into the
+place of the original file.
+.sp
+The \fB-r\fR option can be used to open \fIinfile\fR for read-only access. This
+can be useful for examining an existing file that you do not wish to modify.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutfile\fR\fR
+.ad
+.RS 11n
+.rt  
+Output file. If both \fIinfile\fR and \fIoutfile\fR are present, \fIinfile\fR
+is opened for read-only access, and the modified object contents are written to
+\fIoutfile\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+When supported by the system, \fBelfedit\fR runs as a 64-bit application,
+capable of processing files greater than or equal to 2 Gbytes (2^31 bytes).
+.sp
+.LP
+At startup, \fBelfedit\fR uses \fBlibelf\fR to open the input file and cache a
+copy of its contents in memory for editing. It can then execute one or more
+commands. A session finishes by optionally writing the modified object to the
+output file, and then exiting.
+.sp
+.LP
+If no \fIinfile\fR is present, \fBelfedit\fR runs in a limited mode that only
+allows executing commands from the \fBsys\fR module. This mode is primarily to
+allow access to the command documentation available from the help
+(\fBsys:help\fR) command.
+.sp
+.LP
+If one or more \fB-e\fR options are specified, the commands they supply are
+executed in the order given. \fBelfedit\fR adds implicit calls to write
+(\fBsys:write\fR) and quit (\fBsys:qui\fRt) immediately following the given
+commands, causing the output file to be written and the \fBelfedit\fR process
+to exit. This form of use is convenient in shell scripts and makefiles.
+.sp
+.LP
+If no \fB-e\fR options are specified, \fBelfedit\fR reads commands from
+\fBstdin\fR and executes them in the order given. The caller must explicitly
+issue the write (\fBsys:write\fR) and quit (\fBsys:quit\fR) commands to save
+their work and exit when running in this mode.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+A fatal error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid command line options were specified.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+In the following examples, interactive use of \fBelfedit\fR is shown with the
+shell prompt (\fB%\fR) and the \fBelfedit\fR prompt (\fB>\fR). Neither of these
+characters should be entered by the user.
+.LP
+\fBExample 1 \fRChanging the Runpath of an Executable
+.sp
+.LP
+The following example presupposes an executable named \fBprog\fR, installed in
+a bin directory that has an adjacent lib directory for sharable objects. The
+following command sets the \fBrunpath\fR of that executable to the \fBlib\fR
+directory:
+
+.sp
+.in +2
+.nf
+elfedit -e 'dyn:runpath $ORIGIN/../lib'
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The use of single quotes with the argument to the \fB-e\fR option is necessary
+to ensure that the shell passes the entire command as a single argument to
+\fBelfedit\fR.
+
+.sp
+.LP
+Alternatively, the same operation can be done using \fBelfedit\fR in its
+non-batch mode:
+
+.sp
+.in +2
+.nf
+% elfedit prog
+> dyn:runpath $ORIGIN/../lib
+     index  tag         value
+       [30]  RUNPATH     0x3e6      $ORIGIN/../lib
+> write
+> quit
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The addition or modification of elements such as \fBrunpath\fR or needed
+entries might only be achievable when \fBpadding\fR exists within the objects.
+See \fBNotes\fR.
+
+.LP
+\fBExample 2 \fRRemoving a Hardware Capability Bit
+.sp
+.LP
+Objects that require optional hardware support to run are built with a
+capability section that contains a mask of bits specifying which capabilities
+they need. The runtime linker (\fBld.so.1\fR) checks this mask against the
+attributes of the running system to determine whether a given object is able to
+be run by the current system. Programs that require abilities not available on
+the system are prevented from running.
+
+.sp
+.LP
+This check prevents a naive program that does not explicitly check for the
+hardware support it requires from crashing in a confusing manner. However, it
+can be inconvenient for a program that is written to explicitly check the
+system capabilities at runtime. Such a program might have optimized code to use
+when the hardware supports it while providing a generic fallback version that
+can be run, albeit more slowly, otherwise. In this case, the hardware
+compatibility mask prevents such a program from running on the older hardware.
+In such a case, removing the relevant bit from the mask allows the program to
+run.
+
+.sp
+.LP
+The following example removes the \fBAV_386_SSE\fR3 hardware capability from an
+x86 binary that uses the SSE3 CPU extension. This transfers responsibility for
+validating the ability to use SSE3 from the runtime linker to the program
+itself:
+
+.sp
+.in +2
+.nf
+elfedit -e 'cap:hw1 -and -cmp sse3' prog
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRReading Information From an Object
+.sp
+.LP
+\fBelfedit\fR can be used to extract specific targeted information from an
+object. The following shell command reads the number of section headers
+contained in the file \fB/usr/bin/ls\fR:
+
+.sp
+.in +2
+.nf
+% SHNUM=`elfedit -r -onum -e 'ehdr:e_shnum' /usr/bin/ls`
+% echo $SHNUM
+29
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You might get a different value, depending on the version of Solaris and type
+of machine that you are using. The \fB-r\fR option causes the file to be opened
+read-only, allowing a user with ordinary access permissions to open the file,
+and protecting against accidental damage to an important system executable. The
+\fBnum\fR output style is used in order to obtain only the desired value,
+without any extraneous text.
+
+.sp
+.LP
+Similarly, the following extracts the symbol type of the symbol \fBunlink\fR
+from the C runtime library:
+
+.sp
+.in +2
+.nf
+% TYPE=`elfedit -r -osimple -e 'sym:st_type unlink' /lib/libc.so`
+% echo $TYPE
+STT_FUNC
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELFEDIT_PATH\fR\fR
+.ad
+.RS 16n
+.rt  
+Alters the default module search path. Module search paths are discussed in the
+\fBModule Search Path\fR section of this manual page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLD_NOEXEC_64\fR\fR
+.ad
+.RS 16n
+.rt  
+Suppresses the automatic execution of the 64-bit \fBelfedit\fR. By default, the
+64-bit version of \fBelfedit\fR runs if the system is 64-bit capable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAGER\fR\fR
+.ad
+.RS 16n
+.rt  
+Interactively delivers output from \fBelfedit\fR to the screen. If not set,
+\fBmore\fR is used. See \fBmore\fR(1).
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/elfedit\fR\fR
+.ad
+.RS 20n
+.rt  
+Default directory for \fBelfedit\fR modules that are loaded on demand to supply
+editing commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.teclarc\fR\fR
+.ad
+.RS 20n
+.rt  
+Personal \fBtecla\fR customization file for command line editing. See
+\fBtecla\fR(5).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdump\fR(1), \fBelfdump\fR(1), \fBld.so.1\fR(1), \fBmore\fR(1), \fBnm\fR(1),
+\fBpvs\fR(1), \fBelf\fR(3ELF), \fBlibelf\fR(3LIB), \fBtecla\fR(5),
+\fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH WARNINGS
+.sp
+.LP
+\fBelfedit\fR is designed to be a tool for testing and development of the ELF
+system. It offers the ability to examine and change nearly every piece of ELF
+metadata in the object. It quietly allows edits that can produce an invalid or
+unusable ELF file. The user is expected to have knowledge of the ELF format and
+of the rules and conventions that govern them. The \fILinker and Libraries
+Guide\fR can be helpful when using \fBelfedit\fR.
+.sp
+.LP
+\fBelfedit\fR allows the user to alter the ELF metadata in an object, but
+cannot understand or alter the code of the actual program. Setting ELF
+attributes such as types, sizes, alignments, and so forth in a manner that does
+not agree with the actual contents of the file is therefore likely to yield a
+broken and unusable output object. Such changes might be useful for testing of
+linker components, but should be avoided otherwise.
+.sp
+.LP
+Higher level operations, such as the use of the \fBdyn:runpath\fR command to
+change the \fBrunpath\fR of an object, are safe, and can be carried out without
+the sort of risk detailed in this section.
+.SH NOTES
+.sp
+.LP
+Not every ELF operation supported by \fBelfedit\fR can be successfully carried
+out on every ELF object. \fBelfedit\fR is constrained by the existing sections
+found in the file.
+.sp
+.LP
+One area of particular interest is that \fBelfedit\fR might not be able to
+modify the \fBrunpath\fR of a given object. To modify a \fBrunpath\fR, the
+following must be true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The desired string must already exist in the dynamic string table, or there
+must be enough reserved space within this section for the new string to be
+added. If your object has a string table reservation area, the value of the
+\fB\&.dynamic DT_SUNW_STRPAD\fR element indicates the size of the area. The
+following \fBelfedit\fR command can be used to check this:
+.sp
+.in +2
+.nf
+% elfedit -r -e 'dyn:tag DT_SUNW_STRPAD' file
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The dynamic section must already have a \fBrunpath\fR element, or there must be
+an unused dynamic slot available where one can be inserted. To test for the
+presence of an existing \fBrunpath\fR:
+.sp
+.in +2
+.nf
+% elfedit -r -e 'dyn:runpath' file
+.fi
+.in -2
+.sp
+
+A dynamic section uses an element of type \fBDT_NULL\fR to terminate the array
+found in that section. The final \fBDT_NULL\fR cannot be changed, but if there
+are more than one of these, \fBelfedit\fR can convert one of them into a
+\fBrunpath\fR element. To test for extra dynamic slots:
+.sp
+.in +2
+.nf
+% elfedit -r -e 'dyn:tag DT_NULL' file
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+Older objects do not have the extra space necessary to complete such
+operations. The space necessary to do so was introduced in the Solaris Express
+Community Edition release.
+.sp
+.LP
+When an operation fails, the detailed information printed using the \fB-d\fR
+(debug) option can be very helpful in uncovering the reason why.
+.sp
+.LP
+\fBelfedit\fR modules follow a convention by which commands that directly
+manipulate a field in an ELF structure have the same name as the field, while
+commands that implement higher level concepts do not. For instance, the command
+to manipulate the \fBe_flags\fR field in the ELF header is named
+\fBehdr:e_flags\fR. Therefore, you generally find the command to modify ELF
+fields by identifying the module and looking for a command with the name of the
+field.

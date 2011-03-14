@@ -1,0 +1,545 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_GetStatus 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_GetStatus \- return the current status of a PC Card and its socket
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_GetStatus\fR(\fBclient_handle_t\fR \fIch\fR, \fBget_status_t *\fR\fIgs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIgs\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBget_status_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function returns the current status of a \fBPC \fRCard and its socket.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBget_status_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     Socket;          /* socket number*/
+uint32_t     CardState;       /* "live" card status for this client*/
+uint32_t     SocketState;     /* latched socket values */
+uint32_t     raw_CardState;   /* raw live card status */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR \fR
+.ad
+.RS 18n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCardState\fR \fR
+.ad
+.RS 18n
+.rt  
+The \fBCardState\fR field is the bit-mapped output data returned from Card
+Services. The bits identify what Card Services thinks the current state of the
+installed \fBPC \fRCard is. The bits are:
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_WRITE_PROTECTED\fR
+.ad
+.sp .6
+.RS 4n
+Card is write protected
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_CARD_LOCKED\fR
+.ad
+.sp .6
+.RS 4n
+Card is locked
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_EJECTION_REQUEST\fR
+.ad
+.sp .6
+.RS 4n
+Ejection request in progress
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_INSERTION_REQUEST\fR
+.ad
+.sp .6
+.RS 4n
+Insertion request in progress
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_BATTERY_DEAD\fR
+.ad
+.sp .6
+.RS 4n
+Card battery is dead
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_BATTERY_DEAD\fR
+.ad
+.sp .6
+.RS 4n
+Card battery is dead (\fBBVD1\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_BATTERY_LOW\fR
+.ad
+.sp .6
+.RS 4n
+Card battery is low (\fBBVD2\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_CARD_READY\fR
+.ad
+.sp .6
+.RS 4n
+Card is READY
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_CARD_INSERTED\fR
+.ad
+.sp .6
+.RS 4n
+Card is inserted
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_REQ_ATTN\fR
+.ad
+.sp .6
+.RS 4n
+Extended status attention request
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_RES_EVT1\fR
+.ad
+.sp .6
+.RS 4n
+Extended status reserved event status
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_RES_EVT2\fR
+.ad
+.sp .6
+.RS 4n
+Extended status reserved event status
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB CS_STATUS_RES_EVT3\fR
+.ad
+.sp .6
+.RS 4n
+Extended status reserved event status
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_VCC_50\fR
+.ad
+.sp .6
+.RS 4n
+5.0 Volts Vcc Indicated
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_VCC_33\fR
+.ad
+.sp .6
+.RS 4n
+3.3 Volts Vcc Indicated
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_VCC_XX\fR
+.ad
+.sp .6
+.RS 4n
+X.X Volts Vcc Indicated
+.RE
+
+The state of the \fBCS_STATUS_CARD_INSERTED\fR bit indicates whether the \fBPC
+\fRCard associated with this driver instance, not just any card, is inserted in
+the socket. If an \fBI/O \fRcard is installed in the specified socket, card
+state is returned from the \fBPRR\fR (Pin Replacement Register) and the
+\fBESR\fR (Extended Status Register) (if present). If certain state bits are
+not present in the \fBPRR\fR or \fBESR\fR, a simulated state bit value is
+returned as defined below:
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_WRITE_PROTECTED\fR
+.ad
+.RS 29n
+.rt  
+Not write protected
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_BATTERY_DEAD\fR
+.ad
+.RS 29n
+.rt  
+Power good
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPCS_STATUS_BATTERY_LOW\fR
+.ad
+.RS 29n
+.rt  
+Power good
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_CARD_READY\fR
+.ad
+.RS 29n
+.rt  
+Ready
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_REQ_ATTN\fR
+.ad
+.RS 29n
+.rt  
+Not set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_RES_EVT1\fR
+.ad
+.RS 29n
+.rt  
+Not set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_RES_EVT2\fR
+.ad
+.RS 29n
+.rt  
+Not set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_STATUS_RES_EVT3\fR
+.ad
+.RS 29n
+.rt  
+Not set
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocketState\fR \fR
+.ad
+.RS 18n
+.rt  
+The \fBSocketState\fR field is a bit-map of the current card and socket state.
+The bits are:
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_WRITE_PROTECT_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Write Protect
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBECS_SOCK_STATUS_CARD_LOCK_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Card Lock Change
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_EJECTION_PENDING\fR
+.ad
+.sp .6
+.RS 4n
+Ejection Request
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_INSERTION_PENDING\fR
+.ad
+.sp .6
+.RS 4n
+Insertion Request
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_BATTERY_DEAD_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Battery Dead
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_BATTERY_LOW_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Battery Low
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_CARD_READY_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Ready Change
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_SOCK_STATUS_CARD_INSERTION_CHANGE\fR
+.ad
+.sp .6
+.RS 4n
+Card is inserted
+.sp
+ The state reported in the SocketState field may be different from the state
+reported in the CardState field. Clients should normally depend only on the
+state reported in the CardState field.
+.sp
+The state reported in the \fBSocketState\fR field may be different from the
+state reported in the \fBCardState\fR field. Clients should normally depend
+only on the state reported in the \fBCardState\fR field.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBraw_CardState\fR \fR
+.ad
+.RS 18n
+.rt  
+The \fBraw_CardState\fR field is a Solaris-specific extension that allows the
+client to determine if any card is inserted in the socket. The bit definitions
+in the \fBraw_CardState\fR field are identical to those in the \fBCardState\fR
+field with the exception that the \fBCS_STATUS_CARD_INSERTED\fR bit in the
+\fBraw_CardState\fR field is set whenever any card is inserted into the socket.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SOCKET\fR \fR
+.ad
+.RS 28n
+.rt  
+Error getting socket state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.sp
+.LP
+\fBCS_NO_CARD\fR will not be returned if there is no \fBPC \fRCard present in
+the socket.
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

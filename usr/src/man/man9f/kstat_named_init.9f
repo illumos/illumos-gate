@@ -1,0 +1,170 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_named_init 9F "29 Feb 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+kstat_named_init, kstat_named_setstr \- initialize a named kstat
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+
+
+
+\fBvoid\fR \fBkstat_named_init\fR(\fBkstat_named_t *\fR\fIknp\fR, \fBconst char *\fR\fIname\fR,
+     \fBuchar_t\fR \fIdata_type\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_named_setstr\fR(\fBkstat_named_t *\fR\fIknp\fR, \fBconst char *\fR\fIstr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIknp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBkstat_named\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 13n
+.rt  
+The name of the statistic.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata_type\fR\fR
+.ad
+.RS 13n
+.rt  
+The type of value. This indicates which field of the \fBkstat_named\fR(9S)
+structure should be used. Valid values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_CHAR\fR\fR
+.ad
+.RS 24n
+.rt  
+The "\fBchar\fR" field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_LONG\fR\fR
+.ad
+.RS 24n
+.rt  
+The "\fBlong\fR" field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_ULONG\fR\fR
+.ad
+.RS 24n
+.rt  
+The "\fBunsigned long\fR" field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_LONGLONG\fR\fR
+.ad
+.RS 24n
+.rt  
+Obsolete. Use \fBKSTAT_DATA_INT64\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_ULONGLONG\fR\fR
+.ad
+.RS 24n
+.rt  
+Obsolete. Use \fBKSTAT_DATA_UINT64\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_DATA_STRING\fR\fR
+.ad
+.RS 24n
+.rt  
+Arbitrary length "\fBlong string\fR" field.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstr\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBNULL\fR-terminated string.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBkstat_named_init()\fR associates a name and a type with a
+\fBkstat_named\fR(9S) structure.
+.sp
+.LP
+\fBkstat_named_setstr()\fR associates \fIstr\fR with the named kstat \fBknp\fR.
+It is an error for \fBknp\fR to be of type other than \fBKSTAT_DATA_STRING\fR.
+The string argument must remain valid even after the function that is calling
+\fBkstat_named_setstr()\fR is returned. This is the only supported method of
+changing the value of long strings.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+\fBkstat_named_init()\fR and \fBkstat_named_setstr()\fR can be called from user
+or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S),
+\fBkstat_named\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

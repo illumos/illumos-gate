@@ -41,6 +41,10 @@ dir path=usr/sadm/install
 dir path=usr/sadm/install/bin
 dir path=usr/sadm/install/scripts
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 dir path=var group=sys
 dir path=var/sadm group=sys
 dir path=var/sadm/install
@@ -77,6 +81,27 @@ file path=usr/sbin/installf group=sys mode=0555
 file path=usr/sbin/pkgadd group=sys mode=0555
 file path=usr/sbin/pkgchk group=sys mode=0555
 file path=usr/sbin/pkgrm group=sys mode=0555
+file path=usr/share/man/man1/pkginfo.1
+file path=usr/share/man/man1/pkgmk.1
+file path=usr/share/man/man1/pkgparam.1
+file path=usr/share/man/man1/pkgproto.1
+file path=usr/share/man/man1/pkgtrans.1
+file path=usr/share/man/man1m/installf.1m
+file path=usr/share/man/man1m/pkgadd.1m
+file path=usr/share/man/man1m/pkgadm.1m
+file path=usr/share/man/man1m/pkgask.1m
+file path=usr/share/man/man1m/pkgchk.1m
+file path=usr/share/man/man1m/pkgrm.1m
+file path=usr/share/man/man1m/removef.1m
+file path=usr/share/man/man4/admin.4
+file path=usr/share/man/man4/compver.4
+file path=usr/share/man/man4/contents.4
+file path=usr/share/man/man4/copyright.4
+file path=usr/share/man/man4/depend.4
+file path=usr/share/man/man4/pkginfo.4
+file path=usr/share/man/man4/pkgmap.4
+file path=usr/share/man/man4/prototype.4
+file path=usr/share/man/man4/space.4
 file path=var/sadm/install/admin/default group=sys mode=0444
 hardlink path=usr/sadm/install/scripts/i.CONFIG.prsv target=./i.preserve
 hardlink path=usr/sbin/pkgask target=../../usr/sbin/pkgadd

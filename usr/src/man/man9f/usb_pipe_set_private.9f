@@ -1,0 +1,173 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usb_pipe_set_private 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+usb_pipe_set_private, usb_pipe_get_private \- USB user-defined pipe data-field
+facility
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/usba.h>
+
+\fBint \fR\fBusb_pipe_set_private\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR, \fBusb_opaque_t\fR \fIdata\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBusb_opaque_t usb_pipe_get_private \fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.LP
+For \fBusb_pipe_set_private()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpipe_handle\fR\fR
+.ad
+.RS 15n
+.rt  
+Pipe handle into which user-defined data is placed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdata\fR\fR
+.ad
+.RS 15n
+.rt  
+Data to store in the pipe handle.
+.RE
+
+.sp
+.LP
+For \fBusb_pipe_get_private()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpipe_handle\fR\fR
+.ad
+.RS 15n
+.rt  
+Pipe handle from which user-defined data is retrieved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusb_set_driver_private()\fR function initializes the user-private data
+field of the pipe referred to by \fIpipe_handle\fR, using \fIdata\fR. The
+user-private data field is  used to store any data the client desires and is
+not used in any way by the USBA or OS framework. Client drivers often store
+their soft-state here for convenient retrieval by their callback handlers.
+.sp
+.LP
+The \fBusb_get_driver_private()\fR function retrieves the user-private data
+stored via \fBusb_set_driver_private()\fR, from the pipe referred to by
+\fIpipe_handle\fR.
+.SH RETURN VALUES
+.sp
+.LP
+For \fBusb_pipe_set_private()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_SUCCESS\fR
+.ad
+.RS 20n
+.rt  
+Private data has been successfully stored in pipe handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_PIPE\fR
+.ad
+.RS 20n
+.rt  
+\fIpipe_handle\fR argument is \fBNULL\fR or invalid.
+.sp
+Pipe is closing or closed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUSB_INVALID_PERM\fR
+.ad
+.RS 20n
+.rt  
+The \fIpipe_handle\fR argument refers to the default control pipe.
+.RE
+
+.sp
+.LP
+For \fBusb_pipe_get_private()\fR:
+.sp
+.LP
+On success: usb_opaque_t pointer to data being retrieved.
+.sp
+.LP
+On failure: \fBNULL\fR. Fails if pipe handle is \fBNULL\fR or invalid. Fails if
+pipe handle is to a pipe which is closing or closed.
+.SH CONTEXT
+.sp
+.LP
+May be called from user, kernel or interrupt context.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+    usb_pipe_handle_t pipe;
+
+    /* Some driver defined datatype. */
+    xxx_data_t *data = kmem_zalloc(...);
+
+    usb_pipe_set_private(pipe, data);
+
+    ----
+
+    xxx_data_t *xxx_data_ptr = (xxx_data_t *)usb_pipe_get_private(pipe);
+            
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based systems
+_
+Interface stabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBusb_pipe_open\fR(9F), \fBusb_alloc_request\fR(9F)

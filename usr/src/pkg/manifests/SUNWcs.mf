@@ -20,9 +20,14 @@
 #
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 
+<include SUNWcs.man1.inc>
+<include SUNWcs.man1m.inc>
+<include SUNWcs.man4.inc>
+<include SUNWcs.man5.inc>
+<include SUNWcs.man7d.inc>
+<include SUNWcs.man7fs.inc>
 set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
 set name=pkg.description \
     value="core software for a specific instruction-set architecture"
@@ -134,6 +139,8 @@ dir path=usr/games
 dir path=usr/has
 dir path=usr/has/bin
 dir path=usr/has/lib
+dir path=usr/has/man
+dir path=usr/has/man/man1has
 dir path=usr/kernel group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
@@ -272,6 +279,13 @@ dir path=usr/share/lib/zoneinfo/Pacific
 dir path=usr/share/lib/zoneinfo/US
 dir path=usr/share/lib/zoneinfo/src
 dir path=usr/share/lib/zoneinfo/tab
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
+dir path=usr/share/man/man5
+dir path=usr/share/man/man7d
+dir path=usr/share/man/man7fs
 dir path=usr/share/src group=sys
 dir path=var group=sys
 dir path=var/adm group=sys mode=0775
@@ -891,6 +905,10 @@ file path=usr/bin/xargs mode=0555
 file path=usr/bin/xstr mode=0555
 file path=usr/has/bin/edit mode=0555
 file path=usr/has/bin/sh mode=0555
+file path=usr/has/man/man1has/edit.1has
+file path=usr/has/man/man1has/ex.1has
+file path=usr/has/man/man1has/sh.1has
+file path=usr/has/man/man1has/vi.1has
 file path=usr/kernel/drv/$(ARCH64)/dump group=sys
 file path=usr/kernel/drv/$(ARCH64)/fssnap group=sys
 file path=usr/kernel/drv/$(ARCH64)/kstat group=sys

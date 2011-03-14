@@ -1,0 +1,237 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mq_receive 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mq_receive, mq_timedreceive, mq_reltimedreceive_np \- receive a message from a
+message queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <mqueue.h>
+
+\fBssize_t\fR \fBmq_receive\fR(\fBmqd_t\fR \fImqdes\fR, \fBchar *\fR\fImsg_ptr\fR, \fBsize_t\fR \fImsg_len\fR,
+     \fBunsigned *\fR\fImsg_prio\fR);
+.fi
+
+.LP
+.nf
+#include <mqueue.h>
+#include <time.h>
+
+\fBssize_t\fR \fBmq_timedreceive\fR(\fBmqd_t\fR \fImqdes\fR, \fBchar *restrict\fR \fImsg_ptr\fR,
+     \fBsize_t\fR \fImsg_len\fR, \fBunsigned *restrict\fR \fImsg_prio\fR,
+     \fBconst struct timespec *restrict\fR \fIabs_timeout\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBmq_reltimedreceive_np\fR(\fBmqd_t\fR \fImqdes\fR,
+     \fBchar *restrict\fR \fImsg_ptr\fR, \fBsize_t\fR \fImsg_len\fR,
+     \fBunsigned *restrict\fR \fImsg_prio\fR,
+     \fBconst struct timespec *restrict\fR \fIrel_timeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmq_receive()\fR function receives the oldest of the highest priority
+message(s) from the message queue specified by \fImqdes\fR. If the size of the
+buffer in bytes, specified by \fImsg_len\fR, is less than the \fBmq_msgsize\fR
+member of the message queue, the function fails and returns an error.
+Otherwise, the selected message is removed from the queue and copied to the
+buffer pointed to by \fImsg_ptr\fR.
+.sp
+.LP
+If the value of \fImsg_len\fR is greater than {\fBSSIZE_MAX\fR}, the result is
+implementation-defined.
+.sp
+.LP
+If \fImsg_prio\fR is not \fINULL\fR, the priority of the selected message is
+stored in the location referenced by \fImsg_prio\fR.
+.sp
+.LP
+If the specified message queue is empty and  \fBO_NONBLOCK\fR is not set in the
+message queue description associated with \fImqdes\fR, (see \fBmq_open\fR(3C)
+and \fBmq_setattr\fR(3C)), \fBmq_receive()\fR blocks, waiting until a message
+is enqueued on the message queue, or until \fBmq_receive()\fR is interrupted by
+a signal. If more than one process (or thread) is waiting to receive a message
+when a message arrives at an empty queue, then the process of highest priority
+that has been waiting the longest is selected to receive the message. If the
+specified message queue is empty and  \fBO_NONBLOCK\fR is set in the message
+queue description associated with \fImqdes\fR, no message is removed from the
+queue, and \fBmq_receive()\fR returns an error.
+.sp
+.LP
+The \fBmq_timedreceive()\fR function receives the oldest of the highest
+priority messages from the message queue specified by \fImqdes\fR as described
+for the \fBmq_receive()\fR function. However, if \fBO_NONBLOCK\fR was not
+specified when the message queue was opened with the \fBmq_open\fR(3C)
+function, and no message exists on the queue to satisfy the receive, the wait
+for such a message is terminated when the specified timeout expires. If
+\fBO_NONBLOCK\fR is set, this function is equivalent to \fBmq_receive()\fR.
+.sp
+.LP
+The \fBmq_reltimedreceive_np()\fR function is identical to the
+\fBmq_timedreceive()\fR function, except that the timeout is specified as a
+relative time interval.
+.sp
+.LP
+For \fBmq_timedreceive()\fR, the timeout expires when the absolute time
+specified by \fIabs_timeout\fR passes, as measured by the \fBCLOCK_REALTIME\fR
+clock (that is, when the value of that clock equals or exceeds
+\fIabs_timeout\fR), or if the absolute time specified by \fIabs_timeout\fR has
+already been passed at the time of the call.
+.sp
+.LP
+For \fBmq_reltimedreceive_np()\fR, the timeout expires when the time interval
+specified by \fIrel_timeout\fR passes, as measured by the \fBCLOCK_REALTIME\fR
+clock, or if the time interval specified by \fIrel_timeout\fR is negative at
+the time of the call.
+.sp
+.LP
+The resolution of the timeout is the resolution of the \fBCLOCK_REALTIME\fR
+clock. The \fBtimespec\fR argument is defined in the <\fBtime.h\fR> header.
+.sp
+.LP
+Under no circumstance does the operation fail with a timeout if a message can
+be removed from the message queue immediately. The validity of the timeout
+parameter need not be checked if a message can be removed from the message
+queue immediately.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmq_receive()\fR, \fBmq_timedreceive()\fR, and
+\fBmq_reltimedreceive_np()\fR return the length of the selected message in
+bytes and the message is removed from the queue. Otherwise, no message is
+removed from the queue, the functions return a value of \fB\(mi1\fR, and sets
+\fBerrno\fR to indicate the error condition.
+.SH ERRORS
+.sp
+.LP
+The \fBmq_receive()\fR, \fBmq_timedreceive()\fR, and
+\fBmq_reltimedreceive_np()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR \fR
+.ad
+.RS 13n
+.rt  
+\fBO_NONBLOCK\fR was set in the message description associated with
+\fImqdes\fR, and the specified message queue is empty.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR \fR
+.ad
+.RS 13n
+.rt  
+The \fImqdes\fR argument is not a valid message queue descriptor open for
+reading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR \fR
+.ad
+.RS 13n
+.rt  
+The function was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The process or thread would have blocked, and the timeout parameter specified a
+nanoseconds field value less than zero or greater than or equal to 1,000
+million.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMSGSIZE\fR \fR
+.ad
+.RS 13n
+.rt  
+The specified message buffer size, \fImsg_len\fR, is less than the message size
+member of the message queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETIMEDOUT\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fBO_NONBLOCK\fR flag was not set when the message queue was opened, but no
+message arrived on the queue before the specified timeout expired.
+.RE
+
+.sp
+.LP
+The \fBmq_receive()\fR, \fBmq_timedreceive()\fR, and
+\fBmq_reltimedreceive_np()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADMSG\fR \fR
+.ad
+.RS 12n
+.rt  
+A data corruption problem with the message has been detected.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBmq_receive()\fR and \fBmq_timedreceive()\fR. see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBmqueue.h\fR(3HEAD), \fBmq_open\fR(3C), \fBmq_send\fR(3C),
+\fBmq_setattr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

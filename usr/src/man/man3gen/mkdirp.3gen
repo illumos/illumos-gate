@@ -1,0 +1,97 @@
+'\" te
+.\" Copyright 1989 AT&T. Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mkdirp 3GEN "14 Oct 2003" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+mkdirp, rmdirp \- create or remove directories in a path
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBint\fR \fBmkdirp\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrmdirp\fR(\fBchar *\fR\fIdir\fR, \fBchar *\fR\fIdir1\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmkdirp()\fR function creates all the missing directories in \fIpath\fR
+with \fImode\fR. See \fBchmod\fR(2) for the values of \fImode\fR.
+.sp
+.LP
+The \fBrmdirp()\fR function removes directories in path \fIdir\fR. This removal
+begins at the end of the path and moves backward toward the root as far as
+possible. If an error occurs, the remaining path is stored in \fIdir1\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If \fIpath\fR already exists or if a needed directory cannot be created,
+\fBmkdirp()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to one of the error
+values listed for \fBmkdir\fR(2). It returns zero if all the directories are
+created.
+.sp
+.LP
+The \fBrmdirp()\fR function returns \fB0\fR if it is able to remove every
+directory in the path. It returns \fB\(mi2\fR if a ``\fB\&.\fR'' or
+``\fB\&..\fR'' is in the path and \fB\(mi3\fR if an attempt is made to remove
+the current directory. Otherwise it returns \fB\(mi1\fR\&.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of creating scratch directories.
+.sp
+.LP
+The following example creates scratch directories.
+
+.sp
+.in +2
+.nf
+/* create scratch directories */
+if(mkdirp("/tmp/sub1/sub2/sub3", 0755) == \(mi1) {
+	fprintf(stderr, "cannot create directory");
+	exit(1);
+}
+chdir("/tmp/sub1/sub2/sub3");
+\&.
+\&.
+\&.
+/* cleanup */
+chdir("/tmp");
+rmdirp("sub1/sub2/sub3");
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(2), \fBmkdir\fR(2), \fBrmdir\fR(2), \fBmalloc\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBmkdirp()\fR function uses \fBmalloc\fR(3C) to allocate temporary space
+for the string.

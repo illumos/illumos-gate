@@ -1,0 +1,68 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH makedevice 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+makedevice \- make device number from major and minor numbers
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/mkdev.h>
+#include <sys/ddi.h>
+
+
+
+\fBdev_t\fR \fBmakedevice\fR(\fBmajor_t\fR \fImajnum\fR, \fBminor_t\fR \fIminnum\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImajnum\fR\fR
+.ad
+.RS 10n
+.rt  
+Major device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminnum\fR\fR
+.ad
+.RS 10n
+.rt  
+Minor device number.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmakedevice()\fR function creates a device number from a major and minor
+device number. \fBmakedevice()\fR should be used to create device numbers so
+the driver will port easily to releases that treat device numbers differently.
+.SH RETURN VALUES
+.sp
+.LP
+The device number, containing both the major number and the minor number, is
+returned. No validation of the major or minor numbers is performed.
+.SH CONTEXT
+.sp
+.LP
+The \fBmakedevice()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBgetmajor\fR(9F), \fBgetminor\fR(9F)

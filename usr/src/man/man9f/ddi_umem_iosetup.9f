@@ -1,0 +1,176 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_umem_iosetup 9F "4 Feb 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_umem_iosetup \- Setup I/O requests to application memory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBstruct buf *\fR\fBddi_umem_iosetup\fR(\fBddi_umem_cookie_t\fR \fIcookie,\fRoff_t off,	
+     size_t \fIlen\fR, int \fIdirection\fR, dev_t \fIdev\fR, daddr_t \fIblkno\fR,	
+     int (*iodone) (struct buf *), int \fIsleepflag\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookie\fR \fR
+.ad
+.RS 14n
+.rt  
+The kernel memory cookie allocated by \fBddi_umem_lock\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 14n
+.rt  
+Offset from the start of the cookie.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 14n
+.rt  
+Length of the I/O request in bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdirection\fR \fR
+.ad
+.RS 14n
+.rt  
+Must be set to \fBB_READ\fR for reads from the device or \fBB_WRITE\fR for
+writes to the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 14n
+.rt  
+Device number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIblkno\fR \fR
+.ad
+.RS 14n
+.rt  
+Block number on device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiodone\fR \fR
+.ad
+.RS 14n
+.rt  
+Specific \fBbiodone\fR(9F) routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsleepflag\fR \fR
+.ad
+.RS 14n
+.rt  
+Determines whether caller can sleep for memory. Possible flags are
+\fBDDI_UMEM_SLEEP\fR to allow sleeping until memory is available, or
+\fBDDI_UMEM_NOSLEEP\fR to return \fBNULL\fR immediately if memory is not
+available.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_umem_iosetup\fR(9F) function is used by drivers to setup I/O
+requests to application memory which has been locked down using
+\fBddi_umem_lock\fR(9F).
+.sp
+.LP
+The \fBddi_umem_iosetup\fR(9F) function returns a pointer to a \fBbuf\fR(9S)
+structure corresponding to the memory cookie \fBcookie\fR. Drivers can setup
+multiple buffer structures simultaneously active using the same memory cookie.
+The \fBbuf\fR(9S) structures can span all or part of the region represented by
+the cookie and can overlap each other. The \fBbuf\fR(9S) structure can be
+passed to \fBddi_dma_buf_bind_handle\fR(9F) to initiate DMA transfers to or
+from the locked down memory.
+.sp
+.LP
+The \fIoff \fR parameter specifies the offset from the start of the cookie. The
+\fIlen\fR parameter represents the length of region to be mapped by the buffer.
+The \fIdirection\fR parameter must be set to either \fBB_READ\fR or
+\fBB_WRITE\fR, to indicate the action that will be performed by the device.
+(Note that this direction is in the opposite sense of the VM system's direction
+of \fBDDI_UMEMLOCK_READ\fR and \fBDDI_UMEMLOCK_WRITE\fR.) The direction must be
+compatible with the flags used to create the memory cookie in
+\fBddi_umem_lock\fR(9F). For example, if \fBddi_umem_lock()\fR is called with
+the \fIflags\fR parameter set to DDI_UMEMLOCK_READ, the \fIdirection\fR
+parameter in \fBddi_umem_iosetup()\fR should be set to \fBB_WRITE\fR.
+.sp
+.LP
+The \fIdev\fR parameter specifies the device to which the buffer is to perform
+I/O.The \fIblkno\fR parameter represents the block number on the device. It
+will be assigned to the \fBb_blkno\fR field of the returned buffer structure.
+The \fIiodone\fR parameter enables the driver to identify a specific
+\fBbiodone\fR(9F) routine to be called by the driver when the I/O is complete.
+The \fIsleepflag \fR parameter determines if the caller can sleep for memory.
+\fBDDI_UMEM_SLEEP\fR allocations may sleep but are guaranteed to succeed.
+\fBDDI_UMEM_NOSLEEP\fR allocations do not sleep but may fail (return
+\fBNULL\fR) if memory is currently not available.
+.sp
+.LP
+After the I/O has completed and the buffer structure is no longer needed, the
+driver calls \fBfreerbuf\fR(9F) to free the buffer structure.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_umem_iosetup\fR(9F) function returns a pointer to the initialized
+buffer header, or \fBNULL\fR if no space is available.
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_umem_iosetup\fR(9F) function can be called from any context only if
+flag is set to \fBDDI_UMEM_NOSLEEP\fR. If \fBDDI_UMEM_SLEEP\fR is set,
+\fBddi_umem_iosetup\fR(9F) can be called from user and kernel context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_umem_lock\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F), \fBfreerbuf\fR(9F),
+\fBphysio\fR(9F), \fBbuf\fR(9S)

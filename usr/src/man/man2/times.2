@@ -1,0 +1,109 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH times 2 "14 May 1997" "SunOS 5.11" "System Calls"
+.SH NAME
+times \- get process and child process times
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/times.h>
+#include <limits.h>
+
+\fBclock_t\fR \fBtimes\fR(\fBstruct tms *\fR\fIbuffer\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtimes()\fR function fills the \fBtms\fR structure pointed to by
+\fIbuffer\fR with time-accounting information. The \fBtms\fR structure, defined
+in \fB<sys/times.h>\fR, contains the following members:
+.sp
+.in +2
+.nf
+clock_t    tms_utime;
+clock_t    tms_stime;
+clock_t    tms_cutime;
+clock_t    tms_cstime;
+.fi
+.in -2
+
+.sp
+.LP
+All times are reported in clock ticks. The specific value for a clock tick is
+defined by the variable \fBCLK_TCK\fR, found in the header <\fBlimits.h\fR>.
+.sp
+.LP
+The times of a terminated child process are included in the \fBtms_cutime\fR
+and \fBtms_cstime\fR members of the parent when \fBwait\fR(3C) or
+\fBwaitpid\fR(3C) returns the process \fBID\fR of this terminated child.  If a
+child process has not waited for its children, their times will not be included
+in its times.
+.sp
+.LP
+The \fBtms_utime\fR member is the \fBCPU\fR time used while executing
+instructions in the user space of the calling process.
+.sp
+.LP
+The \fBtms_stime\fR member is the \fBCPU\fR time used by the system on behalf
+of the calling process.
+.sp
+.LP
+The \fBtms_cutime\fR member is the sum of the \fBtms_utime\fR and the
+\fBtms_cutime\fR of the child processes.
+.sp
+.LP
+The \fBtms_cstime\fR member is the sum of the \fBtms_stime\fR and the
+\fBtms_cstime\fR of the child processes.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBtimes()\fR returns the elapsed real time, in
+clock ticks, since an arbitrary point in the past (for example, system start-up
+time). This point does not change from one invocation of \fBtimes()\fR within
+the process to another. The return value may overflow the possible range of
+type \fBclock_t\fR. If \fBtimes()\fR fails, \fB(clock_t)\(mi1\fR is returned
+and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtimes()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuffer\fR argument points to an illegal address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtime\fR(1), \fBtimex\fR(1), \fBexec\fR(2), \fBfork\fR(2), \fBtime\fR(2),
+\fBwaitid\fR(2), \fBwait\fR(3C), \fBwaitpid\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,324 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gld 9F "28 Aug 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+gld, gld_mac_alloc, gld_mac_free, gld_register, gld_unregister, gld_recv,
+gld_sched, gld_intr \- Generic LAN Driver service routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/gld.h> 
+
+\fBgld_mac_info_t *\fR\fBgld_mac_alloc\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgld_mac_free\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgld_register\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, \fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgld_unregister\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgld_recv\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgld_sched\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBgld_intr\fR(\fBcaddr_t);\fR
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgld_linkstate\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, \fBint32_t\fR \fInewstate\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImacinfo\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBgld_mac_info\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR \fR
+.ad
+.RS 13n
+.rt  
+Device interface name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a message block containing a received packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInewstate\fR \fR
+.ad
+.RS 13n
+.rt  
+Media link state.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBgld_mac_alloc\fR(\|) allocates a new \fBgld_mac_info\fR(9S) structure and
+returns a pointer to it. Some of the GLD-private elements of the structure may
+be initialized before \fBgld_mac_alloc\fR(\|) returns; all other elements are
+initialized to zero. The device driver must initialize some structure members,
+as described in \fBgld_mac_info\fR(9S), before passing the mac_info pointer to
+\fBgld_register\fR(\|).
+.sp
+.LP
+\fBgld_mac_free\fR(\|) frees a \fBgld_mac_info\fR(9S) structure previously
+allocated by \fBgld_mac_alloc\fR(\|).
+.sp
+.LP
+\fBgld_register\fR(\|) is called from the device driver's \fBattach\fR(9E)
+routine, and is used to link the GLD-based device driver with the GLD
+framework. Before calling \fBgld_register\fR(\|) the device driver's
+\fBattach\fR(9E) routine must first use \fBgld_mac_alloc\fR(\|) to allocate a
+\fBgld_mac_info\fR(9S) structure, and initialize several of its structure
+elements. See \fBgld_mac_info\fR(9S) for more information. A successful call to
+\fBgld_register\fR(\|) performs the following actions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+links the device-specific driver with the GLD system;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+sets the device-specific driver's private data pointer (using
+\fBddi_set_driver_private\fR(9F)) to point to the \fBmacinfo\fR structure;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+creates the minor device node.
+.RE
+.sp
+.LP
+The device interface name passed to \fBgld_register\fR(\|) must exactly match
+the name of the driver module as it exists in the filesystem.
+.sp
+.LP
+The driver's \fBattach\fR(9E) routine should return \fBDDI_SUCCESS\fR if
+\fBgld_register\fR(\|) succeeds. If \fBgld_register\fR(\|) returns
+\fBDDI_FAILURE\fR, the \fBattach\fR(9E) routine should deallocate any resources
+it allocated before calling \fBgld_register\fR(\|) and then also return
+\fBDDI_FAILURE\fR.
+.sp
+.LP
+\fBgld_unregister\fR(\|) is called by the device driver's \fBdetach\fR(9E)
+function, and if successful, performs the following tasks:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+ensures the device's interrupts are stopped, calling the driver's
+\fBgldm_stop\fR(\|) routine if necessary;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+removes the minor device node;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+unlinks the device-specific driver from the GLD system.
+.RE
+.sp
+.LP
+If \fBgld_unregister\fR(\|) returns \fBDDI_SUCCESS\fR, the \fBdetach\fR(9E)
+routine should deallocate any data structures allocated in the \fBattach\fR(9E)
+routine, using \fBgld_mac_free\fR(\|) to deallocate the \fBmacinfo\fR
+structure, and return \fBDDI_SUCCESS\fR. If \fBgld_unregister\fR(\|) returns
+\fBDDI_FAILURE\fR, the driver's \fBdetach\fR(9E) routine must leave the device
+operational and return \fBDDI_FAILURE\fR.
+.sp
+.LP
+\fBgld_recv\fR(\|) is called by the driver's interrupt handler to pass a
+received packet upstream. The driver must construct and pass a STREAMS
+\fBM_DATA\fR message containing the raw packet. \fBgld_recv\fR(\|) determines
+which STREAMS queues, if any, should receive a copy of the packet, duplicating
+it if necessary. It then formats a \fBDL_UNITDATA_IND\fR message, if required,
+and passes the data up all appropriate streams.
+.sp
+.LP
+The driver should avoid holding mutex or other locks during the call to
+\fBgld_recv\fR(\|). In particular, locks that could be taken by a transmit
+thread may not be held during a call to \fBgld_recv\fR(\|): the interrupt
+thread that calls \fBgld_recv\fR(\|) may in some cases carry out processing
+that includes sending an outgoing packet, resulting in a call to the driver's
+\fBgldm_send\fR(\|) routine. If the \fBgldm_send\fR(\|) routine were to try to
+acquire a mutex being held by the \fBgldm_intr\fR(\|) routine at the time it
+calls \fBgld_recv\fR(\|), this could result in a panic due to recursive mutex
+entry.
+.sp
+.LP
+\fBgld_sched\fR(\|) is called by the device driver to reschedule stalled
+outbound packets. Whenever the driver's \fBgldm_send\fR(\|) routine has
+returned \fBGLD_NORESOURCES\fR, the driver must later call \fBgld_sched\fR(\|)
+to inform the GLD framework that it should retry the packets that previously
+could not be sent. \fBgld_sched\fR(\|) should be called as soon as possible
+after resources are again available, to ensure that GLD resumes passing
+outbound packets to the driver's \fBgldm_send\fR(\|) routine in a timely way.
+(If the driver's \fBgldm_stop\fR(\|) routine is called, the driver is absolved
+from this obligation until it later again returns \fBGLD_NORESOURCES\fR from
+its \fBgldm_send\fR(\|) routine; however, extra calls to \fBgld_sched\fR(\|)
+will not cause incorrect operation.)
+.sp
+.LP
+\fBgld_intr\fR(\|) is GLD's main interrupt handler. Normally it is specified as
+the interrupt routine in the device driver's call to \fBddi_add_intr\fR(9F).
+The argument to the interrupt handler (specified as \fIint_handler_arg\fR in
+the call to \fBddi_add_intr\fR(9F)) must be a pointer to the
+\fBgld_mac_info\fR(9S) structure. \fBgld_intr\fR(\|) will, when appropriate,
+call the device driver's \fBgldm_intr\fR(\|) function, passing that pointer to
+the \fBgld_mac_info\fR(9S) structure. However, if the driver uses a high-level
+interrupt, it must provide its own high-level interrupt handler, and trigger a
+soft interrupt from within that. In this case, \fBgld_intr\fR(\|) may be
+specified as the soft interrupt handler in the call to
+\fBddi_add_softintr\fR(\|).
+.sp
+.LP
+\fBgld_linkstate()\fR is called by the device driver to notify GLD of changes
+in the media link state. The newstate argument should be set to one of the
+following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_LINKSTATE_DOWN\fR \fR
+.ad
+.RS 26n
+.rt  
+The media link is unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_LINKSTATE_UP\fR \fR
+.ad
+.RS 26n
+.rt  
+The media link is unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_LINKSTATE_UNKNOWN\fR \fR
+.ad
+.RS 26n
+.rt  
+The status of the media link is unknown.
+.RE
+
+.sp
+.LP
+If a driver calls \fBgld_linkstate()\fR, it must also set the GLD_CAP_LINKSTATE
+bit  in the  gldm_capabilties field of the \fBgld_mac_info\fR(9S) structure.
+.SH RETURN VALUES
+.sp
+.LP
+\fBgld_mac_alloc\fR(\|) returns a pointer to a new \fBgld_mac_info\fR(9S)
+structure.
+.sp
+.LP
+\fBgld_register\fR(\|) and \fBgld_unregister\fR(\|) return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+on success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+on failure.
+.RE
+
+.sp
+.LP
+\fBgld_intr\fR(\|) returns a value appropriate for an interrupt handler.
+.SH SEE ALSO
+.sp
+.LP
+\fBgld\fR(7D), \fBgld\fR(9E), \fBgld_mac_info\fR(9S), \fBgld_stats\fR(9S),
+\fBdlpi\fR(7P), \fBattach\fR(9E), \fBddi_add_intr\fR(9F).
+.sp
+.LP
+\fIWriting Device Drivers\fR

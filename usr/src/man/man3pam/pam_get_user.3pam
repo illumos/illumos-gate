@@ -1,0 +1,93 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_get_user 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_get_user \- PAM routine to retrieve user name
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ...  \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+
+\fBint\fR \fBpam_get_user\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBchar **\fR\fIuser\fR,
+     \fBconst char *\fR\fIprompt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_get_user()\fR function is used by  \fBPAM\fR service modules to
+retrieve the current user name from the  \fBPAM\fR handle. If the user name has
+not been set with \fBpam_start()\fR or  \fBpam_set_item()\fR, the \fBPAM\fR
+conversation function will be used to prompt the user for the user name with
+the string "prompt". If \fIprompt\fR is  \fINULL\fR, then \fBpam_get_item()\fR
+is called and the value of \fBPAM_USER_PROMPT\fR is used for prompting. If the
+value of  \fBPAM_USER_PROMPT\fR is  \fINULL\fR, the following default prompt is
+used:
+.sp
+.in +2
+.nf
+Please enter user name:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+After the user name is gathered by the conversation function,
+\fBpam_set_item()\fR is called to set the value of  \fBPAM_USER\fR. By
+convention, applications that need to prompt for a user name should  call
+\fBpam_set_item()\fR and set the value of \fBPAM_USER_PROMPT\fR before calling
+\fBpam_authenticate()\fR. The service module's \fBpam_sm_authenticate()\fR
+function will then call \fBpam_get_user()\fR to prompt for the user name.
+.sp
+.LP
+Note that certain  \fBPAM\fR service modules, such as a smart card module, may
+override the value of  \fBPAM_USER_PROMPT\fR and pass in their own prompt.
+Applications that call \fBpam_authenticate()\fR multiple times should set the
+value of  \fBPAM_USER\fR to  \fINULL\fR with  \fBpam_set_item()\fR before
+calling \fBpam_authenticate()\fR, if they want the user to be prompted for a
+new user name each time. The value of \fIuser\fR retrieved by
+\fBpam_get_user()\fR should not be modified or freed.  The item will be
+released by \fBpam_end()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBpam_get_user()\fR returns  \fBPAM_SUCCESS\fR; otherwise it
+returns an error code. Refer to \fBpam\fR(3PAM) for information on error
+related return values.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBpam_end\fR(3PAM),
+\fBpam_get_item\fR(3PAM), \fBpam_set_item\fR(3PAM), \fBpam_sm\fR(3PAM),
+\fBpam_sm_authenticate\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

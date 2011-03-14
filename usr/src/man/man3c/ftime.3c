@@ -1,0 +1,91 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ftime 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ftime \- get date and time
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/timeb.h>
+
+\fBint\fR \fBftime\fR(\fBstruct timeb *\fR\fItp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBftime()\fR function sets the \fBtime\fR and \fBmillitm\fR members of the
+\fBtimeb\fR structure pointed to by \fItp\fR. The structure is defined in
+<\fBsys/timeb.h\fR> and contains the following members:
+.sp
+.in +2
+.nf
+time_t           time;
+unsigned short   millitm;
+short            timezone;
+short            dstflag;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBtime\fR and \fBmillitm\fR members contain the seconds and milliseconds
+portions, respectively, of the current time in seconds since 00:00:00 UTC
+(Coordinated Universal Time), January 1, 1970.
+.sp
+.LP
+The \fBtimezone\fR member contains the local time zone. The \fBdstflag\fR
+member contains a flag that, if non-zero, indicates that Daylight Saving time
+applies locally during the appropriate part of the year.
+.sp
+.LP
+The contents of the \fBtimezone\fR and \fBdstflag\fR members of \fItp\fR after
+a call to \fBftime()\fR are unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBftime()\fR function returns \fB0\fR.
+Otherwise \fB\(mi1\fR is returned.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+For portability to implementations conforming to earlier versions of this
+document, \fBtime\fR(2) is preferred over this function.
+.sp
+.LP
+The millisecond value usually has a granularity greater than one due to the
+resolution of the system clock.  Depending on any granularity (particularly a
+granularity of one) renders code non-portable.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdate\fR(1), \fBtime\fR(2), \fBctime\fR(3C), \fBgettimeofday\fR(3C),
+\fBtimezone\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)

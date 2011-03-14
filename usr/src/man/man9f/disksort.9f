@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH disksort 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+disksort \- single direction elevator seek sort for buffers
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+void
+
+\fB\fR\fBdisksort\fR(\fBstruct diskhd\fR \fI*dp\fR, \fBstruct buf\fR \fI*bp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdp\fR\fR
+.ad
+.RS 6n
+.rt  
+A pointer to a \fBdiskhd\fR structure. A \fBdiskhd\fR structure is essentially
+identical to head of a buffer structure (see \fBbuf\fR(9S)). The only defined
+items of interest for this structure are the \fBav_forw\fR and \fBav_back\fR
+structure elements which are used to maintain the front and tail pointers of
+the forward linked \fBI/O\fR request queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+A pointer to a buffer structure. Typically this is the \fBI/O\fR request that
+the driver receives in its strategy routine (see \fBstrategy\fR(9E)). The
+driver is responsible for initializing the \fBb_resid\fR structure element to a
+meaningful sort key value prior to calling \fBdisksort()\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The function \fBdisksort()\fR sorts a pointer to a buffer into a single forward
+linked list headed by the \fBav_forw\fR element of the argument \fI*dp\fR.
+.sp
+.LP
+It uses a one-way elevator algorithm that sorts buffers into the queue in
+ascending order based upon a key value held in the argument buffer structure
+element \fBb_resid\fR.
+.sp
+.LP
+This value can either be the driver calculated cylinder number for the
+\fBI/O\fR request described by the buffer argument, or simply the absolute
+logical block for the \fBI/O\fR request, depending on how fine grained the sort
+is desired to be or how applicable either quantity is to the device in
+question.
+.sp
+.LP
+The head of the linked list is found by use of the \fBav_forw\fR structure
+element of the argument \fI*dp\fR. The tail of the linked list is found by use
+of the \fBav_back\fR structure element of the argument \fI*dp\fR. The
+\fBav_forw\fR element of the \fI*bp\fR argument is used by \fBdisksort()\fR to
+maintain the forward linkage. The value at the head of the list presumably
+indicates the currently active disk area.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, interrupt, or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBstrategy\fR(9E), \fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+The \fBdisksort()\fR function does no locking. Therefore, any locking is
+completely the responsibility of the caller.

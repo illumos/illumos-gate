@@ -1,0 +1,179 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gcore 1 "19 Jun 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+gcore \- get core images of running processes
+.SH SYNOPSIS
+.LP
+.nf
+\fBgcore\fR [\fB-pgF\fR] [\fB-o\fR \fIfilename\fR] [\fB-c\fR \fIcontent\fR] \fIprocess-id\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgcore\fR utility creates a core image of each specified process. By
+default, the name of the core image file for the process whose process \fBID\fR
+is \fIprocess-id\fR is \fBcore.\fR\fIprocess-id\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIcontent\fR\fR
+.ad
+.RS 15n
+.rt  
+Produces core image files with the specified content. The content description
+uses the same tokens as in \fBcoreadm\fR(1M). The \fB-c\fR option does not
+apply to cores produced due to the \fB-p\fR or \fB-g\fR flags.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 15n
+.rt  
+Force. Grabs the target process even if another process has control.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 15n
+.rt  
+Produces core image files in the global core file repository with the global
+content as configured by \fBcoreadm\fR(1M). The command fails if the user does
+not have permissions to the global core file repository.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-o\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Substitutes \fIfilename\fR in place of \fBcore\fR as the first part of the name
+of the core image files. \fIfilename\fR can contain the same tokens to be
+expanded as the paths in \fBcoreadm\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+.rt  
+Produces a core image file in the process-specific location with the
+process-specific content for each process as configured by \fBcoreadm\fR(1M).
+The command fails if the user does not have permissions to the per-process core
+file repository.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprocess-id\fR\fR
+.ad
+.RS 14n
+.rt  
+process \fBID\fR
+.RE
+
+.SH USAGE
+.sp
+.LP
+Caution should be exercised when using the \fB-F\fR flag. Imposing two
+controlling processes on one victim process can lead to chaos. Safety is
+assured only if the primary controlling process, typically a debugger, has
+stopped the victim process and the primary controlling process is doing nothing
+at the moment of application of the \fBproc\fR tool in question.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+On failure, such as non-existent process \fBID\fR.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fBcore.\fR\fB\fIprocess-id\fR\fR\fR
+.ad
+.RS 19n
+.rt  
+core images
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The command syntax is Evolving. The Output Formats are Unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBcoreadm\fR(1M), \fBsetrlimit\fR(2), \fBcore\fR(4),
+\fBproc\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBgcore\fR is unaffected by the \fBsetrlimit\fR(2) system call using the
+\fBRLIMIT_CORE\fR value.

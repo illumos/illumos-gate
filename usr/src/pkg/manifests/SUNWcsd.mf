@@ -60,6 +60,8 @@ dir path=lib/svc
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
+dir path=usr/share/man
+dir path=usr/share/man/man4
 file path=etc/dacf.conf group=sys
 file path=etc/devlink.tab group=sys preserve=true
 file path=etc/driver_aliases group=sys preserve=true
@@ -74,6 +76,7 @@ file path=etc/security/device_policy group=sys preserve=true
 file path=etc/security/extra_privs group=sys preserve=true
 file path=lib/svc/manifest/system/sysevent.xml group=sys mode=0444
 file path=lib/svc/method/svc-syseventd mode=0555
+file path=usr/share/man/man4/path_to_inst.4
 legacy pkg=SUNWcsd \
     desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
     name="Core Solaris Devices"

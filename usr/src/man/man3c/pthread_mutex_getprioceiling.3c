@@ -1,0 +1,152 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_mutex_getprioceiling 3C "1 Apr 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_mutex_getprioceiling, pthread_mutex_setprioceiling \- change priority
+ceiling of a mutex
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_mutex_getprioceiling\fR(\fBconst pthread_mutex_t *restrict\fR \fImutex\fR,
+     \fBint *restrict\fR \fIprioceiling\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutex_setprioceiling\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
+     \fBint\fR \fIprioceiling\fR, \fBint *restrict\fR \fIold_ceiling\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_mutex_getprioceiling()\fR function returns the current priority
+ceiling of the mutex.
+.sp
+.LP
+The \fBpthread_mutex_setprioceiling()\fR function either locks the mutex if it
+is unlocked, or blocks until it can successfully lock the mutex, then it
+changes the mutex's priority ceiling and releases the mutex. When the change is
+successful, the previous value of the priority ceiling is returned in
+\fIold_ceiling\fR. The process of locking the mutex need not adhere to the
+priority protect protocol.
+.sp
+.LP
+If the \fBpthread_mutex_setprioceiling()\fR function fails, the mutex priority
+ceiling is not changed.
+.sp
+.LP
+The ceiling value should be drawn from the range of priorities for the
+\fBSCHED_FIFO\fR policy. When a thread acquires such a mutex, the policy of the
+thread at mutex acquisition should match that from which the ceiling value was
+derived (\fBSCHED_FIFO\fR, in this case).    If a thread changes its scheduling
+policy while holding a ceiling mutex, the  behavior of
+\fBpthread_mutex_lock()\fR and \fBpthread_mutex_unlock()\fR on this mutex is
+undefined. See \fBpthread_mutex_lock\fR(3C).
+.sp
+.LP
+The ceiling value should not be treated as a persistent value resident in a
+\fBpthread_mutex_t\fR that is valid across upgrades of Solaris. The semantics
+of the actual ceiling value are determined by the existing priority range for
+the \fBSCHED_FIFO\fR policy, as returned  by the \fBsched_get_priority_min()\fR
+and \fBsched_get_priority_max()\fR functions (see
+\fBsched_get_priority_min\fR(3C)) when called on the version of Solaris on
+which the ceiling value is being utilized.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_mutex_getprioceiling()\fR and
+\fBpthread_mutex_setprioceiling()\fR functions return  \fB0\fR. Otherwise, an
+error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_mutex_getprioceiling()\fR and
+\fBpthread_mutex_setprioceiling()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fImutex\fR does not refer to a currently existing
+mutex.
+.RE
+
+.sp
+.LP
+The \fBpthread_mutex_setprioceiling()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex was not initialized with its \fIprotocol\fR attribute having the
+value of \fBPTHREAD_PRIO_PROTECT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The priority requested by \fIprioceiling\fR is out of range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The caller does not have the privilege to perform the operation.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_mutex_init\fR(3C), \fBpthread_mutex_lock\fR(3C),
+\fBsched_get_priority_min\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

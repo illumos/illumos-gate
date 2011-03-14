@@ -1,0 +1,54 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH inquiry-device-type 9P "18 May 2001" "SunOS 5.11" "Kernel Properties for Drivers"
+.SH NAME
+inquiry-device-type, inquiry-vendor-id, inquiry-product-id,
+inquiry-revision-id, inquiry-serial-no \- inquiry properties for SCSI devices
+.SH DESCRIPTION
+.sp
+.LP
+These are optional properties, typically created by the system, for SCSI target
+devices. References to these properties should use their
+\fBsys/scsi/impl/inquiry.h\fR defined names.
+.sp
+.LP
+\fBinquiry-device-type\fR is an integer property. When present, the least
+significant byte of the value indicates the device type as defined by the SCSI
+standard. Consumers of this property should compare the property values with
+\fBDTYPE_*\fR values defined in \fBsys/scsi/generic/inquiry.h\fR.
+.sp
+.LP
+\fBinquiry-vendor-id\fR is a string property. When present, it contains the
+vendor information. This information typically comes from the
+\fBscsi_inquiry\fR(9S) "\fBinq_vid\fR" field.
+.sp
+.LP
+\fBinquiry-product-id\fR is a string property. When present, it contains the
+product identification. This information typically comes from the
+\fBscsi_inquiry\fR(9S) "\fBinq_pid\fR" field.
+.sp
+.LP
+\fBinquiry-revision-id\fR is a string property. When present, it contains the
+product revision. This revision typically comes from the \fBscsi_inquiry\fR(9S)
+"\fBinq_rev\fR" field.
+.sp
+.LP
+\fBinquiry-serial-no\fR is a string property. When present, it contains the
+serial number. The serial number is typically obtained from the \fBEVPD\fR
+"Unit Serial Number" SCSI INQUIRY data (page 0x80).
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_inquiry\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Values established at \fBtran_tgt_init\fR(9E) time by an \fBHBA\fR driver take
+precedence over values established by the system, and \fBHBA\fR driver values
+may not be the same length as the typical \fBscsi_inquiry\fR(9S) field.

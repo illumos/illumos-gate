@@ -1,0 +1,311 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pool_get_property 3POOL "23 Sep 2003" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.SH NAME
+pool_get_property, pool_put_property, pool_rm_property, pool_walk_properties \-
+resource pool element property manipulation
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <pool.h>
+
+\fBpool_value_class_t\fR \fBpool_get_property\fR(\fBpool_conf_t *\fR\fIconf\fR,
+     \fBconst pool_elem_t *\fR\fIelem\fR, \fBconst char *\fR\fIname\fR,
+     \fBpool_value_t *\fR\fIproperty\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_put_property\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_elem_t *\fR\fIelem\fR,
+     \fBconst char *\fR\fIname\fR, \fBconst pool_value_t *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_rm_property\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_elem_t *\fR\fIelem\fR,
+     \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_walk_properties\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_elem_t *\fR\fIelem\fR,
+     \fBvoid *\fR\fIarg\fR, \fBint (*\fR\fIcallback\fR)(\fBpool_conf_t *\fR, \fBpool_elem_t *\fR,
+     \fBconst char *\fR, \fBpool_value_t *\fR, \fBvoid *\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The various pool types are converted to the common pool element type
+(\fBpool_elem_t\fR) before property manipulation. A \fBpool_value_t\fR is an
+opaque type that contains a property value of one of the following types:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOC_UINT\fR\fR
+.ad
+.RS 14n
+.rt  
+unsigned 64-bit integer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOC_INT\fR\fR
+.ad
+.RS 14n
+.rt  
+signed 64-bit integer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOC_DOUBLE\fR\fR
+.ad
+.RS 14n
+.rt  
+signed double-precision floating point value
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOC_BOOL\fR\fR
+.ad
+.RS 14n
+.rt  
+boolean value: 0 is false, non-zero is true
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOC_STRING\fR\fR
+.ad
+.RS 14n
+.rt  
+null-terminated string of characters
+.RE
+
+.sp
+.LP
+The \fIconf\fR argument for each function refers to the target configuration to
+which the operation applies.
+.sp
+.LP
+The \fBpool_get_property()\fR function attempts to retrieve the value of the
+named property from the element. If the property is not found or an error
+occurs, the value \fBPOC_INVAL\fR is returned to indicate error. Otherwise the
+type of the value retrieved is returned.
+.sp
+.LP
+The \fBpool_put_property()\fR function attempts to set the named property on
+the element to the specified value.  Attempting to set a property that does not
+currently exist on the element will cause the property with the given name and
+value to be created on the element and will not cause an error. An attempt to
+overwrite an existing property with a new property of a different type is an
+error.
+.sp
+.LP
+The \fBpool_rm_property()\fR function attempts to remove the named property
+from the element.  If the property does not exist or is not removable, -1 is
+returned and \fBpool_error\fR(3POOL) reporst an error of \fBPOE_PUTPROP\fR.
+.sp
+.LP
+The \fBpool_walk_properties()\fR function invokes \fIcallback\fR on all
+properties defined for the given element. The \fIcallback\fR is called with the
+element itself, the name of the property, the value of the property, and the
+caller-provided opaque argument.
+.sp
+.LP
+A number of special properties are reserved for internal use and cannot be set
+or removed. Attempting to do so will fail. These properties are documented on
+the \fBlibpool\fR(3LIB) manual page.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpool_get_property()\fR returns the type of the
+property. Otherwise it returns \fBPOC_INVAL\fR and \fBpool_error()\fR returns
+the pool-specific error value.
+.sp
+.LP
+Upon successful completion, \fBpool_put_property()\fR,
+\fBpool_rm_property()\fR, and \fBpool_walk_properties()\fR return 0. Otherwise
+they return \(mi1 and \fBpool_error()\fR returns the pool-specific error value.
+.SH ERRORS
+.sp
+.LP
+The \fBpool_get_property()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
+\fIconf\fR does not contain the supplied \fIelem\fR, or the property is
+restricted and cannot be accessed by the library.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.LP
+The \fBpool_put_property()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
+\fIconf\fR does not contain the supplied \fIelem\fR, the property name is not
+in the correct format, or the property already exists and the supplied type
+does not match the existing type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_PUTPROP\fR\fR
+.ad
+.RS 20n
+.rt  
+The property name is reserved by \fBlibpool\fR and not available for use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The configuration is invalid.
+.RE
+
+.sp
+.LP
+The \fBpool_rm_property()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
+\fIconf\fR does not contain the supplied elem, or the property is reserved by
+libpool and cannot be removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_PUTPROP\fR\fR
+.ad
+.RS 16n
+.rt  
+The property name is reserved by \fBlibpool\fR and not available for use.
+.RE
+
+.sp
+.LP
+The \fBpool_walk_properties()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityUnstable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

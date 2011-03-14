@@ -1,0 +1,98 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf32_getshdr 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf32_getshdr, elf64_getshdr \- retrieve class-dependent section header
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf32_Shdr *\fR\fBelf32_getshdr\fR(\fBElf_Scn *\fR\fIscn\fR);
+.fi
+
+.LP
+.nf
+\fBElf64_Shdr *\fR\fBelf64_getshdr\fR(\fBElf_Scn *\fR\fIscn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For a 32-bit class file, \fBelf32_getshdr()\fR returns a pointer to a section
+header for the section descriptor \fIscn\fR. Otherwise, the file is not a
+32-bit class file, \fIscn\fR was \fINULL,\fR or an error occurred;
+\fBelf32_getshdr()\fR then returns \fINULL\fR.
+.sp
+.LP
+The  \fBelf32_getshdr\fR header includes the following members:
+.sp
+.in +2
+.nf
+\fBElf32_Word	sh_name;
+Elf32_Word	sh_type;
+Elf32_Word	sh_flags;
+Elf32_Addr	sh_addr;
+Elf32_Off	sh_offset;
+Elf32_Word	sh_size;
+Elf32_Word	sh_link;
+Elf32_Word	sh_info;
+Elf32_Word	sh_addralign;
+Elf32_Word	sh_entsize;\fR
+.fi
+.in -2
+
+.sp
+.LP
+while the  \fBelf64_getshdr\fR header includes the following members:
+.sp
+.in +2
+.nf
+\fBElf64_Word	sh_name;
+Elf64_Word	sh_type;
+Elf64_Xword	sh_flags;
+Elf64_Addr	sh_addr;
+Elf64_Off	sh_offset;
+Elf64_Xword	sh_size;
+Elf64_Word	sh_link;
+Elf64_Word	sh_info;
+Elf64_Xword	sh_addralign;
+Elf64_Xword	sh_entsize;\fR
+.fi
+.in -2
+
+.sp
+.LP
+For the 64\(mibit class, replace 32 with 64 as appropriate.
+.sp
+.LP
+If the program is building a new file, it is responsible for creating the
+file's \fBELF\fR header before creating sections.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf_flagdata\fR(3ELF), \fBelf_getscn\fR(3ELF),
+\fBelf_strptr\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)

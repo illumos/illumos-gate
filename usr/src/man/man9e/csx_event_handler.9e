@@ -1,0 +1,617 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_event_handler 9E "22 Nov 1996" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+csx_event_handler \- PC Card driver event handler
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t prefix\fR\fBevent_handler\fR(\fBevent_t\fR \fIevent\fR, \fBint32_t\fR \fIpriority\fR, 
+     \fBevent_callback_args_t *\fR\fIargs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevent\fR\fR
+.ad
+.RS 12n
+.rt  
+The event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpriority\fR\fR
+.ad
+.RS 12n
+.rt  
+The priority of the event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIargs\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to the \fBevent_callback_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Each instance of a \fBPC \fRCard driver must register an event handler to
+manage events associated with its \fBPC \fRCard. The driver event handler is
+registered using the \fBevent_handler\fR field of the \fBclient_req_t\fR
+structure passed to \fBcsx_RegisterClient\fR(9F). The driver may also supply a
+parameter to be passed to its event handler function using the
+\fBevent_callback_args.client_data\fR field. Typically, this argument is the
+driver instance's soft state pointer. The driver also registers which events it
+is interested in receiving through the \fBEventMask\fR field of the
+\fBclient_req_t\fR structure.
+.sp
+.LP
+Each event is delivered to the driver with a priority, \fIpriority\fR. High
+priority events with \fBCS_EVENT_PRI_HIGH\fR set in \fIpriority\fR are
+delivered above lock level, and the driver must use its high-level event mutex
+initialized with the \fBiblk_cookie\fR returned by \fBcsx_RegisterClient\fR(9F)
+to protect such events. Low priority events with \fBCS_EVENT_PRI_LOW\fR set in
+\fIpriority\fR are delivered below lock level, and the driver must use its
+low-level event mutex initialized with a \fBNULL \fRinterrupt cookie to protect
+these events.
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F) registers the driver's event handler, but no
+events begin to be delivered to the driver until after a successful call to
+\fBcsx_RequestSocketMask\fR(9F).
+.sp
+.LP
+In all cases, Card Services delivers an event to each driver instance
+associated with a function on a multiple function \fBPC \fRCard.
+.SS "Event Indications"
+.sp
+.LP
+The events and their indications are listed below; they are always delivered as
+low priority unless otherwise noted:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_REGISTRATION_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A registration request processed in the background has been completed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_INSERTION\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fBPC \fRCard has been inserted in a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_READY\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fBPC \fRCard's \fBREADY \fRline has transitioned from the busy to ready
+state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_REMOVAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fBPC \fRCard has been removed from a socket. This event is delivered twice;
+first as a high priority event, followed by delivery as a low priority event.
+As a high priority event, the event handler should only note that the \fBPC
+\fRCard is no longer present to prevent accesses to the hardware from
+occurring. As a low priority event, the event handler should release the
+configuration and free all \fBI/O\fR, window and \fBIRQ \fRresources for use by
+other \fBPC \fRCards.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_BATTERY_LOW\fR\fR
+.ad
+.sp .6
+.RS 4n
+The battery on a \fBPC \fRCard is weak and is in need of replacement.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_BATTERY_DEAD\fR\fR
+.ad
+.sp .6
+.RS 4n
+The battery on a \fBPC \fRCard is no longer providing operational voltage.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_PM_RESUME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Card Services has received a resume notification from the system's Power
+Management software.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_PM_SUSPEND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Card Services has received a suspend notification from the system's Power
+Management software.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_LOCK\fR\fR
+.ad
+.sp .6
+.RS 4n
+A mechanical latch has been manipulated preventing the removal of the \fBPC
+\fRCard from the socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_UNLOCK\fR\fR
+.ad
+.sp .6
+.RS 4n
+A mechanical latch has been manipulated allowing the removal of the \fBPC
+\fRCard from the socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_EJECTION_REQUEST\fR\fR
+.ad
+.sp .6
+.RS 4n
+A request that the \fBPC \fRCard be ejected from a socket using a motor-driven
+mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_EJECTION_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A motor has completed ejecting a \fBPC \fRCard from a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_ERASE_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A queued erase request that is processed in the background has been completed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_INSERTION_REQUEST\fR\fR
+.ad
+.sp .6
+.RS 4n
+A request that a \fBPC \fRCard be inserted into a socket using a motor-driven
+mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_INSERTION_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A motor has completed inserting a \fBPC \fRCard in a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CARD_RESET\fR\fR
+.ad
+.sp .6
+.RS 4n
+A hardware reset has occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_RESET_REQUEST\fR\fR
+.ad
+.sp .6
+.RS 4n
+A request for a physical reset by a client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_RESET_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A reset request that is processed in the background has been completed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_RESET_PHYSICAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+A reset is about to occur.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_CLIENT_INFO\fR\fR
+.ad
+.sp .6
+.RS 4n
+A request that the client return its client information data.  If
+\fBGET_CLIENT_INFO_SUBSVC(args->client_info.Attributes)\fR is equal to
+\fBCS_CLIENT_INFO_SUBSVC_CS\fR, the driver should fill in the other fields in
+the \fBclient_info\fR structure as described below, and return
+\fBCS_SUCCESS\fR. Otherwise, it should return \fBCS_UNSUPPORTED_EVENT.\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.Attributes\fR\fR
+.ad
+.sp .6
+.RS 4n
+Must be \fBOR\fR'ed with \fBCS_CLIENT_INFO_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.Revision\fR\fR
+.ad
+.sp .6
+.RS 4n
+Must be set to a driver-private version number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.CSLevel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Must be set to \fBCS_VERSION\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.RevDate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Must be set to the revision date of the \fBPC \fRCard driver, using
+\fBCS_CLIENT_INFO_MAKE_DATE(\fIday\fR,\fR \fImonth\fR, \fIyear\fR). \fIday\fR
+must be the day of the month, \fImonth\fR must be the month of the year, and
+\fIyear\fR must be the year, offset from a base of 1980. For example, this
+field could be set to a revision date of July 4 1997 with
+\fBCS_CLIENT_INFO_MAKE_DATE(4, 7, 17)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.ClientName\fR\fR
+.ad
+.sp .6
+.RS 4n
+A string describing the \fBPC \fRCard driver should be copied into this space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.VendorName\fR\fR
+.ad
+.sp .6
+.RS 4n
+A string supplying the name of the \fBPC \fRCard driver vendor should be copied
+into this space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargs->client_data.DriverName\fR\fR
+.ad
+.sp .6
+.RS 4n
+A string supplying the name of the \fBPC \fRCard driver will be copied into
+this space by Card Services after the \fBPC \fRCard driver has successfully
+processed this event; the driver does not need to initialize this field.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_WRITE_PROTECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The write protect status of the \fBPC \fRCard in the indicated socket has
+changed. The current write protect state of the \fBPC \fRCard is in the
+\fBargs->info\fR field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_WRITE_PROTECT_WPOFF\fR\fR
+.ad
+.sp .6
+.RS 4n
+Card is not write protected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_EVENT_WRITE_PROTECT_WPON\fR\fR
+.ad
+.sp .6
+.RS 4n
+Card is write protected.
+.RE
+
+.RE
+
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBevent_callback_args_t\fR are:
+.sp
+.in +2
+.nf
+void               *info;            /* event-specific information */
+void               *client_data;     /* driver-private data */
+client_info_t      client_info;      /* client information*/
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBclient_info_t\fR are:
+.sp
+.in +2
+.nf
+unit32_t           Attributes;       /* attributes */
+unit32_t           Revisions;        /* version number */
+uint32_t           CSLevel;          /* Card Services version */
+uint32_t           RevDate;          /* revision date */
+char               ClientName[CS_CLIENT_INFO_MAX_NAME_LEN];
+                                     /*PC Card driver description */
+char               VendorName[CS_CLIENT_INFO_MAX_NAME_LEN];
+                                     /*PC Card driver vendor name */
+char               DriverName[MODMAXNAMELEN];
+                                     /* PC Card driver name */
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 24n
+.rt  
+The event was handled successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_EVENT\fR\fR
+.ad
+.RS 24n
+.rt  
+Driver does not support this event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_FAILURE\fR\fR
+.ad
+.RS 24n
+.rt  
+Error occurred while handling this event.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function is called from high-level interrupt context in the case of high
+priority events, and from kernel context in the case of low priority events.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+static int 
+xx_event(event_t event, int priority, event_callback_args_t *args) 
+{         
+     int	rval; 
+     struct xxx	*xxx = args->client_data;        
+     client_info_t	*info = &args->client_info;        
+     
+     switch (event) {   
+     case CS_EVENT_REGISTRATION_COMPLETE: 
+          ASSERT(priority & CS_EVENT_PRI_LOW);  
+          mutex_enter(&xxx->event_mutex); 
+          xxx->card_state |= XX_REGISTRATION_COMPLETE;               
+          mutex_exit(&xxx->event_mutex);
+          rval = CS_SUCCESS; 
+          break;  
+
+     case CS_EVENT_CARD_READY: 
+          ASSERT(priority & CS_EVENT_PRI_LOW);
+          rval = xx_card_ready(xxx);  
+          mutex_exit(&xxx->event_mutex); 
+          break;   
+
+     case CS_EVENT_CARD_INSERTION:  
+          ASSERT(priority & CS_EVENT_PRI_LOW);  
+          mutex_enter(&xxx->event_mutex);
+          rval = xx_card_insertion(xxx);  
+          mutex_exit(&xxx->event_mutex); 
+          break;
+
+     case CS_EVENT_CARD_REMOVAL:  
+          if (priority & CS_EVENT_PRI_HIGH) { 
+              mutex_enter(&xxx->hi_event_mutex);
+              xxx->card_state &= ~XX_CARD_PRESENT;
+              mutex_exit(&xxx->hi_event_mutex);
+          }  else {
+              mutex_enter(&xxx->event_mutex);
+              rval = xx_card_removal(xxx);
+              mutex_exit(&xxx->event_mutex);
+          }
+          break;        
+
+     case CS_EVENT_CLIENT_INFO:
+          ASSERT(priority & CS_EVENT_PRI_LOW);
+          if (GET_CLIENT_INFO_SUBSVC_CS(info->Attributes) == 
+              CS_CLIENT_INFO_SUBSVC_CS) {
+                info->Attributes |= CS_CLIENT_INFO_VALID; 
+                info->Revision = 4;
+                info->CSLevel = CS_VERSION;
+                info->RevDate = CS_CLIENT_INFO_MAKE_DATE(4, 7, 17);
+                (void)strncpy(info->ClientName,
+                     "WhizBang Ultra Zowie PC card driver",
+                         CS_CLIENT_INFO_MAX_NAME_LEN)  
+      
+                "ACME PC card drivers, Inc.",       
+                         CS_CLIENT_INFO_MAX_NAME_LEN); 
+                rval = CS_SUCCESS;                 
+          } else { 
+                rval = CS_UNSUPPORTED_EVENT;
+          }
+          break; 
+
+          
+     case CS_EVENT_WRITE_PROTECT:
+           ASSERT(priority & CS_EVENT_PRI_LOW);
+           mutex_enter(&xxx->event_mutex);
+           if (args->info == CS_EVENT_WRITE_PROTECT_WPOFF) {
+               xxx->card_state &= ~XX_WRITE_PROTECTED;
+           } else {
+               xxx->card_state |= XX_WRITE_PROTECTED;
+           }
+           mutex_exit(&xxx->event_mutex); 
+           rval = CS_SUCCESS;
+           break; 
+
+     default: 
+           rval = CS_UNSUPPORTED_EVENT; 
+           break;
+     }           
+
+     return (rval); 
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_Event2Text\fR(9F), \fBcsx_RegisterClient\fR(9F),
+\fBcsx_RequestSocketMask\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

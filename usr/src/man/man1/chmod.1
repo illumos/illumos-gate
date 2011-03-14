@@ -1,0 +1,2824 @@
+'\" te
+.\" Copyright 1989 AT&T.
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH chmod 1 "11 Dec 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+chmod \- change the permissions mode of a file
+.SH SYNOPSIS
+.LP
+.nf
+\fBchmod\fR [\fB-fR\fR] \fIabsolute-mode\fR \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fBchmod\fR [\fB-fR\fR] \fIsymbolic-mode-list\fR \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fBchmod\fR [\fB-fR\fR] \fIacl_operation\fR \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fBchmod\fR [\fB-fR\fR] [\fB-@\fR \fInamed_attribute\fR]...\fIattribute_specification_list\fR \fIfile\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBchmod\fR utility changes or assigns the mode of a file.
+.sp
+.LP
+\fBchmod\fR can also be used to modify Access Control Lists (ACLs) on files and
+directories, and to modify boolean read-write system attributes on regular
+files, directories, and opaque extended attribute files.
+.SS "Absolute Mode"
+.sp
+.LP
+An absolute mode command line has the following format:
+.sp
+.LP
+\fBchmod\fR [\fIoptions\fR] \fIabsolute-mode\fR \fIfile\fR . . .
+.sp
+.LP
+where \fIabsolute-mode\fR is specified using octal numbers \fInnnn\fR defined
+as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 5n
+.rt  
+a number from \fB0\fR to \fB7\fR. An absolute mode is constructed from the OR
+of any of the following modes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4000\fR\fR
+.ad
+.RS 12n
+.rt  
+Set user \fBID\fR on execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB20\fR\fI\|#\|\fR\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Set group \fBID\fR on execution if \fI#\fR is \fB7\fR, \fB5\fR, \fB3\fR, or
+\fB1\fR.
+.sp
+Enable mandatory locking if \fI#\fR is \fB6\fR, \fB4\fR, \fB2\fR, or \fB0\fR.
+.sp
+For directories, files are created with BSD semantics for propagation of the
+group ID. With this option, files and subdirectories created in the directory
+inherit the group ID of the directory, rather than of the current process. For
+directories, the set-gid bit can only be set or cleared by using symbolic mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1000\fR\fR
+.ad
+.RS 12n
+.rt  
+Turn on sticky bit. See \fBchmod\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0400\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read by owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0200\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow write by owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0100\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow execute (search in directory) by owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0700\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read, write, and execute (search) by owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0040\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read by group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0020\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow write by group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0010\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow execute (search in directory) by group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0070\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read, write, and execute (search) by group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0004\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read by others.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0002\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow write by others.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0001\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow execute (search in directory) by others.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0007\fR\fR
+.ad
+.RS 12n
+.rt  
+Allow read, write, and execute (search) by others.
+.RE
+
+.RE
+
+.sp
+.LP
+For directories, the \fBsetgid\fR bit cannot be set (or cleared) in absolute
+mode; it must be set (or cleared) in symbolic mode using \fBg+s\fR (or
+\fBg-s\fR).
+.SS "Symbolic Mode"
+.sp
+.LP
+A symbolic mode command line has the following format:
+.sp
+.LP
+\fBchmod\fR [\fIoptions\fR] \fIsymbolic-mode-list\fR \fIfile\fR . . .
+.sp
+.LP
+where \fIsymbolic-mode-list\fR is a comma-separated list (with no intervening
+white space) of symbolic mode expressions of the form:
+.sp
+.LP
+[\fBwho\fR] \fIoperator\fR [\fIpermissions\fR]
+.sp
+.LP
+Operations are performed in the order given. Multiple \fIpermissions\fR letters
+following a single operator cause the corresponding operations to be performed
+simultaneously.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwho\fR\fR
+.ad
+.RS 14n
+.rt  
+zero or more of the characters \fBu\fR, \fBg\fR, \fBo\fR, and \fBa\fR
+specifying whose permissions are to be changed or assigned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR\fR
+.ad
+.RS 5n
+.rt  
+user's permissions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 5n
+.rt  
+group's permissions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 5n
+.rt  
+others' permissions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR\fR
+.ad
+.RS 5n
+.rt  
+all permissions (user, group, and other)
+.RE
+
+If \fBwho\fR is omitted, it defaults to \fBa\fR, but the setting of the file
+mode creation mask (see \fBumask\fR in \fBsh\fR(1) or \fBcsh\fR(1) for more
+information) is taken into account. When \fBwho\fR is omitted, \fBchmod\fR does
+not override the restrictions of your user mask.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoperator\fR\fR
+.ad
+.RS 14n
+.rt  
+either \fB+\fR, \fB\(mi\fR, or \fB=\fR, signifying how permissions are to be
+changed:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 8n
+.rt  
+Add permissions.
+.sp
+If \fIpermissions\fR are omitted, nothing is added.
+.sp
+If \fBwho\fR is omitted, add the file mode bits represented by
+\fIpermissions\fR, \fIexcept\fR for the those with corresponding bits in the
+file mode creation mask.
+.sp
+If \fBwho\fR is present, add the file mode bits represented by the
+\fIpermissions\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 8n
+.rt  
+Take away permissions.
+.sp
+If \fIpermissions\fR are omitted, do nothing.
+.sp
+If \fBwho\fR is omitted, clear the file mode bits represented by
+\fIpermissions\fR, \fIexcept\fR for those with corresponding bits in the file
+mode creation mask.
+.sp
+If \fBwho\fR is present, clear the file mode bits represented by
+\fIpermissions\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=\fR\fR
+.ad
+.RS 8n
+.rt  
+Assign permissions absolutely.
+.sp
+If \fBwho\fR is omitted, clear all file mode bits; if \fBwho\fR is present,
+clear the file mode bits represented by \fBwho\fR.
+.sp
+If \fIpermissions\fR are omitted, do nothing else.
+.sp
+If \fBwho\fR is omitted, add the file mode bits represented by
+\fIpermissions\fR, \fIexcept\fR for the those with corresponding bits in the
+file mode creation mask.
+.sp
+If \fBwho\fR is present, add the file mode bits represented by
+\fIpermissions\fR.
+.RE
+
+Unlike other symbolic operations, \fB=\fR has an absolute effect in that it
+resets all other bits represented by \fBwho\fR. Omitting \fIpermissions\fR is
+useful only with \fB=\fR to take away all permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpermission\fR\fR
+.ad
+.RS 14n
+.rt  
+any compatible combination of the following letters:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.RS 9n
+.rt  
+mandatory locking
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 9n
+.rt  
+read permission
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.RS 9n
+.rt  
+user or group set-ID
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 9n
+.rt  
+sticky bit
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBw\fR\fR
+.ad
+.RS 9n
+.rt  
+write permission
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 9n
+.rt  
+execute permission
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX\fR\fR
+.ad
+.RS 9n
+.rt  
+execute permission if the file is a directory or if there is execute permission
+for one of the other user classes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR,\fBg\fR,\fBo\fR\fR
+.ad
+.RS 9n
+.rt  
+indicate that \fIpermission\fR is to be taken from the current user, group or
+other mode respectively.
+.RE
+
+Permissions to a file can vary depending on your user identification number
+(UID) or group identification number (GID). Permissions are described in three
+sequences each having three characters:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+UserGroupOther
+rwxrwxrwx
+.TE
+
+This example (user, group, and others all have permission to read, write, and
+execute a given file) demonstrates two categories for granting permissions: the
+access class and the permissions themselves.
+.sp
+The letter \fBs\fR is only meaningful with \fBu\fR or \fBg\fR, and \fBt\fR only
+works with \fBu\fR.
+.sp
+Mandatory file and record locking (\fBl\fR) refers to a file's ability to have
+its reading or writing permissions locked while a program is accessing that
+file.
+.sp
+In a directory which has the set-group-ID bit set (reflected as either
+\fB-----s---\fR or \fB-----l---\fR in the output of \fB\&'ls -ld'\fR), files
+and subdirectories are created with the group-ID of the parent directory\(emnot
+that of current process.
+.sp
+It is not possible to permit group execution and enable a file to be locked on
+execution at the same time. In addition, it is not possible to turn on the
+set-group-ID bit and enable a file to be locked on execution at the same time.
+The following examples, therefore, are invalid and elicit error messages:
+.sp
+.in +2
+.nf
+chmod g+x,+l \fIfile\fR
+chmod g+s,+l \fIfile\fR
+.fi
+.in -2
+.sp
+
+Only the owner of a file or directory (or the super-user) can change that
+file's or directory's mode. Only the super-user can set the sticky bit on a
+non-directory file. If you are not super-user, \fBchmod\fR masks the sticky-bit
+but does not return an error. In order to turn on a file's set-group-ID bit,
+your own group ID must correspond to the file's and group execution must be
+set.
+.RE
+
+.SS "ACL Operation"
+.sp
+.LP
+An ACL Operation command line has the following format:
+.sp
+.in +2
+.nf
+chmod [\fIoptions\fR] A[\fInumber\fR]- \fIfile\fR ...
+chmod [\fIoptions\fR] A-\fIacl_specification\fR \fIfile\fR ...
+chmod [\fIoptions\fR] A[\fIindex\fR]{+|=}\fIacl_specification\fR \fIfile\fR ...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Where \fIacl_specification\fR is a comma-separated list (with no intervening
+white space) of an ACL specification of the form:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA[\fIindex\fR]+\fIacl_specification\fR\fR\fR
+.ad
+.RS 30n
+.rt  
+Prepends the access control entries (ACE) specified in \fIacl_specification\fR
+to the beginning of the file's ACL. Depending on the file system, the ACL can
+be reordered when applied to the file. If "optional" number is specified then
+new ACEs are inserted before specified number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA-\fR\fR
+.ad
+.RS 30n
+.rt  
+Removes all ACEs for current ACL on file and replaces current ACL with new ACL
+that represents only the current mode of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA\fIindex\fR\fR-\fR
+.ad
+.RS 30n
+.rt  
+Removes ACE specified by \fIindex\fR number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA-\fIacl_specification\fR\fR\fR
+.ad
+.br
+.na
+\fB\fR
+.ad
+.RS 30n
+.rt  
+Removes ACEs specified by \fIacl_specification\fR, if they exist in current
+file's ACL.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA=\fIacl_specification\fR\fR\fR
+.ad
+.RS 30n
+.rt  
+Replaces a files entire ACL with \fIacl_specification\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA[\fIindex\fR]=\fIacl_specification\fR\fR\fR
+.ad
+.RS 30n
+.rt  
+Replaces ACEs starting at a specific index number in the current ACL on the
+file. If multiple ACEs are specified, then each subsequent ACE in
+\fIacl_specification\fR replaces the corresponding ACE in the current ACL.
+.RE
+
+.sp
+.LP
+\fBPOSIX-draft ACL Specification (as supported by UFS)\fR
+.sp
+.LP
+POSIX-draft ACLs (as supported by UFS) are specified as colon (\fB:\fR)
+separated fields of the following.
+.sp
+.ne 2
+.mk
+.na
+\fBuser::perms\fR
+.ad
+.sp .6
+.RS 4n
+File owner permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBuser:\fIusername\fR:perms\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup::perms\fR
+.ad
+.sp .6
+.RS 4n
+File group owner permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup:\fIgroupname:\fRperms\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBother::perms\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for user other than the file owner or members of file group owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmask:perms\fR
+.ad
+.sp .6
+.RS 4n
+The ACL mask. The mask entry specifies the maximum permissions allowed for user
+(other than that the owner) and for groups.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:user::perms\fR
+.ad
+.sp .6
+.RS 4n
+Default file owner permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:user:\fIusername\fR:perms\fR
+.ad
+.sp .6
+.RS 4n
+Default permissions for a specific user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:group::perms\fR
+.ad
+.sp .6
+.RS 4n
+Default file group owner permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:group:\fIgroupname\fR:perms\fR
+.ad
+.sp .6
+.RS 4n
+Default permissions for a specific group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:other:perms\fR
+.ad
+.sp .6
+.RS 4n
+Default permissions for user other than the file owner or members of the file
+group owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdefault:mask:perms\fR
+.ad
+.sp .6
+.RS 4n
+Default ACL mask.
+.RE
+
+.sp
+.LP
+The above specification allows for ACLs to be specified such as:
+.sp
+.in +2
+.nf
+user:tom:rw-,mask:rwx,group:staff:r-x
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBNFSv4 ACL Specification (as supported by NFSv4 and ZFS)\fR
+.sp
+.LP
+NFSv4 ACLs provide richer ACL semantics. They provide both allow and deny
+entries, finer grained permissions, and enhanced inheritance control.
+.sp
+.LP
+NFSv4 ACLs are specified as colon (\fB:\fR) separated fields of the following.
+.sp
+.ne 2
+.mk
+.na
+\fBowner@:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for file owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup@:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for file group owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBeveryone@:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for everyone, including file owner and group owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBuser:<username>:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBusersid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific user, but user is specified by SID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup:<groupname>:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroupsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific group, but group is specified by SID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
+.ad
+.sp .6
+.RS 4n
+Permissions for a specific SID, but it doesn't matter if it is a user or a
+group.
+.RE
+
+.sp
+.LP
+Permissions can be specified in three different \fBchmod\fR ACL formats:
+verbose, compact, or positional. The verbose format uses words to indicate that
+the permissions are separated with a forward slash (\fB/\fR) character. Compact
+format uses the permission letters and positional format uses the permission
+letters or the hyphen (\fB-\fR) to identify no permissions.
+.sp
+.LP
+The permissions for verbose mode and their abbreviated form in parentheses for
+compact and positional mode are described as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBread_data (\fBr\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to read the data of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlist_directory (\fBr\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to list the contents of a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_data (\fBw\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to modify a file's data. anywhere in the file's offset range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBadd_file (\fBw\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to add a new file to a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBappend_data (\fBp\fR)\fR
+.ad
+.RS 24n
+.rt  
+The ability to modify a file's data, but only starting at EOF.
+.sp
+Currently, this permission is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBadd_subdirectory (\fBp\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to create a subdirectory to a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_xattr (\fBR\fR)\fR
+.ad
+.RS 24n
+.rt  
+Ability to read the extended attributes of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_xattr (\fBW\fR)\fR
+.ad
+.RS 24n
+.rt  
+Ability to create extended attributes or write to the extended attribute
+directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBexecute (\fBx\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to execute a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_attributes (\fBa\fR)\fR
+.ad
+.RS 24n
+.rt  
+The ability to read basic attributes (non-ACLs) of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_attributes (\fBA\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to change the times associated with a file or directory to an
+arbitrary value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelete (\fBd\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to delete a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelete_child (\fBD\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to delete a file within a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_acl (\fBc\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to read the ACL of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_acl (\fBC\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to write the ACL of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_owner (\fBo\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to change the owner of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsynchronize (\fBs\fR)\fR
+.ad
+.RS 24n
+.rt  
+Permission to access file locally at server with synchronize reads and writes.
+.sp
+Currently, this permission is not supported.
+.RE
+
+.sp
+.LP
+Using the compact ACL format, permissions are specified by using 14 unique
+letters to indicate permissions.
+.sp
+.LP
+Using the positional ACL format, permissions are specified as positional
+arguments similar to the \fBls\fR \fB-V\fR format. The hyphen (\fB-\fR), which
+indicates that no permission is granted at that position, can be omitted and
+only the required letters have to be specified.
+.sp
+.LP
+The letters above are listed in the order they would be specified in positional
+notation.
+.sp
+.LP
+Permissions can be specified with these letters in the following way:
+.sp
+.in +2
+.nf
+rwx--D--------
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The hyphens can be removed to compact the string as follows:
+.sp
+.in +2
+.nf
+rwxD
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Several special permission sets or aliases are also supported. The following
+permission sets are used the same way that verbose permissions are specified.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfull_set\fR\fR
+.ad
+.RS 14n
+.rt  
+All permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmodify_set\fR\fR
+.ad
+.RS 14n
+.rt  
+All permissions except \fBwrite_acl\fR and \fBwrite_owner\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBread_set\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBread_data, read_acl, read_attributes,\fR and \fBread_xattr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwrite_set\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBwrite_data, append_data, write_attributes\fR, and \fBwrite_xattr\fR
+.RE
+
+.sp
+.LP
+The optional inheritance flags can be specified in the three formats. The first
+format uses words to indicate the various inheritance flags separated with a
+forward slash (\fB/\fR) character.
+.sp
+.ne 2
+.mk
+.na
+\fBfile_inherit (\fBf\fR)\fR
+.ad
+.RS 20n
+.rt  
+Inherit to all newly created files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdir_inherit (\fBd\fR)\fR
+.ad
+.RS 20n
+.rt  
+Inherit to all newly created directories.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinherit_only (\fBi\fR)\fR
+.ad
+.RS 20n
+.rt  
+When placed on a directory, do not apply to the directory, only to newly
+created files and directories. This flag requires that either
+\fBfile_inherit\fR and or \fBdir_inherit\fR is also specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBno_propagate (\fBn\fR)\fR
+.ad
+.RS 20n
+.rt  
+Indicates that ACL entries should be inherited to objects in a directory, but
+inheritance should stop after descending one level. This flag is dependent upon
+either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
+.RE
+
+.sp
+.LP
+The inheritance flags listed can also be specified in the compact format or as
+positional arguments similar to the \fBls\fR \fB-V\fR format. A hyphen
+character indicates that the inheritance flag at that position is not specified
+in the positional ACL format.
+.sp
+.LP
+The inheritance flags can be specified with these letters in any of the
+following equivalent ways.
+.sp
+.in +2
+.nf
+file_inherit/dir_inherit/no_propagate
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+fd-n--
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+fdn
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+With this inheritance model, an ACL entry can be specified such as:
+.sp
+.in +2
+.nf
+user:tom:read_data/write_data/read_attributes:file_inherit:allow
+user:fred:read_data:file_inherit/dir_inherit:deny
+user:bob:read_data:allow
+.fi
+.in -2
+.sp
+
+.SS "Attribute Operation"
+.sp
+.LP
+An attribute operation command line has the following format:
+.sp
+.in +2
+.nf
+chmod [\fIoptions\fR] \fIattribute_specification_list\fR \fIfile\fR ...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIattribute_specification_list\fR is the character \fBS\fR followed by a
+comma-separated list of one or more \fIattribute_specifications\fR. Each
+\fIattribute_specification\fR is of the form:
+.sp
+.in +2
+.nf
+[\fIoperator\fR]\fIattribute_specifier\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An \fIoperator\fR is one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 5n
+.rt  
+Each attribute specified by the associated \fIattribute_specifier\fR is
+adjusted to match the value specified by the \fIattribute_specifier\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fR
+.ad
+.RS 5n
+.rt  
+Each attribute specified by the associated \fIattribute_specifier\fR is
+adjusted to match the inverse of the value specified by the
+\fIattribute_specifier\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=\fR\fR
+.ad
+.RS 5n
+.rt  
+Each attribute specified by the associated \fIattribute_specifier\fR is
+adjusted to match the value specified by the \fIattribute_specifier\fR. Any
+boolean read-write extended system attributes associated with the current file
+that are not specified by \fIattribute_specifier\fR is cleared.
+.RE
+
+.sp
+.LP
+If an \fIoperator\fR is not specified in an \fIattribute_specification\fR,
+\fBchmod\fR behaves as if \fB+\fR had been specified.
+.sp
+.LP
+An \fIattribute_specifier\fR takes one of the following forms:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set all boolean read-write extended system attributes associated with the
+current file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc[\fIcompact_attribute_list\fR]\fR\fR
+.ad
+.br
+.na
+\fB\fBc'{'\fIcompact_attribute_list\fR'}'\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set each boolean read-write extended system attribute identified by
+\fIcompact_attribute_list\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBv[\fIverbose_attribute_setting\fR]\fR\fR
+.ad
+.br
+.na
+\fB\fBv['{'\fIverbose_attribute_setting_list\fR'}']\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set each boolean read-write extended system attribute identified by
+\fIverbose_attribute_setting\fR.
+.RE
+
+.sp
+.LP
+A \fIcompact_attribute_list\fR is a list of zero or more adjacent attribute
+abbreviation characters from  list of \fBAttribute Names and Abbreviation
+Characters\fR later in this section. An arbitrary number of hyphen (\fB-\fR)
+characters can be included in a \fIcompact_attribute_list\fR. These are
+ignored.
+.sp
+.LP
+A \fIverbose_attribute_setting\fR is an attribute name from the  list of
+\fBAttribute Names and Abbreviation Characters\fR later in this section,
+optionally, immediately preceded by \fBno\fR. If the attribute name is used
+without \fBno\fR, the attribute is set; otherwise the attribute is cleared.
+.sp
+.LP
+A \fIverbose_attribute_setting_list\fR is zero or more comma-separated
+\fIverbose_attribute_setting\fRs.
+.sp
+.LP
+Multiple operations specified for a file are accumulated and are all set for a
+file operand as a single attribute setting operation. If an attribute is
+specified more than once in an \fIattribute_specification_list\fR, the last
+specified operation is applied.
+.sp
+.LP
+The following is a list of \fBAttribute Names and Abbreviation Characters\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttribute Name\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBAbbreviation Character\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhidden\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBH\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsystem\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBS\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreadonly\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBR\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBarchive\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBA\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnounlink\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBu\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimmutable\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBi\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBappendonly\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBa\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnodump\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBd\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBav_quarantined\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBq\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBav_modified\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBm\fR
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 22n
+.rt  
+Force. \fBchmod\fR does not complain if it fails to change the mode of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 22n
+.rt  
+Recursively descend through directory arguments, setting the mode for each
+file. When symbolic links are encountered, the mode of the target file is
+changed, but no recursion takes place.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-@\fR \fInamed_attribute\fR\fR
+.ad
+.RS 22n
+.rt  
+Perform the attribute operation on the named extended attribute file of each
+file operand instead of the file operand itself. If multiple \fB-@\fR
+operations are supplied, the attribute specification mode is applied to each of
+the named attribute files.
+.sp
+A named attribute of \fB*\fR carries meaning to \fBchmod\fR, and is considered
+to mean all extended attribute files associated with a file operand. This does
+not refer to the special files \fB\&.\fR and \fB\&..\fR.
+.sp
+A named attribute of \fB\&..\fR carries special meaning to \fBchmod\fR, and is
+considered to mean the file operand itself. This allows \fBchmod\fR, in a
+single call, to apply the attribute specification mode to the specified named
+attribute file of the file operand and the file operand itself.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIabsolute-mode\fR\fR
+.ad
+.br
+.na
+\fB\fIsymbolic-mode-list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents the change to be made to the file mode bits of each file named by
+one of the \fIfile\fR operands. See \fBAbsolute Mode\fR and \fBSymbolic Mode\fR
+in the \fBDESCRIPTION\fR section of this manual page for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIacl_operation\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents the modification to be performed on the file's ACL. See \fBACL
+Operation\fR in the \fBDESCRIPTION\fR section for more information.
+.sp
+\fIacl_operation\fR is one of the following:
+.sp
+.in +2
+.nf
+\fBA[\fR\fInumber\fR\fB] -\fR
+\fBA-\fR\fIacl_specification\fR
+\fBA[\fR\fIindex\fR\fB]{+|=}\fR\fBacl_specification\fR 
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattribute_specification_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents the modification to performed on the file's attributes. See
+Attribute Operation in the \fBDESCRIPTION\fR section of this manual page for
+more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+A path name of a file whose file mode bits are to be modified.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBchmod\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDenying \fBexecute\fR Permission
+.sp
+.LP
+The following example denies execute permission to everyone:
+
+.sp
+.in +2
+.nf
+% chmod a-x \fIfile\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRAllowing \fBread-only\fR Permission
+.sp
+.LP
+The following example allows only read permission to everyone:
+
+.sp
+.in +2
+.nf
+% chmod 444 \fIfile\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRMaking a File \fBreadable\fR and \fBwritable\fR
+.sp
+.LP
+The following example makes a file readable and writable by the group and
+others:
+
+.sp
+.in +2
+.nf
+% chmod go+rw \fIfile\fR
+% chmod 066 \fIfile\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRLocking a File From Access
+.sp
+.LP
+The following example locks a file from access:
+
+.sp
+.in +2
+.nf
+$ chmod +l \fIfile\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRGranting \fBread\fR, \fBwrite\fR, \fBexecute\fR, and \fBset
+group-ID\fR Permission on a File
+.sp
+.LP
+The following example grants everyone read, write, and execute permissions on
+the file, and turns on the set group-ID:
+
+.sp
+.in +2
+.nf
+$ chmod a=rwx,g+s \fIfile\fR
+$ chmod 2777 \fIfile\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRPrepending a New ACL Entry on a ZFS File
+.sp
+.LP
+The following example prepends a new ACL entry on a ZFS file.
+
+.sp
+.LP
+First, display the current ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.3
+-rw-r--r--   1 marks    staff          0 Oct  9 15:49 file.3
+      0:owner@:execute:deny
+      1:owner@:read_data/write_data/append_data/write_xattr/
+         write_attributes/write_acl/write_owner:allow
+      2:group@:write_data/append_data/execute:deny
+      3:group@:read_data:allow
+      4:everyone@:write_data/append_data/write_xattr/execute/
+        write_attributes/write_acl/write_owner:deny
+      5:everyone@:read_data/read_xattr/read_attributes/read_acl/
+         synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Issue the following command:
+
+.sp
+.in +2
+.nf
+$ chmod A+user:lp:read_data:deny file.3
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Display the new ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.3
+-rw-r--r--+  1 marks    staff          0 Oct  9 15:49 file.3
+      0:user:lp:read_data:deny
+      1:owner@:execute:deny
+      2:owner@:read_data/write_data/append_data/write_xattr/
+          write_attributes/write_acl/write_owner:allow
+      3:group@:write_data/append_data/execute:deny
+      4:group@:read_data:allow
+      5:everyone@:write_data/append_data/write_xattr/execute/
+          write_attributes/write_acl/write_owner:deny
+      6:everyone@:read_data/read_xattr/read_attributes/read_acl/
+          synchronize:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRPrepending a New POSIX-draft ACL Entry on a UFS File
+.sp
+.LP
+The following example prepends a new POSIX-draft ACL entry on a UFS file.
+
+.sp
+.LP
+First, display the current ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.2
+-rw-r--r--   1 marks    staff          0 Oct  9 15:52 file.2
+      0:user::rw-
+      1:group::r--           #effective:r--
+      2:mask:r--
+      3:other:r--
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Issue the following command:
+
+.sp
+.in +2
+.nf
+$ chmod A+user:lp:-wx file.2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Display the new ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.2
+-rw-r--r--+  1 marks    staff          0 Oct  9 15:52 file.2
+      0:user::rw-
+      1:user:lp:-wx          #effective:---
+      2:group::r--           #effective:r--
+      3:mask:r--
+      4:other:r--
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRInserting an ACL Entry in a Specific Position on a ZFS file
+.sp
+.LP
+The following example inserts an ACL entry in a specific position on a ZFS file
+system. It also illustrates the compact ACL format.
+
+.sp
+.LP
+First, display the ACL to pick a location to insert a new ACE.
+
+.sp
+.in +2
+.nf
+% ls -V file.1
+-rw-r--r--+  1 root     root           0 Oct  6 12:16 file.1
+     user:lp:rw------------:------:allow
+      owner@:--x-----------:------:deny
+      owner@:rw-p---A-W-Co-:------:allow
+      group@:-wxp----------:------:deny
+      group@:r-------------:------:allow
+   everyone@:-wxp---A-W-Co-:------:deny
+   everyone@:r-----a-R-c--s:------:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Next, insert a new entry in location 3.   This  causes  the  entries  that  are
+currently in position 3 - 6 to be pushed down.
+
+.sp
+.LP
+Issue the following command:
+
+.sp
+.in +2
+.nf
+$ chmod A3+user:marks:r:deny file.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Display the new ACL:
+
+.sp
+.in +2
+.nf
+$ ls -V file.1
+-rw-r--r--+  1 root     staff          0 Feb  3 14:13 file.1
+     user:lp:rw------------:------:allow
+      owner@:--x-----------:------:deny
+      owner@:rw-p---A-W-Co-:------:allow
+  user:marks:r-------------:------:deny
+      group@:-wxp----------:------:deny
+      group@:r-------------:------:allow
+   everyone@:-wxp---A-W-Co-:------:deny
+   everyone@:r-----a-R-c--s:------:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRInserting a POSIX-draft ACL in a Specific Position on a UFS
+File
+.sp
+.LP
+The file system reorders ACLs when they are stored in the file system. The
+following example illustrates this behavior.
+
+.sp
+.in +2
+.nf
+$ ls -v file.1
+-rw-r--r--+  1 root     root           0 Sep 29 16:10 file.1
+      0:user::rw-
+      1:user:lp:rw-          #effective:r--
+      2:group::r--           #effective:r--
+      3:mask:r--
+      4:other:r--
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Now, insert an entry at index position 3.  The command works, but the file
+system reorders the ACL.
+
+.sp
+.in +2
+.nf
+$ chmod A3+user:marks:rw- file.1
+$ ls -v file.1
+-rw-r--r--+  1 root     root           0 Sep 29 16:10 file.1
+      0:user::rw-
+      1:user:lp:rw-           #effective:r--
+      2:user:marks:rw-        #effective:r--
+      3:group::r--            #effective:r--
+      4:mask:r--
+      5:other:r--
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Rather than inserting the ACL entry in position 3 as requested, it actually
+ends up in position 2.
+
+.LP
+\fBExample 10 \fRRemoving an ACL Entry on a ZFS File
+.sp
+.LP
+The following example removes the \fBlp\fR entry from an ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.3
+-rw-r--r--+  1 marks    staff          0 Oct  9 15:49 file.3
+      0:user:lp:read_data:deny
+      1:owner@:execute:deny
+      2:owner@:read_data/write_data/append_data/write_xattr/
+         write_attributes/write_acl/write_owner:allow
+      3:group@:write_data/append_data/execute:deny
+      4:group@:read_data:allow
+      5:everyone@:write_data/append_data/write_xattr/execute/
+         write_attributes/write_acl/write_owner:deny
+      6:everyone@:read_data/read_xattr/read_attributes/read_acl/
+         synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+$ chmod A-user:lp:read_data:deny file.3
+$ ls -v file.3
+-rw-r--r--   1 marks    staff          0 Oct  9 15:49 file.3
+      0:owner@:execute:deny
+      1:owner@:read_data/write_data/append_data/write_xattr/
+         write_attributes/write_acl/write_owner:allow
+      2:group@:write_data/append_data/execute:deny
+      3:group@:read_data:allow
+      4:everyone@:write_data/append_data/write_xattr/execute/
+         write_attributes/write_acl/write_owner:deny
+      5:everyone@:read_data/read_xattr/read_attributes/read_acl/
+         synchronize:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 11 \fRRemoving a POSIX-draft ACL on a UFS File
+.sp
+.LP
+The following example removes the \fBlp\fR entry from an ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.2
+-rw-r--r--+  1 marks    staff          0 Oct  9 15:52 file.2
+      0:user::rw-
+      1:user:lp:-wx           #effective:---
+      2:group::r--            #effective:r--
+      3:mask:r--
+      4:other:r--
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+$ chmod A-user:lp:-wx file.2
+$ ls -v file.2
+-rw-r--r--   1 marks    staff          0 Oct  9 15:52 file.2
+      0:user::rw-
+      1:group::r--            #effective:r--
+      2:mask:r--
+      3:other:r--
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 12 \fRRemoving a Specific ACL Entry by Index Number on a ZFS File
+.sp
+.LP
+Consider the following ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file
+    0:group:staff:read_data/write_data/execute/read_acl:allow
+    1:user:bin:read_data:deny
+    2:user:bin:read_data:allow
+    3:owner@:write_data/append_data:deny
+    4:owner@:read_data/write_xattr/execute/write_attributes/write_acl
+        /write_owner:allow
+    5:group@:write_data/append_data:deny
+    6:group@:read_data/execute:allow
+    7:everyone@:write_data/append_data/write_xattr/write_attributes
+        /write_acl/write_owner:deny
+    8:everyone@:read_data/read_xattr/execute/read_attributes/read_acl
+        /synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Remove the second user entry for bin.
+
+.sp
+.in +2
+.nf
+$ chmod A2- file
+$ ls -v file
+    0:group:staff:read_data/write_data/execute/read_acl:allow
+    1:user:bin:read_data:deny
+    2:owner@:write_data/append_data:deny
+    3:owner@:read_data/write_xattr/execute/write_attributes/write_acl
+       /write_owner:allow
+    4:group@:write_data/append_data:deny
+    5:group@:read_data/execute:allow
+    6:everyone@:write_data/append_data/write_xattr/write_attributes
+       /write_acl/write_owner:deny
+    7:everyone@:read_data/read_xattr/execute/read_attributes/read_acl
+       /synchronize:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 13 \fRRemoving a Specific POSIX-draft ACL Entry on a UFS File
+.sp
+.LP
+The following example removes the lp entry by index number from the following
+ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.1
+-rw-r--r--+  1 root     root           0 Sep 29 16:10 file.1
+      0:user::rw-
+      1:user:lp:rw-              #effective:r--
+      2:group::r--               #effective:r--
+      3:mask:r--
+      4:other:r--
+
+      $ chmod A1- file.1
+      $ ls -v
+-rw-r--r--+  1 root     root           0 Sep 29 16:10 file.1
+      0:user::rw-
+      1:group::r--               #effective:r--
+      2:mask:r--
+      3:other:r--
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 14 \fRRemoving All ACLs From a File
+.sp
+.LP
+The following command works with either NFSv4/ZFS or POSIX-draft ACLs.
+
+.sp
+.LP
+Consider the following ACL:
+
+.sp
+.in +2
+.nf
+$ ls -v file.3
+-rw-r--r--+  1 marks    staff          0 Oct  9 15:49 file.3
+      0:user:lp:read_data/write_data:allow
+      1:user:marks:read_acl:allow
+      2:owner@:execute:deny
+      3:owner@:read_data/write_data/append_data/write_xattr/
+         write_attributes/write_acl/write_owner:allow
+      4:group@:write_data/append_data/execute:deny
+      5:group@:read_data:allow
+      6:everyone@:write_data/append_data/write_xattr/execute/
+         write_attributes/write_acl/write_owner:deny
+      7:everyone@:read_data/read_xattr/read_attributes/read_acl/
+         synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The existing ACL is effectively removed and is replaced with an ACL that
+represents the permission bits of the file.
+
+.sp
+.in +2
+.nf
+$ chmod A- file.3
+$ ls -v file.3
+-rw-r--r--  1 marks    staff          0 Oct  9 15:49 file.3
+     0:owner@:execute:deny
+     1:owner@:read_data/write_data/append_data/write_xattr/
+        write_attributes/write_acl/write_owner:allow
+     2:group@:write_data/append_data/execute:deny
+     3:group@:read_data:allow
+     4:everyone@:write_data/append_data/write_xattr/execute/
+        write_attributes/write_acl/write_owner:deny
+     5:everyone@:read_data/read_xattr/read_attributes/read_acl/
+       synchronize:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 15 \fRReplacing an Entire ACL Entry on a ZFS File
+.sp
+.LP
+Use the following \fBchmod\fR syntax if you want to replace an ACL in its
+entirety:
+
+.sp
+.in +2
+.nf
+$ chmod A=owner@:read_data/write_data:allow,group@:read_data/
+               write_data:allow,user:lp:read_data:allow file.4
+$ ls -v file.4
+-rw-rw----+  1 marks    staff          0 Oct  9 16:12 file.4
+       0:owner@:read_data/write_data:allow
+       1:group@:read_data/write_data:allow
+       2:user:lp:read_data:allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 16 \fRReplacing an Entire POSIX-draft ACL on a UFS File
+.sp
+.LP
+This operation is a little more complicated.  The replacement ACL needs the
+necessary entries to represent the file owner, file group owner, other, mask
+and any additional entries you wish to set.
+
+.sp
+.in +2
+.nf
+$ chmod A=user::rw-,group::rw-,other::---,mask:r--,
+              user:lp:r-- file.3
+$ ls -v file.3
+-rw-r-----+  1 root     root           0 Oct  9 16:14 file.3
+        0:user::rw-
+        1:user:lp:r--        #effective:r--
+        2:group::rw-         #effective:r--
+        3:mask:r--
+        4:other:---
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 17 \fRReplacing a Specific Entry on a ZFS File
+.sp
+.LP
+Consider the following ACL.
+
+.sp
+.in +2
+.nf
+$ ls -v file.5
+-rw-r--r--+  1 marks    staff          0 Oct  9 16:18 file.5
+     0:user:marks:read_data:allow
+     1:owner@:execute:deny
+     2:owner@:read_data/write_data/append_data/write_xattr/
+        write_attributes/write_acl/write_owner:allow
+     3:group@:write_data/append_data/execute:deny
+     4:group@:read_data:allow
+     5:everyone@:write_data/append_data/write_xattr/execute/
+        write_attributes/write_acl/write_owner:deny
+     6:everyone@:read_data/read_xattr/read_attributes/read_acl/
+        synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Now, change the allow access to a deny for user marks:
+
+.sp
+.in +2
+.nf
+$ chmod A0=user:marks:read_data:deny file.5
+$ ls -v file.5
+-rw-r--r--+  1 marks   staff          0 Aug 23 09:11 file.5
+0:user:marks:read_data:deny 
+1:owner@:read_data/write_data/append_data/write_xattr/write_attributes
+     /write_acl/write_owner:allow
+2:group@:write_data/append_data/execute:deny
+3:group@:read_data:allow
+4:everyone@:write_data/append_data/write_xattr/execute/write_attributes
+     /write_acl/write_owner:deny
+5:everyone@:read_data/read_xattr/read_attributes/read_acl/synchronize
+     :allow
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 18 \fRReplacing a Specific POSIX-draft ACL on a UFS File
+.sp
+.LP
+Consider the following ACL.
+
+.sp
+.in +2
+.nf
+$ ls -v file.4
+-rw-r--r--+  1 marks    staff          0 Oct  9 16:21 file.4
+        0:user::rw-
+        1:user:lp:rwx         #effective:r--
+        2:group::r--          #effective:r--
+        3:mask:r--
+        4:other:r--
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Now, change the permission on \fBlp\fR from \fBrwx\fR to \fBr--\fR:
+
+.sp
+.in +2
+.nf
+$ chmod A1=user:lp:r-- file.4
+
+$ ls -v file
+-rw-r--r--+  1 marks    staff          0 Oct  9 16:21 file.4
+        0:user::rw-
+        1:user:lp:r--         #effective:r--
+        2:group::r--          #effective:r--
+        3:mask:r--
+        4:other:r--
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 19 \fRSetting ACL Inheritance Flags on a ZFS File
+.sp
+.LP
+You can only set inheritance flags on ZFS files. When setting ACLs on
+directories,  several inheritance flags can be optionally set.
+
+.sp
+.LP
+Suppose you have an ACL entry for user \fBlp\fR that you want to be  inherited
+to newly created files in a directory.  First, you need to create an
+inheritable ACL entry on the directory:
+
+.sp
+.in +2
+.nf
+$ chmod A+user:lp:read_data:file_inherit:allow test.dir
+$ ls -dv test.dir
+drwxr-xr-x+  2 marks   staff          2 Aug 23 09:08 test.dir/
+0:user:lp:read_data:file_inherit:allow
+1:owner@::deny 
+2:owner@:list_directory/read_data/add_file/write_data/add_subdirectory
+     /append_data/write_xattr/execute/write_attributes/write_acl
+     /write_owner:allow
+3:group@:add_file/write_data/add_subdirectory/append_data:deny
+4:group@:list_directory/read_data/execute:allow 
+5:everyone@:add_file/write_data/add_subdirectory/append_data/write_xattr
+     /write_attributes/write_acl/write_owner:deny
+6:everyone@:list_directory/read_data/read_xattr/execute/read_attributes
+     /read_acl/synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBlp\fR entry is inherited to newly created files in the directory
+\fBtest.dir\fR.
+
+.sp
+.in +2
+.nf
+$ touch test.dir/file.test
+$ ls -v test.dir/file.test
+-rw-r--r--+  1 marks    staff          0 Oct  9 16:29 test.dir/file.test
+     0:user:lp::deny
+     1:user:lp:read_data:allow
+     2:owner@:execute:deny
+     3:owner@:read_data/write_data/append_data/write_xattr/
+         write_attributes/write_acl/write_owner:allow
+     4:group@:write_data/append_data/execute:deny
+     5:group@:read_data:allow
+     6:everyone@:write_data/append_data/write_xattr/execute/
+         write_attributes/write_acl/write_owner:deny
+     7:everyone@:read_data/read_xattr/read_attributes/read_acl/
+ synchronize:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The user \fBlp\fR entry is inherited to the newly created file. Multiple
+combinations of the inheritance flags can be specified. For example, if you
+wanted the \fBlp\fR entry to also be inherited to  directories, then the
+following command can be used:
+
+.sp
+.in +2
+.nf
+$ chmod A+user:lp:read_data:file_inherit/\e
+      dir_inherit:allow test.dir
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 20 \fRReplacing System Attributes of a ZFS File
+.sp
+.LP
+The following examples replace system attributes of a ZFS file:
+
+.sp
+.in +2
+.nf
+$ chmod S=v{archive,hidden,readonly,system,appendonly,\e
+     nonodump,immutable,noav_modified,noav_quarantined,\e
+     nounlink} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S=c{AHRSaiu} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S=c{AHRSa-i--u} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S=cAHRSaiu file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod -@ '..' S=cAHRSaiu file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Assuming appropriate privileges, this results in the following system
+attributes of \fBfile1\fR being set: \fBarchive\fR, \fBhidden\fR,
+\fBreadonly\fR, \fBsystem\fR, \fBappendonly\fR, \fBimmutable\fR, and
+\fBnounlink\fR. Assuming appropriate privileges, the following system
+attributes of \fBfile1\fR are cleared: \fBnodump\fR, \fBav_modified\fR, and
+\fBav_quarantined\fR.
+
+.LP
+\fBExample 21 \fRClearing All System Attributes of a ZFS File
+.sp
+.LP
+The following examples clears all system attributes of a ZFS file:
+
+.sp
+.in +2
+.nf
+$ chmod S-a file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod -@ '..' S-a file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Assuming appropriate privileges, all boolean read-write system attributes are
+cleared on \fBfile1\fR.
+
+.LP
+\fBExample 22 \fRSetting a System Attribute of a Named Attribute File of a ZFS
+File
+.sp
+.LP
+The following example sets a system attribute of a named attribute file of a
+ZFS file, but not of the file itself:
+
+.sp
+.in +2
+.nf
+$ chmod -@ myattr S+vhidden file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This results in the hidden system attribute being set for the named attribute
+file \fBmyattr\fR of \fBfile1\fR, but not the file itself.
+
+.LP
+\fBExample 23 \fRSetting a System Attribute of All Named Attribute File of a
+ZFS File
+.sp
+.LP
+The following example sets a system attribute of all named attribute files of a
+ZFS file, but not of the file itself:
+
+.sp
+.in +2
+.nf
+$ chmod -@ '*' S+a file1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 24 \fRSetting a System Attribute of All Named Attribute Files of a
+ZFS File
+.sp
+.LP
+The following example sets a system attribute of all named attribute files of a
+ZFS file, as well as of the file itself:
+
+.sp
+.in +2
+.nf
+$ chmod -@ '..' -@ '*' S+vhidden file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This results in the hidden system attribute being set for all named attribute
+files of \fBfile1\fR, as well as the file itself.
+
+.LP
+\fBExample 25 \fRRecursively Descending Through a Directory Hierarchy
+.sp
+.LP
+The following example recursively descends through a directory hierarchy, and
+sets all system attributes of all named attribute files, the ZFS file operands,
+as well as of the directory itself:
+
+.sp
+.in +2
+.nf
+$ chmod -R -@ '..' -@ '*' S+a directory1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This results in the hidden system attribute being set for all named attribute
+files of all regular files and directories within the directory hierarchy of
+\fBdirectory1\fR, as well as of \fBdirectory1\fR itself.
+
+.LP
+\fBExample 26 \fRSetting the \fBhidden\fR and \fBsystem\fR System Attributes of
+a ZFS File
+.sp
+.LP
+The following examples set the \fBhidden\fR and \fBsystem\fR system attributes
+of a ZFS file:
+
+.sp
+.in +2
+.nf
+$ chmod S+cHS file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S+vhidden,+vsystem file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S+v{hidden,system} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S+c{-HS--------} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S-v{nohidden,nosystem} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S-v{hidden,system},+v{hidden,system} file1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 27 \fRClearing All System Attributes of a ZFS File
+.sp
+.LP
+The following example clears all system attributes of a ZFS file:
+
+.sp
+.in +2
+.nf
+$ chmod S-a file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+$ chmod S=v{} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In the following two examples, the last attribute operation specified takes
+precedence.
+
+.sp
+.LP
+In this example, the replacement attribute name list (\fB{}\fR) clears all
+system attributes for \fBfile1\fR:
+
+.sp
+.in +2
+.nf
+$ chmod S+cHS,=v{} file1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example, the clear attributes operation (\fB-a\fR) clears all system
+attributes of \fBfile1\fR:
+
+.sp
+.in +2
+.nf
+$ chmod S+vhidden,+vsystem,-a file1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 28 \fRSetting the Values of All Boolean read-write System Attributes
+of a File
+.sp
+.LP
+The following example sets the values of all boolean read-write system
+attributes of a file to the same as the boolean read-write system attributes of
+another file:
+
+.sp
+.in +2
+.nf
+$ chmod S=v`ls -/v file1|sed -n '2s/.*{/{/p'` file2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Assuming appropriate privileges and that \fBfile1\fR and \fBfile2\fR have the
+same supported system attributes, all system attributes of \fBfile1\fR that are
+set are also set on \fBfile2\fR. All system attributes of \fBfile1\fR that are
+cleared are also cleared on \fBfile2\fR.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBchmod\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetfacl\fR(1), \fBls\fR(1), \fBsetfacl\fR(1), \fBchmod\fR(2),
+\fBfgetattr\fR(3C), \fBacl\fR(5), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Absolute changes do not work for the set-group-\fBID\fR bit of a directory. You
+must use \fBg+s\fR or \fBg-s\fR.
+.sp
+.LP
+\fBchmod\fR permits you to produce useless modes so long as they are not
+illegal (for instance, making a text file executable). \fBchmod\fR does not
+check the file type to see if mandatory locking is meaningful.
+.sp
+.LP
+If the filesystem is mounted with the \fInosuid\fR option, \fIsetuid\fR
+execution is not allowed.
+.sp
+.LP
+If you use \fBchmod\fR to change the file group owner permissions on a file
+with \fBACL\fR entries, both the file group owner permissions and the \fBACL\fR
+mask are changed to the new permissions. Be aware that the new \fBACL\fR mask
+permissions can change the effective permissions for additional users and
+groups who have \fBACL\fR entries on the file. Use the \fBgetfacl\fR(1) or
+\fBls\fR(1)command to make sure the appropriate permissions are set for all
+\fBACL\fR entries.

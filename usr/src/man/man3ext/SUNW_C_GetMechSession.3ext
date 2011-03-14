@@ -1,0 +1,221 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SUNW_C_GetMechSession 3EXT "27 Oct 2005" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+SUNW_C_GetMechSession, SUNW_C_KeyToObject \- PKCS#11 Cryptographic Framework
+functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lpkcs11\fR [ \fIlibrary\&.\|.\|.\fR ]
+#include <security/cryptoki.h>
+#include <security/pkcs11.h>
+
+\fBCK_RV\fR \fBSUNW_C_GetMechSession\fR(\fBCK_MECHANISM_TYPE\fR \fImech\fR,
+     \fBCK_SESSION_HANDLE_PTR\fR \fIhSession\fR);
+.fi
+
+.LP
+.nf
+\fBCK_RV\fR \fBSUNW_C_KeyToObject\fR(\fBCK_SESSION_HANDLE\fR \fIhSession\fR,
+     \fBCK_MECHANISM_TYPE\fR \fImech\fR, \fBconst void *\fR\fIrawkey\fR, \fBsize_t\fR \fIrawkey_len\fR,
+     \fBCK_OBJECT_HANDLE_PTR\fR \fIobj\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions implement the RSA PKCS#11 v2.20 specification by using plug-ins
+to provide the slots.
+.sp
+.LP
+The \fBSUNW_C_GetMechSession()\fR function initializes the PKCS#11
+cryptographic framework and performs all necessary calls to Standard PKCS#11
+functions (see \fBlibpkcs11\fR(3LIB)) to create a session capable of providing
+operations on the requested mechanism. It is not neccessary to call
+\fBC_Initalize()\fR or \fBC_GetSlotList()\fR before the first call to
+\fBSUNW_C_GetMechSession()\fR.
+.sp
+.LP
+If the \fBSUNW_C_GetMechSession()\fR function is called multiple times, it will
+return a new session each time without re-initalizing the framework. If it is
+unable to return a new session, \fBCKR_SESSION_COUNT\fR is returned.
+.sp
+.LP
+The \fBC_CloseSession()\fR function should be called to release the session
+when it is no longer required.
+.sp
+.LP
+The \fBSUNW_C_KeyToObject()\fR function creates a key object for the specified
+mechanism from the \fIrawkey\fR data. The object should be destroyed with
+\fBC_DestroyObject()\fR when it is no longer required.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBSUNW_C_GetMechSession()\fR function returns the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_OK\fR\fR
+.ad
+.RS 25n
+.rt  
+The function completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_SESSION_COUNT\fR\fR
+.ad
+.RS 25n
+.rt  
+No sessions are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_ARGUMENTS_BAD\fR\fR
+.ad
+.RS 25n
+.rt  
+A null pointer was passed for the return session handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_MECHANISM_INVALID\fR\fR
+.ad
+.RS 25n
+.rt  
+The requested mechanism is invalid or no available plug-in provider supports
+it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_FUNCTION_FAILED\fR\fR
+.ad
+.RS 25n
+.rt  
+The function failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_GENERAL_ERROR\fR\fR
+.ad
+.RS 25n
+.rt  
+A general error occurred.
+.RE
+
+.sp
+.LP
+The \fBSUNW_C_KeyToObject()\fR function returns the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_OK\fR\fR
+.ad
+.RS 25n
+.rt  
+The function completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_ARGUMENTS_BAD\fR\fR
+.ad
+.RS 25n
+.rt  
+A null pointer was passed for the session handle or the key material.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_MECHANISM_INVALID\fR\fR
+.ad
+.RS 25n
+.rt  
+The requested mechanism is invalid or no available plug-in provider supports
+it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_FUNCTION_FAILED\fR\fR
+.ad
+.RS 25n
+.rt  
+The function failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCKR_GENERAL_ERROR\fR\fR
+.ad
+.RS 25n
+.rt  
+A general error occurred.
+.RE
+
+.sp
+.LP
+The return values of each of the implemented functions are defined and listed
+in the RSA PKCS#11 v2.20 specification. See http://www.rsasecurity.com.
+.SH USAGE
+.sp
+.LP
+These functions are not part of the RSA PKCS#11 v2.20 specification. They are
+not likely to exist on non-Solaris systems. They are provided as a convenience
+to application programmers. Use of these functions will make the application
+non-portable to other systems.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpkcs11\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+http://www.rsasecurity.com

@@ -1,0 +1,72 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH miocpullup 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+miocpullup \- Prepare the payload of an M_IOCTL message for access
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBint\fR \fBmiocpullup\fR(\fBmblk_t *\fR\fImp\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 8n
+.rt  
+M_IOCTL message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 8n
+.rt  
+Number of bytes to prepare.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmiocpullup()\fR function prepares the payload of the specified M_IOCTL
+message for access by ensuring that it consists of at least \fIsize\fR bytes of
+data.
+.sp
+.LP
+If the M_IOCTL message is transparent, or its total payload is less than
+\fIsize\fR bytes, an error is returned.  Otherwise, the payload is concatenated
+as necessary to provide contiguous access to at least \fIsize\fR bytes of data.
+As a special case, if \fIsize\fR is zero, \fBmiocpullup()\fR returns
+successfully, even if no payload exists.
+.SH RETURN VALUES
+.sp
+.LP
+Zero is returned on success. Otherwise an errno value is returned indicating
+the problem.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

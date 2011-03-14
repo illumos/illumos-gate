@@ -1,0 +1,193 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH split 1 "16 Apr 1999" "SunOS 5.11" "User Commands"
+.SH NAME
+split \- split a file into pieces
+.SH SYNOPSIS
+.LP
+.nf
+\fBsplit\fR [\fB-linecount\fR | \fB-l\fR \fIlinecount\fR] [\fB-a\fR \fIsuffixlength\fR] 
+     [\fIfile\fR [\fIname\fR]]
+.fi
+
+.LP
+.nf
+\fBsplit\fR [\fB-b\fR \fIn\fR | \fIn\fRk | \fIn\fRm] [\fB-a\fR \fIsuffixlength\fR] [\fIfile\fR [\fIname\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsplit\fR utility reads \fIfile\fR and writes it in \fIlinecount\fR-line
+pieces into a set of output-files. The name of the first output-file is
+\fIname\fR with \fBaa\fR appended, and so on lexicographically, up to \fBzz\fR
+(a maximum of 676 files). The maximum length of \fIname\fR is 2 characters less
+than the maximum filename length allowed by the filesystem. See
+\fBstatvfs\fR(2). If no output name is given, \fBx\fR is used as the default
+(output-files will be called \fBxaa\fR, \fBxab\fR, and so forth).
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fIlinecount\fR \fB|\fR \fB-l\fR \fIlinecount\fR\fR
+.ad
+.sp .6
+.RS 4n
+Number of lines in each piece. Defaults to \fB1000\fR lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIsuffixlength\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses \fIsuffixlength\fR letters to form the suffix portion of the filenames of
+the split file. If \fB-a\fR is not specified, the default suffix length is
+\fB2\fR. If the sum of the \fIname\fR operand and the \fIsuffixlength\fR
+option-argument would create a filename exceeding \fINAME_MAX\fR bytes, an
+error will result; \fBsplit\fR will exit with a diagnostic message and no files
+will be created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Splits a file into pieces \fIn\fR bytes in size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIn\fR\fBk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Splits a file into pieces \fIn\fR\fB*1024\fR bytes in size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIn\fR\fBm\fR\fR
+.ad
+.sp .6
+.RS 4n
+Splits a file into pieces \fIn\fR\fB*1\|048\|576\fR bytes in size.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+The path name of the ordinary file to be split. If no input file is given or
+\fIfile\fR is \fB\(mi\fR, the standard input will be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+.rt  
+The prefix to be used for each of the files resulting from the \fBsplit\fR
+operation. If no \fIname\fR argument is given, \fBx\fR will be used as the
+prefix of the output files. The combined length of the basename of \fIprefix\fR
+and \fIsuffixlength\fR cannot exceed \fINAME_MAX\fR bytes. See OPTIONS.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBsplit\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBsplit\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee  \fBstandards\fR(5). 
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsplit\fR(1), \fBstatvfs\fR(2), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)

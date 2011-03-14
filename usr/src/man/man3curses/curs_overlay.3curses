@@ -1,0 +1,83 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_overlay 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_overlay, overlay, overwrite, copywin \- overlap and manipulate overlapped
+curses windows
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBoverlay\fR(\fBWINDOW *\fR\fIsrcwin\fR, \fBWINDOW *\fR\fIdstwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBoverwrite\fR(\fBWINDOW *\fR\fIsrcwin\fR, \fBWINDOW *\fR\fIdstwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcopywin\fR(\fBWINDOW *\fR\fIsrcwin\fR, \fBWINDOW *\fR\fIdstwin\fR, \fBint\fR \fIsminrow\fR,
+     \fBint\fR \fIsmincol\fR, \fBint\fR \fIdminrow\fR, \fBint\fR \fIdmincol\fR,
+     \fBint\fR \fIdmaxrow\fR, \fBint\fR \fIdmaxcol\fR, \fBint\fR \fIoverlay\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBoverlay()\fR and \fBoverwrite()\fR routines overlay \fIsrcwin\fR on top
+of \fIdstwin\fR. \fIscrwin\fR and \fIdstwin\fR are not required to be the same
+size; only text where the two windows overlap is copied. The difference is that
+\fBoverlay()\fR is non-destructive (blanks are not copied) whereas
+\fBoverwrite()\fR is destructive.
+.sp
+.LP
+The \fBcopywin()\fR routine provides a finer granularity of control over the
+\fBoverlay()\fR and \fBoverwrite()\fR routines. Like in the \fBprefresh()\fR
+routine, a rectangle is specified in the destination window, (\fIdminrow\fR,
+\fIdmincol\fR) and (\fIdmaxrow\fR, \fIdmaxcol\fR), and the upper-left-corner
+coordinates of the source window, (\fIsminrow\fR, \fIsmincol\fR). If the
+argument \fIoverlay\fR is \fBtrue\fR, then copying is non-destructive, as in
+\fBoverlay()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return an integer return \fBERR\fR upon failure and an integer
+value other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_pad\fR(3CURSES), \fBcurs_refresh\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBoverlay()\fR and \fBoverwrite\fR may be macros.

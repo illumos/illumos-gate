@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getuserrange 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+getuserrange \- get the label range of a user
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflags\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBm_range_t *\fR\fBgetuserrange\fR(\fBconst char *\fR\fIusername\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetuserrange()\fR function returns the label range of \fIusername\fR.
+The lower bound in the range is used as the initial workspace label when a user
+logs into a multilevel desktop. The upper bound, or clearance, is used as an
+upper limit to the available labels that a user can assign to labeled
+workspaces.
+.sp
+.LP
+The default value for a user's label range is specified in
+\fBlabel_encodings\fR(4). Overriding values for individual users are specified
+in \fBuser_attr\fR(4).
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetuserrange()\fR function returns \fBNULL\fR if the memory allocation
+fails. Otherwise, the function returns a structure which must be freed by the
+caller, as follows:
+.sp
+.in +2
+.nf
+m_range_t  *range;
+    ...
+    m_label_free(range->lower_bound);
+    m_label_free(range->upper_bound);
+    free(range);
+.fi
+.in -2
+.sp
+
+.SH ERRORS
+.sp
+.LP
+The \fBgetuserrange()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The physical limits of the system are exceeded by size bytes of memory which
+cannot be allocated.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.16i) |cw(3.34i) 
+lw(2.16i) |lw(3.34i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+.TE
+
+.sp
+.LP
+The \fBgetuserrange()\fR function is Committed for systems that implement the
+Defense Intelligence Agency (DIA) MAC policy of \fBlabel_encodings\fR(4). Other
+policies might exist in a future release of Trusted Extensions that might make
+obsolete or supplement \fBlabel_encodings\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBfree\fR(3C), \fBlibtsol\fR(3LIB), \fBm_label_free\fR(3TSOL),
+\fBlabel_encodings\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright 1989 AT&T  
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH accept 3SOCKET "24 Jan 2002" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+accept \- accept a connection on a socket
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+
+\fBint\fR \fBaccept\fR(\fBint\fR \fIs\fR, \fBstruct sockaddr *\fR\fIaddr\fR, \fBsocklen_t *\fR\fIaddrlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The argument \fIs\fR is a socket that has been created with
+\fBsocket\fR(3SOCKET) and bound to an address with \fBbind\fR(3SOCKET), and
+that is listening for connections after a call to \fBlisten\fR(3SOCKET). The
+\fBaccept()\fR function extracts the first connection on the queue of pending
+connections, creates a new socket with the properties of \fIs\fR, and allocates
+a new file descriptor, \fIns\fR, for the socket. If no pending connections are
+present on the queue and the socket is not marked as non-blocking,
+\fBaccept()\fR blocks the caller until a connection is present. If the socket
+is marked as non-blocking and no pending connections are present on the queue,
+\fBaccept()\fR returns an error as described below.  The \fBaccept()\fR
+function uses the \fBnetconfig\fR(4) file to determine the \fBSTREAMS\fR device
+file name associated with \fIs\fR.  This is the device on which the connect
+indication will be accepted. The accepted socket, \fIns\fR, is used to read and
+write data to and from the socket that connected to \fIns\fR. It is not used to
+accept more connections. The original socket (\fIs\fR) remains open for
+accepting further connections.
+.sp
+.LP
+The argument \fIaddr\fR is a result parameter that is filled in with the
+address of the connecting entity as it is known to the communications layer.
+The exact format of the \fIaddr\fR parameter is determined by the domain in
+which the communication occurs.
+.sp
+.LP
+The argument \fIaddrlen\fR is a value-result parameter. Initially, it contains
+the amount of space pointed to by \fIaddr\fR; on return it contains the length
+in bytes of the address returned.
+.sp
+.LP
+The \fBaccept()\fR function is used with connection-based socket types,
+currently with \fBSOCK_STREAM\fR.
+.sp
+.LP
+It is possible to \fBselect\fR(3C) or \fBpoll\fR(2) a socket for the purpose of
+an \fBaccept()\fR by selecting or polling it for a read. However, this will
+only indicate when a connect indication is pending; it is still necessary to
+call \fBaccept()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBaccept()\fR function returns \fB\(mi1\fR on error. If it succeeds, it
+returns a non-negative integer that is a descriptor for the accepted socket.
+.SH ERRORS
+.sp
+.LP
+\fBaccept()\fR will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The descriptor is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECONNABORTED\fR\fR
+.ad
+.RS 16n
+.rt  
+The remote side aborted the connection before the \fBaccept()\fR operation
+completed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIaddr\fR parameter or the \fIaddrlen\fR parameter is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fBaccept()\fR attempt was interrupted by the delivery of a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 16n
+.rt  
+The per-process descriptor table is full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 16n
+.rt  
+The protocol family and type corresponding to  \fIs\fR could not be found in
+the \fBnetconfig\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 16n
+.rt  
+There was insufficient user memory available to complete the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 16n
+.rt  
+There were insufficient \fBSTREAMS\fR resources available to complete the
+operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+The descriptor does not reference a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOPNOTSUPP\fR\fR
+.ad
+.RS 16n
+.rt  
+The referenced socket is not of type \fBSOCK_STREAM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPROTO\fR\fR
+.ad
+.RS 16n
+.rt  
+A protocol error has occurred; for example, the \fBSTREAMS\fR protocol stack
+has not been initialized or the connection has already been released.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEWOULDBLOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket is marked as non-blocking and no connections are present to be
+accepted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpoll\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
+\fBlisten\fR(3SOCKET), \fBselect\fR(3C), \fBsocket.h\fR(3HEAD),
+\fBsocket\fR(3SOCKET), \fBnetconfig\fR(4), \fBattributes\fR(5)

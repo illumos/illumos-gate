@@ -1,0 +1,122 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pool_walk_components 3POOL "18 Jul 2005" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.SH NAME
+pool_walk_components, pool_walk_pools, pool_walk_resources \- walk objects
+within resource pool configurations
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <pool.h>
+
+\fBint\fR \fBpool_walk_components\fR(\fBpool_conf_t *\fR\fIconf\fR,
+     \fBpool_resource_t *\fR\fIresource\fR, \fBvoid *\fR\fIarg\fR,
+     \fBint (*\fR\fIcallback\fR)(\fBpool_conf_t *\fR, \fBpool_resource_t *\fR, \fBvoid *\fR));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_walk_pools\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBvoid *\fR\fIarg\fR,
+     \fBint (*\fR\fIcallback\fR)(\fBpool_conf_t *\fR, \fBpool_component_t *\fR, \fBvoid *\fR));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpool_walk_resources\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBpool_t *\fR\fIpool\fR,
+     \fBvoid *\fR\fIarg\fR, \fBint (*\fR\fIcallback\fR)(\fBpool_conf_t *\fR,
+     \fBpool_component_t *\fR, \fBvoid *\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The walker functions provided with \fBlibpool\fR(3LIB) visit each associated
+entity of the given type, and call the caller-provided \fIcallback\fR function
+with a user-provided additional opaque argument. There is no implied order of
+visiting nodes in the walk.  If the \fIcallback\fR function returns a non-zero
+value at any of the nodes, the walk is terminated, and an error value of -1
+returned. The \fIconf\fR argument for each function refers to the target
+configuration to which the operation applies.
+.sp
+.LP
+The \fBpool_walk_components()\fR function invokes \fIcallback\fR on all
+components contained in the resource.
+.sp
+.LP
+The \fBpool_walk_pools()\fR function invokes \fIcallback\fR on all pools
+defined in the configuration.
+.sp
+.LP
+The \fBpool_walk_resources()\fR function invokes \fIcallback\fR function on all
+resources associated with \fIpool\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion of the walk, these functions return 0. Otherwise -1
+is returned and \fBpool_error\fR(3POOL) returns the pool-specific error value.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The configuration is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+A system error has occurred. Check the system error code for more details.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityUnstable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

@@ -1,0 +1,113 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dumpcs 1 "20 Dec 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+dumpcs \- show codeset table for the current locale
+.SH SYNOPSIS
+.LP
+.nf
+\fBdumpcs\fR [\fB-0123vw\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdumpcs\fR shows a list of printable characters for the user's current
+locale, along with their hexadecimal code values. The display device is assumed
+to be capable of displaying characters for a given locale. With no option,
+\fBdumpcs\fR displays the entire list of printable characters for the current
+locale.
+.sp
+.LP
+With one or more numeric options specified, it shows \fBEUC\fR codeset(s) for
+the current locale according to the numbers specified, and in order of codeset
+number. Each non-printable character is represented by an asterisk "*" and
+enough \fBASCII\fR space character(s) to fill that codeset's column width.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-0\fR \fR
+.ad
+.RS 7n
+.rt  
+Show \fBASCII\fR (or \fBEUC\fR primary) codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR \fR
+.ad
+.RS 7n
+.rt  
+Show \fBEUC\fR codeset 1, if used for the current locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-2\fR \fR
+.ad
+.RS 7n
+.rt  
+Show \fBEUC\fR codeset 2, if used for the current locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-3\fR \fR
+.ad
+.RS 7n
+.rt  
+Show \fBEUC\fR codeset 3, if used for the current locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR \fR
+.ad
+.RS 7n
+.rt  
+"Verbose". Normally, ranges of non-printable characters are collapsed into a
+single line. This option produces one line for each non-printable character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fR
+.ad
+.RS 7n
+.rt  
+Replace code values with corresponding wide character values (process codes).
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+The environment variables \fBLC_CTYPE\fR and \fBLANG\fR control the character
+classification throughout \fBdumpcs\fR. On entry to \fBdumpcs\fR, these
+environment variables are checked in that order. This implies that a new
+setting for \fBLANG\fR does not override the setting of \fBLC_CTYPE\fR. When
+none of the values is valid, the character classification defaults to the
+POSIX.1 "C" locale.
+.SH SEE ALSO
+.sp
+.LP
+\fBlocaledef\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBdumpcs\fR can only handle \fBEUC\fR locales.

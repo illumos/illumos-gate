@@ -1,0 +1,45 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH isalist 1 "20 Mar 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+isalist \- display the native instruction sets executable on this platform
+.SH SYNOPSIS
+.LP
+.nf
+\fBisalist\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBisalist\fR prints the names of the native instruction sets executable on
+this platform on the standard output, as returned by the \fBSI_ISALIST\fR
+command of \fBsysinfo\fR(2).
+.sp
+.LP
+The names are space-separated and are ordered in the sense of best performance.
+That is, earlier-named instruction sets might contain more instructions than
+later-named instruction sets; a program that is compiled for an earlier-named
+instruction sets will most likely run faster on this machine than the same
+program compiled for a later-named instruction set.
+.sp
+.LP
+Programs compiled for instruction sets that do not appear in the list will most
+likely experience performance degradation or not run at all on this machine.
+.sp
+.LP
+The instruction set names known to the system are listed in \fBisalist\fR(5).
+These names might or might not match predefined names or compiler options in
+the C language compilation system,
+.sp
+.LP
+This command is obsolete and may be removed in a future version of Solaris. See
+\fBisainfo\fR(1) for a better way to handle instruction set extensions.
+.SH SEE ALSO
+.sp
+.LP
+\fBisainfo\fR(1), \fBoptisa\fR(1), \fBuname\fR(1), \fBsysinfo\fR(2),
+\fBattributes\fR(5), \fBisalist\fR(5)

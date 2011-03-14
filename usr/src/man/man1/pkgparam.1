@@ -1,0 +1,172 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pkgparam 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+pkgparam \- display package parameter values
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkgparam\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIroot_path\fR] \fIpkginst\fR [\fIparam\fR]...
+.fi
+
+.LP
+.nf
+\fBpkgparam\fR \fB-f\fR \fIfilename\fR [\fB-v\fR] [\fIparam\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpkgparam\fR displays the value associated with the parameter or parameters
+requested on the command line. The values are located in either the
+\fBpkginfo\fR(4) file for \fIpkginst\fR or from the specific file named with
+the \fB-f\fR option.
+.sp
+.LP
+One parameter value is shown per line. Only the value of a parameter is given
+unless the \fB-v\fR option is used. With this option, the output of the command
+is in this format:
+.sp
+.in +2
+.nf
+\fIparameter1\fR\fB='\fR\fIvalue1\fR\fB\&'\fR
+\fIparameter2\fR\fB='\fR\fIvalue2\fR\fB\&'\fR
+\fIparameter3\fR\fB='\fR\fIvalue3\fR\fB\&'\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If no parameters are specified on the command line, values for all parameters
+associated with the package are shown.
+.SH OPTIONS
+.sp
+.LP
+Options and arguments for this command are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdevice\fR\fR
+.ad
+.RS 16n
+.rt  
+Specify the \fIdevice\fR on which a \fIpkginst\fR is stored. It can be a
+directory pathname or the identifiers for tape, floppy disk, or removable disk
+(for example, \fB/var/tmp\fR, \fB/dev/diskette\fR, and \fB/dev/dsk/c1d0s0\fR).
+The special token \fBspool\fR may be used to represent the default installation
+spool directory (\fB/var/spool/pkg\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfilename\fR\fR
+.ad
+.RS 16n
+.rt  
+Read \fIfilename\fR for parameter values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIroot_path\fR\fR
+.ad
+.RS 16n
+.rt  
+Defines the full path name of a subdirectory to use as the \fIroot_path\fR. All
+files, including package system information files, are relocated to a directory
+tree starting in the specified \fIroot_path\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 16n
+.rt  
+Verbose mode. Display name of parameter and its value.
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkginst\fR\fR
+.ad
+.RS 11n
+.rt  
+Defines a specific package instance for which parameter values should be
+displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIparam\fR\fR
+.ad
+.RS 11n
+.rt  
+Defines a specific parameter whose value should be displayed.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+If parameter information is not available for the indicated package, the
+command exits with a non-zero status.
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpkgmk\fR(1), \fBpkgproto\fR(1), \fBpkgtrans\fR(1), \fBpkgadd\fR(1M),
+\fBpkginfo\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.sp
+.LP
+\fIApplication Packaging Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+With the \fB-f\fR option, you can specify the file from which parameter values
+should be extracted. This file should be in the same  format as a
+\fBpkginfo\fR(4) file. For example, such a file might be created during package
+development and used while testing software during this stage.
+.sp
+.LP
+Package commands are \fBlargefile\fR(5)-aware. They handle files larger than 2
+GB in the same way they handle smaller files. In their current implementations,
+\fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other package commands can process a
+datastream of  up to 4 GB.

@@ -29,6 +29,20 @@
 # information about overriding the defaults.
 #
 <include global_zone_only_component>
+<include system-kernel.man1m.inc>
+<include system-kernel.man2.inc>
+<include system-kernel.man4.inc>
+<include system-kernel.man5.inc>
+<include system-kernel.man7.inc>
+<include system-kernel.man7d.inc>
+<include system-kernel.man7fs.inc>
+<include system-kernel.man7m.inc>
+<include system-kernel.man7p.inc>
+<include system-kernel.man9.inc>
+<include system-kernel.man9e.inc>
+<include system-kernel.man9f.inc>
+<include system-kernel.man9p.inc>
+<include system-kernel.man9s.inc>
 set name=pkg.fmri value=pkg:/system/kernel@$(PKGVERS)
 set name=pkg.description \
     value="core kernel software for a specific instruction-set architecture"
@@ -78,6 +92,21 @@ dir path=lib/svc
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man2
+dir path=usr/share/man/man3
+dir path=usr/share/man/man4
+dir path=usr/share/man/man5
+dir path=usr/share/man/man7d
+dir path=usr/share/man/man7fs
+dir path=usr/share/man/man7m
+dir path=usr/share/man/man7p
+dir path=usr/share/man/man9
+dir path=usr/share/man/man9e
+dir path=usr/share/man/man9f
+dir path=usr/share/man/man9p
+dir path=usr/share/man/man9s
 $(i386_ONLY)driver name=acpi_drv perms="* 0666 root sys"
 driver name=aggr perms="* 0666 root sys"
 driver name=arp perms="arp 0666 root sys"
@@ -780,6 +809,14 @@ file path=lib/svc/manifest/system/scheduler.xml group=sys mode=0444
 file path=lib/svc/method/svc-dumpadm mode=0555
 file path=lib/svc/method/svc-intrd mode=0555
 file path=lib/svc/method/svc-scheduler mode=0555
+$(sparc_ONLY)file path=usr/share/man/man1m/monitor.1m
+$(sparc_ONLY)file path=usr/share/man/man1m/obpsym.1m
+# On SPARC driver/bscv is Serverblade1 specific, and in system/kernel/platform
+# We keep the manual page generic
+$(sparc_ONLY)file path=usr/share/man/man7d/dad.7d
+$(i386_ONLY)file path=usr/share/man/man7d/smbios.7d
+# Sadly vuid mouse support is in different packages on different platforms
+# While kstat(7D) is in SUNWcs, the structures are general
 hardlink path=kernel/misc/$(ARCH64)/md5 \
     target=../../../kernel/crypto/$(ARCH64)/md5
 hardlink path=kernel/misc/$(ARCH64)/sha1 \

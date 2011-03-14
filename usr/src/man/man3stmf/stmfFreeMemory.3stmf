@@ -1,0 +1,61 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stmfFreeMemory 3STMF "9 Jun 2008" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.SH NAME
+stmfFreeMemory \- free memory allocated by this library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lstmf\fR [ \fIlibrary\fR... ]
+#include <libstmf.h>
+
+\fBvoid\fR \fBstmfFreeMemory\fR(\fBvoid *\fR\fIstmfMemory\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImemory\fR\fR
+.ad
+.RS 10n
+.rt  
+A pointer to memory that was previously allocated by this library. If
+\fBstmfMemory()\fR is equal to \fINULL\fR, the call will return successfully.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstmfFreeMemory()\fR function frees memory allocated by this library.
+.SH RETURN VALUES
+.sp
+.LP
+No values are returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibstmf\fR(3LIB), \fBattributes\fR(5)

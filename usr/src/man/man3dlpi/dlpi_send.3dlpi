@@ -1,0 +1,120 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_send 3DLPI "15 Jul 2008" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_send \- send a data message using DLPI
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldlpi\fR [ \fIlibrary\fR... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_send\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBconst void *\fR\fIdaddrp\fR,
+     \fBsize_t\fR \fIdaddrlen\fR, \fBconst void *\fR\fImsgbuf\fR, \fBsize_t\fR \fImsglen\fR,
+     \fBconst dlpi_sendinfo_t *\fR\fIsendp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_send()\fR function attempts to send the contents of \fImsgbuf\fR
+over the \fBDLPI\fR link instance associated with the \fBDLPI\fR handle
+\fIdh\fR to the destination address specified by \fIdaddrp\fR. The size of
+\fImsgbuf\fR and  \fIdaddrp\fR are provided by the \fImsglen\fR and
+\fIdaddrlen\fR arguments, respectively. The attempt will fail if \fIdh\fR is
+not in the \fBDL_IDLE\fR \fBDLPI\fR state, the address named by \fIdaddrp\fR is
+invalid, \fIdaddrlen\fR is larger than \fBDLPI_PHYSADDR_MAX\fR, or \fImsglen\fR
+is outside the range reported by \fBdlpi_info\fR(3DLPI).
+.sp
+.LP
+If the \fBsendp\fR argument is \fINULL\fR, data is sent using the bound SAP
+associated with \fIdh\fR (see \fBdlpi_bind\fR(3DLPI)) and with default
+priority.  Otherwise, \fIsendp\fR must point to a \fBdlpi_sendinfo_t\fR
+structure defined in \fB<libdlpi.h>\fR as follows:
+.sp
+.in +2
+.nf
+typedef struct {
+        uint_t          dsi_sap;
+        dl_priority_t   dsi_prio;
+} dlpi_sendinfo_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIdsi_sap\fR value indicates the SAP to use for the message and the
+\fIdsi_prio\fR argument indicates the priority.  The priority range spans from
+0 to 100, with 0 being the highest priority.  If one wishes to only alter the
+SAP or priority (but not both), the current SAP can be retrieved using
+\fBdlpi_info\fR(3DLPI), and the default priority can be specified by using the
+\fBDL_QOS_DONT_CARE\fR constant.
+.sp
+.LP
+If the handle is in raw mode (see \fBDLPI_RAW\fR in \fBdlpi_open\fR(3DLPI)),
+\fImsgbuf\fR must start with the link-layer header (see \fBdlpi\fR(7P)). In raw
+mode, the contents of \fIdaddrp\fR and \fIsendp\fR are ignored, as they are
+already specified by the link-layer header in \fImsgbuf\fR.
+.sp
+.LP
+If \fImsgbuf\fR is accepted for delivery, no error is returned. However,
+because only unacknowledged connectionless service (\fBDL_CLDLS\fR) is
+currently supported, a successful return does not guarantee that the data will
+be successfully delivered to \fIdaddrp\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or an error value listed
+in the following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid argument
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_bind\fR(3DLPI), \fBdlpi_info\fR(3DLPI), \fBdlpi_open\fR(3DLPI),
+\fBlibdlpi\fR(3LIB), \fBattributes\fR(5), \fBdlpi\fR(7P)

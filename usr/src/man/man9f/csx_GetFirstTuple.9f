@@ -1,0 +1,248 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_GetFirstTuple 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_GetFirstTuple, csx_GetNextTuple \- return Card Information Structure tuple
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_GetFirstTuple\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_GetNextTuple\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 6n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItu\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBtuple_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The functions \fBcsx_GetFirstTuple()\fR and \fBcsx_GetNextTuple()\fR return the
+first and next tuple, respectively, of the specified type in the Card
+Information Structure (CIS) for the specified socket.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBtuple_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t    Socket;        /* socket number */
+uint32_t    Attributes;    /* Attributes */
+cisdata_t   DesiredTuple;  /* tuple to search for or flags */
+cisdata_t   TupleCode;     /* tuple type code */
+cisdata_t   TupleLink;     /* tuple data body size */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR\fR
+.ad
+.RS 23n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 23n
+.rt  
+This field is bit-mapped. The following bits are defined:
+.sp
+.ne 2
+.mk
+.na
+\fBTUPLE_RETURN_LINK\fR
+.ad
+.sp .6
+.RS 4n
+Return link tuples if set. The following are link tuples and will only be
+returned by this function if the \fBTUPLE_RETURN_LINK\fR bit in the
+\fBAttributes\fR field is set:
+.sp
+.in +2
+.nf
+	CISTPL_NULL	CISTPL_LONGLINK_MFC
+	CISTPL_LONGLINK_A	CISTPL_LINKTARGET
+	CISTPL_LONGLINK_C	CISTPL_NO_LINK
+	CISTPL_LONGLINK_CB	CISTPL_END
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTUPLE_RETURN_IGNORED_TUPLES\fR
+.ad
+.sp .6
+.RS 4n
+Return ignored tuples if set. Ignored tuples will be returned by this function
+if the \fBTUPLE_RETURN_IGNORED_TUPLES\fR bit in the \fBAttributes\fR field is
+set, see \fBtuple\fR(9S) for more information. The \fBCIS \fRis parsed from the
+location setup by the previous \fBcsx_GetFirstTuple()\fR or
+\fBcsx_GetNextTuple()\fR request.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDesiredTuple\fR\fR
+.ad
+.RS 23n
+.rt  
+This field is the tuple value desired. If it is \fBRETURN_FIRST_TUPLE,\fR the
+very first tuple of the \fBCIS \fRis returned (if it exists). If this field is
+set to \fBRETURN_NEXT_TUPLE,\fR the very next tuple of the \fBCIS \fRis
+returned (if it exists). If the \fBDesiredTuple\fR field is any other value on
+entry, the \fBCIS \fRis searched in an attempt to locate a tuple which matches.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleCode,TupleLink\fR\fR
+.ad
+.RS 23n
+.rt  
+These fields are the values returned from the tuple found. If there are no
+tuples on the card, \fBCS_NO_MORE_ITEMS\fR is returned.
+.RE
+
+.sp
+.LP
+Since the \fBcsx_GetFirstTuple()\fR, \fBcsx_GetNextTuple()\fR, and
+\fBcsx_GetTupleData\fR(9F) functions all share the same \fBtuple_t\fR
+structure, some fields in the \fBtuple_t\fR structure are unused or reserved
+when calling this function and these fields must not be initialized by the
+client.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CIS\fR\fR
+.ad
+.RS 27n
+.rt  
+No Card Information Structure (CIS) on \fBPC \fRcard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_MORE_ITEMS\fR\fR
+.ad
+.RS 27n
+.rt  
+Desired tuple not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_GetTupleData\fR(9F), \fBcsx_ParseTuple\fR(9F),
+\fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
+.sp
+.LP
+\fIPC Card \fR\fI95Standard,\fR PCMCIA/JEIDA

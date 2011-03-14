@@ -1,0 +1,105 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH adjmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+adjmsg \- trim bytes from a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBadjmsg\fR(\fBmblk_t *\fR\fImp\fR, \fBssize_t\fR \fIlen\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the message to be trimmed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 7n
+.rt  
+The number of bytes to be removed.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBadjmsg()\fR function removes bytes from a message. |\fIlen\fR| (the
+absolute value of \fIlen\fR) specifies the number of bytes to be removed. The
+\fBadjmsg()\fR function only trims bytes across message blocks of the same
+type.
+.sp
+.LP
+The \fBadjmsg()\fR function finds the maximal leading sequence of message
+blocks of the same type as that of \fImp\fR and starts removing bytes either
+from the head of that sequence or from the tail of that sequence. If \fIlen\fR
+is greater than \fB0\fR, \fBadjmsg()\fR removes bytes from the start of the
+first message block in that sequence. If \fIlen\fR is less than \fB0\fR, it
+removes bytes from the end of the last message block in that sequence.
+.sp
+.LP
+The \fBadjmsg()\fR function fails if |\fIlen\fR| is greater than the number of
+bytes in the maximal leading sequence it finds.
+.sp
+.LP
+The \fBadjmsg()\fR function may remove any except the first zero-length message
+block created during adjusting. It may also remove any zero-length message
+blocks that occur within the scope of |\fIlen\fR|.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBadjmsg()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+An error occurred.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBadjmsg()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

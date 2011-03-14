@@ -1,0 +1,141 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_get_device_type_scsi_options 9F "19 Nov 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_get_device_type_scsi_options \- look up per-device-type scsi-options
+property
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_get_device_type_scsi_options\fR(\fBdev_info_t  *\fR\fIdip\fR, 
+     \fBstruct scsi_device  *\fR\fIdevp\fR, \fBint\fR \fIdefault_scsi_options\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 24n
+.rt  
+Pointer to the device info node for this HBA driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR\fR
+.ad
+.RS 24n
+.rt  
+Pointer to a \fBscsi_device\fR(9S) structure of the target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdefault_scsi_options\fR\fR
+.ad
+.RS 24n
+.rt  
+Value returned if no match is found.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_get_device_type_scsi_options()\fR function looks up the property
+\fBdevice-type-scsi-options-list\fR, which can be specified in the HBA's
+\fBdriver.conf\fR(4) file. This property allows specification of
+\fBscsi-options\fR on a per-device-type basis.
+.sp
+.LP
+The formal syntax is:
+.sp
+.in +2
+.nf
+device-type-scsi-options-list = \fI<duplet>\fR [, \fI<duplet>\fR *];
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where:
+.sp
+.in +2
+.nf
+\fI<duplet>\fR := \fI<vid+pid>\fR, \fI<scsi-options-property-name>\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and:
+.sp
+.in +2
+.nf
+\fI<scsi-options-property-name>\fR = \fI<value>\fR;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The string \fI<vid+pid>\fR is returned by the device on a SCSI inquiry command.
+This string can contain any character in the range 0x20-0x7e. Characters such
+as double quote (\fB"\fR) or single quote (\fB\&'\fR), which are not permitted
+in property value strings, are represented by their octal equivalent (for
+example, \e042 and \e047). Trailing spaces can be truncated.
+.sp
+.LP
+For example:
+.sp
+.in +2
+.nf
+device-type-scsi-options-list=
+        "SEAGATE ST32550W",  "seagate-options",
+        "EXABYTE EXB-2501".  "exabyte-options",
+        "IBM OEM DFHSS4S",  "ibm-options";
+
+seagate-options = 0x78;
+exabyte-options = 0x58;
+ibm-options = 0x378;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBscsi_get_device_type_scsi_options()\fR function searches the list of
+duplets for a matching \fBINQUIRY\fR string. If a match is found,
+\fBscsi_get_device_type_scsi_options()\fR returns the corresponding value.
+.SH RETURN VALUES
+.sp
+.LP
+\fBscsi_get_device_type_scsi_options()\fR returns the \fBscsi-options\fR value
+found, or if no match is found the \fBdefault_scsi_options\fR value passed in.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR

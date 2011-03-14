@@ -1,0 +1,58 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH putpwent 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+putpwent \- write password file entry
+.SH SYNOPSIS
+.LP
+.nf
+#include <pwd.h>
+
+\fBint\fR \fBputpwent\fR(\fBconst struct passwd *\fR\fIp\fR, \fBFILE *\fR\fIf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBputpwent()\fR function is the inverse of \fBgetpwent()\fR. See
+\fBgetpwnam\fR(3C). Given a pointer to a \fBpasswd\fR structure created by
+\fBgetpwent()\fR, \fBgetpwuid()\fR, or \fBgetpwnam()\fR, \fBputpwent()\fR
+writes a line on the stream \fIf\fR that matches the format of
+\fB/etc/passwd\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBputpwent()\fR function returns a non-zero value if an error was detected
+during its operation. Otherwise, it returns \fB0\fR.
+.SH USAGE
+.sp
+.LP
+The \fBputpwent()\fR function is of limited utility, since most password files
+are maintained as Network Information Service (NIS) files that cannot be
+updated with this function. For this reason, the use of this function is
+discouraged. If used at all, it should be used with \fBputspent\fR(3C) to
+update the shadow file.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetpwnam\fR(3C), \fBputspent\fR(3C), \fBattributes\fR(5)

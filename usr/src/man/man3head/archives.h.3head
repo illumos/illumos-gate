@@ -1,0 +1,242 @@
+'\" te
+.\" Copyright (C) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH archives.h 3HEAD "22 Oct 2007" "SunOS 5.11" "Headers"
+.SH NAME
+archives.h, archives \- device header
+.SH DESCRIPTION
+.sp
+.in +2
+.nf
+/* Magic numbers */
+#define CMN_ASC 0x070701    /* Cpio Magic Number for -c header */
+#define CMN_BIN 070707      /* Cpio Magic Number for Binary header */
+#define CMN_BBS 0143561     /* Cpio Magic Number for Byte-Swap header */
+#define CMN_CRC 0x070702    /* Cpio Magic Number for CRC header */
+#define CMS_ASC "070701"    /* Cpio Magic String for -c header */
+#define CMS_CHR "070707"    /* Cpio Magic String for odc header */
+#define CMS_CRC "070702"    /* Cpio Magic String for CRC header */
+#define CMS_LEN 6           /* Cpio Magic String length */
+/* Various header and field lengths */
+#define CHRSZ   76         /* -H odc size minus filename field */
+#define ASCSZ   110        /* -c and CRC hdr size minus filename field */
+#define TARSZ   512        /* TAR hdr size */
+#define HNAMLEN 256        /* maximum filename length for binary and
+                          odc headers */
+#define EXPNLEN 1024      /* maximum filename length for -c and
+                         CRC headers */
+#define HTIMLEN 2         /* length of modification time field */
+#define HSIZLEN 2         /* length of file size field */
+/* cpio binary header definition */
+struct hdr_cpio {
+       short   h_magic,           /* magic number field */
+               h_dev;             /* file system of file */
+       ushort_t  h_ino,           /* inode of file */
+               h_mode,            /* modes of file */
+               h_uid,             /* uid of file */
+               h_gid;             /* gid of file */
+       short   h_nlink,           /* number of links to file */
+               h_rdev,            /* maj/min numbers for special files */
+               h_mtime[HTIMLEN],  /* modification time of file */
+               h_namesize,        /* length of filename */
+          h_filesize[HSIZLEN];     /* size of file */
+     char h_name[HNAMLEN];    /* filename */
+} ;
+/* cpio -H odc header format */
+struct c_hdr {
+       char c_magic[CMS_LEN],
+            c_dev[6],
+            c_ino[6],
+            c_mode[6],
+            c_uid[6],
+            c_gid[6],
+            c_nlink[6],
+            c_rdev[6],
+            c_mtime[11],
+            c_namesz[6],
+            c_filesz[11],
+            c_name[HNAMLEN];
+} ;
+/* -c and CRC header format */
+struct Exp_cpio_hdr {
+     char E_magic[CMS_LEN],
+          E_ino[8],
+          E_mode[8],
+          E_uid[8],
+          E_gid[8],
+          E_nlink[8],
+          E_mtime[8],
+          E_filesize[8],
+          E_maj[8],
+          E_min[8],
+          E_rmaj[8],
+          E_rmin[8],
+          E_namesize[8],
+          E_chksum[8],
+          E_name[EXPNLEN];
+} ;
+/* Tar header structure and format */
+#define TBLOCK 512  /* length of tar header and data blocks */
+#define TNAMLEN     100  /* maximum length for tar file names */
+#define TMODLEN     8    /* length of mode field */
+#define TUIDLEN     8    /* length of uid field */
+#define TGIDLEN     8    /* length of gid field */
+#define TSIZLEN     12   /* length of size field */
+#define TTIMLEN     12   /* length of modification time field */
+#define TCRCLEN     8    /* length of header checksum field */
+/* tar header definition */
+union tblock {
+     char dummy[TBLOCK];
+     struct header {
+         char  t_name[TNAMLEN];     /* name of file */
+         char  t_mode[TMODLEN];     /* mode of file */
+         char  t_uid[TUIDLEN];      /* uid of file */
+         char  t_gid[TGIDLEN];      /* gid of file */
+         char  t_size[TSIZLEN];     /* size of file in bytes */
+         char  t_mtime[TTIMLEN];    /* modification time of file */
+         char  t_chksum[TCRCLEN];   /* checksum of header */
+         char  t_typeflag;          /* flag to indicate type of file */
+         char  t_linkname[TNAMLEN]; /* file this file is linked with */
+         char  t_magic[6];          /* magic string always "ustar" */
+         char  t_version[2];        /* version strings always "00" */
+         char  t_uname[32];         /* owner of file in ASCII */
+         char  t_gname[32];         /* group of file in ASCII */
+         char  t_devmajor[8];       /* major number for special files */
+         char  t_devminor[8];       /* minor number for special files */
+         char  t_prefix[155];       /* pathname prefix */
+     } tbuf;
+}
+/* volcopy tape label format and structure */
+#define VMAGLEN 8
+#define VVOLLEN     6
+#define VFILLEN     464
+struct volcopy_label {
+     char v_magic[VMAGLEN],
+          v_volume[VVOLLEN],
+          v_reels,
+          v_reel;
+     long v_time,
+          v_length,
+          v_dens,
+          v_reelblks,    /* u370 added field */
+          v_blksize,     /* u370 added field */
+          v_nblocks;     /* u370 added field */
+     char v_fill[VFILLEN];
+     long v_offset; /* used with -e and -reel options */
+     int  v_type;        /* does tape have nblocks field? */
+} ;
+
+/*
+ * Define archive formats for extended attributes.
+ *
+ * Extended attributes are stored in two pieces.
+ * 1. An attribute header which has information about
+ *    what file the attribute is for and what the attribute
+ *    is named.
+ * 2. The attribute record itself.  Stored as a normal file type
+ *    of entry.
+ * Both the header and attribute record have special modes/typeflags
+ * associated with them.
+ *
+ * The names of the header in the archive look like:
+ * /dev/null/attr.hdr
+ *
+ * The name of the attribute looks like:
+ * /dev/null/attr.
+ *
+ * This is done so that an archiver that doesn't understand these formats
+ * can just dispose of the attribute records unless the user chooses to
+ * rename them via cpio -r or pax -i
+ *
+ * The format is composed of a fixed size header followed
+ * by a variable sized xattr_buf. If the attribute is a hard link
+ * to another attribute, then another xattr_buf section is included
+ * for the link.
+ *
+ * The xattr_buf is used to define the necessary "pathing" steps
+ * to get to the extended attribute.  This is necessary to support
+ * a fully recursive attribute model where an attribute may itself
+ * have an attribute.
+ *
+ * The basic layout looks like this.
+ *
+*     --------------------------------
+ *     |                              |
+ *     |         xattr_hdr            |
+ *     |                              |
+ *     --------------------------------
+ *     --------------------------------
+ *     |                              |
+ *     |        xattr_buf             |
+ *     |                              |
+ *     --------------------------------
+ *     --------------------------------
+ *     |                              |
+ *     |      (optional link info)    |
+ *     |                              |
+ *     --------------------------------
+ *     --------------------------------
+ *     |                              |
+ *     |      attribute itself        |
+ *     |      stored as normal tar    |
+ *     |      or cpio data with       |
+ *     |      special mode or         |
+ *     |      typeflag                |
+ *     |                              |
+ *     --------------------------------
+ *
+ */
+#define XATTR_ARCH_VERS "1.0"
+
+/*
+ * extended attribute fixed header
+ *
+ * h_version            format version.
+ * h_size               size of header + variable sized data sections.
+ * h_component_len      Length of entire pathing section.
+ * h_link_component_len Length of link component section.  Again same 
+ *                      definition as h_component_len.
+ */
+struct xattr_hdr {
+        char    h_version[7];
+        char    h_size[10];
+        char    h_component_len[10]; /* total length of path component */
+        char    h_link_component_len[10];
+};
+
+/*
+ * The name is encoded like this:
+ * filepathNULattrpathNUL[attrpathNULL]...
+ */
+struct xattr_buf {
+        char    h_namesz[7];  /* length of h_names */
+        char    h_typeflag;   /* actual typeflag of file being archived */
+        char    h_names[1];   /* filepathNULattrpathNUL... */
+};
+
+/*
+ * Special values for tar archives
+ */
+
+/*
+ * typeflag for tar archives.
+ */
+
+/*
+ * Attribute hdr and attribute files have the following typeflag
+ */
+#define _XATTR_HDRTYPE          'E'
+
+/*
+ * For cpio archives the header and attribute have
+ * _XATTR_CPIO_MODE ORED into the mode field in both
+ * character and binary versions of the archive format
+ */
+#define _XATTR_CPIO_MODE        0xB000
+.fi
+.in -2
+.sp
+

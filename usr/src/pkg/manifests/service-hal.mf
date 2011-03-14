@@ -65,6 +65,10 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
+dir path=usr/share/man/man5
 file path=etc/dbus-1/system.d/hal.conf variant.opensolaris.zone=global
 file path=etc/hal/fdi/information/10freedesktop/10-camera-ptp.fdi mode=0444 \
     variant.opensolaris.zone=global
@@ -165,6 +169,16 @@ file path=usr/sbin/hal-get-property mode=0555
 file path=usr/sbin/hal-set-property mode=0555
 file path=usr/sbin/lshal mode=0555
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
+file path=usr/share/man/man1m/hal-device.1m
+file path=usr/share/man/man1m/hal-fdi-validate.1m
+file path=usr/share/man/man1m/hal-find-by-capability.1m
+file path=usr/share/man/man1m/hal-find-by-property.1m
+file path=usr/share/man/man1m/hal-find.1m
+file path=usr/share/man/man1m/hal-get-property.1m
+file path=usr/share/man/man1m/hal-set-property.1m
+file path=usr/share/man/man1m/hald.1m
+file path=usr/share/man/man4/fdi.4
+file path=usr/share/man/man5/hal.5
 legacy pkg=SUNWhal desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
     name="Hardware Abstraction Layer"
 legacy pkg=SUNWhalr \

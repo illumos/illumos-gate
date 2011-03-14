@@ -1,0 +1,519 @@
+'\" te
+.\" Copyright (c) 2007 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pcfs 7FS "6 Nov 2007" "SunOS 5.11" "File Systems"
+.SH NAME
+pcfs \- FAT formatted file system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <sys/fs/pc_fs.h>
+
+\fBint\fR \fBmount\fR(\fBconst char *\fR\fIspec\fR, 
+     \fBconst char *\fR \fIdir\fR, \fBint\fR  \fImflag\fR,
+     \fB"pcfs", NULL, 0,\fR \fBchar *\fR\fIoptptr\fR, 
+     \fBint\fR \fIoptlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpcfs\fR is a file system type that enables direct access to files on
+\fBFAT\fR formatted disks from within the SunOS operating system.
+.sp
+.LP
+Once mounted, \fBpcfs\fR provides standard SunOS file operations and semantics.
+Using \fBpcfs\fR, you can create, delete, read, and write files on a \fBFAT\fR
+formatted disk. You can also create and delete directories and list files in a
+directory.
+.sp
+.LP
+\fBpcfs\fR supports FAT12 (floppies) and FAT16 and FAT32 file systems.
+.sp
+.LP
+\fBpcfs\fR file systems can be force umounted using the \fB-f\fR argument to
+\fBumount\fR(1M).
+.sp
+.LP
+The \fBpcfs\fR file system contained on the block special file identified by
+\fIspec\fR is mounted on the directory identified by \fIdir\fR. \fIspec\fR and
+\fIdir\fR are pointers to pathnames. \fImflag\fR specifies the \fBmount\fR
+options. The \fBMS_DATA\fR bit in \fImflag\fR must be set. Mount options can be
+passed to \fBpcfs\fR  using the  optptr and optlen  arguments.  See
+\fBmount_pcfs\fR(1M) for a list of mount options supported by \fBpcfs\fR.
+.sp
+.LP
+Because FAT formatted media can record file timestamps between January 1st 1980
+and December 31st 2127, it's not possible to fully represent UNIX \fBtime_t\fR
+in \fBpcfs\fR for 32 bit or 64 bit programs. In particular, if post-2038
+timestamps are present on a FAT formatted medium and \fBpcfs\fR returns these,
+32bit applications may unexpectedly fail with \fBEOVERFLOW\fR errors. To
+prevent this, the default behaviour of \fBpcfs\fR has been modified to clamp
+post-2038 timestamps to the latest possible value for a 32bit \fBtime_t\fR,
+which is January 19th 2038, 03:14:06 UTC when setting and retrieving file
+timestamps. You can override this behavior using the \fBnoclamptime\fR mount
+option, as described in \fBmount_pcfs\fR(1M).
+.sp
+.LP
+Timestamps on FAT formatted media are recorded in local time. If the recording
+and  receiving systems use different timezones, the representation of
+timestamps shown on the two systems for the same medium might vary. To correct
+this,  \fBpcfs\fR  provides a  timezone mount option to force  interpretation
+of timestamps as read from a FAT formatted medium in a given  timezone (that of
+the recorder). By default, the local timezone of the  receiver is used. See
+\fBmount_pcfs\fR(1M) for details.
+.sp
+.LP
+The root directory of a FAT formatted medium has no timestamps and \fBpcfs\fR
+returns the time when the mount was done as timestamp  for the root of the
+filesystem.
+.sp
+.LP
+The FAT filesystem doesn't support multiple links. As a result, the link count
+for all files and directories in \fBpcfs\fR is hard-coded as "1."
+.SS "Mounting File Systems"
+.sp
+.LP
+Use the following command to mount \fBpcfs\fR from diskette:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs \fIdevice-special\fR \fIdirectory-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You can use:
+.sp
+.in +2
+.nf
+mount \fIdirectory-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+if the following line is in your \fB/etc/vfstab\fR file:
+.sp
+.in +2
+.nf
+\fIdevice-special\fR - \fIdirectory-name\fRpcfs \(mi no rw
+.fi
+.in -2
+
+.sp
+.LP
+Use the following command to mount \fBpcfs\fR from non-diskette media:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs \fIdevice-special\fR:\fIlogical-drive\fR \fBdirectory-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You can use:
+.sp
+.in +2
+.nf
+mount \fIdirectory-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+if the following line is in your \fB/etc/vfstab\fR file:
+.sp
+.in +2
+.nf
+\fIdevice-special\fR:\fIlogical_drive\fR \fB\(mi\fR \fIdirectory-name\fR \fBpcfs \(mi no rw\fR
+.fi
+.in -2
+
+.sp
+.LP
+\fIdevice-special\fR specifies the special block device file for the diskette
+(\fB/dev/diskette\fIN\fR\fR) or the entire hard disk
+(\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRp0\fR for a SCSI disk, and
+\fB/dev/dsk/c\fIN\fRd\fIN\fRp0\fR for \fBIDE\fR disks) or the \fBPCMCIA\fR
+pseudo-floppy memory card (\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR).
+.sp
+.LP
+\fIlogical-drive\fR specifies either the \fBDOS\fR logical drive letter
+(\fBc\fR through \fBz\fR) or a drive number (\fB1\fR through \fB24\fR). Drive
+letter \fBc\fR is equivalent to drive number \fB1\fR and represents the Primary
+\fBDOS\fR partition on the disk; drive letters \fBd\fR through \fBz\fR are
+equivalent to drive numbers \fB2\fR through \fB24\fR, and represent \fBDOS\fR
+drives within the Extended \fBFAT\fR partition. Note that \fIdevice-special\fR
+and \fIlogical-drive\fR must be separated by a colon.
+.sp
+.LP
+\fIdirectory-name\fR specifies the location where the file system is mounted.
+.sp
+.LP
+For example, to mount the Primary \fBDOS\fR partition from a SCSI hard disk,
+use:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs /dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRp0:c /pcfs/c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To mount the first logical drive in the Extended \fBDOS\fR partition from an
+\fBIDE\fR hard disk, use:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs /dev/dsk/c\fIN\fRd\fIN\fRp0:d /pcfs/d
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To mount a \fBDOS\fR diskette in the first floppy drive when volume management
+is not running use:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs /dev/diskette /pcfs/a
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If Volume Management is running, run \fBvolcheck\fR(1) to automatically mount
+the floppy and some removable disks.
+.sp
+.LP
+To mount a \fBPCMCIA\fR pseudo-floppy memory card, with Volume Management not
+running (or not managing the \fBPCMCIA\fR media), use:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs /dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR /pcfs
+.fi
+.in -2
+.sp
+
+.SS "Conventions"
+.sp
+.LP
+Files and directories created through \fBpcfs\fR must comply with either the
+\fBFAT\fR short file name convention or the long file name convention
+introduced with Windows 95. The \fBFAT\fR short file name convention is of the
+form \fIfilename\fR[.\fIext\fR], where \fIfilename\fR generally consists of
+from one to eight upper-case characters, while the optional \fIext\fR consists
+of from one to three upper-case characters.
+.sp
+.LP
+The long file name convention is much closer to Solaris file names. A long file
+name can consist of any characters valid in a short file name, lowercase
+letters, non-leading spaces, the characters \fB+,;=[]\fR, any number of
+periods, and can be up to 255 characters long. Long file names have an
+associated short file name for systems that do not support long file names
+(including earlier releases of Solaris). The short file name is not visible if
+the system recognizes long file names. \fBpcfs\fR generates a unique short name
+automatically when creating a long file name.
+.sp
+.LP
+Given a long file name such as \fBThis is a really long filename.TXT\fR, the
+short file name will generally be of the form \fBTHISIS~\fR\fIN\fR\fB\&.TXT\fR,
+where \fIN\fR is a number. The long file name will probably get the short name
+\fBTHISIS~1.TXT\fR, or \fBTHISIS~2.TXT\fR if \fBTHISIS~1.TXT\fR already exits
+(or \fBTHISIS~3.TXT\fR if both exist, and so forth). If you use \fBpcfs\fR file
+systems on systems that do not support long file names, you may want to
+continue following the short file name conventions. See \fBEXAMPLES\fR.
+.sp
+.LP
+When creating a file name, \fBpcfs\fR creates a short file name if it fits the
+\fBFAT\fR short file name format, otherwise it creates a long file name. This
+is because long file names take more directory space. Because the root
+directory of a \fBpcfs\fR file system is fixed size, long file names in the
+root directory should be avoided if possible.
+.sp
+.LP
+When displaying file names, \fBpcfs\fR shows them exactly as they are on the
+media. This means that short names are displayed as uppercase and long file
+names retain their case. Earlier versions of \fBpcfs\fR folded all names to
+lowercase, which can be forced with the \fBPCFS_MNT_FOLDCASE\fR mount option.
+All file name searches within \fBpcfs\fR, however, are treated as if they were
+uppercase, so \fBreadme.txt\fR and \fBReAdMe.TxT\fR refer to the same file.
+.sp
+.LP
+To format a diskette or a \fBPCMCIA\fR pseudo-floppy memory card in \fBFAT\fR
+format in the SunOS system, use either the \fBfdformat\fR \fB-d\fR or the
+\fBDOS\fR \fBFORMAT\fR command.
+.SS "Boot Partitions"
+.sp
+.LP
+On x86 systems, hard drives may contain an \fBfdisk\fR partition reserved for
+the Solaris boot utilities. These partitions are special instances of
+\fBpcfs\fR. You can mount an x86 boot partition with the command:
+.sp
+.in +2
+.nf
+mount \fB-F\fR pcfs \fIdevice-special\fR:boot \fIdirectory-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or you can use:
+.sp
+.in +2
+.nf
+\fBmount \fIdirectory-name\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+if the following line is in your \fB/etc/vfstab\fR file:
+.sp
+.in +2
+.nf
+\fIdevice-special\fR:boot \(mi \fIdirectory-name\fR pcfs \(mi no rw
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fIdevice-special\fR specifies the special block device file for the entire
+hard disk (\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRp0\fR)
+.sp
+.LP
+\fIdirectory-name\fR specifies the location where the file system is mounted.
+.sp
+.LP
+All files on a boot partition are owned by super-user. Only the super-user may
+create, delete, or modify files on a boot partition.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample Displays of File Names
+.sp
+.LP
+If you copy a file \fBfinancial.data\fR from a UNIX file system to \fBpcfs\fR,
+it displays as \fBfinancial.data\fR in \fBpcfs\fR, but may show up as
+\fBFINANC~1.DAT\fR in systems that do not support long file names.
+
+.sp
+.LP
+The following are legal long file names. They are also \fBillegal\fR short file
+names:
+
+.br
+.in +2
+\fBtest.sh.orig\fR
+.in -2
+.br
+.in +2
+\fBdata+\fR
+.in -2
+.br
+.in +2
+\fB\&.login\fR
+.in -2
+.sp
+.LP
+Other systems that do not support long file names may see:
+
+.br
+.in +2
+\fBTESTSH~1.ORI\fR
+.in -2
+.br
+.in +2
+\fBDATA~1\fR
+.in -2
+.br
+.in +2
+\fBLOGIN~1\fR
+.in -2
+.sp
+.LP
+The short file name is generated from the initial characters of the long file
+name, so differentiate names in the first few characters. For example, these
+names:
+
+.br
+.in +2
+\fBWorkReport.January.Data\fR
+.in -2
+.br
+.in +2
+\fBWorkReport.February.Data\fR
+.in -2
+.br
+.in +2
+\fBWorkReport.March.Data\fR
+.in -2
+.sp
+.LP
+result in these short names, which are not distinguishable:
+
+.br
+.in +2
+\fBWORKRE~1.DAT\fR
+.in -2
+.br
+.in +2
+\fBWORKRE~2.DAT\fR
+.in -2
+.br
+.in +2
+\fBWORKRE~13.DAT\fR
+.in -2
+.sp
+.LP
+These names, however:
+
+.br
+.in +2
+\fBJanuary.WorkReport.Data\fR
+.in -2
+.br
+.in +2
+\fBFebruary.WorkReport.Data\fR
+.in -2
+.br
+.in +2
+\fBMarch.WorkReport.Data\fR
+.in -2
+.sp
+.LP
+result in the more descriptive short names:
+
+.br
+.in +2
+\fBJANUAR~1.DAT\fR
+.in -2
+.br
+.in +2
+\fBFEBRUA~1.DAT\fR
+.in -2
+.br
+.in +2
+\fBMARCHW~1.DAT\fR
+.in -2
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/fs/pcfs/mount\fR\fR
+.ad
+.RS 26n
+.rt  
+\fBpcfs\fR \fBmount\fR command
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/kernel/fs/pcfs\fR\fR
+.ad
+.RS 26n
+.rt  
+32-bit kernel module
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+for the current locale setting: LANG, LC_ALL, LC_CTYPE, and LC_COLLATE.
+.SH SEE ALSO
+.sp
+.LP
+\fBchgrp\fR(1), \fBchown\fR(1), \fBdos2unix\fR(1), \fBeject\fR(1),
+\fBfdformat\fR(1), \fBunix2dos\fR(1), \fBvolcheck\fR(1), \fBmount\fR(1M),
+\fBmount_pcfs\fR(1M), \fBumount\fR(1M), \fBctime\fR(3C), \fBvfstab\fR(4),
+\fBenviron\fR(5), \fBpcmem\fR(7D)
+.SH WARNINGS
+.sp
+.LP
+Do not physically eject a \fBFAT\fR floppy while the device is mounted as
+\fBpcfs\fR. If Volume Management is managing a device, use the \fBeject\fR(1)
+command before physically removing media.
+.sp
+.LP
+When mounting \fBpcfs\fR on a hard disk, make sure the first block on that
+device contains a valid \fBfdisk\fR partition table.
+.sp
+.LP
+Because \fBpcfs\fR has no provision for handling owner-IDs or group-IDs on
+files, \fBchown\fR(1) or \fBchgrp\fR(1) may generate various errors. This is a
+limitation of \fBpcfs\fR, but it should not cause problems other than error
+messages.
+.SH NOTES
+.sp
+.LP
+Only the following characters are allowed in \fBpcfs\fR short file names and
+extensions:
+.br
+.in +2
+\fB0-9\fR
+.in -2
+.br
+.in +2
+\fBA-Z\fR
+.in -2
+.br
+.in +2
+\fB$#&@!%()-{}<>`_^~|'\fR
+.in -2
+.sp
+.LP
+SunOS and \fBFAT\fR use different character sets and have different
+requirements for the text file format. Use the \fBdos2unix\fR(1) and
+\fBunix2dos\fR(1) commands to convert files between them.
+.sp
+.LP
+\fBpcfs\fR offers a convenient transportation vehicle for files between Sun
+workstations and \fBPCs.\fR Because the \fBFAT\fR disk format was designed for
+use under \fBDOS,\fR it does not operate efficiently under the SunOS system and
+should not be used as the format for a regular local storage. Instead, use
+\fBufs\fR for local storage within the SunOS system.
+.sp
+.LP
+Although long file names can contain spaces (just as in UNIX file names), some
+utilities may be confused by them.
+.sp
+.LP
+This implementation of \fBpcfs\fR conforms to the behavior exhibited by Windows
+95 version 4.00.950.
+.sp
+.LP
+When \fBpcfs\fR encounters long file names with non-ASCII characters, it
+converts such long file names in Unicode scalar values into UTF-8 encoded
+filenames so that they are legible and usable with any of Solaris UTF-8
+locales. In the same context, when new file names with non-ASCII characters are
+created, \fBpcfs\fR expects that such file names are in UTF-8. This feature
+increases the interoperability of \fBpcfs\fR on Solaris with other operating
+systems.
+.SH BUGS
+.sp
+.LP
+\fBpcfs\fR should handle the disk change condition in the same way that
+\fBDOS\fR does, so you do not need to unmount the file system to change
+floppies.

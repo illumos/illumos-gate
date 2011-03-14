@@ -1,0 +1,45 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2011, Richard Lowe
+
+ROOTMAN			= $(ROOT)/usr/share/man
+ROOTHASMAN		= $(ROOT)/usr/has/man
+
+FILEMODE= 0444
+
+# The manual section being built, client Makefiles must set this to, for e.g.
+# "3perl", with case matching that of the section name as installed.
+#
+# MANSECT=
+
+ROOTMANFILES = 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
+
+CLOBBERFILES = $(MANSOFILES)
+
+$(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
+	$(INS.file)
+
+$(MANSOFILES):
+	$(RM) $@; $(ECHO) ".so $(SOSRC)" > $@
+
+all:
+
+clean:
+
+clobber:
+	$(RM) $(CLOBBERFILES)
+
+lint:
+
+.PARALLEL:
+
+FRC:

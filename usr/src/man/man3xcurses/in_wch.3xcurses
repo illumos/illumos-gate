@@ -1,0 +1,128 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH in_wch 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+in_wch, mvin_wch, mvwin_wch, win_wch \- retrieve a complex character (with
+rendition)
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBin_wch\fR(\fBcchar_t *\fR\fIwcval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvin_wch\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBcchar_t *\fR\fIwcval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwin_wch\fR(\fBWINDOW *\fR\fIwin\fR, \fB\fR\fIinty\fR, \fBcchar_t *\fR\fIwcval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwin_wch\fR(\fBWINDOW *\fR\fIwin\fR, \fBcchar_t *\fR\fIwcval\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBin_wch()\fR and \fBwin_wch()\fR functions retrieve the complex character
+and its rendition located at the current cursor position of the  \fBstdscr\fR
+window and window \fIwin\fR, respectively. The \fBmvin_wch()\fR and
+\fBmvwin_wch()\fR functions retrieve the complex character and its rendition
+located at the position indicated by the \fIx\fR  (column) and \fIy\fR (row)
+parameters (the former in the \fBstdscr\fR window; the latter in window
+\fIwin\fR).
+.sp
+.LP
+All these functions store the retrieved character and its rendition in the
+object pointed to by \fIwcval\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwcval\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to an object that can store a complex character and its rendition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the y (row) coordinate of the position of the character to be returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the x (column) coordinate of the position of the character to be returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window that contains the character to be returned.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBadd_wch\fR(3XCURSES), \fBinch\fR(3XCURSES), \fBlibcurses\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

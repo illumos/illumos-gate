@@ -1,0 +1,75 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_dmafree 9E "30 Aug 1995" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_dmafree \- SCSI HBA DMA deallocation entry point
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fB void prefix\fR\fBtran_dmafree\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 8n
+.rt  
+A pointer to a \fIscsi_address\fR structure. See \fBscsi_address\fR(9S).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR \fR
+.ad
+.RS 8n
+.rt  
+A pointer to a \fIscsi_pkt\fR  structure. See \fBscsi_pkt\fR(9S).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_dmafree()\fR vector in the \fIscsi_hba_tran\fR structure must be
+initialized during the \fBHBA \fRdriver's \fBattach()\fR to point to an \fBHBA
+\fRentry point to be called when a target driver calls \fBscsi_dmafree\fR(9F).
+See \fBattach\fR(9E) and \fBscsi_hba_tran\fR(9S).
+.sp
+.LP
+\fBtran_dmafree()\fR must deallocate any \fBDMA \fRresources previously
+allocated to this  \fIpkt\fR in a call to \fBtran_init_pkt\fR(9E).
+\fBtran_dmafree()\fR should not free the structure pointed to by \fIpkt\fR
+itself. Since  \fBtran_destroy_pkt\fR(9E) must also free \fBDMA \fRresources,
+it is important that the \fBHBA \fRdriver keeps accurate note of whether
+\fBscsi_pkt\fR(9S) structures have \fBDMA \fRresources allocated.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBtran_destroy_pkt\fR(9E), \fBtran_init_pkt\fR(9E),
+\fBscsi_dmafree\fR(9F), \fBscsi_dmaget\fR(9F), \fBscsi_hba_attach\fR(9F),
+\fBscsi_init_pkt\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S),
+\fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+A target driver may call \fBtran_dmafree()\fR on packets for which no \fBDMA
+\fRresources were allocated.

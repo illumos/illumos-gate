@@ -1,0 +1,582 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getipnodebyname 3SOCKET "22 Aug 2007" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+getipnodebyname, getipnodebyaddr, freehostent \- get IP node entry
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR... ]
+#include <sys/socket.h>
+#include <netdb.h>
+
+\fBstruct hostent *\fR\fBgetipnodebyname\fR(\fBconst char *\fR\fIname\fR, \fBint\fR \fIaf\fR,
+     \fBint\fR \fIflags\fR, \fBint *\fR\fIerror_num\fR);
+.fi
+
+.LP
+.nf
+\fBstruct hostent *\fR\fBgetipnodebyaddr\fR(\fBconst void *\fR\fIsrc\fR, \fBsize_t\fR \fIlen\fR,
+     \fBint\fR \fIaf\fR, \fBint *\fR\fIerror_num\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfreehostent\fR(\fBstruct hostent *\fR\fIptr\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaf\fR\fR
+.ad
+.RS 13n
+.rt  
+Address family
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 13n
+.rt  
+Various flags
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 13n
+.rt  
+Name of host
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerror_num\fR\fR
+.ad
+.RS 13n
+.rt  
+Error storage
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrc\fR\fR
+.ad
+.RS 13n
+.rt  
+Address for lookup
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 13n
+.rt  
+Length of address
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIptr\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to \fBhostent\fR structure
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetipnodebyname()\fR function searches the \fBipnodes\fR database from
+the beginning. The function finds the first \fBh_name\fR member that matches
+the hostname specified by \fIname\fR. The function takes an \fIaf\fR argument
+that specifies the address family. The address family can be \fBAF_INET\fR for
+IPv4 addresses or \fBAF_INET6\fR for IPv6 addresses. The \fIflags\fR argument
+determines what results are returned based on the value of \fIflags\fR. If the
+\fIflags\fR argument is set to \fB0\fR (zero), the default operation of the
+function is specified as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fIaf\fR argument is \fBAF_INET\fR, a query is made for an IPv4 address.
+If successful, IPv4 addresses are returned and the \fBh_length\fR member of the
+\fBhostent\fR structure is 4. Otherwise, the function returns a \fINULL\fR
+pointer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fIaf\fR argument is \fBAF_INET6\fR, a query is made for an IPv6
+address. If successful, IPv6 addresses are returned and the \fBh_length\fR
+member of the \fBhostent\fR structure is 16. Otherwise, the function returns a
+\fINULL\fR pointer.
+.RE
+.sp
+.LP
+The \fIflags\fR argument changes the default actions of the function. Set the
+\fIflags\fR argument with a logical \fBOR\fR operation on any of combination of
+the following values:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBAI_V4MAPPED\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBAI_ALL\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBAI_ADDRCONFIG\fR
+.RE
+.sp
+.LP
+The special flags value, \fBAI_DEFAULT\fR, should handle most applications.
+Porting simple applications to use IPv6 replaces the call
+.sp
+.in +2
+.nf
+hptr = gethostbyname(name);
+.fi
+.in -2
+
+.sp
+.LP
+with
+.sp
+.in +2
+.nf
+hptr = getipnodebyname(name, AF_INET6, AI_DEFAULT, &error_num);
+.fi
+.in -2
+
+.sp
+.LP
+The \fIflags\fR value \fB0\fR (zero) implies a strict interpretation of the
+\fIaf\fR argument:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIflags\fR is \fB0\fR and \fIaf\fR is \fBAF_INET\fR, the caller wants only
+IPv4 addresses. A query is made for \fBA\fR records. If successful, IPv4
+addresses are returned and the \fBh_length\fR member of the \fBhostent\fR
+structure is 4. Otherwise, the function returns a \fINULL\fR pointer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIflags\fR is \fB0\fR and \fIaf\fR is \fBAF_INET6\fR, the caller wants only
+IPv6 addresses. A query is made for \fBAAAA\fR records. If successful, IPv6
+addresses are returned and the \fBh_length\fR member of the \fBhostent\fR
+structure is 16. Otherwise, the function returns a \fINULL\fR pointer.
+.RE
+.sp
+.LP
+Logically \fBOR\fR other constants into the \fIflags\fR argument to modify the
+behavior of the \fBgetipnodebyname()\fR function.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fBAI_V4MAPPED\fR flag is specified with \fIaf\fR set to \fBAF_INET6\fR,
+the caller can accept IPv4-mapped IPv6 addresses. If no \fBAAAA\fR records are
+found, a query is made for \fBA\fR records. Any \fBA\fR records found are
+returned as IPv4-mapped IPv6 addresses and the \fBh_length\fR is 16. The
+\fBAI_V4MAPPED\fR flag is ignored unless \fIaf\fR equals \fBAF_INET6\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBAI_ALL\fR flag is used in conjunction with the \fBAI_V4MAPPED\fR flag,
+exclusively with the IPv6 address family. When \fBAI_ALL\fR is logically
+\fBOR\fRed with \fBAI_V4MAPPED\fR flag, the caller wants all addresses: IPv6
+and IPv4-mapped IPv6 addresses. A query is first made for \fBAAAA\fR records
+and, if successful, IPv6 addresses are returned. Another query is then made for
+\fBA\fR records. Any \fBA\fR records found are returned as IPv4-mapped IPv6
+addresses and the \fBh_length\fR is 16. Only when both queries fail does the
+function return a \fINULL\fR pointer. The \fBAI_ALL\fR flag is ignored unless
+\fIaf\fR is set to \fBAF_INET6\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBAI_ADDRCONFIG\fR flag specifies that a query for \fBAAAA\fR records
+should occur only when the node is configured with at least one IPv6 source
+address. A query for \fBA\fR records should occur only when the node is
+configured with at least one IPv4 source address. For example, if a node is
+configured with no IPv6 source addresses, \fIaf\fR equals \fBAF_INET6\fR, and
+the node name queried has both \fBAAAA\fR and \fBA\fR records, then:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A \fINULL\fR pointer is returned when only the \fBAI_ADDRCONFIG\fR value is
+specified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBA\fR records are returned as IPv4-mapped IPv6 addresses when the
+\fBAI_ADDRCONFIG\fR and \fBAI_V4MAPPED\fR values are specified.
+.RE
+.RE
+.sp
+.LP
+The special flags value, \fBAI_DEFAULT\fR, is defined as
+.sp
+.in +2
+.nf
+#define  AI_DEFAULT  (AI_V4MAPPED | AI_ADDRCONFIG)
+.fi
+.in -2
+
+.sp
+.LP
+The \fBgetipnodebyname()\fR function allows the \fIname\fR argument to be a
+node name or a literal address string: a dotted-decimal IPv4 address or an IPv6
+hex address. Applications do not have to call \fBinet_pton\fR(3SOCKET) to
+handle literal address strings.
+.sp
+.LP
+Four scenarios arise based on the type of literal address string and the value
+of the \fIaf\fR argument. The two simple cases occur when \fIname\fR is a
+dotted-decimal IPv4 address and \fIaf\fR equals \fBAF_INET\fR and when
+\fIname\fR is an IPv6 hex address and \fIaf\fR equals \fBAF_INET6\fR. The
+members of the returned \fBhostent\fR structure are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh_name\fR\fR
+.ad
+.RS 15n
+.rt  
+Pointer to a copy of the name argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh_aliases\fR\fR
+.ad
+.RS 15n
+.rt  
+\fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh_addrtype\fR\fR
+.ad
+.RS 15n
+.rt  
+Copy of the \fIaf\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh_length\fR\fR
+.ad
+.RS 15n
+.rt  
+4 for \fBAF_INET\fR or 16 for \fBAF_INET6\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh_addr_list\fR\fR
+.ad
+.RS 15n
+.rt  
+Array of pointers to 4-byte or 16-byte binary addresses. The array is
+terminated by a \fINULL\fR pointer.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetipnodebyname()\fR and \fBgetipnodebyaddr()\fR
+return a \fBhostent\fR structure. Otherwise they return \fINULL\fR.
+.sp
+.LP
+The \fBhostent\fR structure does not change from the existing definition when
+used with \fBgethostbyname\fR(3NSL). For example, host entries are represented
+by the \fBstruct hostent\fR structure defined in <\fBnetdb.h\fR>:
+.sp
+.in +2
+.nf
+struct  hostent {
+        char    *h_name;        /* canonical name of host */
+        char    **h_aliases;    /* alias list */
+        int     h_addrtype;     /* host address type */
+        int     h_length;       /* length of address */
+        char    **h_addr_list;  /* list of addresses */
+};
+.fi
+.in -2
+
+.sp
+.LP
+An error occurs when \fIname\fR is an IPv6 hex address and \fIaf\fR equals
+\fBAF_INET\fR. The return value of the function is a \fINULL\fR pointer and
+\fBerror_num\fR equals \fBHOST_NOT_FOUND\fR.
+.sp
+.LP
+The \fBgetipnodebyaddr()\fR function has the same arguments as the existing
+\fBgethostbyaddr\fR(3NSL) function, but adds an error number. As with
+\fBgetipnodebyname()\fR, \fBgetipnodebyaddr()\fR is thread-safe. The
+\fBerror_num\fR value is returned to the caller with the appropriate error code
+to support thread-safe error code returns. The following error conditions can
+be returned for \fBerror_num\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOST_NOT_FOUND\fR\fR
+.ad
+.RS 18n
+.rt  
+Host is unknown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO_DATA\fR\fR
+.ad
+.RS 18n
+.rt  
+No address is available for the \fIname\fR specified in the server request.
+This error is not a soft error. Another type of \fIname\fR server request might
+be successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO_RECOVERY\fR\fR
+.ad
+.RS 18n
+.rt  
+An unexpected server failure occurred, which is a non-recoverable error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRY_AGAIN\fR\fR
+.ad
+.RS 18n
+.rt  
+This error is a soft error that indicates that the local server did not receive
+a response from an authoritative server. A retry at some later time might be
+successful.
+.RE
+
+.sp
+.LP
+One possible source of confusion is the handling of IPv4-mapped IPv6 addresses
+and IPv4-compatible IPv6 addresses, but the following logic should apply:
+.RS +4
+.TP
+1.
+If \fIaf\fR is \fBAF_INET6\fR, and if \fIlen\fR equals 16, and if the IPv6
+address is an IPv4-mapped IPv6 address or an IPv4-compatible IPv6 address, then
+skip over the first 12 bytes of the IPv6 address, set \fIaf\fR to
+\fBAF_INET\fR, and set \fIlen\fR to 4.
+.RE
+.RS +4
+.TP
+2.
+If \fIaf\fR is \fBAF_INET\fR, lookup the \fIname\fR for the given IPv4
+address.
+.RE
+.RS +4
+.TP
+3.
+If \fIaf\fR is \fBAF_INET6\fR, lookup the \fIname\fR for the given IPv6
+address.
+.RE
+.RS +4
+.TP
+4.
+If the function is returning success, then the single address that is
+returned in the \fBhostent\fR structure is a copy of the first argument to the
+function with the same address family that was passed as an argument to this
+function.
+.RE
+.sp
+.LP
+All four steps listed are performed in order.
+.sp
+.LP
+This structure, and the information pointed to by this structure, are
+dynamically allocated by \fBgetipnodebyname()\fR and \fBgetipnodebyaddr()\fR.
+The \fBfreehostent()\fR function frees this memory.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGetting the Canonical Name, Aliases, and Internet IP Addresses
+for a Given Hostname
+.sp
+.LP
+The following is a sample program that retrieves the canonical name, aliases,
+and all Internet IP addresses, both version 6 and version 4, for a given
+hostname.
+
+.sp
+.in +2
+.nf
+     #include <stdio.h>
+     #include <string.h>
+     #include <sys/types.h>
+     #include <sys/socket.h>
+     #include <netinet/in.h>
+     #include <arpa/inet.h>
+     #include <netdb.h>
+
+     main(int argc, const char **argv)
+     {
+     char abuf[INET6_ADDRSTRLEN];
+     int error_num;
+     struct hostent *hp;
+     char **p;
+
+         if (argc != 2) {
+             (void) printf("usage: %s hostname\n", argv[0]);
+             exit (1);
+         }
+
+     /* argv[1] can be a pointer to a hostname or literal IP address */
+     hp = getipnodebyname(argv[1], AF_INET6, AI_ALL | AI_ADDRCONFIG |
+        AI_V4MAPPED, &error_num);
+     if (hp == NULL) {
+        if (error_num == TRY_AGAIN) {
+            printf("%s: unknown host or invalid literal address "
+                "(try again later)\n", argv[1]);
+        } else {
+            printf("%s: unknown host or invalid literal address\n",
+                argv[1]);
+        }
+        exit (1);
+     }
+     for (p = hp->h_addr_list; *p != 0; p++) {
+        struct in6_addr in6;
+        char **q;
+
+        bcopy(*p, (caddr_t)&in6, hp->h_length);
+        (void) printf("%s\t%s", inet_ntop(AF_INET6, (void *)&in6,
+            abuf, sizeof(abuf)), hp->h_name);
+        for (q = hp->h_aliases; *q != 0; q++)
+        (void) printf(" %s", *q);
+        (void) putchar('\n');
+     }
+     freehostent(hp);
+     exit (0);
+     }
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBhtonl\fR(3SOCKET),
+\fBinet\fR(3SOCKET), \fBnetdb.h\fR(3HEAD), \fBhosts\fR(4),
+\fBnsswitch.conf\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+No enumeration functions are provided for IPv6. Existing enumeration functions
+such as \fBsethostent\fR(3NSL) do not work in combination with the
+\fBgetipnodebyname()\fR and \fBgetipnodebyaddr()\fR functions.
+.sp
+.LP
+All the functions that return a \fBstruct hostent\fR must always return the
+canonical in the \fBh_name\fR field. This name, by definition, is the
+well-known and official hostname shared between all aliases and all addresses.
+The underlying source that satisfies the request determines the mapping of the
+input name or address into the set of names and addresses in \fBhostent\fR.
+Different sources might make such as determination in different ways. If more
+than one alias and more than one address in \fBhostent\fR exist, no pairing is
+implied between the alias and address.
+.sp
+.LP
+The current implementations of these functions return or accept only addresses
+for the Internet address family (type \fBAF_INET\fR) or the Internet address
+family Version 6 (type \fBAF_INET6\fR).
+.sp
+.LP
+IPv4-mapped addresses are not recommended. The \fBgetaddrinfo\fR(3SOCKET)
+function is preferred over \fBgetipnodebyaddr()\fR because it allows
+applications to lookup IPv4 and IPv6 addresses without relying on IPv4-mapped
+addresses.
+.sp
+.LP
+The form for an address of type \fBAF_INET\fR is a \fBstruct in_addr\fR defined
+in <\fBnetinet/in.h\fR>. The form for an address of type \fBAF_INET6\fR is a
+\fBstruct in6_addr\fR, also defined in <\fBnetinet/in.h\fR>. The functions
+described in \fBinet_ntop\fR(3SOCKET) and \fBinet_pton\fR(3SOCKET) that are
+illustrated in the EXAMPLES section are helpful in constructing and
+manipulating addresses in either of these forms.

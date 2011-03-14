@@ -44,6 +44,8 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/qlc group=sys
 dir path=kernel/misc/qlc/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pci1077,2200 \
     alias=pci1077,2300 \
@@ -74,6 +76,7 @@ $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2400 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2500 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_6322 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_8100 group=sys mode=0755
+file path=usr/share/man/man7d/qlc.7d
 legacy pkg=SUNWqlc \
     desc="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver" \
     name="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"

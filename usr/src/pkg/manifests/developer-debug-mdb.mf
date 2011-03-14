@@ -88,6 +88,8 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/lib
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man1
 file path=kernel/kmdb/$(ARCH64)/arp group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/cpc group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/cpu.generic group=sys mode=0555
@@ -358,6 +360,9 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/vdsk.so \
     group=sys mode=0555
+file path=usr/share/man/man1/adb.1
+file path=usr/share/man/man1/kmdb.1
+file path=usr/share/man/man1/mdb.1
 hardlink path=usr/bin/$(ARCH32)/adb target=../../../usr/bin/$(ARCH32)/mdb
 hardlink path=usr/bin/$(ARCH64)/adb target=../../../usr/bin/$(ARCH64)/mdb
 hardlink path=usr/bin/adb target=../../usr/lib/isaexec

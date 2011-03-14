@@ -1,0 +1,75 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sync_instruction_memory 3C "12 Feb 1997" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sync_instruction_memory \- make modified instructions executable
+.SH SYNOPSIS
+.LP
+.nf
+\fBvoid\fR \fBsync_instruction_memory\fR(\fBcaddr_t\fR \fIaddr\fR, \fBint\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsync_instruction_memory()\fR function performs whatever steps are
+required to make instructions modified by a program executable.
+.sp
+.LP
+Some processor architectures, including some  SPARC processors, have separate
+and independent instruction and data caches which are not kept consistent by
+hardware.  For example, if the instruction cache contains an instruction from
+some address and the program then stores a new instruction at that address, the
+new instruction may not be immediately visible to the instruction fetch
+mechanism. Software must explicitly invalidate the instruction cache entries
+for new or changed mappings of pages that might contain executable
+instructions.  The \fBsync_instruction_memory()\fR function performs this
+function, and/or any other functions needed to make modified instructions
+between \fIaddr\fR and \fIaddr\fR+\fIlen\fR visible. A program should call
+\fBsync_instruction_memory()\fR after modifying instructions and before
+executing them.
+.sp
+.LP
+On processors with unified caches (one cache for both instructions and data)
+and pipelines which are flushed by a branch instruction, such as the x86
+architecture, the function may do nothing and just return.
+.sp
+.LP
+The changes are immediately visible to the thread calling
+\fBsync_instruction_memory()\fR when the call returns, even if the thread
+should migrate to another processor during or after the call. The changes
+become visible to other threads in the same manner that stores do; that is,
+they eventually become visible, but the latency is implementation-dependent.
+.sp
+.LP
+The result of executing \fBsync_instruction_memory()\fR are unpredictable if
+\fIaddr\fR through \fIaddr\fR+\fIlen\fR-1 are not valid for the address space
+of the program making the call.
+.SH RETURN VALUES
+.sp
+.LP
+No values are returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

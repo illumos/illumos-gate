@@ -1,0 +1,200 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_seterrhndlr 3CPC "30 Jan 2004" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_seterrhndlr \- control libcpc error reporting
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libcpc.h>
+
+\fBtypedef void(\fR\fBcpc_errhndlr_t\fR)(\fBcpc_t *\fR\fIcpc\fR, \fBconst char *\fR\fIfn\fR, \fBint\fR \fIsubcode\fR,
+     \fBconst char *\fR\fIfmt\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_seterrhndlr\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_errhndlr_t *\fR\fIerrfn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For the convenience of programmers instrumenting their code, several
+\fBlibcpc\fR(3LIB) functions automatically emit to \fBstderr\fR error messages
+that attempt to provide a more detailed explanation of their error return
+values.  While this can be useful for simple programs, some applications might
+wanat to report their errors differently, for example, to a window or to a log
+file.
+.sp
+.LP
+The \fBcpc_seterrhndlr()\fR function allows the caller to provide an alternate
+function for reporting errors. The type signature is shown in the SYNOPSIS. The
+\fIfn\fR argument is passed the library function name that detected the error,
+an integer subcode indicating the specific error condidtion that has occurred,
+and the format string \fIfmt\fR that contains a textual description of the
+integer subcode. The format string \fIfmt\fR and argument pointer \fIap\fR can
+be passed directly to \fBvsnprintf\fR(3C) or similar \fIvarargs\fR-based
+function for formatting.
+.sp
+.LP
+The integer subcodes are provided to allow programs to recognize error
+conditions while using \fBlibcpc\fR. The \fIfmt\fR string is provided as a
+convenience for easy printing. The error subcodes are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_INVALID_EVENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+A specified event is not supported by the processor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_INVALID_PICNUM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The counter number does not fall in the range of available counters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_INVALID_ATTRIBUTE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A specified attribute is not supported by the processor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_ATTRIBUTE_OUT_OF_RANGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value of an attribute is outside the range supported by the processor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_RESOURCE_UNAVAIL\fR\fR
+.ad
+.sp .6
+.RS 4n
+A hardware resource necessary for completing an operation was unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_PIC_NOT_CAPABLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The requested counter cannot count an assigned event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_REQ_INVALID_FLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+One or more requests has invalid flags.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_CONFLICTING_REQS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The requests in a set cannot be programmed onto the hardware at the same time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCPC_ATTR_REQUIRES_PRIVILEGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A request contains an attribute which requires the cpc_cpu privilege, which the
+process does not have.
+.RE
+
+.sp
+.LP
+The default printing routine can be restored by calling  the routine with an
+\fIerrfn\fR argument of \fINULL\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDebugging example.
+.sp
+.LP
+The following example produces error messages only when debugging the program
+containing it, or when the \fBcpc_bind_curlwp()\fR, \fBcpc_bind_cpu()\fR, or
+\fBcpc_bind_pctx()\fR functions are reporting an error when binding a
+cpc_set_t.
+
+.sp
+.in +2
+.nf
+int debugging;
+void
+myapp_errfn(const char *fn, int subcode, const char *fmt, va_list ap)
+{
+        if (strncmp(fn, "cpc_bind", 8) != 0 && !debugging)
+            return;
+        (void) fprintf(stderr, "myapp: cpc_%s(): ", fn);
+        (void) vfprintf(stderr, fmt, ap);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc_bind_curlwp\fR(3CPC), \fBlibcpc\fR(3LIB), \fBvsnprintf\fR(3C),
+\fBattributes\fR(5)

@@ -33,9 +33,19 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
+dir path=usr/share/man
+dir path=usr/share/man/man3lib
+dir path=usr/share/man/man3papi
 file path=usr/include/papi.h
 file path=usr/lib/libpapi-common.so.0
 file path=usr/lib/libpapi.so.0
+file path=usr/share/man/man3lib/libpapi.3lib
+file path=usr/share/man/man3papi/papiAttributeListAddValue.3papi
+file path=usr/share/man/man3papi/papiJobSubmit.3papi
+file path=usr/share/man/man3papi/papiLibrarySupportedCall.3papi
+file path=usr/share/man/man3papi/papiPrintersList.3papi
+file path=usr/share/man/man3papi/papiServiceCreate.3papi
+file path=usr/share/man/man3papi/papiStatusString.3papi
 legacy pkg=SUNWpapi desc="Free Standards Group Open Printing API, Draft v0.9" \
     name="Free Standards Group Open Printing API" \
     version=11.11.0,REV=2009.11.11

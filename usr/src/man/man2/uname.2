@@ -1,0 +1,88 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uname 2 "21 Jul 1999" "SunOS 5.11" "System Calls"
+.SH NAME
+uname \- get name of current operating system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/utsname.h>
+
+\fBint\fR \fBuname\fR(\fBstruct utsname *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuname()\fR function stores information identifying the current operating
+system in the structure pointed to by \fIname\fR.
+.sp
+.LP
+The \fBuname()\fR function uses the \fButsname\fR structure, defined in
+<\fBsys/utsname.h\fR>, whose members include:
+.sp
+.in +2
+.nf
+char    sysname[SYS_NMLN];
+char    nodename[SYS_NMLN];
+char    release[SYS_NMLN];
+char    version[SYS_NMLN];
+char    machine[SYS_NMLN];
+.fi
+.in -2
+
+.sp
+.LP
+The \fBuname()\fR function returns a null-terminated character string naming
+the current operating system in the character array \fBsysname\fR. Similarly,
+the \fBnodename\fR member contains the name by which the system is known on a
+communications network. The \fBrelease\fR and \fBversion\fR members further
+identify the operating system. The \fBmachine\fR member contains a standard
+name that identifies the hardware on which the operating system is running.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a non-negative value is returned. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBuname()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIname\fR argument points to an illegal address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBuname\fR(1), \fBsysinfo\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

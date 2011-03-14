@@ -1,0 +1,189 @@
+'\" te
+.\" Copyright (c) 1995, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_prop_exists 9F "22 May 1995" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_prop_exists \- check for the existence of a property
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_prop_exists\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR, 
+     \fBchar *\fR\fIname\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImatch_dev\fR \fR
+.ad
+.RS 14n
+.rt  
+Device number associated with property or \fBDDI_DEV_T_ANY.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 14n
+.rt  
+Pointer to the device info node of device whose property list should be
+searched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR \fR
+.ad
+.RS 14n
+.rt  
+Possible flag values are some combination of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_DONTPASS\fR \fR
+.ad
+.RS 22n
+.rt  
+Do not pass request to parent device information node if the property  is not
+found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_NOTPROM\fR \fR
+.ad
+.RS 22n
+.rt  
+Do not look at  \fBPROM \fRproperties (ignored on platforms that do not support
+\fBPROM \fRproperties).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR \fR
+.ad
+.RS 14n
+.rt  
+String containing the name of the property.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_prop_exists()\fR checks for the existence of a property regardless  of
+the property value data type.
+.sp
+.LP
+Properties are searched for based on the \fIdip\fR, \fIname\fR, and
+\fImatch_dev\fR. The property search order is as follows:
+.RS +4
+.TP
+1.
+Search software properties created by the driver.
+.RE
+.RS +4
+.TP
+2.
+Search the software properties created by the system (or nexus nodes in the
+device info tree).
+.RE
+.RS +4
+.TP
+3.
+Search the driver global properties list.
+.RE
+.RS +4
+.TP
+4.
+If \fBDDI_PROP_NOTPROM\fR is not set, search the \fBPROM \fRproperties (if
+they exist).
+.RE
+.RS +4
+.TP
+5.
+If \fBDDI_PROP_DONTPASS\fR is not set, pass this request to the parent
+device information node.
+.RE
+.RS +4
+.TP
+6.
+Return \fB0\fR if not found and \fB1\fR if found.
+.RE
+.sp
+.LP
+Usually, the \fImatch_dev\fR argument should be set to the actual device number
+that this property is associated with.  However, if the  \fImatch_dev\fR
+argument is \fBDDI_DEV_T_ANY,\fR then  \fBddi_prop_exists()\fR will match the
+request  regardless of the  \fImatch_dev\fR the property was created with.
+That is the first property whose name matches \fIname\fR will be returned.  If
+a property was created with  \fImatch_dev\fR set to  \fBDDI_DEV_T_NONE\fR then
+the only way to look up this property is with a  \fImatch_dev\fR set to
+\fBDDI_DEV_T_ANY.\fR \fBPROM \fRproperties are always created with
+\fImatch_dev\fR set to \fBDDI_DEV_T_NONE.\fR
+.sp
+.LP
+\fIname\fR must always be set to the name of the property being looked up.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_prop_exists()\fR returns  \fB1\fR if the property exists and  \fB0\fR
+otherwise.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR: Using \fBddi_prop_exists()\fR
+.sp
+.LP
+The following example demonstrates the use of  \fBddi_prop_exists()\fR.
+
+.sp
+.in +2
+.nf
+/*
+	* Enable "whizzy" mode if the "whizzy-mode" property exists
+	*/
+	if (ddi_prop_exists(xx_dev, xx_dip, DDI_PROP_NOTPROM,
+	        "whizzy-mode") == 1) {
+	      xx_enable_whizzy_mode(xx_dip);
+	} else {
+	      xx_disable_whizzy_mode(xx_dip);
+	}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_prop_get_int\fR(9F), \fBddi_prop_lookup\fR(9F),
+\fBddi_prop_remove\fR(9F), \fBddi_prop_update\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

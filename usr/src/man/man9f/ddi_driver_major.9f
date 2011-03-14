@@ -1,0 +1,55 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_driver_major 9F "18 Jun 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_driver_major \- return driver's major device number
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBmajor_t\fR \fBddi_driver_major\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_driver_major()\fR returns the major device number for the driver
+associated with the supplied \fBdev_info node\fR. This value can then be used
+as an argument to \fBmakedevice\fR(9F) to construct a complete \fBdev_t\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_driver_major()\fR returns the major number of the driver bound to a
+device, if any, or \fBDDI_MAJOR_T_NONE\fR otherwise.
+.SH CONTEXT
+.sp
+.LP
+\fBddi_driver_major()\fR can be called from kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_driver_name\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

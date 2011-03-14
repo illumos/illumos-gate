@@ -1,0 +1,84 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_strptr 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_strptr \- make a string pointer
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBchar *\fR\fBelf_strptr\fR(\fBElf *\fR\fIelf\fR, \fBsize_t\fR \fIsection\fR, \fBsize_t\fR \fIoffset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_strptr()\fR function converts a string section \fIoffset\fR to a
+string pointer. \fIelf\fR identifies the file in which the string section
+resides, and \fIsection\fR identifies the section table index for the strings.
+\fBelf_strptr()\fR normally returns a pointer to a string, but it returns a
+null pointer when \fIelf\fR is null, \fIsection\fR is invalid or is not a
+section of type \fBSHT_STRTAB\fR, the section data cannot be obtained,
+\fIoffset\fR is invalid, or an error occurs.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program of calling \fBelf_strptr()\fR function.
+.sp
+.LP
+A prototype for retrieving section names appears below. The file header
+specifies the section name string table in the \fBe_shstrndx\fR member. The
+following code loops through the sections, printing their names.
+
+.sp
+.in +2
+.nf
+\fB/* handle the error */
+if ((ehdr = elf32_getehdr(elf)) == 0) {
+	return;
+}
+ndx = ehdr->e_shstrndx;
+scn = 0;
+while ((scn = elf_nextscn(elf, scn)) != 0) {
+	char	*name = 0;
+	if ((shdr = elf32_getshdr(scn)) != 0)
+                name = elf_strptr(elf, ndx, (size_t)shdr->sh_name);
+	printf("'%s'\en", name? name: "(null)");
+}\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_getshdr\fR(3ELF), \fBelf32_xlatetof\fR(3ELF),
+\fBelf_getdata\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+A program may call \fBelf_getdata()\fR to retrieve an entire string table
+section. For some applications, that would be both more efficient and more
+convenient than using \fBelf_strptr()\fR.

@@ -43,6 +43,8 @@ dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 dir path=kernel/strmod group=sys
 dir path=kernel/strmod/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=asy alias=pci11c1,480 perms="* 0666 root sys" \
     perms="*,cu 0600 uucp uucp"
 driver name=cmdk perms="* 0640 root sys"
@@ -80,6 +82,10 @@ file path=kernel/strmod/vuid3ps2 group=sys mode=0755
 file path=kernel/strmod/vuidm3p group=sys mode=0755
 file path=kernel/strmod/vuidm4p group=sys mode=0755
 file path=kernel/strmod/vuidm5p group=sys mode=0755
+file path=usr/share/man/man7d/asy.7d
+file path=usr/share/man/man7d/cmdk.7d
+file path=usr/share/man/man7d/ecpp.7d
+file path=usr/share/man/man7d/fd.7d
 legacy pkg=SUNWpsdcr \
     desc="Platform Support, Bus-independent Device Drivers, (Root)" \
     name="Platform Support, Bus-independent Device Drivers (Root)"

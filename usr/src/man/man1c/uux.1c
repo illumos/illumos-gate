@@ -1,0 +1,463 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uux 1C "28 Mar 1995" "SunOS 5.11" "Communication Commands"
+.SH NAME
+uux \- UNIX-to-UNIX system command execution
+.SH SYNOPSIS
+.LP
+.nf
+\fBuux\fR [\fB-\fR] [\fB-bcCjnprz\fR] [\fB-a\fR \fIname\fR] [\fB-g\fR \fIgrade\fR]
+     [\fB-s\fR \fIfilename\fR] [\fB-x\fR \fIdebug_level\fR] \fIcommand-string\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuux\fR utility will gather zero or more files from various systems,
+execute a command on a specified system and then send standard output to a file
+on a specified system.
+.sp
+.LP
+\fBNote:\fR  For security reasons, most installations limit the list of
+commands executable on behalf of an incoming request from \fBuux\fR, permitting
+only the receipt of mail (see \fBmail\fR(1)). (Remote execution permissions are
+defined in \fB/etc/uucp/Permissions\fR.)
+.sp
+.LP
+The \fIcommand-string\fR is made up of one or more arguments that look like a
+shell command line, except that the command and file names may be prefixed by
+\fIsystem-name\fR\fB!\fR. A null \fIsystem-name\fR is interpreted as the local
+system.
+.sp
+.LP
+File names may be one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An absolute path name.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A path name preceded by \fB~\fR\fIxxx\fR, where \fIxxx\fR is a login name on
+the specified system and is replaced by that user's login directory.
+.RE
+.sp
+.LP
+Anything else is prefixed by the current directory.
+.sp
+.LP
+As an example, the command:
+.sp
+.in +2
+.nf
+example% \fBuux "!diff sys1!/home/dan/filename1 \e
+       sys2!/a4/dan/filename2 > !~/dan/filename.diff"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will get the \fBfilename1\fR and \fBfilename2\fR files from the \fBsys1\fR and
+\fBsys2\fR machines, execute a \fBdiff\fR(1) command and put the results in
+\fBfilename.diff\fR in the local \fIPUBDIR\fR\fB/dan/\fR directory.
+\fIPUBDIR\fR is a public directory defined in the \fBuucp\fR source. By
+default, this directory is \fB/var/spool/uucppublic\fR.
+.sp
+.LP
+Any special shell characters (such as \fB< > ; |\fR) should be quoted either by
+quoting the entire \fIcommand-string\fR, or quoting the special characters as
+individual arguments. The redirection operators \fB>>\fR,  \fB<<\fR, \fB>|\fR,
+and \fB>&\fR cannot be used.
+.sp
+.LP
+\fBuux\fR will attempt to get all appropriate files to the specified system
+where they will be processed. For files that are output files, the file name
+must be escaped using parentheses. For example, the command:
+.sp
+.in +2
+.nf
+example% \fBuux "a!cut -f1 b!/usr/filename > c!/usr/filename"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+gets \fB/usr/filename\fR from system \fBb\fR and sends it to system \fBa\fR,
+performs a \fBcut\fR command on that file and sends the result of the \fBcut\fR
+command to system \fBc\fR.
+.sp
+.LP
+\fBuux\fR will notify you if the requested command on the remote system was
+disallowed. This notification can be turned off by the \fB-n\fR option. The
+response comes by remote mail from the remote machine.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 18n
+.rt  
+The standard input to \fBuux\fR is made the standard input to the
+\fIcommand-string\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIname\fR\fR
+.ad
+.RS 18n
+.rt  
+Uses \fIname\fR as the user job identification replacing the initiator user-id.
+(Notification will be returned to user-id \fIname\fR.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 18n
+.rt  
+Returns whatever standard input was provided to the \fBuux\fR command if the
+exit status is non-zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 18n
+.rt  
+Does not copy local file to the spool directory for transfer to the remote
+machine (default).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 18n
+.rt  
+Forces the copy of local files to the spool directory for transfer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR \fIgrade\fR\fR
+.ad
+.RS 18n
+.rt  
+\fIgrade\fR can be either a single letter, number, or a string of alphanumeric
+characters defining a service grade. The \fBuuglist\fR(1C) command determines
+whether it is appropriate to use the single letter, number, or a string of
+alphanumeric characters as a service grade. The output from the \fIuuglist\fR
+command will be a list of service grades that are available or a message that
+says to use a single letter or number as a  grade of service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR\fR
+.ad
+.RS 18n
+.rt  
+Outputs the jobid string on the standard output which is the job
+identification. This job identification can be used by \fBuustat\fR(1C) to
+obtain the status  or terminate a job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 18n
+.rt  
+Does not notify the user if the command fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 18n
+.rt  
+Same as \fB\(mi\fR\&. The standard input to \fBuux\fR is made the standard
+input to the \fIcommand-string\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 18n
+.rt  
+Does not start the file transfer, but just queues the job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIfilename\fR\fR
+.ad
+.RS 18n
+.rt  
+Reports status of the transfer in \fIfilename\fR. This option is accepted for
+compatibility, but it is ignored because it is insecure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fIdebug_level\fR\fR
+.ad
+.RS 18n
+.rt  
+Produces debugging output on the standard output. \fIdebug_level\fR is a number
+between 0 and 9. As \fIdebug_level\fR increases to 9, more detailed debugging
+information is given.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 18n
+.rt  
+Sends success notification to the user.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBuux\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/uucp/*\fR\fR
+.ad
+.RS 25n
+.rt  
+other data and programs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/uucp/Permissions\fR\fR
+.ad
+.RS 25n
+.rt  
+remote execution permissions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/uucp/*\fR\fR
+.ad
+.RS 25n
+.rt  
+other programs
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/uucp\fR\fR
+.ad
+.RS 25n
+.rt  
+spool directories
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPE ATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcut\fR(1), \fBmail\fR(1), \fBuucp\fR(1C), \fBuuglist\fR(1C),
+\fBuustat\fR(1C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The execution of commands on remote systems takes place in an execution
+directory known to the \fBuucp\fR system.
+.sp
+.LP
+All files required for the execution will be put into this directory unless
+they already reside on that machine. Therefore, the simple file name (without
+path or machine reference) must be unique within the \fBuux\fR request. The
+following command will NOT work:
+.sp
+.in +2
+.nf
+example% \fBuux "a!diff b!/home/dan/xyz c!/home/dan/xyz > !xyz.diff"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+But the command:
+.sp
+.in +2
+.nf
+example% \fBuux "a!diff a!/home/dan/xyz c!/home/dan/xyz > !xyz.diff"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fIwill\fR work (if \fBdiff\fR is a permitted command.)
+.sp
+.LP
+Protected files and files that are in protected directories that are owned by
+the requester can be sent in commands using \fBuux\fR. However, if the
+requester is root, and the directory is not searchable by "other", the request
+will fail.
+.sp
+.LP
+The following restrictions apply to the shell pipeline processed by \fBuux\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In gathering files from different systems, pathname expansion in not performed
+by \fBuux\fR. Thus, a request such as
+.sp
+.in +2
+.nf
+    \fBuux "c89 remsys!~/*.c"\fR
+.fi
+.in -2
+.sp
+
+would attempt to copy the file named literally \fB*.c\fR to the local system.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Only the first command of a shell pipeline may have a \fIsystem-name\fR\fB!\fR.
+All other commands are executed on the system of the first command.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The use of the shell metacharacter \fB*\fR will probably not do what you want
+it to do.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The shell tokens \fB<<\fR and \fB>>\fR are not implemented.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The redirection operators \fB>>\fR, \fB<<\fR, \fB>|\fR, and \fB>&\fR cannot be
+used.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The reserved word \fB!\fR cannot be used at the head of the pipeline to modify
+the exit status.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Alias substitution is not performed.
+.RE

@@ -1,0 +1,511 @@
+'\" te
+.\"  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_RequestWindow 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_RequestWindow, csx_ReleaseWindow \- request or release window resources
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_RequestWindow\fR(\fBclient_handle_t\fR \fIch\fR, \fBwindow_handle_t *\fR\fIwh\fR,
+     \fBwin_req_t *\fR\fIwr\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_ReleaseWindow\fR(\fBwindow_handle_t\fR \fIwh\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 6n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwh\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBwindow_handle_t\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwr\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBwin_req_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The function \fBcsx_RequestWindow()\fR requests a block of system address space
+be assigned to a \fBPC \fRCard in a socket.
+.sp
+.LP
+The function \fBcsx_ReleaseWindow()\fR releases window resources which were
+obtained by a call to \fBcsx_RequestWindow()\fR. No adapter or socket hardware
+is modified by this function.
+.sp
+.LP
+The \fBcsx_MapMemPage\fR(9F) and \fBcsx_ModifyWindow\fR(9F) functions use the
+window handle returned by \fBcsx_RequestWindow()\fR. This window handle must be
+freed by calling \fBcsx_ReleaseWindow()\fR when the client is done using this
+window.
+.sp
+.LP
+The \fBPC\fR Card Attribute or Common Memory offset for this window is set by
+\fBcsx_MapMemPage\fR(9F).
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBwin_req_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t      Socket;                  /* socket number */
+uint32_t      Attributes;              /* window flags */
+uint32_t      Base.base;               /* requested window */
+                                        /*   base address */
+acc_handle_t  Base.handle;             /* returned handle for 
+                                        /*   base of window */
+uint32_t      Size;                    /* window size requested */
+                                        /*   or granted */
+uint32_t      win_params.AccessSpeed;  /* window access speed */
+uint32_t      win_params.IOAddrLines;  /* IO address lines decoded */
+uint32_t      ReqOffset;               /* required window offest */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR\fR
+.ad
+.RS 26n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 26n
+.rt  
+This field is bit-mapped and is defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_MEMORY_TYPE_IO\fR\fR
+.ad
+.sp .6
+.RS 4n
+Points to I/O space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_MEMORY_TYPE_CM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Points to common memory space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_MEMORY_TYPE_AM\fR\fR
+.ad
+.sp .6
+.RS 4n
+These bits select which type of window is being requested. One of these bits
+must be set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ENABLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The client must set this bit to enable the window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_BIG_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Describes device as big-endian.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_LITTLE_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+These bits describe the endian characteristics of the device as big endian or
+little endian, respectively. Even though most of the devices will have the same
+endian characteristics as their busses, there are examples of devices with an
+\fBI/O \fRprocessor that has opposite endian characteristics of the busses.
+When either of these bits are set, byte swapping will automatically be
+performed by the system if the host machine and the device data formats have
+opposite endian characteristics. The implementation may take advantage of
+hardware platform byte swapping capabilities.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_NEVER_SWAP\fR\fR
+.ad
+.sp .6
+.RS 4n
+When this is specified, byte swapping will not be invoked in the data access
+functions.
+.RE
+
+The ability to specify the order in which the \fBCPU\fR will reference data is
+provided by the following \fBAttributes\fR bits, only one of which may be
+specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STRICT_ORDER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The data references must be issued by a \fBCPU \fR in program order. Strict
+ordering is the default behavior.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_UNORDERED_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU\fR may re-order the data references. This includes all kinds of
+re-ordering (that is, a load followed by a store may be replaced by a store
+followed by a load).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_MERGING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU \fRmay merge individual stores to consecutive locations. For
+example, the \fBCPU \fRmay turn two consecutive byte stores into one halfword
+store. It may also batch individual loads. For example, the \fBCPU \fRmay turn
+two consecutive byte loads into one halfword load. This bit also implies
+re-ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU \fRmay cache the data it fetches and reuse it until another store
+occurs. The default behavior is to fetch new data on every load. This bit also
+implies merging and re-ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STORECACHING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU \fRmay keep the data in the cache and push it to the device (perhaps
+with other data) at a later time. The default behavior is to push the data
+right away. This bit also implies load caching, merging, and re-ordering.
+.RE
+
+These values are advisory, not mandatory. For example, data can be ordered
+without being merged or cached, even though a driver requests unordered, merged
+and cached together.
+.sp
+All other bits in the \fBAttributes\fR field must be set to \fB0\fR.
+.sp
+On successful return from \fBcsx_RequestWindow()\fR, \fBWIN_OFFSET_SIZE\fR is
+set in the \fBAttributes\fR field when the client must specify card offsets to
+\fBcsx_MapMemPage\fR(9F) that are a multiple of the window size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBase.base\fR\fR
+.ad
+.RS 26n
+.rt  
+This field must be set to \fB0\fR on calling \fBcsx_RequestWindow()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBase.handle\fR\fR
+.ad
+.RS 26n
+.rt  
+On successful return from \fBcsx_RequestWindow()\fR, the \fBBase.handle\fR
+field contains an access handle corresponding to the first byte of the
+allocated memory window which the client must use when accessing the \fBPC
+\fRCard's memory space via the common access functions. A client must \fBnot\fR
+make any assumptions as to the format of the returned \fBBase.handle\fR field
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSize\fR\fR
+.ad
+.RS 26n
+.rt  
+On calling \fBcsx_RequestWindow()\fR, the \fBSize\fR field is the size in bytes
+of the memory window requested. \fBSize\fR may be zero to indicate that Card
+Services should provide the smallest sized window available. On successful
+return from \fBcsx_RequestWindow()\fR, the \fBSize\fR field contains the actual
+size of the window allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwin_params.AccessSpeed\fR\fR
+.ad
+.RS 26n
+.rt  
+This field specifies the access speed of the window if the client is requesting
+a memory window. The \fBAccessSpeed\fR field bit definitions use the format of
+the extended speed byte of the Device \fBID \fRtuple. If the mantissa is
+\fB0\fR (noted as reserved in the \fBPC Card 95 Standard\fR), the lower bits
+are a binary code representing a speed from the following table:
+.RE
+
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBCode\fR\fBSpeed\fR
+_
+0(Reserved - do not use).
+_
+1250 nsec
+_
+2200 nsec
+_
+3150 nsec
+_
+4100 nse
+_
+5-7(Reserved\(emdo not use.)
+.TE
+
+.sp
+.LP
+To request a window that supports the \fBWAIT\fR signal, \fBOR-in\fR the
+\fBWIN_USE_WAIT\fR bit to the \fBAccessSpeed\fR value before calling this
+function.
+.sp
+.LP
+It is recommended that clients use the \fBcsx_ConvertSpeed\fR(9F) function to
+generate the appropriate \fBAccessSpeed\fR values rather than manually
+perturbing the \fBAccessSpeed\fR field.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwin_params.IOAddrLines\fR\fR
+.ad
+.RS 26n
+.rt  
+If the client is requesting an \fBI/O \fRwindow, the \fBIOAddrLines\fR field is
+the number of \fBI/O \fRaddress lines decoded by the \fBPC \fRCard in the
+specified socket. Access to the \fBI/O \fRwindow is not enabled until
+\fBcsx_RequestConfiguration\fR(9F) has been invoked successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBReqOffset\fR\fR
+.ad
+.RS 26n
+.rt  
+This field is a Solaris-specific extension that can be used by clients to
+generate optimum window offsets passed to \fBcsx_MapMemPage\fR(9F).
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ATTRIBUTE\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBAttributes\fR are invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SPEED\fR\fR
+.ad
+.RS 27n
+.rt  
+Speed is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SIZE\fR\fR
+.ad
+.RS 27n
+.rt  
+Window size is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_OUT_OF_RESOURCE\fR\fR
+.ad
+.RS 27n
+.rt  
+Unable to allocate window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_ConvertSpeed\fR(9F), \fBcsx_MapMemPage\fR(9F),
+\fBcsx_ModifyWindow\fR(9F), \fBcsx_RegisterClient\fR(9F),
+\fBcsx_RequestConfiguration\fR(9F)
+.sp
+.LP
+\fIPC\fR \fICard\fR \fI95\fR \fIStandard,\fR PCMCIA/JEIDA

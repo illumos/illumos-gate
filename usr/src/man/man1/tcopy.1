@@ -1,0 +1,49 @@
+'\" te
+.\" Copyright (c) 1985 Regents of the University
+.\" of California.  All rights reserved.  The Berkeley software License Agreement
+.\" specifies the terms and conditions for redistribution. 
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\"  All Rights Reserved 
+.TH tcopy 1 "10 Mar 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+tcopy \- copy a magnetic tape
+.SH SYNOPSIS
+.LP
+.nf
+\fBtcopy\fR \fIsource\fR [\fIdestination\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtcopy\fR utility copies the magnetic tape mounted on the tape drive
+specified by the \fBsource\fR argument. The only assumption made about the
+contents of a tape is that there are two tape marks at the end.
+.sp
+.LP
+When only a source drive is specified, \fBtcopy\fR scans the tape, and displays
+information about the sizes of records and tape files. If a destination is
+specified, \fBtcopy\fR makes a copies the source tape onto the
+\fIdestination\fR tape, with blocking preserved. As it copies, \fBtcopy\fR
+produces the same output as it does when only scanning a tape.
+.sp
+.LP
+The \fBtcopy\fR utility requires the use of Berkeley-compatible device names.
+For example,
+.sp
+.in +2
+.nf
+example% \fBtcopy /dev/rmt/1b /dev/rmt/2b\fR
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmt\fR(1), \fBioctl\fR(2), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBtcopy\fR will only run on systems supporting an associated set of
+\fBioctl\fR(2) requests.

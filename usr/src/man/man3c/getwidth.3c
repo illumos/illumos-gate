@@ -1,0 +1,74 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getwidth 3C "20 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getwidth \- get codeset information
+.SH SYNOPSIS
+.LP
+.nf
+#include <euc.h>
+#include <getwidth.h>
+
+\fBvoid\fR \fBgetwidth\fR(\fBeucwidth_t *\fR\fIptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetwidth()\fR function reads the character class table for the current
+locale to get information on the supplementary codesets. \fBgetwidth()\fR sets
+this information into the struct \fBeucwidth_t\fR. This struct is defined in
+<\fBeuc.h\fR> and has the following members:
+.sp
+.in +2
+.nf
+short int   _eucw1,_eucw2,_eucw3;
+short int   _scrw1,_scrw2,_scrw3;
+short int   _pcw;
+char        _multibyte;
+.fi
+.in -2
+
+.sp
+.LP
+Codeset width values for supplementary codesets 1, 2, and 3 are set in
+\fB_eucw1\fR, \fB_eucw2\fR, and \fB_eucw3\fR, respectively. Screen width values
+for supplementary codesets 1, 2, and 3 are set in \fB_scrw1\fR, \fB_scrw2\fR,
+and \fB_scrw3\fR, respectively.
+.sp
+.LP
+The width of  Extended Unix Code (EUC) Process Code is set in \fB_pcw\fR. The
+\fB_multibyte\fR entry is set to \fB1\fR if multibyte characters are used, and
+set to \fB0\fR if only single-byte characters are used.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBeuclen\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBgetwidth()\fR function can be used safely in a multithreaded
+application, as long as \fBsetlocale\fR(3C) is not being called to change the
+locale.
+.sp
+.LP
+The \fBgetwidth()\fR function will only work with \fBEUC\fR locales.

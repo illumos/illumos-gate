@@ -1,0 +1,86 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH door_revoke 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+door_revoke \- revoke access to a door descriptor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <door.h>
+
+\fBint\fR \fBdoor_revoke\fR(\fBint\fR \fId\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdoor_revoke()\fR function revokes access to a door descriptor. Door
+descriptors are created with  \fBdoor_create\fR(3C). The \fBdoor_revoke()\fR
+function performs an implicit call to  \fBclose\fR(2), marking the door
+descriptor \fId\fR as invalid.
+.sp
+.LP
+A door descriptor can be revoked only by the process that created it.  Door
+invocations that are in progress during a \fBdoor_revoke()\fR invocation are
+allowed to complete normally.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdoor_revoke()\fR returns \fB0\fR. Otherwise,
+\fBdoor_revoke()\fR returns \(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBdoor_revoke()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 9n
+.rt  
+An invalid door descriptor was passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+.rt  
+The door descriptor was not created by this process (with
+\fBdoor_create\fR(3C)).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityStable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBdoor_create\fR(3C), \fBattributes\fR(5)

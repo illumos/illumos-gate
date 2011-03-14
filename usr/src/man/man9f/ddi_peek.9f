@@ -1,0 +1,197 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_peek 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_peek, ddi_peek8, ddi_peek16, ddi_peek32, ddi_peek64, ddi_peekc, ddi_peeks,
+ddi_peekl, ddi_peekd \- read a value from a location
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_peek8\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint8_t\fR \fI*addr\fR, \fBint8_t\fR \fI*valuep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_peek16\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint16_t\fR \fI*addr\fR, \fBint16_t\fR \fI*valuep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_peek32\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint32_t\fR \fI*addr\fR, \fBint32_t\fR \fI*valuep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_peek64\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint64_t\fR \fI*addr\fR, \fBint64_t\fR \fI*valuep\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). The \fBddi_peekc()\fR, \fBddi_peeks()\fR,
+\fBddi_peekl()\fR, and \fBddi_peekd()\fR functions are obsolete. Use,
+respectively, \fBddi_peek8()\fR, \fBddi_peek16()\fR, \fBddi_peek32()\fR, and
+\fBddi_peek64()\fR, instead.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 10n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 10n
+.rt  
+Virtual address of the location to be examined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvaluep\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to a location to hold the result. If a null pointer is specified, then
+the value read from the location will simply be discarded.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines cautiously attempt to read a value from a specified virtual
+address, and return the value to the caller, using the parent nexus driver to
+assist in the process where necessary.
+.sp
+.LP
+If the address is not valid, or the value cannot be read without an error
+occurring, an error code is returned.
+.sp
+.LP
+The routines are most useful when first trying to establish the presence of a
+device on the system in a driver's \fBprobe\fR(9E) or \fBattach\fR(9E)
+routines.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The value at the given virtual address was successfully read, and if
+\fIvaluep\fR is non-null, \fI*valuep\fR will have been updated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+An error occurred while trying to read the location. \fI*valuep\fR is
+unchanged.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRChecking to see that the status register of a device is mapped
+into the kernel address space:
+.sp
+.in +2
+.nf
+if (ddi_peek8(dip, csr, (int8_t *)0) != DDI_SUCCESS) {
+        cmn_err(CE_WARN, "Status register not mapped");
+        return (DDI_FAILURE);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRReading and logging the device type of a particular device:
+.sp
+.in +2
+.nf
+int
+xx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+       \&.\|.\|.
+      /* map device registers */
+       \&.\|.\|.
+
+      if (ddi_peek32(dip, id_addr, &id_value) != DDI_SUCCESS) {
+              cmn_err(CE_WARN, "%s%d: cannot read device identifier",
+                ddi_get_name(dip), ddi_get_instance(dip));
+              goto failure;
+      } else
+              cmn_err(CE_CONT, "!%s%d: device type 0x%x\en",
+                ddi_get_name(dip), ddi_get_instance(dip), id_value);
+	      \&.\|.\|.
+	      \&.\|.\|.
+
+      ddi_report_dev(dip);
+      return (DDI_SUCCESS);
+
+failure:
+      /* free any resources allocated */
+      \&.\|.\|.
+      return (DDI_FAILURE);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_poke\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The functions described in this manual page previously used symbolic names
+which specified their data access size; the function names have been changed so
+they now specify a fixed-width data size. See the following table for the new
+name equivalents:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBPrevious Name\fR\fBNew Name\fR
+\fBddi_peekc\fR\fBddi_peek8\fR
+\fBddi_peeks\fR\fBddi_peek16\fR
+\fBddi_peekl\fR\fBddi_peek32\fR
+\fBddi_peekd\fR\fBddi_peek64\fR
+.TE
+

@@ -1,0 +1,100 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH menu_item_value 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+menu_item_value, set_item_value, item_value \- set and get menus item values
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lmenu\fR \fB -lcurses \fR [ \fIlibrary\fR... ]
+#include <menu.h>
+
+\fBint\fR \fBset_item_value\fR(\fBITEM *\fR\fIitem\fR, \fBint\fR \fIbool\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBitem_value\fR(\fBITEM *\fR\fIitem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Unlike single-valued menus, multi-valued menus enable the end-user to select
+one or more items from a menu. \fBset_item_value()\fR sets the selected value
+of the \fIitem\fR \(em \fBTRUE\fR (selected) or \fBFALSE\fR (not selected).
+\fBset_item_value()\fR may be used only with multi-valued menus. To make a menu
+multi-valued, use \fBset_menu_opts\fR or \fBmenu_opts_off()\fR to turn off the
+option \fBO_ONEVALUE\fR. (See \fBmenu_opts\fR(3CURSES)).
+.sp
+.LP
+\fBitem_value()\fR returns the select value of \fIitem\fR, either \fBTRUE\fR
+(selected) or \fBFALSE\fR (unselected).
+.SH RETURN VALUES
+.sp
+.LP
+\fBset_item_value()\fR returns one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBE_OK\fR
+.ad
+.RS 20n
+.rt  
+The routine returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_SYSTEM_ERROR\fR
+.ad
+.RS 20n
+.rt  
+System error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_REQUEST_DENIED\fR
+.ad
+.RS 20n
+.rt  
+The menu driver could not process the request.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBmenu_opts\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
+\fB<curses.h>\fR\&.

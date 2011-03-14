@@ -1,0 +1,156 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd., All Rights Reserved. Portions Copyright 1989 AT&T. Portions Copyright (c) 1998, Sun Microsystems, Inc. , All Rights Reserved 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_close 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_close \- close a transport endpoint
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h>
+
+
+
+
+\fBint\fR \fBt_close\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This routine is part of the \fBXTI\fR interfaces which evolved from the
+\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
+interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
+using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
+\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
+\fBCOMPATIBILITY\fR section for a description of differences between the two
+interfaces.
+.sp
+.LP
+The \fBt_close()\fR function informs the transport provider that the user is
+finished with the transport endpoint specified by \fIfd\fR, and frees any local
+library resources associated with the endpoint. In addition, \fBt_close()\fR
+closes the file associated with the transport endpoint.
+.sp
+.LP
+The function \fBt_close()\fR should be called from the \fBT_UNBND\fR state. See
+\fBt_getstate\fR(3NSL). However, this function does not check state
+information, so it may be called from any state to close a transport endpoint.
+If this occurs, the local library resources associated with the endpoint will
+be freed automatically.  In addition, \fBclose\fR(2) will be issued for that
+file descriptor; if there are no other descriptors in this process or in
+another process which references the communication endpoint, any connection
+that may be associated with that endpoint is broken. The connection may be
+terminated in an orderly or abortive manner.
+.sp
+.LP
+A \fBt_close()\fR issued on a connection endpoint may cause data previously
+sent, or data not yet received, to be lost. It is the responsibility of the
+transport user to ensure that data is received by the remote peer.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a value of  \fB0\fR \fBis\fR returned.  Otherwise,
+a value of  -1 \fBis\fR \fBreturned\fR \fBand\fR \fBt_errno\fR is set to
+indicate an error.
+.SH VALID STATES
+.sp
+.LP
+\fBT_UNBND\fR
+.SH ERRORS
+.sp
+.LP
+On failure, \fBt_errno\fR is set to the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 11n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 11n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
+different header files. This, and other semantic differences between the two
+interfaces are described in the subsections below.
+.SS "Interface Header"
+.sp
+.LP
+The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
+should \fInot\fR use this header.  They should use the header:
+.sp
+.LP
+\fB#include\fR \fB<tiuser.h>\fR
+.SS "Error Description Values"
+.sp
+.LP
+The \fBt_errno\fR value that can be set by the \fBXTI\fR interface and cannot
+be set by the \fBTLI\fR interface is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR \fR
+.ad
+.RS 11n
+.rt  
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBt_getstate\fR(3NSL), \fBt_open\fR(3NSL),
+\fBt_unbind\fR(3NSL), \fBattributes\fR(5)

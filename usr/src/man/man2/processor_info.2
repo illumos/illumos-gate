@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH processor_info 2 "28 Jun 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+processor_info \- determine type and status of a processor
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/processor.h>
+
+\fBint\fR \fBprocessor_info\fR(\fBprocessorid_t\fR \fIprocessorid\fR, \fBprocessor_info_t *\fR\fIinfop\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBprocessor_info()\fR function returns the status of the processor
+specified by \fIprocessorid\fR in the \fBprocessor_info_t\fR structure pointed
+to by \fIinfop\fR.
+.sp
+.LP
+The structure \fBprocessor_info_t\fR contains the following members:
+.sp
+.in +2
+.nf
+int      pi_state;
+char     pi_processor_type[PI_TYPELEN];
+char     pi_fputypes[PI_FPUTYPE];
+int      pi_clock;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpi_state\fR member is the current state of the processor, either
+\fBP_ONLINE\fR, \fBP_OFFLINE\fR, \fBP_NOINTR\fR, \fBP_FAULTED\fR,
+\fBP_SPARE\fR, or \fBP_POWEROFF\fR.
+.sp
+.LP
+The \fBpi_processor_type\fR member is a null-terminated ASCII string specifying
+the type of the processor.
+.sp
+.LP
+The \fBpi_fputypes\fR member is a null-terminated ASCII string containing the
+comma-separated types of floating-point units (FPUs) attached to the processor.
+This string will be empty if no FPU is attached.
+.sp
+.LP
+The \fBpi_clock\fR member is the processor clock frequency rounded to the
+nearest megahertz. It may be  \fB0\fR if not known.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise,  \fB\(mi1\fR is
+returned and  \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBprocessor_info()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An non-existent processor \fBID\fR was specified.
+.sp
+The caller is in a non-global zone, the pools facility is active, and the
+processor is not a member of the zone's pool's processor set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The  \fBprocessor_info_t\fR structure pointed to by  \fIinfop\fR was not
+writable by the user.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBzoneadm\fR(1M),
+\fBp_online\fR(2), \fBsysconf\fR(3C)

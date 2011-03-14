@@ -1,0 +1,1580 @@
+'\" te
+.\" Copyright 1989 AT&T.
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priocntl 2 "11 May 2006" "SunOS 5.11" "System Calls"
+.SH NAME
+priocntl \- process scheduler control
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/priocntl.h>
+#include <sys/rtpriocntl.h>
+#include <sys/tspriocntl.h>
+#include <sys/iapriocntl.h>
+#include <sys/fsspriocntl.h>
+#include <sys/fxpriocntl.h>
+
+\fBlong\fR \fBpriocntl\fR(\fBidtype_t\fR \fIidtype\fR, \fBid_t\fR \fIid\fR, \fBint\fR \fIcmd\fR, \fB/*\fR \fIarg\fR */ ...);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpriocntl()\fR function provides for control over the scheduling of an
+active light weight process (LWP).
+.sp
+.LP
+LWPs fall into distinct classes with a separate scheduling policy applied to
+each class. The classes currently supported are the realtime class, the
+time-sharing class, the fair-share class, and the fixed-priority class. The
+characteristics of these classes are described under the corresponding headings
+below.
+.sp
+.LP
+The class attribute of an LWP is inherited across the \fBfork\fR(2) function
+and the \fBexec\fR(2) family of functions. The \fBpriocntl()\fR function can be
+used to dynamically change the class and other scheduling parameters associated
+with a running LWP or set of LWPs given the appropriate permissions as
+explained below.
+.sp
+.LP
+In the default configuration, a runnable realtime LWP runs before any other
+LWP. Therefore, inappropriate use of realtime LWP can have a dramatic negative
+impact on system performance.
+.sp
+.LP
+The \fBpriocntl()\fR function provides an interface for specifying a process,
+set of processes, or an LWP to which the function applies. The
+\fBpriocntlset\fR(2) function provides the same functions as \fBpriocntl()\fR,
+but allows a more general interface for specifying the set of LWPs to which the
+function is to apply.
+.sp
+.LP
+For \fBpriocntl()\fR, the \fIidtype\fR and \fIid\fR arguments are used together
+to specify the set of LWPs. The interpretation of \fIid\fR depends on the value
+of \fIidtype\fR. The possible values for \fIidtype\fR and corresponding
+interpretations of \fIid\fR are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_ALL\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fBpriocntl()\fR function applies to all existing LWPs. The value of
+\fIid\fR is ignored. The permission restrictions described below still apply.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_CID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a class ID (returned by the \fBpriocntl()\fR
+\fBPC_GETCID\fR command as explained below). The \fBpriocntl()\fR function
+applies to all LWPs in the specified class.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_GID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a group ID. The \fBpriocntl()\fR function applies to
+all LWPs with this effective group ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_LWPID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is an LWP ID. The \fIpriocntl\fR function applies to the
+LWP with the specified ID within the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_PGID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a process group ID. The \fBpriocntl()\fR function
+applies to all LWPs currently associated with processes in the specified
+process group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_PID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a process ID specifying a single process. The
+\fBpriocntl()\fR function applies to all LWPs currently associated with the
+specified process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_PPID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a parent process ID. The \fBpriocntl()\fR function
+applies to all LWPs currently associated with processes with the specified
+parent process ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_PROJID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a project ID. The \fBpriocntl()\fR function applies to
+all LWPs with this project ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_SID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a session ID. The \fBpriocntl()\fR function applies to
+all LWPs currently associated with processes in the specified session.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_TASKID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a task ID. The \fBpriocntl()\fR function applies to
+all LWPs currently associated with processes in the specified task.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_UID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a user ID. The \fBpriocntl()\fR function applies to
+all LWPs with this effective user ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_ZONEID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a zone ID. The \fBpriocntl()\fR function applies to
+all LWPs with this zone ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP_CTID\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIid\fR argument is a process contract ID. The \fBpriocntl()\fR function
+applies to all LWPs with this process contract ID.
+.RE
+
+.sp
+.LP
+An \fIid\fR value of \fBP_MYID\fR can be used in conjunction with the
+\fIidtype\fR value to specify the LWP ID, parent process ID, process group ID,
+session ID, task ID, class ID, user ID, group ID, project ID, zone ID, or
+process contract ID of the calling LWP.
+.sp
+.LP
+To change the scheduling parameters of an LWP (using the \fBPC_SETPARMS\fR or
+\fBPC_SETXPARMS\fR command as explained below) , the real or effective user ID
+of the LWP calling \fBpriocntl()\fR must match the real or the calling LWP must
+have sufficient privileges. These are the minimum permission requirements
+enforced for all classes. An individual class might impose additional
+permissions requirements when setting LWPs to that class and/or when setting
+class-specific scheduling parameters.
+.sp
+.LP
+A special \fBSYS\fR scheduling class exists for the purpose of scheduling the
+execution of certain special system processes (such as the swapper process). It
+is not possible to change the class of any LWP to \fBSYS\fR. In addition, any
+processes in the \fBSYS\fR class that are included in a specified set of
+processes are disregarded by  \fBpriocntl()\fR. For example, an \fIidtype\fR of
+\fBP_UID\fR and an \fIid\fR value of 0 would specify all processes with a user
+ID of 0 except processes in the \fBSYS\fR class and (if changing the parameters
+using \fBPC_SETPARMS\fR or \fBPC_SETXPARMS\fR) the  \fBinit\fR(1M) process.
+.sp
+.LP
+The \fBinit\fR process is a special case. For a \fBpriocntl()\fR call to change
+the class or other scheduling parameters of the \fIinit\fR process (process ID
+1), it must be the only process specified by \fIidtype\fR and \fIid\fR. The
+\fBinit\fR process can be assigned to any class configured on the system, but
+the time-sharing class is almost always the appropriate choice. (Other choices
+might be highly undesirable. See the \fISystem Administration Guide: Basic
+Administration\fR for more information.)
+.sp
+.LP
+The data type and value of \fIarg\fR are specific to the type of command
+specified by \fIcmd\fR.
+.sp
+.LP
+A \fBpcinfo_t\fR structure with the following members, defined in
+\fB<sys/priocntl.h>\fR, is used by the \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR
+commands.
+.sp
+.in +2
+.nf
+id_t   pc_cid;                   /* Class id */
+char   pc_clname[PC_CLNMSZ];     /* Class name */
+int    pc_clinfo[PC_CLINFOSZ];   /* Class information */
+.fi
+.in -2
+
+.sp
+.LP
+The \fIpc_cid\fR member is a class ID returned by the \fBpriocntl()\fR
+\fBPC_GETCID\fR command.
+.sp
+.LP
+The \fIpc_clname\fR member is a buffer of size \fBPC_CLNMSZ\fR, defined in
+\fB<sys/priocntl.h>\fR, used to hold the class name: \fBRT\fR for realtime,
+\fBTS\fR for time-sharing, \fBIA\fRfor interactive, \fBFSS\fR for fair-share,
+or \fBFX\fR for fixed-priority. Each string is null-terminated.
+.sp
+.LP
+The \fIpc_clinfo\fR member is a buffer of size \fBPC_CLINFOSZ\fR, defined in
+\fB<sys/priocntl.h>\fR, used to return data describing the attributes of a
+specific class. The format of this data is class-specific and is described
+under the appropriate heading (\fBREALTIME CLASS\fR, \fBTIME-SHARING CLASS\fR,
+\fBINTERACTIVE CLASS\fR, \fBFAIR-SHARE CLASS\fR, or \fBFIXED-PRIORITY CLASS\fR)
+below.
+.sp
+.LP
+A \fBpcparms_t\fR structure with the following members, defined in
+\fB<sys/priocntl.h>\fR, is used by the \fBPC_SETPARMS\fR and \fBPC_GETPARMS\fR
+commands.
+.sp
+.in +2
+.nf
+id_t  pc_cid;                   /* LWP class */
+int   pc_clparms[PC_CLPARMSZ];  /* Class-specific params */
+.fi
+.in -2
+
+.sp
+.LP
+The \fIpc_cid\fR member is a class ID returned by the \fBpriocntl()\fR
+\fBPC_GETCID\fR command. The special class ID \fBPC_CLNULL\fR can also be
+assigned to \fIpc_cid\fR when using the \fBPC_GETPARMS\fR command as explained
+below.
+.sp
+.LP
+The \fIpc_clparms\fR buffer holds class-specific scheduling parameters. The
+format of this parameter data for a particular class is described under the
+appropriate heading below. \fBPC_CLPARMSZ\fR is the length of the
+\fIpc_clparms\fR buffer and is defined in \fB<sys/priocntl.h>\fR.
+.sp
+.LP
+The \fBPC_SETXPARMS\fR and \fBPC_GETXPARMS\fR commands exploit the
+\fBvarargs\fR declaration of \fBpriocntl()\fR. The argument following the
+command code is a class name: \fBRT\fR for realtime, \fBTS\fR for time-sharing,
+\fBIA\fR for interactive, \fBFSS\fR for fair-share, or \fBFX\fR for
+fixed-priority. The parameters  after the class name build a chain of (key,
+value) pairs, where the key  determines the meaning of the value within the
+pair. When using \fBPC_GETXPARMS\fR, the value associated with the key is
+always a pointer to a scheduling parameter. In contrast, when using
+\fBPC_SETXPARMS\fR the scheduling parameter is given as a direct value.  A key
+value of \fB0\fR terminates the sequence and all further keys or values are
+ignored.
+.sp
+.LP
+The \fBPC_SETXPARMS\fR and \fBPC_GETXPARMS\fR commands are more flexible than
+\fBPC_SETPARMS\fR and \fBPC_GETPARMS\fR and should replace \fBPC_SETPARMS\fR
+and \fBPC_GETPARMS\fR on a long-term basis.
+.SH COMMANDS
+.sp
+.LP
+Available \fBpriocntl()\fR commands are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_ADMIN\fR\fR
+.ad
+.RS 16n
+.rt  
+This command provides functionality needed for the implementation of the
+\fBdispadmin\fR(1M) utility. It is not intended for general use by other
+applications.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_DONICE\fR\fR
+.ad
+.RS 16n
+.rt  
+Set or get nice value of the specified LWP(s) associated with the specified
+process(es). When this command is used with the \fIidtype\fR of \fBP_LWPID\fR,
+it sets the nice value of the LWP. The \fIarg\fR argument points to a structure
+of type \fBpcnice_t\fR. The \fIpc_val\fR member specifies the nice value and
+the \fIpc_op\fR specifies the type of the operation.
+.sp
+When \fIpc_op\fR is set to \fBPC_GETNICE\fR, \fBpriocntl()\fR sets the
+\fIpc_val\fR to the highest priority (lowest numerical value) pertaining to any
+of the specified LWPs.
+.sp
+When \fIpc_op\fR is set to \fBPC_SETNICE\fR, \fBpriocntl()\fR sets the nice
+value of all LWPs in the specified set to the value specified in \fIpc_val\fR
+member of \fBpcnice_t\fR structure.
+.sp
+The \fBpriocntl()\fR function returns \fB\(mi1\fR with \fBerrno\fR set to
+\fBEPERM\fR if the calling LWP doesn't have appropriate permissions to set or
+get nice values for one or more of the target LWPs. If \fBpriocntl()\fR
+encounters an error other than permissions, it does not continue through the
+set of target LWPs but returns the error immediately.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_GETCID\fR\fR
+.ad
+.RS 16n
+.rt  
+Get class ID and class attributes for a specific class given the class name.
+The \fIidtype\fR and \fIid\fR arguments are ignored. If \fIarg\fR is non-null,
+it points to a structure of type \fBpcinfo_t\fR. The \fIpc_clname\fR buffer
+contains the name of the class whose attributes you are getting.
+.sp
+On success, the class ID is returned in \fBpc_cid\fR, the class attributes are
+returned in the \fIpc_clinfo\fR buffer, and the \fBpriocntl()\fR call returns
+the total number of classes configured in the system (including the \fBsys\fR
+class). If the class specified by \fIpc_clname\fR is invalid or is not
+currently configured, the \fBpriocntl()\fR call returns \fB\(mi1\fR with
+\fBerrno\fR set to \fBEINVAL\fR. The format of the attribute data returned for
+a given class is defined in the \fB<sys/rtpriocntl.h>\fR,
+\fB<sys/tspriocntl.h>\fR, \fB<sys/iapriocntl.h>\fR, \fB<sys/fsspriocntl.h>\fR,
+or \fB<sys/fxpriocntl.h>\fR header and described under the appropriate heading
+below.
+.sp
+If \fIarg\fR is a null pointer, no attribute data is returned but the
+\fBpriocntl()\fR call still returns the number of configured classes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_GETCLINFO\fR\fR
+.ad
+.RS 16n
+.rt  
+Get class name and class attributes for a specific class given class ID. The
+\fIidtype\fR and \fIid\fR arguments are ignored. If \fIarg\fR is non-null, it
+points to a structure of type \fBpcinfo_t\fR. The \fIpc_cid\fR member is the
+class ID of the class whose attributes you are getting.
+.sp
+On success, the class name is returned in the \fIpc_clname\fR buffer, the class
+attributes are returned in the \fIpc_clinfo\fR buffer, and the \fBpriocntl()\fR
+call returns the total number of classes configured in the system (including
+the \fBsys\fR class). The format of the attribute data returned for a given
+class is defined in the \fB<sys/rtpriocntl.h>\fR, \fB<sys/tspriocntl.h>\fR,
+\fB<sys/iapriocntl.h>\fR, \fB<sys/fsspriocntl.h>\fR, or
+\fB<sys/fxpriocntl.h>\fR header and described under the appropriate heading
+below.
+.sp
+If \fIarg\fR is a null pointer, no attribute data is returned but the
+\fBpriocntl()\fR call still returns the number of configured classes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_GETPARMS\fR\fR
+.ad
+.RS 16n
+.rt  
+Get the class and/or class-specific scheduling parameters of an LWP. The
+\fIarg\fR member points to a structure of type \fBpcparms_t\fR.
+.sp
+If \fIpc_cid\fR specifies a configured class and a single LWP belonging to that
+class is specified  by the \fIidtype\fR and \fIid\fR values or the
+\fBprocset\fR structure, then the scheduling parameters of that LWP are
+returned in the \fIpc_clparms\fR buffer. If the LWP specified does not exist or
+does not belong to the specified class, the \fBpriocntl()\fR call returns
+\fB\(mi1\fR with \fBerrno\fR set to \fBESRCH\fR.
+.sp
+If \fIpc_cid\fR specifies a configured class and a set of LWPs is specified,
+the scheduling parameters of one of the specified LWP belonging to the
+specified class are returned in the \fIpc_clparms\fR buffer and the
+\fBpriocntl()\fR call returns the process ID of the selected LWP. The criteria
+for selecting an LWP to return in this case is class-dependent. If none of the
+specified LWPs exist or none of them belong to the specified class, the
+\fBpriocntl()\fR call returns \fB\(mi1\fR with \fBerrno\fR set to \fBESRCH\fR.
+.sp
+If \fIpc_cid\fR is \fBPC_CLNULL\fR and a single LWP is specified, the class of
+the specified LWP is returned in \fIpc_cid\fR and its scheduling parameters are
+returned in the \fIpc_clparms\fR buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_GETXPARMS\fR\fR
+.ad
+.RS 16n
+.rt  
+Get the class or class-specific scheduling parameters of an LWP. The class name
+(first argument after \fBPC_GETXPARMS\fR) specifies the class and the (key,
+value) pair sequence contains a pointer to the class-specific parameters. The
+keys and the types of the class-specific parameter data  are described below
+and can also be found in the class-specific headers \fB<sys/rtpriocntl.h>\fR,
+\fB<sys/tspriocntl.h>\fR, \fB<sys/iapriocntl.h>\fR, \fB<sys/fsspriocntl.h>\fR,
+and \fB<sys/fxpriocntl.h>\fR. If the specified class is a configured class and
+a single LWP belonging to that class is specified by the \fIidtype\fR and
+\fIid\fR values or the \fBprocset\fR structure, then the scheduling parameters
+of that LWP are returned in the  given (key, value) pair buffers. If the LWP
+specified does not exist or does not belong to the specified class,
+\fBpriocntl()\fR returns \fB\(mi1\fR and \fBerrno\fR is set to \fBESRCH\fR.
+.sp
+If the class name specifies a configured class and a set of LWPs is given, the
+scheduling parameters of one of the specified LWPs belonging to the specified
+class are returned and the \fBpriocntl()\fR call returns the process ID of the
+selected LWP. The criteria for selecting an LWP to return in this case is
+class-dependent. If none of the specified LWPs exist or none of them belong to
+the specified class, \fBpriocntl()\fR returns \fB\(mi1\fR and \fBerrno\fR is
+set to \fBESRCH\fR.
+.sp
+If the class name is a null pointer, a single process or LWP is specified, and
+a (key, value) pair for a class name request is given, \fBpriocntl()\fR fills
+the buffer pointed to by value with the class name of the specified process or
+LWP. The key for the class name  request is \fBPC_KY_CLNAME\fR and the class
+name buffer should be declared as:
+.sp
+.in +2
+.nf
+char   pc_clname[PC_CLNMSZ];     /* Class name */
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_SETPARMS\fR\fR
+.ad
+.RS 16n
+.rt  
+Set the class and class-specific scheduling parameters of the specified LWP(s)
+associated with the specified process(es). When this command is used with the
+\fIidtype\fR of P_LWPID, it will set the class and class-specific scheduling
+parameters of the LWP.  The \fIarg\fR argument points to a structure of type
+\fBpcparms_t\fR. The \fIpc_cid\fR member specifies the class you are setting
+and the \fIpc_clparms\fR buffer contains the class-specific parameters you are
+setting. The format of the class-specific parameter data is defined in the
+\fB<sys/rtpriocntl.h>\fR, \fB<sys/tspriocntl.h>\fR, \fB<sys/iapriocntl.h>\fR,
+\fB<sys/fsspriocntl.h>\fR, or \fB<sys/fxpriocntl.h>\fR header and described
+under the appropriate class heading below.
+.sp
+When setting parameters for a set of LWPs, \fBpriocntl()\fR acts on the LWPs in
+the set in an implementation-specific order. If \fBpriocntl()\fR encounters an
+error for one or more of the target processes, it might or might not continue
+through the set of LWPs, depending on the nature of the error. If the error is
+related to permissions (\fBEPERM\fR), \fBpriocntl()\fR continues through the
+LWP set, resetting the parameters for all target LWPs for which the calling LWP
+has appropriate permissions.  The \fBpriocntl()\fR function then returns
+\fB\(mi1\fR with \fBerrno\fR set to \fBEPERM\fR to indicate that the operation
+failed for one or more of the target LWPs. If \fBpriocntl()\fR encounters an
+error other than permissions, it does not continue through the set of target
+LWPs but returns the error immediately.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPC_SETXPARMS\fR\fR
+.ad
+.RS 16n
+.rt  
+Set the class and class-specific scheduling parameters of the specified LWP(s)
+associated with the specified process(es). When this command is used with
+\fBP_LWPID\fR as \fIidtype\fR, it will set the class and class-specific
+scheduling parameters of the LWP. The class name (first argument after
+\fBPC_SETXPARMS\fR) specifies the class to be changed and the following (key,
+value) pair sequence contains the class-specific parameters to be changed. Only
+those (key,value) pairs whose scheduling behavior is to change must be
+specified. The keys and the types of the class-specific parameter data are
+described below and can also be found in the class-specific header files
+\fB<sys/rtpriocntl.h>\fR, \fB<sys/tspriocntl.h>\fR, \fB<sys/iapriocntl.h>\fR,
+\fB<sys/fsspriocntl.h>\fR, and \fB<sys/fxpriocntl.h>\fR.
+.sp
+When setting parameters for a set of LWPs, \fBpriocntl()\fR acts on the LWPs in
+the set in an implementation-specific order. If \fBpriocntl()\fR encounters an
+error for one or more of the target processes, it might or might not continue
+through the set of LWPs, depending on the nature of the error. If the error is
+related to permissions (\fBEPERM\fR), \fBpriocntl()\fR continues to reset the
+parameters for all target LWPs where the calling LWP has appropriate
+permissions. The \fBpriocntl()\fR function returns \fB\(mi1\fR and \fBerrno\fR
+is set to \fBEPERM\fR when the operation failed for one or more of the target
+LWPs. All errors other than \fBEPERM\fR result in an immediate termination of
+\fBpriocntl()\fR.
+.RE
+
+.SH REALTIME CLASS
+.sp
+.LP
+The realtime class provides a fixed priority preemptive scheduling policy for
+those LWPS requiring fast and deterministic response and absolute
+user/application control of scheduling priorities. If the realtime class is
+configured in the system, it should have exclusive control of the highest range
+of scheduling priorities on the system. This ensures that a runnable realtime
+LWP is given CPU service before any LWP belonging to any other class.
+.sp
+.LP
+The realtime class has a range of realtime priority (\fIrt_pri\fR) values that
+can be assigned to an LWP within the class. Realtime priorities range from 0 to
+\fIx\fR, where the value of \fIx\fR is configurable and can be determined for a
+specific installation by using the \fBpriocntl()\fR \fBPC_GETCID\fR or
+\fBPC_GETCLINFO\fR command.
+.sp
+.LP
+The realtime scheduling policy is a fixed priority policy. The scheduling
+priority of a realtime LWP is never changed except as the result of an explicit
+request by the user/application to change the \fIrt_pri\fR value of the LWP.
+.sp
+.LP
+For an LWP in the realtime class, the \fIrt_pri\fR value is, for all practical
+purposes, equivalent to the scheduling priority of the LWP. The \fIrt_pri\fR
+value completely determines the scheduling priority of a realtime LWP relative
+to other LWPs within its class. Numerically higher \fIrt_pri\fR values
+represent higher priorities. Since the realtime class controls the highest
+range of scheduling priorities in the system, it is guaranteed that the
+runnable realtime LWP with the highest \fIrt_pri\fR value is always selected to
+run before any other LWPs in the system.
+.sp
+.LP
+In addition to providing control over priority, \fBpriocntl()\fR provides for
+control over the length of the time quantum allotted to the LWP in the realtime
+class. The time quantum value specifies the maximum amount of time an LWP can
+run assuming that it does not complete or enter a resource or event wait state
+(\fIsleep\fR). If another LWP becomes runnable at a higher priority, the
+currently running LWP might be preempted before receiving its full time
+quantum.
+.sp
+.LP
+The realtime quantum signal can be used for the notification of runaway
+realtime processes about the consumption of their time quantum. Those
+processes, which are monitored by the realtime time quantum signal, receive the
+configured signal in the event of time quantum expiration. The default value
+(\fB0\fR) of the time quantum signal will denote no signal delivery and a
+positive value will denote the delivery of the signal specified by the value.
+The realtime quantum signal can be set with the \fBpriocntl()\fR
+\fBPC_SETXPARMS\fR command and displayed with the \fBpriocntl()\fR
+\fBPC_GETXPARMS\fR command as explained below.
+.sp
+.LP
+The system's process scheduler keeps the runnable realtime LWPs on a set of
+scheduling queues. There is a separate queue for each configured realtime
+priority and all realtime LWPs with a given \fIrt_pri\fR value are kept
+together on the appropriate queue. The LWPs on a given queue are ordered in
+FIFO order (that is, the LWP at the front of the queue has been waiting longest
+for service and receives the CPU first). Realtime LWPs that wake up after
+sleeping, LWPs that change to the realtime class from some other class, LWPs
+that have used their full time quantum, and runnable LWPs whose priority is
+reset by \fBpriocntl()\fR are all placed at the back of the appropriate queue
+for their priority. An LWP that is preempted by a higher priority LWP remains
+at the front of the queue (with whatever time is remaining in its time quantum)
+and runs before any other LWP at this priority. Following a \fBfork\fR(2)
+function call by a realtime LWP, the parent LWP continues to run while the
+child LWP (which inherits its parent's \fBrt_pri\fR value) is placed at the
+back of the queue.
+.sp
+.LP
+A \fBrtinfo_t\fR structure with the following members, defined in
+\fB<sys/rtpriocntl.h>\fR, defines the format used for the attribute data for
+the realtime class.
+.sp
+.in +2
+.nf
+short    rt_maxpri;      /* Maximum realtime priority */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpriocntl()\fR \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands return
+realtime class attributes in the \fIpc_clinfo\fR buffer in this format.
+.sp
+.LP
+The \fBrt_maxpri\fR member specifies the configured maximum \fBrt_pri\fR value
+for the realtime class. If \fIrt_maxpri\fR is \fBx\fR, the valid realtime
+priorities range from 0 to \fIx\fR.
+.sp
+.LP
+A \fBrtparms_t\fR structure with the following members, defined in
+\fB<sys/rtpriocntl.h>\fR, defines the format used to specify the realtime
+class-specific scheduling parameters of an LWP.
+.sp
+.in +2
+.nf
+short    rt_pri;       /* Real-Time priority */
+uint_t   rt_tqsecs;    /* Seconds in time quantum */
+int      rt_tqnsecs;   /* Additional nanoseconds in quantum */
+.fi
+.in -2
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETPARMS\fR or \fBPC_GETPARMS\fR
+commands, if \fBpc_cid\fR specifies the realtime class, the data in the
+\fIpc_clparms\fR buffer are in this format.
+.sp
+.LP
+These commands can be used to set the realtime priority to the specified value
+or get the current \fIrt_pri\fR value. Setting the \fBrt_pri\fR value of an LWP
+that is currently running or runnable (not sleeping) causes the LWP to be
+placed at the back of the scheduling queue for the specified priority. The LWP
+is placed at the back of the appropriate queue regardless of whether the
+priority being set is different from the previous \fIrt_pri\fR value of the
+LWP. A running LWP can voluntarily release the CPU and go to the back of the
+scheduling queue at the same priority by resetting its \fIrt_pri\fR value to
+its current realtime priority value. To change the time quantum of an LWP
+without setting the priority or affecting the LWP's position on the queue, the
+\fIrt_pri\fR member should be set to the special value \fBRT_NOCHANGE\fR,
+defined in \fB<sys/rtpriocntl.h>\fR. Specifying \fBRT_NOCHANGE\fR when changing
+the class of an LWP to realtime from some other class results in the realtime
+priority being set to 0.
+.sp
+.LP
+For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fIpc_cid\fR specifies
+the realtime class and more than one realtime LWP is specified, the scheduling
+parameters of the realtime LWP with the highest \fIrt_pri\fR value among the
+specified LWPs are returned and the LWP ID of this LWP is returned by the
+\fBpriocntl()\fR call. If there is more than one LWP sharing the highest
+priority, the one returned is implementation-dependent.
+.sp
+.LP
+The \fIrt_tqsecs\fR and \fIrt_tqnsecs\fR members are used for getting or
+setting the time quantum associated with an LWP or group of LWPs.
+\fIrt_tqsecs\fR is the number of seconds in the time quantum and
+\fBrt_tqnsecs\fR is the number of additional nanoseconds in the quantum. For
+example, setting \fIrt_tqsecs\fR to 2 and \fBrt_tqnsecs\fR to 500,000,000
+(decimal) would result in a time quantum of two and one-half seconds.
+Specifying a value of 1,000,000,000 or greater in the \fIrt_tqnsecs\fR member
+results in an error return with \fBerrno\fR set to \fBEINVAL\fR. Although the
+resolution of the \fItq_nsecs\fR member is very fine, the specified time
+quantum length is rounded up by the system to the next integral multiple of the
+system clock's resolution. The maximum time quantum that can be specified is
+implementation-specific and equal to \fBINT_MAX\fR1 ticks. The \fBINT_MAX\fR
+value is defined in \fB<limits.h>\fR. Requesting a quantum greater than this
+maximum results in an error return with \fBerrno\fR set to \fBERANGE\fR,
+although infinite quantums can be requested using a special value as explained
+below. Requesting a time quantum of 0 by setting both \fIrt_tqsecs\fR and
+\fBrt_tqnsecs\fR to 0 results in an error return with \fBerrno\fR set to
+\fBEINVAL\fR.
+.sp
+.LP
+The \fIrt_tqnsecs\fR member can also be set to one of the following special
+values defined in \fB<sys/rtpriocntl.h>\fR, in which case the value of
+\fIrt_tqsecs\fR is ignored:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRT_TQINF\fR\fR
+.ad
+.RS 15n
+.rt  
+Set an infinite time quantum.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRT_TQDEF\fR\fR
+.ad
+.RS 15n
+.rt  
+Set the time quantum to the default for this priority (see \fBrt_dptbl\fR(4)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRT_NOCHANGE\fR\fR
+.ad
+.RS 15n
+.rt  
+Do not set the time quantum. This value is useful when you wish to change the
+realtime priority of an LWP without affecting the time quantum. Specifying this
+value when changing the class of an LWP to realtime from some other class is
+equivalent to specifying \fBRT_TQDEF\fR.
+.RE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
+commands, the first argument after the command code must be the class name of
+the realtime class (\fBRT\fR) . The next arguments are formed as (key, value)
+pairs, terminated by a \fB0\fR key. The definition for the keys of the realtime
+class can be found in \fB<sys/rtpriocntl.h>\fR. A repeated specification of the
+same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.44i) |cw(1.08i) |cw(2.98i) 
+lw(1.44i) |lw(1.08i) |lw(2.98i) 
+.
+KeyValue TypeDescription
+_
+\fBRT_KY_PRI\fR\fBpri_t\fRrealtime priority
+\fBRT_KY_TQSECS\fR\fBuint_t\fRseconds in time quantum
+_
+\fBRT_KY_TQNSECS\fR\fBint\fRnanoseconds in time quantum
+_
+\fBRT_KY_TQSIG\fR\fBint\fRrealtime time quantum signal
+.TE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_GETXPARMS\fR command, the value
+associated with the key is always a pointer to a scheduling parameter of the
+value type shown in the table above. In contrast, when using the
+\fBpriocntl()\fR \fBPC_SETXPARMS\fR command, the scheduling parameter is given
+as a  direct value.
+.sp
+.LP
+A \fBpriocntl()\fR \fBPC_SETXPARMS\fR command with the class name (\fBRT\fR)
+and without a following (key, value) pair will set or reset all realtime
+scheduling parameters of the target process(es) to their default values.
+Changing the class of an LWP to realtime from some other class causes the
+parameters to be set to their default values. The default realtime priority
+(\fBRT_KY_PRI\fR) is \fB0\fR. A default time quantum (\fBRT_TQDEF\fR) is
+assigned to each priority class (see \fBrt_dptbl\fR(4)). The default realtime
+time quantum signal (\fBRT_KY_TQSIG\fR) is \fB0\fR.
+.sp
+.LP
+The value associated with \fBRT_KY_TQSECS\fR is the number of seconds in the
+time quantum. The value associated with \fBRT_KY_TQNSECS\fR is the number of
+nanoseconds in the quantum. Specifying a value of 1,000,000,000 or greater for
+the number of nanoseconds results in an error return and \fBerrno\fR is set to
+\fBEINVAL\fR. The specified time quantum is rounded up by the system to the
+next integral multiple of the system clock's resolution. The maximum time
+quantum that can be specified is implementation-specific and equal to
+\fBINT_MAX\fR ticks, defined in \fB<limits.h>\fR. Requesting a quantum greater
+than this maximum results in an error return and \fBerrno\fR is set to
+\fBERANGE\fR. If seconds (\fBRT_KY_TQSECS\fR) but no nanoseconds
+(\fBRT_KY_TQNSECS\fR) are supplied, the number of nanoseconds is set to
+\fB0\fR. If nanoseconds (\fBRT_KY_TQNSECS\fR) but no seconds
+(\fBRT_KY_TQSECS\fR) are supplied, the  number of seconds is set to \fB0\fR. A
+time quantum of \fB0\fR (seconds and nanoseconds are \fB0\fR) results in an
+error return with \fBerrno\fR set to \fBEINVAL\fR. Special values for
+\fBRT_KY_TQSECS\fR are \fBRT_TQINF\fR and \fBRT_TQDEF\fR (as described above).
+The \fBpriocntl()\fR command \fBPC_SETXPARMS\fR knows no special value
+\fBRT_NOCHANGE\fR.
+.sp
+.LP
+To change the class of an LWP to realtime from any other class, the LWP
+invoking \fBpriocntl()\fR must have sufficient privileges. To change the
+priority or time quantum setting of a realtime LWP, the LWP invoking
+\fBpriocntl()\fR must have sufficient privileges or must itself be a realtime
+LWP whose real or effective user ID matches the real of effective user ID of
+the target LWP.
+.sp
+.LP
+The realtime priority and time quantum are inherited across \fBfork\fR(2) and
+the \fBexec\fR family of functions. When using the time quantum signal with a
+user-defined signal handler across the \fBexec\fR functions, the new image must
+install an appropriate user-defined signal handler before the time quantum
+expires. Otherwise, unpredictable behavior might result.
+.SH TIME-SHARING CLASS
+.sp
+.LP
+The time-sharing scheduling policy provides for a fair and effective allocation
+of the CPU resource among LWPs with varying CPU consumption characteristics.
+The objectives of the time-sharing policy are to provide good response time to
+interactive LWPs and good throughput to CPU-bound jobs, while providing a
+degree of user/application control over scheduling.
+.sp
+.LP
+The time-sharing class has a range of time-sharing user priority (see
+\fIts_upri\fR below) values that can be assigned to LWPs within the class. A
+\fIts_upri\fR value of 0 is defined as the default base priority for the
+time-sharing class. User priorities range from \(mi\fIx\fR to +\fIx\fR where
+the value of \fIx\fR is configurable and can be determined for a specific
+installation by using the \fBpriocntl()\fR \fBPC_GETCID\fR or
+\fBPC_GETCLINFO\fR command.
+.sp
+.LP
+The purpose of the user priority is to provide some degree of user/application
+control over the scheduling of LWPs in the time-sharing class. Raising or
+lowering the \fIts_upri\fR value of an LWP in the time-sharing class raises or
+lowers the scheduling priority of the LWP. It is not guaranteed, however, that
+an LWP with a higher \fIts_upri\fR value will run before one with a lower
+\fIts_upri\fR value, since the \fIts_upri\fR value is just one factor used to
+determine the scheduling priority of a time-sharing LWP. The system can
+dynamically adjust the internal scheduling priority of a time-sharing LWP based
+on other factors such as recent CPU usage.
+.sp
+.LP
+In addition to the system-wide limits on user priority (returned by the
+\fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands) there is a per LWP user
+priority limit (see \fIts_uprilim\fR below) specifying the maximum
+\fIts_upri\fR value that can be set for a given LWP. By default,
+\fIts_uprilim\fR is 0.
+.sp
+.LP
+A \fBtsinfo_t\fR structure with the following members, defined in
+\fB<sys/tspriocntl.h>\fR, defines the format used for the attribute data for
+the time-sharing class.
+.sp
+.in +2
+.nf
+short    ts_maxupri;     /* Limits of user priority range */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpriocntl()\fR \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands return
+time-sharing class attributes in the \fBpc_clinfo\fR buffer in this format.
+.sp
+.LP
+The \fBts_maxupri\fR member specifies the configured maximum user priority
+value for the time-sharing class. If \fBts_maxupri\fR is \fIx\fR, the valid
+range for both user priorities and user priority limits is from \(mi\fIx\fR to
++\fIx\fR.
+.sp
+.LP
+A \fBtsparms_t\fR structure with the following members, defined in
+\fB<sys/tspriocntl.h>\fR, defines the format used to specify the time-sharing
+class-specific scheduling parameters of an LWP.
+.sp
+.in +2
+.nf
+short    ts_uprilim;     /* Time-Sharing user priority limit */
+short    ts_upri;        /* Time-Sharing user priority */
+.fi
+.in -2
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETPARMS\fR or \fBPC_GETPARMS\fR
+commands, if \fBpc_cid\fR specifies the time-sharing class, the data in the
+\fBpc_clparms\fR buffer is in this format.
+.sp
+.LP
+For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fBpc_cid\fR specifies
+the time-sharing class and more than one time-sharing LWP is specified, the
+scheduling parameters of the time-sharing LWP with the highest \fIts_upri\fR
+value among the specified LWPs is returned and the LWP ID of this LWP is
+returned by the \fBpriocntl()\fR call. If there is more than one LWP sharing
+the highest user priority, the one returned is implementation-dependent.
+.sp
+.LP
+Any time-sharing LWP can lower its own \fIts_uprilim\fR (or that of another LWP
+with the same user ID). Only a time-sharing LWP with sufficient privileges can
+raise a \fIts_uprilim\fR. When changing the class of an LWP to time-sharing
+from some other class, sufficient privileges are required to set the initial
+\fIts_uprilim\fR to a value greater than 0. Attempts by an unprivileged LWP to
+raise a \fIts_uprilim\fR or set an initial \fIts_uprilim\fR greater than 0 fail
+with a return value of \(mi1 and \fBerrno\fR set to \fBEPERM\fR.
+.sp
+.LP
+Any time-sharing LWP can set its own \fIts_upri\fR (or that of another LWP with
+the same user ID) to any value less than or equal to the LWP's
+\fIts_uprilim\fR. Attempts to set the \fIts_upri\fR above the \fIts_uprilim\fR
+(and/or set the \fIts_uprilim\fR below the \fIts_upri\fR) result in the
+\fIts_upri\fR being set equal to the \fIts_uprilim\fR.
+.sp
+.LP
+Either of the \fIts_uprilim\fR or \fIts_upri\fR members can be set to the
+special value \fBTS_NOCHANGE\fR, defined in \fB<sys/tspriocntl.h>\fR, to set
+one of the values without affecting the other. Specifying \fBTS_NOCHANGE\fR for
+the \fIts_upri\fR when the \fIts_uprilim\fR is being set to a value below the
+current \fIts_upri\fR causes the \fIts_upri\fR to be set equal to the
+\fIts_uprilim\fR being set. Specifying \fBTS_NOCHANGE\fR for a parameter when
+changing the class of an LWP to time-sharing (from some other class) causes the
+parameter to be set to a default value. The default value for the
+\fIts_uprilim\fR is \fB0\fR and the default for the \fIts_upri\fR is to set it
+equal to the \fIts_uprilim\fR that is being set.
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
+commands, the first argument after the command code is the class name of the
+time-sharing class (\fBTS\fR) . The next arguments are formed as (key, value)
+pairs, terminated by a \fB0\fR key. The definition for the keys of the
+time-sharing class can be found in  \fB<sys/tspriocntl.h>\fR. A repeated
+specification of the same key results in an error return and \fBerrno\fR set to
+\fBEINVAL\fR.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.44i) |cw(1.08i) |cw(2.98i) 
+lw(1.44i) |lw(1.08i) |lw(2.98i) 
+.
+KeyValue TypeDescription
+_
+\fBTS_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
+\fBTS_KY_UPRI\fR\fBpri_t\fRuser priority
+.TE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_GETXPARMS\fR command, the value
+associated with the key is always a pointer to a scheduling parameter of the
+value type in the table above. In contrast, when using the \fBpriocntl()\fR
+\fBPC_SETXPARMS\fR command, the scheduling parameter is given as a direct
+value.
+.sp
+.LP
+A \fBpriocntl()\fR \fBPC_SETXPARMS\fR command with the class name (\fBTS\fR)
+and without a following (key, value) pair will set or reset all time-sharing
+scheduling parameters of the target process(es) to their default values.
+Changing the class of an LWP to time-sharing from some other class causes the
+parameters to be set to their default values. The default value for the user
+priority limit (\fBTS_KY_UPRILIM\fR) is \fB0\fR. The default value for the user
+priority (\fBTS_KY_UPRI\fR) is equal to the user priority limit
+(\fBTS_KY_UPRILIM\fR) that is being set.
+.sp
+.LP
+The \fBpriocntl()\fR command \fBPC_SETXPARMS\fR knows no special value
+\fBTS_NOCHANGE\fR.
+.sp
+.LP
+The time-sharing user priority and user priority limit are inherited across
+\fBfork()\fR and the \fBexec\fR family of functions.
+.SH INTERACTIVE CLASS
+.sp
+.LP
+The interactive scheduling policy is a variation on the time-sharing scheduling
+policy. All that can be said about the time-sharing scheduling policy is also
+true for the interactive scheduling policy, with one addition: An LWP in the
+interactive class with its \fIia_mode\fR value set to \fBIA_SET_INTERACTIVE\fR
+has its time-sharing priority boosted by \fBIA_BOOST\fR (10).
+.sp
+.LP
+An \fBiainfo_t\fR structure with the following members, defined in
+\fB<sys/iapriocntl.h>\fR, defines the format used for the attribute data for
+the interactive class.
+.sp
+.in +2
+.nf
+short    ia_maxupri;     /* Limits of user priority range */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpriocntl()\fR \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands return
+interactive class attributes in the \fIpc_clinfo\fR buffer in this format.
+.sp
+.LP
+The \fIia_maxupri\fR member specifies the configured maximum user priority
+value for the interactive class. If \fIia_maxupri\fR is \fBx\fR, the valid
+range for both user priorities and user priority limits is from -x to +x.
+.sp
+.LP
+A \fBiaparms_t\fR structure with the following members, defined in
+\fB<sys/iapriocntl.h>\fR, defines the format used to specify the interactive
+class-specific scheduling parameters of an LWP.
+.sp
+.in +2
+.nf
+short    ia_uprilim;     /* Interactive user priority limit */
+short    ia_upri;        /* Interactive user priority */
+int      ia_mode;        /* interactive on/off */
+.fi
+.in -2
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETPARMS\fR or \fBPC_GETPARMS\fR
+commands, if \fIpc_cid\fR specifies the interactive class, the data in the
+\fIpc_clparms\fR buffer is in this format.
+.sp
+.LP
+For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fIpc_cid\fR specifies
+the interactive class and more than one interactive LWP is specified, the
+scheduling parameters of the interactive LWP with the highest \fIia_upri\fR
+value among the specified LWPs is returned and the LWP ID of this LWP is
+returned by the \fBpriocntl()\fR call. If there is more than one LWP sharing
+the highest user priority, the one returned is implementation-dependent.
+.sp
+.LP
+All that is said above in the TIME-SHARING CLASS section concerning
+manipulation of \fIts_uprilim\fR and \fIts_upri\fR applies equally to
+manipulations of \fIia_uprilim\fR and \fIia_upri\fR in the interactive class.
+.sp
+.LP
+When using the \fBPC_SETPARMS\fR command, the \fIia_mode\fR member must be set
+to one of the values \fBIA_SET_INTERACTIVE\fR, \fBIA_INTERACTIVE_OFF\fR, or
+\fBIA_NOCHANGE\fR, defined in \fB<sys/iapriocntl.h>\fR, to set the interactive
+mode on or off or to make no change to the interactive mode.
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
+commands, the first argument after the command code is the class name of the
+interactive class (IA) . The next arguments are formed as (key, value) pairs,
+terminated by a 0 key. The definition for the keys of the interactive class can
+be found in \fB<sys/iapriocntl.h>\fR. A repeated specification of the same key
+results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
+.sp
+
+.sp
+.TS
+tab();
+cw(1.83i) cw(1.83i) cw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+KeyValue TypeDescription
+\fBIA_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
+\fBIA_KY_UPRI\fR\fBpri_t\fRuser priority
+\fBIA_KY_MODE\fR\fBint\fRinteractive mode
+.TE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_GETXPARMS\fR command, the value
+associated with the key is always a pointer to a scheduling parameter of the
+value type in the table above. In contrast, when using the \fBpriocntl()\fR
+\fBPC_SETXPARMS\fR command, the scheduling parameter is given as a direct
+value.
+.sp
+.LP
+A \fBpriocntl()\fR \fBPC_SETXPARMS\fR command with the class name (IA) and
+without a following (key, value) pair will set or reset all interactive
+scheduling parameters of the target process(es) to their default values.
+Changing the class of an LWP to interactive from some other class causes the
+parameters to be set to their default values. The default value for the user
+priority limit (\fBIA_KY_UPRILIM\fR) is 0. The default value for the user
+priority (\fBIA_KY_UPRI\fR) is equal to the user priority limit
+(\fBIA_KY_UPRILIM\fR) that is being set. The default value for the interactive
+mode (\fBIA_KY_MODE\fR) is \fBIA_SET_INTERACTIVE\fR.
+.sp
+.LP
+The \fBpriocntl()\fR command \fBPC_SETXPARMS\fR knows no special value
+\fBIA_NOCHANGE\fR.
+.sp
+.LP
+The interactive user priority and user priority limit are inherited across fork
+and the exec family of functions.
+.SH FAIR-SHARE CLASS
+.sp
+.LP
+The fair-share scheduling policy provides a fair allocation of CPU resources
+among projects, independent of the number of processes they contain. Projects
+are given "shares" to control their quota of CPU resources. See \fBFSS\fR(7)
+for more information about how to configure shares.
+.sp
+.LP
+The fair share class supports the notion of per-LWP user priority (see
+\fBfss_upri\fR below) values for compatibility with the time-sharing scheduling
+class. An \fIfss_upri\fR value of 0 is defined as the default base priority for
+the fair-share class. User priorities range from -\fIx\fR to +\fIx\fR where the
+value of \fIx\fR is configurable and can be determined for a specific
+installation by using the \fBpriocntl()\fR \fBPC_GETCID\fR or
+\fBPC_GETCLINFO\fR command.
+.sp
+.LP
+The purpose of the user priority is to provide some degree of user/application
+control over the scheduling of LWPs in the fair-share class. Raising the
+\fBfss_upri\fR value of an LWP in the fair-share class tells the scheduler to
+give this LWP more CPU time slices, while lowering the \fBfss_upri\fR value
+tells the scheduler to give it less CPU slices. It is not guaranteed, however,
+that an LWP with a higher \fBfss_upri\fR value will run before one with a lower
+\fBfss_upri\fR value. This is because the \fBfss_upri\fR value is just one
+factor used to determine the scheduling priority of a fair-share LWP. The
+system can dynamically adjust the internal scheduling priority of a fair-share
+LWP based on other factors such as recent CPU usage. The fair-share scheduler
+attempts to provide an evenly graded effect across the whole range of user
+priority values.
+.sp
+.LP
+User priority values do not interfere with project shares. That is, changing a
+user priority value of a process does not have any effect on its project CPU
+entitlement, which is based on the number of shares it is allocated in
+comparison with other projects.
+.sp
+.LP
+In addition to the system-wide limits on user priority (returned by the
+\fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands), there is a per-LWP user
+priority limit (see \fIfss_uprilim\fR below) that specifies the maximum
+\fBfss_upri\fR value that can be set for a given LWP. By default,
+\fIfss_uprilim\fR is 0.
+.sp
+.LP
+A \fBfssinfo_t\fR structure with the following members, defined in
+\fB<sys/fsspriocntl.h>\fR, defines  the format used for the attribute data for
+the fair-share class.
+.sp
+.in +2
+.nf
+short    fss_maxupri;    /* Limits of user priority range */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpriocntl()\fR \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands return
+fair-share class attributes in the \fIpc_clinfo\fR buffer in this format.
+.sp
+.LP
+\fIfss_maxupri\fR specifies the configured maximum user priority value for the
+fair-share class. If \fBfss_maxupri\fR is \fIx\fR, the valid range for both
+user priorities and user priority limits is from -\fIx\fR to +\fIx\fR.
+.sp
+.LP
+A \fBfssparms_t\fR structure with the following members, defined in
+\fB<sys/fsspriocntl.h>\fR, defines the format used to specify the fair-share
+class-specific scheduling parameters of an LWP.
+.sp
+.in +2
+.nf
+short    fss_uprilim;   /* Fair-share user priority limit */
+short    fss_upri;      /* Fair-share user priority */
+.fi
+.in -2
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETPARMS\fR or \fBPC_GETPARMS\fR
+commands, if \fIpc_cid\fR specifies the fair-share class, the data in the
+\fIpc_clparms\fR buffer is in this format.
+.sp
+.LP
+For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fIpc_cid\fR specifies
+the fair-share class and more than one fair-share LWP is specified, the
+scheduling parameters of the  fair-share LWP with the highest \fIfss_upri\fR
+value among the specified LWPs is returned and the LWP ID of this LWP is
+returned by the \fBpriocntl()\fR call. If there is more than one LWP sharing
+the highest user priority, the one returned is implementation-dependent.
+.sp
+.LP
+Any fair-share LWP can lower its own \fIfss_uprilim\fR (or that of another LWP
+with the same user ID). Only a fair-share LWP with sufficient privileges can
+raise an \fIfss_uprilim\fR. When changing the class of an LWP to fair-share
+from some other class, sufficient privileges are required to enter the FSS
+class or to set the initial \fIfss_uprilim\fR to a value greater than 0.
+Attempts by an unprivileged LWP to raise an \fIfss_uprilim\fR or set an initial
+\fIfss_uprilim\fR greater than 0 fail with a return value of -1 and \fBerrno\fR
+set to \fBEPERM\fR.
+.sp
+.LP
+Any fair-share LWP can set its own \fIfss_upri\fR (or that of another LWP with
+the same user ID) to any value less than or equal to the LWP's
+\fIfss_uprilim\fR. Attempts to set the \fBfss_upr\fRi above the
+\fBfss_uprilim\fR (and/or set the \fIfss_uprilim\fR below the \fIfss_upri\fR)
+result in the \fIfss_upri\fR being set equal to the \fIfss_uprilim\fR.
+.sp
+.LP
+Either of the \fIfss_uprilim\fR or \fBfss_upri\fR members can be set to the
+special value \fBFSS_NOCHANGE\fR (defined in \fB<sys/fsspriocntl.h>\fR) to set
+one of the values without affecting the other. Specifying \fBFSS_NOCHANGE\fR
+for the \fIfss_upri\fR when the \fIfss_uprilim\fR is being set to a value below
+the current \fIfss_upri\fR causes the \fIfss_upri\fR to be set equal to the
+\fIfss_uprilim\fR being set. Specifying \fBFSS_NOCHANGE\fR for a parameter when
+changing the class of an LWP to fair-share (from some other class) causes the
+parameter to be set to a default value. The default value for the
+\fBfss_uprilim\fR is 0 and the default for the \fBfss_upri\fR is to set it
+equal to the \fIfss_uprilim\fR which is being set.
+.sp
+.LP
+The fair-share user priority and user priority limit are inherited across
+\fBfork()\fR and the \fBexec\fR family of functions.
+.SH FIXED-PRIORITY CLASS
+.sp
+.LP
+The fixed-priority class provides a fixed-priority preemptive scheduling policy
+for those LWPs requiring that the scheduling priorities do not get dynamically
+adjusted by the system and that the user/application have control of the
+scheduling priorities.
+.sp
+.LP
+The fixed-priority class has a range of fixed-priority user priority (see
+\fBfx_upri\fR below) values that can be assigned to LWPs within the class. A
+\fIfx_upri\fR value of 0 is defined as the default base priority for the
+fixed-priority class. User priorities range from 0 to \fIx\fR where the value
+of \fIx\fR is configurable and can be determined for a specific installation by
+using the \fBpriocntl()\fR \fBPC_GETCID\fR or \fBPC_GETCLINFO\fR command.
+.sp
+.LP
+The purpose of the user priority is to provide user/application control over
+the scheduling of processes in the fixed-priority class. For processes in the
+fixed-priority class, the \fIfx_upri\fR value is, for all practical purposes,
+equivalent to the scheduling priority of the process. The \fIfx_upri\fR value
+completely determines the scheduling priority of a fixed-priority process
+relative to other processes within its class. Numerically higher \fIfx_upri\fR
+values represent higher priorities.
+.sp
+.LP
+In addition to the system-wide limits on user priority (returned by the
+\fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands), there is a per-LWP user
+priority limit (see \fIfx_uprilim\fR below) that specifies the maximum
+\fIfx_upri\fR value that can be set for a given LWP. By default,
+\fIfx_uprilim\fR is 0.
+.sp
+.LP
+A structure with the following member (defined in \fB<sys/fxpriocntl.h>\fR)
+defines the format used for the attribute data for the fixed-priority class.
+.sp
+.in +2
+.nf
+pri_t   fx_maxupri;      /* Maximum user priority */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpriocntl()\fR \fBPC_GETCID\fR and \fBPC_GETCLINFO\fR commands return
+fixed-priority class attributes in the \fIpc_clinfo\fR buffer in this format.
+.sp
+.LP
+The \fIfx_maxupri\fR member specifies the configured maximum user priority
+value for the fixed-priority class. If \fIfx_maxupri\fR is \fIx\fR, the valid
+range for both user priorities and user priority limits is from 0 to \fIx\fR.
+.sp
+.LP
+A structure with the following members (defined in \fB<sys/fxpriocntl.h>\fR)
+defines the format used to specify the fixed-priority class-specific scheduling
+parameters of an LWP.
+.sp
+.in +2
+.nf
+pri_t    fx_upri;     /* Fixed-priority user priority */
+pri_t    fx_uprilim;  /* Fixed-priority user priority limit */
+uint_t   fx_tqsecs;   /* seconds in time quantum */
+int      fx_tqnsecs;  /* additional nanosecs in time quant */
+.fi
+.in -2
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETPARMS\fR or \fBPC_GETPARMS\fR
+commands, if \fIpc_cid\fR specifies the fixed-priority class, the data in the
+\fIpc_clparms\fR buffer is in this format.
+.sp
+.LP
+For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fIpc_cid\fR specifies
+the fixed-priority class and more than one fixed-priority LWP is specified, the
+scheduling parameters of the fixed-priority LWP with the highest \fIfx_upri\fR
+value among the specified LWPs is returned and the LWP ID of this LWP is
+returned by the \fBpriocntl()\fR call. If there is more than one LWP sharing
+the highest user priority, the one returned is implementation-dependent.
+.sp
+.LP
+Any fixed-priority LWP can lower its own \fIfx_uprilim\fR (or that of another
+LWP with the same user ID). Only a fixed-priority LWP with sufficient
+privileges can raise a \fIfx_uprilim\fR. When changing the class of an LWP to
+fixed-priority from some other class, sufficient privileges are required to set
+the initial \fIfx_uprilim\fR to a value greater than 0. Attempts by an
+unprivileged LWP to raise a \fIfx_uprilim\fR or set an initial \fBfx_uprilim\fR
+greater than 0 fail with a return value of -1 and errno set to \fBEPERM\fR.
+.sp
+.LP
+Any fixed-priority LWP can set its own \fIfx_upri\fR (or that of another LWP
+with the same user ID) to any value less than or equal to the LWP's
+\fIfx_uprilim\fR. Attempts to set the \fIfx_upri\fR above the \fBfx_uprilim\fR
+(and/or set the \fIfx_uprilim\fR below the \fIfx_upri\fR) result in the
+\fBfx_upri\fR being set equal to the \fIfx_uprilim\fR.
+.sp
+.LP
+Either of the \fIfx_uprilim\fR or \fIfx_upri\fR members can be set to the
+special value \fBFX_NOCHANGE\fR (defined in \fB<sys/fxpriocntl.h>\fR) to set
+one of the values without affecting the other. Specifying \fBFX_NOCHANGE\fR for
+the \fIfx_upri\fR when the \fIfx_uprilim\fR is being set to a value below the
+current \fIfx_upri\fR causes the \fIfx_upri\fR to be set equal to the
+\fIfx_uprilim\fR being set. Specifying \fBFX_NOCHANGE\fR for a parameter when
+changing the class of an LWP to fixed-priority (from some other class) causes
+the parameter to be set to a default value. The default value for the
+\fIfx_uprilim\fR is 0 and the default for the \fIfx_upri\fR is to set it equal
+to the \fIfx_uprilim\fR that is being set. The default for time quantum is
+dependent on the \fIfx_upri\fR and on the system configuration; see
+\fBfx_dptbl\fR(4).
+.sp
+.LP
+The \fIfx_tqsecs\fR and \fIfx_tqnsecs\fR members are used for getting or
+setting the time quantum associated with an LWP or group of LWPs.
+\fIfx_tqsecs\fR is the number of seconds in the time quantum and
+\fIfx_tqnsecs\fR is the number of additional nanoseconds in the quantum. For
+example, setting \fIfx_tqsecs\fR to 2 and \fIfx_tqnsecs\fR to 500,000,000
+(decimal) would result in a time quantum of two and one-half seconds.
+Specifying a value of 1,000,000,000 or greater in the \fIfx_tqnsecs\fR member
+results in an error return with \fBerrno\fR set to \fBEINVAL\fR. Although the
+resolution of the \fItq_nsecs\fR member is very fine, the specified time
+quantum length is rounded up by the system to the next integral multiple of the
+system clock's resolution. The maximum time quantum that can be specified is
+implementation-specific and equal to \fBINT_MAX\fR ticks (defined in
+\fB<limits.h>\fR). Requesting a quantum greater than this maximum results in an
+error return with \fBerrno\fR set to \fBERANGE\fR, although infinite quantums
+can be requested using a special value as explained below. Requesting a time
+quantum of 0 (setting both \fIfx_tqsecs\fR and \fIfx_tqnsecs\fR to 0) results
+in an error return with \fBerrno\fR set to \fBEINVAL\fR.
+.sp
+.LP
+The \fIfx_tqnsecs\fR member can also be set to one of the following special
+values (defined in \fB<sys/fxpriocntl.h>\fR), in which case the value of
+\fIfx_tqsecs\fR is ignored:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFX_TQINF\fR\fR
+.ad
+.RS 15n
+.rt  
+Set an infinite time quantum.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFX_TQDEF\fR\fR
+.ad
+.RS 15n
+.rt  
+Set the time quantum to the default for this priority (see \fBfx_dptbl\fR(4)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFX_NOCHANGE\fR\fR
+.ad
+.RS 15n
+.rt  
+Do not set the time quantum. This value is useful in changing the user priority
+of an LWP without affecting the time quantum. Specifying this value when
+changing the class of an LWP to fixed-priority from some other class is
+equivalent to specifying \fBFX_TQDEF\fR.
+.RE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
+commands, the first argument after the command code must be the class name of
+the fixed-priority class (FX) . The next arguments are formed as (key, value)
+pairs, terminated by a 0 key. The definition for the keys of the fixed-priority
+class can be found in \fB<sys/fxpriocntl.h>\fR. A repeated specification of the
+same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.44i) |cw(1.08i) |cw(2.98i) 
+lw(1.44i) |lw(1.08i) |lw(2.98i) 
+.
+KeyValue TypeDescription
+_
+\fBFX_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
+\fBFX_KY_UPRI\fR\fBpri_t\fRuser priority
+_
+\fBFX_KY_TQSECS\fR\fBuint_t\fRseconds in time quantum
+_
+\fBFX_KY_TQNSECS\fR\fBint\fRnanoseconds in time quantum
+.TE
+
+.sp
+.LP
+When using the \fBpriocntl()\fR \fBPC_GETXPARMS\fR command, the value
+associated with the key is always a pointer to a scheduling parameter of the
+value type shown in the table above. In contrast, when using the
+\fBpriocntl()\fR \fBPC_SETXPARMS\fR command, the scheduling parameter is given
+as a direct value.
+.sp
+.LP
+A \fBpriocntl()\fR \fBPC_SETXPARMS\fR command with the class name (FX) and
+without a following (key, value) pair will set or reset all realtime scheduling
+parameters of the target process(es) to their default values. Changing the
+class of an LWP to fixed-priority from some other class causes the parameters
+to be set to their default values. The default value for the user priority
+limit (\fBFX_KY_UPRILIM\fR) is 0. The default value for the user priority
+(\fBFX_KY_UPRI\fR) is equal to the user priority limit (\fBFX_KY_UPRILIM\fR)
+that is being set. A default time quantum (\fBFX_TQDEF\fR) is assigned to each
+priority class (see \fBfx_dptbl\fR(4)).
+.sp
+.LP
+The value associated with \fBFX_KY_TQSECS\fR is the number of seconds in the
+time quantum. The value associated with \fBFX_KY_TQNSECS\fR is the number of
+nanoseconds in the quantum. Specifying a value of 1,000,000,000 or greater for
+the number of nanoseconds results in an error return and \fBerrno\fR is set to
+\fBEINVAL\fR. The specified time quantum is rounded up by the system to the
+next integral multiple of the system clock's resolution. The maximum time
+quantum that can be specified is implementation-specific and equal to
+\fBINT_MAX\fR ticks, defined in \fB<limits.h>\fR. Requesting a quantum greater
+than this maximum results in an error return and \fBerrno\fR is set to
+\fBERANGE\fR. If seconds (\fBFX_KY_TQSECS\fR) but no nanoseconds
+(\fBFX_KY_TQNSECS\fR) are supplied, the number of nanoseconds is set to 0. If
+nanoseconds (\fBFX_KY_TQNSECS\fR) but no seconds (\fBFX_KY_TQSECS\fR) are
+supplied, the number of seconds is set to 0. A time quantum of 0 (seconds and
+nanoseconds are 0) results in an error return with \fBerrno\fR set to
+\fBEINVAL\fR. Special values for \fBFX_KY_TQSECS\fR are \fBFX_TQINF\fR and
+\fBFX_TQDEF\fR (as described above). The \fBpriocntl()\fR command
+\fBPC_SETXPARMS\fR knows no special value \fBFX_NOCHANGE\fR.
+.sp
+.LP
+The fixed-priority user priority and user priority limit are inherited across
+\fBfork\fR(2) and the \fBexec\fR family of functions.
+.SH RETURN VALUES
+.sp
+.LP
+Unless otherwise noted above, \fBpriocntl()\fR returns \fB0\fR on success. On
+failure, \fBpriocntl()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpriocntl()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt to change the class of an LWP failed because of insufficient
+resources other than memory (for example, class-specific kernel data
+structures).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the arguments points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The argument \fIcmd\fR was invalid, an invalid or unconfigured class was
+specified, or one of the parameters specified was invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt to change the class of an LWP failed because of insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_PRIOCNTL\fR} privilege is not asserted in the effective set
+of the calling LWP.
+.sp
+The calling LWP does not have sufficient privileges to affect the target LWP.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested time quantum is out of range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+None of the specified LWPs exist.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBinit\fR(1M), \fBexec\fR(2),
+\fBfork\fR(2), \fBnice\fR(2), \fBpriocntlset\fR(2), \fBfx_dptbl\fR(4),
+\fBprocess\fR(4), \fBrt_dptbl\fR(4), \fBprivileges\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+\fIProgramming Interfaces Guide\fR

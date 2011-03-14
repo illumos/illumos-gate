@@ -1,0 +1,272 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sysevent_subscribe_event 3SYSEVENT "24 Jul 2009" "SunOS 5.11" "System Event Library Functions"
+.SH NAME
+sysevent_subscribe_event, sysevent_unsubscribe_event \- register or unregister
+interest in event receipt
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR  [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsysevent\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libsysevent.h>
+
+\fBint\fR \fBsysevent_subscribe_event\fR(\fBsysevent_handle_t *\fR\fIsysevent_hdl\fR,
+     \fBchar *\fR\fIevent_class\fR, \fBchar **\fR\fIevent_subclass_list\fR,
+     \fBint\fR \fInum_subclasses\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsysevent_unsubscribe_event\fR(\fBsysevent_handle_t *\fR\fIsysevent_hdl\fR,
+     \fBchar *\fR\fIevent_class\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevent_class\fR\fR
+.ad
+.RS 23n
+.rt  
+system event class string
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevent_subclass_list\fR\fR
+.ad
+.RS 23n
+.rt  
+array of subclass strings
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInum_subclasses\fR\fR
+.ad
+.RS 23n
+.rt  
+number of subclass strings
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsysevent_hdl\fR\fR
+.ad
+.RS 23n
+.rt  
+\fBsysevent\fR subscriber handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsysevent_subscribe_event()\fR function registers the caller's interest
+in event notifications belonging to the class \fIevent_class\fR and the
+subclasses contained in \fIevent_subclass_list\fR.  The subscriber handle
+\fIsysevent_hdl\fR is updated with the new subscription and the calling process
+receives event notifications from the event handler specified in
+\fIsysevent_bind_handle\fR.
+.sp
+.LP
+System events matching \fIevent_class\fR and a subclass contained in
+\fIevent_subclass_list\fR published after the caller returns from
+\fBsysevent_subscribe_event()\fR are guaranteed to be delivered to the calling
+process.  Matching system events published and queued prior to a call to
+\fBsysevent_subscribe_event()\fR may be delivered to the process's event
+handler.
+.sp
+.LP
+The \fInum_subclasses\fR argument provides the number of subclass string
+elements in \fIevent_subclass_list\fR.
+.sp
+.LP
+A caller can use the event class \fBEC_ALL\fR to subscribe to all event classes
+and subclasses. The event class \fBEC_SUB_ALL\fR can be used to subscribe to
+all subclasses within a given event class.
+.sp
+.LP
+Subsequent calls to \fBsysevent_subscribe_event()\fR are allowed to add
+additional classes or subclasses.  To remove an existing subscription,
+\fBsysevent_unsubscribe_event()\fR must be used to remove the subscription.
+.sp
+.LP
+The \fBsysevent_unsubscribe_event()\fR function removes the subscription
+described by \fIevent_class\fR for \fIsysevent_hdl\fR.  Event notifications
+matching event_class will not be delivered to the calling process upon return.
+.sp
+.LP
+A caller can use the event class \fBEC_ALL\fR to remove all subscriptions for
+\fIsysevent_hdl\fR.
+.sp
+.LP
+The library manages all subscription resources.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsysevent_subscribe_event()\fR function returns 0 if the subscription is
+successful. Otherwise, \(mi1 is returned and \fBerrno\fR is set to indicate the
+error.
+.sp
+.LP
+The \fBsysevent_unsubscribe_event()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+The \fBsysevent_subscribe_event()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process has an ID other than the privileged user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsysevent_hdl\fR argument is an invalid \fBsysevent\fR handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient memory available to allocate subscription resources.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSubscribing for environmental events
+.sp
+.in +2
+.nf
+#include <libsysevent.h>
+#include <sys/nvpair.h>
+
+static int32_t attr_int32;
+
+#define    CLASS1        "class1"
+#define    CLASS2        "class2"
+#define    SUBCLASS_1    "subclass_1"
+#define    SUBCLASS_2    "subclass_2"
+#define    SUBCLASS_3    "subclass_3"
+#define    MAX_SUBCLASS  3
+
+static void
+event_handler(sysevent_t *ev)
+{
+    nvlist_t *nvlist;
+
+    /*
+     * Special processing  for events (CLASS1, SUBCLASS_1) and
+     * (CLASS2, SUBCLASS_3)
+     */  
+    if ((strcmp(CLASS1, sysevent_get_class_name(ev)) == 0 &&
+        strcmp(SUBCLASS_1, sysevent_get_subclass_name(ev)) == 0) ||
+        (strcmp(CLASS2, sysevent_get_subclass_name(ev) == 0) &&
+        strcmp(SUBCLASS_3, sysevent_get_subclass(ev)) == 0)) {
+        if (sysevent_get_attr_list(ev, &nvlist) != 0)
+            return;
+        if (nvlist_lookup_int32(nvlist, "my_int32_attr", &attr_int32)
+            != 0)
+            return;
+
+        /* Event Processing */
+    } else {
+        /* Event Processing */
+    }
+
+}
+
+
+int
+main(int argc, char **argv)
+{
+    sysevent_handle_t *shp;
+    const char *subclass_list[MAX_SUBCLASS];
+
+    /* Bind event handler and create subscriber handle */
+    shp = sysevent_bind_handle(event_handler);
+    if (shp == NULL)
+        exit(1);
+
+    /* Subscribe to all CLASS1 event notifications */
+    subclass_list[0] = EC_SUB_ALL;
+    if (sysevent_subscribe_event(shp, CLASS1, subclass_list, 1) != 0) {
+        sysevent_unbind_handle(shp);
+        exit(1);
+    }
+
+    /* Subscribe to CLASS2 events for subclasses: SUBCLASS_1,
+     * SUBCLASS_2 and SUBCLASS_3
+     */  
+    subclass_list[0] = SUBCLASS_1;
+    subclass_list[1] = SUBCLASS_2;
+    subclass_list[2] = SUBCLASS_3;
+    if (sysevent_subscribe_event(shp, CLASS2, subclass_list,
+        MAX_SUBCLASS) != 0) {
+        sysevent_unbind_handle(shp);
+        exit(1);
+    }
+ 
+    for (;;) {
+        (void) pause();
+    }
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsyseventd\fR(1M), \fBsysevent_bind_handle\fR(3SYSEVENT),
+\fBsysevent_get_attr_list\fR(3SYSEVENT),
+\fBsysevent_get_class_name\fR(3SYSEVENT),
+\fBsysevent_get_vendor_name\fR(3SYSEVENT), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBlibsysevent\fR interfaces do not work at all in non-global zones.

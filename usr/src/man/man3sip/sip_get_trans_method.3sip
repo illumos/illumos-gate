@@ -1,0 +1,223 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_get_trans_method 3SIP "10 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_get_trans_method, sip_get_trans_state, sip_get_trans_orig_msg,
+sip_get_trans_conn_obj, sip_get_trans_resp_msg, sip_get_trans_branchid \- get
+transaction attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBsip_method_t\fR \fIsip_get_trans_method\fR(\fBsip_transaction_t\fR \fIsip_trans\fR,
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_trans_state\fR(\fBsip_transaction_t\fR \fItrans\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_message *\fR\fIsip_get_trans_orig_msg\fR
+     (\fBsip_transaction_t\fR \fIsip_trans\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_message *\fR\fIsip_get_trans_resp_msg\fR
+     (\fBsip_transaction_t\fR \fIsip_trans\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_conn_object *\fR\fIsip_get_trans_conn_obj\fR
+     (\fBsip_transaction_t\fR \fIsip_trans\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fIsip_get_trans_branchid\fR(\fBsip_transaction_t\fR \fItrans\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_get_trans_method()\fR function returns the method the SIP message
+that created the transaction \fIsip_trans\fR.
+.sp
+.LP
+The \fBsip_get_trans_state()\fR function returns the state of the transaction
+\fIsip_trans\fR.
+.sp
+.LP
+A newly created transaction is in the state:
+.br
+.in +2
+\fBSIP_NEW_TRANSACTION\fR
+.in -2
+.sp
+.LP
+A client transaction could be in one of the following states:
+.br
+.in +2
+\fBSIP_CLNT_CALLING\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_INV_PROCEEDING\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_INV_TERMINATED\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_INV_COMPLETED\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_TRYING\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_NONINV_PROCEEDING\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_NONINV_TERMINATED\fR
+.in -2
+.br
+.in +2
+\fBSIP_CLNT_NONINV_COMPLETED\fR
+.in -2
+.sp
+.LP
+A server transaction could be in one of the following states:
+.br
+.in +2
+\fBSIP_SRV_INV_PROCEEDING\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_INV_COMPLETED\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_CONFIRMED\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_INV_TERMINATED\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_TRYING\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_NONINV_PROCEEDING\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_NONINV_COMPLETED\fR
+.in -2
+.br
+.in +2
+\fBSIP_SRV_NONINV_TERMINATED\fR
+.in -2
+.sp
+.LP
+The \fBsip_get_trans_orig_msg()\fR function returns the message that created
+the transaction \fIsip_trans\fR. This could be a request on the client or a
+response on the server.
+.sp
+.LP
+The \fBsip_get_trans_resp_msg()\fR function returns the last response that was
+sent on the transaction \fIsip_trans\fR. Typically, this response is used by
+the transaction layer for retransmissions for unreliable transports or for
+responding to retransmitted requests. A response that terminates a transaction
+is not returned.
+.sp
+.LP
+The \fBsip_get_trans_conn_obj()\fR function returns the cached connection
+object, if any, in the transaction\fIsip_trans\fR.
+.sp
+.LP
+The \fBsip_get_trans_branchid()\fR function returns the branch ID for the
+message that created the transaction\fIsip_trans\fR. The caller is responsible
+for freeing the returned string.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsip_get_trans_orig_msg()\fR, \fBsip_get_trans_resp_msg()\fR,
+\fBsip_get_trans_conn_obj()\fR, and \fBsip_get_trans_branchid()\fR functions
+return the required value on success or \fINULL\fR on failure.
+.sp
+.LP
+The \fBsip_get_trans_state()\fR and \fBsip_get_trans_method()\fR functions
+return the required value on success and  -1 on failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+If the error is non-null, one of the following values is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The input transaction \fIsip_trans\fR is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+For \fBsip_get_trans_branchid()\fR there is an  error allocating memory for the
+branch ID string.
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

@@ -1,0 +1,187 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH media_findname 3VOLMGT "2 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+media_findname \- convert a supplied name into an absolute pathname that can be
+used to access removable media
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
+#include <volmgt.h>
+
+
+
+\fBchar *\fR\fBmedia_findname\fR(\fBchar *\fR\fIstart\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+\fBmedia_findname()\fR converts the supplied \fIstart\fR string into an
+absolute pathname that can then be used to access a particular piece of media.
+.sp
+.LP
+The \fIstart\fR parameter can be one of the following types of specifications:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/\fR\|.\|.\|.\fR
+.ad
+.RS 18n
+.rt  
+An absolute pathname in \fB/dev\fR, such as \fB/dev/rdiskette0\fR, in which
+case a copy of that string is returned (see \fBNOTES\fR on this page).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvolume_name\fR\fR
+.ad
+.RS 18n
+.rt  
+The volume name for a particular volume, such as \fBfred\fR (see
+\fBfdformat\fR(1) for a description of how to label floppies).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvolmgt_symname\fR\fR
+.ad
+.RS 18n
+.rt  
+The symbolic name for a device, such as \fBfloppy0\fR or \fBcdrom2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImedia_type\fR\fR
+.ad
+.RS 18n
+.rt  
+The generic media type name.  For example, \fBfloppy\fR or \fBcdrom\fR. In this
+case \fBmedia_findname()\fR looks for the first piece of media that matches
+that media type, starting at 0 (zero) and continuing on until a match is found
+(or some fairly large maximum number is reached).  In this case, if a match is
+found, a copy of the pathname to the volume found is returned.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+For cases where the supplied \fIstart\fR parameter is an absolute pathname,
+\fBmedia_findname()\fR can fail, returning a null string pointer, if an
+\fBlstat\fR(2) of that supplied pathname fails. Also, if the supplied absolute
+pathname is a symbolic link, \fBmedia_findname()\fR can fail if a
+\fBreadlink\fR(2) of that symbolic link fails, or if a \fBstat\fR(2) of the
+pathname pointed to by that symbolic link fails, or if any of the following is
+true:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+.rt  
+The specified absolute pathname was not a character special device, and it was
+not a directory with a character special device in it.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample programs of the \fBmedia_findname()\fR function.
+.sp
+.LP
+The following example attempts to find what the pathname is to a piece of media
+called fred.  Notice that a \fBvolmgt_check()\fR is done first (see the
+\fBNOTES\fR section on this page).
+
+.sp
+.in +2
+.nf
+\fB(void) volmgt_check(NULL);
+if ((nm = media_findname("fred")) != NULL) {
+        (void) printf("media named \e"fred\e" is at \e"%s\e"\en", nm);
+} else {
+	  (void) printf("media named \e"fred\e" not found\en");
+}\fR
+.fi
+.in -2
+
+.sp
+.LP
+This example looks for whatever volume is in the first floppy drive, letting
+\fBmedia_findname()\fR call \fBvolmgt_check()\fR if and only if no floppy is
+currently known to be the first floppy drive.
+
+.sp
+.in +2
+.nf
+\fBif ((nm = media_findname("floppy0")) != NULL) {
+        (void) printf("path to floppy0 is \e"%s\e"\en", nm);
+} else {
+        (void) printf("nothing in floppy0\en");
+}\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Unsafe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfdformat\fR(1), \fBlstat\fR(2), \fBreadlink\fR(2), \fBstat\fR(2),
+\fBfree\fR(3C), \fBmalloc\fR(3C), \fBvolmgt_check\fR(3VOLMGT),
+\fBvolmgt_inuse\fR(3VOLMGT), \fBvolmgt_root\fR(3VOLMGT),
+\fBvolmgt_running\fR(3VOLMGT), \fBvolmgt_symname\fR(3VOLMGT),
+\fBattributes\fR(5), \fBhal\fR(5)
+.SH NOTES
+.sp
+.LP
+If \fBmedia_findname()\fR cannot find a match for the supplied name, it
+performs a \fBvolmgt_check\fR(3VOLMGT) and tries again, so it can be more
+efficient to perform \fBvolmgt_check()\fR before calling
+\fBmedia_findname()\fR.
+.sp
+.LP
+Upon success  \fBmedia_findname()\fR returns a pointer to string which has been
+allocated; this should be freed when no longer in use (see \fBfree\fR(3C)).

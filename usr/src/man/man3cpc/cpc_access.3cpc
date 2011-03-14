@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_access 3CPC "28 Mar 2005" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_access \- test access CPU performance counters
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_access\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Access to CPU performance counters is possible only on systems where the
+appropriate hardware exists and is correctly configured. The \fBcpc_access()\fR
+function \fBmust\fR be used to determine if the hardware exists and is
+accessible on the platform before any of the interfaces that use the counters
+are invoked.
+.sp
+.LP
+When the hardware is available, access to the per-process counters is always
+allowed to the process itself, and allowed to other processes mediated using
+the existing security mechanisms of \fB/proc\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBcpc_access()\fR returns \fB0\fR.  Otherwise, it
+returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+By default, two common \fBerrno\fR values are decoded and cause the library to
+print an error message using its reporting mechanism. See
+\fBcpc_seterrfn\fR(3CPC) for a description of how this behavior can be
+modified.
+.SH ERRORS
+.sp
+.LP
+The \fBcpc_access()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+Another process may be sampling system-wide CPU statistics.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 10n
+.rt  
+CPU performance counters are inaccessible on this machine. This error can occur
+when the machine supports CPU performance counters, but some software
+components are missing. Check to see that all CPU Performance Counter packages
+have been correctly installed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc\fR(3CPC), \fBcpc_open\fR(3CPC), \fBcpc_seterrfn\fR(3CPC),
+\fBlibcpc\fR(3LIB), \fBproc\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_access()\fR function exists for binary compatibility only. Source
+containing this function will not compile. This function is obsolete and might
+be removed in a future release. Applications should use \fBcpc_open\fR(3CPC)
+instead.

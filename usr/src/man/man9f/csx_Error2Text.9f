@@ -1,0 +1,113 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_Error2Text 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_Error2Text \- convert error return codes to text strings
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_Error2Text\fR(\fBerror2text_t *\fR\fIer\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIer\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to an \fBerror2text_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is a Solaris-specific extension that provides a method for
+clients to convert Card Services error return codes to text strings.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBerror2text_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     item;                             /*the error code*/
+char         test[CS_ERROR_MAX_BUFSIZE};       /*the error code*/
+.fi
+.in -2
+
+.sp
+.LP
+A pointer to the text for the Card Services error return code in the \fBitem\fR
+field is returned in the \fBtext\fR field if the error return code is found.
+The client is not responsible for allocating a buffer to hold the text. If the
+Card Services error return code specified in the item field is not found, the
+\fBtext\fR field will be set to a string of the form:
+.sp
+.LP
+"{\fIunknown Card Services return code\fR}"
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR: Using the csxError2Text function
+.sp
+.in +2
+.nf
+if ((ret = csx_RegisterClient(&client_handle, &
+	   client_reg)) != CS_SUCCESS)
+{
+   error2text_t error2text;
+   error2text.item = ret;
+   csx_Error2Text(&error2text);
+   cmn_err(CE_CONT, "RegisterClient failed %s (0x%x)", 
+	   error2text.text, ret);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_Event2Text\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

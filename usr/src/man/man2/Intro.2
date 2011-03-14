@@ -1,0 +1,2348 @@
+'\" te
+.\" Copyright 1989 AT&T.
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Intro 2 "17 Nov 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+Intro, intro \- introduction to system calls and error numbers
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <errno.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+A system call is a C library function that requests a service from the system,
+such as getting the time of day. This request is performed in the kernel. The
+library interface executes a trap into the kernel, which actually executes the
+system call code.
+.sp
+.LP
+Most system calls return one or more error conditions. An error condition is
+indicated by an otherwise impossible return value. This is almost always
+\fB\(mi1\fR or the null pointer; the individual descriptions specify the
+details. An error number is also made available in the external variable
+\fBerrno\fR, which is not cleared on successful calls, so it should be tested
+only after an error has been indicated.
+.sp
+.LP
+In the case of multithreaded applications, the \fB-mt\fR option must be
+specified on the command line at compilation time (see \fBthreads\fR(5)). When
+the \fB-mt\fR option is specified, \fBerrno\fR becomes a macro that enables
+each thread to have its own \fBerrno\fR. This \fBerrno\fR macro can be used on
+either side of the assignment as though it were a variable.
+.sp
+.LP
+An error value listed as "will fail" describes a condition whose detection and
+reporting is mandatory for an implementation that conforms to the Single UNIX
+Specification (SUS). An application can rely on this condition being detected
+and reported. An error value listed as "may fail" describes a condition whose
+detection and reporting is  optional for an implementation that conforms to the
+SUS. An application should not rely this condition being detected and reported.
+An application that relies on such behavior cannot be assured to be portable
+across conforming implementations. If more than one error occurs in processing
+a function call, any one of the possible errors might may be returned, as the
+order of detection is undefined. See \fBstandards\fR(5) for additional
+information regarding the Single UNIX Specification.
+.sp
+.LP
+Each system call description attempts to list all possible error numbers. The
+following is a complete list of the error numbers and their names as defined in
+<\fBerrno.h\fR>.
+.sp
+.ne 2
+.mk
+.na
+\fB1 EPERM\fR
+.ad
+.RS 23n
+.rt  
+Lacking appropriate privileges
+.sp
+Typically this error indicates an attempt to modify a file in some way
+forbidden except to its owner or an appropriately privileged process.  It is
+also returned for attempts by ordinary users to perform operations allowed only
+to processes with certain privileges.
+.sp
+The manual pages for individual functions document which privileges are needed
+to override the restriction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB2 ENOENT\fR
+.ad
+.RS 23n
+.rt  
+No such file or directory
+.sp
+A file name is specified and the file should exist but doesn't, or one of the
+directories in a path name does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB3 ESRCH\fR
+.ad
+.RS 23n
+.rt  
+No such process, LWP, or thread
+.sp
+No process can be found in the system that corresponds to the specified
+\fBPID,\fR \fBLWPID_t\fR, or \fBthread_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB4 EINTR\fR
+.ad
+.RS 23n
+.rt  
+Interrupted system call
+.sp
+An asynchronous signal (such as interrupt or quit), which the user has elected
+to catch, occurred during a system service function. If execution is resumed
+after processing the signal, it will appear as if the interrupted function call
+returned this error condition.
+.sp
+In a multithreaded application, \fBEINTR\fR may be returned whenever another
+thread or \fBLWP\fR calls \fBfork\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB5 EIO\fR
+.ad
+.RS 23n
+.rt  
+I/O error
+.sp
+Some physical I/O error has occurred. This error may in some cases occur on a
+call following the one to which it actually applies.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB6 ENXIO\fR
+.ad
+.RS 23n
+.rt  
+No such device or address
+.sp
+I/O on a special file refers to a subdevice which does not exist, or exists
+beyond the limit of the device. It may also occur when, for example, a tape
+drive is not on-line or no disk pack is loaded on a drive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB7 E2BIG\fR
+.ad
+.RS 23n
+.rt  
+Arg list too long
+.sp
+An argument list longer than  \fBARG_MAX\fR bytes is presented to a member of
+the \fBexec\fR family of functions (see \fBexec\fR(2)). The argument list limit
+is the sum of the size of the argument list plus the size of the environment's
+exported shell variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB8 ENOEXEC\fR
+.ad
+.RS 23n
+.rt  
+Exec format error
+.sp
+A request is made to execute a file which, although it has the appropriate
+permissions, does not start with a valid format (see \fBa.out\fR(4)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB9 EBADF\fR
+.ad
+.RS 23n
+.rt  
+Bad file number
+.sp
+Either a file descriptor refers to no open file, or a \fBread\fR(2)
+(respectively,  \fBwrite\fR(2)) request is made to a file that is open only for
+writing (respectively, reading).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB10 ECHILD\fR
+.ad
+.RS 23n
+.rt  
+No child processes
+.sp
+A \fBwait\fR(3C) function call was executed by a process that had no existing
+or unwaited-for child processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB11 EAGAIN\fR
+.ad
+.RS 23n
+.rt  
+No more processes, or no more LWPs
+.sp
+For example, the \fBfork\fR(2) function failed because the system's process
+table is full or the user is not allowed to create any more processes, or a
+call failed because of insufficient memory or swap space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB12 ENOMEM\fR
+.ad
+.RS 23n
+.rt  
+Not enough space
+.sp
+During execution of \fBbrk()\fR or \fBsbrk()\fR (see \fBbrk\fR(2)), or one of
+the \fBexec\fR family of functions, a program asks for more space than the
+system is able to supply. This is not a temporary condition; the maximum size
+is a system parameter. On some architectures, the error may also occur if the
+arrangement of text, data, and stack segments requires too many segmentation
+registers, or if there is not enough swap space during the \fBfork\fR(2)
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB13 EACCES\fR
+.ad
+.RS 23n
+.rt  
+Permission denied
+.sp
+An attempt was made to access a file in a way forbidden by the protection
+system.
+.sp
+The manual pages for individual functions document which privileges are needed
+to override the protection system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB14 EFAULT\fR
+.ad
+.RS 23n
+.rt  
+Bad address
+.sp
+The system encountered a hardware fault in attempting to use an argument of a
+routine. For example, \fBerrno\fR potentially may be set to  \fBEFAULT\fR any
+time a routine that takes a pointer argument is passed an invalid address, if
+the system can detect the condition. Because systems will differ in their
+ability to reliably detect a bad address, on some implementations passing a bad
+address to a routine will result in undefined behavior.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB15 ENOTBLK\fR
+.ad
+.RS 23n
+.rt  
+Block device required
+.sp
+A non-block device or file was mentioned where a block device was required (for
+example, in a call to the \fBmount\fR(2) function).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB16 EBUSY\fR
+.ad
+.RS 23n
+.rt  
+Device busy
+.sp
+An attempt was made to mount a device that was already mounted or an attempt
+was made to unmount a device on which there is an active file (open file,
+current directory, mounted-on file, active text segment). It will also occur if
+an attempt is made to enable accounting when it is already enabled. The device
+or resource is currently unavailable.   \fBEBUSY\fR is also used by mutexes,
+semaphores, condition variables, and r/w locks, to indicate that  a lock is
+held,  and by the processor control function  \fBP_ONLINE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB17 EEXIST\fR
+.ad
+.RS 23n
+.rt  
+File exists
+.sp
+An existing file was mentioned in an inappropriate context (for example, call
+to the \fBlink\fR(2) function).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB18 EXDEV\fR
+.ad
+.RS 23n
+.rt  
+Cross-device link
+.sp
+A hard link to a file on another device was attempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB19 ENODEV\fR
+.ad
+.RS 23n
+.rt  
+No such device
+.sp
+An attempt was made to apply an inappropriate operation to a device (for
+example, read a write-only device).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB20 ENOTDIR\fR
+.ad
+.RS 23n
+.rt  
+Not a directory
+.sp
+A non-directory was specified where a directory is required (for example, in a
+path prefix or as an argument to the \fBchdir\fR(2) function).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB21 EISDIR\fR
+.ad
+.RS 23n
+.rt  
+Is a directory
+.sp
+An attempt was made to write on a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB22 EINVAL\fR
+.ad
+.RS 23n
+.rt  
+Invalid argument
+.sp
+An invalid argument was specified (for example, unmounting a non-mounted
+device), mentioning an undefined signal in a call to the \fBsignal\fR(3C) or
+\fBkill\fR(2) function, or an unsupported operation related to extended
+attributes was attempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB23 ENFILE\fR
+.ad
+.RS 23n
+.rt  
+File table overflow
+.sp
+The system file table is full (that is,  \fBSYS_OPEN\fR files are open, and
+temporarily no more files can be opened).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB24 EMFILE\fR
+.ad
+.RS 23n
+.rt  
+Too many open files
+.sp
+No process may have more than  \fBOPEN_MAX\fR file descriptors open at a time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB25 ENOTTY\fR
+.ad
+.RS 23n
+.rt  
+Inappropriate ioctl for device
+.sp
+A call was made to the \fBioctl\fR(2) function specifying a file that is not a
+special character device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB26 ETXTBSY\fR
+.ad
+.RS 23n
+.rt  
+Text file busy (obsolete)
+.sp
+An attempt was made to execute a pure-procedure program that is currently open
+for writing. Also an attempt to open for writing or to remove a pure-procedure
+program that is being executed. \fB(This message is obsolete.)\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB27 EFBIG\fR
+.ad
+.RS 23n
+.rt  
+File too large
+.sp
+The size of the file exceeded the limit specified by resource
+\fBRLIMIT_FSIZEn\fR; the file size exceeds the maximum supported by the file
+system; or the file size exceeds the offset maximum of the file descriptor.
+See the \fBFile Descriptor\fR subsection of the \fBDEFINITIONS\fR section
+below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB28 ENOSPC\fR
+.ad
+.RS 23n
+.rt  
+No space left on device
+.sp
+While writing an ordinary file or creating a directory entry, there is no free
+space left on the device. In the \fBfcntl\fR(2) function, the setting or
+removing of record locks on a file cannot be accomplished because there are no
+more record entries left on the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB29 ESPIPE\fR
+.ad
+.RS 23n
+.rt  
+Illegal seek
+.sp
+A call to the  \fBlseek\fR(2) function was issued to a pipe.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB30 EROFS\fR
+.ad
+.RS 23n
+.rt  
+Read-only file system
+.sp
+An attempt to modify a file or directory was made on a device mounted
+read-only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB31 EMLINK\fR
+.ad
+.RS 23n
+.rt  
+Too many links
+.sp
+An attempt to make more than the maximum number of links,  \fBLINK_MAX\fR, to a
+file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB32 EPIPE\fR
+.ad
+.RS 23n
+.rt  
+Broken pipe
+.sp
+A write on a pipe for which there is no process to read the data. This
+condition normally generates a signal; the error is returned if the signal is
+ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB33 EDOM\fR
+.ad
+.RS 23n
+.rt  
+Math argument out of domain of function
+.sp
+The argument of a function in the math package (3M) is out of the domain of the
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB34 ERANGE\fR
+.ad
+.RS 23n
+.rt  
+Math result not representable
+.sp
+The value of a function in the math package (3M) is not representable within
+machine precision.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB35 ENOMSG\fR
+.ad
+.RS 23n
+.rt  
+No message of desired type
+.sp
+An attempt was made to receive a message of a type that does not exist on the
+specified message queue (see \fBmsgrcv\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB36 EIDRM\fR
+.ad
+.RS 23n
+.rt  
+Identifier removed
+.sp
+This error is returned to processes that resume execution due to the removal of
+an identifier from the file system's name space (see \fBmsgctl\fR(2),
+\fBsemctl\fR(2), and \fBshmctl\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB37 ECHRNG\fR
+.ad
+.RS 23n
+.rt  
+Channel number out of range
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB38 EL2NSYNC\fR
+.ad
+.RS 23n
+.rt  
+Level 2 not synchronized
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB39 EL3HLT\fR
+.ad
+.RS 23n
+.rt  
+Level 3 halted
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB40 EL3RST\fR
+.ad
+.RS 23n
+.rt  
+Level 3 reset
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB41 ELNRNG\fR
+.ad
+.RS 23n
+.rt  
+Link number out of range
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB42 EUNATCH\fR
+.ad
+.RS 23n
+.rt  
+Protocol driver not attached
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB43 ENOCSI\fR
+.ad
+.RS 23n
+.rt  
+No CSI structure available
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB44 EL2HLT\fR
+.ad
+.RS 23n
+.rt  
+Level 2 halted
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB45 EDEADLK\fR
+.ad
+.RS 23n
+.rt  
+Deadlock condition
+.sp
+A deadlock situation was detected and avoided. This error pertains to file and
+record locking, and also applies to mutexes, semaphores, condition variables,
+and r/w locks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB46 ENOLCK\fR
+.ad
+.RS 23n
+.rt  
+No record locks available
+.sp
+There are no more locks available. The system lock table is full (see
+\fBfcntl\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB47 ECANCELED\fR
+.ad
+.RS 23n
+.rt  
+Operation canceled
+.sp
+The associated asynchronous operation was canceled before completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB48 ENOTSUP\fR
+.ad
+.RS 23n
+.rt  
+Not supported
+.sp
+This version of the system does not support this feature. Future versions of
+the system may provide support.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB49 EDQUOT\fR
+.ad
+.RS 23n
+.rt  
+Disc quota exceeded
+.sp
+A \fBwrite\fR(2) to an ordinary file, the creation of a directory or symbolic
+link, or the creation of a directory entry failed because the user's quota of
+disk blocks was exhausted, or the allocation of an inode for a newly created
+file failed because the user's quota of inodes was exhausted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB58-59\fR
+.ad
+.RS 23n
+.rt  
+Reserved
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB60 ENOSTR\fR
+.ad
+.RS 23n
+.rt  
+Device not a stream
+.sp
+A \fBputmsg\fR(2) or \fBgetmsg\fR(2) call was attempted on a file descriptor
+that is not a STREAMS device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB61 ENODATA\fR
+.ad
+.RS 23n
+.rt  
+No data available
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB62 ETIME\fR
+.ad
+.RS 23n
+.rt  
+Timer expired
+.sp
+The timer set for a STREAMS \fBioctl\fR(2) call has expired. The cause of this
+error is device-specific and could indicate either a hardware or software
+failure, or perhaps a timeout value that is too short for the specific
+operation. The status of the \fBioctl()\fR operation is indeterminate. This is
+also returned in the case of \fB_lwp_cond_timedwait\fR(2) or
+\fBcond_timedwait\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB63 ENOSR\fR
+.ad
+.RS 23n
+.rt  
+Out of stream resources
+.sp
+During a  \fBSTREAMS\fR \fBopen\fR(2) call, either no  \fBSTREAMS\fR queues or
+no \fBSTREAMS\fR head data structures were available. This is a temporary
+condition; one may recover from it if other processes release resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB65 ENOPKG\fR
+.ad
+.RS 23n
+.rt  
+Package not installed
+.sp
+This error occurs when users attempt to use a call from a package which has not
+been installed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB71 EPROTO\fR
+.ad
+.RS 23n
+.rt  
+Protocol error
+.sp
+Some protocol error occurred.  This error is device-specific, but is generally
+not related to a hardware failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB77 EBADMSG\fR
+.ad
+.RS 23n
+.rt  
+Not a data message
+.sp
+During a \fBread\fR(2), \fBgetmsg\fR(2), or \fBioctl\fR(2) \fBI_RECVFD\fR call
+to a STREAMS device, something has come to the head of the queue that can not
+be processed.  That something depends on the call:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBread()\fR:\fR
+.ad
+.RS 13n
+.rt  
+control information or passed file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetmsg()\fR:\fR
+.ad
+.RS 13n
+.rt  
+passed file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBioctl()\fR:\fR
+.ad
+.RS 13n
+.rt  
+control or data information.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB78 ENAMETOOLONG\fR
+.ad
+.RS 23n
+.rt  
+File name too long
+.sp
+The length of the path argument exceeds  \fIPATH_MAX\fR, or the length of a
+path component exceeds \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in effect;
+see \fBlimits.h\fR(3HEAD).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB79 EOVERFLOW\fR
+.ad
+.RS 23n
+.rt  
+Value too large for defined data type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB80 ENOTUNIQ\fR
+.ad
+.RS 23n
+.rt  
+Name not unique on network
+.sp
+Given log name not unique.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB81 EBADFD\fR
+.ad
+.RS 23n
+.rt  
+File descriptor in bad state
+.sp
+Either a file descriptor refers to no open file or a read request was made to a
+file that is open only for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB82 EREMCHG\fR
+.ad
+.RS 23n
+.rt  
+Remote address changed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB83 ELIBACC\fR
+.ad
+.RS 23n
+.rt  
+Cannot access a needed share library
+.sp
+Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library and
+the static shared library does not exist or the user does not have permission
+to use it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB84 ELIBBAD\fR
+.ad
+.RS 23n
+.rt  
+Accessing a corrupted shared library
+.sp
+Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library (to
+be linked in) and \fBexec\fR could not load the static shared library. The
+static shared library is probably corrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB85 ELIBSCN\fR
+.ad
+.RS 23n
+.rt  
+\fB\&.lib\fR section in \fBa.out\fR corrupted
+.sp
+Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library (to
+be linked in) and there was erroneous data in the \fB\&.lib\fR section of the
+\fBa.out\fR. The \fB\&.lib\fR section tells \fBexec\fR what static shared
+libraries are needed. The \fBa.out\fR is probably corrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB86 ELIBMAX\fR
+.ad
+.RS 23n
+.rt  
+Attempting to link in more shared libraries than system limit
+.sp
+Trying to \fBexec\fR an \fBa.out\fR that requires more static shared libraries
+than is allowed on the current configuration of the system. See \fISystem
+Administration Guide: IP Services\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB87 ELIBEXEC\fR
+.ad
+.RS 23n
+.rt  
+Cannot \fBexec\fR a shared library directly
+.sp
+Attempting to \fBexec\fR a shared library directly.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB88 EILSEQ\fR
+.ad
+.RS 23n
+.rt  
+Error 88
+.sp
+Illegal byte sequence. Handle multiple characters as a single character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB89 ENOSYS\fR
+.ad
+.RS 23n
+.rt  
+Operation not applicable
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB90 ELOOP\fR
+.ad
+.RS 23n
+.rt  
+Number of symbolic links encountered during path name traversal exceeds
+\fBMAXSYMLINKS\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB91 ESTART\fR
+.ad
+.RS 23n
+.rt  
+Restartable system call
+.sp
+Interrupted system call should be restarted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB92 ESTRPIPE\fR
+.ad
+.RS 23n
+.rt  
+If pipe/FIFO, don't sleep in stream head
+.sp
+Streams pipe error (not externally visible).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB93 ENOTEMPTY\fR
+.ad
+.RS 23n
+.rt  
+Directory not empty
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB94 EUSERS\fR
+.ad
+.RS 23n
+.rt  
+Too many users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB95 ENOTSOCK\fR
+.ad
+.RS 23n
+.rt  
+Socket operation on non-socket
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB96 EDESTADDRREQ\fR
+.ad
+.RS 23n
+.rt  
+Destination address required
+.sp
+A required address was omitted from an operation on a transport endpoint.
+Destination address required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB97 EMGSIZE\fR
+.ad
+.RS 23n
+.rt  
+Message too long
+.sp
+A message sent on a transport provider was larger than the internal message
+buffer or some other network limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB98 EPROTOTYPE\fR
+.ad
+.RS 23n
+.rt  
+Protocol wrong type for socket
+.sp
+A protocol was specified that does not support the semantics of the socket type
+requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB99 ENOPROTOOPT\fR
+.ad
+.RS 23n
+.rt  
+Protocol not available
+.sp
+A bad option or level was specified when getting or setting options for a
+protocol.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB120 EPROTONOSUPPORT\fR
+.ad
+.RS 23n
+.rt  
+Protocol not supported
+.sp
+The protocol has not been configured into the system or no implementation for
+it exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB121 ESOCKTNOSUPPORT\fR
+.ad
+.RS 23n
+.rt  
+Socket type not supported
+.sp
+The support for the socket type has not been configured into the system or no
+implementation for it exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB122 EOPNOTSUPP\fR
+.ad
+.RS 23n
+.rt  
+Operation not supported on transport endpoint
+.sp
+For example, trying to accept a connection on a datagram transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB123 EPFNOSUPPORT\fR
+.ad
+.RS 23n
+.rt  
+Protocol family not supported
+.sp
+The protocol family has not been configured into the system or no
+implementation for it exists. Used for the Internet protocols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB124 EAFNOSUPPORT\fR
+.ad
+.RS 23n
+.rt  
+Address family not supported by protocol family
+.sp
+An address incompatible with the requested protocol was used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB125 EADDRINUSE\fR
+.ad
+.RS 23n
+.rt  
+Address already in use
+.sp
+User attempted to use an address already in use, and the protocol does not
+allow this.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB126 EADDRNOTAVAIL\fR
+.ad
+.RS 23n
+.rt  
+Cannot assign requested address
+.sp
+Results from an attempt to create a transport endpoint with an address not on
+the current machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB127 ENETDOWN\fR
+.ad
+.RS 23n
+.rt  
+Network is down
+.sp
+Operation encountered a dead network.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB128 ENETUNREACH\fR
+.ad
+.RS 23n
+.rt  
+Network is unreachable
+.sp
+Operation was attempted to an unreachable network.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB129 ENETRESET\fR
+.ad
+.RS 23n
+.rt  
+Network dropped connection because of reset
+.sp
+The host you were connected to crashed and rebooted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB130 ECONNABORTED\fR
+.ad
+.RS 23n
+.rt  
+Software caused connection abort
+.sp
+A connection abort was caused internal to your host machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB131 ECONNRESET\fR
+.ad
+.RS 23n
+.rt  
+Connection reset by peer
+.sp
+A connection was forcibly closed by a peer. This normally results from a loss
+of the connection on the remote host due to a timeout or a reboot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB132 ENOBUFS\fR
+.ad
+.RS 23n
+.rt  
+No buffer space available
+.sp
+An operation on a transport endpoint or pipe was not performed because the
+system lacked sufficient buffer space or because a queue was full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB133 EISCONN\fR
+.ad
+.RS 23n
+.rt  
+Transport endpoint is already connected
+.sp
+A connect request was made on an already connected transport endpoint; or, a
+\fBsendto\fR(3SOCKET) or \fBsendmsg\fR(3SOCKET) request on a connected
+transport endpoint specified a destination when already connected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB134 ENOTCONN\fR
+.ad
+.RS 23n
+.rt  
+Transport endpoint is not connected
+.sp
+A request to send or receive data was disallowed because the transport endpoint
+is not connected and (when sending a datagram) no address was supplied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB143 ESHUTDOWN\fR
+.ad
+.RS 23n
+.rt  
+Cannot send after transport endpoint shutdown
+.sp
+A request to send data was disallowed because the transport endpoint has
+already been shut down.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB144 ETOOMANYREFS\fR
+.ad
+.RS 23n
+.rt  
+Too many references: cannot splice
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB145 ETIMEDOUT\fR
+.ad
+.RS 23n
+.rt  
+Connection timed out
+.sp
+A  \fBconnect\fR(3SOCKET) or  \fBsend\fR(3SOCKET) request failed because the
+connected party did not properly respond after a period of time; or a
+\fBwrite\fR(2) or  \fBfsync\fR(3C) request failed because a file is on an
+\fBNFS\fR file system mounted with the  \fIsoft\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB146 ECONNREFUSED\fR
+.ad
+.RS 23n
+.rt  
+Connection refused
+.sp
+No connection could be made because the target machine actively refused it.
+This usually results from trying to connect to a service that is inactive on
+the remote host.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB147 EHOSTDOWN\fR
+.ad
+.RS 23n
+.rt  
+Host is down
+.sp
+A transport provider operation failed because the destination host was down.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB148 EHOSTUNREACH\fR
+.ad
+.RS 23n
+.rt  
+No route to host
+.sp
+A transport provider operation was attempted to an unreachable host.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB149 EALREADY\fR
+.ad
+.RS 23n
+.rt  
+Operation already in progress
+.sp
+An operation was attempted on a non-blocking object that already had an
+operation in progress.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB150 EINPROGRESS\fR
+.ad
+.RS 23n
+.rt  
+Operation now in progress
+.sp
+An operation that takes a long time to complete (such as a \fBconnect()\fR) was
+attempted on a non-blocking object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB151 ESTALE\fR
+.ad
+.RS 23n
+.rt  
+Stale NFS file handle
+.RE
+
+.SH DEFINITIONS
+.SS "Background Process Group"
+.sp
+.LP
+Any process group that is not the foreground process group  of a session that
+has established a connection with a controlling terminal.
+.SS "Controlling Process"
+.sp
+.LP
+A session leader that established a connection to a controlling terminal.
+.SS "Controlling Terminal"
+.sp
+.LP
+A terminal that is associated with a session.  Each session may have, at most,
+one controlling terminal associated with it and a controlling terminal may be
+associated with only one session.  Certain input sequences from the controlling
+terminal cause signals to be sent to process groups in the session associated
+with the controlling terminal; see \fBtermio\fR(7I).
+.SS "Directory"
+.sp
+.LP
+Directories organize files into a hierarchical system where directories are the
+nodes in the hierarchy. A directory is a file that catalogs the list of files,
+including directories (sub-directories), that are directly beneath it in the
+hierarchy. Entries in a directory file are called links. A link associates a
+file identifier with a filename. By convention, a directory contains at least
+two links, \fB\&.\fR (dot) and \fB\&..\fR (dot-dot). The link called dot refers
+to the directory itself while dot-dot refers to its parent directory. The root
+directory, which is the top-most node of the hierarchy, has itself as its
+parent directory. The pathname of the root directory is \fB/\fR and the parent
+directory of the root directory is \fB/\fR.
+.SS "Downstream"
+.sp
+.LP
+In a stream, the direction from stream head to driver.
+.SS "Driver"
+.sp
+.LP
+In a stream, the driver provides the interface between peripheral hardware and
+the stream. A driver can also be a pseudo-driver, such as a multiplexor or log
+driver (see \fBlog\fR(7D)), which is not associated with a hardware device.
+.SS "Effective User \fBID\fR and Effective Group \fBID\fR"
+.sp
+.LP
+An active process has an effective user \fBID\fR and an effective group
+\fBID\fR that are used to determine file access permissions (see below). The
+effective user \fBID\fR and effective group \fBID\fR are equal to the process's
+real user \fBID\fR and real group \fBID,\fR respectively, unless the process or
+one of its ancestors evolved from a file that had the  set-user-ID bit or
+set-group-ID bit set  (see \fBexec\fR(2)).
+.SS "File Access Permissions"
+.sp
+.LP
+Read, write, and execute/search permissions for a file are granted to a process
+if one or more of the following are true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user ID of the process matches the user ID of the owner of the
+file and the appropriate access bit of the "owner" portion (0700) of the file
+mode is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user  ID of the process does not match the user ID of the owner
+of the file, but either the effective group ID or one of the supplementary
+group  IDs of the process match the group  ID of the file and the appropriate
+access bit of the "group" portion (0070) of the file mode is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user ID of the process does not match the user ID of the owner of
+the file, and neither the effective group ID nor any of the supplementary group
+IDs of the process match the group ID of the file, but the appropriate access
+bit of the "other" portion (0007) of the file mode is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The read, write, or execute mode bit is not set but the process has the
+discretionary file access override privilege for the corresponding mode bit:
+{\fBPRIV_FILE_DAC_READ\fR} for the read bit {\fBPRIV_FILE_DAC_WRITE\fR} for the
+write bit, {\fBPRIV_FILE_DAC_SEARCH\fR} for the execute bit on directories, and
+{\fBPRIV_FILE_DAC_EXECUTE\fR} for the executable bit on plain files.
+.RE
+.sp
+.LP
+Otherwise, the corresponding permissions are denied.
+.SS "File Descriptor"
+.sp
+.LP
+A file descriptor is a small integer used to perform \fBI/O\fR on a file. The
+value of a file descriptor is from \fB0\fR to (\fBNOFILES\(mi1\fR). A process
+may have no more than  \fBNOFILES\fR file descriptors  open simultaneously. A
+file descriptor is returned by calls such as \fBopen\fR(2) or \fBpipe\fR(2).
+The file descriptor is used as an argument by calls such as \fBread\fR(2),
+\fBwrite\fR(2), \fBioctl\fR(2), and \fBclose\fR(2).
+.sp
+.LP
+Each file descriptor has a corresponding offset maximum. For regular files that
+were opened without setting the \fBO_LARGEFILE\fR flag, the offset maximum is 2
+Gbyte \(mi 1 byte (2^31 \(mi1 bytes). For regular files that were opened with
+the \fBO_LARGEFILE\fR flag set, the offset maximum is 2^63 \(mi1 bytes.
+.SS "File Name"
+.sp
+.LP
+Names consisting of 1 to  \fINAME_MAX\fR characters may be used to name an
+ordinary file, special file or directory.
+.sp
+.LP
+These characters may be selected from the set of all character values excluding
+\e0 (null) and the \fBASCII\fR code for \fB/\fR (slash).
+.sp
+.LP
+Note that it is generally unwise to use \fB*\fR, \fB?\fR, \fB[\fR, or \fB]\fR
+as part of file names because of the special meaning attached to these
+characters by the shell (see \fBsh\fR(1), \fBcsh\fR(1), and \fBksh\fR(1)).
+Although permitted, the use of unprintable characters in file names should be
+avoided.
+.sp
+.LP
+A file name is sometimes referred to as a pathname component.  The
+interpretation of a pathname component is dependent on the values of
+\fINAME_MAX\fR and  \fB_POSIX_NO_TRUNC\fR associated with the path prefix of
+that component.  If any pathname component is longer than \fINAME_MAX\fR and
+\fB_POSIX_NO_TRUNC\fR is in effect for the path prefix of that component (see
+\fBfpathconf\fR(2) and \fBlimits.h\fR(3HEAD)), it shall be considered an error
+condition in  that implementation. Otherwise, the implementation shall use the
+first \fINAME_MAX\fR bytes of the pathname component.
+.SS "Foreground Process Group"
+.sp
+.LP
+Each session that has established a connection with a controlling terminal will
+distinguish one process group of the session as the foreground process group of
+the controlling terminal.  This group has certain privileges when accessing its
+controlling terminal that are denied to background process groups.
+.SS "{IOV_MAX}"
+.sp
+.LP
+Maximum number of entries in a \fBstruct iovec\fR array.
+.SS "{LIMIT}"
+.sp
+.LP
+The braces notation, \fB{LIMIT}\fR, is used to denote a magnitude limitation
+imposed by the implementation. This indicates a value which may be  defined by
+a header file (without the braces), or the actual value may be obtained at
+runtime  by a call to the configuration inquiry \fBpathconf\fR(2) with the name
+argument  \fB_PC_LIMIT\fR.
+.SS "Masks"
+.sp
+.LP
+The file mode creation mask of the process used during any create function
+calls to turn off permission bits in the \fImode\fR argument supplied. Bit
+positions that are set in \fBumask(\fR\fIcmask\fR\fB)\fR are cleared in the
+mode of the created file.
+.SS "Message"
+.sp
+.LP
+In a stream, one or more blocks of data or information, with associated STREAMS
+control structures. Messages can be of several defined types, which identify
+the message contents. Messages are the only means of transferring data and
+communicating within a stream.
+.SS "Message Queue"
+.sp
+.LP
+In a stream, a linked list of messages awaiting processing by a module or
+driver.
+.SS "Message Queue Identifier"
+.sp
+.LP
+A message queue identifier (\fBmsqid\fR) is a unique positive integer created
+by a \fBmsgget\fR(2) call. Each \fBmsqid\fR has a message queue and a data
+structure associated with it. The data structure is referred to as
+\fBmsqid_ds\fR and contains the following members:
+.sp
+.in +2
+.nf
+struct     ipc_perm msg_perm;
+struct     msg *msg_first;
+struct     msg *msg_last;
+ulong_t    msg_cbytes;
+ulong_t    msg_qnum;
+ulong_t    msg_qbytes;
+pid_t      msg_lspid;
+pid_t      msg_lrpid;
+time_t     msg_stime;
+time_t     msg_rtime;
+time_t     msg_ctime;
+.fi
+.in -2
+
+.sp
+.LP
+The following are descriptions of the \fBmsqid_ds\fR structure members:
+.sp
+.LP
+The \fBmsg_perm\fR member is an \fBipc_perm\fR structure that specifies the
+message operation permission (see below). This structure includes the following
+members:
+.sp
+.in +2
+.nf
+uid_t    cuid;   /* creator user id */
+gid_t    cgid;   /* creator group id */
+uid_t    uid;    /* user id */
+gid_t    gid;    /* group id */
+mode_t   mode;   /* r/w permission */
+ulong_t  seq;    /* slot usage sequence # */
+key_t    key;    /* key */
+.fi
+.in -2
+
+.sp
+.LP
+The \fB*msg_first\fR member is a pointer to the first message on the queue.
+.sp
+.LP
+The \fB*msg_last\fR member is a pointer to the last message on the queue.
+.sp
+.LP
+The \fBmsg_cbytes\fR member is the current number of bytes on the queue.
+.sp
+.LP
+The \fBmsg_qnum\fR member is the number of messages currently on the queue.
+.sp
+.LP
+The \fBmsg_qbytes\fR member is the maximum number of bytes allowed on the
+queue.
+.sp
+.LP
+The \fBmsg_lspid\fR member is the process \fBID\fR of the last process that
+performed a \fBmsgsnd()\fR operation.
+.sp
+.LP
+The \fBmsg_lrpid\fR member is the process id of the last process that performed
+a \fBmsgrcv()\fR operation.
+.sp
+.LP
+The \fBmsg_stime\fR member is the time of the last \fBmsgsnd()\fR operation.
+.sp
+.LP
+The \fBmsg_rtime\fR member is the time of the last \fBmsgrcv()\fR operation.
+.sp
+.LP
+The \fBmsg_ctime\fR member is the time of the last \fBmsgctl()\fR operation
+that changed a member of the above structure.
+.SS "Message Operation Permissions"
+.sp
+.LP
+In the \fBmsgctl\fR(2), \fBmsgget\fR(2), \fBmsgrcv\fR(2), and \fBmsgsnd\fR(2)
+function descriptions, the permission required for an operation is given as
+{\fItoken\fR}, where \fItoken\fR is the type of permission needed, interpreted
+as follows:
+.sp
+.in +2
+.nf
+00400   READ by user
+00200   WRITE by user
+00040   READ by group
+00020   WRITE by group
+00004   READ by others
+00002   WRITE by others
+.fi
+.in -2
+
+.sp
+.LP
+Read and write permissions for a \fBmsqid\fR are granted to a process if one or
+more of the following are true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The {\fBPRIV_IPC_DAC_READ\fR} or {\fBPRIV_IPC_DAC_WRITE\fR} privilege is
+present in the effective set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user \fBID\fR of the process matches \fBmsg_perm.cuid\fR or
+\fBmsg_perm.uid\fR in the data structure associated with \fBmsqid\fR and the
+appropriate bit of the "user" portion (0600) of \fBmsg_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any group ID in the process credentials from the set (\fBcr_gid\fR,
+\fBcr_groups\fR) matches \fBmsg_perm.cgid\fR or \fBmsg_perm.gid\fR and the
+appropriate bit of the "group" portion (060) of \fBmsg_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The appropriate bit of the "other" portion (006) of \fBmsg_perm.mode\fR is
+set."
+.RE
+.sp
+.LP
+Otherwise, the corresponding permissions are denied.
+.SS "Module"
+.sp
+.LP
+A module is an entity containing processing routines for input and output data.
+It always exists in the middle of a stream, between the stream's head and a
+driver. A module is the STREAMS counterpart to the commands in a shell pipeline
+except that a module contains a pair of functions which allow independent
+bidirectional (downstream and upstream) data flow and processing.
+.SS "Multiplexor"
+.sp
+.LP
+A multiplexor is a driver that allows streams associated with several user
+processes to be connected to a single driver, or several drivers to be
+connected to a single user process. STREAMS does not provide a general
+multiplexing driver, but does provide the facilities for constructing them and
+for connecting multiplexed configurations of streams.
+.SS "Offset Maximum"
+.sp
+.LP
+An offset maximum is an attribute of an open file description representing the
+largest value that can be used as a file offset.
+.SS "Orphaned Process Group"
+.sp
+.LP
+A process group in which the parent of every member in the group is either
+itself a member of the group, or is not a member of the process group's
+session.
+.SS "Path Name"
+.sp
+.LP
+A path name is a null-terminated character string starting with an optional
+slash (\fB/\fR), followed by zero or more directory names separated by slashes,
+optionally followed by a file name.
+.sp
+.LP
+If a path name begins with a slash, the path search begins at the root
+directory. Otherwise, the search begins from the current working directory.
+.sp
+.LP
+A slash by itself names the root directory.
+.sp
+.LP
+Unless specifically stated otherwise, the null path name is treated as if it
+named a non-existent file.
+.SS "Privileged User"
+.sp
+.LP
+Solaris software implements a set of privileges that provide fine-grained
+control over the actions of processes. The possession of of a certain privilege
+allows a process to perform a specific set of restricted operations. Prior to
+the Solaris 10 release, a process running with uid 0 was granted all
+privileges. See \fBprivileges\fR(5) for the semantics and the degree of
+backward compatibility awarded to processes with an effective uid of 0.
+.SS "Process \fBID\fR"
+.sp
+.LP
+Each process in the system is uniquely identified during its lifetime by a
+positive integer called a process ID. A process ID cannot be reused by the
+system until the process lifetime, process group lifetime, and session lifetime
+ends for any process ID, process group ID, and session ID equal to that process
+ID. There are threads within a process with thread IDs \fBthread_t\fR and
+\fBLWPID_t\fR. These threads are not visible to the outside process.
+.SS "Parent Process \fBID\fR"
+.sp
+.LP
+A new process is created by a currently active process (see \fBfork\fR(2)). The
+parent process \fBID\fR of a process is the process \fBID\fR of its creator.
+.SS "Privilege"
+.sp
+.LP
+Having appropriate privilege means having the capability to override system
+restrictions.
+.SS "Process Group"
+.sp
+.LP
+Each process in the system is a member of a process group that is identified by
+a process group ID.  Any process that is not a process group leader may create
+a new process group and become its leader. Any process that is not a process
+group leader may join an existing  process group that shares the same session
+as the process.  A newly created process joins the process group of its parent.
+.SS "Process Group Leader"
+.sp
+.LP
+A process group leader is a process whose process \fBID\fR is the same as its
+process group ID.
+.SS "Process Group \fBID\fR"
+.sp
+.LP
+Each active process is a member of a process group and is identified by a
+positive integer called the process group ID. This \fBID\fR is the process
+\fBID\fR of the group leader. This grouping permits the signaling of related
+processes (see \fBkill\fR(2)).
+.SS "Process Lifetime"
+.sp
+.LP
+A process lifetime begins when the process is forked and ends after it exits,
+when its termination has been acknowledged by its parent process. See
+\fBwait\fR(3C).
+.SS "Process Group Lifetime"
+.sp
+.LP
+A process group lifetime begins when the process group is created by its
+process group leader, and ends when the lifetime of the last process in the
+group ends or when the last process in the group leaves the group.
+.SS "Processor Set \fBID\fR"
+.sp
+.LP
+The processors in a system may be divided into subsets, known as processor
+sets. A process bound to one of these sets will run only on processors in that
+set, and the processors in the set will normally run only processes that have
+been bound to the set. Each active processor set is identified by a positive
+integer. See \fBpset_create\fR(2).
+.SS "Read Queue"
+.sp
+.LP
+In a stream, the message queue in a module or driver containing messages moving
+upstream.
+.SS "Real User \fBID\fR and Real Group \fBID\fR"
+.sp
+.LP
+Each user allowed on the system is  identified by a positive integer (\fB0\fR
+to  \fBMAXUID\fR) called a real user \fBID.\fR
+.sp
+.LP
+Each user is also a member of a group. The group is identified by a positive
+integer called the real group \fBID.\fR
+.sp
+.LP
+An active process has a real user \fBID\fR and real group \fBID\fR that are set
+to the real user \fBID\fR and real group \fBID,\fR respectively, of the user
+responsible for the creation of the process.
+.SS "Root Directory and Current Working Directory"
+.sp
+.LP
+Each process has associated with it a concept of a root directory and a current
+working directory for the purpose of resolving path name searches. The root
+directory of a process need not be the root directory of the root file system.
+.SS "Saved Resource Limits"
+.sp
+.LP
+Saved resource limits is an attribute of a process that provides some
+flexibility in the handling of unrepresentable resource limits, as described in
+the \fBexec\fR family of functions and \fBsetrlimit\fR(2).
+.SS "Saved User \fBID\fR and Saved Group \fBID\fR"
+.sp
+.LP
+The saved user \fBID\fR and saved group \fBID\fR are the values of the
+effective user \fBID\fR and effective group \fBID\fR just after an \fBexec\fR
+of a file whose set user or set group file mode bit has been set (see
+\fBexec\fR(2)).
+.SS "Semaphore Identifier"
+.sp
+.LP
+A semaphore identifier (\fBsemid\fR) is a unique positive  integer created by a
+\fBsemget\fR(2) call. Each \fBsemid\fR has a set of semaphores and a data
+structure associated with it. The data structure is referred to as
+\fBsemid_ds\fR and contains the following members:
+.sp
+.in +2
+.nf
+struct ipc_perm   sem_perm;    /* operation permission struct */
+struct sem        *sem_base;   /* ptr to first semaphore in set */
+ushort_t          sem_nsems;   /* number of sems in set */
+time_t            sem_otime;   /* last operation time */
+time_t            sem_ctime;   /* last change time */
+                               /* Times measured in secs since */
+                               /* 00:00:00 GMT, Jan. 1, 1970 */
+.fi
+.in -2
+
+.sp
+.LP
+The following are descriptions of the \fBsemid_ds\fR structure members:
+.sp
+.LP
+The \fBsem_perm\fR member is an \fBipc_perm\fR structure that specifies the
+semaphore operation permission (see below). This structure includes the
+following members:
+.sp
+.in +2
+.nf
+uid_t     uid;    /* user id */
+gid_t     gid;    /* group id */
+uid_t     cuid;   /* creator user id */
+gid_t     cgid;   /* creator group id */
+mode_t    mode;   /* r/a permission */
+ulong_t   seq;    /* slot usage sequence number */
+key_t     key;    /* key */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsem_nsems\fR member is equal to the number of semaphores in the set.
+Each semaphore in the set is referenced by a nonnegative integer referred to as
+a \fBsem_num\fR. \fBsem_num\fR values run sequentially from \fB0\fR to the
+value of \fBsem_nsems\fR minus 1.
+.sp
+.LP
+The \fBsem_otime\fR member is the time of the last \fBsemop\fR(2) operation.
+.sp
+.LP
+The \fBsem_ctime\fR member is the time of the last \fBsemctl\fR(2) operation
+that changed a member of the above structure.
+.sp
+.LP
+A semaphore is a data structure called \fBsem\fR that contains the following
+members:
+.sp
+.in +2
+.nf
+ushort_t   semval;    /* semaphore value */
+pid_t      sempid;    /* pid of last operation  */
+ushort_t   semncnt;   /* # awaiting semval > cval */
+ushort_t   semzcnt;   /* # awaiting semval = 0 */
+.fi
+.in -2
+
+.sp
+.LP
+The following are descriptions of the \fBsem\fR structure members:
+.sp
+.LP
+The \fBsemval\fR member is a non-negative integer that is the actual value of
+the semaphore.
+.sp
+.LP
+The \fBsempid\fR member is equal to the process \fBID\fR of the last process
+that performed a semaphore operation on this semaphore.
+.sp
+.LP
+The \fBsemncnt\fR member is a count of the number of processes that are
+currently suspended awaiting this semaphore's \fBsemval\fR to become greater
+than its current value.
+.sp
+.LP
+The \fBsemzcnt\fR member is a count of the number of processes that are
+currently suspended awaiting this semaphore's \fBsemval\fR to become \fB0\fR.
+.SS "Semaphore Operation Permissions"
+.sp
+.LP
+In the \fBsemop\fR(2) and \fBsemctl\fR(2) function descriptions, the permission
+required for an operation is given as {\fItoken\fR}, where \fItoken\fR is the
+type of permission needed interpreted as follows:
+.sp
+.in +2
+.nf
+\fB00400	  READ by user
+00200   ALTER by user
+00040   READ by group
+00020   ALTER by group
+00004   READ by others
+00002   ALTER by others\fR
+.fi
+.in -2
+
+.sp
+.LP
+Read and alter permissions for a \fBsemid\fR are granted to a process if one or
+more of the following are true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The {\fBPRIV_IPC_DAC_READ\fR} or {\fBPRIV_IPC_DAC_WRITE\fR} privilege is
+present in the effective set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user \fBID\fR of the process matches \fBsem_perm.cuid\fR or
+\fBsem_perm.uid\fR in the data structure associated with \fBsemid\fR and the
+appropriate bit of the "user" portion (0600) of \fBsem_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective group \fBID\fR of the process matches \fBsem_perm.cgid\fR or
+\fBsem_perm.gid\fR and the appropriate bit of the "group" portion (060) of
+\fBsem_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The appropriate bit of the "other" portion (06) of \fBsem_perm.mode\fR is set.
+.RE
+.sp
+.LP
+Otherwise, the corresponding permissions are denied.
+.SS "Session"
+.sp
+.LP
+A session is a group of processes identified by a common \fBID\fR called a
+session  ID, capable of establishing a connection with a controlling terminal.
+Any process that is not a process group leader may create a new session  and
+process group, becoming the session leader of the session and process group
+leader of the process group.  A newly created process joins the session of its
+creator.
+.SS "Session \fBID\fR"
+.sp
+.LP
+Each session in the system is uniquely identified during its lifetime by  a
+positive integer called a session ID, the process \fBID\fR of its session
+leader.
+.SS "Session Leader"
+.sp
+.LP
+A session leader is a process whose session \fBID\fR is the same as its
+process and process group ID.
+.SS "Session Lifetime"
+.sp
+.LP
+A session lifetime begins when the session is created by its session leader,
+and ends when the lifetime of the last process that is a member  of the session
+ends, or when the last process that is a member in the session leaves the
+session.
+.SS "Shared Memory Identifier"
+.sp
+.LP
+A shared memory identifier (\fBshmid\fR) is a unique positive integer created
+by a \fBshmget\fR(2) call. Each \fBshmid\fR has a segment of memory (referred
+to as a shared memory segment) and a data structure associated with it. (Note
+that these shared memory segments must be explicitly removed by the user after
+the last reference to them is removed.) The data structure is referred to as
+\fBshmid_ds\fR and contains the following members:
+.sp
+.in +2
+.nf
+struct ipc_perm   shm_perm;     /* operation permission struct */
+size_t            shm_segsz;    /* size of segment */
+struct anon_map   *shm_amp;     /* ptr to region structure */
+char              pad[4];       /* for swap compatibility */
+pid_t             shm_lpid;     /* pid of last operation */
+pid_t             shm_cpid;     /* creator pid */
+shmatt_t          shm_nattch;   /* number of current attaches */
+ulong_t           shm_cnattch;  /* used only for shminfo */
+time_t            shm_atime;    /* last attach time */
+time_t            shm_dtime;    /* last detach time */
+time_t            shm_ctime;    /* last change time */
+                                /* Times measured in secs since */
+                                /* 00:00:00 GMT, Jan. 1, 1970 */
+.fi
+.in -2
+
+.sp
+.LP
+The following are descriptions of the \fBshmid_ds\fR structure members:
+.sp
+.LP
+The \fBshm_perm\fR member is an \fBipc_perm\fR structure that specifies the
+shared memory operation permission (see below). This structure includes the
+following members:
+.sp
+.in +2
+.nf
+uid_t     cuid;   /* creator user id */
+gid_t     cgid;   /* creator group id */
+uid_t     uid;    /* user id */
+gid_t     gid;    /* group id */
+mode_t    mode;   /* r/w permission */
+ulong_t   seq;    /* slot usage sequence # */
+key_t     key;    /* key */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBshm_segsz\fR member specifies the size of the shared memory segment in
+bytes.
+.sp
+.LP
+The \fBshm_cpid\fR member is the process \fBID\fR of the process that created
+the shared memory identifier.
+.sp
+.LP
+The \fBshm_lpid\fR member is the process \fBID\fR of the last process that
+performed a \fBshmat()\fR or \fBshmdt()\fR operation (see \fBshmop\fR(2)).
+.sp
+.LP
+The \fBshm_nattch\fR member is the number of processes that currently have this
+segment attached.
+.sp
+.LP
+The \fBshm_atime\fR member is the time of the last \fBshmat()\fR operation (see
+\fBshmop\fR(2)).
+.sp
+.LP
+The \fBshm_dtime\fR member is the time of the last \fBshmdt()\fR operation (see
+\fBshmop\fR(2)).
+.sp
+.LP
+The \fBshm_ctime\fR member is the time of the last \fBshmctl\fR(2) operation
+that changed one of the members of the above structure.
+.SS "Shared Memory Operation Permissions"
+.sp
+.LP
+In the \fBshmctl\fR(2), \fBshmat()\fR, and \fBshmdt()\fR (see \fBshmop\fR(2))
+function descriptions, the permission required for an operation is given as
+{\fItoken\fR}, where \fItoken\fR is the type of permission needed interpreted
+as follows:
+.sp
+.in +2
+.nf
+00400   READ by user
+00200   WRITE by user
+00040   READ by group
+00020   WRITE by group
+00004   READ by others
+00002   WRITE by others
+.fi
+.in -2
+
+.sp
+.LP
+Read and write permissions for a \fBshmid\fR are granted to a process if one or
+more of the following are true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The {\fBPRIV_IPC_DAC_READ\fR} or {\fBPRIV_IPC_DAC_WRITE\fR} privilege is
+present in the effective set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective user \fBID\fR of the process matches \fBshm_perm.cuid\fR or
+\fBshm_perm.uid\fR in the data structure associated with \fBshmid\fR and the
+appropriate bit of the "user" portion (0600) of \fBshm_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The effective group \fBID\fR of the process matches \fBshm_perm.cgid\fR or
+\fBshm_perm.gid\fR and the appropriate bit of the "group" portion (060) of
+\fBshm_perm.mode\fR is set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The appropriate bit of the "other" portion (06) of \fBshm_perm.mode\fR is set.
+.RE
+.sp
+.LP
+Otherwise, the corresponding permissions are denied.
+.SS "Special Processes"
+.sp
+.LP
+The process with \fBID\fR 0 and the process with \fBID\fR 1 are special
+processes referred to as proc0 and proc1; see \fBkill\fR(2). proc0 is the
+process scheduler. proc1 is the initialization process (\fIinit\fR); proc1 is
+the ancestor of every other process in the system and is used to control the
+process structure.
+.SS "\fBSTREAMS\fR"
+.sp
+.LP
+A set of kernel mechanisms that support the development of network services and
+data communication drivers. It defines interface standards for character
+input/output within the kernel and between the kernel and user level processes.
+The STREAMS mechanism is composed of utility routines, kernel facilities and a
+set of data structures.
+.SS "Stream"
+.sp
+.LP
+A stream is a full-duplex data path within the kernel  between a user process
+and driver routines. The primary components are a stream head, a driver, and
+zero or more modules between the stream head and driver. A stream is analogous
+to a shell pipeline, except that data flow and processing are bidirectional.
+.SS "Stream Head"
+.sp
+.LP
+In a stream, the stream head is the end of the stream that provides the
+interface between the stream and a user process. The principal functions of the
+stream head are processing STREAMS-related system calls and passing data and
+information between a user process and the stream.
+.SS "Upstream"
+.sp
+.LP
+In a stream, the direction from driver to stream head.
+.SS "Write Queue"
+.sp
+.LP
+In a stream, the message queue in a module or driver containing messages moving
+downstream.
+.SH ACKNOWLEDGMENTS
+.sp
+.LP
+Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
+reproduce portions of its copyrighted documentation. Original documentation
+from The Open Group can be obtained online at
+http://www.opengroup.org/bookstore/\&.
+.sp
+.LP
+The Institute of Electrical and Electronics Engineers and The Open Group, have
+given us permission to reprint portions of their documentation.
+.sp
+.LP
+In the following statement, the phrase ``this text'' refers to portions of the
+system documentation.
+.sp
+.LP
+Portions of this text are reprinted and reproduced in electronic form in the
+SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+Information Technology -- Portable Operating System Interface (POSIX), The Open
+Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
+Electrical and Electronics Engineers, Inc and The Open Group.  In the event of
+any discrepancy between these versions and the original IEEE and The Open Group
+Standard, the original IEEE and The Open Group Standard is the referee
+document.  The original Standard can be obtained online at
+http://www.opengroup.org/unix/online.html\&.
+.sp
+.LP
+This notice shall appear on any product containing this material.
+.SH SEE ALSO
+.sp
+.LP
+\fBstandards\fR(5), \fBthreads\fR(5)

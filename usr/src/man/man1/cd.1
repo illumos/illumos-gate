@@ -1,0 +1,379 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cd 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+cd, chdir, pushd, popd, dirs \- change working directory
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/cd\fR [\fIdirectory\fR]
+.fi
+
+.SS "sh"
+.LP
+.nf
+\fBcd\fR [\fIargument\fR]
+.fi
+
+.LP
+.nf
+\fBchdir\fR [\fIargument\fR]
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBcd\fR [\fIdir\fR]
+.fi
+
+.LP
+.nf
+\fBchdir\fR [\fIdir\fR]
+.fi
+
+.LP
+.nf
+\fBpushd\fR [\fB+\fR\fIn\fR | \fIdir\fR]
+.fi
+
+.LP
+.nf
+\fBpopd\fR [\fB+\fR\fIn\fR]
+.fi
+
+.LP
+.nf
+\fBdirs\fR [\fB-l\fR]
+.fi
+
+.SS "ksh, ksh93"
+.LP
+.nf
+\fBcd\fR [\fB-L\fR] [\fB-P\fR] [\fIarg\fR]
+.fi
+
+.LP
+.nf
+\fBcd\fR \fIold\fR \fInew\fR
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/cd"
+.sp
+.LP
+The \fB/usr/bin/cd\fR utility changes the current directory in the context of
+the \fBcd\fR utility only. This is in contrast to the version built into the
+shell. \fB/usr/bin/cd\fR has no effect on the invoking process but can be used
+to determine whether or not a given directory can be set as the current
+directory.
+.SS "sh"
+.sp
+.LP
+The Bourne shell built-in \fBcd\fR changes the current directory to
+\fIargument\fR. The shell parameter \fBHOME\fR is the default \fIargument\fR.
+The shell parameter \fBCDPATH\fR defines the search path for the directory
+containing \fIargument\fR. Alternative directory names are separated by a colon
+(\fB:\fR). The default path is \fB<null>\fR (specifying the current directory).
+The current directory is specified by a null path name, which can appear
+immediately after the equal sign or between the colon delimiters anywhere else
+in the path list. If \fIargument\fR begins with `\fB/\fR', `\fB\&.\fR', or
+`\fB\&.\|.\fR', the search path is not used. Otherwise, each directory in the
+path is searched for \fIargument\fR. \fBcd\fR must have execute (search)
+permission in \fIargument\fR. Because a new process is created to execute each
+command, \fBcd\fR would be ineffective if it were written as a normal command;
+therefore, it is recognized by and is internal to the shell. (See \fBpwd\fR(1),
+\fBsh\fR(1), and \fBchdir\fR(2)).
+.sp
+.LP
+\fBchdir\fR is just another way to call \fBcd\fR.
+.SS "csh"
+.sp
+.LP
+If \fIdir\fR is not specified, the C shell built-in \fBcd\fR uses the value of
+shell parameter \fBHOME\fR as the new working directory. If \fIdir\fR specifies
+a complete path starting with `\fB/\fR', `\fB\&.\fR', or `\fB\&.\|.\fR',
+\fIdir\fR becomes the new working directory. If neither case applies, \fBcd\fR
+tries to find the designated directory relative to one of the paths specified
+by the \fBCDPATH\fR shell variable. \fBCDPATH\fR has the same syntax as, and
+similar semantics to, the \fBPATH\fR shell variable. \fBcd\fR must have execute
+(search) permission in \fIdir\fR. Because a new process is created to execute
+each command, \fBcd\fR would be ineffective if it were written as a normal
+command; therefore, it is recognized by and is internal to the C-shell. (See
+\fBpwd\fR(1), \fBsh\fR(1), and \fBchdir\fR(2)).
+.sp
+.LP
+\fBchdir\fR changes the shell's working directory to directory \fIdir\fR. If no
+argument is given, change to the home directory of the user. If \fIdir\fR is a
+relative pathname not found in the current directory, check for it in those
+directories listed in the \fBcdpath\fR variable. If \fIdir\fR is the name of a
+shell variable whose value starts with a \fB/\fR, change to the directory named
+by that value.
+.sp
+.LP
+\fBpushd\fR pushes a directory onto the directory stack. With no arguments,
+exchange the top two elements.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIn\fR\fR
+.ad
+.RS 7n
+.rt  
+Rotate the \fIn\fR'th entry to the top of the stack and \fBcd\fR to it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdir\fR\fR
+.ad
+.RS 7n
+.rt  
+Push the current working directory onto the stack and change to \fIdir\fR.
+.RE
+
+.sp
+.LP
+\fBpopd\fR pops the directory stack and \fBcd\fR to the new top directory. The
+elements of the directory stack are numbered from 0 starting at the top.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIn\fR\fR
+.ad
+.RS 6n
+.rt  
+Discard the \fIn\fR'th entry in the stack.
+.RE
+
+.sp
+.LP
+\fBdirs\fR prints the directory stack, most recent to the left; the first
+directory shown is the current directory. With the \fB-l\fR argument, produce
+an unabbreviated printout; use of the \fB~\fR notation is suppressed.
+.SS "ksh, ksh93"
+.sp
+.LP
+The Korn shell built-in \fBcd\fR command can be in either of two forms. In the
+first form it changes the current directory to \fIarg\fR. If \fIarg\fR is
+\fB\(mi\fR the directory is changed to the previous directory. The shell
+variable \fBHOME\fR is the default \fIarg\fR. The environment variable
+\fBPWD\fR is set to the current directory. If the \fBPWD\fR is changed, the
+\fBOLDPWD\fR environment variable shall also be changed to the value of the old
+working directory, that is, the current working directory immediately prior to
+the call to change directory (\fBcd\fR). The shell variable \fBCDPATH\fR
+defines the search path for the directory containing \fIarg\fR. Alternative
+directory names are separated by a colon (\fB:\fR). The default path is
+\fBnull\fR (specifying the current directory). The current directory is
+specified by a null path name, which can appear immediately after the equal
+sign or between the colon delimiters anywhere else in the path list. If
+\fIarg\fR begins with a `\fB/\fR', `\fB\&.\fR', or `\fB\&.\|.\fR', then the
+search path is not used. Otherwise, each directory in the path is searched for
+\fIarg\fR. If unsuccessful, \fBcd\fR attempts to change directories to the
+pathname formed by the concatenation of the value of PWD, a slash character,
+and arg.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 6n
+.rt  
+Handles the operation dot-dot (\fB\&..\fR) logically. Symbolic link components
+are \fBnot\fR resolved before dot-dot components are processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 6n
+.rt  
+Handles the operand dot-dot physically. Symbolic link components \fBare\fR
+resolved before dot-dot components are processed.
+.RE
+
+.sp
+.LP
+If both \fB-L\fR and \fB-P\fR options are specified, the last option to be
+invoked is used and the other is ignored. If neither \fB-L\fR nor \fB-P\fR is
+specified, the operand is handled dot-dot logically.
+.sp
+.LP
+The second form of \fBcd\fR substitutes the string \fInew\fR for the string
+\fIold\fR in the current directory name, \fBPWD\fR and tries to change to this
+new directory.
+.sp
+.LP
+The \fBcd\fR command cannot be executed by \fBrksh\fR. Because a new process is
+created to execute each command, \fBcd\fR would be ineffective if it were
+written as a normal command; therefore, it is recognized by and is internal to
+the Korn shell. (See \fBpwd\fR(1), \fBsh\fR(1), and \fBchdir\fR(2)).
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdirectory\fR\fR
+.ad
+.RS 13n
+.rt  
+An absolute or relative pathname of the directory that becomes the new working
+directory. The interpretation of a relative pathname by \fBcd\fR depends on the
+\fBCDPATH\fR environment variable.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+If a non-empty directory name from \fBCDPATH\fR is used, an absolute pathname
+of the new working directory is written to the standard output as follows:
+.sp
+.LP
+\fB"%s\en"\fR, <\fInew directory\fR>
+.sp
+.LP
+Otherwise, there is no output.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcd\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCDPATH\fR\fR
+.ad
+.RS 10n
+.rt  
+A colon-separated list of pathnames that refer to directories. If the
+\fIdirectory\fR operand does not begin with a slash \fB(\fR \fB/\fR \fB)\fR
+character, and the first component is not dot or dot-dot, \fBcd\fR searches for
+\fIdirectory\fR relative to each directory named in the \fBCDPATH\fR variable,
+in the order listed. The new working directory sets to the first matching
+directory found. An empty string in place of a directory pathname represents
+the current directory. If \fBCDPATH\fR is not set, it is treated as if it were
+an empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOME\fR\fR
+.ad
+.RS 10n
+.rt  
+The name of the home directory, used when no \fIdirectory\fR operand is
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOLDPWD\fR\fR
+.ad
+.RS 10n
+.rt  
+A pathname of the previous working directory, used by \fBcd-\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPWD\fR\fR
+.ad
+.RS 10n
+.rt  
+A pathname of the current working directory, set by \fBcd\fR after it has
+changed to that directory.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned by \fBcd\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The directory was successfully changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "csh, ksh, sh"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBpwd\fR(1), \fBsh\fR(1),
+\fBchdir\fR(2), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

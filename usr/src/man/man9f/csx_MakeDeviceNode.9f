@@ -1,0 +1,270 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_MakeDeviceNode 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_MakeDeviceNode, csx_RemoveDeviceNode \- create and remove minor nodes on
+behalf of the client
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_MakeDeviceNode\fR(\fBclient_handle_t\fR \fIch\fR, \fBmake_device_node_t *\fR\fIdn\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_RemoveDeviceNode\fR(\fBclient_handle_t\fR \fIch\fR, \fBremove_device_node_t *\fR\fIdn\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdn\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBmake_device_node_t\fR or \fBremove_device_node_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBcsx_MakeDeviceNode()\fR and \fBcsx_RemoveDeviceNode()\fR are
+Solaris-specific extensions to allow the client to request that device nodes in
+the filesystem are created or removed, respectively, on its behalf.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBmake_device_node_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t        Action;         /* device operation */
+uint32_t        NumDevNodes;    /* number of nodes to create */
+devnode_desc_t  *devnode_desc;  /* description of device nodes */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBremove_device_node_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t       Action;          /* device operation */
+uint32_t       NumDevNodes;     /* number of nodes to remove */
+devnode_desc_t *devnode_desc;   /* description of device nodes */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBdevnode_desc_t\fR are:
+.sp
+.in +2
+.nf
+char           *name;           /* device node path and name */
+int32_t        spec_type;       /* device special type (block or char) */
+int32_t        minor_num;       /* device node minor number */
+char           *node_type;      /* device node type */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBAction\fR field is used to specify the operation that
+\fBcsx_MakeDeviceNode()\fR and \fBcsx_RemoveDeviceNode()\fR should perform.
+.sp
+.LP
+The following \fBAction\fR values are defined for \fBcsx_MakeDeviceNode()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fBCREATE_DEVICE_NODE\fR
+.ad
+.RS 22n
+.rt  
+Create \fBNumDevNodes\fR minor nodes
+.RE
+
+.sp
+.LP
+The following \fBAction\fR values are defined for \fBcsx_RemoveDeviceNode()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fBREMOVE_DEVICE_NODE\fR
+.ad
+.RS 27n
+.rt  
+Remove \fBNumDevNodes\fR minor nodes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBREMOVE_ALL_DEVICE_NODES\fR
+.ad
+.RS 27n
+.rt  
+Remove all minor nodes for this client
+.RE
+
+.sp
+.LP
+For \fBcsx_MakeDeviceNode()\fR, if the \fBAction\fR field is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCREATE_DEVICE_NODE\fR \fR
+.ad
+.RS 23n
+.rt  
+The \fBNumDevNodes\fR field must be set to the number of minor devices to
+create, and the client must allocate the quantity of \fBdevnode_desc_t\fR
+structures specified by \fBNumDevNodes\fR and fill out the fields in the
+\fBdevnode_desc_t\fR structure with the appropriate minor node information. The
+meanings of the fields in the \fBdevnode_desc_t\fR structure are identical to
+the parameters of the same name to the \fBddi_create_minor_node\fR(9F) \fBDDI
+\fRfunction.
+.RE
+
+.sp
+.LP
+For \fBcsx_RemoveDeviceNode()\fR, if the \fBAction\fR field is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBREMOVE_DEVICE_NODE\fR \fR
+.ad
+.RS 28n
+.rt  
+The \fBNumDevNodes\fR field must be set to the number of minor devices to
+remove, and the client must allocate the quantity of \fBdevnode_desc_t\fR
+structures specified by \fBNumDevNodes\fR and fill out the fields in the
+\fBdevnode_desc_t\fR structure with the appropriate minor node information. The
+meanings of the fields in the \fBdevnode_desc_t\fR structure are identical to
+the parameters of the same name to the \fBddi_remove_minor_node\fR(9F) \fBDDI
+\fRfunction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBREMOVE_ALL_DEVICE_NODES\fR \fR
+.ad
+.RS 28n
+.rt  
+The \fBNumDevNodes\fR field must be set to \fB0\fR and the \fBdevnode_desc_t\fR
+structure pointer must be set to \fINULL\fR. All device nodes for this client
+will be removed from the filesystem.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ATTRIBUTE\fR \fR
+.ad
+.RS 28n
+.rt  
+The value of one or more arguments is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ARGS\fR \fR
+.ad
+.RS 28n
+.rt  
+Action is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_OUT_OF_RESOURCE\fR \fR
+.ad
+.RS 28n
+.rt  
+Unable to create or remove device node.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F), \fBddi_create_minor_node\fR(9F),
+\fBddi_remove_minor_node\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

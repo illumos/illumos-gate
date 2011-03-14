@@ -1,0 +1,304 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH send 3SOCKET "31 Aug 2009" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+send, sendto, sendmsg \- send a message from a socket
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+
+\fBssize_t\fR \fBsend\fR(\fBint\fR \fIs\fR, \fBconst void *\fR\fImsg\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBsendto\fR(\fBint\fR \fIs\fR, \fBconst void *\fR\fImsg\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIflags\fR,
+     \fBconst struct sockaddr *\fR\fIto\fR, \fBint\fR  \fItolen\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBsendmsg\fR(\fBint\fR \fIs\fR, \fBconst struct msghdr *\fR\fImsg\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsend()\fR, \fBsendto()\fR, and \fBsendmsg()\fR functions are used to
+transmit a message to another transport end-point. The \fBsend()\fR function
+can be used only when the socket is in a connected state. See
+\fBconnect\fR(3SOCKET). The \fBsendto()\fR and \fBsendmsg()\fR functions can be
+used at any time. The \fIs\fR socket is created with \fBsocket\fR(3SOCKET).
+.sp
+.LP
+The address of the target is supplied by \fIto\fR with a \fItolen\fR parameter
+used to specify the size. The length of the message is supplied by the
+\fIlen\fR parameter. For socket types such as \fBSOCK_DGRAM\fR and
+\fBSOCK_RAW\fR that require atomic messages, the error \fBEMSGSIZE\fR is
+returned and the message is not transmitted when it is too long to pass
+atomically through the underlying protocol. The same restrictions do not apply
+to \fBSOCK_STREAM\fR sockets.
+.sp
+.LP
+A return value \fB\(mi1\fR indicates locally detected errors. It does not imply
+a delivery failure.
+.sp
+.LP
+If the socket does not have enough buffer space available to hold a message,
+the \fBsend()\fR function blocks the message, unless the socket has been placed
+in non-blocking I/O mode (see \fBfcntl\fR(2)). The \fBselect\fR(3C) or
+\fBpoll\fR(2) call can be used to determine when it is possible to send more
+data.
+.sp
+.LP
+The \fIflags\fR parameter is formed from the bitwise OR of zero or more of the
+following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMSG_OOB\fR\fR
+.ad
+.RS 17n
+.rt  
+Send \fBout-of-band\fR data on sockets that support this notion. The underlying
+protocol must also support \fBout-of-band\fR data. Only \fBSOCK_STREAM\fR
+sockets created in the \fBAF_INET\fR or the \fBAF_INET6\fR address family
+support out-of-band data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMSG_DONTROUTE\fR\fR
+.ad
+.RS 17n
+.rt  
+The \fBSO_DONTROUTE\fR option is turned on for the duration of the operation.
+It is used only by diagnostic or routing programs.
+.RE
+
+.sp
+.LP
+See \fBrecv\fR(3SOCKET) for a description of the \fBmsghdr\fR structure.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the number of bytes sent.
+Otherwise, they return \fB-1\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsend()\fR, \fBsendto()\fR, and \fBsendmsg()\fR functions return errors
+under the following conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+\fIs\fR is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+The operation was interrupted by delivery of a signal before any data could be
+buffered to be sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMSGSIZE\fR\fR
+.ad
+.RS 16n
+.rt  
+The message is too large to be sent all at once (as the socket requires), or
+the \fImsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by message
+is less than or equal to 0 or is greater than {\fBIOV_MAX\fR}.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 16n
+.rt  
+Insufficient memory is available to complete the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 16n
+.rt  
+Insufficient STREAMS resources are available for the operation to complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+\fIs\fR is not a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEWOULDBLOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket is marked non-blocking and the requested operation would block.
+\fBEWOULDBLOCK\fR is also returned when sufficient memory is not immediately
+available to allocate a suitable buffer. In such a case, the operation can be
+retried later.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECONNREFUSED\fR\fR
+.ad
+.RS 16n
+.rt  
+The requested connection was refused by the peer. For conected IPv4 and IPv6
+datagram sockets, this indicates that the system received an \fBICMP
+Destination Port Unreachable\fR message from the peer in response to some prior
+transmission.
+.RE
+
+.sp
+.LP
+The \fBsend()\fR and \fBsendto()\fR functions return errors under the following
+conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIlen\fR argument overflows a \fBssize_t\fR.
+.sp
+Inconsistent port attributes for system call.
+.RE
+
+.sp
+.LP
+The \fBsendto()\fR function returns errors under the following conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified for the \fItolen\fR parameter is not the size of a valid
+address for the specified address family.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEISCON\fR\fR
+.ad
+.RS 10n
+.rt  
+A destination address was specified and the socket is already connected.
+.RE
+
+.sp
+.LP
+The \fBsendmsg()\fR function returns errors under the following conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBmsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by
+\fImsg\fR is less than or equal to \fB0\fR, or the sum of the \fIiov_len\fR
+values in the \fBmsg_iov\fR array overflows a \fBssize_t\fR.
+.sp
+One of the \fIiov_len\fR values in the \fBmsg_iov\fR array member of the
+\fBmsghdr\fR structure pointed to by \fImsg\fR is negative, or the sum of the
+\fIiov_len\fR values in the \fBmsg_iov\fR array overflows a \fBssize_t\fR.
+.sp
+\fBmsg_iov\fR contents are inconsistent with port attributes.
+.RE
+
+.sp
+.LP
+The \fBsend()\fR function returns errors under the following conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 9n
+.rt  
+The socket is shut down for writing, or the socket is connection-mode and is no
+longer connected. In the latter case, if the socket is of type
+\fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfcntl\fR(2), \fBpoll\fR(2), \fBwrite\fR(2), \fBconnect\fR(3SOCKET),
+\fBgetsockopt\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBselect\fR(3C),
+\fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD), \fBattributes\fR(5)

@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.,
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH put 9F "28 Apr 1992" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+put \- call a STREAMS put procedure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBvoid\fR \fBput\fR(\fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a STREAMS queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to message block being passed into queue.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBput()\fR calls the put procedure ( \fBput\fR(9E) entry point) for the
+STREAMS queue specified by \fIq\fR, passing it the message block referred to by
+\fImp\fR. It is typically used by a driver or module to call its own put
+procedure.
+.SH CONTEXT
+.sp
+.LP
+\fBput()\fR can be called from a STREAMS module or driver put or service
+routine, or from an associated interrupt handler, timeout, bufcall, or esballoc
+call-back. In the latter cases, the calling code must guarantee the validity of
+the \fIq\fR argument.
+.sp
+.LP
+Since \fBput()\fR may cause re-entry of the module (as it is intended to do),
+mutexes or other locks should not be held across calls to it, due to the risk
+of single-party deadlock (\fBput\fR(9E), \fBputnext\fR(9F), \fBputctl\fR(9F),
+\fBqreply\fR(9F)). This function is provided as a DDI/DKI conforming
+replacement for a direct call to a put procedure.
+.SH SEE ALSO
+.sp
+.LP
+\fBput\fR(9E), \fBfreezestr\fR(9F), \fBputctl\fR(9F), \fBputctl1\fR(9F),
+\fBputnext\fR(9F), \fBputnextctl\fR(9F), \fBputnextctl1\fR(9F),
+\fBqprocson\fR(9F), \fBqreply\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+ \fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The caller cannot have the stream frozen when calling this function. See
+\fBfreezestr\fR(9F).
+.sp
+.LP
+DDI/DKI conforming modules and drivers are no longer permitted to call put
+procedures directly, but must call through the appropriate STREAMS utility
+function, for example, \fBput\fR(9E), \fBputnext\fR(9F), \fBputctl\fR(9F), and
+\fBqreply\fR(9F). This function is provided as a DDI/DKI conforming replacement
+for a direct call to a put procedure.
+.sp
+.LP
+The \fBput()\fR and \fBputnext()\fR functions should be called only after
+\fBqprocson()\fR is finished.

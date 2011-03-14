@@ -1,0 +1,170 @@
+'\" te
+.\"  Copyright (c) 1994 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH unifdef 1 "14 Jan 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+unifdef \- resolve and remove ifdef'ed lines from C program source
+.SH SYNOPSIS
+.LP
+.nf
+\fBunifdef\fR [\fB-clt\fR] [\fB-D\fR\fIname\fR] [\fB-U\fR\fIname\fR] [\fB-iD\fR\fIname\fR] [\fB-iU\fR\fIname\fR] ... 
+     [\fIfilename\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBunifdef\fR removes \fBifdef\fRed lines from a file while otherwise leaving
+the file alone. It is smart enough to deal with the nested \fBifdef\fRs,
+comments, single and double quotes of C syntax, but it does not do any
+including or interpretation of macros. Neither does it strip out comments,
+though it recognizes and ignores them. You specify which symbols you want
+defined with \fB-D\fR options, and which you want undefined with \fB-U\fR
+options. Lines within those \fBifdef\fRs will be copied to the output, or
+removed, as appropriate. Any \fBifdef\fR, \fBifndef\fR, \fBelse\fR, and
+\fBendif\fR lines associated with \fIfilename\fR will also be removed.
+.sp
+.LP
+\fBifdef\fRs involving symbols you do not specify are untouched and copied out
+along with their associated \fBifdef\fR, \fBelse\fR, and \fBendiff1\fR lines.
+.sp
+.LP
+If an \fBifdef\fR\fIX\fR occurs nested inside another \fBifdef\fR\fIX\fR, then
+the inside \fBifdef\fR is treated as if it were an unrecognized symbol. If the
+same symbol appears in more than one argument, only the first occurrence is
+significant.
+.sp
+.LP
+\fBunifdef\fR copies its output to the standard output and will take its input
+from the standard input if no \fIfilename\fR argument is given.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 11n
+.rt  
+Complement the normal operation. Lines that would have been removed or blanked
+are retained, and vice versa.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 11n
+.rt  
+Replace ``lines removed'' lines with blank lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 11n
+.rt  
+Plain text option. \fBunifdef\fR refrains from attempting to recognize comments
+and single and double quotes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+Lines associated with the defined symbol \fIname\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+Lines associated with the undefined symbol \fIname\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-iD\fR\fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+Ignore, but print out, lines associated with the defined symbol \fIname\fR. If
+you use \fBifdef\fRs to delimit non-C lines, such as comments or code which is
+under construction, then you must tell \fBunifdef\fR which symbols are used for
+that purpose so that it will not try to parse for quotes and comments within
+them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-iU\fR\fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+Ignore, but print out, lines associated with the undefined symbol \fIname\fR.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Operation failed.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdiff\fR(1), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPremature\fR \fBEOF\fR\fR
+.ad
+.RS 17n
+.rt  
+Inappropriate \fBelse\fR or \fBendif\fR.
+.RE
+

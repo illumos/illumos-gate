@@ -1,0 +1,166 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH get_wch 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+get_wch, wget_wch, mvget_wch, mvwget_wch \- get a wide character from terminal
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBget_wch\fR(\fBwint_t *\fR\fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwget_wch\fR(\fBWINDOW *\fR\fIwin\fR, \fBwint_t *\fR\fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvget_wch\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwint_t *\fR\fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwget_wch\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwint_t *\fR\fIch\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBget_wch()\fR and \fBwget_wch()\fR functions get a wide character from
+the terminal associated with the window \fBstdscr\fR or window \fIwin\fR,
+respectively. The \fBmvget_wch()\fR and \fBmvwget_wch()\fR functions move the
+cursor to  the position specified in \fBstdscr\fR or \fIwin\fR, respectively,
+then get a character.
+.sp
+.LP
+If the window is not a pad and has been changed since the last call to
+\fBrefresh\fR(3XCURSES), \fBget_wch()\fR calls \fBrefresh()\fR to update the
+window before the next character is read.
+.sp
+.LP
+The setting of certain functions affects the behavior of the \fBget_wch()\fR
+set of functions. For example, if \fBcbreak\fR(3XCURSES) is set, characters
+typed by the user are  immediately processed. If \fBhalfdelay\fR(3XCURSES) is
+set, \fBget_wch()\fR waits until a character is typed  or returns \fBERR\fR if
+no character is typed within the specified timeout period.  This timeout can
+also be specified for individual windows with the \fIdelay\fR parameter of
+\fBtimeout\fR(3XCURSES) A negative value waits for input; a value of \fB0\fR
+returns \fBERR\fR if no input is ready; a positive value blocks until input
+arrives or the time  specified expires (in which case \fBERR\fR is returned).
+If \fBnodelay\fR(3XCURSES) is set, \fBERR\fR is returned if no input is
+waiting;  if not set, \fBget_wch()\fR waits until input arrives.  Each
+character will be echoed to the window unless \fBnoecho\fR(3XCURSES) has been
+set.
+.sp
+.LP
+If keypad handling is enabled ( \fBkeypad\fR(3XCURSES) is \fBTRUE\fR), the
+token for the function key (a \fBKEY_\fR value) is stored in the object pointed
+to by \fIch\fR and \fBKEY_CODE_YES\fR is returned. If a character is received
+that could be the beginning of a function key (for  example, ESC), an
+inter-byte timer is set.  If the remainder of the sequence is not received
+before the time expires,  the character is passed through; otherwise, the value
+of the function key is returned.  If \fBnotimeout()\fR is set, the inter-byte
+timer is not used.
+.sp
+.LP
+The ESC key is typically a prefix key used with function keys and should not be
+used as a single character.
+.sp
+.LP
+See the  \fBgetch\fR(3XCURSES) manual page for a list of tokens for function
+keys that  are returned by the \fBget_wch()\fR set of functions if keypad
+handling is  enabled (Some terminals may not support all tokens).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to a wide integer where the returned wide character or  \fBKEY_\fR
+value can be stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to the window associated with the terminal from which the
+character is to be read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the y (row) coordinate for the position of the character to be read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the x (column) coordinate for the position of the character to be read.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+When these functions successfully report the pressing of a function key, they
+return \fBKEY_CODE_YES\fR. When they successfully report a wide character, they
+return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcbreak\fR(3XCURSES), \fBecho\fR(3XCURSES), \fBhalfdelay\fR(3XCURSES),
+\fBkeypad\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBnodelay\fR(3XCURSES),
+\fBnotimeout\fR(3XCURSES), \fBraw\fR(3XCURSES), \fBtimeout\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

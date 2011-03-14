@@ -1,0 +1,204 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kvm_open 3KVM "2 May 2002" "SunOS 5.11" "Kernel VM Library Functions"
+.SH NAME
+kvm_open, kvm_close \- specify a kernel to examine
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkvm\fR [ \fIlibrary\fR\&.\|.\|.]
+#include <kvm.h>
+#include <fcntl.h>
+
+\fBkvm_t *\fR\fBkvm_open\fR(\fBchar *\fR\fInamelist\fR, \fBchar *\fR\fIcorefile\fR, \fBchar *\fR\fIswapfile\fR, \fBint\fR \fIflag\fR,
+     \fBchar *\fR\fIerrstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkvm_close\fR(\fBkvm_t *\fR\fIkd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkvm_open()\fR function initializes a set of file descriptors to be used
+in subsequent calls to kernel virtual memory ( VM) routines.  It returns a
+pointer to a kernel identifier that must be used as the \fIkd\fR argument in
+subsequent kernel VM function calls.
+.sp
+.LP
+The \fInamelist\fR argument specifies an unstripped executable file whose
+symbol table will be used to locate various offsets in \fIcorefile\fR. If
+\fInamelist\fR is \fINULL\fR, the symbol table of the currently running kernel
+is used to determine offsets in the core image.  In this case, it is up to the
+implementation to select an appropriate way to resolve symbolic references, for
+instance, using \fB/dev/ksyms\fR as a default \fInamelist\fR file.
+.sp
+.LP
+The \fIcorefile\fR argument specifies a file that contains an image of physical
+memory, for instance, a kernel crash dump file (see \fBsavecore\fR(1M)) or the
+special device \fB/dev/mem\fR. If \fIcorefile\fR is \fINULL\fR, the currently
+running kernel is accessed, using \fB/dev/mem\fR and \fB/dev/kmem\fR.
+.sp
+.LP
+The \fIswapfile\fR argument specifies a file that represents the swap device.
+If both \fIcorefile\fR and \fIswapfile\fR are \fINULL\fR, the swap device of
+the currently running kernel is accessed.  Otherwise, if \fIswapfile\fR is
+\fINULL\fR, \fBkvm_open()\fR may succeed but subsequent \fBkvm_getu\fR(3KVM)
+function calls may fail if the desired information is swapped out.
+.sp
+.LP
+The \fIflag\fR function is used to specify read or write access for
+\fIcorefile\fR and may have one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_RDONLY\fR\fR
+.ad
+.RS 12n
+.rt  
+open for reading
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_RDWR\fR\fR
+.ad
+.RS 12n
+.rt  
+open for reading and writing
+.RE
+
+.sp
+.LP
+The \fIerrstr\fR argument is used to control error reporting.  If it is a null
+pointer, no error messages will be printed. If it is non-null, it is assumed to
+be the address of a string that will be used to prefix error messages generated
+by \fBkvm_open\fR. Errors are printed to \fBstderr\fR. A useful value to supply
+for \fIerrstr\fR would be \fIargv\fR[0]. This has the effect of printing the
+process name in front of any error messages.
+.sp
+.LP
+Applications using  \fBlibkvm\fR are dependent on the underlying data model of
+the kernel image, that is, whether it is a 32\(mibit or 64\(mibit kernel.
+.sp
+.LP
+The data model of these applications must match the data model of the kernel in
+order to correctly interpret the size and offsets of kernel data structures.
+For example, a 32\(mibit application that uses the 32\(mibit version of the
+\fBlibkvm\fR interfaces will fail to open a 64\(mibit kernel image.  Similarly,
+a 64\(mibit application that uses the 64\(mibit version of the \fBlibkvm\fR
+interfaces will fail to open a 32\(mibit kernel image.
+.sp
+.LP
+The \fBkvm_close()\fR function closes all file descriptors that were associated
+with \fIkd\fR. These files are also closed on \fBexit\fR(2) and
+\fBexecve\fR(\|) (see \fBexec\fR(2)). \fBkvm_close()\fR also resets the
+\fBproc\fR pointer associated with \fBkvm_nextproc\fR(3KVM) and flushes any
+cached kernel data.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBkvm_open()\fR function returns a non-null value suitable for use with
+subsequent kernel VM function calls. On failure, it returns \fINULL\fR and no
+files are opened.
+.sp
+.LP
+The \fBkvm_close()\fR function returns 0 on success and \(mi1 on failure.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/kmem\fR\fR
+.ad
+.RS 14n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/ksyms\fR\fR
+.ad
+.RS 14n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/mem\fR\fR
+.ad
+.RS 14n
+.rt  
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsavecore\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBpathconf\fR(2),
+\fBgetloadavg\fR(3C), \fBkstat\fR(3KSTAT), \fBkvm_getu\fR(3KVM),
+\fBkvm_nextproc\fR(3KVM), \fBkvm_nlist\fR(3KVM), \fBkvm_kread\fR(3KVM),
+\fBlibkvm\fR(3LIB),\fBsysconf\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
+\fBlfcompile\fR(5)
+.SH NOTES
+.sp
+.LP
+Kernel core dumps should be examined on the platform on which they were
+created. While a 32-bit application running on a 64-bit kernel can examine a
+32-bit core dump, a 64-bit application running on a 64-bit kernel cannot
+examine a kernel core dump from the 32-bit system.
+.sp
+.LP
+On 32-bit systems, applications that use \fBlibkvm\fR to access the running
+kernel must be 32-bit applications. On systems that support both 32-bit and
+64-bit applications, applications that use the \fBlibkvm\fR interfaces to
+access the running kernel must themselves be 64-bit applications.
+.sp
+.LP
+Although the \fBlibkvm\fR API is Stable, the symbol names and data values that
+can be accessed through this set of interfaces are Private and are subject to
+ongoing change.
+.sp
+.LP
+Applications using  \fBlibkvm\fR are likely to be platform- and
+release-dependent.
+.sp
+.LP
+Most of the traditional uses of \fBlibkvm\fR have been superseded by more
+stable interfaces that allow the same information to be extracted more
+efficiently, yet  independent of the kernel data model.  For examples, see
+\fBsysconf\fR(3C), \fBproc\fR(4), \fBkstat\fR(3KSTAT), \fBgetloadavg\fR(3C),
+and \fBpathconf\fR(2).

@@ -1,0 +1,134 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_callback_ctl 9S "24 Jul 1996" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+devmap_callback_ctl \- device mapping-control structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddidevmap.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+A \fBdevmap_callback_ctl\fR structure describes a set of callback routines that
+are called by  the system to notify a device driver to manage events on  the
+device mappings created by \fBdevmap_setup\fR(9F) or
+\fBddi_devmap_segmap\fR(9F).
+.sp
+.LP
+Device drivers pass the initialized \fBdevmap_callback_ctl\fR structure to
+either \fBdevmap_devmem_setup\fR(9F) or \fBdevmap_umem_setup\fR(9F) in the
+\fBdevmap\fR(9E) entry point during the mapping setup.  The system makes a
+private copy of the structure for later use. Device drivers can specify
+different \fBdevmap_callback_ctl\fR for different mappings.
+.sp
+.LP
+A device driver should allocate the device mapping control structure and
+initialize the following fields, if the driver wants the entry points to be
+called by the system:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevmap_rev\fR \fR
+.ad
+.RS 18n
+.rt  
+Version number. Set this to \fBDEVMAP_OPS_REV\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevmap_map\fR \fR
+.ad
+.RS 18n
+.rt  
+Set to the address of the \fBdevmap_map\fR(9E) entry point or to  \fINULL\fR if
+the driver does not support this callback. If set, the system calls the
+\fBdevmap_map\fR(9E) entry point during the \fBmmap\fR(2) system call.  The
+drivers typically allocate driver private data structure in this function and
+return the pointer to the private data structure to the system for later use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevmap_access\fR \fR
+.ad
+.RS 18n
+.rt  
+Set to the address of the \fBdevmap_access\fR(9E) entry point or to  \fINULL\fR
+if the driver does not support this callback. If set, the system calls the
+driver's \fBdevmap_access\fR(9E) entry point during memory access.  The system
+expects \fBdevmap_access\fR(9E) to call either \fBdevmap_do_ctxmgt\fR(9F) or
+\fBdevmap_default_access\fR(9F) to load the memory address translations before
+it returns to the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevmap_dup\fR \fR
+.ad
+.RS 18n
+.rt  
+Set to the address of the \fBdevmap_dup\fR(9E) entry point or to  \fINULL\fR if
+the driver does not support this call. If set, the system calls the
+\fBdevmap_dup\fR(9E) entry point during the \fBfork\fR(2) system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevmap_unmap\fR \fR
+.ad
+.RS 18n
+.rt  
+Set to the address of the \fBdevmap_unmap\fR(9E) entry point or to  \fINULL\fR
+if the driver does not support this call. If set, the system will call the
+\fBdevmap_unmap\fR(9E) entry point during the \fBmunmap\fR(2) or \fBexit\fR(2)
+system calls.
+.RE
+
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+int	devmap_rev;
+int	(*devmap_map)(devmap_cookie_t dhp, dev_t dev, 
+     uint_t flags,offset_t off, size_t len, void **pvtp);
+int	(*devmap_access)(devmap_cookie_t dhp, void *pvtp, 
+     offset_t off, size_t len, uint_t type, uint_t rw);
+int	(*devmap_dup)(devmap_cookie_t dhp, void *pvtp,
+		   devmap_cookie_t new_dhp, void **new_pvtp);
+void	(*devmap_unmap)(devmap_cookie_t dhp, void *pvtp, 
+     offset_t off, size_t len, devmap_cookie_t new_dhp1, 
+     void **new_pvtp1, devmap_cookie_t new_dhp2, void **new_pvtp2);
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmunmap\fR(2), \fBdevmap\fR(9E),
+\fBdevmap_access\fR(9E), \fBdevmap_dup\fR(9E), \fBdevmap_map\fR(9E),
+\fBdevmap_unmap\fR(9E), \fBddi_devmap_segmap\fR(9F),
+\fBdevmap_default_access\fR(9F), \fBdevmap_devmem_setup\fR(9F),
+\fBdevmap_do_ctxmgt\fR(9F), \fBdevmap_setup\fR(9F), \fBdevmap_umem_setup\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

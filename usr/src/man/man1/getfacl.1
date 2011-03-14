@@ -1,0 +1,317 @@
+'\" te
+.\" \&.Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getfacl 1 "5 Nov 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+getfacl \- display discretionary file information
+.SH SYNOPSIS
+.LP
+.nf
+\fBgetfacl\fR [\fB-ad\fR] \fIfile\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For each argument that is a regular file, special file, or named pipe, the
+\fBgetfacl\fR utility displays the owner, the group, and the Access Control
+List (\fBACL\fR). For each directory argument, \fBgetfacl\fR displays the
+owner, the group, and the \fBACL\fR and/or the default \fBACL\fR. Only
+directories contain default \fBACL\fRs.
+.sp
+.LP
+The \fBgetfacl\fR utility may be executed on a file system that does not
+support \fBACL\fRs. It reports the \fBACL\fR based on the base permission bits.
+.sp
+.LP
+With no options specified, \fBgetfacl\fR displays the filename, the file owner,
+the file group owner, and both the \fBACL\fR and the default \fBACL\fR, if it
+exists.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays the filename, the file owner, the file group owner, and the \fBACL\fR
+of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays the filename, the file owner, the file group owner, and the default
+\fBACL\fR of the file, if it exists.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+The path name of a regular file, special file, or named pipe.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+The format for \fBACL\fR output is as follows:
+.sp
+.in +2
+.nf
+# file: filename	
+# owner: uid	
+# group: gid	
+user::perm	
+user:uid:perm	
+group::perm	
+group:gid:perm	
+mask:perm	
+other:perm	
+default:user::perm	
+default:user:uid:perm	
+default:group::perm	
+default:group:gid:perm	
+default:mask:perm	
+default:other:perm
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When multiple files are specified on the command line, a blank line separates
+the \fBACL\fRs for each file.
+.sp
+.LP
+The \fBACL\fR entries are displayed in the order in which they are evaluated
+when an access check is performed. The default \fBACL\fR entries that may exist
+on a directory have no effect on access checks.
+.sp
+.LP
+The first three lines display the filename, the file owner, and the file group
+owner. Notice that when only the \fB-d\fR option is specified and the file has
+no default \fBACL\fR, only these three lines are displayed.
+.sp
+.LP
+The \fBuser\fR entry without a user \fBID\fR indicates the permissions that
+are granted to the file owner. One or more additional user entries indicate the
+permissions that are granted to the specified users.
+.sp
+.LP
+The \fBgroup\fR entry without a group \fBID\fR indicates the permissions that
+are granted to the file group owner. One or more additional group entries
+indicate the permissions that  are granted to the specified groups.
+.sp
+.LP
+The \fBmask\fR entry indicates the \fBACL\fR mask permissions. These are the
+maximum permissions allowed to any user entries except the file owner, and to
+any group entries, including the file group owner. These permissions restrict
+the permissions specified in other entries.
+.sp
+.LP
+The \fBother\fR entry indicates the permissions that are granted to others.
+.sp
+.LP
+The \fBdefault\fR entries may exist only for directories. These entries
+indicate the default entries that are added to a file created within the
+directory.
+.sp
+.LP
+The \fBuid\fR is a login name or a user \fBID\fR if there is no entry for the
+\fBuid\fR in the system password file, \fB/etc/passwd\fR. The \fBgid\fR is a
+group name or a group \fBID\fR if there is no entry for the \fBgid\fR in the
+system group file, \fB/etc/group\fR. The \fBperm\fR is a three character string
+composed of the letters representing the separate discretionary access rights:
+\fBr\fR (read), \fBw\fR (write), \fBx\fR (execute/search), or the place holder
+character \fB\(mi\fR\&. The \fBperm\fR is displayed in the following order:
+\fBrwx\fR. If a permission is not granted by an \fBACL\fR entry, the place
+holder character appears.
+.sp
+.LP
+If  you use the \fBchmod\fR(1) command to change the file group owner
+permissions on a file with \fBACL\fR entries, both the file group owner
+permissions and the \fBACL\fR mask are changed to the new permissions. Be aware
+that the new \fBACL\fR mask permissions may change the effective permissions
+for additional users and groups who have \fBACL\fR entries on the file.
+.sp
+.LP
+In order to indicate that the \fBACL\fR mask  restricts an \fBACL\fR entry,
+\fBgetfacl\fR displays an additional tab character, pound sign (\fB#\fR), and
+the actual permissions granted, following the entry.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying file information
+.sp
+.LP
+Given file \fBfoo\fR, with an \fBACL\fR six entries long, the command
+
+.sp
+.in +2
+.nf
+host% \fBgetfacl foo\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would print:
+
+.sp
+.in +2
+.nf
+# file: foo 
+# owner: shea 
+# group: staff 
+user::rwx 
+user:spy:\|\(mi\|\(mi\|\(mi 
+user:mookie:r\|\(mi\|\(mi 
+group::r\|\(mi\|\(mi 
+mask::rw\|\(mi 
+other::\|\(mi\|\(mi\|\(mi
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying information after chmod command
+.sp
+.LP
+Continue with the above example, after \fBchmod\fR \fB700 foo\fR was issued:
+
+.sp
+.in +2
+.nf
+host% \fBgetfacl foo\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would print:
+
+.sp
+.in +2
+.nf
+# file: foo
+# owner: shea
+# group: staff
+user::rwx
+user:spy:\|\(mi\|\(mi\|\(mi
+user:mookie:r\|\(mi\|\(mi     #effective:\|\(mi\|\(mi\|\(mi
+group::\|\(mi\|\(mi\|\(mi          
+mask::\|\(mi\|\(mi\|\(mi
+other::\|\(mi\|\(mi\|\(mi
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRDisplaying information when ACL contains default entries
+.sp
+.LP
+Given directory \fBdoo\fR, with an \fBACL\fR containing default entries, the
+command
+
+.sp
+.in +2
+.nf
+host% \fBgetfacl -d doo\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would print:
+
+.sp
+.in +2
+.nf
+# file: doo
+# owner: shea
+# group: staff
+default:user::rwx
+default:user:spy:\|\(mi\|\(mi\|\(mi
+default:user:mookie:r\|\(mi\|\(mi
+default:group::r\|\(mi\|\(mi
+default:mask::\|\(mi\|\(mi\|\(mi
+default:other::\|\(mi\|\(mi\|\(mi
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 15n
+.rt  
+system password file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.RS 15n
+.rt  
+group file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBls\fR(1), \fBsetfacl\fR(1), \fBacl\fR(2),
+\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The output from \fBgetfacl\fR is in the correct format for input to the
+\fBsetfacl\fR \fB-f\fR command. If the output from \fBgetfacl\fR is redirected
+to a file, the file may be used as input to \fBsetfacl\fR. In this way, a user
+may easily assign one file's \fBACL\fR to another file.

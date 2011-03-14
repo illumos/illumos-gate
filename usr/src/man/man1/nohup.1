@@ -1,0 +1,455 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nohup 1 "19 Jun 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+nohup \- run a command immune to hangups
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/nohup\fR \fIcommand\fR [\fIargument\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/nohup\fR \fB-p\fR [\fB-Fa\fR] \fIpid\fR [\fIpid\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/nohup\fR \fB-g\fR [\fB-Fa\fR] \fIgpid\fR [\fIgpid\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/nohup\fR \fIcommand\fR [\fIargument\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnohup\fR utility invokes the named \fIcommand\fR with the arguments
+supplied.  When the \fIcommand\fR is invoked, \fBnohup\fR arranges for the
+\fBSIGHUP\fR signal to be ignored by the process.
+.sp
+.LP
+When invoked with the \fB-p\fR or \fB-g\fR flags, \fBnohup\fR arranges for
+processes already running as identified by a list of process \fBID\fRs or a
+list of process group \fBID\fRs to become immune to hangups.
+.sp
+.LP
+The \fBnohup\fR utility can be used when it is known that \fIcommand\fR takes a
+long time to run and the user wants to log out of the terminal. When a shell
+exits, the system sends its children \fBSIGHUP\fR signals, which by default
+cause them to be killed. All stopped, running, and background jobs ignores
+\fBSIGHUP\fR and continue running, if their invocation is preceded by the
+\fBnohup\fR command or if the process programmatically has chosen to ignore
+\fBSIGHUP\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/nohup\fR\fR
+.ad
+.RS 27n
+.rt  
+Processes run by \fB/usr/bin/nohup\fR are immune to \fBSIGHUP\fR (hangup) and
+\fBSIGQUIT\fR (quit) signals.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/nohup\fR \fB-p\fR [\fB-Fa\fR]\fR
+.ad
+.RS 27n
+.rt  
+Processes specified by \fBID\fR are made immune to \fBSIGHUP\fR and
+\fBSIGQUIT\fR, and all output to the controlling terminal is redirected to
+\fBnohup.out\fR. If \fB-F\fR is specified, \fBnohup\fR forces control of each
+process. If \fB-a\fR is specified, \fBnohup\fR changes the signal disposition
+of \fBSIGHUP\fR and \fBSIGQUIT\fR even if the process has installed a handler
+for either signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/nohup\fR \fB-g\fR [\fB-Fa\fR]\fR
+.ad
+.RS 27n
+.rt  
+Every process in the same process group as the processes specified by \fBID\fR
+are made immune to \fBSIGHUP\fR and \fBSIGQUIT\fR, and all output to the
+controlling terminal is redirected to \fBnohup.out\fR. If \fB-F\fR is
+specified, \fBnohup\fR forces control of each process. If \fB-a\fR is
+specified, \fBnohup\fR changes the signal disposition of \fBSIGHUP\fR and
+\fBSIGQUIT\fR even if the process has installed a handler for either signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/nohup\fR\fR
+.ad
+.RS 27n
+.rt  
+Processes run by \fB/usr/xpg4/bin/nohup\fR are immune to \fBSIGHUP\fR.
+.sp
+The \fBnohup\fR utility does not arrange to make processes immune to a
+\fBSIGTERM\fR (terminate) signal, so unless they arrange to be immune to
+\fBSIGTERM\fR or the shell makes them immune to \fBSIGTERM\fR, they will
+receive it.
+.sp
+If \fBnohup.out\fR is not writable in the current directory, output is
+redirected to \fB$HOME/nohup.out\fR. If a file is created, the file has read
+and write permission (\fB600\fR. See \fBchmod\fR(1). If the standard error is a
+terminal, it is redirected to the standard output, otherwise it is not
+redirected. The priority of the process run by \fBnohup\fR is not altered.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Always changes the signal disposition of target processes. This option is valid
+only when specified with \fB-p\fR or \fB-g\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+.rt  
+Force. Grabs the target processes even if another process has control. This
+option is valid only when specified with \fB-p\fR or \fB-g.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 6n
+.rt  
+Operates on a list of process groups. This option is not valid with \fB-p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Operates on a list of processes. This option is not valid with \fB-g\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 12n
+.rt  
+A decimal process \fBID\fR to be manipulated by \fBnohup\fR \fB-p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpgid\fR\fR
+.ad
+.RS 12n
+.rt  
+A decimal process group \fBID\fR to be manipulated by \fBnohup\fR \fB-g\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcommand\fR\fR
+.ad
+.RS 12n
+.rt  
+The name of a command that is to be invoked. If the \fIcommand\fR operand names
+any of the special \fBshell_builtins\fR(1) utilities, the results are
+undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIargument\fR\fR
+.ad
+.RS 12n
+.rt  
+Any string to be supplied as an argument when invoking the \fIcommand\fR
+operand.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Caution should be exercised when using the \fB-F\fR flag. Imposing two
+controlling processes on one victim process can lead to chaos. Safety is
+assured only if the primary controlling process, typically a debugger, has
+stopped the victim process and the primary controlling process is doing nothing
+at the moment of application of the \fBproc\fR tool in question.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRApplying nohup to pipelines or command lists
+.sp
+.LP
+It is frequently desirable to apply \fBnohup\fR to pipelines or lists of
+commands. This can be done only by placing pipelines and command lists in a
+single file, called a shell script. One can then issue:
+
+.sp
+.in +2
+.nf
+example$ \fBnohup sh \fIfile\fR\fR	
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and the \fBnohup\fR applies to everything in \fIfile\fR. If the shell script
+\fIfile\fR is to be executed often, then the need to type \fBsh\fR can be
+eliminated by giving \fIfile\fR execute permission.
+
+.sp
+.LP
+Add an ampersand and the contents of \fIfile\fR are run in the background with
+interrupts also ignored (see \fBsh\fR(1)):
+
+.sp
+.in +2
+.nf
+example$ \fBnohup \fIfile\fR &\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRApplying nohup -p to a process
+.sp
+.in +2
+.nf
+example$ \fBlong_running_command &\fR
+example$ \fBnohup -p `pgrep long_running_command`\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRApplying nohup -g to a process group
+.sp
+.in +2
+.nf
+example$ \fBmake &\fR
+example$ \fBps -o sid -p $$\fR
+   SID
+81079
+example$ \fBnohup -g `pgrep -s 81079 make`\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBnohup\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBPATH\fR, \fBNLSPATH\fR, and \fBPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOME\fR\fR
+.ad
+.RS 8n
+.rt  
+Determine the path name of the user's home directory: if the output file
+\fBnohup.out\fR cannot be created in the current directory, the \fBnohup\fR
+command uses the directory named by \fBHOME\fR to create the file.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB126\fR\fR
+.ad
+.RS 7n
+.rt  
+\fIcommand\fR was found but could not be invoked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB127\fR\fR
+.ad
+.RS 7n
+.rt  
+An error occurred in \fBnohup\fR, or \fIcommand\fR could not be found
+.RE
+
+.sp
+.LP
+Otherwise, the exit values of \fBnohup\fR are those of the \fIcommand\fR
+operand.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnohup.out\fR\fR
+.ad
+.RS 19n
+.rt  
+The output file of the \fBnohup\fR execution if standard output is a terminal
+and if the current directory is writable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/nohup.out\fR\fR
+.ad
+.RS 19n
+.rt  
+The output file of the \fBnohup\fR execution if standard output is a terminal
+and if the current directory is not writable.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/nohup"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SS "/usr/xpg4/bin/nohup"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbatch\fR(1), \fBchmod\fR(1), \fBcsh\fR(1), \fBksh\fR(1), \fBnice\fR(1),
+\fBpgrep\fR(1), \fBproc\fR(1), \fBps\fR(1), \fBsh\fR(1),
+\fBshell_builtins\fR(1), \fBsignal\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBstandards\fR(5)
+.SH WARNINGS
+.sp
+.LP
+If you are running the Korn shell (\fBksh\fR(1)) as your login shell, and have
+\fBnohup\fR'ed jobs running when you attempt to log out, you are warned with
+the message:
+.sp
+.in +2
+.nf
+You have jobs running.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You need to log out a second time to actually log out. However, your background
+jobs continues to run.
+.SH NOTES
+.sp
+.LP
+The C-shell (\fBcsh\fR(1)) has a built-in command \fBnohup\fR that provides
+immunity from \fBSIGHUP\fR, but does not redirect output to \fBnohup.out\fR.
+Commands executed with `\fB&\fR\&' are automatically immune to \fBHUP\fR
+signals while in the background.
+.sp
+.LP
+\fBnohup\fR does not recognize command sequences. In the case of the following
+command,
+.sp
+.in +2
+.nf
+example$ \fBnohup command1; command2\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+the \fBnohup\fR utility applies only to \fBcommand1\fR. The command,
+.sp
+.in +2
+.nf
+example$ \fBnohup (command1; command2)\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is syntactically incorrect.

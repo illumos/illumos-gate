@@ -1,0 +1,105 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_disabnotify 3DLPI "21 Sep 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_disabnotify \- disable DLPI notification
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -\fBldlpi\fR [ \fIlibrary\fR... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_disabnotify\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBdlpi_notifyid_t\fR \fIid\fR,
+     \fBvoid **\fR\fIargp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_disabnotify()\fR function disables the notification registration
+associated with identifier \fIid\fR. If \fIargp\fR is not NULL, the argument
+\fIarg\fR that was passed to \fBdlpi_enabnotify\fR(3DLPI) during registration
+is also returned. This operation can be performed in any DLPI state of a
+handle.
+.sp
+.LP
+Closing the DLPI handle \fIdh\fR will also remove all associated callback
+functions.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a DLPI
+error value defined in \fB<sys/dlpi.h>\fR or an error value listed in the
+following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 21n
+.rt  
+A DLPI handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 21n
+.rt  
+An argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ENOTEIDINVAL\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI notification ID is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_FAILURE\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI operation failed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_enabnotify\fR(3DLPI), \fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,602 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getsockopt 3SOCKET "27 Jan 2009" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+getsockopt, setsockopt \- get and set options on sockets
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+
+\fBint\fR \fBgetsockopt\fR(\fBint\fR \fIs\fR, \fBint\fR \fIlevel\fR, \fBint\fR \fIoptname\fR, \fBvoid *\fR\fIoptval\fR,
+     \fBint *\fR\fIoptlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetsockopt\fR(\fBint\fR \fIs\fR, \fBint\fR \fIlevel\fR, \fBint\fR \fIoptname\fR, \fBconst void *\fR\fIoptval\fR,
+     \fBint\fR \fIoptlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetsockopt()\fR and \fBsetsockopt()\fR functions manipulate options
+associated with a socket. Options may exist at multiple protocol levels; they
+are always present at the uppermost "socket" level.
+.sp
+.LP
+The \fIlevel\fR argument specifies the protocol level at which the option
+resides. To manipulate options at the socket level, specify the \fIlevel\fR
+argument as \fBSOL_SOCKET\fR. To manipulate options at the protocol level,
+supply the appropriate protocol number for the protocol controlling the option.
+For example, to indicate that an option will be interpreted by the \fBTCP\fR,
+set \fIlevel\fR to the protocol number of \fBTCP\fR, as defined in the
+\fB<netinet/in.h>\fR header, or as determined by using
+\fBgetprotobyname\fR(3SOCKET). Some socket protocol families may also define
+additional levels, such as \fBSOL_ROUTE\fR. Only socket-level options are
+described here.
+.sp
+.LP
+The parameters \fIoptval\fR and \fIoptlen\fR are used to access option values
+for \fBsetsockopt()\fR. For \fBgetsockopt()\fR, they identify a buffer in which
+the value(s) for the requested option(s) are to be returned. For
+\fBgetsockopt()\fR, \fIoptlen\fR is a value-result parameter, initially
+containing the size of the buffer pointed to by \fIoptval\fR, and modified on
+return to indicate the actual size of the value returned. Use a 0 \fIoptval\fR
+if no option value is to be supplied or returned.
+.sp
+.LP
+The \fIoptname\fR and any specified options are passed uninterpreted to the
+appropriate protocol module for interpretation. The include file
+<\fBsys/socket.h\fR> contains definitions for the socket-level options
+described below. Options at other protocol levels vary in format and name.
+.sp
+.LP
+Most socket-level options take an \fBint\fR for \fIoptval\fR. For
+\fBsetsockopt()\fR, the \fIoptval\fR parameter should be non-zero to enable a
+boolean option, or zero if the option is to be disabled. \fBSO_LINGER\fR uses a
+\fBstruct linger\fR parameter that specifies the desired state of the option
+and the linger interval. \fBstruct linger\fR is defined in
+<\fBsys/socket.h\fR>. \fBstruct\fR \fBlinger\fR contains the following members:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl_onoff\fR\fR
+.ad
+.RS 12n
+.rt  
+on = 1/off = 0
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl_linger\fR\fR
+.ad
+.RS 12n
+.rt  
+linger time, in seconds
+.RE
+
+.sp
+.LP
+The following options are recognized at the socket level. Except as noted, each
+may be examined with \fBgetsockopt()\fR and set with \fBsetsockopt()\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DEBUG\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable recording of debugging information
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_REUSEADDR\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable local address reuse
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_KEEPALIVE\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable keep connections alive
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DONTROUTE\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable routing bypass for outgoing messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_LINGER\fR\fR
+.ad
+.RS 19n
+.rt  
+linger on close if data is present
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_BROADCAST\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable permission to transmit broadcast messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_OOBINLINE\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable reception of out-of-band data in band
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_SNDBUF\fR\fR
+.ad
+.RS 19n
+.rt  
+set buffer size for output
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_RCVBUF\fR\fR
+.ad
+.RS 19n
+.rt  
+set buffer size for input
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DGRAM_ERRIND\fR\fR
+.ad
+.RS 19n
+.rt  
+application wants delayed error
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_TIMESTAMP\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable reception of timestamp with datagrams
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_EXCLBIND\fR\fR
+.ad
+.RS 19n
+.rt  
+enable/disable exclusive binding of the socket
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_TYPE\fR\fR
+.ad
+.RS 19n
+.rt  
+get the type of the socket (get only)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_ERROR\fR\fR
+.ad
+.RS 19n
+.rt  
+get and clear error on the socket (get only)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_MAC_EXEMPT\fR\fR
+.ad
+.RS 19n
+.rt  
+get or set mandatory access control on the socket. This option is available
+only when the system is configured with Trusted Extensions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_ALLZONES\fR\fR
+.ad
+.RS 19n
+.rt  
+bypass zone boundaries (privileged).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DOMAIN\fR\fR
+.ad
+.RS 19n
+.rt  
+get the domain used in the socket (get only)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_PROTOTYPE\fR\fR
+.ad
+.RS 19n
+.rt  
+for socket in domains \fBPF_INET\fR and \fBPF_INET6\fR, get the underlying
+protocol number used in the socket. For socket in domain \fBPF_ROUTE\fR, get
+the address family used in the socket.
+.RE
+
+.sp
+.LP
+The \fBSO_DEBUG\fR option enables debugging in the underlying protocol modules.
+The \fBSO_REUSEADDR\fR option indicates that the rules used in validating
+addresses supplied in a \fBbind\fR(3SOCKET) call should allow reuse of local
+addresses. The \fBSO_KEEPALIVE\fR option enables the periodic transmission of
+messages on a connected socket. If the connected party fails to respond to
+these messages, the connection is considered broken and threads using the
+socket are notified using a \fBSIGPIPE\fR signal. The \fBSO_DONTROUTE\fR option
+indicates that outgoing messages should bypass the standard routing facilities.
+Instead, messages are directed to the appropriate network interface according
+to the network portion of the destination address.
+.sp
+.LP
+The \fBSO_LINGER\fR option controls the action taken when unsent messages are
+queued on a socket and a \fBclose\fR(2) is performed. If the socket promises
+reliable delivery of data and \fBSO_LINGER\fR is set, the system will block the
+thread on the \fBclose()\fR attempt until it is able to transmit the data or
+until it decides it is unable to deliver the information (a timeout period,
+termed the linger interval, is specified in the \fBsetsockopt()\fR call when
+\fBSO_LINGER\fR is requested). If \fBSO_LINGER\fR is disabled and a
+\fBclose()\fR is issued, the system will process the \fBclose()\fR in a manner
+that allows the thread to continue as quickly as possible.
+.sp
+.LP
+The option \fBSO_BROADCAST\fR requests permission to send broadcast datagrams
+on the socket. With protocols that support out-of-band data, the
+\fBSO_OOBINLINE\fR option requests that out-of-band data be placed in the
+normal data input queue as received; it will then be accessible with
+\fBrecv()\fR or \fBread()\fR calls without the \fBMSG_OOB\fR flag.
+.sp
+.LP
+The \fBSO_SNDBUF\fR and \fBSO_RCVBUF\fR options adjust the normal buffer sizes
+allocated for output and input buffers, respectively. The buffer size may be
+increased for high-volume connections or may be decreased to limit the possible
+backlog of incoming data. The maximum buffer size for \fBUDP\fR is determined
+by the value of the \fBndd\fR variable \fBudp_max_buf\fR. The maximum buffer
+size for \fBTCP\fR is determined the value of the \fBndd\fR variable
+\fBtcp_max_buf\fR. Use the \fBndd\fR(1M) utility to determine the current
+default values. See the \fISolaris Tunable Parameters Reference Manual\fR for
+information on setting the values of \fBudp_max_buf\fR and \fBtcp_max_buf\fR.
+At present, lowering \fBSO_RCVBUF\fR on a TCP connection after it has been
+established has no effect.
+.sp
+.LP
+By default, delayed errors (such as \fBICMP\fR port unreachable packets) are
+returned only for connected datagram sockets. The \fBSO_DGRAM_ERRIND\fR option
+makes it possible to receive errors for datagram sockets that are not
+connected. When this option is set, certain delayed errors received after
+completion of a \fBsendto()\fR or \fBsendmsg()\fR operation will cause a
+subsequent \fBsendto()\fR or \fBsendmsg()\fR operation using the same
+destination address (\fIto\fR parameter) to fail with the appropriate error.
+See \fBsend\fR(3SOCKET).
+.sp
+.LP
+If the \fBSO_TIMESTAMP\fR option is enabled on a \fBSO_DGRAM\fR or a
+\fBSO_RAW\fR socket, the \fBrecvmsg\fR(3XNET) call will return a timestamp in
+the native data format, corresponding to when the datagram was received.
+.sp
+.LP
+The \fBSO_EXCLBIND\fR option is used to enable or disable the exclusive binding
+of a socket. It overrides the use of the \fBSO_REUSEADDR\fR option to reuse an
+address on \fBbind\fR(3SOCKET). The actual semantics of the \fBSO_EXCLBIND\fR
+option depend on the underlying protocol. See \fBtcp\fR(7P) or \fBudp\fR(7P)
+for more information.
+.sp
+.LP
+The \fBSO_TYPE\fR and \fBSO_ERROR\fR options are used only with
+\fBgetsockopt()\fR. The \fBSO_TYPE\fR option returns the type of the socket,
+for example, \fBSOCK_STREAM\fR. It is useful for servers that inherit sockets
+on startup. The \fBSO_ERROR\fR option returns any pending error on the socket
+and clears the error status. It may be used to check for asynchronous errors on
+connected datagram sockets or for other asynchronous errors.
+.sp
+.LP
+The \fBSO_MAC_EXEMPT\fR option is used to toggle socket behavior with unlabeled
+peers. A socket that has this option enabled can communicate with an unlabeled
+peer if it is in the global zone or has a label that dominates the default
+label of the peer. Otherwise, the socket must have a label that is equal to the
+default label of the unlabeled peer. Calling \fBsetsockopt()\fR with this
+option returns an \fBEACCES\fR error if the process lacks the
+\fBNET_MAC_AWARE\fR privilege or if the socket is bound. The
+\fBSO_MAC_EXEMPT\fR option is available only when the system is configured with
+Trusted Extensions.
+.sp
+.LP
+The \fBSO_ALLZONES\fR option can be used to bypass zone boundaries between
+shared-IP zones. Normally, the system prevents a socket from being bound to an
+address that is not assigned to the current zone. It also prevents a socket
+that is bound to a wildcard address from receiving traffic for other zones.
+However, some daemons which run in the global zone might need to send and
+receive traffic using addresses that belong to other shared-IP zones. If set
+before a socket is bound, \fBSO_ALLZONES\fR causes the socket to ignore zone
+boundaries between shared-IP zones and permits the socket to be bound to any
+address assigned to the shared-IP zones. If the socket is bound to a wildcard
+address, it receives traffic intended for all shared-IP zones and behaves as if
+an equivalent socket were bound in each active shared-IP zone. Applications
+that use the \fBSO_ALLZONES\fR option to initiate connections or send datagram
+traffic should specify the source address for outbound traffic by binding to a
+specific address. There is no effect from setting this option in an
+exclusive-IP zone. Setting this option requires the \fBsys_net_config\fR
+privilege. See \fBzones\fR(5).
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBgetsockopt()\fR and \fBsetsockopt()\fR return \fB0\fR.
+Otherwise, the functions return \fB\(mi1\fR and set \fBerrno\fR to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetsockopt()\fR and \fBsetsockopt()\fR calls succeed unless:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 17n
+.rt  
+The argument \fIs\fR is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 17n
+.rt  
+There was insufficient memory available for the operation to complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOPROTOOPT\fR\fR
+.ad
+.RS 17n
+.rt  
+The option is unknown at the level indicated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 17n
+.rt  
+There were insufficient STREAMS resources available for the operation to
+complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 17n
+.rt  
+The argument \fIs\fR is not a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOBUFS\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBSO_SNDBUF\fR or \fBSO_RCVBUF\fR exceeds a system limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 17n
+.rt  
+Invalid length for \fBIP_OPTIONS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEHOSTUNREACH\fR\fR
+.ad
+.RS 17n
+.rt  
+Invalid address for \fBIP_MULTICAST_IF\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 17n
+.rt  
+Not a multicast address for \fBIP_ADD_MEMBERSHIP\fR and
+\fBIP_DROP_MEMBERSHIP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEADDRNOTAVAIL\fR\fR
+.ad
+.RS 17n
+.rt  
+Bad interface address for \fBIP_ADD_MEMBERSHIP\fR and \fBIP_DROP_MEMBERSHIP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEADDRINUSE\fR\fR
+.ad
+.RS 17n
+.rt  
+Address already joined for \fBIP_ADD_MEMBERSHIP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 17n
+.rt  
+Address not joined for \fBIP_DROP_MEMBERSHIP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 17n
+.rt  
+No permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 17n
+.rt  
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified option is invalid at the specified socket level, or the socket
+has been shut down.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBndd\fR(1M), \fBclose\fR(2), \fBioctl\fR(2), \fBread\fR(2),
+\fBbind\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET), \fBrecv\fR(3SOCKET),
+\fBrecvmsg\fR(3XNET), \fBsend\fR(3SOCKET), \fBsocket\fR(3SOCKET),
+\fBsocket.h\fR(3HEAD), \fBattributes\fR(5), \fBzones\fR(5), \fBtcp\fR(7P),
+\fBudp\fR(7P)
+.sp
+.LP
+\fISolaris Tunable Parameters Reference Manual\fR

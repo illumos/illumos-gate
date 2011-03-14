@@ -1,0 +1,331 @@
+'\" te
+.\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright
+.\" (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.TH getrusage 3C "2 Jul 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getrusage \- get information about resource utilization
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/resource.h>
+
+\fBint\fR \fBgetrusage\fR(\fBint\fR \fIwho\fR, \fBstruct rusage *\fR\fIr_usage\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetrusage()\fR function provides measures of the resources used by the
+current process, its terminated and waited-for child processes, or the current
+light weight process (LWP).  If the value of the \fIwho\fR argument is
+\fBRUSAGE_SELF\fR, information is returned about resources used by the current
+process. If the value of the \fIwho\fR argument is \fBRUSAGE_CHILDREN\fR,
+information is returned about resources used by the terminated and waited-for
+children of the current process. If the child is never waited for (for
+instance, if the parent has \fBSA_NOCLDWAIT\fR set or sets \fBSIGCHLD\fR to
+\fBSIG_IGN\fR), the resource information for the child process is discarded and
+not included in the resource information provided by \fBgetrusage()\fR. If the
+value of the \fIwho\fR argument is \fBRUSAGE_LWP\fR, information is returned
+about resources used by the current LWP.
+.sp
+.LP
+The \fIr_usage\fR argument is a pointer to an object of type \fBstruct\fR
+\fBrusage\fR in which the returned information is stored.  The members of
+\fBrusage\fR are as follows:
+.sp
+.in +2
+.nf
+struct timeval  ru_utime;     /* user time used */
+struct timeval  ru_stime;     /* system time used */
+long            ru_maxrss;    /* maximum resident set size */
+long            ru_idrss;     /* integral resident set size */
+long            ru_minflt;    /* page faults not requiring physical 
+                                 I/O */
+long            ru_majflt;    /* page faults requiring physical I/O */
+long            ru_nswap;     /* swaps */
+long            ru_inblock;   /* block input operations */
+long            ru_oublock;   /* block output operations */
+long            ru_msgsnd;    /* messages sent */
+long            ru_msgrcv;    /* messages received */
+long            ru_nsignals;  /* signals received */
+long            ru_nvcsw;     /* voluntary context switches */
+long            ru_nivcsw;    /* involuntary context switches */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members are interpreted as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_utime\fR\fR
+.ad
+.RS 15n
+.rt  
+The total amount of time spent executing in user mode. Time is given in seconds
+and microseconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_stime\fR\fR
+.ad
+.RS 15n
+.rt  
+The total amount of time spent executing in system mode. Time is given in
+seconds and microseconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_maxrss\fR\fR
+.ad
+.RS 15n
+.rt  
+The maximum resident set size.  Size is given in pages (the size of a page, in
+bytes, is given by the \fBgetpagesize\fR(3C) function). See the \fBNOTES\fR
+section of this page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_idrss\fR\fR
+.ad
+.RS 15n
+.rt  
+An "integral" value indicating the amount of memory in use by a process while
+the process is running. This value is the sum of the resident set sizes of the
+process running when a clock tick occurs. The value is given in pages times
+clock ticks. It does not take sharing into account. See the  \fBNOTES\fR
+section of this page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_minflt\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of page faults serviced which did not require any physical I/O
+activity. See the  \fBNOTES\fR section of this page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_majflt\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of page faults serviced which required physical I/O activity. This
+could include page ahead operations by the kernel. See the  \fBNOTES\fR section
+of this page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_nswap\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of times a process was swapped out of main memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_inblock\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of times the file system had to perform input in servicing a
+\fBread\fR(2) request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_oublock\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of times the file system had to perform output in servicing a
+\fBwrite\fR(2) request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_msgsnd\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of messages sent over sockets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_msgrcv\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of messages received from sockets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_nsignals\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of signals delivered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_nvcsw\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of times a context switch resulted due to a process voluntarily
+giving up the processor before its time slice was completed (usually to await
+availability of a resource).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBru_nivcsw\fR\fR
+.ad
+.RS 15n
+.rt  
+The number of times a context switch resulted due to a higher priority process
+becoming runnable or because the current process exceeded its time slice.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetrusage()\fR returns \fB0\fR. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBgetrusage()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The address specified by the \fIr_usage\fR argument is not in a valid portion
+of the process' address space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBwho\fR parameter is not a valid value.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsar\fR(1M), \fBread\fR(2), \fBtimes\fR(2), \fBwrite\fR(2),
+\fBgetpagesize\fR(3C), \fBgettimeofday\fR(3C), \fBwait\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBru_maxrss\fR, \fBru_ixrss\fR, \fBru_idrss\fR, and \fBru_isrss\fR members
+of the \fBrusage\fR structure are set to 0 in this implementation.
+.sp
+.LP
+The numbers \fBru_inblock\fR and \fBru_oublock\fR account only for real I/O,
+and are approximate measures at best. Data supplied by the cache mechanism is
+charged only to the first process to read and the last process to write the
+data.
+.sp
+.LP
+The way resident set size is calculated is an approximation, and could
+misrepresent the true resident set size.
+.sp
+.LP
+Page faults can be generated from a variety of sources and for a variety of
+reasons. The customary cause for a page fault is a direct reference by the
+program to a page which is not in memory.  Now, however, the kernel can
+generate page faults on behalf of the user, for example, servicing
+\fBread\fR(2) and \fBwrite\fR(2) functions. Also, a page fault can be caused by
+an absent hardware translation to a page, even though the page is in physical
+memory.
+.sp
+.LP
+In addition to hardware detected page faults, the kernel may cause pseudo page
+faults in order to perform some housekeeping.  For example, the kernel may
+generate page faults, even if the pages exist in physical memory, in order to
+lock down pages involved in a raw I/O request.
+.sp
+.LP
+By definition, major page faults require physical I/O, while minor page faults
+do not require physical I/O. For example, reclaiming the page from the free
+list would avoid I/O and generate a minor page fault. More commonly, minor page
+faults occur during process startup as references to pages which are already in
+memory. For example, if an address space faults on some "hot" executable or
+shared library, this results in a minor page fault for the address space. Also,
+any one doing a \fBread\fR(2) or \fBwrite\fR(2) to something that is in the
+page cache will get a minor page fault(s) as well.
+.sp
+.LP
+There is no way to obtain information about a child process which has not yet
+terminated.

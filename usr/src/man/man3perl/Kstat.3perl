@@ -1,0 +1,171 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Kstat 3PERL "21 Jul 2005" "SunOS 5.11" "Perl Library Functions"
+.SH NAME
+Kstat \- Perl tied hash interface to the kstat facility
+.SH SYNOPSIS
+.LP
+.nf
+use Sun::Solaris::Kstat;
+
+Sun::Solaris::Kstat->new();
+Sun::Solaris::Kstat->update();
+Sun::Solaris::Kstat->{module}{instance}{name}{statistic}
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Kernel statistics are categorized using a 3-part key consisting of the module,
+the instance, and the statistic name. For example, CPU information can be found
+under \fBcpu_stat:0:cpu_stat0\fR, as in the above example. The method
+\fBSun::Solaris::Kstat\fR\(->\fBnew()\fR creates a new 3-layer tree of Perl
+hashes with the same structure; that is, the statistic for CPU 0 can be
+accessed as \fB$ks\(->{cpu_stat}{0}{cpu_stat0}\fR. The fourth and lowest layer
+is a tied hash used to hold the individual statistics values for a particular
+system resource.
+.sp
+.LP
+For performance reasons, the creation of a \fBSun::Solaris::Kstat\fR object is
+not accompanied by a following read of all possible statistics. Instead, the
+3-layer structure described above is created, but reads of a statistic's values
+are done only when referenced. For example, accessing
+\fB$ks\(->{cpu_stat}{0}{cpu_stat0}{syscall}\fR will read in all the statistics
+for CPU 0, including user, system, and wait times, and the other CPU
+statistics, as well as the number of system call entries. Once you have
+accessed a lowest level statistics value, calling \fB$ks\fR\(->\fBupdate()\fR
+will automatically update all the individual values of any statistics you have
+accessed.
+.sp
+.LP
+There are two values of the lowest-level hash that can be read without causing
+the full set of statistics to be read from the kernel. These are "class", which
+is the \fBkstat\fR class of the statistics, and "crtime"n, which is the time
+that the kstat was created. See \fBkstat\fR(3KSTAT) for full details of these
+fields.
+.SS "Methods"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnew()\fR\fR
+.ad
+.RS 12n
+.rt  
+Create a new kstat statistics hierarchy and return a reference to the top-level
+hash. Use it like any normal hash to access the statistics.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBupdate()\fR\fR
+.ad
+.RS 12n
+.rt  
+Update all the statistics that have been accessed so far.  In scalar context,
+\fBupdate()\fR returns 1 if the \fBkstat\fR structure has changed, and 0
+otherwise. In list context, \fBupdate()\fR returns references to two arrays:
+the first holds the keys of any kstats that have been added, and the second
+holds the keys of any kstats that have been deleted. Each key will be returned
+in the form "\fBmodule\fR:\fBinstance\fR:\fBname\fR".
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSun::Solaris::Kstat example
+.sp
+.in +2
+.nf
+use Sun::Solaris::Kstat;
+
+my $kstat = Sun::Solaris::Kstat->new();
+my ($usr1, $sys1, $wio1, $idle1) =
+   @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel 
+        wait idle)};
+print("usr sys wio idle\en");
+while (1) {
+   sleep 5;
+   if ($kstat->update()) {
+           print("Configuration changed\en");
+   }
+   my ($usr2, $sys2, $wio2, $idle2) =
+       @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel 
+            wait idle)};
+   printf(" %.2d  %.2d  %.2d  %.2d\en",
+        ($usr2 - $usr1) / 5, ($sys2 - $sys1) / 5,
+        ($wio2 - $wio1) / 5, ($idle2 - $idle1) / 5);
+   $usr1 = $usr2;
+   $sys1 = $sys2;
+   $wio1 = $wio2;
+   $idle1 = $idle2;
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBperl\fR(1), \fBkstat\fR(1M), \fBkstat\fR(3KSTAT),
+\fBkstat_chain_update\fR(3KSTAT), \fBkstat_close\fR(3KSTAT),
+\fBkstat_open\fR(3KSTAT), \fBkstat_read\fR(3KSTAT)
+.SH NOTES
+.sp
+.LP
+As the statistics are stored in a tied hash, taking additional references of
+members of the hash, such as
+.sp
+.in +2
+.nf
+my $ref = \eks->{cpu_stat}{0}{cpu_stat0}{syscall};
+print("$$ref\en");
+.fi
+.in -2
+
+.sp
+.LP
+will be recorded as a hold on that statistic's value, preventing it from being
+updated by \fBrefresh()\fR. Copy the values explicitly if persistence is
+necessary.
+.sp
+.LP
+Several of the statistics provided by the \fBkstat\fR facility are stored as
+64-bit integer values. Perl 5 does not yet internally support 64-bit integers,
+so these values are approximated in this module. There are two classes of
+64-bit value to be dealt with:
+.sp
+.ne 2
+.mk
+.na
+\fB64-bit intervals and times\fR
+.ad
+.RS 30n
+.rt  
+These are the \fBcrtime\fR and \fBsnaptime\fR fields of all the statistics
+hashes, and the \fBwtime\fR, \fBwlentime\fR, \fBwlastupdate\fR, \fBrtime\fR,
+\fBrlentime\fR and \fBrlastupdate\fR fields of the \fBkstat\fR I/O statistics
+structures.  These are measured by the \fBkstat\fR facility in nanoseconds,
+meaning that a 32-bit value would represent approximately 4 seconds. The
+alternative is to store the values as floating-point numbers, which offer
+approximately 53 bits of  precision on present hardware. 64-bit intervals and
+timers as floating point values expressed in seconds, meaning that time-related
+kstats are being rounded to approximately microsecond resolution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB64-bit counters\fR
+.ad
+.RS 30n
+.rt  
+It is not useful to store these values as 32-bit values. As noted above,
+floating-point values offer 53 bits of precision. Accordingly, all 64-bit
+counters are stored as floating-point values.
+.RE
+

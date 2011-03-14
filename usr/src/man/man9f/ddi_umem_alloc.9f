@@ -1,0 +1,196 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_umem_alloc 9F "19 Mar 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_umem_alloc, ddi_umem_free \- allocate and free page-aligned kernel memory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/sunddi.h>
+
+\fBvoid *\fR\fBddi_umem_alloc\fR(\fBsize_t\fR \fIsize\fR, \fBint\fR \fIflag\fR,
+     \fBddi_umem_cookie_t *\fR\fIcookiep\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_umem_free\fR(\fBddi_umem_cookie_t\fR \fIcookie\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.SS "ddi_umem_alloc()"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 11n
+.rt  
+Number of bytes to allocate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 11n
+.rt  
+Used to determine the sleep and pageable conditions.
+.sp
+Possible sleep flags are \fBDDI_UMEM_SLEEP\fR, which allows sleeping until
+memory is available, and \fBDDI_UMEM_NOSLEEP\fR, which returns \fBNULL\fR
+immediately if memory is not available.
+.sp
+The default condition is to allocate locked memory; this can be changed to
+allocate pageable memory using the \fBDDI_UMEM_PAGEABLE\fR flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookiep\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to a kernel memory cookie.
+.RE
+
+.SS "ddi_umem_free()"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookie\fR\fR
+.ad
+.RS 10n
+.rt  
+A kernel memory cookie allocated in \fBddi_umem_alloc()\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_umem_alloc()\fR allocates page-aligned kernel memory and returns a
+pointer to the allocated memory. The number of bytes allocated is a multiple of
+the system page size (roundup of \fIsize\fR). The allocated memory can be used
+in the kernel and can be exported to user space. See \fBdevmap\fR(9E) and
+\fBdevmap_umem_setup\fR(9F) for further information.
+.sp
+.LP
+\fIflag\fR determines whether the caller can sleep for memory and whether the
+allocated memory is locked or not. \fBDDI_UMEM_SLEEP\fR allocations may sleep
+but are guaranteed to succeed. \fBDDI_UMEM_NOSLEEP\fR allocations do not sleep
+but may fail (return \fINULL\fR) if memory is currently unavailable. If
+\fBDDI_UMEM_PAGEABLE\fR is set, pageable memory will be allocated. These pages
+can be swapped out to secondary memory devices. The initial contents of memory
+allocated using \fBddi_umem_alloc()\fR is zero-filled.
+.sp
+.LP
+\fI*cookiep\fR is a pointer to the kernel memory cookie that describes the
+kernel memory being allocated. A typical use of \fIcookiep\fR is in
+\fBdevmap_umem_setup\fR(9F) when the drivers want to export the kernel memory
+to a user application.
+.sp
+.LP
+To free the allocated memory, a driver calls \fBddi_umem_free()\fR with the
+cookie obtained from \fBddi_umem_alloc()\fR. \fBddi_umem_free()\fR releases the
+entire buffer.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNon-null\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion. \fBddi_umem_alloc()\fR returns a pointer to the
+allocated memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL\fR\fR
+.ad
+.RS 12n
+.rt  
+Memory cannot be allocated by \fBddi_umem_alloc()\fR because
+\fBDDI_UMEM_NOSLEEP\fR is set and the system is out of resources.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_umem_alloc()\fR can be called from any context if \fIflag\fR is set to
+\fBDDI_UMEM_NOSLEEP.\fR If \fBDDI_UMEM_SLEEP\fR is set, \fBddi_umem_alloc()\fR
+can be called from user and kernel context only. \fBddi_umem_free()\fR can be
+called from any context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdevmap\fR(9E), \fBcondvar\fR(9F), \fBdevmap_umem_setup\fR(9F),
+\fBkmem_alloc\fR(9F), \fBmutex\fR(9F), \fBrwlock\fR(9F), \fBsemaphore\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+Setting the \fBDDI_UMEM_PAGEABLE\fR flag in \fBddi_umem_alloc()\fR will result
+in an allocation of pageable memory. Because these pages can be swapped out to
+secondary memory devices, drivers should use this flag with care. This memory
+must not be used for the following purposes:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For synchronization objects such as locks and condition variables. See
+\fBmutex\fR(9F), \fBsemaphore\fR(9F), \fBrwlock\fR(9F), and \fBcondvar\fR(9F).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For driver interrupt routines.
+.RE
+.sp
+.LP
+Memory allocated using \fBddi_umem_alloc()\fR without setting
+\fBDDI_UMEM_PAGEABLE\fR flag cannot be paged. Available memory is therefore
+limited by the total physical memory on the system. It is also limited by the
+available kernel virtual address space, which is often the more restrictive
+constraint on large-memory configurations.
+.sp
+.LP
+Excessive use of kernel memory is likely to effect overall system performance.
+Over-commitment of kernel memory may cause unpredictable consequences.
+.sp
+.LP
+Misuse of the kernel memory allocator, such as writing past the end of a
+buffer, using a buffer after freeing it, freeing a buffer twice, or freeing an
+invalid pointer, will cause the system to corrupt data or panic.
+.sp
+.LP
+Do not call \fBddi_umem_alloc()\fR within \fBDDI_SUSPEND\fR and
+\fBDDI_RESUME\fR operations. Memory acquired at these times is not reliable. In
+some cases, such a call can cause a system to hang.
+.SH NOTES
+.sp
+.LP
+\fBddi_umem_alloc(0,\fR \fIflag\fR, \fIcookiep\fR\fB)\fR always returns
+\fBNULL.\fR \fBddi_umem_free(NULL)\fR has no effects on system.

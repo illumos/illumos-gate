@@ -1,0 +1,59 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_ber_free 3LDAP "25 Oct 2001" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_ber_free \- free a BerElement structure from memory
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc \fR\fB-flag \&.\|.\|.\fR  \fIfile \fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR] 
+#include <ldap.h>
+
+\fBvoid\fR \fBldap_ber_free\fR(\fBBerElement *\fR\fIber\fR, \fBint\fR \fIfreebuf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+You can make a call to the \fBldap_ber_free()\fR function to free
+\fBBerElement\fR structures allocated by \fBldap_first_attribute()\fR and by
+\fBldap_next_attribute()\fR function calls. When freeing structures allocated
+by these functions, specify 0 for the \fIfreebuf\fR argument. The
+\fBldap_first_attribute()\fR and by \fBldap_next_attribute()\fR functions do
+not allocate the extra buffer in the \fBBerElement\fR structure.
+.sp
+.LP
+For example, to retrieve attributes from a search result entry, you need to
+call the \fBldap_first_attribute()\fR function. A call to this function
+allocates a \fBBerElement\fR structure, which is used to help track the current
+attribute. When you are done working with the attributes, this structure should
+be freed from memory, if it still exists.
+.sp
+.LP
+This function is deprecated . Use the \fBber_free()\fR function instead.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBber_free\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP),
+\fBldap_next_attribute\fR(3LDAP), \fBattributes\fR(5)

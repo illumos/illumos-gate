@@ -1,0 +1,117 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH initscr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+initscr, newterm \- screen initialization functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBWINDOW *\fR\fBinitscr\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBSCREEN *\fR\fBnewterm\fR(\fBchar *\fR\fItype\fR, \fBFILE *\fR\fIoutfp\fR, \fBFILE *\fR\fIinfp\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtype\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a string defining the terminal type to be used in place of \fBTERM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutfp\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to a file to be used for output to the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinfp\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the pointer to a file to be used for input to the terminal.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinitscr()\fR function initializes X/Open Curses data structures,
+determines the terminal type, and ensures the first call to
+\fBrefresh\fR(3XCURSES) clears the screen.
+.sp
+.LP
+The \fBnewterm()\fR function opens a new terminal with each call.  It should be
+used instead of \fBinitscr()\fR when the program interacts with more than one
+terminal.  It returns a variable of type \fBSCREEN\fR, which should be used for
+later  reference to that terminal. Before program termination, \fBendwin()\fR
+should be called for each terminal.
+.sp
+.LP
+The only functions that you can call before calling \fBinitscr()\fR or
+\fBnewterm()\fR are \fBfilter\fR(3XCURSES), \fBripoffline\fR(3XCURSES),
+\fBslk_init\fR(3XCURSES), and \fBuse_env\fR(3XCURSES).
+.SH RETURN VALUES
+.sp
+.LP
+On success, the \fBinitscr()\fR function returns a pointer to \fBstdscr\fR;
+otherwise, \fBinitscr()\fR does not return.
+.sp
+.LP
+On success, the \fBnewterm()\fR function returns a pointer to the specified
+terminal; otherwise, a null pointer is returned.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdel_curterm\fR(3XCURSES), \fBdelscreen\fR(3XCURSES),
+\fBdoupdate\fR(3XCURSES), \fBendwin\fR(3XCURSES), \fBfilter\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBslk_attroff\fR(3XCURSES),
+\fBuse_env\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,159 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_attr_getguardsize 3C "23 mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_attr_getguardsize, pthread_attr_setguardsize \- get or set thread
+guardsize attribute
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h> 
+
+\fBint\fR \fBpthread_attr_getguardsize\fR(\fBconst pthread_attr_t *restrict\fR \fIattr\fR,
+     \fBsize_t *restrict\fR \fIguardsize\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_attr_setguardsize\fR(\fBpthread_attr_t *\fR\fIattr\fR, \fBsize_t\fR \fIguardsize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fIguardsize\fR attribute controls the size of the guard area for the
+created thread's stack. The \fIguardsize\fR attribute provides protection
+against overflow of the stack pointer. If a thread's stack is created with
+guard protection, the implementation allocates extra memory at the overflow end
+of the stack as a buffer against stack overflow of the stack pointer. If an
+application overflows into this buffer an error results (possibly in a
+\fBSIGSEGV\fR signal being delivered to the thread).
+.sp
+.LP
+The \fIguardsize\fR attribute is provided to the application for two reasons:
+.RS +4
+.TP
+1.
+Overflow protection can potentially result in wasted system resources. An
+application that creates a large number of threads, and which knows its threads
+will never overflow their stack, can save system resources by turning off guard
+areas.
+.RE
+.RS +4
+.TP
+2.
+When threads allocate large data structures on the stack, large guard areas
+may be needed to detect stack overflow.
+.RE
+.sp
+.LP
+The  \fBpthread_attr_getguardsize()\fR function gets the \fIguardsize\fR
+attribute in the \fIattr\fR object. This attribute is returned in the
+\fIguardsize\fR parameter.
+.sp
+.LP
+The  \fBpthread_attr_setguardsize()\fR function sets the \fIguardsize\fR
+attribute in the \fIattr\fR object. The new value of this attribute is obtained
+from the \fIguardsize\fR parameter. If \fIguardsize\fR is  \fB0\fR, a guard
+area will not be provided for threads created with \fIattr\fR. If
+\fIguardsize\fR is greater than  \fB0\fR, a guard area of at least size
+\fIguardsize\fR bytes is provided for each thread created with \fIattr\fR.
+.sp
+.LP
+A conforming implementation is permitted to round up the value contained in
+\fIguardsize\fR to a multiple of the configurable system variable
+\fBPAGESIZE.\fR If an implementation rounds up the value of \fIguardsize\fR to
+a multiple of  \fBPAGESIZE,\fR a call to \fBpthread_attr_getguardsize()\fR
+specifying \fIattr\fR will store in the \fIguardsize\fR parameter the guard
+size specified by the previous  \fBpthread_attr_setguardsize()\fR function
+call.
+.sp
+.LP
+The default value of the \fIguardsize\fR attribute is  \fBPAGESIZE\fR bytes.
+The actual value of  \fBPAGESIZE\fR is implementation-dependent and may not be
+the same on all implementations.
+.sp
+.LP
+If the \fIstackaddr\fR attribute has been set (that is, the caller is
+allocating and managing its own thread stacks), the \fIguardsize\fR attribute
+is ignored and no protection will be provided by the implementation. It is the
+responsibility of the application to manage stack overflow along with stack
+allocation and management in this case.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the  \fBpthread_attr_getguardsize()\fR and
+\fBpthread_attr_setguardsize()\fR functions return  \fB0\fR. Otherwise, an
+error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_attr_getguardsize()\fR and \fBpthread_attr_setguardsize()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The attribute \fIattr\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The parameter \fIguardsize\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The parameter \fIguardsize\fR contains an invalid value.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsysconf\fR(3C), \fBpthread_attr_init\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

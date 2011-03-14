@@ -1,0 +1,60 @@
+'\" te
+.\"  Copyright (c) 1994, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH listusers 1 "18 Mar 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+listusers \- list user login information
+.SH SYNOPSIS
+.LP
+.nf
+\fBlistusers\fR [\fB-g\fR \fIgroups\fR] [\fB-l\fR \fIlogins\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Executed without any options, this command lists all user logins sorted by
+login. The output shows the login \fBID\fR and the account field value  from
+the system's password database as specified by \fB/etc/nsswitch.conf\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fI groups\fR\fR
+.ad
+.RS 13n
+.rt  
+Lists all user logins belonging to \fBgroup\fR, sorted by login. Multiple
+groups can be specified as a comma-separated list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fI logins\fR\fR
+.ad
+.RS 13n
+.rt  
+Lists the user login or logins specified by \fBlogins\fR, sorted by login.
+Multiple logins can be specified as a comma-separated list.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnsswitch.conf\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+A user login is one that has a \fBUID\fR of 100 or greater.
+.sp
+.LP
+The \fB-l\fR and \fB-g\fR options can be combined. User logins will only be
+listed once, even if they belong to more than one of the selected groups.

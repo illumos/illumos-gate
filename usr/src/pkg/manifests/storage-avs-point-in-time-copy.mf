@@ -62,6 +62,9 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=ii devlink=type=ddi_pseudo;name=ii\t\D perms="* 0666 root sys" \
     privs=sys_config privs=sys_devices
 file path=etc/init.d/ii mode=0744
@@ -80,6 +83,10 @@ file path=usr/kernel/drv/ii.conf group=sys \
     original_name=SUNWii:usr/kernel/drv/ii.conf preserve=true
 file path=usr/lib/mdb/kvm/$(ARCH64)/ii.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/ii.so group=sys mode=0555
+file path=usr/share/man/man1m/iiadm.1m
+file path=usr/share/man/man1m/iicpbmp.1m
+file path=usr/share/man/man1m/iicpshd.1m
+file path=usr/share/man/man7d/ii.7d
 hardlink path=lib/svc/method/svc-ii target=../../../etc/init.d/ii
 legacy pkg=SUNWiir desc="Point-In-Time Copy and snapshot facility" \
     name="Sun StorageTek Availability Suite Point-In-Time Copy (root)"

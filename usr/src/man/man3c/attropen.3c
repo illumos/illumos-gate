@@ -1,0 +1,64 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH attropen 3C "1 Aug 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+attropen \- open a file
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+\fBint\fR \fBattropen\fR(\fBconst char *\fR\fIpath\fR, \fBconst char *\fR\fIattrpath\fR, \fBint\fR \fIoflag\fR,
+     \fB/* mode_t\fR \fImode\fR */...);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBattropen()\fR function is similar to the \fBopen\fR(2) function except
+that it takes a second path argument, \fIattrpath\fR, that identifies an
+extended attribute file associated with the first \fIpath\fR argument. This
+function returns a file descriptor for the extended attribute rather than the
+file named by the initial argument.
+.sp
+.LP
+The \fBO_XATTR\fR flag is set by default for \fBattropen()\fR and the
+\fIattrpath\fR argument is always interpreted as a reference to an extended
+attribute. Extended attributes must be referenced with a relative path;
+providing an absolute path results in a normal file reference.
+.SH RETURN VALUES
+.sp
+.LP
+Refer to \fBopen\fR(2).
+.SH ERRORS
+.sp
+.LP
+Refer to \fBopen\fR(2).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopen\fR(2), \fBattributes\fR(5), \fBfsattr\fR(5)
