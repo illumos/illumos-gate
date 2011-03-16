@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Joyent Inc.
+ */
+
+/*
  * method.c - method execution functions
  *
  * This file contains the routines needed to run a method:  a fork(2)-exec(2)
@@ -70,7 +74,7 @@
 #include <unistd.h>
 #include <atomic.h>
 #include <poll.h>
-
+#include <libscf_priv.h>
 #include "startd.h"
 
 #define	SBIN_SH		"/sbin/sh"
@@ -110,24 +114,44 @@ method_record_start(restarter_inst_t *inst)
 /*
  * method_rate_critical(restarter_inst_t *)
  *    Return true if the average start interval is less than the permitted
- *    interval.  Implicit success if insufficient measurements for an
- *    average exist.
+ *    interval.  The implicit interval defaults to RINST_FAILURE_RATE_NS and
+ *    RINST_START_TIMES but is overridable with the
+ *    startd/critical_failure_rate and startd/critical_start_times properties
+ *    Implicit success if insufficient measurements for an average exist.
  */
 static int
 method_rate_critical(restarter_inst_t *inst)
 {
+	hrtime_t critical_failure_rate = RINST_FAILURE_RATE_NS;
+	uint_t critical_start_times = RINST_START_TIMES;
 	uint_t n = inst->ri_start_index;
 	hrtime_t avg_ns = 0;
+	uint64_t scf_fr, scf_st;
+	scf_propvec_t *prop = NULL;
+	scf_propvec_t restart_critical[] = {
+		{ "critical_failure_rate", NULL, SCF_TYPE_INTEGER, NULL, 0 },
+		{ "critical_start_times", NULL, SCF_TYPE_INTEGER, NULL, 0 },
+		{ NULL }
+	};
 
-	if (inst->ri_start_index < RINST_START_TIMES)
-		return (0);
+	restart_critical[0].pv_ptr = &scf_fr;
+	restart_critical[1].pv_ptr = &scf_st;
+
+	if (scf_read_propvec(inst->ri_i.i_fmri, "startd",
+	    B_TRUE, restart_critical, &prop) != SCF_FAILED) {
+	    /* failure rate is defined in 1s intervals, but implemented in ns */
+	    critical_failure_rate = (hrtime_t) scf_fr * 1000000000;
+	    critical_start_times = (uint_t) scf_st;
+	}
+	if (inst->ri_start_index < critical_start_times)
+	    return (0);
 
 	avg_ns =
-	    (inst->ri_start_time[(n - 1) % RINST_START_TIMES] -
-	    inst->ri_start_time[n % RINST_START_TIMES]) /
-	    (RINST_START_TIMES - 1);
+	    (inst->ri_start_time[(n - 1) % critical_start_times] -
+	    inst->ri_start_time[n % critical_start_times]) /
+	    (critical_start_times - 1);
 
-	return (avg_ns < RINST_FAILURE_RATE_NS);
+	return (avg_ns < critical_failure_rate);
 }
 
 /*
