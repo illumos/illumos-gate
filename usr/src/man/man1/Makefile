@@ -342,7 +342,6 @@ MANFILES=	acctcom.1			\
 	 	setlabel.1			\
 	 	setpgrp.1			\
 	 	sftp.1				\
-		sh.1				\
 	 	shcomp.1			\
 	 	shell_builtins.1		\
 	 	shift.1				\
@@ -659,10 +658,11 @@ fg.1		:= SOSRC = man1/jobs.1
 notify.1	:= SOSRC = man1/jobs.1
 stop.1		:= SOSRC = man1/jobs.1
 
-rksh.1		:= SOSRC = man1/ksh.1
-
-rksh93.1	:= SOSRC = man1/ksh93.1
+jsh.1		:= SOSRC = man1/ksh93.1
 ksh.1		:= SOSRC = man1/ksh93.1
+rksh.1		:= SOSRC = man1/ksh93.1
+rksh93.1	:= SOSRC = man1/ksh93.1
+sh.1		:= SOSRC = man1/ksh93.1
 
 ldapadd.1	:= SOSRC = man1/ldapmodify.1
 
@@ -724,9 +724,6 @@ export.1	:= SOSRC = man1/set.1
 setenv.1	:= SOSRC = man1/set.1
 unset.1		:= SOSRC = man1/set.1
 unsetenv.1	:= SOSRC = man1/set.1
-
-jsh.1		:= SOSRC = man1/sh.1
-sh.1		:= SOSRC = man1/sh.1
 
 case.1		:= SOSRC = man1/shell_builtins.1
 for.1		:= SOSRC = man1/shell_builtins.1
