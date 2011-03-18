@@ -23,6 +23,10 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #ifndef	_LIBBE_PRIV_H
 #define	_LIBBE_PRIV_H
 
@@ -38,6 +42,7 @@ extern "C" {
 #define	BE_AUTO_NAME_MAX_TRY	3
 #define	BE_AUTO_NAME_DELIM	'-'
 #define	BE_CONTAINER_DS_NAME	"ROOT"
+#define	BE_DEFAULT_CONSOLE	"text"
 #define	BE_POLICY_PROPERTY	"org.opensolaris.libbe:policy"
 #define	BE_UUID_PROPERTY	"org.opensolaris.libbe:uuid"
 #define	BE_PLCY_STATIC		"static"
@@ -45,6 +50,10 @@ extern "C" {
 #define	BE_GRUB_MENU		"/boot/grub/menu.lst"
 #define	BE_SPARC_MENU		"/boot/menu.lst"
 #define	BE_GRUB_COMMENT		"#============ End of LIBBE entry ============="
+#define	BE_GRUB_SPLASH		"splashimage /boot/solaris.xpm"
+#define	BE_GRUB_FOREGROUND	"foreground 343434"
+#define	BE_GRUB_BACKGROUND	"background F7FBFF"
+#define	BE_GRUB_DEFAULT		"default 0"
 #define	BE_WHITE_SPACE		" \t\r\n"
 #define	BE_CAP_FILE		"/boot/grub/capability"
 #define	BE_INSTALL_GRUB		"/sbin/installgrub"

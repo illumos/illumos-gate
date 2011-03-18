@@ -24,6 +24,11 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+
+/*
  * System includes
  */
 #include <assert.h>
@@ -46,11 +51,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <wait.h>
+#include <libdevinfo.h>
 
 #include <libbe.h>
 #include <libbe_priv.h>
-
-#define	INST_ICT "/usr/lib/python2.6/vendor-packages/osol_install/ict.py"
 
 /* Private function prototypes */
 static int update_dataset(char *, int, char *, char *, char *);
@@ -2775,8 +2779,6 @@ be_err_to_str(int err)
 		return (gettext("Invalid path for menu.lst file"));
 	case BE_ERR_ZONE_SS_EXISTS:
 		return (gettext("Zone snapshot exists."));
-	case BE_ERR_ADD_SPLASH_ICT:
-		return (gettext("Add_spash_image ICT failed."));
 	case BE_ERR_BOOTFILE_INST:
 		return (gettext("Error installing boot files."));
 	case BE_ERR_EXTCMD:
@@ -3451,6 +3453,52 @@ be_get_auto_name(char *obe_name, char *be_container_ds, boolean_t zone_be)
 }
 
 /*
+ * Function:	be_get_console_prop
+ * Description:	Determine console device.
+ * Returns:
+ *		Success - pointer to console setting.
+ *		Failure - NULL
+ * Scope:
+ *		Private
+ */
+static char *
+be_get_console_prop(void)
+{
+	di_node_t	dn;
+	char *console = NULL;
+
+	if ((dn = di_init("/", DINFOPROP)) == DI_NODE_NIL) {
+		be_print_err(gettext("be_get_console_prop: "
+		    "di_init() failed\n"));
+		return (NULL);
+	}
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, dn,
+	    "console", &console) != -1) {
+		di_fini(dn);
+		return (console);
+	}
+
+	if (console == NULL) {
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY, dn,
+		    "output-device", &console) != -1) {
+			di_fini(dn);
+			if (strncmp(console, "screen", strlen("screen")) == 0)
+				console = BE_DEFAULT_CONSOLE;
+		}
+	}
+
+	/*
+	 * Default console to text
+	 */
+	if (console == NULL) {
+		console = BE_DEFAULT_CONSOLE;
+	}
+
+	return (console);
+}
+
+/*
  * Function:	be_create_menu
  * Description:
  *		This function is used if no menu.lst file exists. In
@@ -3480,11 +3528,10 @@ be_create_menu(
 	char *mode)
 {
 	be_node_list_t	*be_nodes = NULL;
-	char add_default_cmd[BUFSIZ];
 	char *menu_path = NULL;
 	char *be_rpool = NULL;
 	char *be_name = NULL;
-
+	char *console = NULL;
 	errno = 0;
 
 	if (menu_file == NULL || menu_fp == NULL || mode == NULL)
@@ -3513,23 +3560,43 @@ be_create_menu(
 	 * Check to see if this system supports grub
 	 */
 	if (be_has_grub()) {
-		char be_run_cmd_errbuf[BUFSIZ];
 		/*
 		 * The grub menu is missing so we need to create it
 		 * and fill in the first few lines.
 		 */
-		(void) snprintf(add_default_cmd, sizeof (add_default_cmd),
-		    "%s add_splash_image_to_grub_menu %s",
-		    INST_ICT, pool_mntpt);
-		if (be_run_cmd(add_default_cmd, be_run_cmd_errbuf, BUFSIZ,
-		    NULL, 0) != BE_SUCCESS) {
-			be_print_err(gettext("be_create_menu: "
-			    "add_splash_image_to_grub_menu ICT failed.\n"));
-			be_print_err(gettext("  Command: \"%s\"\n"),
-			    add_default_cmd);
-			be_print_err(be_run_cmd_errbuf);
-			return (BE_ERR_ADD_SPLASH_ICT);
+		FILE *temp_fp = fopen(menu_file, "a+");
+		if (temp_fp == NULL) {
+			*menu_fp = NULL;
+			return (errno_to_be_err(errno));
 		}
+
+		if ((console = be_get_console_prop()) != NULL) {
+
+			/*
+			 * If console is redirected to serial line,
+			 * GRUB splash screen will not be enabled.
+			 */
+			if (strncmp(console, "text", strlen("text")) == 0 ||
+			    strncmp(console, "graphics",
+			    strlen("graphics")) == 0) {
+
+				(void) fprintf(temp_fp, "%s\n", BE_GRUB_SPLASH);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_FOREGROUND);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_BACKGROUND);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_DEFAULT);
+			} else {
+				be_print_err(gettext("be_create_menu: "
+				    "console on serial line, "
+				    "GRUB splash image will be disabled\n"));
+			}
+		}
+
+		(void) fprintf(temp_fp,	"timeout 30\n");
+		(void) fclose(temp_fp);
+
 	} else {
 		/*
 		 * The menu file doesn't exist so we need to create a
