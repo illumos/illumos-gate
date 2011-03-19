@@ -25,6 +25,9 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
+/*
+ * Copyright 2011 cyril.galibern@opensvc.com
+ */
 
 /*
  * SCSI disk target driver.
@@ -20954,7 +20957,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t  usr_cmd,
  *                      for the target.
  *		usr_cmd SCSI-3 reservation facility command (one of
  *			SD_SCSI3_REGISTER, SD_SCSI3_RESERVE, SD_SCSI3_RELEASE,
- *			SD_SCSI3_PREEMPTANDABORT)
+ *			SD_SCSI3_PREEMPTANDABORT, SD_SCSI3_CLEAR)
  *		usr_bufp - user provided pointer register, reserve descriptor or
  *			preempt and abort structure (mhioc_register_t,
  *                      mhioc_resv_desc_t, mhioc_preemptandabort_t)
@@ -21018,6 +21021,12 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(sd_ssc_t *ssc, uchar_t usr_cmd,
 		bcopy(ptr->newkey.key, prp->service_key,
 		    MHIOC_RESV_KEY_SIZE);
 		prp->aptpl = ptr->aptpl;
+		break;
+	}
+	case SD_SCSI3_CLEAR: {
+		mhioc_resv_desc_t *ptr = (mhioc_resv_desc_t *)usr_bufp;
+
+		bcopy(ptr->key.key, prp->res_key, MHIOC_RESV_KEY_SIZE);
 		break;
 	}
 	case SD_SCSI3_RESERVE:
@@ -22290,6 +22299,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case MHIOCGRP_INKEYS:
 		case MHIOCGRP_INRESV:
 		case MHIOCGRP_REGISTER:
+		case MHIOCGRP_CLEAR:
 		case MHIOCGRP_RESERVE:
 		case MHIOCGRP_PREEMPTANDABORT:
 		case MHIOCGRP_REGISTERANDIGNOREKEY:
@@ -22598,6 +22608,28 @@ skip_ready_valid:
 					err =
 					    sd_send_scsi_PERSISTENT_RESERVE_OUT(
 					    ssc, SD_SCSI3_REGISTER,
+					    (uchar_t *)&reg);
+					if (err != 0)
+						goto done_with_assess;
+				}
+			}
+		}
+		break;
+
+	case MHIOCGRP_CLEAR:
+		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_CLEAR\n");
+		if ((err = drv_priv(cred_p)) != EPERM) {
+			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
+				err = ENOTSUP;
+			} else if (arg != NULL) {
+				mhioc_register_t reg;
+				if (ddi_copyin((void *)arg, &reg,
+				    sizeof (mhioc_register_t), flag) != 0) {
+					err = EFAULT;
+				} else {
+					err =
+					    sd_send_scsi_PERSISTENT_RESERVE_OUT(
+					    ssc, SD_SCSI3_CLEAR,
 					    (uchar_t *)&reg);
 					if (err != 0)
 						goto done_with_assess;
@@ -24729,7 +24761,7 @@ sd_mhdioc_inresv(dev_t dev, caddr_t arg, int flag)
  * A direct semantic implementation of the SCSI-3 Persistent Reservation
  * facility is supported through the shared multihost disk ioctls
  * (MHIOCGRP_INKEYS, MHIOCGRP_INRESV, MHIOCGRP_REGISTER, MHIOCGRP_RESERVE,
- * MHIOCGRP_PREEMPTANDABORT)
+ * MHIOCGRP_PREEMPTANDABORT, MHIOCGRP_CLEAR)
  *
  * Reservation Reclaim:
  * --------------------

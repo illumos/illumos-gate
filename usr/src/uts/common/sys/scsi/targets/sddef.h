@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 cyril.galibern@opensvc.com
+ */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
 #define	_SYS_SCSI_TARGETS_SDDEF_H
@@ -884,6 +887,7 @@ typedef struct sd_prout {
 #define	SD_SCSI3_REGISTER		0x00
 #define	SD_SCSI3_RESERVE		0x01
 #define	SD_SCSI3_RELEASE		0x02
+#define	SD_SCSI3_CLEAR			0x03
 #define	SD_SCSI3_PREEMPTANDABORT	0x05
 #define	SD_SCSI3_REGISTERANDIGNOREKEY	0x06
 
