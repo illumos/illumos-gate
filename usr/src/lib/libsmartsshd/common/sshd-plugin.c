@@ -53,8 +53,8 @@ static const int RETURN_SZ = 2;
 static const int MAX_ATTEMPTS = 2;
 static const int SLEEP_PERIOD = 1;
 
-int
-sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
+static int
+sshd_allowed_in_capi(struct passwd *pw, const char *fp)
 {
 	int allowed = 0;
 	int fd = -1;
@@ -62,7 +62,8 @@ sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
 	int attempts = 0;
 	char *buf = NULL;
 	door_arg_t door_args = {0};
-	if (pw == NULL || key == NULL)
+
+	if (pw == NULL || fp == NULL)
 		return (0);
 
 	blen = snprintf(NULL, 0, REQ_FMT_STR, pw->pw_name, pw->pw_uid, fp) + 1;
@@ -88,7 +89,7 @@ sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
 	do {
 		fd = open(DOOR, O_RDWR);
 		if (fd < 0)
-			perror("smartplugn: open (of door FD) failed");
+			perror("smartplugin: open (of door FD) failed");
 
 		if (door_call(fd, &door_args) < 0) {
 			perror("smartplugin: door_call failed");
@@ -103,6 +104,19 @@ sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
 
 	return (0);
 }
+
+int
+sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
+{
+	return sshd_allowed_in_capi(pw, fp);
+}
+
+int
+sshd_user_dsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
+{
+	return sshd_allowed_in_capi(pw, fp);
+}
+
 
 #ifdef __cplusplus
 }

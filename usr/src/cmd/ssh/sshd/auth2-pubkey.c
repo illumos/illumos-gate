@@ -58,6 +58,10 @@ extern int session_id2_len;
 
 /* global plugin function requirements */
 static const char *RSA_SYM_NAME = "sshd_user_rsa_key_allowed";
+static const char *DSA_SYM_NAME = "sshd_user_rsa_key_allowed";
+typedef int (*RSA_SYM)(struct passwd *, RSA *, const char *);
+typedef int (*DSA_SYM)(struct passwd *, DSA *, const char *);
+
 
 static void
 userauth_pubkey(Authctxt *authctxt)
@@ -330,12 +334,15 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 static int
 user_key_allowed_from_plugin(struct passwd *pw, Key *key)
 {
-	int (*authorize)(struct passwd *, RSA *, const char *) = NULL;
+	RSA_SYM rsa_sym = NULL;
+	DSA_SYM dsa_sym = NULL;
 	char *fp = NULL;
 	void *handle = NULL;
 	int success = 0;
 
-	if (options.pubkey_plugin == NULL || pw == NULL || key == NULL)
+	if (options.pubkey_plugin == NULL || pw == NULL || key == NULL ||
+	    (key->type != KEY_RSA && key->type != KEY_RSA1 &&
+	     key->type != KEY_DSA && key->type != KEY_ECDSA))
 		return success;
 
 	handle = dlopen(options.pubkey_plugin, RTLD_NOW);
@@ -345,33 +352,48 @@ user_key_allowed_from_plugin(struct passwd *pw, Key *key)
 		goto out;
 	}
 
-	authorize = (int (*)(struct passwd *, RSA *, const char *))dlsym(
-		handle, RSA_SYM_NAME);
-
-	if (authorize == NULL) {
-		debug("Unable to resolve symbol %s: %s", RSA_SYM_NAME, dlerror());
+	fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	if (fp == NULL) {
+		debug("failed to generate fingerprint");
 		goto out;
 	}
 
 	switch (key->type) {
-		case KEY_RSA1:
-		case KEY_RSA:
-			fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
-			if (fp == NULL) {
-				debug("failed to generate fingerprint");
-				goto out;
-			}
-			success = (*authorize)(pw, key->rsa, fp);
-			debug("sshd_plugin returned: %d", success);
-			break;
-		default:
-			debug2("user_key_plugins only support RSA keys");
+	case KEY_RSA1:
+	case KEY_RSA:
+		rsa_sym = (RSA_SYM)dlsym(handle, RSA_SYM_NAME);
+		if (rsa_sym == NULL) {
+			debug("Unable to resolve symbol %s: %s", RSA_SYM_NAME,
+				dlerror());
+			goto out;
+		}
+		debug2("Invoking %s from %s", RSA_SYM_NAME,
+			options.pubkey_plugin);
+		success = (*rsa_sym)(pw, key->rsa, fp);
+		break;
+	case KEY_DSA:
+	case KEY_ECDSA:
+		dsa_sym = (DSA_SYM)dlsym(handle, RSA_SYM_NAME);
+		if (dsa_sym == NULL) {
+			debug("Unable to resolve symbol %s: %s", DSA_SYM_NAME,
+				dlerror());
+			goto out;
+		}
+		debug2("Invoking %s from %s", DSA_SYM_NAME,
+			options.pubkey_plugin);
+		success = (*dsa_sym)(pw, key->dsa, fp);
+		break;
+	default:
+		debug2("user_key_plugins only support RSA keys");
 	}
+
+	debug("sshd_plugin returned: %d", success);
 
 out:
 	if (handle != NULL) {
 		dlclose(handle);
-		authorize = NULL;
+		dsa_sym = NULL;
+		rsa_sym = NULL;
 		handle = NULL;
 	}
 
