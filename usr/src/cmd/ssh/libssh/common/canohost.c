@@ -65,14 +65,14 @@ get_remote_hostname(int socket, int verify_reverse_mapping)
 	}
 #endif /* IPV4_IN_IPV6 */
 
+	if (!verify_reverse_mapping)
+		return xstrdup(ntop);
+
 	debug3("Trying to reverse map address %.100s.", ntop);
 	/* Map the IP address to a host name. */
 	if (getnameinfo((struct sockaddr *)&from, fromlen, name, sizeof(name),
 	    NULL, 0, NI_NAMEREQD) != 0) {
 		/* Host name not found.  Use ip address. */
-#if 0
-		log("Could not reverse map address %.100s.", ntop);
-#endif
 		return xstrdup(ntop);
 	}
 
@@ -205,36 +205,6 @@ get_socket_address(int socket, int remote, int flags)
 
 	return (xstrdup(result));
 }
-#if 0
-static char *
-get_socket_address(int socket, int remote, int flags)
-{
-	struct sockaddr_storage addr;
-	socklen_t addrlen;
-	char ntop[NI_MAXHOST];
-
-	/* Get IP address of client. */
-	addrlen = sizeof(addr);
-	memset(&addr, 0, sizeof(addr));
-
-	if (remote) {
-		if (getpeername(socket, (struct sockaddr *)&addr, &addrlen)
-		    < 0)
-			return NULL;
-	} else {
-		if (getsockname(socket, (struct sockaddr *)&addr, &addrlen)
-		    < 0)
-			return NULL;
-	}
-	/* Get the address in ascii. */
-	if (getnameinfo((struct sockaddr *)&addr, addrlen, ntop, sizeof(ntop),
-	    NULL, 0, flags) != 0) {
-		error("get_socket_ipaddr: getnameinfo %d failed", flags);
-		return NULL;
-	}
-	return xstrdup(ntop);
-}
-#endif
 
 char *
 get_peer_ipaddr(int socket)
@@ -387,4 +357,4 @@ inet_ntop_native(int af, const void *src, char *dst, size_t size)
 	}
 
 	return (result);
-} 
+}
