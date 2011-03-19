@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mhd 7i "1 Sep 2005" "SunOS 5.11" "Ioctl Requests"
+.TH mhd 7i "18 Mar 2011" "SunOS 5.11" "Ioctl Requests"
 .SH NAME
 mhd \- multihost disk control operations
 .SH SYNOPSIS
@@ -292,7 +292,6 @@ implemented).
 Issues the SCSI-3 command Persistent Reserve Out Clear. The input parameter
 \fIr\fR is the reservation key of the caller, which should have been already
 registered with the device, by an earlier call to \fBMHIOCGRP_REGISTER\fR.
-(Note: This command is not implemented).
 .RE
 
 .sp

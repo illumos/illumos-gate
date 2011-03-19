@@ -195,6 +195,8 @@ i386_MANFILES =	ahci.7d		\
 		atu.7d		\
 		audio810.7d	\
 		audiocmi.7d	\
+		audiocmihd.7d	\
+		audioemu10k.7d	\
 		audiohd.7d	\
 		audioixp.7d	\
 		audiosolo.7d	\

@@ -24,6 +24,10 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.
+#
+
+#
 # The default for payload-bearing actions in this package is to appear in the
 # global zone only.  See the include file for greater detail, as well as
 # information about overriding the defaults.
@@ -37,12 +41,15 @@ set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=audioemu10k \
     alias=pci1102,2 \
     alias=pci1102,4 \
     alias=pci1102,8
 file path=kernel/drv/$(ARCH64)/audioemu10k group=sys
 file path=kernel/drv/audioemu10k group=sys
+file path=usr/share/man/man7d/audioemu10k.7d
 legacy pkg=SUNWaudioemu10k \
     desc="SunOS audio device driver for Creative EMU10K" \
     name="Creative EMU10K Audio Driver"
