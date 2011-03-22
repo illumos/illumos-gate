@@ -43,10 +43,10 @@ include ../Makefile.man
 # As a workaround, install the files manually in a FRC target.
 CMD= $(INS) -s -m $(FILEMODE) -f $(ROOTMAN)/man$(MANSECT)
 install: FRC
-	@for file in $(MANFILES); do				\
-		if [[ $$file -nt $(ROOTMAN)/man$(MANSECT)/$$file ]]; then	\
+	@for file in $(MANFILES); do					\
+		if [[ $$file -nt $(ROOTMAN)/man$(MANSECT)/$$file ]]; then \
 			$(ECHO) $(CMD) $$file;				\
-			$(RM) $(ROOTMAN)man$(MANSECT)/$$file;			\
+			$(RM) $(ROOTMAN)/man$(MANSECT)/$$file;		\
 			$(CMD) $$file;					\
 		fi							\
 	done;
