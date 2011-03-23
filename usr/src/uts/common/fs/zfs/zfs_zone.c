@@ -874,9 +874,10 @@ zfs_zone_zio_init(zio_t *zp)
 void
 zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 {
+	zone_t *zonep = curzone;
+	zone_zfs_kstat_t *zzp;
 	hrtime_t unow;
 	uint16_t wait;
-	zone_t	*zonep = curzone;
 
 	unow = GET_USEC_TIME;
 
@@ -927,6 +928,11 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 		    (uintptr_t)type, (uintptr_t)wait);
 
 		drv_usecwait(wait);
+
+		if ((zzp = zonep->zone_zfs_stats) != NULL) {
+			atomic_inc_64(&zzp->zz_throttle_cnt.value.ui64);
+			atomic_add_64(&zzp->zz_throttle_time.value.ui64, wait);
+		}
 	}
 }
 

@@ -387,6 +387,11 @@ typedef struct {
 	hrtime_t	zone_avg_cnt;
 } sys_zio_cntr_t;
 
+typedef struct {
+	kstat_named_t 	zz_throttle_cnt;
+	kstat_named_t	zz_throttle_time;
+} zone_zfs_kstat_t;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -556,6 +561,13 @@ typedef struct zone {
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
 	kstat_t		*zone_vfs_ksp;
 	kstat_io_t	*zone_vfs_kiop;
+
+	/*
+	 * kstats for ZFS observability.
+	 */
+	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
+	kstat_t		*zone_zfs_ksp;
+	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*
 	 * Solaris Auditing per-zone audit context

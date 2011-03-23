@@ -1861,6 +1861,35 @@ zone_rctl_kstat_create_common(zone_t *zone, char *name,
 	return (ksp);
 }
 
+static kstat_t *
+zone_zfs_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_zfs_kstat_t *zzp;
+
+	if ((ksp = kstat_create_zone("zone_zfs", zone->zone_id,
+	    zone->zone_name, "zone_zfs", KSTAT_TYPE_NAMED,
+	    sizeof (zone_zfs_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zzp = ksp->ks_data = kmem_zalloc(sizeof (zone_zfs_kstat_t), KM_SLEEP);
+	ksp->ks_lock = &zone->zone_zfs_lock;
+	zone->zone_zfs_stats = zzp;
+
+	kstat_named_init(&zzp->zz_throttle_cnt,
+	    "throttle_cnt", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_throttle_time,
+	    "throttle_time", KSTAT_DATA_UINT64);
+
+	ksp->ks_private = zone;
+	kstat_install(ksp);
+	return (ksp);
+}
+
 static void
 zone_kstat_create(zone_t *zone)
 {
@@ -1902,6 +1931,11 @@ zone_kstat_create(zone_t *zone)
 		zone->zone_vfs_kiop = kmem_zalloc(
 		    sizeof (kstat_io_t), KM_SLEEP);
 	}
+
+	if ((zone->zone_zfs_ksp = zone_zfs_kstat_create(zone)) == NULL) {
+		zone->zone_zfs_stats = kmem_zalloc(
+		    sizeof (zone_zfs_kstat_t), KM_SLEEP);
+	}
 }
 
 static void
@@ -1940,6 +1974,9 @@ zone_kstat_delete(zone_t *zone)
 	} else {
 		kmem_free(zone->zone_vfs_kiop, sizeof (kstat_io_t));
 	}
+
+	zone_kstat_delete_common(&zone->zone_zfs_ksp,
+	    sizeof (zone_zfs_kstat_t));
 }
 
 /*
