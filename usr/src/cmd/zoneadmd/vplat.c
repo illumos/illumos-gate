@@ -3117,20 +3117,17 @@ remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
 			/* datalink does not belong to the GZ */
 			continue;
 		}
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'protection' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
+
 		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
 		    "allowed-ips", NULL, 0, DLADM_OPT_ACTIVE);
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'allowed-ips' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
 	}
 	free(dllinks);
 	return (0);
@@ -5142,16 +5139,12 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 		goto error;
 	}
 
-	if (remove_datalink_pool(zlogp, zoneid) != 0) {
+	if (remove_datalink_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "unable clear datalink pool property");
-		goto error;
-	}
 
-	if (remove_datalink_protect(zlogp, zoneid) != 0) {
+	if (remove_datalink_protect(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE,
 		    "unable clear datalink protect property");
-		goto error;
-	}
 
 	/*
 	 * The datalinks assigned to the zone will be removed from the NGZ as
@@ -5227,7 +5220,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 			    zoneid) != 0) {
 				zerror(zlogp, B_FALSE, "unable to unconfigure "
 				    "network interfaces in zone");
-				goto error;
 			}
 			status = dladm_zone_halt(dld_handle, zoneid);
 			if (status != DLADM_STATUS_OK) {

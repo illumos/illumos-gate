@@ -120,14 +120,28 @@ setup_net()
 		tname=tmp$$0
 		dout=`dladm create-vnic -t -l $global_nic $opt_str $tname 2>&1`
 		if (( $? != 0 )); then
-			echo "error creating VNIC $nic " \
-			    "(global NIC $orig_global)"
-			echo "msg: $dout"
+			print -f "error creating VNIC %s (global NIC %s)\n" \
+			   "$nic" "$orig_global"
+			print -f "msg: %s\n" "$dout"
 			logger -p daemon.err "zone $ZONENAME error creating " \
 			    "VNIC $nic (global NIC $orig_global $global_nic)"
 			logger -p daemon.err "msg: $dout"
 			logger -p daemon.err "Failed cmd: dladm create-vnic " \
 			    "-t -l $global_nic $opt_str $tname"
+
+			# Show more info if dup MAC addr.
+			echo $dout | egrep -s "MAC address is already in use"
+			if (( $? == 0 )); then
+				entry=`dladm show-vnic -olink,macaddress,zone \
+				    | nawk -v addr=$mac_addr '{
+					if ($2 == addr)
+						print $0
+				    }'`
+				if [[ -n $entry ]]; then
+					print -f "LINK\tMACADDRESS\tZONE\n"
+					print -f "%s\n" "$entry"
+				fi
+			fi
 			exit 1
 		fi
 		dladm rename-link -z $ZONENAME $tname $nic

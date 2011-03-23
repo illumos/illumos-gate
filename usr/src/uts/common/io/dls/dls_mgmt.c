@@ -947,9 +947,23 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 	ASSERT(ddp->dd_ref != 0);
 	if ((ddp->dd_ref != 1) || (!wait &&
 	    (ddp->dd_tref != 0 || ddp->dd_prop_taskid != NULL))) {
-		mutex_exit(&ddp->dd_mutex);
-		rw_exit(&i_dls_devnet_lock);
-		return (EBUSY);
+		/*
+		 * Its possible that we're trying to clean up an orphaned
+		 * vnic that was delegated to a zone and which wasn't cleaned
+		 * up properly when the zone went away.  Check for this
+		 * case before we return EBUSY.
+		 */
+		if (ddp->dd_ref > 1 && ddp->dd_zid != GLOBAL_ZONEID &&
+		    zone_find_by_id(ddp->dd_zid) == NULL) {
+			/* Log a warning, but continue in this case */
+			cmn_err(CE_WARN, "clear orphaned datalink: %s\n",
+			    ddp->dd_linkname);
+			ddp->dd_ref = 1;
+		} else {
+			mutex_exit(&ddp->dd_mutex);
+			rw_exit(&i_dls_devnet_lock);
+			return (EBUSY);
+		}
 	}
 
 	ddp->dd_flags |= DD_CONDEMNED;
