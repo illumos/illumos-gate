@@ -200,6 +200,10 @@ static void 		(**vsd_destructor)(void *);
 		cr = crgetmapped(cr);					\
 	}
 
+#define	VOP_LATENCY_10MS	10000000
+#define	VOP_LATENCY_100MS	100000000
+#define	VOP_LATENCY_1S		1000000000
+
 /*
  * Convert stat(2) formats to vnode types and vice versa.  (Knows about
  * numerical order of S_IFMT and vnode types.)
@@ -3263,14 +3267,52 @@ fop_read(
 	cred_t *cr,
 	caller_context_t *ct)
 {
-	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
+	zone_vfs_kstat_t *zvp = zonep->zone_vfs_stats;
+
+	hrtime_t start, lat;
+	ssize_t len;
+	int err;
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		start = gethrtime();
+
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_runq_enter(&zonep->zone_vfs_rwstats);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, read,
-	    read_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, read, read_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_rwstats.reads++;
+		zonep->zone_vfs_rwstats.nread += len;
+		kstat_runq_exit(&zonep->zone_vfs_rwstats);
+		mutex_exit(&zonep->zone_vfs_lock);
+
+		lat = gethrtime() - start;
+
+		if (lat >= VOP_LATENCY_10MS) {
+			if (lat < VOP_LATENCY_100MS)
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			else if (lat < VOP_LATENCY_1S) {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			} else {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+			}
+		}
+	}
+
 	return (err);
 }
 
@@ -3282,14 +3324,57 @@ fop_write(
 	cred_t *cr,
 	caller_context_t *ct)
 {
-	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+	zone_t	*zonep = curzone;
+	zone_vfs_kstat_t *zvp = zonep->zone_vfs_stats;
+
+	hrtime_t start, lat;
+	ssize_t len;
+	int	err;
+
+	/*
+	 * For the purposes of VFS kstat consumers, the "waitq" calculation is
+	 * repurposed as the active queue for VFS write operations.  There's no
+	 * actual wait queue for VFS operations.
+	 */
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		start = gethrtime();
+
+		mutex_enter(&zonep->zone_vfs_lock);
+		kstat_waitq_enter(&zonep->zone_vfs_rwstats);
+		mutex_exit(&zonep->zone_vfs_lock);
+	}
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, write,
-	    write_bytes, (resid_start - uiop->uio_resid));
+	len = resid_start - uiop->uio_resid;
+
+	VOPSTATS_UPDATE_IO(vp, write, write_bytes, len);
+
+	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+		mutex_enter(&zonep->zone_vfs_lock);
+		zonep->zone_vfs_rwstats.writes++;
+		zonep->zone_vfs_rwstats.nwritten += len;
+		kstat_waitq_exit(&zonep->zone_vfs_rwstats);
+		mutex_exit(&zonep->zone_vfs_lock);
+
+		lat = gethrtime() - start;
+
+		if (lat >= VOP_LATENCY_10MS) {
+			if (lat < VOP_LATENCY_100MS)
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			else if (lat < VOP_LATENCY_1S) {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			} else {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+			}
+		}
+	}
+
 	return (err);
 }
 

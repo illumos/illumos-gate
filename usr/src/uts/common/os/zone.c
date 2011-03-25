@@ -2241,6 +2241,11 @@ zone_kstat_create(zone_t *zone)
 		    sizeof (zone_misc_kstat_t), KM_SLEEP);
 	}
 
+	if ((zone->zone_vfs_ksp = zone_vfs_kstat_create(zone)) == NULL) {
+		zone->zone_vfs_stats = kmem_zalloc(
+		    sizeof (zone_vfs_kstat_t), KM_SLEEP);
+	}
+
 	if ((zone->zone_mcap_ksp = zone_mcap_kstat_create(zone)) == NULL) {
 		zone->zone_mcap_stats = kmem_zalloc(
 		    sizeof (zone_mcap_kstat_t), KM_SLEEP);
@@ -2275,6 +2280,18 @@ zone_kstat_delete(zone_t *zone)
 	    sizeof (zone_mcap_kstat_t));
 	zone_kstat_delete_common(&zone->zone_misc_ksp,
 	    sizeof (zone_misc_kstat_t));
+
+	if (zone->zone_io_ksp != NULL) {
+		kstat_delete(zone->zone_io_ksp);
+		zone->zone_io_ksp = NULL;
+	} else {
+		kmem_free(zone->zone_io_kiop, sizeof (kstat_io_t));
+	}
+
+	zone_kstat_delete_common(&zone->zone_vfs_ksp,
+	    sizeof (zone_vfs_kstat_t));
+	zone_kstat_delete_common(&zone->zone_zfs_ksp,
+	    sizeof (zone_zfs_kstat_t));
 }
 
 /*
