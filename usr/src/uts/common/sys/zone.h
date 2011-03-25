@@ -388,6 +388,20 @@ typedef struct {
 } sys_zio_cntr_t;
 
 typedef struct {
+	kstat_named_t	zv_nread;
+	kstat_named_t	zv_reads;
+	kstat_named_t	zv_rtime;
+	kstat_named_t	zv_rlentime;
+	kstat_named_t	zv_nwritten;
+	kstat_named_t	zv_writes;
+	kstat_named_t	zv_wtime;
+	kstat_named_t	zv_wlentime;
+	kstat_named_t	zv_10ms_ops;
+	kstat_named_t	zv_100ms_ops;
+	kstat_named_t	zv_1s_ops;
+} zone_vfs_kstat_t;
+
+typedef struct {
 	kstat_named_t 	zz_throttle_cnt;
 	kstat_named_t	zz_throttle_time;
 } zone_zfs_kstat_t;
@@ -560,7 +574,8 @@ typedef struct zone {
 	 */
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
 	kstat_t		*zone_vfs_ksp;
-	kstat_io_t	*zone_vfs_kiop;
+	kstat_io_t	zone_vfs_rwstats;
+	zone_vfs_kstat_t *zone_vfs_stats;
 
 	/*
 	 * kstats for ZFS observability.

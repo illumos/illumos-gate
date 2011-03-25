@@ -93,6 +93,7 @@ my $DATA_FMT = $USE_COMMA ?
 my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? 1024 * 1024 : 1024;
 my $INTERVAL_SUFFIX = $USE_INTERVAL ? "i" : "s";
+my $NANOSEC = 1000000000;
 
 my @fields = ( 'reads', 'writes', 'nread', 'nwritten', 'rtime', 'wtime',
     'rlentime', 'wlentime', 'snaptime' );
@@ -179,16 +180,20 @@ sub print_stats {
 	my $w_tps = ($data->{'writes'} - $old->{'writes'}) / $etime;
 
 	# Calculate average length of active queue
-	my $r_actv = ($data->{'rlentime'} - $old->{'rlentime'}) / $etime;
-	my $w_actv = ($data->{'wlentime'} - $old->{'wlentime'}) / $etime;
+	my $r_actv = (($data->{'rlentime'} - $old->{'rlentime'}) / $NANOSEC) /
+	    $etime;
+	my $w_actv = (($data->{'wlentime'} - $old->{'wlentime'}) / $NANOSEC) /
+	    $etime;
 
 	# Calculate average service time
 	my $read_t = $r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0;
 	my $writ_t = $w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0;
 
 	# Calculate the % time the VFS layer is active
-	my $r_b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
-	my $w_b_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
+	my $r_b_pct = ((($data->{'rtime'} - $old->{'rtime'}) / $NANOSEC) /
+	    $etime) * 100;
+	my $w_b_pct = ((($data->{'wtime'} - $old->{'wtime'}) / $NANOSEC) /
+	    $etime) * 100;
 
 	if (! $HIDE_ZEROES || $reads != 0.0 || $writes != 0.0 ||
 	    $nread != 0.0 || $nwritten != 0.0) {
