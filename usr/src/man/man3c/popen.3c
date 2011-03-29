@@ -43,19 +43,11 @@ argument as described in \fBfopen\fR(3C) to enable extended FILE facility.
 .sp
 .LP
 The environment of the executed command will be as if a child process were
-created within the \fBpopen()\fR call using \fBfork\fR(2). If the application
-is standard-conforming (see \fBstandards\fR(5)), the child is created as if
-invoked with the call:
+created within the \fBpopen()\fR call using \fBfork\fR(2).  The child is
+created as if invoked with the call:
 .sp
 .LP
-\fBexecl("/usr/xpg4/bin/sh", "sh", "\fR\fB-c\fR\fB",\fR\fIcommand\fR, \fB(char
-*)0);\fR
-.sp
-.LP
-otherwise, the child is created as if invoked with the call:
-.sp
-.LP
-\fBexecl("/usr/bin/sh", "sh", "\fR\fB-c\fR\fB",\fR\fIcommand\fR, \fB(char
+\fBexecl("/usr/bin/sh", "sh", "\fR\fB-c\fR\fB", \fR\fIcommand\fR, \fB(char
 *)0);\fR
 .sp
 .LP

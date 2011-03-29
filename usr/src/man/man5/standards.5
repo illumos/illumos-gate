@@ -252,29 +252,6 @@ other directories containing binaries needed by the application
 .RE
 .RE
 
-.sp
-.LP
-When an application uses \fBexeclp()\fR or \fBexecvp()\fR (see \fBexec\fR(2))
-to execute a shell file, or uses \fBsystem\fR(3C), the shell used to interpret
-the shell file depends on the standard to which the caller conforms:
-.sp
-
-.sp
-.TS
-tab();
-cw(4.33i) cw(1.17i) 
-lw(4.33i) lw(1.17i) 
-.
-StandardShell Used
-_
-T{
-1989 ANSI C, 1990 ISO C, 1999 ISO C, POSIX.1 (1990-2001), SUS, SUSv2, SUSv3, XPG4
-T}\fB/usr/xpg4/bin/sh\fR
-T{
-POSIX.1 (1988), SVID3, XPG3, no standard specified
-T}\fB/usr/bin/sh\fR
-.TE
-
 .SS "Feature Test Macros"
 .sp
 .LP

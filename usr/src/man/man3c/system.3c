@@ -31,8 +31,7 @@ the shell in the format specified by \fBwaitpid\fR(3C).
 .LP
 If \fIstring\fR is a null pointer, \fBsystem()\fR checks if the shell exists
 and is executable.  If the shell is available, \fBsystem()\fR returns a
-non-zero value; otherwise, it returns \fB0\fR.  The standard to which the
-caller conforms determines which shell is used. See \fBstandards\fR(5).
+non-zero value; otherwise, it returns \fB0\fR.
 .sp
 .LP
 The \fBsystem()\fR function sets the \fBSIGINT\fR and \fBSIGQUIT\fR signals to
