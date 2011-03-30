@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright 2011 Joyent, Inc.  All rights reserved.
@@ -530,12 +531,13 @@ enum pkt_type {
 
 /*
  * In general we do port based hashing to spread traffic over different
- * softrings. The below tunable allows to override that behavior. Setting it
- * to B_TRUE allows to do a fanout based on src ipv6 address. This behavior
- * is also the applicable to ipv6 packets carrying multiple optional headers
+ * softrings. The below tunables allows to override that behavior. Setting it
+ * to B_TRUE allows to do a fanout based on src ipv6/ipv4 address. This behavior
+ * is also applicable to ipv6 packets carrying multiple optional headers
  * and other uncommon packet types.
  */
 boolean_t mac_src_ipv6_fanout = B_FALSE;
+boolean_t mac_src_ipv4_fanout = B_FALSE;
 
 /*
  * Pair of local and remote ports in the transport header
@@ -765,13 +767,14 @@ int	fanout_unalligned = 0;
 /*
  * mac_rx_srs_long_fanout
  *
- * The fanout routine for IPv6
+ * The fanout routine for IPv6 (and IPv4 when VLANs are in use).
  */
 static int
 mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
     uint32_t sap, size_t hdrsize, enum pkt_type *type, uint_t *indx)
 {
 	ip6_t		*ip6h;
+	struct ip	*ip4h;
 	uint8_t		*whereptr;
 	uint_t		hash;
 	uint16_t	remlen;
@@ -839,7 +842,7 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 		 */
 		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(ip6h,
 		    mp->b_wptr, &hdr_len, &nexthdr, NULL)) {
-			goto src_based_fanout;
+			goto ipv6_src_based_fanout;
 		}
 		whereptr = (uint8_t *)ip6h + hdr_len;
 
@@ -856,7 +859,7 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 			 */
 			if (mp->b_cont != NULL &&
 			    whereptr + PORTS_SIZE > mp->b_wptr) {
-				goto src_based_fanout;
+				goto ipv6_src_based_fanout;
 			}
 			break;
 		default:
@@ -890,7 +893,85 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 
 			/* For all other protocol, do source based fanout */
 		default:
-			goto src_based_fanout;
+			goto ipv6_src_based_fanout;
+		}
+	} else if (sap == ETHERTYPE_IP) {
+		boolean_t	modifiable = B_TRUE;
+
+		ASSERT(MBLKL(mp) >= hdrsize);
+
+		ip4h = (struct ip *)(mp->b_rptr + hdrsize);
+
+		if ((unsigned char *)ip4h == mp->b_wptr) {
+			/*
+			 * The first mblk_t only includes the mac header.
+			 * Note that it is safe to change the mp pointer here,
+			 * as the subsequent operation does not assume mp
+			 * points to the start of the mac header.
+			 */
+			mp = mp->b_cont;
+
+			/*
+			 * Make sure ip4h holds the full base ip structure
+			 * up through the destination address.  It might not
+			 * hold any of the options though.
+			 */
+			if (mp == NULL)
+				return (-1);
+
+			if (MBLKL(mp) < IP_SIMPLE_HDR_LENGTH) {
+				modifiable = (DB_REF(mp) == 1);
+
+				if (modifiable &&
+				    !pullupmsg(mp, IP_SIMPLE_HDR_LENGTH))
+					return (-1);
+			}
+
+			ip4h = (struct ip *)mp->b_rptr;
+		}
+
+		if (!modifiable || !(OK_32PTR((char *)ip4h))) {
+			/*
+			 * If ip4h is not aligned fanout to the default ring.
+			 * Note that this may cause packets reordering.
+			 */
+			*indx = 0;
+			*type = OTH;
+			fanout_unalligned++;
+			return (0);
+		}
+
+		/* Do src based fanout if below tunable is set to B_TRUE. */
+		if (mac_src_ipv4_fanout)
+			goto ipv4_src_based_fanout;
+
+		/* If the transport is TCP, we try to do port based fanout */
+		if (ip4h->ip_p == IPPROTO_TCP) {
+			int	hdr_len;
+
+			hdr_len = ip4h->ip_hl << 2;
+			/* set whereptr to point to tcphdr */
+			whereptr = (uint8_t *)ip4h + hdr_len;
+
+			/*
+			 * If ip4h does not hold the complete ip header
+			 * including options, or if both ports in the TCP
+			 * header are not part of the mblk, do src_based_fanout
+			 * (the second case covers the first one so we only
+			 * need one test).
+			 */
+			if (mp->b_cont != NULL &&
+			    whereptr + PORTS_SIZE > mp->b_wptr)
+				goto ipv4_src_based_fanout;
+
+			hash = HASH_ADDR(ip4h->ip_src.s_addr,
+			    *(uint32_t *)whereptr);
+			*indx = COMPUTE_INDEX(hash,
+			    mac_srs->srs_tcp_ring_count);
+			*type = OTH;
+		} else {
+			/* For all other protocols, do source based fanout */
+			goto ipv4_src_based_fanout;
 		}
 	} else {
 		*indx = 0;
@@ -898,8 +979,14 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 	}
 	return (0);
 
-src_based_fanout:
+ipv6_src_based_fanout:
 	hash = HASH_ADDR(V4_PART_OF_V6(ip6h->ip6_src), (uint32_t)0);
+	*indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
+	*type = OTH;
+	return (0);
+
+ipv4_src_based_fanout:
+	hash = HASH_ADDR(ip4h->ip_src.s_addr, (uint32_t)0);
 	*indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
 	*type = OTH;
 	return (0);
