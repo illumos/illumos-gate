@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1294,7 +1295,7 @@ main(int argc, char *argv[])
 		optstring = "dlnqfp";
 		usage = gettext("usage: %s [ -dlnq(p|f) ] [ boot args ]\n");
 #endif
-		cmd = A_SHUTDOWN;
+		cmd = A_REBOOT;
 		fcn = AD_BOOT;
 	} else {
 		(void) fprintf(stderr,
@@ -1503,7 +1504,8 @@ main(int argc, char *argv[])
 	 * check_zone_haltedness later on.
 	 */
 	if (zoneid == GLOBAL_ZONEID && cmd != A_DUMP) {
-		need_check_zones = halt_zones();
+		if (!qflag)
+			need_check_zones = halt_zones();
 	}
 
 #if defined(__i386)
@@ -1603,7 +1605,7 @@ main(int argc, char *argv[])
 
 	(void) signal(SIGINT, SIG_IGN);
 
-	if (!qflag && !nosync) {
+	if (!nosync) {
 		struct utmpx wtmpx;
 
 		bzero(&wtmpx, sizeof (struct utmpx));
