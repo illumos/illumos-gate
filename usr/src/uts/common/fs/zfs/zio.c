@@ -493,6 +493,8 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	zio = kmem_cache_alloc(zio_cache, KM_SLEEP);
 	bzero(zio, sizeof (zio_t));
 
+	zio->io_start = gethrtime();
+
 	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&zio->io_cv, NULL, CV_DEFAULT, NULL);
 
@@ -550,9 +552,9 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 		if (zio->io_child_type == ZIO_CHILD_GANG)
 			zio->io_gang_leader = pio->io_gang_leader;
 		zio_add_child(pio, zio);
+	} else {
+		zfs_zone_zio_init(zio);
 	}
-
-	zfs_zone_zio_init(zio);
 
 	return (zio);
 }
@@ -888,6 +890,8 @@ static int
 zio_read_bp_init(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
+
+	zio->io_start = gethrtime();
 
 	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF &&
 	    zio->io_child_type == ZIO_CHILD_LOGICAL &&
@@ -2245,6 +2249,9 @@ zio_vdev_io_start(zio_t *zio)
 
 	ASSERT(zio->io_error == 0);
 	ASSERT(zio->io_child_error[ZIO_CHILD_VDEV] == 0);
+
+	if (zio->io_type == ZIO_TYPE_WRITE)
+		zio->io_start = gethrtime();
 
 	if (vd == NULL) {
 		if (!(zio->io_flags & ZIO_FLAG_CONFIG_WRITER))

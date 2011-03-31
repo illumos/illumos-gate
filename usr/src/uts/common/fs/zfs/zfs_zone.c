@@ -875,7 +875,6 @@ void
 zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 {
 	zone_t *zonep = curzone;
-	zone_zfs_kstat_t *zzp;
 	hrtime_t unow;
 	uint16_t wait;
 
@@ -929,9 +928,11 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
 
 		drv_usecwait(wait);
 
-		if ((zzp = zonep->zone_zfs_stats) != NULL) {
-			atomic_inc_64(&zzp->zz_throttle_cnt.value.ui64);
-			atomic_add_64(&zzp->zz_throttle_time.value.ui64, wait);
+		if (zonep->zone_vfs_stats != NULL) {
+			atomic_inc_64(&zonep->zone_vfs_stats->
+			    zv_delay_cnt.value.ui64);
+			atomic_add_64(&zonep->zone_vfs_stats->
+			    zv_delay_time.value.ui64, wait);
 		}
 	}
 }
@@ -1007,17 +1008,18 @@ zfs_zone_zio_start(zio_t *zp)
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
-	mutex_enter(&zonep->zone_io_lock);
-	kstat_runq_enter(zonep->zone_io_kiop);
+	mutex_enter(&zonep->zone_zfs_lock);
+	if (zp->io_type == ZIO_TYPE_READ)
+		kstat_runq_enter(&zonep->zone_zfs_rwstats);
 	zonep->zone_zfs_weight = 0;
-	mutex_exit(&zonep->zone_io_lock);
+	mutex_exit(&zonep->zone_zfs_lock);
 
 	mutex_enter(&zfs_disk_lock);
-	zp->io_start = gethrtime();
+	zp->io_dispatched = gethrtime();
 
 	if (zfs_disk_rcnt++ != 0)
-		zfs_disk_rtime += (zp->io_start - zfs_disk_rlastupdate);
-	zfs_disk_rlastupdate = zp->io_start;
+		zfs_disk_rtime += (zp->io_dispatched - zfs_disk_rlastupdate);
+	zfs_disk_rlastupdate = zp->io_dispatched;
 	mutex_exit(&zfs_disk_lock);
 
 	zone_rele(zonep);
@@ -1040,26 +1042,33 @@ zfs_zone_zio_done(zio_t *zp)
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
-	mutex_enter(&zonep->zone_io_lock);
-
-	kstat_runq_exit(zonep->zone_io_kiop);
-
-	if (zp->io_type == ZIO_TYPE_READ) {
-		zonep->zone_io_kiop->reads++;
-		zonep->zone_io_kiop->nread += zp->io_size;
-	} else {
-		zonep->zone_io_kiop->writes++;
-		zonep->zone_io_kiop->nwritten += zp->io_size;
-	}
-
-	mutex_exit(&zonep->zone_io_lock);
-
-	mutex_enter(&zfs_disk_lock);
-
 	now = gethrtime();
 	unow = NANO_TO_MICRO(now);
-	udelta = unow - NANO_TO_MICRO(zp->io_start);
+	udelta = unow - NANO_TO_MICRO(zp->io_dispatched);
 
+	mutex_enter(&zonep->zone_zfs_lock);
+
+	/*
+	 * To calculate the wsvc_t average, keep a cumulative sum of all the
+	 * wait time before each I/O was dispatched.  Since most writes are
+	 * asynchronous, only track the wait time for read I/Os.
+	 */
+	if (zp->io_type == ZIO_TYPE_READ) {
+		zonep->zone_zfs_rwstats.reads++;
+		zonep->zone_zfs_rwstats.nread += zp->io_size;
+
+		zonep->zone_zfs_stats->zz_waittime.value.ui64 +=
+		    zp->io_dispatched - zp->io_start;
+
+		kstat_runq_exit(&zonep->zone_zfs_rwstats);
+	} else {
+		zonep->zone_zfs_rwstats.writes++;
+		zonep->zone_zfs_rwstats.nwritten += zp->io_size;
+	}
+
+	mutex_exit(&zonep->zone_zfs_lock);
+
+	mutex_enter(&zfs_disk_lock);
 	zfs_disk_rcnt--;
 	zfs_disk_rtime += (now - zfs_disk_rlastupdate);
 	zfs_disk_rlastupdate = now;
