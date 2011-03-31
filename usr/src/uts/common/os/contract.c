@@ -2077,7 +2077,8 @@ cte_copy(ct_equeue_t *q, ct_equeue_t *newq)
 		if ((e->cte_flags & (CTE_INFO | CTE_ACK)) == 0) {
 			if (first == NULL)
 				first = e;
-			VERIFY(!list_link_active((list_node_t *)e));
+			VERIFY(!list_link_active((list_node_t *)
+			    ((uintptr_t)e + newq->ctq_events.list_offset)));
 			list_insert_tail(&newq->ctq_events, e);
 			cte_hold(e);
 		}
@@ -2248,7 +2249,8 @@ cte_publish(ct_equeue_t *q, ct_kevent_t *e, timespec_t *tsp)
 	/*
 	 * Enqueue event
 	 */
-	VERIFY(!list_link_active((list_node_t *)e));
+	VERIFY(!list_link_active((list_node_t *)
+	    ((uintptr_t)e + q->ctq_events.list_offset)));
 	list_insert_tail(&q->ctq_events, e);
 
 	/*
