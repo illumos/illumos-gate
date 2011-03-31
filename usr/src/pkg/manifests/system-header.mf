@@ -612,6 +612,7 @@ file path=usr/include/nss_dbdefs.h
 file path=usr/include/nss_netdir.h
 file path=usr/include/nsswitch.h
 file path=usr/include/panel.h
+file path=usr/include/paths.h
 file path=usr/include/pcsample.h
 file path=usr/include/pfmt.h
 file path=usr/include/pkgdev.h
