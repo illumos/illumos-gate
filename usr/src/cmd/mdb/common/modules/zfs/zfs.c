@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -314,7 +315,7 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"spa_max_replication_override",
 		"spa_mode_global",
 		"zfs_flags",
-		"zfs_txg_synctime",
+		"zfs_txg_synctime_ms",
 		"zfs_txg_timeout",
 		"zfs_write_limit_min",
 		"zfs_write_limit_max",
