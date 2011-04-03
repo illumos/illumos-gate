@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1034,7 +1034,17 @@ kcfpool_svc(void *arg)
 				if (kcfpool->kp_threads > kcf_minthreads) {
 					KCF_ATOMIC_DECR(kcfpool->kp_threads);
 					mutex_exit(&gswq->gs_lock);
-					return;
+
+					/*
+					 * lwp_exit() assumes it is called
+					 * with the proc lock held.  But the
+					 * first thing it does is drop it.
+					 * This ensures that lwp does not
+					 * exit before lwp_create is done
+					 * with it.
+					 */
+					mutex_enter(&curproc->p_lock);
+					lwp_exit();	/* does not return */
 				}
 
 				/* Resume the wait for work. */
@@ -1405,7 +1415,7 @@ kcfpoold(void *arg)
 	 */
 	for (;;) {
 		int rv;
-		
+
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
 		rv = cv_reltimedwait(&kcfpool->kp_cv,
 		    &kcfpool->kp_lock, timeout_val, TR_CLOCK_TICK);
