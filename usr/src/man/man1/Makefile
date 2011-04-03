@@ -283,14 +283,9 @@ MANFILES=	acctcom.1			\
 	 	plimit.1			\
 	 	pmadvise.1			\
 	 	pmap.1				\
-	 	postdaisy.1			\
-	 	postdmd.1			\
 	 	postio.1			\
-	 	postmd.1			\
-	 	postplot.1			\
 	 	postprint.1			\
 	 	postreverse.1			\
-	 	posttek.1			\
 	 	ppgsz.1				\
 	 	ppriv.1				\
 	 	pr.1				\

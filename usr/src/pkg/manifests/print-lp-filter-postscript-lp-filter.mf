@@ -53,14 +53,9 @@ file path=usr/lib/lp/postscript/postreverse group=lp mode=0555
 file path=usr/lib/lp/postscript/ps.requests group=lp mode=0555
 file path=usr/share/man/man1/download.1
 file path=usr/share/man/man1/dpost.1
-file path=usr/share/man/man1/postdaisy.1
-file path=usr/share/man/man1/postdmd.1
 file path=usr/share/man/man1/postio.1
-file path=usr/share/man/man1/postmd.1
-file path=usr/share/man/man1/postplot.1
 file path=usr/share/man/man1/postprint.1
 file path=usr/share/man/man1/postreverse.1
-file path=usr/share/man/man1/posttek.1
 legacy pkg=SUNWpsf \
     desc="client configuration files and utilities for the print service" \
     name="PostScript filters - (Usr)" version=13.1,REV=2009.11.11
