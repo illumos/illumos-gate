@@ -422,8 +422,11 @@ license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
     license=usr/src/cmd/vgrind/THIRDPARTYLICENSE
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/man target=./share/man
-#
+# lp is used by man -t and -r
+depend fmri=print/lp/print-client-commands type=require
+# awk is used by catman (via makewhatis)
+depend fmri=system/extended-system-utilities type=require
 # gpic is used as a preprocessor by the apropos command
-#
 depend fmri=text/groff type=require
+# less is the default (per user environment) pager
 depend fmri=text/less type=require
