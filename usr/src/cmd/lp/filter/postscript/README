@@ -202,32 +202,6 @@ dpost
 
 		pic -T720 | tbl | eqn -r720 | troff -mm -Tpost | dpost >file.ps
 
-postbgi
-	Translates BGI (Basic Graphical Instruction) files into PostScript. The
-	default line width, as with posttek, is one pixel, which probably won't
-	produce acceptable results on write-white engines, like the ones used in
-	the QMS PS-2400 or Dataproducts 2665. The -w option can be used to set a
-	new line width. For a different default change the definition of linewidth
-	in postscript/postbgi.ps.
-
-	Support for PRISM (ie. color BGI) jobs has been included, although what
-	you get by default may not be acceptable, at least not on the ColorScript
-	100. A simple solution is add the -P"/prism true def" option to the postbgi
-	command line when you're translating PRISM jobs. In fact nothing breaks if 
-	you include the -P"/prism true def" option when translating STARE (black
-	and white BGI) jobs. The only difference most users will notice is that
-	plots are smaller than normal.
-
-	EXAMPLES:
-
-	    For normal STARE jobs, scaled to almost fill a page, use
-
-		postbgi file >file.ps
-
-	    while most PRISM jobs require,
-
-		postbgi -P"/prism true" file >file.ps
-
 postprint
 	Translates ASCII files into PostScript.
 
