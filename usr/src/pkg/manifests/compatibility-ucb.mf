@@ -31,9 +31,6 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/mail group=mail
-dir path=export group=sys
-dir path=home group=root mode=0555
-dir path=tmp group=sys mode=1777
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
