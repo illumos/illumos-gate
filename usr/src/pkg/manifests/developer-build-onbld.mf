@@ -114,7 +114,6 @@ file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
-file path=opt/onbld/bin/mkclosed mode=0555
 file path=opt/onbld/bin/mkreadme_osol mode=0555
 file path=opt/onbld/bin/mktpl mode=0555
 file path=opt/onbld/bin/nightly mode=0555
