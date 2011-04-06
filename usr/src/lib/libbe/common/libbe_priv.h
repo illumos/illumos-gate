@@ -41,6 +41,8 @@ extern "C" {
 #define	ARCH_LENGTH		MAXNAMELEN
 #define	BE_AUTO_NAME_MAX_TRY	3
 #define	BE_AUTO_NAME_DELIM	'-'
+#define	BE_DEFAULTS		"/etc/default/be"
+#define	BE_DFLT_BENAME_STARTS	"BENAME_STARTS_WITH="
 #define	BE_CONTAINER_DS_NAME	"ROOT"
 #define	BE_DEFAULT_CONSOLE	"text"
 #define	BE_POLICY_PROPERTY	"org.opensolaris.libbe:policy"
@@ -129,6 +131,11 @@ typedef struct be_plcy_list {
 	struct be_plcy_list	*be_next_plcy;
 }be_plcy_list_t;
 
+struct be_defaults {
+	boolean_t	be_deflt_rpool_container;
+	char		be_deflt_bename_starts_with[ZFS_MAXNAMELEN];
+};
+
 /* Library globals */
 extern libzfs_handle_t *g_zfs;
 extern boolean_t do_print;
@@ -210,6 +217,9 @@ int be_find_zpool_callback(zpool_handle_t *, void *);
 int be_zpool_find_current_be_callback(zpool_handle_t *, void *);
 int be_zfs_find_current_be_callback(zfs_handle_t *, void *);
 int be_check_be_roots_callback(zpool_handle_t *, void *);
+
+/* defaults */
+void be_get_defaults(struct be_defaults *defaults);
 
 #ifdef __cplusplus
 }

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
  * System includes
  */
 #include <assert.h>
@@ -248,27 +252,33 @@ be_rollback(nvlist_t *be_attrs)
 {
 	be_transaction_data_t	bt = { 0 };
 	zfs_handle_t		*zhp = NULL;
+	zpool_handle_t		*zphp;
 	char			obe_root_ds[MAXPATHLEN];
+	char			*obe_name = NULL;
 	int			zret = 0, ret = BE_SUCCESS;
+	struct be_defaults be_defaults;
 
 	/* Initialize libzfs handle */
 	if (!be_zfs_init())
 		return (BE_ERR_INIT);
 
+	if ((ret = be_find_current_be(&bt)) != BE_SUCCESS) {
+		return (ret);
+	}
+
 	/* Get original BE name if one was provided */
 	if (nvlist_lookup_pairs(be_attrs, NV_FLAG_NOENTOK,
-	    BE_ATTR_ORIG_BE_NAME, DATA_TYPE_STRING, &bt.obe_name, NULL) != 0) {
+	    BE_ATTR_ORIG_BE_NAME, DATA_TYPE_STRING, &obe_name, NULL) != 0) {
 		be_print_err(gettext("be_rollback: "
 		    "failed to lookup BE_ATTR_ORIG_BE_NAME attribute\n"));
 		return (BE_ERR_INVAL);
 	}
 
+	be_get_defaults(&be_defaults);
+
 	/* If original BE name not provided, use current BE */
-	if (bt.obe_name == NULL) {
-		if ((ret = be_find_current_be(&bt)) != BE_SUCCESS) {
-			return (ret);
-		}
-	} else {
+	if (obe_name != NULL) {
+		bt.obe_name = obe_name;
 		/* Validate original BE name  */
 		if (!be_valid_be_name(bt.obe_name)) {
 			be_print_err(gettext("be_rollback: "
@@ -285,16 +295,27 @@ be_rollback(nvlist_t *be_attrs)
 		return (BE_ERR_INVAL);
 	}
 
-	/* Find which zpool obe_name lives in */
-	if ((zret = zpool_iter(g_zfs, be_find_zpool_callback, &bt)) == 0) {
-		be_print_err(gettext("be_rollback: "
-		    "failed to find zpool for BE (%s)\n"), bt.obe_name);
-		return (BE_ERR_BE_NOENT);
-	} else if (zret < 0) {
-		be_print_err(gettext("be_rollback: "
-		    "zpool_iter failed: %s\n"),
-		    libzfs_error_description(g_zfs));
-		return (zfs_err_to_be_err(g_zfs));
+	if (be_defaults.be_deflt_rpool_container) {
+		if ((zphp = zpool_open(g_zfs, bt.obe_zpool)) == NULL) {
+			be_print_err(gettext("be_rollback: failed to "
+			    "open rpool (%s): %s\n"), bt.obe_zpool,
+			    libzfs_error_description(g_zfs));
+			return (zfs_err_to_be_err(g_zfs));
+		}
+		zret = be_find_zpool_callback(zphp, &bt);
+	} else {
+		/* Find which zpool obe_name lives in */
+		if ((zret = zpool_iter(g_zfs, be_find_zpool_callback, &bt)) ==
+		    0) {
+			be_print_err(gettext("be_rollback: "
+			    "failed to find zpool for BE (%s)\n"), bt.obe_name);
+			return (BE_ERR_BE_NOENT);
+		} else if (zret < 0) {
+			be_print_err(gettext("be_rollback: "
+			    "zpool_iter failed: %s\n"),
+			    libzfs_error_description(g_zfs));
+			return (zfs_err_to_be_err(g_zfs));
+		}
 	}
 
 	/* Generate string for BE's root dataset */

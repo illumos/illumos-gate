@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 .TH beadm 1M "26 Feb 2011" "SunOS 5.11" "System Administration Commands"
 .SH NAME
 beadm \- utility for managing zfs boot environments
@@ -406,6 +407,13 @@ Renames the boot environment named \fIbeName\fR to \fInewBeName\fR.
 Makes beName the active BE on next reboot.
 .RE
 
+.SH ALTERNATE BE LOCATION
+.LP
+The alternate BE location outside rpool/ROOT can be configured
+by modifying the BENAME_STARTS_WITH parameter in /etc/default/be.
+For example: BENAME_STARTS_WITH=rootfs
+.RE
+
 .SH EXAMPLES
 .LP     
 \fBExample 1\fR: Create a new BE named BE1, by cloning the current live BE.
@@ -682,6 +690,20 @@ Log used for capturing beadm create output
 \fIss\fR - second; 58
 .fi
 .in -2
+.sp
+.RE
+.RE
+.sp
+.LP     
+.sp
+.ne 2
+.mk
+.na
+\fB/etc/default/be\fR
+.ad
+.sp .6
+.RS 4n    
+Contains default value for BENAME_STARTS_WITH parameter
 .sp
 .RE
 .RE
