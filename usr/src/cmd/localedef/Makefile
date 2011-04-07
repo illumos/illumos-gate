@@ -140,6 +140,7 @@ UTF_8_LOCALES		= \
 		ja_JP \
 		ka_GE \
 		kk_KZ \
+		km_KH \
 		kn_IN \
 		ko_KR \
 		kok_IN \
