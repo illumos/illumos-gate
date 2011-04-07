@@ -2077,10 +2077,19 @@ cte_copy(ct_equeue_t *q, ct_equeue_t *newq)
 		if ((e->cte_flags & (CTE_INFO | CTE_ACK)) == 0) {
 			if (first == NULL)
 				first = e;
-			VERIFY(!list_link_active((list_node_t *)
-			    ((uintptr_t)e + newq->ctq_events.list_offset)));
-			list_insert_tail(&newq->ctq_events, e);
-			cte_hold(e);
+			/*
+			 * In cte_publish_all() ct_evtlock is used to
+			 * ensure events are properly delivered.  However,
+			 * during adoption we have a totally different locking
+			 * order. Thus its possible for a race to occur and
+			 * we could get an event inserted multiple times unless
+			 * we double check for that case.
+			 */
+			if (!list_link_active((list_node_t *)
+			    ((uintptr_t)e + newq->ctq_events.list_offset))) {
+				list_insert_tail(&newq->ctq_events, e);
+				cte_hold(e);
+			}
 		}
 	}
 
