@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Nexenta Systems. All rights reserved.
  */
 
 /*
@@ -634,7 +635,7 @@ log_init()
 
 	if (!st->st_log_locale_known && stat(FS_LOCALE_DIR, &sb) == 0) {
 		(void) setlocale(LC_ALL, "");
-		st->st_locale = setlocale(LC_MESSAGES, "");
+		st->st_locale = setlocale(LC_MESSAGES, NULL);
 		if (st->st_locale)
 			st->st_log_locale_known = 1;
 
