@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -211,7 +212,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	char hostname[MAXHOSTNAMELEN];
 	struct sockaddr_in sin;
 	struct sockaddr_in6 sin6;
-	int sock, rc;
+	int sock, rc, tmo;
 	smb_wchar_t unicode_server_name[SMB_PI_MAX_DOMAIN];
 	char server_name[SMB_PI_MAX_DOMAIN];
 	char ipstr[INET6_ADDRSTRLEN];
@@ -222,6 +223,15 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 		    strerror(errno));
 		return (-1);
 	}
+
+	/*
+	 * The default connect timeout is very long.
+	 * We want to give up after 45 sec.
+	 */
+	tmo = 1000 * smbrdr_default_timeout;
+	setsockopt(sock, IPPROTO_TCP, TCP_CONN_ABORT_THRESHOLD,
+	    &tmo, sizeof (tmo));
+
 	if (sess->srv_ipaddr.a_family == AF_INET) {
 		bzero(&sin, sizeof (struct sockaddr_in));
 		sin.sin_family = AF_INET;

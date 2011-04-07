@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -298,6 +300,16 @@ smb_domain_getinfo(smb_domainex_t *dxi)
 		smb_dcache_getdc(dxi->d_dc, sizeof (dxi->d_dc));
 
 	return (success);
+}
+
+/*
+ * Get the name of the current DC (if any)
+ * Does NOT block.
+ */
+void
+smb_domain_current_dc(char *buf, size_t len)
+{
+	smb_dcache_getdc(buf, len);
 }
 
 /*
