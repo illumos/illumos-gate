@@ -399,11 +399,18 @@ typedef struct {
 	kstat_named_t	zv_10ms_ops;
 	kstat_named_t	zv_100ms_ops;
 	kstat_named_t	zv_1s_ops;
+	kstat_named_t 	zv_delay_cnt;
+	kstat_named_t	zv_delay_time;
 } zone_vfs_kstat_t;
 
 typedef struct {
-	kstat_named_t 	zz_throttle_cnt;
-	kstat_named_t	zz_throttle_time;
+	kstat_named_t	zz_nread;
+	kstat_named_t	zz_reads;
+	kstat_named_t	zz_rtime;
+	kstat_named_t	zz_rlentime;
+	kstat_named_t	zz_nwritten;
+	kstat_named_t	zz_writes;
+	kstat_named_t	zz_waittime;
 } zone_zfs_kstat_t;
 
 typedef struct zone {
@@ -563,13 +570,6 @@ typedef struct zone {
 	sys_zio_cntr_t	zone_lwr_ops;
 
 	/*
-	 * kstats and counters for I/O ops and bytes.
-	 */
-	kmutex_t	zone_io_lock;		/* protects I/O statistics */
-	kstat_t		*zone_io_ksp;
-	kstat_io_t	*zone_io_kiop;
-
-	/*
 	 * kstats and counters for VFS ops and bytes.
 	 */
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
@@ -578,10 +578,11 @@ typedef struct zone {
 	zone_vfs_kstat_t *zone_vfs_stats;
 
 	/*
-	 * kstats for ZFS observability.
+	 * kstats for ZFS I/O ops and bytes.
 	 */
 	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
 	kstat_t		*zone_zfs_ksp;
+	kstat_io_t	zone_zfs_rwstats;
 	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*

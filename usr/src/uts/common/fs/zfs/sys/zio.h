@@ -418,9 +418,9 @@ struct zio {
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
 
-	/* Zone which originated this IO */
-	zoneid_t	io_zoneid;
-	hrtime_t	io_start;          /* time IO was dispatched */
+	zoneid_t	io_zoneid;	/* zone which originated this I/O */
+	hrtime_t	io_start;	/* time I/O entered zio pipeline */
+	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
