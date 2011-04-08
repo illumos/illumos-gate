@@ -56,6 +56,7 @@ use vars  qw(%id_hash %alias_hash);
 use POSIX qw(getenv);
 use Getopt::Std;
 use File::Basename;
+use IO::Dir;
 
 
 ## GetObjectInfo(path)
@@ -232,8 +233,9 @@ sub ProcDir {
 	my($NewFull, $NewRel, $Entry);
 
 	# Open the directory and read each entry, omit files starting with "."
-	if (opendir(DIR, $FullDir)) {
-		foreach $Entry (readdir(DIR)) {
+	my $Dir = IO::Dir->new($FullDir);
+	if (defined($Dir)) {
+		foreach $Entry ($Dir->read()) {
 
 			# In fast mode, we skip any file name that starts
 			# with a dot, which by side effect also skips the
@@ -300,7 +302,7 @@ sub ProcDir {
 			}
 
 		}
-		closedir(DIR);
+		$Dir->close();
 	}
 }
 
