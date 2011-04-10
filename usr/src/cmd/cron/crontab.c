@@ -236,8 +236,24 @@ main(int argc, char **argv)
 		exit(0);
 	}
 	if (lflag) {
-		if ((fp = fopen(cf, "r")) == NULL)
-			crabort(BADOPEN);
+		int sys_done = 0;
+		char sysconf[PATH_MAX];
+
+		if (snprintf(sysconf, sizeof (sysconf), "%s/%s",
+		    SYSCRONDIR, login) < sizeof (sysconf) &&
+		    (fp = fopen(sysconf, "r")) != NULL) {
+			while (fgets(line, CTLINESIZE, fp) != NULL)
+				fputs(line, stdout);
+			fclose(fp);
+			sys_done = 1;
+		}
+
+		if ((fp = fopen(cf, "r")) == NULL) {
+			if (!sys_done)
+				crabort(BADOPEN);
+			else
+				exit(0);
+		}
 		while (fgets(line, CTLINESIZE, fp) != NULL)
 			fputs(line, stdout);
 		fclose(fp);
