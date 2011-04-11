@@ -8107,7 +8107,7 @@ sata_build_msense_page_1a(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 	page->mode_page.code = MODEPAGE_POWER_COND;
 	page->mode_page.length = sizeof (struct mode_info_power_cond);
 
-	if (sata_id->ai_cap && SATA_STANDBYTIMER) {
+	if (sata_id->ai_cap & SATA_STANDBYTIMER) {
 		page->standby = 1;
 		bcopy(sdinfo->satadrv_standby_timer, page->standby_cond_timer,
 		    sizeof (uchar_t) * 4);
@@ -8513,7 +8513,7 @@ sata_mode_select_page_1a(sata_pkt_txlate_t *spx, struct
 
 	/* If parmlen is too short or the feature is not supported, drop it */
 	if ((len < parmlen) || (page->idle == 1) ||
-	    (!(sata_id->ai_cap && SATA_STANDBYTIMER) && page->standby == 1)) {
+	    (!(sata_id->ai_cap & SATA_STANDBYTIMER) && page->standby == 1)) {
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
 		sense->es_key = KEY_ILLEGAL_REQUEST;
@@ -12279,7 +12279,7 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 			}
 
 			if ((SATA_PMPORT_DEV_TYPE(sata_hba_inst, cport,
-			    pmport) && SATA_VALID_DEV_TYPE) == 0) {
+			    pmport) & SATA_VALID_DEV_TYPE) == 0) {
 				rval = -1;
 				goto out;
 			}
