@@ -59,7 +59,9 @@
 #include <libsysevent.h>
 #include <libdlmgmt.h>
 #include <librcm.h>
-#include <thread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "dlmgmt_impl.h"
 
 typedef void dlmgmt_door_handler_t(void *, void *, size_t *, zoneid_t,
@@ -1318,14 +1320,6 @@ done:
 	retvalp->lr_err = err;
 }
 
-static void
-do_zonehalt(void *zid)
-{
-	dlmgmt_table_lock(B_TRUE);
-	dlmgmt_db_fini((zoneid_t)zid);
-	dlmgmt_table_unlock();
-}
-
 /* ARGSUSED */
 static void
 dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
@@ -1350,17 +1344,22 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			 * dls_devnet_destroy calls mac_perim_enter_by_mh
 			 * which could lead to deadlock if another process is
 			 * holding the mac perimeter then made an upcall to
-			 * dlmgmtd.  To avoid this, we run the dlmgmt_db_fini
-			 * in a thread so that we can continue to service
-			 * upcalls in parallel with cleaning up zones.
+			 * dlmgmtd.  To try to avoid this, we serialize zone
+			 * activity on the /etc/dladm/zone.lck file.
 			 */
-			err = thr_create(NULL, 0,
-			    (void *(*)(void *))do_zonehalt,
-			    (void *)(zonehalt->ld_zoneid), THR_DAEMON, NULL);
-			if (err != 0)
-				dlmgmt_log(LOG_ERR, "unable to create thread "
-				    "to clean up zone %d: %s",
-				    zonehalt->ld_zoneid, strerror(err));
+			int fd;
+
+			while ((fd = open(ZONE_LOCK,
+			    O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR))
+			    < 0)
+				sleep(1);
+        		close(fd);
+
+			dlmgmt_table_lock(B_TRUE);
+			dlmgmt_db_fini(zonehalt->ld_zoneid);
+			dlmgmt_table_unlock();
+
+			(void) unlink(ZONE_LOCK);
 		}
 	}
 	retvalp->lr_err = err;

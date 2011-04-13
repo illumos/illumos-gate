@@ -1229,6 +1229,17 @@ do_archives_update(int do_fast_reboot)
 	pid_t	pid;
 	char	*cmd_argv[MAXARGS];
 
+#if defined(__i386)
+	{
+		/*
+		 * bootadm will complain and exit if not a grub root, so
+		 * just skip running it.
+		 */
+		struct stat sb;
+		if (stat("/boot/grub/stage2", &sb) == -1)
+			return;
+	}
+#endif	/* __i386 */
 
 	cmd_argv[i++] = "/sbin/bootadm";
 	cmd_argv[i++] = "-ea";

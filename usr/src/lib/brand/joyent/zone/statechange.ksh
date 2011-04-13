@@ -55,6 +55,29 @@ ZONEPATH=$3
 state=$4
 cmd=$5
 
+LOCKFILE=/etc/dladm/zone.lck
+
+#
+# Create a lock file which we use to serialize datalink operations across zones.
+#
+lock_file()
+{
+	while true; do
+		if (set -o noclobber; echo "$$" >$LOCKFILE) 2>/dev/null; then
+			trap 'rm -f $LOCKFILE; exit $?' INT TERM EXIT
+			break;
+		else
+			sleep 1
+		fi
+	done
+}
+
+unlock_file()
+{
+	rm -f $LOCKFILE
+	trap - INT TERM EXIT
+}
+
 #
 # Set up the vnic(s) for the zone.
 #
@@ -98,6 +121,8 @@ setup_net()
 			    "undefined VNIC $nic (global NIC $orig_global)"
 			exit 1
 		fi
+
+		lock_file
 
 		#
 		# Create the vnic.
@@ -211,7 +236,7 @@ setup_net()
 
 		# If on VMWare and we have external IPs, create a bridge to
 		# allow zones to reach the external gateway
-		if [[ ${headnode} == "true" && ${orig_global} == "external" && \
+		if [[ ${orig_global} == "external" && \
 		    "${SYSINFO_Product}" == "VMware Virtual Platform" ]]; then
 			dladm show-bridge -p -o BRIDGE vmwareextbr \
 			    >/dev/null 2>&1
@@ -252,6 +277,8 @@ setup_net()
 			done
 			IFS=$OLDIFS
 		fi
+
+		unlock_file
 	done
 }
 
@@ -287,12 +314,16 @@ cleanup_net()
 	# Cleanup any flows that were setup.
 	for nic in $_ZONECFG_net_resources
 	do
+		lock_file
+
 		flowadm remove-flow -t -z $ZONENAME -l $nic
 		if (( $? != 0 )); then
 			echo "error removing flows for $nic"
 			logger -p daemon.err "zone $ZONENAME " \
 			    "error removing flows for $nic"
 		fi
+
+		unlock_file
 	done
 }
 
