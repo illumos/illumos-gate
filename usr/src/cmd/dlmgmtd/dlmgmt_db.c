@@ -554,6 +554,10 @@ dlmgmt_db_update(dlmgmt_db_op_t op, const char *entryname, dlmgmt_link_t *linkp,
 	    linkp->ll_zoneid, flags, &err)) == NULL)
 		return (err);
 
+	/* If transient op and onloan, use the global zone cache file. */
+	if (flags == DLMGMT_ACTIVE && linkp->ll_onloan)
+		req->ls_zoneid = GLOBAL_ZONEID;
+
 	/*
 	 * If the return error is EINPROGRESS, this request is handled
 	 * asynchronously; return success.
