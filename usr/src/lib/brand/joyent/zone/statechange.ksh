@@ -102,11 +102,7 @@ setup_net()
 		[[ -z $global_nic ]] && continue
 
 		orig_global=$global_nic
-		[[ "$global_nic" == "admin" ]] && global_nic=$SYSINFO_NIC_admin
-		[[ "$global_nic" == "external" ]] && \
-		    global_nic=$SYSINFO_NIC_external
-		[[ "$global_nic" == "internal" ]] && \
-		    global_nic=$SYSINFO_NIC_internal
+		global_nic=$(eval echo \$SYSINFO_NIC_${orig_global})
 
 		# For backwards compatibility with the other parts of the
 		# system, check if this zone already has this vnic setup.
