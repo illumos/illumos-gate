@@ -93,6 +93,8 @@ setup_net()
 		vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
 		blocked_outgoing_ports=$(eval \
 		    echo \$_ZONECFG_net_${nic}_blocked_outgoing_ports)
+		zone_ip=$(eval \
+		    echo \$_ZONECFG_net_${nic}_ip)
 
 		# If address set, must be a shared stack zone
 		[[ -n $address ]] && exit 0
@@ -209,24 +211,33 @@ setup_net()
 			exit 1
 		fi
 
-		# Get the static IP for the vnic from the zone config file.
+
+		# Get the static IP for the vnic from the zone config file, but only
+        # if there's not an IP from the zone properties
 		hostname_file="/zones/$ZONENAME/root/etc/hostname.$nic"
-		if [ -e $hostname_file ]; then
+		if [[ -z "${zone_ip}" ]] && [ -e $hostname_file ]; then
 			zone_ip=`nawk \
 			    '{if ($1 ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)
 			    print $1}' $hostname_file`
+			/usr/sbin/zonecfg -z $ZONENAME "select net physical=${nic}; add property (name=ip, value=\"$zone_ip\"); end; exit"
+			if (( $? != 0 )); then
+				echo "error updating zone config ${nic} ${zone_ip}"
+				logger -p daemon.err "zone $ZONENAME error updating " \
+				    "zone config ${nic} ${zone_ip}"
+				exit 1
+			fi
+		fi
 
-			if [[ -n "${zone_ip}" ]]; then
-				dladm set-linkprop -t -z $ZONENAME \
-				    -p "allowed-ips=${zone_ip}" ${nic}
-				if (( $? != 0 )); then
-					echo "error setting VNIC allowed-ip " \
-					    "$nic $zone_ip"
-					logger -p daemon.err "zone $ZONENAME " \
-					    "error setting VNIC allowed-ip " \
-					    "$nic $zone_ip"
-					exit 1
-				fi
+		if [[ -n "${zone_ip}" ]]; then
+			dladm set-linkprop -t -z $ZONENAME \
+			    -p "allowed-ips=${zone_ip}" ${nic}
+			if (( $? != 0 )); then
+				echo "error setting VNIC allowed-ip " \
+				    "$nic $zone_ip"
+				logger -p daemon.err "zone $ZONENAME " \
+				    "error setting VNIC allowed-ip " \
+				    "$nic $zone_ip"
+				exit 1
 			fi
 		fi
 
