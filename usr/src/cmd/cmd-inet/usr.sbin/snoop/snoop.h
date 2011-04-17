@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SNOOP_H
@@ -43,6 +45,7 @@
 #include <netinet/icmp6.h>
 #include <net/pppoe.h>
 #include <libdlpi.h>
+#include <note.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,6 +190,9 @@ extern void click(int);
 extern void show_pktinfo(int, int, char *, char *, struct timeval *,
 		struct timeval *, int, int);
 extern void show_line(char *);
+/*PRINTFLIKE1*/
+extern void show_printf(char *fmt, ...)
+    __PRINTFLIKE(1);
 extern char *getxdr_time(void);
 extern char *showxdr_time(char *);
 extern char *addrtoname(int, const void *);
