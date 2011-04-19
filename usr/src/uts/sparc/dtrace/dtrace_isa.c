@@ -936,3 +936,12 @@ got_fp:
 
 	return (value);
 }
+
+/*ARGSUSED*/
+uint64_t
+dtrace_getvmreg(uint_t ndx, volatile uint16_t *flags)
+{
+	*flags |= CPU_DTRACE_ILLOP;
+
+	return (0);
+}
