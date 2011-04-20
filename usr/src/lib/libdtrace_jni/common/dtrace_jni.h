@@ -27,8 +27,6 @@
 #ifndef	_DTRACE_JNI_H
 #define	_DTRACE_JNI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libuutil.h>
 #include <jni.h>
 #include <dtrace.h>
@@ -401,6 +399,10 @@ extern jmethodID g_dist_normal_jm;
 /* LogDistribution */
 extern jclass g_dist_jc;
 extern jmethodID g_distinit_jm;
+
+/* LogLinearDistribution */
+extern jclass g_lldist_jc;
+extern jmethodID g_lldistinit_jm;
 
 /* LinearDistribution */
 extern jclass g_ldist_jc;

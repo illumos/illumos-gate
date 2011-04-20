@@ -325,6 +325,9 @@ file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LogDistribution.html \
     group=other
 file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LogLinearDistribution.html \
+    group=other
+file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/MaxValue.html \
     group=other
 file \
@@ -509,6 +512,9 @@ file \
     group=other
 file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LogDistribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LogLinearDistribution.html \
     group=other
 file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/MaxValue.html \

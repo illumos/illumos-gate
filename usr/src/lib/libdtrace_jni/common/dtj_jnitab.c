@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stddef.h>
 #include <limits.h>
@@ -197,6 +195,10 @@ jmethodID g_dist_normal_jm = 0;
 /* LogDistribution */
 jclass g_dist_jc = 0;
 jmethodID g_distinit_jm = 0;
+
+/* LogLinear Distribution */
+jclass g_lldist_jc = 0;
+jmethodID g_lldistinit_jm = 0;
 
 /* LinearDistribution */
 jclass g_ldist_jc = 0;
@@ -450,6 +452,11 @@ dtj_table_load(JNIEnv *jenv)
 		{ JCLASS,  &g_dist_jc,
 			"org/opensolaris/os/dtrace/LogDistribution" },
 		{ JMETHOD,  &g_distinit_jm, CONSTRUCTOR, "([J)V" },
+
+		/* LogLinearDistribution */
+		{ JCLASS, &g_lldist_jc,
+			"org/opensolaris/os/dtrace/LogLinearDistribution" },
+		{ JMETHOD, &g_lldistinit_jm, CONSTRUCTOR, "(J[J)V" },
 
 		/* LinearDistribution */
 		{ JCLASS,  &g_ldist_jc,
