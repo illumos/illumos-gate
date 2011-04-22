@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -55,7 +56,7 @@ extern sock_downcalls_t sock_tcp_downcalls;
  * Bind hash list size and has function.  It has to be a power of 2 for
  * hashing.
  */
-#define	TCP_BIND_FANOUT_SIZE	512
+#define	TCP_BIND_FANOUT_SIZE	1024
 #define	TCP_BIND_HASH(lport) (ntohs(lport) & (TCP_BIND_FANOUT_SIZE - 1))
 
 /*
