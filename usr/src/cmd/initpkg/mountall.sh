@@ -20,15 +20,35 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 #
+
+usage () {
+	if [ -n "$1" ]; then
+		echo "mountall: $1" 1>&2
+	fi
+	echo "Usage:\nmountall [-F FSType] [-l|-r|-g] [file_system_table]" 1>&2
+	exit 2
+}
+
+PATH=/usr/sbin:/usr/bin
+TYPES=all
+FSTAB=/etc/vfstab
+err=0
+
+# Clear these in case they were already set in our environment.
+FSType=
+GFLAG=
+RFLAG=
+LFLAG=
+SFLAG=
+RemoteFSTypes=
 
 #	checkmessage "fsck_device | mount_point"
 #
@@ -105,12 +125,29 @@ saveentry() {
 	fi
 }
 
+# Do the passed mount options include "global"?
+isglobal() {
+	case ",${1}," in
+	*,global,*)
+		return 0
+		;;
+	esac
+	return 1
+}
 
-PATH=/usr/sbin:/usr/bin
-USAGE="Usage:\nmountall [-F FSType] [-l|-r|-g] [file_system_table]"
-TYPES=all
-FSTAB=/etc/vfstab
-err=0
+# Is the passed fstype a "remote" one?
+# Essentially: /usr/bin/grep "^$1" /etc/dfs/fstypes
+isremote() {
+	for t in $RemoteFSTypes
+	do
+		[ "$t" = "$1" ] && return 0
+	done
+	return 1
+}
+
+# Get list of remote FS types (just once)
+RemoteFSTypes=`while read t junk; do echo $t; done < /etc/dfs/fstypes`
+
 
 #
 # Process command line args
@@ -136,16 +173,14 @@ do
 			exit 2
 		esac
 		;;
-	\?)	echo "$USAGE" 1>&2; exit 2;;
+	\?)	usage "";;
 	esac
 done
 
 shift `/usr/bin/expr $OPTIND - 1`	# get past the processed args
 
 if [ $# -gt 1 ]; then
-	echo "mountall: multiple arguments not supported" 1>&2
-	echo "$USAGE" 1>&2
-	exit 2
+	usage "multiple arguments not supported"
 fi
 
 # get file system table name and make sure file exists
@@ -179,22 +214,19 @@ if [ "$GFLAG" = "g" -a "$RFLAG$LFLAG" != "" -o \
      "$RFLAG" = "r" -a "$GFLAG$LFLAG" != "" -o \
      "$LFLAG" = "l" -a "$RFLAG$GFLAG" != "" ]
 then
-	echo "mountall: options -g, -r and -l are mutually exclusive" 1>&2
-	echo "$USAGE" 1>&2
-	exit 2
+	usage "options -g, -r and -l are mutually exclusive"
 fi
 
-if [ \( "$FSType" = "cachefs" -o "$FSType" = "nfs" \) -a "$LFLAG" = "l" ]
-then
-	echo "mountall: option -l and FSType are incompatible" 1>&2
-	echo "$USAGE" 1>&2
-	exit 2
+if [ "$LFLAG" = "l" -a -n "$FSType" ]; then
+	# remote FSType not allowed
+	isremote "$FSType" &&
+	usage "option -l and FSType are incompatible"
 fi
-if [ "$FSType" -a "$FSType" != "nfs" -a "$RFLAG" = "r" ]
-then
-	echo "mountall: option -r and FSType are incompatible" 1>&2
-	echo "$USAGE" 1>&2
-	exit 2
+
+if [ "$RFLAG" = "r" -a -n "$FSType" ]; then
+	# remote FSType required
+	isremote "$FSType" ||
+	usage "option -r and FSType are incompatible"
 fi
 
 #	file-system-table format:
@@ -232,25 +264,28 @@ do
 		continue
 	fi
 
-	if [ "$LFLAG" ]; then
-		# Skip entries that have the "global" option.
-		g=`/usr/bin/grep '\<global\>' << EOF
-			$mntopts
-		EOF`
-		if [ "$fstype" = "cachefs" -o "$fstype" = "nfs" -o "$g" ]; then
-			continue
-		fi
-	elif [ "$RFLAG" -a "$fstype" != "nfs" ]; then
-		continue
-	elif [ "$GFLAG" ]; then
-		# Skip entries that have don't the "global" option.
-		g=`/usr/bin/grep '\<global\>' << EOF
-			$mntopts
-		EOF`
-		if [ "$fstype" = "cachefs" -o "$fstype" = "nfs" -o -z "$g" ]
-		then
-			continue
-		fi
+	# The -g option is not in the man page, but according to
+	# PSARC/1998/255 it's used by Sun Cluster (via contract) to
+	# mount disk-based filesystems with the "global" option.
+	# Also, the -l option now skips those "global" mounts.
+	#
+	# Note: options -g -l -r are mutually exclusive
+	#
+	if [ -n "$GFLAG" ]; then
+		# Mount "local" filesystems that have
+		# the "global" option in mntopts.
+		isremote "$fstype" && continue
+		isglobal "$mntopts" || continue
+	fi
+	if [ -n "$LFLAG" ]; then
+		# Mount "local" filesystems, excluding
+		# those marked "global".
+		isremote "$fstype" && continue
+		isglobal "$mntopts" && continue
+	fi
+	if [ -n "$RFLAG" ]; then
+		# Mount "remote" filesystems.
+		isremote "$fstype" || continue
 	fi
 
 	if [ "$fstype" = "-" ]; then
@@ -374,8 +409,11 @@ if [ -n "$FSType" ]; then
 	exit
 fi
 
+# Some remote filesystems (e.g. cachefs or autofs) shouldn't be be mounted
+# with mountall, so the list here is explicit (not from /etc/dfs/fstypes)
 if [ "$RFLAG" ]; then
 	/sbin/mount -a -F nfs
+	/sbin/mount -a -F smbfs
 	exit
 fi
 
