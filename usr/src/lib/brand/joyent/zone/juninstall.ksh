@@ -63,6 +63,7 @@ ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$bname`
 
 zfs destroy -r $PDS_NAME/$bname/cores
 zfs destroy -r $PDS_NAME/$bname
+(( $? != 0 )) && (echo "processes in zone: " && fuser $ZONEPATH)
 
 [ "$ORIGIN" != "-" ] && zfs destroy $ORIGIN
 
