@@ -2123,7 +2123,7 @@ function child_wstype {
 	echo $scm_type
 }
 
-export SCM_TYPE=$(child_wstype)
+SCM_TYPE=$(child_wstype)
 
 #
 #	Decide whether to clobber
