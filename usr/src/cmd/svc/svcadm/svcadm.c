@@ -2136,7 +2136,8 @@ main(int argc, char *argv[])
 	}
 
 	if (scf_handle_bind(h) == -1)
-		uu_die(gettext("Couldn't bind to svc.configd.\n"));
+		uu_die(gettext("Couldn't bind to configuration repository: "
+		    "%s.\n"), scf_strerror(scf_error()));
 
 	if (optind >= argc)
 		usage();
