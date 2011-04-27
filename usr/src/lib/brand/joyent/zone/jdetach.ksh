@@ -1,3 +1,4 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,43 +19,41 @@
 #
 # CDDL HEADER END
 #
-
-#
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
+# Copyright 2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROGS =		jattach jdetach jinstall juninstall pinstall prestate \
-		poststate statechange
-XMLDOCS=	config.xml platform.xml common.ksh
-USERFILES=
-MANIFEST=	joyinit.xml
-SVCMETHOD=	svc-joyinit
-TEMPLATES =	Joyent.xml
-CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
 
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.joyent
+. /usr/lib/brand/shared/common.ksh
+. /usr/lib/brand/joyent/common.ksh
 
-ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
+ZONENAME=""
+ZONEPATH=""
 
-.KEEP_STATE:
+while getopts "R:t:U:z:" opt
+do
+	case "$opt" in
+		R)	ZONEPATH="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	printf "$m_usage\n"
+			exit $ZONE_SUBPROC_USAGE;;
+	esac
+done
+shift OPTIND-1
 
-all:	$(PROGS)
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
 
-POFILES =	$(PROGS:%=%.po) common.po
-POFILE =	joyent.po
+#
+# We just need a brand hook so that we can bypass the mount checking
+# that zoneadm does.  This is needed because we have the cores dataset
+# mounted under {zonepath}/root.
+#
+cp /etc/zones/${ZONENAME}.xml ${ZONEPATH}/SUNWdetached.xml
 
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
-
-install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) \
-	$(ROOTSVCMETHOD) $(ROOTTEMPLATES) $(ETCUSER)
-
-lint:
-
-clean:
-	-$(RM) $(PROGS) $(POFILES) $(POFILE)
-
-include $(SRC)/cmd/Makefile.targ
+exit $ZONE_SUBPROC_OK
