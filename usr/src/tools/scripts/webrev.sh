@@ -2098,19 +2098,11 @@ function build_old_new_git
 		file="$DIR/$F"
 	fi
 	rm -rf $newdir/$file
-	$GIT ls-tree HEAD $file | read n_mode type n_object junk
-	$GIT cat-file $type $n_object > $newdir/$file 2>/dev/null
 
-	if (( $? != 0 )); then
-		rm -f $newdir/$file
-	elif [[ -n $n_mode ]]; then
-		# Strip the first 3 digits, to get a regular octal mode
-		n_mode=${n_mode/???/}
-		chmod $n_mode $newdir/$file
-	else
-		# should never happen
-		print -u2 "ERROR: set mode of $newdir/$file"
-	fi
+        if [[ -e $CWS/$DIR/$F ]]; then
+            cp $CWS/$DIR/$F $newdir/$DIR/$F
+            chmod $(get_file_mode $CWS/$DIR/$F) $newdir/$DIR/$F
+        fi
 	cd $OWD
 }
 
