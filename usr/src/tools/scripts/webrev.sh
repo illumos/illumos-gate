@@ -1798,20 +1798,21 @@ function git_wxfile
 	typeset parent="$2"
 
 	TMPFLIST=/tmp/$$.active
-	$GIT log --name-only --reverse --pretty=format:'%s' "${parent}".. | \
+	$GIT log --pretty=format:'%H %s' "${parent}".. | \
 	    $PERL -e 'my %files;
 
 	    while (<>) {
 	        chop;
-	        my $msg = $_;
-	        while (<>) {
-	            last if $_ eq "\n";
-	            $files{$_} .= "$msg\n";
+	        my ($c, $m) = split / /, $_, 2;
+		open(F, "git show --name-only --pretty=format:'' $c |");
+		$_ = <F>;            # First line is trash
+	        while (<F>) { 
+	            $files{$_} .= "$m\n";
 	        }
-	    }
-	     
+		close F;
+	    }	     
 	    for (sort keys %files) {
-	        printf "%s\n%s\n", $_, $files{$_}
+	        printf "%s\n%s\n", $_, $files{$_};
 	    }'> $TMPFLIST
 
 	wxfile=$TMPFLIST
