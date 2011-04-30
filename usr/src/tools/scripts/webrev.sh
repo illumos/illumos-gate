@@ -2074,20 +2074,25 @@ function build_old_new_git
 	if [[ "$PDIR" == "." ]]; then
 		file="$PF"
 	else
-		file="$PDIR/$PF"
+	       file="$PDIR/$PF"
 	fi
-	$GIT ls-tree $GIT_PARENT $file | read o_mode type o_object junk
-	$GIT cat-file $type $o_object > $olddir/$file 2>/dev/null
 
-	if (( $? != 0 )); then
-		rm -f $olddir/$file
-	elif [[ -n $o_mode ]]; then
-		# Strip the first 3 digits, to get a regular octal mode
-		o_mode=${o_mode/???/}
-		chmod $o_mode $olddir/$file
+	if [[ -n $parent_webrev && -e $PWS/$PDIR/$PF ]]; then
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
 	else
-		# should never happen
-		print -u2 "ERROR: set mode of $olddir/$file"
+                $GIT ls-tree $GIT_PARENT $file | read o_mode type o_object junk
+                $GIT cat-file $type $o_object > $olddir/$file 2>/dev/null
+                 
+                if (( $? != 0 )); then
+                        rm -f $olddir/$file
+                elif [[ -n $o_mode ]]; then
+                        # Strip the first 3 digits, to get a regular octal mode
+                        o_mode=${o_mode/???/}
+                        chmod $o_mode $olddir/$file
+                else
+                        # should never happen
+                        print -u2 "ERROR: set mode of $olddir/$file"
+                fi
 	fi
 
 	#
