@@ -2771,10 +2771,10 @@ elif [[ $SCM_MODE == "git" ]]; then
 
 	# Try to figure out the parent based on the branch the current
 	# branch is tracking, if we fail, use origin/master
-	this_branch=$(git branch | nawk '$1 == "*" { print $2 }')
+	this_branch=$($GIT branch | nawk '$1 == "*" { print $2 }')
 	par_branch="origin/master"
 
-	git for-each-ref                                                  \
+	$GIT for-each-ref                                                 \
 	    --format='%(refname:short) %(upstream:short)' refs/heads/ |   \
 	    while read local remote; do                                   \
 		[[ "$local" == "$this_branch" ]] && par_branch="$remote"; \
