@@ -2229,7 +2229,7 @@ trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
 
 set +o noclobber
 
-PATH=$(dirname $(whence $0)):$PATH
+PATH=$(dirname "$(whence $0)"):$PATH
 
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
@@ -2896,7 +2896,7 @@ typeset -A itsinfo
 typeset -r its_sed_script=/tmp/$$.its_sed
 valid_prefixes=
 if [[ -z $nflag ]]; then
-	DEFREGFILE="$(dirname $(whence $0))/../etc/its.reg"
+	DEFREGFILE="$(dirname "$(whence $0)")/../etc/its.reg"
 	if [[ -n $Iflag ]]; then
 		REGFILE=$ITSREG
 	elif [[ -r $HOME/.its.reg ]]; then
@@ -2925,7 +2925,7 @@ if [[ -z $nflag ]]; then
 	done
 
 
-	DEFCONFFILE="$(dirname $(whence $0))/../etc/its.conf"
+	DEFCONFFILE="$(dirname "$(whence $0)")/../etc/its.conf"
 	CONFFILES=$DEFCONFFILE
 	if [[ -r $HOME/.its.conf ]]; then
 		CONFFILES="${CONFFILES} $HOME/.its.conf"
