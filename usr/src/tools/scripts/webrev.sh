@@ -2492,8 +2492,8 @@ fi
 # then note that fact and set the parent to the raw_files/new subdirectory.
 #
 if [[ -n $pflag && -d $codemgr_parent/raw_files/new ]]; then
-	parent_webrev="$codemgr_parent"
-	codemgr_parent="$codemgr_parent/raw_files/new"
+	parent_webrev=$(readlink -f "$codemgr_parent")
+	codemgr_parent=$(readlink -f "$codemgr_parent/raw_files/new")
 fi
 
 if [[ -z $wflag && -z $lflag ]]; then
