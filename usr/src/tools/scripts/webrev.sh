@@ -1799,22 +1799,20 @@ function git_wxfile
 
 	TMPFLIST=/tmp/$$.active
 	$GIT log --name-only --reverse --pretty=format:'%s' "${parent}".. | \
-	    $AWK '
-		{
-		    msg = $0;
-		    sub(/\n$/, "", msg);
-		    getline;
-		    while (NF > 0) {
-			files[$0] = files[$0] ? files[$0] "\n" msg : msg;
-			getline;
-		    }
-		}
-		 
-		END {
-		    for (file in files) {
-			printf "%s\n\n%s\n\n", file, files[file]
-		    }
-		}' > $TMPFLIST
+	    $PERL -e 'my %files;
+
+	    while (<>) {
+	        chop;
+	        my $msg = $_;
+	        while (<>) {
+	            last if $_ eq "\n";
+	            $files{$_} .= "$msg\n";
+	        }
+	    }
+	     
+	    for (sort keys %files) {
+	        printf "%s\n%s\n", $_, $files{$_}
+	    }'> $TMPFLIST
 
 	wxfile=$TMPFLIST
 }
