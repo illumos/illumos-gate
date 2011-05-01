@@ -1467,7 +1467,7 @@ const instable_t dis_op0F[16][16] = {
 /*  [10]  */	TNSZ("movups",XMMO,16),	TNSZ("movups",XMMOS,16),TNSZ("movlps",XMMO,8),	TNSZ("movlps",XMMOS,8),
 /*  [14]  */	TNSZ("unpcklps",XMMO,16),TNSZ("unpckhps",XMMO,16),TNSZ("movhps",XMMOM,8),TNSZ("movhps",XMMOMS,8),
 /*  [18]  */	IND(dis_op0F18),	INVALID,		INVALID,		INVALID,
-/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		TS("nop",Mw),
 }, {
 /*  [20]  */	TSy("mov",SREG),	TSy("mov",SREG),	TSy("mov",SREG),	TSy("mov",SREG),
 /*  [24]  */	TSx("mov",SREG),	INVALID,		TSx("mov",SREG),	INVALID,
@@ -1882,7 +1882,7 @@ const instable_t dis_distable[16][16] = {
 /* [2,0] */	TNS("andb",RMw),	TS("and",RMw),		TNS("andb",MRw),	TS("and",MRw),
 /* [2,4] */	TNS("andb",IA),		TS("and",IA),		TNSx("%es:",OVERRIDE),	TNSx("daa",NORM),
 /* [2,8] */	TNS("subb",RMw),	TS("sub",RMw),		TNS("subb",MRw),	TS("sub",MRw),
-/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNSx("%cs:",OVERRIDE),	TNSx("das",NORM),
+/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNS("%cs:",OVERRIDE),	TNSx("das",NORM),
 }, {
 /* [3,0] */	TNS("xorb",RMw),	TS("xor",RMw),		TNS("xorb",MRw),	TS("xor",MRw),
 /* [3,4] */	TNS("xorb",IA),		TS("xor",IA),		TNSx("%ss:",OVERRIDE),	TNSx("aaa",NORM),
