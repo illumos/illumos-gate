@@ -2446,7 +2446,10 @@ prt_zga(private_t *pri, int raw, long val)
 		case ZONE_ATTR_BOOTARGS:	s = "ZONE_ATTR_BOOTARGS"; break;
 		case ZONE_ATTR_BRAND:	s = "ZONE_ATTR_BRAND"; break;
 		case ZONE_ATTR_FLAGS:	s = "ZONE_ATTR_FLAGS"; break;
-		case ZONE_ATTR_PHYS_MCAP: s = "ZONE_ATTR_PHYS_MCAP"; break;
+		case ZONE_ATTR_DID:	s = "ZONE_ATTR_DID"; break;
+		case ZONE_ATTR_PMCAP_NOVER: s = "ZONE_ATTR_PMCAP_NOVER"; break;
+		case ZONE_ATTR_PMCAP_PAGEOUT: s = "ZONE_ATTR_PMCAP_PAGEOUT";
+					break;
 		}
 	}
 
