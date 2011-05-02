@@ -31674,6 +31674,8 @@ sd_check_solid_state(sd_ssc_t *ssc)
 			 */
 			if (inqb1[4] == 0 && inqb1[5] == 1) {
 				un->un_f_is_solid_state = TRUE;
+				/* solid state drives don't need disksort */
+				un->un_f_disksort_disabled = TRUE;
 			}
 			mutex_exit(SD_MUTEX(un));
 		} else if (rval != 0) {
