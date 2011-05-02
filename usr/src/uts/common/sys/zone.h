@@ -95,13 +95,14 @@ extern "C" {
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
 #define	ZONE_ATTR_BRAND		11
-#define	ZONE_ATTR_PHYS_MCAP	12
+#define	ZONE_ATTR_PMCAP_NOVER	12
 #define	ZONE_ATTR_SCHED_CLASS	13
 #define	ZONE_ATTR_FLAGS		14
 #define	ZONE_ATTR_HOSTID	15
 #define	ZONE_ATTR_FS_ALLOWED	16
 #define	ZONE_ATTR_NETWORK	17
 #define	ZONE_ATTR_DID		18
+#define	ZONE_ATTR_PMCAP_PAGEOUT	19
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -413,6 +414,13 @@ typedef struct {
 	kstat_named_t	zz_waittime;
 } zone_zfs_kstat_t;
 
+typedef struct {
+	kstat_named_t	zm_rss;
+	kstat_named_t	zm_swap;
+	kstat_named_t	zm_nover;
+	kstat_named_t	zm_pagedout;
+} zone_mcap_kstat_t;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -508,7 +516,7 @@ typedef struct zone {
 	char		*zone_initname;	/* fs path to 'init' */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
 	char		*zone_bootargs;	/* arguments passed via zone_boot() */
-	uint64_t	zone_phys_mcap;	/* physical memory cap */
+	rctl_qty_t	zone_phys_mem_ctl;	/* current phys. memory limit */
 	/*
 	 * zone_kthreads is protected by zone_status_lock.
 	 */
@@ -602,6 +610,17 @@ typedef struct zone {
 	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
 						/* zone_rctls->rcs_lock */
 	kstat_t		*zone_nprocs_kstat;
+
+	/*
+	 * kstats and counters for physical memory capping.
+	 */
+	rctl_qty_t	zone_phys_mem;	/* current bytes of phys. mem. (RSS) */
+	kstat_t		*zone_physmem_kstat;
+	uint64_t	zone_mcap_nover;	/* # of times over phys. cap */
+	uint64_t	zone_mcap_pagedout;	/* bytes of mem. paged out */
+	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
+	kstat_t		*zone_mcap_ksp;
+	zone_mcap_kstat_t *zone_mcap_stats;
 } zone_t;
 
 /*
@@ -828,6 +847,7 @@ extern int zone_walk(int (*)(zone_t *, void *), void *);
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;
+extern rctl_hndl_t rc_zone_phys_mem;
 extern rctl_hndl_t rc_zone_max_lofi;
 
 #endif	/* _KERNEL */

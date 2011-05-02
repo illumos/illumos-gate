@@ -370,6 +370,7 @@ static char *zone_ref_subsys_names[] = {
 rctl_hndl_t rc_zone_cpu_shares;
 rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_max_swap;
+rctl_hndl_t rc_zone_phys_mem;
 rctl_hndl_t rc_zone_max_lofi;
 rctl_hndl_t rc_zone_cpu_cap;
 rctl_hndl_t rc_zone_zfs_io_pri;
@@ -1715,6 +1716,39 @@ static rctl_ops_t zone_max_swap_ops = {
 
 /*ARGSUSED*/
 static rctl_qty_t
+zone_phys_mem_usage(rctl_t *rctl, struct proc *p)
+{
+	rctl_qty_t q;
+	zone_t *z = p->p_zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	/* No additional lock because not enforced in the kernel */
+	q = z->zone_phys_mem;
+	return (q);
+}
+
+/*ARGSUSED*/
+static int
+zone_phys_mem_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	e->rcep_p.zone->zone_phys_mem_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_phys_mem_ops = {
+	rcop_no_action,
+	zone_phys_mem_usage,
+	zone_phys_mem_set,
+	rcop_no_test
+};
+
+/*ARGSUSED*/
+static rctl_qty_t
 zone_max_lofi_usage(rctl_t *rctl, struct proc *p)
 {
 	rctl_qty_t q;
@@ -1804,6 +1838,20 @@ zone_lockedmem_kstat_update(kstat_t *ksp, int rw)
 
 	zk->zk_usage.value.ui64 = zone->zone_locked_mem;
 	zk->zk_value.value.ui64 = zone->zone_locked_mem_ctl;
+	return (0);
+}
+
+static int
+zone_physmem_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_kstat_t *zk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zk->zk_usage.value.ui64 = zone->zone_phys_mem;
+	zk->zk_value.value.ui64 = zone->zone_phys_mem_ctl;
 	return (0);
 }
 
@@ -2003,6 +2051,54 @@ zone_zfs_kstat_create(zone_t *zone)
 	return (ksp);
 }
 
+static int
+zone_mcap_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_mcap_kstat_t *zmp = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zmp->zm_rss.value.ui64 = zone->zone_phys_mem;
+	zmp->zm_swap.value.ui64 = zone->zone_max_swap;
+	zmp->zm_nover.value.ui64 = zone->zone_mcap_nover;
+	zmp->zm_pagedout.value.ui64 = zone->zone_mcap_pagedout;
+
+	return (0);
+}
+
+static kstat_t *
+zone_mcap_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_mcap_kstat_t *zmp;
+
+	if ((ksp = kstat_create_zone("memory_cap", zone->zone_id,
+	    zone->zone_name, "zone_memory_cap", KSTAT_TYPE_NAMED,
+	    sizeof (zone_mcap_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zmp = ksp->ks_data = kmem_zalloc(sizeof (zone_mcap_kstat_t), KM_SLEEP);
+	ksp->ks_lock = &zone->zone_mcap_lock;
+	zone->zone_mcap_stats = zmp;
+
+	kstat_named_init(&zmp->zm_rss, "rss", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_swap, "swap", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_nover, "nover", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_pagedout, "pagedout", KSTAT_DATA_UINT64);
+
+	ksp->ks_update = zone_mcap_kstat_update;
+	ksp->ks_private = zone;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
 static void
 zone_kstat_create(zone_t *zone)
 {
@@ -2010,6 +2106,8 @@ zone_kstat_create(zone_t *zone)
 	    "lockedmem", zone_lockedmem_kstat_update);
 	zone->zone_swapresv_kstat = zone_rctl_kstat_create_common(zone,
 	    "swapresv", zone_swapresv_kstat_update);
+	zone->zone_physmem_kstat = zone_rctl_kstat_create_common(zone,
+	    "physicalmem", zone_physmem_kstat_update);
 	zone->zone_nprocs_kstat = zone_rctl_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
@@ -2021,6 +2119,11 @@ zone_kstat_create(zone_t *zone)
 	if ((zone->zone_zfs_ksp = zone_zfs_kstat_create(zone)) == NULL) {
 		zone->zone_zfs_stats = kmem_zalloc(
 		    sizeof (zone_zfs_kstat_t), KM_SLEEP);
+	}
+
+	if ((zone->zone_mcap_ksp = zone_mcap_kstat_create(zone)) == NULL) {
+		zone->zone_mcap_stats = kmem_zalloc(
+		    sizeof (zone_mcap_kstat_t), KM_SLEEP);
 	}
 }
 
@@ -2044,6 +2147,8 @@ zone_kstat_delete(zone_t *zone)
 	    sizeof (zone_kstat_t));
 	zone_kstat_delete_common(&zone->zone_swapresv_kstat,
 	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_physmem_kstat,
+	    sizeof (zone_kstat_t));
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
 	    sizeof (zone_kstat_t));
 
@@ -2051,6 +2156,8 @@ zone_kstat_delete(zone_t *zone)
 	    sizeof (zone_vfs_kstat_t));
 	zone_kstat_delete_common(&zone->zone_zfs_ksp,
 	    sizeof (zone_zfs_kstat_t));
+	zone_kstat_delete_common(&zone->zone_mcap_ksp,
+	    sizeof (zone_mcap_kstat_t));
 }
 
 /*
@@ -2084,6 +2191,8 @@ zone_zsd_init(void)
 	zone0.zone_locked_mem_ctl = UINT64_MAX;
 	ASSERT(zone0.zone_max_swap == 0);
 	zone0.zone_max_swap_ctl = UINT64_MAX;
+	zone0.zone_phys_mem = 0;
+	zone0.zone_phys_mem_ctl = UINT64_MAX;
 	zone0.zone_max_lofi = 0;
 	zone0.zone_max_lofi_ctl = UINT64_MAX;
 	zone0.zone_shmmax = 0;
@@ -2107,6 +2216,7 @@ zone_zsd_init(void)
 	zone0.zone_initname = initname;
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
+	zone0.zone_physmem_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
 	zone0.zone_zfs_io_pri = 1;
 
@@ -2285,6 +2395,11 @@ zone_init(void)
 	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES |
 	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
 	    &zone_max_swap_ops);
+
+	rc_zone_phys_mem = rctl_register("zone.max-physical-memory",
+	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES |
+	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
+	    &zone_phys_mem_ops);
 
 	rc_zone_max_lofi = rctl_register("zone.max-lofi",
 	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |
@@ -2597,14 +2712,31 @@ zone_set_initname(zone_t *zone, const char *zone_initname)
 	return (0);
 }
 
+/*
+ * The zone_set_mcap_nover and zone_set_mcap_pageout functions are used
+ * to provide the physical memory capping kstats.  Since physical memory
+ * capping is currently implemented in userland, that code uses the setattr
+ * entry point to increment the kstats.  We always simply increment nover
+ * every time that setattr is called and we always add in the input value
+ * to zone_mcap_pagedout every time that is called.
+ */
+/*ARGSUSED*/
 static int
-zone_set_phys_mcap(zone_t *zone, const uint64_t *zone_mcap)
+zone_set_mcap_nover(zone_t *zone, const uint64_t *zone_nover)
 {
-	uint64_t mcap;
-	int err = 0;
+	zone->zone_mcap_nover++;
 
-	if ((err = copyin(zone_mcap, &mcap, sizeof (uint64_t))) == 0)
-		zone->zone_phys_mcap = mcap;
+	return (0);
+}
+
+static int
+zone_set_mcap_pageout(zone_t *zone, const uint64_t *zone_pageout)
+{
+	uint64_t pageout;
+	int err;
+
+	if ((err = copyin(zone_pageout, &pageout, sizeof (uint64_t))) == 0)
+		zone->zone_mcap_pagedout += pageout;
 
 	return (err);
 }
@@ -4401,10 +4533,13 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_locked_mem_ctl = UINT64_MAX;
 	zone->zone_max_swap = 0;
 	zone->zone_max_swap_ctl = UINT64_MAX;
+	zone->zone_phys_mem = 0;
+	zone->zone_phys_mem_ctl = UINT64_MAX;
 	zone->zone_max_lofi = 0;
 	zone->zone_max_lofi_ctl = UINT64_MAX;
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
+	zone->zone_physmem_kstat = NULL;
 	zone->zone_zfs_io_pri = 1;
 
 	/*
@@ -5452,14 +5587,6 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				error = EFAULT;
 		}
 		break;
-	case ZONE_ATTR_PHYS_MCAP:
-		size = sizeof (zone->zone_phys_mcap);
-		if (bufsize > size)
-			bufsize = size;
-		if (buf != NULL &&
-		    copyout(&zone->zone_phys_mcap, buf, bufsize) != 0)
-			error = EFAULT;
-		break;
 	case ZONE_ATTR_SCHED_CLASS:
 		mutex_enter(&class_lock);
 
@@ -5553,10 +5680,11 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		return (set_errno(EPERM));
 
 	/*
-	 * Only the ZONE_ATTR_PHYS_MCAP attribute can be set on the
-	 * global zone.
+	 * Only the ZONE_ATTR_PMCAP_NOVER and ZONE_ATTR_PMCAP_PAGEOUT
+	 * attributes can be set on the global zone.
 	 */
-	if (zoneid == GLOBAL_ZONEID && attr != ZONE_ATTR_PHYS_MCAP) {
+	if (zoneid == GLOBAL_ZONEID &&
+	    attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT) {
 		return (set_errno(EINVAL));
 	}
 
@@ -5573,7 +5701,8 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	 * non-global zones.
 	 */
 	zone_status = zone_status_get(zone);
-	if (attr != ZONE_ATTR_PHYS_MCAP && zone_status > ZONE_IS_READY) {
+	if (attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT &&
+	    zone_status > ZONE_IS_READY) {
 		err = EINVAL;
 		goto done;
 	}
@@ -5591,8 +5720,11 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	case ZONE_ATTR_FS_ALLOWED:
 		err = zone_set_fs_allowed(zone, (const char *)buf);
 		break;
-	case ZONE_ATTR_PHYS_MCAP:
-		err = zone_set_phys_mcap(zone, (const uint64_t *)buf);
+	case ZONE_ATTR_PMCAP_NOVER:
+		err = zone_set_mcap_nover(zone, (const uint64_t *)buf);
+		break;
+	case ZONE_ATTR_PMCAP_PAGEOUT:
+		err = zone_set_mcap_pageout(zone, (const uint64_t *)buf);
 		break;
 	case ZONE_ATTR_SCHED_CLASS:
 		err = zone_set_sched_class(zone, (const char *)buf);

@@ -182,6 +182,8 @@ static struct alias {
 	{ALIAS_MAXSEMIDS, "zone.max-sem-ids", "privileged", "deny", 0},
 	{ALIAS_MAXLOCKEDMEM, "zone.max-locked-memory", "privileged", "deny", 0},
 	{ALIAS_MAXSWAP, "zone.max-swap", "privileged", "deny", 0},
+	{ALIAS_MAXPHYSMEM, "zone.max-physical-memory", "privileged", "deny",
+	    1048576},
 	{ALIAS_SHARES, "zone.cpu-shares", "privileged", "none", 0},
 	{ALIAS_CPUCAP, "zone.cpu-cap", "privileged", "deny", 0},
 	{ALIAS_MAXPROCS, "zone.max-processes", "privileged", "deny", 100},
@@ -7188,131 +7190,49 @@ zonecfg_getpsetent(zone_dochandle_t handle, struct zone_psettab *tabptr)
 	return (err);
 }
 
-static int
-add_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	xmlNodePtr newnode, cur = handle->zone_dh_cur;
-	int err;
-
-	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_MCAP, NULL);
-	if ((err = newprop(newnode, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap))
-	    != Z_OK)
-		return (err);
-
-	return (Z_OK);
-}
-
+/*
+ * Cleanup obsolete constructs in the configuration.
+ * Return true of the config has been updated and must be commited.
+ */
 int
-zonecfg_delete_mcap(zone_dochandle_t handle)
+zonecfg_fix_obsolete(zone_dochandle_t handle)
 {
-	int err;
-	xmlNodePtr cur = handle->zone_dh_cur;
-
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
-
-	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
-		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
-			continue;
-
-		xmlUnlinkNode(cur);
-		xmlFreeNode(cur);
-		return (Z_OK);
-	}
-	return (Z_NO_RESOURCE_ID);
-}
-
-int
-zonecfg_modify_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	int err;
-
-	if (tabptr == NULL)
-		return (Z_INVAL);
-
-	err = zonecfg_delete_mcap(handle);
-	/* it is ok if there is no mcap entry */
-	if (err != Z_OK && err != Z_NO_RESOURCE_ID)
-		return (err);
-
-	if ((err = add_mcap(handle, tabptr)) != Z_OK)
-		return (err);
-
-	return (Z_OK);
-}
-
-int
-zonecfg_lookup_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
+	int res = 0;
+	int add_physmem_rctl = 0;
 	xmlNodePtr cur;
-	int err;
+	char	zone_physmem_cap[MAXNAMELEN];
 
-	if (tabptr == NULL)
-		return (Z_INVAL);
+	if (operation_prep(handle) != Z_OK)
+		return (res);
 
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
-
+	/*
+	 * If an obsolete mcap entry exists, convert it to the rctl.
+	 */
 	cur = handle->zone_dh_cur;
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
 			continue;
-		if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP,
-		    tabptr->zone_physmem_cap,
-		    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
-			handle->zone_dh_cur = handle->zone_dh_top;
-			return (err);
+
+		if (fetchprop(cur, DTD_ATTR_PHYSCAP,
+		    zone_physmem_cap, sizeof (zone_physmem_cap)) == Z_OK) {
+			res = 1;
+			add_physmem_rctl = 1;
 		}
 
-		return (Z_OK);
+		xmlUnlinkNode(cur);
+		xmlFreeNode(cur);
+		break;
 	}
 
-	return (Z_NO_ENTRY);
-}
+	if (add_physmem_rctl) {
+		uint64_t cap;
+		char *endp;
 
-static int
-getmcapent_core(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	xmlNodePtr cur;
-	int err;
-
-	if (handle == NULL)
-		return (Z_INVAL);
-
-	if ((cur = handle->zone_dh_cur) == NULL)
-		return (Z_NO_ENTRY);
-
-	for (; cur != NULL; cur = cur->next)
-		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) == 0)
-			break;
-	if (cur == NULL) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (Z_NO_ENTRY);
+		cap = strtoull(zone_physmem_cap, &endp, 10);
+		(void) zonecfg_set_aliased_rctl(handle, ALIAS_MAXPHYSMEM, cap);
 	}
 
-	if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap,
-	    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (err);
-	}
-
-	handle->zone_dh_cur = cur->next;
-	return (Z_OK);
-}
-
-int
-zonecfg_getmcapent(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	int err;
-
-	if ((err = zonecfg_setent(handle)) != Z_OK)
-		return (err);
-
-	err = getmcapent_core(handle, tabptr);
-
-	(void) zonecfg_endent(handle);
-
-	return (err);
+	return (res);
 }
 
 /*

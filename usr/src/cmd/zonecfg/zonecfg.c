@@ -597,7 +597,6 @@ static struct zone_rctltab	old_rctltab, in_progress_rctltab;
 static struct zone_attrtab	old_attrtab, in_progress_attrtab;
 static struct zone_dstab	old_dstab, in_progress_dstab;
 static struct zone_psettab	old_psettab, in_progress_psettab;
-static struct zone_mcaptab	old_mcaptab, in_progress_mcaptab;
 static struct zone_admintab	old_admintab, in_progress_admintab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
@@ -1345,6 +1344,9 @@ initialize(boolean_t handle_expected)
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		if ((err = zonecfg_get_handle(zone, handle)) == Z_OK) {
 			got_handle = B_TRUE;
+
+			(void) zonecfg_fix_obsolete(handle);
+
 			if (zonecfg_get_brand(handle, brandname,
 			    sizeof (brandname)) != Z_OK) {
 				zerr("Zone %s is inconsistent: missing "
@@ -1758,7 +1760,6 @@ export_func(cmd_t *cmd)
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
 	struct zone_psettab psettab;
-	struct zone_mcaptab mcaptab;
 	struct zone_rctlvaltab *valptr;
 	struct zone_nwif_attrtab *nap;
 	struct zone_admintab admintab;
@@ -1957,17 +1958,6 @@ export_func(cmd_t *cmd)
 	}
 	(void) zonecfg_enddevent(handle);
 
-	if (zonecfg_getmcapent(handle, &mcaptab) == Z_OK) {
-		char buf[128];
-
-		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
-		    rt_to_str(RT_MCAP));
-		bytes_to_units(mcaptab.zone_physmem_cap, buf, sizeof (buf));
-		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
-		    pt_to_str(PT_PHYSICAL), buf);
-		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
-	}
-
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_FALSE);
 		goto done;
@@ -2121,7 +2111,6 @@ add_resource(cmd_t *cmd)
 {
 	int type;
 	struct zone_psettab tmp_psettab;
-	struct zone_mcaptab tmp_mcaptab;
 	uint64_t tmp;
 	uint64_t tmp_mcap;
 	char pool[MAXNAMELEN];
@@ -2213,9 +2202,10 @@ add_resource(cmd_t *cmd)
 		 * Make sure there isn't already a mem-cap entry or max-swap
 		 * or max-locked rctl.
 		 */
-		if (zonecfg_lookup_mcap(handle, &tmp_mcaptab) == Z_OK ||
-		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp_mcap)
-		    == Z_OK ||
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
+		    &tmp_mcap) == Z_OK ||
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM,
+		    &tmp_mcap) == Z_OK ||
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
 		    &tmp_mcap) == Z_OK) {
 			zerr(gettext("The %s resource or a related resource "
@@ -2228,7 +2218,6 @@ add_resource(cmd_t *cmd)
 			    "to even the root user; "
 			    "this could render the system impossible\n"
 			    "to administer.  Please use caution."));
-		bzero(&in_progress_mcaptab, sizeof (in_progress_mcaptab));
 		return;
 	case RT_ADMIN:
 		bzero(&in_progress_admintab, sizeof (in_progress_admintab));
@@ -3311,10 +3300,9 @@ remove_mcap()
 {
 	int err, res1, res2, res3;
 	uint64_t tmp;
-	struct zone_mcaptab mcaptab;
 	boolean_t revert = B_FALSE;
 
-	res1 = zonecfg_lookup_mcap(handle, &mcaptab);
+	res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &tmp);
 	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp);
 	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &tmp);
 
@@ -3326,13 +3314,15 @@ remove_mcap()
 		return;
 	}
 	if (res1 == Z_OK) {
-		if ((err = zonecfg_delete_mcap(handle)) != Z_OK) {
+		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXPHYSMEM))
+		    != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, B_TRUE);
 			revert = B_TRUE;
 		} else {
 			need_to_commit = B_TRUE;
 		}
 	}
+
 	if (res2 == Z_OK) {
 		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXSWAP))
 		    != Z_OK) {
@@ -3693,8 +3683,7 @@ clear_property(cmd_t *cmd)
 	case RT_MCAP:
 		switch (prop_type) {
 		case PT_PHYSICAL:
-			in_progress_mcaptab.zone_physmem_cap[0] = '\0';
-			need_to_commit = B_TRUE;
+			remove_aliased_rctl(PT_PHYSICAL, ALIAS_MAXPHYSMEM);
 			return;
 		case PT_SWAP:
 			remove_aliased_rctl(PT_SWAP, ALIAS_MAXSWAP);
@@ -3863,7 +3852,7 @@ clear_func(cmd_t *cmd)
 void
 select_func(cmd_t *cmd)
 {
-	int type, err, res;
+	int type, err;
 	uint64_t limit;
 	uint64_t tmp;
 
@@ -3958,7 +3947,8 @@ select_func(cmd_t *cmd)
 		return;
 	case RT_MCAP:
 		/* if none of these exist, there is no resource to select */
-		if ((res = zonecfg_lookup_mcap(handle, &old_mcaptab)) != Z_OK &&
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &limit)
+		    != Z_OK &&
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &limit)
 		    != Z_OK &&
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &limit)
@@ -3967,12 +3957,6 @@ select_func(cmd_t *cmd)
 			    B_TRUE);
 			global_scope = B_TRUE;
 		}
-		if (res == Z_OK)
-			bcopy(&old_mcaptab, &in_progress_mcaptab,
-			    sizeof (struct zone_mcaptab));
-		else
-			bzero(&in_progress_mcaptab,
-			    sizeof (in_progress_mcaptab));
 		return;
 	case RT_ADMIN:
 		if ((err = fill_in_admintab(cmd, &old_admintab, B_FALSE))
@@ -4239,7 +4223,6 @@ set_func(cmd_t *cmd)
 	boolean_t autoboot;
 	zone_iptype_t iptype;
 	boolean_t force_set = B_FALSE;
-	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
 	float cap;
 	char *unitp;
@@ -4827,18 +4810,30 @@ set_func(cmd_t *cmd)
 	case RT_MCAP:
 		switch (prop_type) {
 		case PT_PHYSICAL:
-			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
-				zerr(gettext("A positive number with a "
-				    "required scale suffix (K, M, G or T) was "
-				    "expected here."));
+			/*
+			 * We have to check if an rctl is allowed here since
+			 * there might already be a rctl defined that blocks
+			 * the alias.
+			 */
+			if (!zonecfg_aliased_rctl_ok(handle,
+			    ALIAS_MAXPHYSMEM)) {
+				zone_perror(pt_to_str(PT_LOCKED),
+				    Z_ALIAS_DISALLOW, B_FALSE);
 				saw_error = B_TRUE;
-			} else if (mem_cap < ONE_MB) {
-				zerr(gettext("%s value is too small.  It must "
-				    "be at least 1M."), pt_to_str(PT_PHYSICAL));
+				return;
+			}
+
+			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
+				zerr(gettext("A non-negative number with a "
+				    "required scale suffix (K, M, G or T) was "
+				    "expected\nhere."));
 				saw_error = B_TRUE;
 			} else {
-				snprintf(in_progress_mcaptab.zone_physmem_cap,
-				    physmem_size, "%llu", mem_cap);
+				if ((err = zonecfg_set_aliased_rctl(handle,
+				    ALIAS_MAXPHYSMEM, mem_cap)) != Z_OK)
+					zone_perror(zone, err, B_TRUE);
+				else
+					need_to_commit = B_TRUE;
 			}
 			break;
 		case PT_SWAP:
@@ -5512,15 +5507,18 @@ bytes_to_units(char *str, char *buf, int bufsize)
 }
 
 static void
-output_mcap(FILE *fp, struct zone_mcaptab *mcaptab, int showswap,
+output_mcap(FILE *fp, int showphys, uint64_t maxphys, int showswap,
     uint64_t maxswap, int showlocked, uint64_t maxlocked)
 {
 	char buf[128];
 
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_MCAP));
-	if (mcaptab->zone_physmem_cap[0] != '\0') {
-		bytes_to_units(mcaptab->zone_physmem_cap, buf, sizeof (buf));
-		output_prop(fp, PT_PHYSICAL, buf, B_TRUE);
+
+	if (showphys == Z_OK) {
+		(void) snprintf(buf, sizeof (buf), "%llu", maxphys);
+		bytes_to_units(buf, buf, sizeof (buf));
+		/* Print directly since "physical" also is a net property. */
+		(void) fprintf(fp, "\t[%s: %s]\n", pt_to_str(PT_PHYSICAL), buf);
 	}
 
 	if (showswap == Z_OK) {
@@ -5542,16 +5540,16 @@ info_mcap(zone_dochandle_t handle, FILE *fp)
 	int res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
-	struct zone_mcaptab lookup;
+	uint64_t phys_limit;
 
-	bzero(&lookup, sizeof (lookup));
-	res1 = zonecfg_getmcapent(handle, &lookup);
+	res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &phys_limit);
 	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &swap_limit);
 	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
 	    &locked_limit);
 
 	if (res1 == Z_OK || res2 == Z_OK || res3 == Z_OK)
-		output_mcap(fp, &lookup, res2, swap_limit, res3, locked_limit);
+		output_mcap(fp, res1, phys_limit, res2, swap_limit,
+		    res3, locked_limit);
 }
 
 static void
@@ -5603,9 +5601,10 @@ info_func(cmd_t *cmd)
 	boolean_t need_to_close = B_FALSE;
 	char *pager, *space;
 	int type;
-	int res1, res2;
+	int res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	uint64_t phys_limit;
 	struct stat statbuf;
 
 	assert(cmd != NULL);
@@ -5666,7 +5665,9 @@ info_func(cmd_t *cmd)
 			    &swap_limit);
 			res2 = zonecfg_get_aliased_rctl(handle,
 			    ALIAS_MAXLOCKEDMEM, &locked_limit);
-			output_mcap(fp, &in_progress_mcaptab, res1, swap_limit,
+			res3 = zonecfg_get_aliased_rctl(handle,
+			    ALIAS_MAXPHYSMEM, &phys_limit);
+			output_mcap(fp, res3, phys_limit, res1, swap_limit,
 			    res2, locked_limit);
 			break;
 		case RT_ADMIN:
@@ -6458,6 +6459,7 @@ end_func(cmd_t *cmd)
 	int err, arg, res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	uint64_t phys_limit;
 	uint64_t proc_cap;
 
 	assert(cmd != NULL);
@@ -6761,8 +6763,8 @@ end_func(cmd_t *cmd)
 		break;
 	case RT_MCAP:
 		/* Make sure everything was filled in. */
-		res1 = strlen(in_progress_mcaptab.zone_physmem_cap) == 0 ?
-		    Z_ERR : Z_OK;
+		res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM,
+		    &phys_limit);
 		res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
 		    &swap_limit);
 		res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
@@ -6778,11 +6780,6 @@ end_func(cmd_t *cmd)
 
 		/* if phys & locked are both set, verify locked <= phys */
 		if (res1 == Z_OK && res3 == Z_OK) {
-			uint64_t phys_limit;
-			char *endp;
-
-			phys_limit = strtoull(
-			    in_progress_mcaptab.zone_physmem_cap, &endp, 10);
 			if (phys_limit < locked_limit) {
 				zerr(gettext("The %s cap must be less than or "
 				    "equal to the %s cap."),
@@ -6794,23 +6791,6 @@ end_func(cmd_t *cmd)
 		}
 
 		err = Z_OK;
-		if (res1 == Z_OK) {
-			/*
-			 * We could be ending from either an add operation
-			 * or a select operation.  Since all of the properties
-			 * within this resource are optional, we always use
-			 * modify on the mcap entry.  zonecfg_modify_mcap()
-			 * will handle both adding and modifying a memory cap.
-			 */
-			err = zonecfg_modify_mcap(handle, &in_progress_mcaptab);
-		} else if (end_op == CMD_SELECT) {
-			/*
-			 * If we're ending from a select and the physical
-			 * memory cap is empty then the user could have cleared
-			 * the physical cap value, so try to delete the entry.
-			 */
-			(void) zonecfg_delete_mcap(handle);
-		}
 		break;
 	case RT_ADMIN:
 		/* First make sure everything was filled in. */

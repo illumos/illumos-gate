@@ -4378,15 +4378,13 @@ duplicate_reachable_path(zlog_t *zlogp, const char *rootpath)
 }
 
 /*
- * Set memory cap and pool info for the zone's resource management
- * configuration.
+ * Set pool info for the zone's resource management configuration.
  */
 static int
 setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 {
 	int res;
 	uint64_t tmp;
-	struct zone_mcaptab mcap;
 	char sched[MAXNAMELEN];
 	zone_dochandle_t handle = NULL;
 	char pool_err[128];
@@ -4400,29 +4398,6 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 		zerror(zlogp, B_FALSE, "invalid configuration");
 		zonecfg_fini_handle(handle);
 		return (res);
-	}
-
-	/*
-	 * If a memory cap is configured, set the cap in the kernel using
-	 * zone_setattr() and make sure the rcapd SMF service is enabled.
-	 */
-	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
-		uint64_t num;
-		char smf_err[128];
-
-		num = (uint64_t)strtoull(mcap.zone_physmem_cap, NULL, 10);
-		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
-			zerror(zlogp, B_TRUE, "could not set zone memory cap");
-			zonecfg_fini_handle(handle);
-			return (Z_INVAL);
-		}
-
-		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
-			zerror(zlogp, B_FALSE, "enabling system/rcap service "
-			    "failed: %s", smf_err);
-			zonecfg_fini_handle(handle);
-			return (Z_INVAL);
-		}
 	}
 
 	/* Get the scheduling class set in the zone configuration. */
