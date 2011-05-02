@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
@@ -9,13 +10,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH date 1 "11 May 2004" "SunOS 5.11" "User Commands"
+.TH date 1 "1 May 2011" "SunOS 5.11" "User Commands"
 .SH NAME
 date \- write the date and time
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/date\fR [\fB-u\fR] [+\fIformat\fR]
+\fB/usr/bin/date\fR [\fB-u\fR] [\fB-R\fR] [+\fIformat\fR]
 .fi
 
 .LP
@@ -30,7 +31,7 @@ date \- write the date and time
 
 .LP
 .nf
-\fB/usr/xpg4/bin/date\fR [\fB-u\fR] [+\fIformat\fR]
+\fB/usr/xpg4/bin/date\fR [\fB-u\fR] [\fB-R\fR] [+\fIformat\fR]
 .fi
 
 .LP
@@ -105,6 +106,24 @@ seconds specified. Only the super-user may adjust the time.
 .rt  
 Display (or set) the date in Greenwich Mean Time (GMT\(emuniversal time),
 bypassing the normal conversion to (or from) local time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-R\fR
+.ad
+.RS 24n
+.rt  
+Change the default format to the format used for mail message headers
+(similar to RFC 822 format).  The default format becomes
+.sp
+.in +2
+.nf
+\fI%a, %d %h %Y %H:%M:%S %z\fR
+.fi
+.in -2
 .RE
 
 .SH OPERANDS

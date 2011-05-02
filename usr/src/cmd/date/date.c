@@ -23,6 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -36,8 +39,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	date - with format capabilities and international flair
@@ -70,6 +71,7 @@ static char *usage =
 	"usage:\tdate [-u] mmddHHMM[[cc]yy][.SS]\n\tdate [-u] [+format]\n"
 	"\tdate -a [-]sss[.fff]\n";
 static int uflag = 0;
+static int Rflag = 0;
 
 static int get_adj(char *, struct timeval *);
 static int setdate(struct tm *, char *);
@@ -89,19 +91,22 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:u")) != EOF)
+	while ((c = getopt(argc, argv, "a:uR")) != EOF)
 		switch (c) {
 		case 'a':
 			aflag++;
 			if (get_adj(optarg, &tv) < 0) {
 				(void) fprintf(stderr,
 				    gettext("date: invalid argument -- %s\n"),
-						optarg);
+				    optarg);
 				illflag++;
 			}
 			break;
 		case 'u':
 			uflag++;
+			break;
+		case 'R':
+			Rflag++;
 			break;
 		default:
 			illflag++;
@@ -110,8 +115,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv  = &argv[optind];
 
-	/* -u and -a are mutually exclusive */
+	/* -a is mutually exclusive with -u and -R */
 	if (uflag && aflag)
+		illflag++;
+	if (Rflag && aflag)
 		illflag++;
 
 	if (illflag) {
@@ -139,6 +146,8 @@ main(int argc, char **argv)
 			}
 			fmt = nl_langinfo(_DATE_FMT);
 		}
+	} else if (Rflag) {
+		fmt = "%a, %d %h %Y %H:%M:%S %z";
 	} else
 		fmt = nl_langinfo(_DATE_FMT);
 
@@ -244,7 +253,7 @@ setdate(struct tm *current_date, char *date)
 			dd_check++;
 	}
 	if (!((mm >= 1 && mm <= 12) && (dd >= 1 && dd <= dd_check) &&
-		(hh >= 0 && hh <= 23) && (min >= 0 && min <= 59))) {
+	    (hh >= 0 && hh <= 23) && (min >= 0 && min <= 59))) {
 		(void) fprintf(stderr, gettext("date: bad conversion\n"));
 		return (1);
 	}
