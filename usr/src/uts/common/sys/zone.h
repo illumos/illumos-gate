@@ -415,8 +415,11 @@ typedef struct {
 } zone_zfs_kstat_t;
 
 typedef struct {
+	kstat_named_t	zm_zonename;
 	kstat_named_t	zm_rss;
+	kstat_named_t	zm_phys_cap;
 	kstat_named_t	zm_swap;
+	kstat_named_t	zm_swap_cap;
 	kstat_named_t	zm_nover;
 	kstat_named_t	zm_pagedout;
 } zone_mcap_kstat_t;

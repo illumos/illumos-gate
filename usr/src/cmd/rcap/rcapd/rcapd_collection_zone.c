@@ -121,61 +121,36 @@ get_zone_cap(zoneid_t zid)
 	return (mcap);
 }
 
-static void
-update_zone(zone_entry_t *zent, void *walk_data)
+/*
+ * For zones, rcapd only caps the global zone, since each non-global zone
+ * caps itself.
+ */
+/* ARGSUSED */
+void
+lcollection_update_zone(lcollection_update_type_t ut,
+    void(*update_notification_cb)(char *, char *, int, uint64_t, int))
 {
-	void(*update_notification_cb)(char *, char *, int, uint64_t, int) =
-	    (void(*)(char *, char *, int, uint64_t, int))walk_data;
 	int changes;
 	int64_t max_rss;
 	uint64_t mcap;
 	lcollection_t *lcol;
 	rcid_t colid;
 
-	mcap = get_zone_cap(zent->zid);
-	if (mcap != 0 && mcap != UINT64_MAX)
+	mcap = get_zone_cap(GLOBAL_ZONEID);
+	if (mcap != 0 && mcap != UINT64_MAX) {
 		max_rss = ROUNDUP(mcap, 1024) / 1024;
-	else
-		max_rss = 0;
-
-	if (zent->zid == GLOBAL_ZONEID) {
-		if (max_rss > 0)
-			gz_capped = B_TRUE;
-		else
-			gz_capped = B_FALSE;
+		gz_capped = B_TRUE;
+	} else {
+		max_rss = UINT64_MAX / 1024;
+		gz_capped = B_FALSE;
 	}
-
 
 	colid.rcid_type = RCIDT_ZONE;
-	colid.rcid_val = zent->zid;
+	colid.rcid_val = GLOBAL_ZONEID;
 
-	lcol = lcollection_insert_update(&colid, max_rss, zent->zname,
+	lcol = lcollection_insert_update(&colid, max_rss, GLOBAL_ZONENAME,
 	    &changes);
 	if (update_notification_cb != NULL)
-		update_notification_cb("zone", zent->zname, changes, max_rss,
-		    (lcol != NULL) ? lcol->lcol_mark : 0);
-}
-
-
-/* ARGSUSED */
-void
-lcollection_update_zone(lcollection_update_type_t ut,
-    void(*update_notification_cb)(char *, char *, int, uint64_t, int))
-{
-	int i;
-	uint_t nzents;
-	zone_entry_t *zents;
-
-	/*
-	 * Enumerate running zones.
-	 */
-	if (get_running_zones(&nzents, &zents) != 0)
-		return;
-
-	for (i = 0; i < nzents; i++) {
-		update_zone(&zents[i], (void *)update_notification_cb);
-
-	}
-
-	free(zents);
+		update_notification_cb("zone", GLOBAL_ZONENAME, changes,
+		    max_rss, (lcol != NULL) ? lcol->lcol_mark : 0);
 }

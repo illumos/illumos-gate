@@ -152,6 +152,12 @@ extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
 
 /*
+ * Memory capping thread creation.
+ */
+extern void create_mcap_thread(zlog_t *, zoneid_t);
+extern void destroy_mcap_thread();
+
+/*
  * Contract handling.
  */
 extern int init_template(void);
