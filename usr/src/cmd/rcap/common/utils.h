@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_UTILS_H
@@ -98,7 +99,6 @@ extern void vdprintfe(int, const char *, va_list);
 extern void dprintfe(int, char *, ...);
 extern void hrt2ts(hrtime_t, timestruc_t *);
 extern int xatoi(char *);
-extern int get_running_zones(uint_t *, zone_entry_t **);
 
 #ifdef	__cplusplus
 }

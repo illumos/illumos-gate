@@ -24,6 +24,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
 PROG= zoneadmd
@@ -32,7 +33,7 @@ include ../Makefile.cmd
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
-OBJS= zoneadmd.o zcons.o vplat.o
+OBJS= zoneadmd.o zcons.o vplat.o mcap.o
 SRCS = $(OBJS:.o=.c)
 POFILE=zoneadmd_all.po
 POFILES= $(OBJS:%.o=%.po)
@@ -44,7 +45,7 @@ CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil -lscf
+	-linetutil -lscf -lproc
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:
