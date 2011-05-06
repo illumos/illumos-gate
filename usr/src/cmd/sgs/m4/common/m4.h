@@ -26,6 +26,10 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2011 Gary Mills
+ */
+
 #ifndef	_M4_H
 #define	_M4_H
 
@@ -33,6 +37,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<errno.h>
 #include	<locale.h>
 #include	<limits.h>
 
@@ -161,6 +166,7 @@ extern void error(char *);
 extern int min(int, int);
 extern void putbak(wchar_t);
 extern void stkchr(wchar_t);
+extern void errorf(char *, char *);
 extern void error2(char *, int);
 
 extern wchar_t *wstrdup(wchar_t *);

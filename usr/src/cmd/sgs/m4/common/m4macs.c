@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011 Gary Mills
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<limits.h>
 #include	<unistd.h>
@@ -297,8 +299,8 @@ incl(wchar_t **ap, int c, int noisy)
 		if ((ifile[++ifx] = fopen(wstr2str(ap[1], 0), "r")) == NULL) {
 			--ifx;
 			if (noisy)
-				error(gettext(
-				"can't open file"));
+				errorf(gettext("cannot open file: %s"),
+				    strerror(errno));
 		} else {
 			ipstk[ifx] = ipflr = ip;
 			setfname(wstr2str(ap[1], 0));
