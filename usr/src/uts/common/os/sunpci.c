@@ -1053,8 +1053,7 @@ pci_post_suspend(dev_info_t *dip)
 		if ((pmcap & (PCI_PMCAP_D3COLD_PME | PCI_PMCAP_D3HOT_PME)) != 0)
 			p->ppc_suspend_level =
 			    (PCI_PMCSR_PME_EN | PCI_PMCSR_D3HOT);
-		else if ((pmcap & PCI_PMCAP_D2_PME) !=
-		    0)
+		else if ((pmcap & PCI_PMCAP_D2_PME) != 0)
 			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D2;
 		else if ((pmcap & PCI_PMCAP_D1_PME) != 0)
 			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D1;
@@ -1112,9 +1111,9 @@ done:
 
 
 #if defined(__x86)
-	if (pci_enable_wakeup) {
-
-			ret = acpi_ddi_setwake(dip, 3);
+	if (pci_enable_wakeup &&
+	    (p->ppc_suspend_level & PCI_PMCSR_PME_EN) != 0) {
+		ret = acpi_ddi_setwake(dip, 3);
 
 		if (ret) {
 			PMD(PMD_SX, ("pci_post_suspend, setwake %s@%s rets "
@@ -1173,9 +1172,6 @@ pci_pre_resume(dev_info_t *dip)
 	int flags;
 	uint_t length;
 	clock_t drv_usectohz(clock_t microsecs);
-#if defined(__x86)
-	int retval;
-#endif
 
 	PMD(PMD_SX, ("pci_pre_resume %s:%d\n", ddi_driver_name(dip),
 	    ddi_get_instance(dip)))
@@ -1187,14 +1183,15 @@ pci_pre_resume(dev_info_t *dip)
 	flags = p->ppc_flags;
 	pmcap = p->ppc_cap_offset;
 	pmcsr = p->ppc_pmcsr;
-	ddi_prop_free(p);
 
 #if defined(__x86)
 	/*
 	 * Turn platform wake enable back off
 	 */
+	if (pci_enable_wakeup &&
+	    (p->ppc_suspend_level & PCI_PMCSR_PME_EN) != 0) {
+		int retval;
 
-	if (pci_enable_wakeup) {
 		retval = acpi_ddi_setwake(dip, 0);	/* 0 for now */
 		if (retval) {
 			PMD(PMD_SX, ("pci_pre_resume, setwake %s@%s rets "
@@ -1202,6 +1199,9 @@ pci_pre_resume(dev_info_t *dip)
 		}
 	}
 #endif
+
+	ddi_prop_free(p);
+
 	if ((flags & PPCF_NOPMCAP) != 0)
 		goto done;
 
