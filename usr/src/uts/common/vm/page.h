@@ -38,12 +38,6 @@
 #ifndef	_VM_PAGE_H
 #define	_VM_PAGE_H
 
-/*
- * The following should be defined in a Makefile, but right now, I'm not sure
- * which Makefile to use.  This is used by solaris KVM
- */
-#define	SOLARIS_KVM
-
 #include <vm/seg.h>
 
 #ifdef	__cplusplus
@@ -548,10 +542,6 @@ typedef struct page {
 	kmutex_t	p_ilock;	/* protects p_vpmref */
 #else
 	uint64_t	p_msresv_2;	/* page allocation debugging */
-#endif
-#ifdef SOLARIS_KVM
-	void		*p_private;	/* for KVM, kvm_mmu_page *  */
-	caddr_t		p_virtual;	/* kernel virtual address */
 #endif
 } page_t;
 
