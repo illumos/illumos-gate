@@ -1,0 +1,115 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmvq 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+rmvq \- remove a message from a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBvoid\fR \fBrmvq\fR(\fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 6n
+.rt  
+Queue containing the message to be removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Message to remove.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrmvq()\fR function removes a message from a queue. A message can be
+removed from anywhere on a queue. To prevent modules and drivers from having to
+deal with the internals of message linkage on a queue, either \fBrmvq()\fR or
+\fBgetq\fR(9F) should be used to remove a message from a queue.
+.SH CONTEXT
+.sp
+.LP
+The \fBrmvq()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+This code fragment illustrates how one may flush one type of message from a
+queue. In this case, only \fBM_PROTO T_DATA_IND\fR messages are flushed. For
+each message on the queue, if it is an \fBM_PROTO\fR message (line 8) of type
+\fBT_DATA_IND\fR (line 10), save a pointer to the next message (line 11),
+remove the \fBT_DATA_IND\fR message (line 12) and free it (line 13). Continue
+with the next message in the list (line 19).
+.sp
+.in +2
+.nf
+1  mblk_t *mp, *nmp;
+2  queue_t *q;
+3  union T_primitives *tp;
+4
+5	/* Insert code here to protect queue and message block */
+6	mp = q->q_first;
+7	while (mp) {
+8		if (mp->b_datap->db_type == M_PROTO) {
+9			tp = (union T_primitives *)mp->b_rptr;
+10			if (tp->type == T_DATA_IND) {
+11				nmp = mp->b_next;
+12				rmvq(q, mp);
+13				freemsg(mp);
+14				mp = nmp;
+15			} else {
+16				mp = mp->b_next;
+17			}
+18		} else {
+19			mp = mp->b_next;
+20		}
+21	}
+22	/* End of region that must be protected */
+.fi
+.in -2
+
+.sp
+.LP
+When using \fBrmvq()\fR, you must ensure that the queue and the message block
+is not modified by another thread at the same time. You can achieve this either
+by using STREAMS functions or by implementing your own locking.
+.SH SEE ALSO
+.sp
+.LP
+\fBfreemsg\fR(9F), \fBgetq\fR(9F), \fBinsq\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH WARNINGS
+.sp
+.LP
+Make sure that the message \fImp\fR is linked onto \fIq\fR to avoid a possible
+system panic.

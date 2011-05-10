@@ -1,0 +1,384 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wordexp 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wordexp, wordfree \- perform word expansions
+.SH SYNOPSIS
+.LP
+.nf
+#include <wordexp.h>
+
+\fBint\fR \fBwordexp\fR(\fBconst char *restrict\fR \fIwords\fR, \fBwordexp_t *restrict\fR \fIpwordexp\fR,
+     \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwordfree\fR(\fBwordexp_t *\fR\fIpwordexp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwordexp()\fR function performs word expansions, subject to quoting, and
+places the list of expanded words into the structure pointed to by
+\fIpwordexp\fR.
+.sp
+.LP
+The \fBwordfree()\fR function frees any memory allocated by \fBwordexp()\fR
+associated with \fIpwordexp\fR.
+.SS "\fIwords\fR Argument"
+.sp
+.LP
+The \fIwords\fR argument is a pointer to a string containing one or more words
+to be expanded. The expansions will be the same as would be performed by the
+shell if \fIwords\fR were the part of a command line representing the arguments
+to a utility. Therefore, \fIwords\fR must not contain an unquoted \fBNEWLINE\fR
+or any of the unquoted shell special characters:
+.sp
+.LP
+\fB |   &   ;   <   >\fR
+.sp
+.LP
+except in the context of command substitution. It also must not contain
+unquoted parentheses or braces, except in the context of command or variable
+substitution. If the argument \fIwords\fR contains an unquoted comment
+character (number sign) that is the beginning of a token, \fBwordexp()\fR may
+treat the comment character as a regular character, or may interpret it as a
+comment indicator and ignore the remainder of \fIwords\fR.
+.SS "\fIpwordexp\fR Argument"
+.sp
+.LP
+The structure type \fBwordexp_t\fR is defined in the header <\fBwordexp.h\fR>
+and includes at least the following members:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsize_t we_wordc\fR\fR
+.ad
+.RS 19n
+.rt  
+Count of words matched by \fIwords\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBchar **we_wordv\fR\fR
+.ad
+.RS 19n
+.rt  
+Pointer to list of expanded words.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsize_t we_offs\fR\fR
+.ad
+.RS 19n
+.rt  
+Slots to reserve at the beginning of \fIpwordexp\(mi>\fR\fBwe_wordv\fR.
+.RE
+
+.sp
+.LP
+The \fBwordexp()\fR function stores the number of generated words into
+\fIpwordexp\(mi>\fR\fBwe_wordc\fR and a pointer to a list of pointers to words
+in \fIpwordexp\(mi>\fR\fBwe_wordv.\fR Each individual field created during
+field splitting is a separate word in the \fIpwordexp\(mi>\fR\fBwe_wordv\fR
+list.  The words are in order. The first pointer after the last word pointer
+will be a null pointer.
+.sp
+.LP
+It is the caller's responsibility to allocate the storage pointed to by
+\fIpwordexp\fR. The \fBwordexp()\fR function allocates other space as needed,
+including memory pointed to by \fIpwordexp\(mi>\fR\fBwe_wordv\fR. The
+\fBwordfree()\fR function frees any memory associated with \fIpwordexp\fR from
+a previous call to \fBwordexp()\fR.
+.SS "\fIflags\fR Argument"
+.sp
+.LP
+The \fIflags\fR argument is used to control the behavior of \fBwordexp()\fR.
+The value of \fIflags\fR is the bitwise inclusive \fBOR\fR of zero or more of
+the following constants, which are defined in \fB<wordexp.h>\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_APPEND\fR\fR
+.ad
+.RS 16n
+.rt  
+Append words generated to the ones from a previous call to \fBwordexp()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_DOOFFS\fR\fR
+.ad
+.RS 16n
+.rt  
+Make use of \fIpwordexp\(mi>\fR\fBwe_offs.\fR If this flag is set,
+\fIpwordexp\(mi>\fR\fBwe_offs\fR is used to specify how many \fINULL\fR
+pointers to add to the beginning of \fIpwordexp\(mi>\fR\fBwe_wordv.\fR In other
+words, \fIpwordexp\(mi>\fR\fBwe_wordv\fR will point to
+\fIpwordexp\(mi>\fR\fBwe_offs\fR \fINULL\fR pointers, followed by
+\fIpwordexp\(mi>\fR\fBwe_wordc\fR word pointers, followed by a \fINULL\fR
+pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_NOCMD\fR\fR
+.ad
+.RS 16n
+.rt  
+Fail if command substitution is requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_REUSE\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpwordexp\fR argument was passed to a previous successful call to
+\fBwordexp()\fR, and has not been passed to \fBwordfree()\fR. The result will
+be the same as if the application had called \fBwordfree()\fR and then called
+\fBwordexp()\fR without \fBWRDE_REUSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_SHOWERR\fR\fR
+.ad
+.RS 16n
+.rt  
+Do not redirect \fBstderr\fR to \fB/dev/null\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_UNDEF\fR\fR
+.ad
+.RS 16n
+.rt  
+Report error on an attempt to expand an undefined shell variable.
+.RE
+
+.sp
+.LP
+The \fBWRDE_APPEND\fR flag can be used to append a new set of words to those
+generated by a previous call to \fBwordexp()\fR. The following rules apply when
+two or more calls to \fBwordexp()\fR are made with the same value of
+\fIpwordexp\fR and without intervening calls to \fBwordfree()\fR:
+.RS +4
+.TP
+1.
+The first such call must not set \fBWRDE_APPEND\fR. All subsequent calls
+must set it.
+.RE
+.RS +4
+.TP
+2.
+All of the calls must set \fBWRDE_DOOFFS\fR, or all must not set it.
+.RE
+.RS +4
+.TP
+3.
+After the second and each subsequent call, \fIpwordexp\(mi>\fR\fBwe_wordv\fR
+will point to a list containing the following:
+.RS +4
+.TP
+a.
+zero or more \fINULL\fR pointers, as specified by \fBWRDE_DOOFFS\fR and
+\fIpwordexp\(mi>\fR\fBwe_offs.\fR
+.RE
+.RS +4
+.TP
+b.
+pointers to the words that were in the \fIpwordexp\(mi>\fR\fBwe_wordv\fR
+list before the call, in the same order as before.
+.RE
+.RS +4
+.TP
+c.
+pointers to the new words generated by the latest call, in the specified
+order.
+.RE
+.RE
+.RS +4
+.TP
+4.
+The count returned in \fIpwordexp\(mi>\fR\fBwe_wordc\fR will be the total
+number of words from all of the calls.
+.RE
+.RS +4
+.TP
+5.
+The application can change any of the fields after a call to
+\fBwordexp()\fR, but if it does it must reset them to the original value before
+a subsequent call, using the same \fIpwordexp\fR value, to \fBwordfree()\fR or
+\fBwordexp()\fR with the \fBWRDE_APPEND\fR or \fBWRDE_REUSE\fR flag.
+.RE
+.sp
+.LP
+If \fIwords\fR contains an unquoted:
+.sp
+.LP
+\fBNEWLINE\fR \fB|   &   ;   <   >   (   )   {   }\fR
+.sp
+.LP
+in an inappropriate context, \fBwordexp()\fR will fail, and the number of
+expanded words will be zero.
+.sp
+.LP
+Unless \fBWRDE_SHOWERR\fR is set in \fIflags\fR, \fBwordexp()\fR will redirect
+\fBstderr\fR to \fB/dev/null\fR for any utilities executed as a result of
+command substitution while expanding \fIwords\fR.
+.sp
+.LP
+If \fBWRDE_SHOWERR\fR is set, \fBwordexp()\fR may write messages to
+\fIstderr\fR if syntax errors are detected while expanding \fIwords\fR. If
+\fBWRDE_DOOFFS\fR is set, then \fIpwordexp\(mi>\fR\fB we_offs\fR must have the
+same value for each \fBwordexp()\fR call and \fBwordfree()\fR call using a
+given \fIpwordexp\fR.
+.sp
+.LP
+The following constants are defined as error return values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_BADCHAR\fR\fR
+.ad
+.RS 16n
+.rt  
+One of the unquoted characters:
+.sp
+\fBNEWLINE\fR \fB|   &   ;   <   >   (   )   {   }\fR
+.sp
+appears in \fIwords\fR in an inappropriate context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_BADVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+Reference to undefined shell variable when \fBWRDE_UNDEF\fR is set in
+\fIflags\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_CMDSUB\fR\fR
+.ad
+.RS 16n
+.rt  
+Command substitution requested when \fBWRDE_NOCMD\fR was set in flags.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_NOSPACE\fR\fR
+.ad
+.RS 16n
+.rt  
+Attempt to allocate memory failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWRDE_SYNTAX\fR\fR
+.ad
+.RS 16n
+.rt  
+Shell syntax error, such as unbalanced parentheses or unterminated string.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, \fBwordexp()\fR returns \fB0\fR.
+.sp
+.LP
+Otherwise, a non-zero value as described in \fB<wordexp.h>\fR is returned to
+indicate an error.  If \fBwordexp()\fR returns the value \fBWRDE_NOSPACE\fR,
+then \fIpwordexp\(mi>\fR\fBwe_wordc\fR and \fIpwordexp\(mi>\fR\fBwe_wordv\fR
+will be updated to reflect any words that were successfully expanded. In other
+cases, they will not be modified.
+.sp
+.LP
+The \fBwordfree()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+This function is intended to be used by an application that wants to do all of
+the shell's expansions on a word or words obtained from a user. For example, if
+the application prompts for a filename (or list of filenames) and then uses
+\fBwordexp()\fR to process the input, the user could respond with anything that
+would be valid as input to the shell.
+.sp
+.LP
+The \fBWRDE_NOCMD\fR flag is provided for applications that, for security or
+other reasons, want to prevent a user from executing shell command. Disallowing
+unquoted shell special characters also prevents unwanted side effects such as
+executing a command or writing a file.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfnmatch\fR(3C), \fBglob\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,130 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH profil 2 "12 Nov 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+profil \- execution time profile
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBvoid\fR \fBprofil\fR(\fBunsigned short *\fR\fIbuff\fR, \fBunsigned int\fR \fIbufsiz\fR, \fBunsigned int\fR \fIoffset\fR,
+     \fBunsigned int\fR \fIscale\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBprofil()\fR function provides CPU-use statistics by profiling the amount
+of \fBCPU\fR time expended by a program. The \fBprofil()\fR function generates
+the statistics by creating an execution histogram for a current process. The
+histogram is defined for a specific region of program code to be profiled, and
+the identified region is logically broken up into a set of equal size
+subdivisions, each of which corresponds to a count in the histogram.  With each
+clock tick, the current subdivision is identified and its corresponding
+histogram count is incremented. These counts establish a relative measure of
+how much time is being spent in each code subdivision.  The resulting histogram
+counts for a profiled region can be used to identify those functions that
+consume a disproportionately high percentage of \fBCPU\fR time.
+.sp
+.LP
+The \fIbuff\fR argument is a buffer of  \fIbufsiz\fR bytes in which the
+histogram counts are stored in an array of \fBunsigned short int\fR. Once one
+of the counts reaches 32767 (the size of a \fB short int\fR), profiling stops
+and no more data is collected.
+.sp
+.LP
+The \fIoffset\fR, \fIscale\fR, and  \fIbufsiz\fR arguments specify the region
+to be profiled.
+.sp
+.LP
+The \fIoffset\fR argument is effectively the start address of the region to be
+profiled.
+.sp
+.LP
+The \fIscale\fR argument is a contraction factor that indicates how much
+smaller the histogram buffer is than the region to be profiled. More precisely,
+\fIscale\fR is interpreted as an unsigned 16-bit fixed-point fraction with the
+decimal point implied on the left. Its value is the reciprocal of the number of
+bytes in a subdivision, per byte of histogram buffer. Since there are two bytes
+per histogram counter, the effective ratio of subdivision bytes per counter is
+one half the scale.
+.sp
+.LP
+The values of \fIscale\fR are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the maximum value of  \fIscale\fR, \fB0xffff\fR (approximately 1), maps
+subdivisions 2 bytes long to each counter.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the minimum value of  \fIscale\fR (for which profiling is performed),
+\fB0x0002\fR (1/32,768), maps subdivision 65,536 bytes long to each counter.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the default value of  \fIscale\fR (currently used by  \fBcc \fR\fB-qp\fR),
+\fB0x4000\fR, maps subdivisions 8 bytes long to each counter.
+.RE
+.sp
+.LP
+The values are used within the kernel as follows:  when the process is
+interrupted for a clock tick, the value of  \fIoffset\fR is subtracted from the
+current value of the program counter (pc), and the remainder is multiplied by
+\fIscale\fR to derive a result. That result is used as an index into the
+histogram array to locate the cell to be incremented. Therefore, the cell count
+represents the number of times that the process was executing code in the
+subdivision associated with that cell when the process was interrupted.
+.sp
+.LP
+The value of \fIscale\fR can be computed as  (\fIRATIO\fR \fB* 0200000L\fR),
+where \fIRATIO\fR is the desired ratio of  \fIbufsiz\fR to profiled region
+size, and has a value between 0 and 1. Qualitatively speaking, the closer
+\fIRATIO\fR is to 1, the higher the resolution of the profile information.
+.sp
+.LP
+The value of \fIbufsiz\fR can be computed as
+(\fIsize_of_region_to_be_profiled\fR \fB* \fR\fIRATIO\fR).
+.sp
+.LP
+Profiling is turned off by giving a \fIscale\fR value of 0 or 1, and is
+rendered ineffective by giving a \fIbufsiz\fR value of 0. Profiling is turned
+off when one of the \fBexec\fR family of functions (see \fBexec\fR(2)) is
+executed, but remains on in both child and parent  processes after a
+\fBfork\fR(2). Profiling is turned off if a \fIbuff\fR update would cause a
+memory fault.
+.SH USAGE
+.sp
+.LP
+The \fBpcsample\fR(2) function should be used when profiling dynamically-linked
+programs and 64-bit programs.
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBfork\fR(2), \fBpcsample\fR(2), \fBtimes\fR(2),
+\fBmonitor\fR(3C), \fBprof\fR(5)
+.SH NOTES
+.sp
+.LP
+In Solaris releases prior to 2.6, calling \fBprofil()\fR in a multithreaded
+program would impact only the calling \fBLWP\fR; the profile state was not
+inherited at \fBLWP\fR creation time. To profile a multithreaded program with a
+global profile buffer, each thread needed to issue a call to \fBprofil()\fR at
+threads start-up time, and each thread had to be a bound thread. This was
+cumbersome and did not easily support dynamically turning profiling on and off.
+In Solaris 2.6, the \fBprofil()\fR system call for multithreaded processes has
+global impact \(em that is, a call to \fBprofil()\fR impacts all
+\fBLWP\fRs/threads in the process. This may cause applications that depend on
+the previous per-\fBLWP\fR semantic to break, but it is expected to improve
+multithreaded programs that wish to turn profiling on and off dynamically at
+runtime.

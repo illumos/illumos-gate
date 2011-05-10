@@ -1,0 +1,229 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_enabnotify 3DLPI "10 Mar 2009" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_enabnotify \- enable DLPI notification
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -\fBldlpi\fR [ \fIlibrary\fR... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_enabnotify\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fInotes\fR,
+     \fBdlpi_notifyfunc_t *\fR\fIfuncp\fR, \fBvoid *\fR\fIarg\fR, \fBdlpi_notifyid_t *\fR\fIid\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef void\fR \fBdlpi_notifyfunc_t\fR(\fBdlpi_handle_t\fR,
+     \fBdlpi_notifyinfo_t *\fR, \fBvoid *\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_enabnotify()\fR function enables a notification callback for the
+set of events specified in \fInotes\fR, which must be one or more (by a logical
+OR operation) of the DLPI notifications documented in \fBdlpi\fR(7P).   The
+callback function \fIfuncp\fR is registered with the DLPI handle \fIdh\fR and
+is invoked when \fIdh\fR receives notification for any of the specified event
+types. Upon success, \fIid\fR contains the identifier associated with the
+registration.
+.sp
+.LP
+Multiple event types can be registered for a callback function on the DLPI
+handle \fIdh\fR. Similarly, the same event type can be registered multiple
+times on the same handle.
+.sp
+.LP
+Once a callback has been registered, \fBlibdlpi\fR will check for notification
+events on the DLPI handle \fIdh\fR, when exchanging DLPI messages with the
+underlying DLPI link instance. The \fBdlpi_recv\fR(3DLPI) function will always
+check for notification events, but other \fBlibdlpi\fR operations may also lead
+to an event callback being invoked. Although there may be no expected data
+messages to be received, \fBdlpi_recv()\fR can be called, as shown below, with
+a null buffer to force a check for pending events on the underlying DLPI link
+instance.
+.sp
+.in +2
+.nf
+dlpi_recv(dh, NULL, NULL, NULL, NULL, 0, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+When a notification event of interest occurs, the callback function is invoked
+with the arguments \fIarg\fR, originally passed to
+\fBdlpi_disabnotify\fR(3DLPI), and \fIinfop\fR, whose members are described
+below.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuint_t\fR \fIdni_note\fR\fR
+.ad
+.RS 27n
+.rt  
+Notification event type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuint_t\fR \fIdni_speed\fR\fR
+.ad
+.RS 27n
+.rt  
+Current speed, in kilobits per second, of the DLPI link. Valid only for
+\fBDL_NOTE_SPEED\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuint_t\fR \fIdni_size\fR\fR
+.ad
+.RS 27n
+.rt  
+Current maximum message size, in bytes, that the DLPI link is able to accept
+for transmission. Valid only for \fBDL_NOTE_SDU_SIZE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuchar_t\fR \fIdni_physaddrlen\fR\fR
+.ad
+.RS 27n
+.rt  
+Link-layer physical address length, in bytes. Valid only for
+\fBDL_NOTE_PHYS_ADDR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuchar_t\fR \fIdni_physaddr\fR[]\fR
+.ad
+.RS 27n
+.rt  
+Link-layer physical address of DLPI link.  Valid only for
+\fBDL_NOTE_PHYS_ADDR\fR.
+.RE
+
+.sp
+.LP
+The \fBlibdlpi\fR library will allocate and free the \fBdlpi_notifyinfo_t\fR
+structure and the caller must not allocate the structure or perform any
+operations that require its size to be known.
+.sp
+.LP
+The callback is not allowed to block.  This precludes calling
+\fBdlpi_enabnotify()\fR from a callback, but non-blocking \fBlibdlpi\fR
+functions, including \fBdlpi_disabnotify()\fR, can be called.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If  \fBDL_SYSERR\fR  is returned,
+\fBerrno\fR  contains  the  specific  UNIX system error value. Otherwise, a
+DLPI error value defined in \fB<sys/dlpi.h>\fR or an error value listed in the
+following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 21n
+.rt  
+A DLPI handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 21n
+.rt  
+An argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ENOTEIDINVAL\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI notification ID is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ENOTENOTSUP\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI notification is not supported by the link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI operation timed out.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_FAILURE\fR\fR
+.ad
+.RS 21n
+.rt  
+The DLPI operation failed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_disabnotify\fR(3DLPI), \fBdlpi_recv\fR(3DLPI), \fBlibdlpi\fR(3LIB),
+\fBattributes\fR(5), \fBdlpi\fR(7P)

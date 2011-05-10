@@ -1,0 +1,229 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmdir 2 "18 May 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+rmdir \- remove a directory
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBrmdir\fR(\fBconst char *\fR\fIpath\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrmdir()\fR function removes the directory named by the path name pointed
+to by \fIpath\fR. The directory must not have any entries other than
+"\fB\&.\fR" and "\fB\&..\fR".
+.sp
+.LP
+If the directory's link count becomes zero and no process has the directory
+open, the space occupied by the directory is freed and the directory is no
+longer accessible. If one or more processes have the directory open when the
+last link is removed, the "\fB\&.\fR" and "\fB\&..\fR" entries, if present, are
+removed before \fBrmdir()\fR returns and no new entries may be created in the
+directory, but the directory is not removed until all references to the
+directory have been closed.
+.sp
+.LP
+Upon successful completion \fBrmdir()\fR marks for update the \fBst_ctime\fR
+and \fBst_mtime\fR fields of the parent directory.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned, \fBerrno\fR is set to indicate the error, and the named directory is
+not changed.
+.SH ERRORS
+.sp
+.LP
+The \fBrmdir()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied for a component of the path prefix and
+{\fBPRIV_FILE_DAC_SEARCH\fR} is not asserted in the effective set of the
+calling process
+.sp
+Write permission is denied on the directory containing the directory to be
+removed and {\fBPRIV_FILE_DAC_WRITE\fR} is not asserted.
+.sp
+The parent directory has the \fBS_ISVTX\fR variable set, is not owned by the
+user, and {\fBPRIV_FILE_OWNER\fR} is not asserted.
+.sp
+The directory is not owned by the user and is not writable by the user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory to be removed is the mount point for a mounted file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory contains entries other than those for "\fB\&.\fR" and
+"\fB\&..\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory to be removed is the current directory, or the final component of
+\fIpath\fR is "\fB\&.\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 16n
+.rt  
+The path argument includes non-UTF8 characters and the file system accepts only
+file names where all characters are part of the UTF-8 character codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error occurred while accessing the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating \fIpath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds \fBPATH_MAX\fR, or the length of
+a \fIpath\fR component exceeds \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+The named directory does not exist or is the null pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine, and the connection to that
+machine is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix is not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory entry to be removed is part of a read-only file system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmkdir\fR(1), \fBrm\fR(1), \fBmkdir\fR(2), \fBattributes\fR(5),
+\fBprivileges\fR(5), \fBstandards\fR(5)

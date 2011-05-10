@@ -57,6 +57,10 @@ dir path=usr/lib
 dir path=usr/lib/drv
 dir path=usr/lib/lvm
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
+dir path=usr/share/man/man7d
 dir path=usr/snadm
 dir path=usr/snadm/lib
 driver name=md policy="admin write_priv_set=sys_config" \
@@ -134,6 +138,38 @@ file path=usr/sbin/rpc.mdcommd mode=0555
 file path=usr/sbin/rpc.metad mode=0555
 file path=usr/sbin/rpc.metamedd mode=0555
 file path=usr/sbin/rpc.metamhd mode=0555
+file path=usr/share/man/man1m/growfs.1m
+file path=usr/share/man/man1m/mdmonitord.1m
+file path=usr/share/man/man1m/medstat.1m
+file path=usr/share/man/man1m/metaclear.1m
+file path=usr/share/man/man1m/metadb.1m
+file path=usr/share/man/man1m/metadetach.1m
+file path=usr/share/man/man1m/metadevadm.1m
+file path=usr/share/man/man1m/metahs.1m
+file path=usr/share/man/man1m/metaimport.1m
+file path=usr/share/man/man1m/metainit.1m
+file path=usr/share/man/man1m/metaoffline.1m
+file path=usr/share/man/man1m/metaonline.1m
+file path=usr/share/man/man1m/metaparam.1m
+file path=usr/share/man/man1m/metarecover.1m
+file path=usr/share/man/man1m/metarename.1m
+file path=usr/share/man/man1m/metareplace.1m
+file path=usr/share/man/man1m/metaroot.1m
+file path=usr/share/man/man1m/metaset.1m
+file path=usr/share/man/man1m/metastat.1m
+file path=usr/share/man/man1m/metasync.1m
+file path=usr/share/man/man1m/metattach.1m
+file path=usr/share/man/man1m/rpc.mdcommd.1m
+file path=usr/share/man/man1m/rpc.metad.1m
+file path=usr/share/man/man1m/rpc.metamedd.1m
+file path=usr/share/man/man1m/rpc.metamhd.1m
+file path=usr/share/man/man4/md.cf.4
+file path=usr/share/man/man4/md.tab.4
+file path=usr/share/man/man4/mddb.cf.4
+file path=usr/share/man/man4/meddb.4
+file path=usr/share/man/man7d/console.7d
+file path=usr/share/man/man7d/md.7d
+file path=usr/share/man/man7d/mediator.7d
 file path=usr/snadm/lib/libsvm.so.1
 legacy pkg=SUNWmdr desc="Solaris Volume Manager driver" \
     name="Solaris Volume Manager, (Root)"

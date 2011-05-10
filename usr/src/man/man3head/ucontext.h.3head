@@ -1,0 +1,70 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ucontext.h 3HEAD "30 Aug 2002" "SunOS 5.11" "Headers"
+.SH NAME
+ucontext.h, ucontext \- user context
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBucontext.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  <\fBucontext.h\fR> header defines the \fBucontext_t\fR type as a structure
+that includes at least the following members:
+.sp
+.in +2
+.nf
+ucontext_t  uc_link
+sigset_t    uc_sigmask
+stack_t     uc_stack
+mcontext_t  uc_mcontext
+.fi
+.in -2
+
+.sp
+.LP
+The \fBuc_link\fR member is a pointer to the context that to be resumed when
+this context returns. If \fBuc_link\fR is equal to 0, this context is the main
+context and the process exits when this context returns.
+.sp
+.LP
+The \fBuc_sigmask\fR member defines the set of signals that are blocked when
+this context is active. See \fBsigprocmask\fR(2).
+.sp
+.LP
+The \fBuc_stack\fR member defines the stack used by this context. See
+\fBsigaltstack\fR(2).
+.sp
+.LP
+The \fBuc_mcontext\fR member contains the saved set of machine registers and
+any implementation-specific context data. Portable applications should not
+modify or access \fBuc_mcontext\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetcontext\fR(2), \fBsigaction\fR(2), \fBsigaltstack\fR(2),
+\fBsigprocmask\fR(2), \fBmakecontext\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

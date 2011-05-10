@@ -1,0 +1,66 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH exit 3C "1 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+exit, _exithandle \- terminate process
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid\fR \fBexit\fR(\fBint\fR \fIstatus\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fB_exithandle\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBexit()\fR function terminates a process by calling first
+\fB_exithandle()\fR and then \fB_exit()\fR (see \fBexit\fR(2)).
+.sp
+.LP
+The  \fB_exithandle()\fR function calls any functions registered through the
+\fBatexit\fR(3C) function in the reverse order of their registration. This
+action includes executing all finalization code from the \fI\&.fini\fR sections
+of all objects that are part of the process.
+.sp
+.LP
+The \fB_exithandle()\fR function is intended for use \fIonly\fR with
+\fB_exit()\fR, and allows for specialized processing such as \fBdldump\fR(3C)
+to be performed. Normal process execution should not be continued after a call
+to \fB_exithandle()\fR has occurred, as internal data structures may have been
+torn down due to \fBatexit()\fR or \fI\&.fini\fR processing.
+.sp
+.LP
+The symbols \fBEXIT_SUCCESS\fR and \fBEXIT_FAILURE\fR are defined in the header
+<\fBstdlib.h\fR> and may be used as the value of \fIstatus\fR to indicate
+successful or unsuccessful termination, respectively.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBatexit\fR(3C), \fBdldump\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

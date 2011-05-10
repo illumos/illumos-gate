@@ -1,0 +1,140 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_get_device_type_string 9F "12 Jul 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_get_device_type_string \- look up per-device-type, returning matching
+information string
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBchar\fR \fB*scsi_get_device_type_string\fR(\fBchar *prop_name,
+		dev_info_t  *\fR\fIdip\fR, \fBstruct scsi_device  *\fR\fIdevp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprop_name\fR\fR
+.ad
+.RS 13n
+.rt  
+Name of string array property that contains a list of paired device-type
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the device info node for this HBA driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_device\fR(9S) structure of the target.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_get_device_type_string()\fR function looks up the \fIprop_name\fR
+property, which can be specified in the HBA's \fBdriver.conf\fR(4)file. This
+property allows specification of per-device-type information. The syntax for
+\fIprop_name\fR in a \fBdriver.conf\fR(4) file is:
+.sp
+.LP
+The formal syntax is:
+.sp
+.in +2
+.nf
+prop_name = \fI<duplet>\fR [, \fI<duplet>\fR *];
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where:
+.sp
+.in +2
+.nf
+\fI<duplet>\fR := \fI"<vid+pid>"\fR, \fI"<information"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The string \fI<vid+pid>\fR is returned by the device on a SCSI inquiry command.
+This string can contain any character in the range 0x20-0x7e. Characters such
+as double quote (") or single quote ('), which are not permitted in property
+value strings, are represented by their octal equivalent (for example, \e042
+and \e047). Trailing spaces can be truncated.
+.sp
+.LP
+For example:
+.sp
+.in +2
+.nf
+scsi_vhci_failover_override =
+	    "STK     FLEXLINE 400",	"f_asym_lsi", 
+ 	    "SUN     T4",		"f_tpgs";;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBscsi_get_device_type_string\fR() function searches the list of duplets
+for a matching INQUIRY string. If a match is found,
+\fBscsi_get_device_type_string\fR returns a copy of the <\fIinformation\fR>
+string. The meaning of the returned <\fIinformation\fR> string is determined by
+the caller.
+.SH RETURN VALUES
+.sp
+.LP
+\fBscsi_get_device_type_string()\fR returns a copy of the matching
+<\fIinformation\fR> string, or if no match is found, \fBNULL\fR is returned.
+When a non-NULL value is returned, the caller is responsible for freeing the
+<\fIinformation\fR> string via:
+.sp
+.in +2
+.nf
+kmem_free(info, strlen(info) + 1);
+.fi
+.in -2
+
+.SH CONTEXT
+.sp
+.LP
+This function can be called from kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdriver.conf\fR(4)
+.sp
+.LP
+\fIWriting Device Drivers \fR

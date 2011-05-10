@@ -1,0 +1,539 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cp 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+cp \- copy files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/cp\fR [\fB-fip@/\fR] \fIsource_file\fR \fItarget_file\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/cp\fR [\fB-fip@/\fR] \fIsource_file\fR... \fItarget\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/cp\fR \fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR] [\fB-fip@/\fR] \fIsource_dir\fR... \fItarget\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/cp\fR \fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR] [\fB-fip@/\fR] \fIsource_dir\fR... \fItarget\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/cp\fR [\fB-fip@/\fR] \fIsource_file\fR \fItarget_file\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/cp\fR [\fB-fip@/\fR] \fIsource_file\fR... \fItarget\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/cp\fR \fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR] [\fB-fip@/\fR] \fIsource_dir\fR... \fItarget\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/cp\fR \fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR] [\fB-fip@/\fR] \fIsource_dir\fR... \fItarget\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In the first synopsis form, neither \fIsource_file\fR nor \fItarget_file\fR are
+directory files, nor can they have the same name. The \fBcp\fR utility copies
+the contents of \fIsource_file\fR to the destination path named by
+\fItarget_file\fR. If \fItarget_file\fR exists, \fBcp\fR overwrites its
+contents, but the mode (and \fBACL\fR if applicable), owner, and group
+associated with it are not changed. The last modification time of
+\fItarget_file\fR and the last access time of \fIsource_file\fR are set to the
+time the copy was made. If \fItarget_file\fR does not exist, \fBcp\fR creates a
+new file named \fItarget_file\fR that has the same mode as \fIsource_file\fR
+except that the sticky bit is not set unless the user is super-user. In this
+case, the owner and group of \fItarget_file\fR are those of the user, unless
+the setgid bit is set on the directory containing the newly created file. If
+the directory's setgid bit is set, the newly created file has the group of the
+containing directory rather than of the creating user. If \fItarget_file\fR is
+a link to another file, \fBcp\fR overwrites the link destination with the
+contents of \fIsource_file\fR; the link(s) from \fItarget_file\fR remains.
+.sp
+.LP
+In the second synopsis form, one or more \fIsource_file\fRs are copied to the
+directory specified by \fItarget\fR. It is an error if any \fIsource_file\fR is
+a file of type directory, if \fItarget\fR either does not exist or is not a
+directory.
+.sp
+.LP
+In the third or fourth synopsis forms, one or more directories specified by
+\fIsource_dir\fR are copied to the directory specified by \fItarget\fR. Either
+the \fB-r\fR or \fB-R\fR must be specified. For each \fIsource_dir\fR, \fBcp\fR
+copies all files and subdirectories.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported for both \fB/usr/bin/cp\fR and
+\fB/usr/xpg4/bin/cp\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Unlink. If a file descriptor for a destination file cannot be obtained, this
+option attempts to unlink the destination file and proceed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 6n
+.rt  
+Takes actions based on the type and contents of the file referenced by any
+symbolic link specified as a \fIsource_file\fR operand.
+.sp
+If the \fIsource_file\fR operand is a symbolic link, then \fBcp\fR copies the
+file referenced by the symbolic link for the \fIsource_file\fR operand. All
+other symbolic links encountered during traversal of a file hierarchy are
+preserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Interactive. \fBcp\fR prompts for confirmation whenever the copy would
+overwrite an existing \fItarget\fR. An affirmative response means that the copy
+should proceed. Any other answer prevents \fBcp\fR from overwriting
+\fItarget\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 6n
+.rt  
+Takes actions based on the type and contents of the file referenced by any
+symbolic link specified as a \fIsource_file\fR operand or any symbolic links
+encountered during traversal of a file hierarchy.
+.sp
+Copies files referenced by symbolic links. Symbolic links encountered during
+traversal of a file hierarchy are not preserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Preserve. The \fBcp\fR utility duplicates not only the contents of
+\fIsource_file\fR, but also attempts to preserve its ACL, access and
+modification times, extended attributes, extended system attributes, file mode,
+and owner and group ids.
+.sp
+If \fBcp\fR is unable to preserve the access and modification times, extended
+attributes, or the file mode, \fBcp\fR does not consider it a failure. If
+\fBcp\fR is unable to preserve the owner and group id, the copy does not fail,
+but \fBcp\fR silently clears the \fBS_ISUID\fR and \fBS_ISGID\fR bits from the
+file mode of the target. The copy fails if \fBcp\fR is unable to clear these
+bits. If \fBcp\fR is unable to preserve the ACL or extended system attributes,
+the copy fails. If the copy fails, then a diagnostic message is written to
+\fBstderr\fR and (after processing any remaining operands) \fBcp\fR exits with
+a \fBnon-zero\fR exit status.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 6n
+.rt  
+Takes actions on any symbolic link specified as a \fIsource_file\fR operand or
+any symbolic link encountered during traversal of a file hierarchy.
+.sp
+Copies symbolic links. Symbolic links encountered during traversal of a file
+hierarchy are preserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Recursive. \fBcp\fR copies the directory and all its files, including any
+subdirectories and their files to \fItarget\fR. Unless the \fB-H\fR, \fB-L\fR,
+or \fB-P\fR option is specified, the \fB-L\fR option is used as the default
+mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 6n
+.rt  
+Same as \fB-r\fR, except pipes are replicated, not read from.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-@\fR\fR
+.ad
+.RS 6n
+.rt  
+Preserves extended attributes. \fBcp\fR attempts to copy all of the source
+file's extended attributes along with the file data to the destination file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-/\fR\fR
+.ad
+.RS 6n
+.rt  
+Preserves extended attributes and extended system attributes. Along with the
+file's data, the \fBcp\fR utility attempts to copy extended attributes and
+extended system attributes from each source file, and extended system
+attributes associated with extended attributes to the destination file. If
+\fBcp\fR is unable to copy extended attributes or extended system attributes,
+then a diagnostic message is written to \fBstderr\fR and (after processing any
+remaining operands) exits with a \fBnon-zero\fR exit status.
+.RE
+
+.sp
+.LP
+Specifying more than one of the mutually-exclusive options \fB-H\fR, \fB-L\fR,
+and \fB-P\fR is not considered an error. The last option specified determines
+the behavior of the utility.
+.SS "/usr/bin/cp"
+.sp
+.LP
+If the \fB-p\fR option is specified with either the \fB-@\fR option or the
+\fB-/\fR option, \fB/usr/bin/cp\fR behaves as follows
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When both \fB-p\fR and \fB-@\fR are specified in any order, the copy fails if
+extended attributes cannot be copied.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When both \fB-p\fR and \fB-/\fR are specified in any order, the copy fails if
+extended system attributes cannot be copied.
+.RE
+.SS "/usr/xpg4/bin/cp"
+.sp
+.LP
+If the \fB-p\fR option is specified with either the \fB-@\fR option or the
+\fB-/\fR option, /\fBusr/xpg4/bin/cp\fR behaves as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When both \fB-p\fR and \fB-@\fR are specified, the last option specified
+determines whether the copy fails if extended attributes cannot be preserved.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When both \fB-p\fR and \fB-/\fR are specified, the last option specified
+determines whether the copy fails if extended system attributes cannot be
+preserved.
+.RE
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsource_file\fR\fR
+.ad
+.RS 15n
+.rt  
+A pathname of a regular file to be copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsource_dir\fR\fR
+.ad
+.RS 15n
+.rt  
+A pathname of a directory to be copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItarget_file\fR\fR
+.ad
+.RS 15n
+.rt  
+A pathname of an existing or non-existing file, used for the output when a
+single file is copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItarget\fR\fR
+.ad
+.RS 15n
+.rt  
+A pathname of a directory to contain the copied files.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBcp\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCopying a File
+.sp
+.LP
+The following example copies a file:
+
+.sp
+.in +2
+.nf
+example% cp goodies goodies.old
+
+example% ls goodies*
+goodies goodies.old
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRCopying a List of Files
+.sp
+.LP
+The following example copies a list of files to a destination directory:
+
+.sp
+.in +2
+.nf
+example% cp ~/src/* /tmp
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRCopying a Directory
+.sp
+.LP
+The following example copies a directory, first to a new, and then to an
+existing destination directory
+
+.sp
+.in +2
+.nf
+example% ls ~/bkup
+/usr/example/fred/bkup not found
+
+example% cp \fB-r\fR ~/src ~/bkup
+
+example% ls \fB-R\fR ~/bkup
+x.c y.c z.sh
+
+example% cp \fB-r\fR ~/src ~/bkup
+
+example% ls \fB-R\fR ~/bkup
+src x.c y.c z.sh
+src:
+x.c y.c z.s
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRCopying Extended File System Attributes
+.sp
+.LP
+The following example copies extended file system attributes:
+
+.sp
+.in +2
+.nf
+$ ls -/ c file1
+-rw-r--r--   1 foo   staff          0 Oct 29 20:04 file1
+                {AH-----m--}
+
+$ cp -/ file1 file2
+$ ls -/c file2
+-rw-r--r--   1 foo  staff          0 Oct 29 20:17 file2
+                {AH-----m--}
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRFailing to Copy Extended System Attributes
+.sp
+.LP
+The following example fails to copy extended system attributes:
+
+.sp
+.in +2
+.nf
+$ ls -/c file1
+-rw-r--r--   1 foo    staff          0 Oct 29 20:04 file1
+                {AH-----m--}
+
+$ cp -/ file1 /tmp         
+cp: Failed to copy extended system attributes from file1 to /tmp/file1
+
+
+$ ls -/c /tmp/file1
+-rw-r--r--   1 foo    staff          0 Oct 29 20:09 /tmp/file1
+                {}
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcp\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.LP
+Affirmative responses are processed using the extended regular expression
+defined for the \fByesexpr\fR keyword in the \fBLC_MESSAGES\fR category of the
+user's locale. The locale specified in the \fBLC_COLLATE\fR category defines
+the behavior of ranges, equivalence classes, and multi-character collating
+elements used in the expression defined for \fByesexpr\fR. The locale specified
+in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
+bytes of text data a characters, the behavior of character classes used in the
+expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All files were copied successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/cp"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+.TE
+
+.SS "/usr/xpg4/bin/cp"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBchown\fR(1), \fBsetfacl\fR(1), \fButime\fR(2),
+\fBfgetattr\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBfsattr\fR(5),
+\fBlargefile\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The permission modes of the source file are preserved in the copy.
+.sp
+.LP
+A \fB--\fR permits the user to mark the end of any command line options
+explicitly, thus allowing \fBcp\fR to recognize filename arguments that begin
+with a \fB-\fR.

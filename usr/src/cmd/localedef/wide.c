@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -115,10 +115,6 @@ static struct {
 	 * This should probably be an aliase for euc-cn, or vice versa.
 	 */
 	{ "GB2312",	"GB2312",	16, towide_gb2312, tomb_mbs },
-
-	{ "ASCII",	"ASCII",	7, towide_none,	tomb_none },
-	{ "US-ASCII",	"ASCII",	7, towide_none,	tomb_none },
-	{ "646",	"ASCII",	7, towide_none,	tomb_none },
 
 	{ NULL, NULL },
 };

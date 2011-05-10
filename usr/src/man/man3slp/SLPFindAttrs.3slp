@@ -1,0 +1,179 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPFindAttrs 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPFindAttrs \- return service attributes
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBSLPError\fR \fBSLPFindAttrs\fR(\fBSLPHandle\fR \fIhSLP\fR, \fBconst char *\fR\fIpcURL\fR,
+     \fBconst char *\fR\fIpcScopeList\fR, \fBconst char *\fR\fIpcAttrIds\fR,
+     \fBSLPAttrCallback *\fR\fIcallback\fR, \fBvoid *\fR\fIpvCookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPFindAttrs()\fR function returns service attributes matching the
+attribute tags for the  indicated full or partial \fBURL\fR.If \fIpcURL\fR is a
+complete \fBURL\fR, the attribute information returned is for that particular
+service in the language  locale of the  \fBSLPHandle\fR. If \fIpcURL\fR is a
+service type, then all attributes for the service type  are returned,
+regardless of the language of registration. Results are returned through the
+\fIcallback\fR parameter.
+.sp
+.LP
+The result is filtered  with an \fBSLP\fR attribute  request  filter  string
+parameter,  the  syntax  of  which  is  described  in  \fIRFC 2608\fR.  If  the
+filter string is  the empty string,  \fB""\fR,  all  attributes are returned.
+.sp
+.LP
+If an error occurs in starting the operation, one of the \fBSLPError\fR codes
+is returned.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhSLP\fR\fR
+.ad
+.RS 15n
+.rt  
+The language-specific \fBSLPHandle\fR on which to  search for attributes. It
+cannot  be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcURL\fR\fR
+.ad
+.RS 15n
+.rt  
+The full or partial \fBURL\fR. See \fIRFC 2608\fR for partial \fBURL\fR syntax.
+It cannot  be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcScopeList\fR\fR
+.ad
+.RS 15n
+.rt  
+A pointer to a \fBchar\fR containing a comma-separated  list  of scope names.
+It cannot  be \fINULL\fR or an empty string, \fB""\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcAttrIds\fR\fR
+.ad
+.RS 15n
+.rt  
+The filter  string indicating  which attribute  values to  return. Use  empty
+string \fB""\fR  to indicate all values.  Wildcards matching  all attribute ids
+having  a particular prefix or suffix are also possible. It cannot be
+\fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 15n
+.rt  
+A callback function through which the results of the operation are reported. It
+cannot be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvCookie\fR\fR
+.ad
+.RS 15n
+.rt  
+Memory passed to the callback code from the client. It may be \fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReturning Service Attributes for a Specific \fBURL\fR
+.sp
+.LP
+Use the following example to return the attributes "\fBlocation\fR" and
+"\fBdpi\fR" for the \fBURL \fR"\fBservice:printer:lpr://serv/queue1\fR" through
+the callback \fBattrReturn\fR:
+
+.sp
+.in +2
+.nf
+SLPHandle hSLP;
+SLPAttrCallback attrReturn;
+SLPError err;
+
+err = SLPFindAttrs(hSLP "service:printer:lpr://serv/queue1",
+     "default", "location,dpi", attrReturn, err);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRReturning Service Attributes for All \fBURL\fRs of a Specific
+Type
+.sp
+.LP
+Use the following example to return the attributes "\fBlocation\fR" and
+"\fBdpi\fR" for all service \fBURL\fRs having type "\fBservice:printer:lpr\fR":
+
+.sp
+.in +2
+.nf
+err = SLPFindAttrs(hSLP, "service:printer:lpr",
+     "default", "location, pi",
+     attrReturn, NULL);
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

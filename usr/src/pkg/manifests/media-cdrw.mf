@@ -37,8 +37,10 @@ dir path=usr/lib/help
 dir path=usr/lib/help/auths
 dir path=usr/lib/help/auths/locale
 dir path=usr/lib/help/auths/locale/C
+dir path=usr/share/man/man1
 file path=usr/bin/cdrw mode=4755
 file path=usr/lib/help/auths/locale/C/DevCDRW.html
+file path=usr/share/man/man1/cdrw.1
 legacy pkg=SUNWcdrw \
     desc="utility for writing to CD-R/RW and DVD{+-}R/RW disks" \
     name="utility for writing to CD-R/RW and DVD{+-}R/RW disks"

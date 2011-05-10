@@ -1,0 +1,81 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wstring 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wstring, wscasecmp, wsncasecmp, wsdup, wscol \- Process Code string operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <widec.h> 
+
+\fBint\fR \fBwscasecmp\fR(\fBconst wchar_t *\fR\fIs1\fR, \fBconst wchar_t *\fR\fIs2\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwsncasecmp\fR(\fBconst wchar_t *\fR\fIs1\fR, \fBconst wchar_t *\fR\fIs2\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBwchar_t *\fR\fBwsdup\fR(\fBconst wchar_t *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwscol\fR(\fBconst wchar_t *\fR\fIs\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions operate on Process Code strings terminated by \fBwchar_t\fR
+null characters.  During appending or copying, these routines do not check for
+an overflow condition of the receiving string. In the following, \fIs\fR,
+\fIs1\fR, and \fIs2\fR point to Process Code strings terminated by a
+\fBwchar_t\fR null.
+.SS "wscasecmp(\|), wsncasecmp(\|)"
+.sp
+.LP
+The \fBwscasecmp()\fR function compares its arguments, ignoring case, and
+returns an integer greater than, equal to, or less than 0, depending upon
+whether \fIs1\fR is lexicographically greater than, equal to, or less than
+\fIs2\fR. It makes the same comparison but compares at most \fIn\fR Process
+Code characters. The four Extended Unix Code (EUC) codesets are ordered from
+lowest to highest as 0, 2, 3, 1 when characters from different codesets are
+compared.
+.SS "wsdup(\|)"
+.sp
+.LP
+The \fBwsdup()\fR function returns a pointer to a new Process Code string,
+which is a duplicate of the string pointed to by \fIs\fR. The space for the new
+string is obtained using \fBmalloc\fR(3C). If the new string cannot be created,
+a null pointer is returned.
+.SS "wscol(\|)"
+.sp
+.LP
+The \fBwscol()\fR function returns the screen display width (in columns) of the
+Process Code string \fIs\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmalloc\fR(3C), \fBstring\fR(3C), \fBwcstring\fR(3C), \fBattributes\fR(5)

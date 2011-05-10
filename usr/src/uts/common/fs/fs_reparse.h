@@ -75,7 +75,7 @@ extern int reparse_add(nvlist_t *nvl, const char *svc_type,
 			const char *svc_data);
 extern int reparse_remove(nvlist_t *nvl, const char *svc_type);
 extern int reparse_unparse(nvlist_t *nvl, char **stringp);
-extern int reparse_create(const char *path, const char *string);
+extern int reparse_create(const char *path, const char *data);
 extern int reparse_delete(const char *path);
 extern int reparse_deref(const char *svc_type, const char *svc_data,
 			char *buf, size_t *bufsz);

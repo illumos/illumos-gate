@@ -1,0 +1,325 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_tmpl_pg_create 3SCF "28 Oct 2008" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_tmpl_pg_create, scf_tmpl_pg_reset, scf_tmpl_pg_destroy,
+scf_tmpl_get_by_pg_name, scf_tmpl_get_by_pg, scf_tmpl_iter_pgs \- template
+property group functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBscf_pg_tmpl_t *\fR\fBscf_tmpl_pg_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_tmpl_pg_reset\fR(\fBscf_pg_tmpl_t *\fR\fIpg_tmpl\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_tmpl_pg_destroy\fR(\fBscf_pg_tmpl_t *\fR\fIpg_tmpl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_tmpl_get_by_pg_name\fR(\fBconst char *\fR\fIinstance_fmri\fR,
+     \fBconst char *\fR\fIsnapshot\fR, \fBconst char *\fR\fIpg_name\fR,
+     \fBconst char *\fR\fIpg_type\fR, \fBscf_pg_tmpl_t *\fR\fIpg_tmpl\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_tmpl_get_by_pg\fR(\fBscf_propertygroup_t *\fR\fIpg\fR,
+     \fBscf_pg_tmpl_t *\fR\fIpg_tmpl\fR, \fBint\fR \fIflags\fR)
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_tmpl_iter_pgs\fR(\fBscf_pg_tmpl_t *\fR\fIpg_tmpl\fR, \fBconst char *\fR\fIfmri\fR,
+     \fBconst char *\fR\fIsnapshot\fR, \fBconst char *\fR\fIpg_type\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The template property group functions locate and give access to metadata about
+SMF configuration for service instances. They are used to directly access
+property group metadata and explore metadata for properties contained in those
+property groups.
+.sp
+.LP
+A property group does not need to be currently defined in order to explore
+metadata about it, as long as the metadata is defined.  Thus, the property
+group template functions operate on strings rather than
+\fBscf_propertygroup_t\fR entities.
+.sp
+.LP
+By default, when an instance FMRI is specified, \fBscf_tmpl_get_by_pg_name()\fR
+and \fBscf_tmpl_iter_pgs()\fR lookup composed data from the running snapshot of
+the instance. A different snapshot may be explicitly selected by specifying a
+valid snapshot name rather than  NULL for the snapshot argument. If a service
+FMRI is specified, the current properties are used.
+.sp
+.LP
+By default, these functions also explore template data defined by the service
+or instance itself, the service's restarter, and global template data. See
+\fBsmf_template\fR(5) for more information about this composition.
+.sp
+.LP
+Once retrieved, the \fBscf_pg_tmpl_t\fR can be explored using the
+\fBscf_tmpl_pg_name\fR(3SCF) and \fBscf_tmpl_prop_create\fR(3SCF) suite of
+functions.
+.sp
+.LP
+Before calling \fBscf_tmpl_get_by_pg()\fR, \fBscf_tmpl_get_by_pg_name()\fR, or
+\fBscf_tmpl_iter_pgs()\fR, the \fBscf_pg_tmpl_t\fR must be allocated by
+\fBscf_tmpl_pg_create()\fR. The \fBscf_pg_tmpl_t\fR can be reset to contain no
+template information with \fBscf_tmpl_pg_reset()\fR, so that it can be used to
+start an iteration from scratch. All associated memory can be freed with
+\fBscf_tmpl_pg_destroy()\fR.
+.sp
+.LP
+The \fBscf_tmpl_get_by_pg()\fR function locates the most specific matching
+template for the property group supplied. The parent of that property group can
+be either a service or an instance.
+.sp
+.LP
+The \fBscf_tmpl_get_by_pg_name()\fR function locates the most specific matching
+template for the property group as specified. As described above, when  the
+snapshot argument is \fINULL\fR the default running snapshot is used. If flags
+includes \fBSCF_PG_TMPL_FLAG_CURRENT\fR, the snapshot argument is ignored and
+the current configuration is used. If flags includes
+\fBSCF_PG_TMPL_FLAG_EXACT\fR, only the exact FMRI is looked up. Either or both
+of the \fIpg_name\fR and \fIpg_type\fR arguments may be specified as
+\fINULL\fR. In this case, \fIpg_name\fR and/or \fIpg_type\fR is wildcarded and
+matches any value. The most specific snapshot matching those arguments is
+returned.
+.sp
+.LP
+The \fBscf_tmpl_iter_pgs()\fR function iterates across all templates defined
+for the specified FMRI, snapshot, and optional property group type. It also
+takes an optional flags argument. If flags includes
+\fBSCF_PG_TMPL_FLAG_CURRENT\fR, the snapshot argument is ignored and the
+"running" snapshot is used. \fBSCF_PG_TMPL_FLAG_REQUIRED\fR searches only for
+required property groups. \fBSCF_PG_TMPL_FLAG_EXACT\fR looks only at the exact
+FMRI provided for templates, and not for templates defined on its restarter or
+globally.
+.sp
+.LP
+The iterator state for \fBscf_tmpl_iter_pgs()\fR is stored on the template data
+structure. The data structure should be allocated with
+\fBscf_tmpl_pg_create()\fR and to continue the iteration the previously
+returned structure should be passed in as an argument.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscf_tmpl_pg_create()\fR function returns \fINULL\fR on failure and a
+pointer to an allocated and populated \fBscf_pg_tmpl_t\fR on success. The
+caller is responsible for freeing the memory with \fBscf_tmpl_pg_destroy()\fR.
+.sp
+.LP
+The \fBscf_tmpl_get_by_pg()\fR and \fBscf_tmpl_get_by_pg_name()\fR functions
+return 0 on success and -1 on failure.
+.sp
+.LP
+The \fBscf_tmpl_iter_pgs()\fR function returns 1 on successful completion. If
+the iteration is complete, it returns 0. It returns -1 on error.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_tmpl_get_by_pg()\fR, \fBscf_tmpl_get_by_pg_name()\fR, and
+\fBscf_tmpl_iter_pgs()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The storage mechanism that the repository server (\fBsvc.configd\fR(1M)) chose
+for the operation denied access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_DELETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The instance or its template property group has been deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle passed in has been destroyed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INTERNAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+An internal error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIhandle\fR argument, \fIfmri\fR argument, snapshot name, \fIpg_name\fR,
+or \fIpg\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.sp .6
+.RS 4n
+There is not enough memory to populate the \fBscf_pg_tmpl_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
+.ad
+.sp .6
+.RS 4n
+The server does not have adequate resources to complete the request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not currently bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_FOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The object matching FMRI does not exist in the repository, or the snapshot does
+not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The template could not be read due to access restrictions.
+.RE
+
+.sp
+.LP
+The \fBscf_tmpl_get_by_pg()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 21n
+.rt  
+The property group specified by \fIpg\fR is not set.
+.RE
+
+.sp
+.LP
+The \fBscf_tmpl_pg_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle argument is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.RS 30n
+.rt  
+There is no memory available.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsvc.configd\fR(1M), \fBscf_tmpl_pg_name\fR(3SCF),
+\fBscf_tmpl_prop_create\fR(3SCF), \fBattributes\fR(5), \fBsmf_template\fR(5)

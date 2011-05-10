@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sbltos 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+sbltos, sbsltos, sbcleartos \- translate binary labels to canonical
+character-coded labels
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBchar *\fR\fBsbsltos\fR(\fBconst m_label_t *\fR\fIlabel\fR, \fBconst int\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBsbcleartos\fR(\fBconst m_label_t *\fR\fIclearance\fR, \fBconst int\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions translate binary labels into canonical strings that are clipped
+to the number of printable characters specified in \fIlen\fR. Clipping is
+required if the number of characters of the translated string is greater than
+\fIlen\fR. Clipping is done by truncating the label on the right to two
+characters less than the specified number of characters. A clipped indicator,
+"<\(mi", is appended to sensitivity labels and clearances. The character-coded
+label begins with a classification name separated with a single space character
+from the list of words making up the remainder of the label. The binary labels
+must be of the proper defined type and dominated by the process's sensitivity
+label. A \fIlen\fR of 0 (zero) returns the entire string with no clipping.
+.sp
+.LP
+The \fBsbsltos()\fR function translates a binary sensitivity label into a
+clipped string using the long form of the words and the short form of the
+classification name. If \fIlen\fR is less than the minimum number of characters
+(three), the translation fails.
+.sp
+.LP
+The \fBsbcleartos()\fR function translates a binary clearance into a clipped
+string using the long form of the words and the short form of the
+classification name. If \fIlen\fR is less than the minimum number of characters
+(three), the translation fails. The translation of a clearance might not be the
+same as the translation of a sensitivity label. These functions use different
+tables of the \fBlabel_encodings\fR file which might contain different words
+and constraints.
+.sp
+.LP
+The calling process must have \fBPRIV_SYS_TRANS_LABEL\fR in its set of
+effective privileges to perform label translation on labels that dominate the
+current process's sensitivity label.
+.SS "Process Attributes"
+.sp
+.LP
+If the \fBVIEW_EXTERNAL\fR or \fBVIEW_INTERNAL\fR flags are not specified,
+translation of \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels is controlled by the
+label view process attribute flags. If no label view process attribute flags
+are defined, their translation is controlled by the label view configured in
+the \fBlabel_encodings\fR file. A value of External specifies that
+\fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels are mapped to the lowest and
+highest labels defined in the \fBlabel_encodings\fR file. A value of Internal
+specifies that the \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels are translated
+to the \fBadmin low name\fR and \fBadmin high name\fR strings specified in the
+\fBlabel_encodings\fR file. If no such names are specified, the strings
+"\fBADMIN_LOW\fR" and "\fBADMIN_HIGH\fR" are used.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return a pointer to a statically allocated string that contains
+the result of the translation, or \fB(char\fR \fB*)0\fR if the translation
+fails for any reason.
+.SH EXAMPLES
+.SS "\fBsbsltos()\fR"
+.sp
+.LP
+Assume that a sensitivity label is:
+.sp
+.in +2
+.nf
+UN TOP/MIDDLE/LOWER DRAWER
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When clipped to ten characters it is:
+.sp
+.in +2
+.nf
+UN TOP/M<\(mi
+.fi
+.in -2
+.sp
+
+.SS "\fBsbcleartos()\fR"
+.sp
+.LP
+Assume that a clearance is:
+.sp
+.in +2
+.nf
+UN TOP/MIDDLE/LOWER DRAWER
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When clipped to ten characters it is:
+.sp
+.in +2
+.nf
+UN TOP/M<\(mi
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/tsol/label_encodings\fR\fR
+.ad
+.sp .6
+.RS 4n
+The label encodings file contains the classification names, words, constraints,
+and values for the defined labels of this system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+_
+MT-LevelUnsafe
+.TE
+
+.sp
+.LP
+These functions are obsolete and retained for ease of porting. They might be
+removed in a future Solaris Trusted Extensions release. Use the
+\fBlabel_to_str\fR(3TSOL) function instead.
+.SH SEE ALSO
+.sp
+.LP
+\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBattributes\fR(5),
+\fBlabels\fR(5)
+.SH WARNINGS
+.sp
+.LP
+All these functions share the same statically allocated string storage. They
+are not MT-Safe. Subsequent calls to any of these functions will overwrite that
+string with the newly translated string.
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

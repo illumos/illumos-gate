@@ -1,0 +1,94 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ungetwc 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ungetwc \- push wide-character code back into input stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h> 
+#include <wchar.h> 
+
+\fBwint_t\fR \fBungetwc\fR(\fBwint_t\fR \fIwc\fR, \fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBungetwc()\fR function pushes the character corresponding to the wide
+character code specified by \fIwc\fR back onto the input stream pointed to by
+\fIstream\fR. The pushed-back characters will be returned by subsequent reads
+on that stream in the reverse order of their pushing. A successful intervening
+call (with the stream pointed to by \fIstream\fR) to a file-positioning
+function ( \fBfseek\fR(3C), \fBfsetpos\fR(3C) or \fBrewind\fR(3C)) discards any
+pushed-back characters for the stream. The external storage corresponding to
+the stream is unchanged.
+.sp
+.LP
+One character of push-back is guaranteed. If \fBungetwc()\fR is called too many
+times on the same stream without an intervening read or file-positioning
+operation on that stream, the operation may fail.
+.sp
+.LP
+If the value of \fIwc\fR equals that of the macro \fBWEOF\fR, the operation
+fails and the input stream is unchanged.
+.sp
+.LP
+A successful call to \fBungetwc()\fR clears the end-of-file indicator for the
+stream. The value of the file-position indicator for the stream after reading
+or discarding all pushed-back characters will be the same as it was before the
+characters were pushed back. The file-position indicator is decremented (by one
+or more) by each successful call to \fBungetwc()\fR; if its value was 0 before
+a call, its value is indeterminate after the call.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBungetwc()\fR returns the wide-character code
+corresponding to the pushed-back character. Otherwise it returns \fBWEOF\fR.
+.SH ERRORS
+.sp
+.LP
+The \fBungetwc()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+An invalid character sequence is detected, or a wide-character code does not
+correspond to a valid character.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBfseek\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C),
+\fBsetbuf\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

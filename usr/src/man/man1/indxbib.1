@@ -1,0 +1,118 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH indxbib 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+indxbib \- create an inverted index to a bibliographic database
+.SH SYNOPSIS
+.LP
+.nf
+\fBindxbib\fR \fIdatabase-file\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBindxbib\fR makes an inverted index to the named \fIdatabase-file\fR (which
+must reside within the current directory), typically for use by
+\fBlookbib\fR(1) and \fBrefer\fR(1). A \fIdatabase\fR contains bibliographic
+references (or other kinds of information) separated by blank lines.
+.sp
+.LP
+A bibliographic reference is a set of lines, constituting fields of
+bibliographic information.  Each field starts on a line beginning with a
+`\fB%\fR', followed by a key-letter, then a blank, and finally the contents of
+the field, which may continue until the next line starting with `\fB%\fR'.
+.sp
+.LP
+\fBindxbib\fR is a shell script that calls two programs:
+\fB/usr/lib/refer/mkey\fR and \fB/usr/lib/refer/inv\fR. \fBmkey\fR truncates
+words to 6 characters, and maps upper case to lower case.  It also discards
+words shorter than 3 characters, words among the 100 most common English words,
+and numbers (dates) < 1000 or > 2099.  These parameters can be changed.
+.sp
+.LP
+\fBindxbib\fR creates an entry file (with a \fB\&.ia\fR suffix), a posting file
+(\fB\&.ib\fR), and a tag file (\fB\&.ic\fR), in the working directory.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/refer/mkey\fR\fR
+.ad
+.RS 23n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/refer/inv\fR\fR
+.ad
+.RS 23n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\&.ia\fR\fR
+.ad
+.RS 23n
+.rt  
+entry file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\&.ib\fR\fR
+.ad
+.RS 23n
+.rt  
+posting file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\&.ic\fR\fR
+.ad
+.RS 23n
+.rt  
+tag file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\&.ig\fR\fR
+.ad
+.RS 23n
+.rt  
+reference file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddbib\fR(1), \fBlookbib\fR(1), \fBrefer\fR(1), \fBroffbib\fR(1),
+\fBsortbib\fR(1), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+All dates should probably be indexed, since many disciplines refer to
+literature written in the 1800s or earlier.
+.sp
+.LP
+\fBindxbib\fR does not recognize pathnames.

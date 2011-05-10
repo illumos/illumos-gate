@@ -1,0 +1,143 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved. Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wait 3C "9 Jun 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wait \- wait for child process to stop or terminate
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/wait.h>
+
+\fBpid_t\fR \fBwait\fR(\fBint *\fR\fIstat_loc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwait()\fR function will suspend execution of the calling thread until
+status information for one of its terminated child processes is available, or
+until delivery of a signal whose action is either to execute a signal-catching
+function or to terminate the process. If more than one thread is suspended in
+\fBwait()\fR, \fBwaitpid\fR(3C), or \fBwaitid\fR(2) awaiting termination of the
+same process, exactly one thread will return the process status at the time of
+the target process termination. If status information is available prior to the
+call to \fBwait()\fR, return will be immediate.
+.sp
+.LP
+If \fBwait()\fR returns because the status of a child process is available, it
+returns the process \fBID\fR of the child process. If the calling process
+specified a non-zero value for \fIstat_loc\fR, the status of the child process
+is stored in the location pointed to by \fIstat_loc\fR. That status can be
+evaluated with the macros described on the \fBwait.h\fR(3HEAD) manual page.
+.sp
+.LP
+In the following, \fIstatus\fR is the object pointed to by \fIstat_loc\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the child process terminated due to an \fB_exit()\fR call, the low order 8
+bits of \fIstatus\fR will be 0 and the high order 8 bits will contain the low
+order 7 bits of the argument that the child process passed to \fB_exit()\fR;
+see \fBexit\fR(2).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the child process terminated due to a signal, the high order 8 bits of
+\fIstatus\fR will be 0 and the low order 7bits will contain the number of the
+signal that caused the termination. In addition, if  \fBWCOREFLG\fR is set, a
+"core image" will have been  produced; see \fBsignal.h\fR(3HEAD) and
+\fBwait.h\fR(3HEAD).
+.RE
+.sp
+.LP
+One instance of a \fBSIGCHLD\fR signal is queued for each child process whose
+status has changed. If \fBwait()\fR returns because the status of a child
+process is available, any pending \fBSIGCHLD\fR signal associated with the
+process ID of that child process is discarded. Any other pending \fBSIGCHLD\fR
+signals remain pending.
+.sp
+.LP
+If the calling process has \fBSA_NOCLDWAIT\fR set or has \fBSIGCHLD\fR set to
+\fBSIG_IGN\fR, and the process has no unwaited children that were transformed
+into zombie processes, it will block until all of its children terminate, and
+\fBwait()\fR will fail and set \fBerrno\fR to \fBECHILD\fR.
+.sp
+.LP
+If a parent process terminates without waiting for its child processes to
+terminate, the parent process \fBID\fR of each child process is set to 1, with
+the initialization process inheriting the child processes; see \fBIntro\fR(2).
+.SH RETURN VALUES
+.sp
+.LP
+When \fBwait()\fR returns due to a terminated child process, the process
+\fBID\fR of the child is returned to the calling process. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBwait()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECHILD\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process has no existing unwaited-for child processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The function was interrupted by a signal.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Since \fBwait()\fR blocks on a stopped child, a calling process wanting to see
+the return results of such a call should use \fBwaitpid\fR(3C) or
+\fBwaitid\fR(2) instead of \fBwait()\fR. The \fBwait()\fR function is
+implemented as a call to \fBwaitpid(-1, stat_loc, 0)\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBpause\fR(2),
+\fBwaitid\fR(2), \fBptrace\fR(3C), \fBsignal\fR(3C), \fBsignal.h\fR(3HEAD),
+\fBwaitpid\fR(3C), \fBwait.h\fR(3HEAD), \fBattributes\fR(5)

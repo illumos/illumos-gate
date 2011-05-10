@@ -1,0 +1,148 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_count_usr_events 3CPC "28 Mar 2005" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_count_usr_events, cpc_count_sys_events \- enable and disable performance
+counters
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_count_usr_events\fR(\fBint\fR \fIenable\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_count_sys_events\fR(\fBint\fR \fIenable\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In certain applications, it can be useful to explicitly enable and disable
+performance counters at different times so that the performance of a critical
+algorithm can be examined.  The \fBcpc_count_usr_events()\fR function can be
+used to control whether events are counted on behalf of the application running
+in user mode, while \fBcpc_count_sys_events()\fR can be used to control whether
+events are counted on behalf of the application while it is running in the
+kernel, without otherwise disturbing the binding of events to the invoking LWP.
+If the \fIenable\fR argument is non-zero, counting of events is enabled,
+otherwise they are disabled.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBcpc_count_usr_events()\fR and
+\fBcpc_count_sys_events()\fR return \fB0\fR. Otherwise, the functions return
+\fB\(mi1\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBcpc_count_usr_events()\fR and \fBcpc_count_sys_events()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR \fR
+.ad
+.RS 11n
+.rt  
+The associated performance counter context has been invalidated by another
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+No performance counter context has been created, or an attempt was made to
+enable system events while delivering counter overflow signals.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBcpc_count_usr_events()\fR to minimize code needed by
+application.
+.sp
+.LP
+In this example, the routine \fBcpc_count_usr_events()\fR is used to minimize
+the amount of code that needs to be added to the application. The
+\fBcputrack\fR(1) command can be used in conjunction with these interfaces to
+provide event programming, sampling, and reporting facilities.
+
+.sp
+.LP
+If the application is instrumented in this way and then started by
+\fBcputrack\fR with the \fBnouser\fR flag set in the event specification,
+counting of user events will only be enabled around the critical code section
+of interest.   If the program is run normally, no harm will ensue.
+
+.sp
+.in +2
+.nf
+int have_counters = 0;
+int
+main(int argc, char *argv[])
+{
+    if (cpc_version(CPC_VER_CURRENT) == CPC_VER_CURRENT &&
+        cpc_getcpuver() != -1 && cpc_access() == 0)
+        have_counters = 1;
+
+    /* ... other application code */
+
+    if (have_counters)
+        (void) cpc_count_usr_events(1);
+
+    /* ==> Code to be measured goes here <== */
+
+    if (have_counters)
+        (void) cpc_count_usr_events(0);
+
+    /* ... other application code */
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcputrack\fR(1), \fBcpc\fR(3CPC), \fBcpc_access\fR(3CPC),
+\fBcpc_bind_event\fR(3CPC), \fBcpc_enable\fR(3CPC), \fBcpc_getcpuver\fR(3CPC),
+\fBcpc_pctx_bind_event\fR(3CPC), \fBcpc_version\fR(3CPC), \fBlibcpc\fR(3LIB),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_count_usr_events()\fR and \fBcpc_count_sys_events()\fR functions
+exist for binary compatibility only. Source containing these functions will not
+compile. These functions are obsolete and might be removed in a future release.
+Applications should use \fBcpc_enable\fR(3CPC) instead.

@@ -26,8 +26,6 @@
 #ifndef	_SYS_FCODE_H
 #define	_SYS_FCODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -160,7 +158,7 @@ typedef	struct fc_client_interface fc_ci_t;
 /*
  * FC_GET_FCODE_DATA: This ioctl allows userland portion of the fcode
  * interpreter to get the fcode into a local buffer without having
- * to use mmap() interface (which calls hat_getkpfnum() routine).
+ * to use mmap() interface.
  * This allows DR kernel cage memory to be relocated while this
  * fcode buffer is allocated.
  *

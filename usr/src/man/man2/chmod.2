@@ -1,0 +1,503 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T. 
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH chmod 2 "12 Sep 2005" "SunOS 5.11" "System Calls"
+.SH NAME
+chmod, fchmod \- change access permission mode of file
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+
+\fBint\fR \fBchmod\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfchmod\fR(\fBint\fR \fIfildes\fR, \fBmode_t\fR \fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBchmod()\fR and \fBfchmod()\fR functions set the access permission
+portion of the mode of the file whose name is given by \fIpath\fR or referenced
+by the open file descriptor \fIfildes\fR to the bit pattern contained in
+\fImode\fR. Access permission bits are interpreted as follows:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.01i) lw(.69i) lw(3.79i) 
+lw(1.01i) lw(.69i) lw(3.79i) 
+.
+\fBS_ISUID\fR04000Set user ID on execution.
+\fBS_ISGID\fR020#0T{
+Set group ID on execution if # is \fB7\fR, \fB5\fR, \fB3\fR, or \fB1\fR. Enable mandatory file/record locking if # is \fB6\fR, \fB4\fR, \fB2\fR, or \fB0\fR.
+T}
+\fBS_ISVTX\fR01000Sticky bit.
+\fBS_IRWXU\fR00700Read, write, execute by owner.
+\fBS_IRUSR\fR00400Read by owner.
+\fBS_IWUSR\fR00200Write by owner.
+\fBS_IXUSR\fR00100T{
+Execute (search if a directory) by owner.
+T}
+\fBS_IRWXG\fR00070Read, write, execute by group.
+\fBS_IRGRP\fR00040Read by group.
+\fBS_IWGRP\fR00020Write by group.
+\fBS_IXGRP\fR00010Execute by group.
+\fBS_IRWXO\fR00007Read, write, execute (search) by others.
+\fBS_IROTH\fR00004Read by others.
+\fBS_IWOTH\fR00002Write by others.
+\fBS_IXOTH\fR00001Execute by others.
+.TE
+
+.sp
+.LP
+Modes are constructed by the bitwise OR operation of the access permission
+bits.
+.sp
+.LP
+The effective user ID of the process must match the owner of the file or the
+process must have the appropriate privilege to change the mode of a file.
+.sp
+.LP
+If the process is not a privileged process and the file is not a directory,
+mode bit 01000 (save text image on execution) is cleared.
+.sp
+.LP
+If neither the process is privileged nor the file's group is a member of the
+process's  supplementary group list, and the effective group ID of the process
+does not match the group ID of the file, mode bit 02000 (set group ID on
+execution) is cleared.
+.sp
+.LP
+If a directory is writable and has \fBS_ISVTX\fR (the sticky bit) set, files
+within that directory can be removed or renamed only if one or more of the
+following is true (see \fBunlink\fR(2) and \fBrename\fR(2)):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user owns the file
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user owns the directory
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the file is writable by the user
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user is a privileged user
+.RE
+.sp
+.LP
+If a regular file is not executable and has \fBS_ISVTX\fR set, the file is
+assumed to be a swap file. In this case, the system's page cache will not be
+used to hold the file's data. If the \fBS_ISVTX\fR bit is set on any other
+file, the results are unspecified.
+.sp
+.LP
+If a directory has the set group ID bit set, a given file created within that
+directory will have  the same group ID as the directory.  Otherwise, the newly
+created file's group ID will be set to the effective group ID of the creating
+process.
+.sp
+.LP
+If the mode bit 02000 (set group ID on execution) is set and the mode bit 00010
+(execute or search by group) is not set, mandatory file/record locking will
+exist on a regular file, possibly affecting future calls to \fBopen\fR(2),
+\fBcreat\fR(2), \fBread\fR(2), and \fBwrite\fR(2) on this file.
+.sp
+.LP
+If \fIfildes\fR references a shared memory object, \fBfchmod()\fR need only
+affect the \fBS_IRUSR\fR, \fBS_IRGRP\fR, \fBS_IROTH\fR, \fBS_IWUSR\fR,
+\fBS_IWGRP\fR, \fBS_IWOTH\fR, \fBS_IXUSR\fR, \fBS_IXGRP\fR, and \fBS_IXOTH\fR
+file permission bits.
+.sp
+.LP
+If \fIfildes\fR refers to a socket, \fBfchmod()\fR does not fail but no action
+is taken.
+.sp
+.LP
+If \fIfildes\fR refers to a stream that is attached to an object in the file
+system name space with \fBfattach\fR(3C), the \fBfchmod()\fR call performs no
+action and returns successfully.
+.sp
+.LP
+Upon successful completion, \fBchmod()\fR and \fBfchmod()\fR mark for update
+the \fBst_ctime\fR field of the file.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned, the file mode is unchanged, and \fBerrno\fR is set to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBchmod()\fR and \fBfchmod()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 9n
+.rt  
+An I/O error occurred while reading from or writing to the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+.rt  
+The effective user ID does not match the owner of the file and the process does
+not have appropriate privilege.
+.sp
+The {\fBPRIV_FILE_OWNER\fR} privilege overrides constraints on ownership when
+changing permissions on a file.
+.sp
+The {\fBPRIV_FILE_SETID\fR} privilege overrides constraints on ownership when
+adding the setuid or setgid bits to an executable file or a directory.  When
+adding the setuid bit to a root owned executable, additional restrictions
+apply. See \fBprivileges\fR(5).
+.RE
+
+.sp
+.LP
+The \fBchmod()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied on a component of the path prefix of \fIpath\fR.
+The privilege {\fBFILE_DAC_SEARCH\fR} overrides file permissions restrictions
+in that case.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+A loop exists in symbolic links encountered during the resolution of the
+\fIpath\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds \fBPATH_MAX\fR, or the length of
+a \fIpath\fR component exceeds \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+Either a component of the path prefix or the file referred to by \fIpath\fR
+does not exist or is a null pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIfildes\fR argument points to a remote machine and the link to that
+machine is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the prefix of \fIpath\fR is not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The file referred to by \fIpath\fR resides on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBfchmod()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is not an open file descriptor
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 11n
+.rt  
+The file referred to by \fIfildes\fR resides on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBchmod()\fR and \fBfchmod()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was caught during execution of the function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fImode\fR argument is invalid.
+.RE
+
+.sp
+.LP
+The \fBchmod()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+More than {\fBSYMLOOP_MAX\fR} symbolic links were encountered during the
+resolution of the \fIpath\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+As a result of encountering a symbolic link in resolution of the\fIpath\fR
+argument, the length of the substituted pathname strings exceeds
+{\fBPATH_MAX\fR}.
+.RE
+
+.sp
+.LP
+The \fBfchmod()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument refers to a pipe and the system disallows execution
+of this function on a pipe.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSet Read Permissions for User, Group, and Others
+.sp
+.LP
+The following example sets read permissions for the owner, group, and others.
+
+.sp
+.in +2
+.nf
+#include <sys/stat.h>
+const char *path;
+\&...
+chmod(path, S_IRUSR|S_IRGRP|S_IROTH);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRSet Read, Write, and Execute Permissions for the Owner Only
+.sp
+.LP
+The following example sets read, write, and execute permissions for the owner,
+and no permissions for group and others.
+
+.sp
+.in +2
+.nf
+#include <sys/stat.h>
+const char *path;
+\&...
+chmod(path, S_IRWXU);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRSet Different Permissions for Owner, Group, and Other
+.sp
+.LP
+The following example sets owner permissions for CHANGEFILE to read, write, and
+execute, group permissions to read and execute, and other permissions to read.
+
+.sp
+.in +2
+.nf
+#include <sys/stat.h>
+#define CHANGEFILE "/etc/myfile" 
+\&...
+chmod(CHANGEFILE, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH);
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRSet and Checking File Permissions
+.sp
+.LP
+The following example sets the file permission bits for a file named
+\fB/home/cnd/mod1\fR, then calls the \fBstat\fR(2) function to verify the
+permissions.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+int status;
+struct stat buffer
+\&...
+chmod("home/cnd/mod1", S_IRWXU|S_IRWXG|S_IROTH|S_IWOTH);
+status = stat("home/cnd/mod1", &buffer;);
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+If \fBchmod()\fR or \fBfchmod()\fR is used to change the file group owner
+permissions on a file with non-trivial ACL entries, only the ACL mask is set to
+the new permissions and the group owner permission bits in the file's mode
+field (defined in \fBmknod\fR(2)) are unchanged.  A non-trivial ACL entry is
+one whose meaning cannot be represented in the file's mode field alone. The new
+ACL mask permissions  might change the effective permissions for additional
+users and groups that have ACL entries on the file.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBchown\fR(2), \fBcreat\fR(2), \fBfcntl\fR(2), \fBmknod\fR(2),
+\fBopen\fR(2), \fBread\fR(2), \fBrename\fR(2), \fBstat\fR(2), \fBwrite\fR(2),
+\fBfattach\fR(3C), \fBmkfifo\fR(3C), \fBstat.h\fR(3HEAD), \fBattributes\fR(5),
+\fBprivileges\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fIProgramming Interfaces Guide\fR

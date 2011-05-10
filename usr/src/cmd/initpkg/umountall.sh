@@ -83,8 +83,25 @@ ZFLAG=
 NFLAG=
 LOCALNAME=
 UMOUNTFLAG=
+RemoteFSTypes=
+
+# Is the passed fstype a "remote" one?
+# Essentially: /usr/bin/grep "^$1" /etc/dfs/fstypes
+isremote() {
+	for t in $RemoteFSTypes
+	do
+		[ "$t" = "$1" ] && return 0
+	done
+	return 1
+}
+
+# Get list of remote FS types (just once)
+RemoteFSTypes=`while read t junk; do echo $t; done < /etc/dfs/fstypes`
 
 
+#
+# Process command line args
+#
 while getopts ?rslkF:h:Zn c
 do
 	case $c in
@@ -155,11 +172,15 @@ if [ -n "$HFLAG" -a "$HOST" = "$LOCALNAME" ]; then			# 5
 	usage "Specifying local host illegal for -h option"
 fi
 
-if [ "$FSType" = "nfs" -a "$LFLAG" = "l" ]; then			# 6
-	usage "option -l and FSType nfs are incompatible"
+if [ "$LFLAG" = "l" -a -n "$FSType" ]; then				# 6
+	# remote FSType not allowed
+	isremote "$FSType" &&
+	usage "option -l and FSType ${FSType} are incompatible"
 fi
 
-if [ -n "$FFLAG" -a "$FSType" != "nfs"  -a -n "$RFLAG" ]; then		# 7
+if [ "$RFLAG" = "r" -a -n "$FSType" ]; then				# 7
+	# remote FSType required
+	isremote "$FSType" ||
 	usage "option -r and FSType ${FSType} are incompatible"
 fi
 
@@ -189,7 +210,7 @@ if [ -n "$KFLAG" -a -z "$NFLAG" ]; then
 	else
 		if [ ! -x /usr/bin/sleep ]; then
 			sleep () {
-				echo "umountall: sleep after fuser -k skipped (no /usr)" 1>&2
+		echo "umountall: sleep after fuser -k skipped (no /usr)" 1>&2
 				# continue - not fatal
 			}
 		fi
@@ -199,12 +220,26 @@ fi
 #
 # Shell function to avoid using /usr/bin/cut.  Given a dev from a
 # fstype=nfs line in mnttab (eg, "host:/export) extract the host
-# component.
-print_host () {
+# component.  The dev string looks like: "host:/path"
+print_nfs_host () {
 	OIFS=$IFS
 	IFS=":"
 	set -- $*
 	echo $1
+	IFS=$OIFS
+}
+#
+# Similar for smbfs, but tricky due to the optional parts
+# of the "device" syntax.  The dev strings look like:
+# "//server/share" or "//user@server/share"
+print_smbfs_host () {
+	OIFS=$IFS
+	IFS="/@"
+	set -- $*
+	case $# in
+	3) echo "$2";;
+	2) echo "$1";;
+	esac
 	IFS=$OIFS
 }
 
@@ -215,7 +250,6 @@ doumounts () {
 	(
 	rc=0
 	fslist=""
-	nfslist=""
 	while read dev mountp fstype mode dummy
 	do
 		case "${mountp}" in
@@ -246,24 +280,28 @@ doumounts () {
 			;;
 		* )
 			if [ -n "$HFLAG" ]; then
+				thishost='-'
 				if [ "$fstype" = "nfs" ]; then
-					thishost=`print_host $dev`
-					if [ "$HOST" != "$thishost" ]; then
-						continue
-					fi
-				else
+					thishost=`print_nfs_host $dev`
+				fi
+				if [ "$fstype" = "smbfs" ]; then
+					thishost=`print_smbfs_host $dev`
+				fi
+				if [ "$HOST" != "$thishost" ]; then
 					continue
 				fi
 			fi
 			if [ -n "$FFLAG" -a "$FSType" != "$fstype" ]; then
 				continue
 			fi
-			if [ -n "$LFLAG" -a "$fstype" = "nfs" ]; then
-				nfslist="$nfslist $mountp"
-				continue
+
+			if [ -n "$LFLAG" ]; then
+				# umount local filesystems
+				isremote "$fstype" && continue
 			fi
-			#
-			# This will filter out autofs mounts with nfs file
+
+			# Note: isremote is true for both nfs & autofs, so
+			# this will filter out autofs mounts with nfs file
 			# system mounted on the top of it.
 			#
 			# WARNING: use of any syscall on a NFS file system has
@@ -272,19 +310,11 @@ doumounts () {
 			# down beforehand.
 			# For the reason described above, a simple test like 
 			# "df -F nfs $mountp" can't be used to filter out
-			# nfs-over-autofs mounts. We loop over a list instead:
+			# nfs-over-autofs mounts.  (isremote works OK)
 			#
-			if [ -n "$LFLAG" -a -n "$nfslist" -a "$fstype" = "autofs" ]
-			then
-				for m in $nfslist; do
-					if [ "$mountp" = "$m" ]; then
-						# Resume the outer while loop
-						continue 2
-					fi
-				done
-			fi
-			if [ -n "$RFLAG" -a "$fstype" != "nfs" ]; then
-				continue
+			if [ -n "$RFLAG" ]; then
+				# umount remote filesystems
+				isremote "$fstype" || continue
 			fi
 			if [ "$ZONENAME" != "global" ]; then
 				for option in `echo $mode | tr , '\012'`; do

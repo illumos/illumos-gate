@@ -1,3 +1,4 @@
+'\" t
 .\"
 .\" This file and its contents are supplied under the terms of the
 .\" Common Development and Distribution License ("CDDL"), version 1.0.
@@ -9,5 +10,5 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2010 <contributor>.  All rights reserved.
+.\" Copyright 2011 <contributor>.  All rights reserved.
 .\"

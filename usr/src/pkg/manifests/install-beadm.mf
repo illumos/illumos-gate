@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/install/beadm@$(PKGVERS)
@@ -36,19 +37,15 @@ dir path=usr/lib/python2.6/vendor-packages
 dir path=usr/lib/python2.6/vendor-packages/beadm
 dir path=usr/sbin
 dir path=usr/share group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man1m
 file path=sbin/beadm mode=0555
 file path=usr/include/libbe.h
 file path=usr/lib/libbe.so.1
 file path=usr/lib/llib-lbe
 file path=usr/lib/llib-lbe.ln
-file path=usr/lib/python2.6/vendor-packages/beadm/BootEnvironment.py mode=0444
-file path=usr/lib/python2.6/vendor-packages/beadm/BootEnvironment.pyc \
-    mode=0444
-file path=usr/lib/python2.6/vendor-packages/beadm/__init__.py mode=0444
-file path=usr/lib/python2.6/vendor-packages/beadm/__init__.pyc mode=0444
-file path=usr/lib/python2.6/vendor-packages/beadm/messages.py mode=0444
-file path=usr/lib/python2.6/vendor-packages/beadm/messages.pyc mode=0444
 file path=usr/lib/python2.6/vendor-packages/libbe_py.so
+file path=usr/share/man/man1m/beadm.1m
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libbe.so target=./libbe.so.1

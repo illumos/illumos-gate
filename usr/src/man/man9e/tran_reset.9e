@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_reset 9E "17 Aug 2005" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_reset \- reset a SCSI bus or target
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fB int prefix\fR\fBtran_reset\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIlevel\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR \fR
+.ad
+.RS 10n
+.rt  
+Pointer to the \fBscsi_address\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlevel\fR \fR
+.ad
+.RS 10n
+.rt  
+The level of reset required.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_reset()\fR vector in the \fBscsi_hba_tran\fR(9S) structure must be
+initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
+\fBHBA\fR entry point to be called when a target driver calls
+\fBscsi_reset\fR(9F).
+.sp
+.LP
+\fBtran_reset()\fR must reset either the \fBSCSI\fR bus, a \fBSCSI\fR target
+device, or a \fBSCSI\fR logical unit as specified by \fIlevel\fR.
+.sp
+.LP
+\fIlevel\fR must be one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRESET_ALL\fR \fR
+.ad
+.RS 17n
+.rt  
+Reset the \fBSCSI\fR bus.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRESET_TARGET\fR \fR
+.ad
+.RS 17n
+.rt  
+Reset the target specified by \fIap\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRESET_LUN\fR \fR
+.ad
+.RS 17n
+.rt  
+Reset the logical unit specified by \fIap\fR.
+.RE
+
+.sp
+.LP
+\fBtran_reset\fR should set the \fBpkt_reason\fR field of all outstanding
+packets in the transport layer associated with each target or logical unit that
+was successfully reset to \fBCMD_RESET\fR and the \fBpkt_statistics\fR field
+must be \fBOR\fR'ed with either \fBSTAT_BUS_RESET\fR (if the SCSI bus was
+reset) or \fBSTAT_DEV_RESET\fR (if the target or logical unit was reset).
+.sp
+.LP
+The \fBHBA\fR driver should use a \fBSCSI\fR Bus Device Reset Message to reset
+a target device. The HBA driver should use a  SCSI Logical Unit Reset Message
+to reset a logical unit.
+.sp
+.LP
+Packets that are in the transport layer but not yet active on the bus should be
+returned with \fBpkt_reason\fR set to \fBCMD_RESET\fR and \fBpkt_statistics\fR
+\fBOR\fR'ed with \fBSTAT_ABORTED\fR.
+.sp
+.LP
+Support for \fBRESET_LUN\fR is optional but strongly encouraged for new and
+updated HBA drivers. If an HBA driver provides \fBRESET_LUN\fR support, it must
+also create the \fBlun-reset\fR capability with a value of zero for each target
+device instance represented by a valid \fIap\fR. The HBA is also required to
+provide the means to return the current value of the \fBlun-reset\fR capability
+in its \fBtran_getcap\fR(9E) routine, as well as the means to change the value
+of the \fBlun_reset\fR capability in its \fBtran_getcap\fR(9E) routine.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_reset()\fR should return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 6n
+.rt  
+on success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 6n
+.rt  
+on failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBtran_reset()\fR function can be called from user or interrupt context.
+This requirement comes from \fBscsi_reset()\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBddi_dma_buf_setup\fR(9F), \fBscsi_hba_attach\fR(9F),
+\fBscsi_reset\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If \fBpkt_reason\fR already indicates that an earlier error had occurred for a
+particular \fIpkt\fR, \fBtran_reset()\fR should not overwrite \fBpkt_reason\fR
+with \fBCMD_RESET\fR.

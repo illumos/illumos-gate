@@ -1,0 +1,935 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpio 1 "3 Aug 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+cpio \- copy file archives in and out
+.SH SYNOPSIS
+.LP
+.nf
+\fBcpio\fR \fB-i\fR [\fB-bBcdfkmPrsStuvV6@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-E\fR \fIfile\fR] 
+     [\fB-H\fR \fIheader\fR] [\fB-I\fR \fI\fR [\fB-M\fR \fImessage\fR]] [\fB-R\fR \fIid\fR] [\fIpattern\fR]...
+.fi
+
+.LP
+.nf
+\fBcpio\fR \fB-o\fR [\fB-aABcLPvV@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-H\fR \fIheader\fR] 
+     [\fB-O\fR \fIfile\fR [\fB-M\fR \fImessage\fR]]
+.fi
+
+.LP
+.nf
+\fBcpio\fR \fB-p\fR [\fB-adlLmPuvV@/\fR] [\fB-R\fR \fIid\fR] \fIdirectory\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpio\fR command copies files into and out of a \fBcpio\fR archive. The
+\fBcpio\fR archive can span multiple volumes. The \fB-i\fR, \fB-o\fR, and
+\fB-p\fR options select the action to be performed. The following list
+describes each of the actions. These actions are mutually exclusive.
+.SS "Copy In Mode"
+.sp
+.LP
+\fBcpio\fR \fB-i\fR (copy in) extracts files from the standard input, which is
+assumed to be the product of a previous \fBcpio\fR \fB-o\fR command. Only files
+with names that match one of the \fIpattern\fRs are selected. See \fBsh\fR(1)
+and OPERANDS for more information about \fIpattern\fR. Extracted files are
+conditionally copied into the current directory tree, based on the options
+described below. The permissions of the files are those of the previous \fBcpio
+-o\fR command. The owner and group are the same as the current user, unless the
+current user has the \fB{PRIV_FILE_CHOWN_SELF}\fR privilege. See
+\fBchown\fR(2). If this is the case, owner and group are the same as those
+resulting from the previous \fBcpio -o\fR command. Notice that if \fBcpio\fR
+\fB-i\fR tries to create a file that already exists and the existing file is
+the same age or younger (\fBnewer\fR), \fBcpio\fR outputs a warning message and
+not replace the file. The \fB-u\fR option can be used to unconditionally
+overwrite the existing file.
+.SS "Copy Out Mode"
+.sp
+.LP
+\fBcpio\fR \fB-o\fR (copy out) reads a list of file path names from the
+standard input and copies those files to the standard output, together with
+path name and status information in the form of a \fBcpio\fR archive. Output is
+padded to an 8192-byte boundary by default or to the user-specified block size
+(with the \fB-B\fR or \fB-C\fR options) or to some device-dependent block size
+where necessary (as with the CTC tape).
+.SS "Pass Mode"
+.sp
+.LP
+\fBcpio\fR \fB-p\fR (pass) reads a list of file path names from the standard
+input and conditionally copies those files into the destination directory tree,
+based on the options described below.
+.sp
+.LP
+If the underlying file system of the source file supports detection of holes as
+reported by \fBpathconf\fR(2), the file is a sparse file, and the destination
+file is seekable, then holes in sparse files are preserved in pass mode,
+otherwise holes are filled with zeros.
+.sp
+.LP
+\fBcpio\fR assumes four-byte words.
+.sp
+.LP
+If, when writing to a character device (\fB-o\fR) or reading from a character
+device (\fB-i\fR), \fBcpio\fR reaches the end of a medium (such as the end of a
+diskette), and the \fB-O\fR and \fB-I\fR options are not used, \fBcpio\fR
+prints the following message:
+.sp
+.in +2
+.nf
+To continue, type device/file name when ready.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To continue, you must replace the medium and type the character special device
+name (\fB/dev/rdiskette\fR for example) and press RETURN. You might want to
+continue by directing \fBcpio\fR to use a different device. For example, if you
+have two floppy drives you might want to switch between them so \fBcpio\fR can
+proceed while you are changing the floppies. Press RETURN to cause the
+\fBcpio\fR process to exit.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+(copy in) Reads an archive from the standard input and conditionally extracts
+the files contained in it and places them into the current directory tree.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 6n
+.rt  
+(copy out) Reads a list of file path names from the standard input and copies
+those files to the standard output in the form of a \fBcpio\fR archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+(pass) Reads a list of file path names from the standard input and
+conditionally copies those files into the destination directory tree.
+.RE
+
+.sp
+.LP
+The following options can be appended in any sequence to the \fB-i\fR,
+\fB-o\fR, or \fB-p\fR options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 14n
+.rt  
+Resets access times of input files after they have been copied, making
+\fBcpio\fR's access invisible. Access times are not reset for linked files when
+\fBcpio\fR \fB-pla\fR is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.RS 14n
+.rt  
+Appends files to an archive. The \fB-A\fR option requires the \fB-O\fR option.
+Valid only with archives that are files, or that are on floppy diskettes or
+hard disk partitions. The effect on files that are linked in the existing
+portion of the archive is unpredictable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 14n
+.rt  
+Reverses the order of the bytes within each word. Use only with the \fB-i\fR
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fR
+.ad
+.RS 14n
+.rt  
+Blocks input/output 5120 bytes to the record. The default buffer size is 8192
+bytes when this and the \fB-C\fR options are not used. \fB-B\fR does not apply
+to the \fB-p\fR (pass) option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 14n
+.rt  
+Reads or writes header information in \fBASCII\fR character form for
+portability. There are no \fBUID\fR or \fBGID\fR restrictions associated with
+this header format. Use this option between SVR4-based machines, or the
+\fB-H\fR \fBodc\fR option between unknown machines. The \fB-c\fR option implies
+the use of expanded device numbers, which are only supported on SVR4-based
+systems. When transferring files between SunOS 4 or Interactive UNIX and the
+Solaris 2.6 Operating environment or compatible versions, use \fB-H\fR
+\fBodc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fIbufsize\fR\fR
+.ad
+.RS 14n
+.rt  
+Blocks input/output \fIbufsize\fR bytes to the record, where \fIbufsize\fR is
+replaced by a positive integer. The default buffer size is 8192 bytes when this
+and \fB-B\fR options are not used. \fB-C\fR does not apply to the \fB-p\fR
+(pass) option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 14n
+.rt  
+Creates directories as needed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR \fIfile\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies an input file (\fIfile\fR) that contains a list of filenames to be
+extracted from the archive (one filename per line).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 14n
+.rt  
+Copies in all files except those in \fIpattern\fRs. See OPERANDS for a
+description of \fIpattern\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR \fIheader\fR\fR
+.ad
+.RS 14n
+.rt  
+Reads or writes header information in \fIheader\fR format. Always use this
+option or the \fB-c\fR option when the origin and the destination machines are
+different types. This option is mutually exclusive with options \fB-c\fR and
+\fB-6\fR.
+.sp
+Valid values for \fIheader\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbar\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBbar\fR head and format. Used only with the \fB-i\fR option ( read only).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrc\fR | \fBCRC\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBASCII\fR header with expanded device numbers and an additional per-file
+checksum. There are no \fBUID\fR or \fBGID\fR restrictions associated with this
+header format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBodc\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBASCII\fR header with small device numbers. This is the IEEE/P1003 Data
+Interchange Standard cpio header and format. It has the widest range of
+portability of any of the header formats. It is the official format for
+transferring files between POSIX-conforming systems (see \fBstandards\fR(5)).
+Use this format to communicate with SunOS 4 and Interactive UNIX. This header
+format allows \fBUID\fRs and \fBGID\fRs up to 262143 to be stored in the
+header.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtar\fR | \fBTAR\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBtar\fR header and format. This is an older \fBtar\fR header format that
+allows \fBUID\fRs and \fBGID\fRs up to 2097151 to be stored in the header. It
+is provided for the reading of legacy archives only, that is, in conjunction
+with option \fB-i\fR.
+.sp
+Specifying this archive format with option \fB-o\fR has the same effect as
+specifying the "ustar" format: the output archive is in \fBustar\fR format, and
+must be read using \fB-H\fR \fBustar\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBustar\fR | \fBUSTAR\fR\fR
+.ad
+.RS 17n
+.rt  
+IEEE/P1003 Data Interchange Standard tar header and format. This header format
+allows \fBUID\fRs and \fBGID\fRs up to 2097151 to be stored in the header.
+.RE
+
+Files with \fBUID\fRs and \fBGID\fRs greater than the limit stated above are
+archived with the \fBUID\fR and \fBGID\fR of \fB60001\fR. To transfer a large
+file (8 Gb \(em 1 byte), the header format can be \fBtar|TAR\fR,
+\fBustar|USTAR\fR, or \fBodc\fR only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR \fIfile\fR\fR
+.ad
+.RS 14n
+.rt  
+Reads the contents of \fIfile\fR as an input archive, instead of the standard
+input. If \fIfile\fR is a character special device, and the current medium has
+been completely read, replace the medium and press RETURN to continue to the
+next medium. This option is used only with the \fB-i\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 14n
+.rt  
+Attempts to skip corrupted file headers and I/O errors that might be
+encountered. If you want to copy files from a medium that is corrupted or out
+of sequence, this option lets you read only those files with good headers. For
+\fBcpio\fR archives that contain other \fBcpio\fR archives, if an error is
+encountered, \fBcpio\fR can terminate prematurely. \fBcpio\fR finds the next
+good header, which can be one for a smaller archive, and terminate when the
+smaller archive's trailer is encountered. Use only with the \fB-i\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 14n
+.rt  
+In pass mode, makes hard links between the source and destination whenever
+possible. If the \fB-L\fR option is also specified, the hard link is to the
+file referred to by the symbolic link. Otherwise, the hard link is to the
+symbolic link itself. Use only with the \fB-p\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 14n
+.rt  
+Follows symbolic links. If a symbolic link to a directory is encountered,
+archives the directory referred to by the link, using the name of the link.
+Otherwise, archives the file referred to by the link, using the name of the
+link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 14n
+.rt  
+Retains previous file modification time. This option is ineffective on
+directories that are being copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR \fImessage\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines a \fImessage\fR to use when switching media. When you use the \fB-O\fR
+or \fB-I\fR options and specify a character special device, you can use this
+option to define the message that is printed when you reach the end of the
+medium. One \fB%d\fR can be placed in \fImessage\fR to print the sequence
+number of the next medium needed to continue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR \fIfile\fR\fR
+.ad
+.RS 14n
+.rt  
+Directs the output of \fBcpio\fR to \fIfile\fR, instead of the standard output.
+If \fIfile\fR is a character special device and the current medium is full,
+replace the medium and type a carriage return to continue to the next medium.
+Use only with the \fB-o\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 14n
+.rt  
+Preserves \fBACL\fRs. If the option is used for output, existing \fBACL\fRs are
+written along with other attributes, except for extended attributes, to the
+standard output. \fBACL\fRs are created as special files with a special file
+type. If the option is used for input, existing \fBACL\fRs are extracted along
+with other attributes from standard input. The option recognizes the special
+file type. Notice that errors occurs if a \fBcpio\fR archive with \fBACL\fRs is
+extracted by previous versions of \fBcpio\fR. This option should not be used
+with the \fB-c\fR option, as \fBACL\fR support might not be present on all
+systems, and hence is not portable. Use \fBASCII\fR headers for portability.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 14n
+.rt  
+Interactively renames files. If the user types a carriage return alone, the
+file is skipped. If the user types a ``.'', the original pathname is retained.
+Not available with \fBcpio\fR \fB-p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIid\fR\fR
+.ad
+.RS 14n
+.rt  
+Reassigns ownership and group information for each file to user ID. (ID must be
+a valid login ID from the \fBpasswd\fR database.) This option is valid only
+when id is the invoking user or the super-user. See \fBNOTES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 14n
+.rt  
+Swaps bytes within each half word.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 14n
+.rt  
+Swaps halfwords within each word.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 14n
+.rt  
+Prints a table of contents of the input. If any file in the table of contents
+has extended attributes, these are also listed. No files are created. \fB-t\fR
+and \fB-V\fR are mutually exclusive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 14n
+.rt  
+Copies unconditionally. Normally, an older file is not replaced a newer file
+with the same name, although an older directory updates a newer directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 14n
+.rt  
+Verbose. Prints a list of file and extended attribute names. When used with the
+\fB-t\fR option, the table of contents looks like the output of an \fBls\fR
+\fB-l\fR command (see \fBls\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 14n
+.rt  
+Special verbose. Prints a dot for each file read or written. Useful to assure
+the user that \fBcpio\fR is working without printing out all file names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-6\fR\fR
+.ad
+.RS 14n
+.rt  
+Processes a UNIX System Sixth Edition archive format file. Use only with the
+\fB-i\fR option. This option is mutually exclusive with \fB-c\fR and \fB-H\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-@\fR\fR
+.ad
+.RS 14n
+.rt  
+Includes extended attributes in archive. By default, \fBcpio\fR does not place
+extended attributes in the archive. With this flag, \fBcpio\fR looks for
+extended attributes on the files to be placed in the archive and add them, as
+regular files, to the archive. The extended attribute files go in the archive
+as special files with special file types. When the \fB-@\fR flag is used with
+\fB-i\fR or \fB-p\fR, it instructs \fBcpio\fR to restore extended attribute
+data along with the normal file data. Extended attribute files can only be
+extracted from an archive as part of a normal file extract. Attempts to
+explicitly extract attribute records are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-/\fR\fR
+.ad
+.RS 14n
+.rt  
+Includes extended system attributes in archive. By default, \fBcpio\fR does not
+place extended system attributes in the archive. With this flag, \fBcpio\fR
+looks for extended system attributes on the files to be placed in the archive
+and add them, as regular files, to the archive. The extended attribute files go
+in the archive as special files with special file types. When the \fB-/\fR flag
+is used with \fB-i\fR or \fB-p\fR, it instructs \fBcpio\fR to restore extended
+system attribute data along with the normal file data. Extended system
+attribute files can only be extracted from an archive as part of a normal file
+extract. Attempts to explicitly extract attribute records are ignored.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdirectory\fR\fR
+.ad
+.RS 13n
+.rt  
+A path name of an existing directory to be used as the target of \fBcpio\fR
+\fB-p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpattern\fR\fR
+.ad
+.RS 13n
+.rt  
+Expressions making use of a pattern-matching notation similar to that used by
+the shell (see \fBsh\fR(1)) for filename pattern matching, and similar to
+regular expressions. The following metacharacters are defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 9n
+.rt  
+Matches any string, including the empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 9n
+.rt  
+Matches any single character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[...]\fR\fR
+.ad
+.RS 9n
+.rt  
+Matches any one of the enclosed characters. A pair of characters separated by
+`\(mi' matches any symbol between the pair (inclusive), as defined by the
+system default collating sequence. If the first character following the opening
+\fB`['\fR is a \fB`!'\fR, the results are unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.RS 9n
+.rt  
+The ! (exclamation point) means \fInot\fR. For example, the \fB!abc*\fR pattern
+would exclude all files that begin with \fBabc\fR.
+.RE
+
+In \fIpattern\fR, metacharacters \fB?\fR, \fB*\fR, and \fB[\fR\|.\|.\|.\fB]\fR
+match the slash (\fB/\fR) character, and backslash (\fB\e\fR) is an escape
+character. Multiple cases of \fIpattern\fR can be specified and if no
+\fIpattern\fR is specified, the default for \fIpattern\fR is \fB*\fR (that is,
+select all files).
+.sp
+Each pattern must be enclosed in double quotes. Otherwise, the name of a file
+in the current directory might be used.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBcpio\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.sp
+.LP
+The following examples show three uses of \fBcpio\fR.
+.LP
+\fBExample 1 \fRUsing standard input
+.sp
+.in +2
+.nf
+example% \fBls | cpio -oc > ../newfile\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When standard input is directed through a pipe to \fBcpio\fR \fB-o\fR, as in
+the example above, it groups the files so they can be directed (>) to a single
+file (\fB\&../newfile\fR). The \fB-c\fR option insures that the file is
+portable to other machines (as would the \fB-H\fR option). Instead of
+\fBls\fR(1), you could use \fBfind\fR(1), \fBecho\fR(1), \fBcat\fR(1), and so
+on, to pipe a list of names to \fBcpio\fR. You could direct the output to a
+device instead of a file.
+
+.LP
+\fBExample 2 \fRExtracting files into directories
+.sp
+.in +2
+.nf
+example% \fBcat newfile | cpio -icd "memo/a1" "memo/b*"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example, \fBcpio\fR \fB-i\fR uses the output file of \fBcpio\fR
+\fB-o\fR (directed through a pipe with \fBcat\fR), extracts those files that
+match the patterns (\fBmemo/a1\fR, \fBmemo/b*\fR), creates directories below
+the current directory as needed (\fB-d\fR option), and places the files in the
+appropriate directories. The \fB-c\fR option is used if the input file was
+created with a portable header. If no patterns were given, all files from
+\fBnewfile\fR would be placed in the directory.
+
+.LP
+\fBExample 3 \fRCopying or linking files to another directory
+.sp
+.in +2
+.nf
+example% \fBfind . -depth -print | cpio -pdlmv newdir\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example, \fBcpio\fR \fB-p\fR takes the file names piped to it and
+copies or links (\fB-l\fR option) those files to another directory,
+\fBnewdir\fR. The \fB-d\fR option says to create directories as needed. The
+\fB-m\fR option says to retain the modification time. (It is important to use
+the \fB-depth\fR option of \fBfind\fR(1) to generate path names for \fBcpio\fR.
+This eliminates problems that \fBcpio\fR could have trying to create files
+under read-only directories.) The destination directory, \fBnewdir\fR, must
+exist.
+
+.sp
+.LP
+Notice that when you use \fBcpio\fR in conjunction with \fBfind\fR, if you use
+the \fB-L\fR option with \fBcpio\fR, you must use the \fB-follow\fR option with
+\fBfind\fR and vice versa. Otherwise, there are undesirable results.
+.sp
+.LP
+For multi-reel archives, dismount the old volume, mount the new one, and
+continue to the next tape by typing the name of the next device (probably the
+same as the first reel). To stop, type a RETURN and \fBcpio\fR ends.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcpio\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
+\fBLC_MESSAGES\fR, \fBLC_TIME\fR, \fBTZ\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMPDIR\fR\fR
+.ad
+.RS 10n
+.rt  
+\fBcpio\fR creates its temporary file in \fB/var/tmp\fR by default. Otherwise,
+it uses the directory specified by \fBTMPDIR\fR.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBcat\fR(1), \fBecho\fR(1), \fBfind\fR(1), \fBls\fR(1),
+\fBpax\fR(1), \fBsetfacl\fR(1), \fBsh\fR(1), \fBtar\fR(1), \fBchown\fR(2),
+\fBarchives.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The maximum path name length allowed in a \fBcpio\fR archive is determined by
+the header type involved. The following table shows the proper value for each
+supported archive header type.
+.sp
+
+.sp
+.TS
+tab();
+cw(1.83i) cw(1.83i) cw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+Header typeCommand line optionsMaximum path name length
+BINARY"\fB-o\fR"256
+POSIX"\fB-oH\fR odc"256
+ASCII"\fB-oc\fR"1023
+CRC"\fB-oH\fR crc"1023
+USTAR"\fB-oH\fR ustar"255
+.TE
+
+.sp
+.LP
+When the command line options "\fB-o\fR \fB-H\fR \fBtar\fR" are specified, the
+archive created is of type \fBUSTAR\fR. This means that it is an error to read
+this same archive using the command line options "\fB-i\fR \fB-H\fR \fBtar\fR".
+The archive should be read using the command line options "\fB-i\fR \fB-H\fR
+\fBustar\fR". The options "\fB-i\fR \fB-H\fR \fBtar\fR" refer to an older tar
+archive format.
+.sp
+.LP
+An error message is output for files whose \fBUID\fR or \fBGID\fR are too large
+to fit in the selected header format. Use \fB-H\fR \fBcrc\fR or \fB-c\fR to
+create archives that allow all \fBUID\fR or \fBGID\fR values.
+.sp
+.LP
+Only the super-user can copy special files.
+.sp
+.LP
+Blocks are reported in 512-byte quantities.
+.sp
+.LP
+If a file has \fB000\fR permissions, contains more than 0 characters of data,
+and the user is not root, the file is not saved or restored.
+.sp
+.LP
+When cpio is invoked in \fBCopy In\fR or \fBPass Mode\fR by a user with
+\fB{PRIV_FILE_CHOWN_SELF}\fR privilege, and in particular on a system where
+\fB{_POSIX_CHOWN_RESTRICTED}\fR is not in effect (effectively granting this
+privilege to all users where not overridden), extracted or copied files can end
+up with owners and groups determined by those of the original archived files,
+which can differ from the invoking user's. This might not be what the user
+intended. The \fB-R\fR option can be used to retain file ownership, if desired,
+if you specify the user's id.
+.sp
+.LP
+The inode number stored in the header (\fB/usr/include/archives.h\fR) is an
+unsigned short, which is 2 bytes. This limits the range of inode numbers from
+\fB0\fR to \fB65535\fR. Files which are hard linked must fall in this inode
+range. This could be a problem when moving \fBcpio\fR archives between
+different vendors' machines.
+.sp
+.LP
+You must use the same blocking factor when you retrieve or copy files from the
+tape to the hard disk as you did when you copied files from the hard disk to
+the tape. Therefore, you must specify the \fB-B\fR or \fB-C\fR option.
+.sp
+.LP
+During \fB-p\fR and \fB-o\fR processing, \fBcpio\fR buffers the file list
+presented on stdin in a temporary file.
+.sp
+.LP
+The new \fBpax\fR(1) format, with a command that supports it (for example,
+\fBtar\fR), should be used for large files. The \fBcpio\fR command is no longer
+part of the current POSIX standard and is deprecated in favor of \fBpax\fR.

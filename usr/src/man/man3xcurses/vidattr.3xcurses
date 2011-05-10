@@ -1,0 +1,165 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vidattr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+vidattr, vid_attr, vidputs, vid_puts \- output attributes to the terminal
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBvidattr\fR(\fBchtype\fR \fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvid_attr\fR(\fBattr_t\fR \fIattr\fR, \fBshort\fR \fIcolor_pair_number\fR, \fBvoid *\fR\fIopt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvidputs\fR(\fBchtype\fR \fIattr\fR, \fBint (*\fR\fIputfunc\fR) (int));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvid_puts\fR(\fBattr_t\fR \fIattr\fR, \fBshort\fR \fIcolor_pair_number\fR, \fBvoid *\fR\fIopt\fR,
+     \fBint (*\fR\fIputfunc\fR) (int));
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattr\fR\fR
+.ad
+.RS 21n
+.rt  
+Is the rendition of the foreground window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcolor_pair_number\fR\fR
+.ad
+.RS 21n
+.rt  
+Is a color pair.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIopt\fR\fR
+.ad
+.RS 21n
+.rt  
+Is reserved for future use.  Currently, this must be a null pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIputfunc\fR\fR
+.ad
+.RS 21n
+.rt  
+Is a user-supplied output function.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions output commands to the terminal that change the terminal's
+attributes.
+.sp
+.LP
+If the \fBterminfo\fR database indicates that the terminal in use can display
+characters in the rendition specified by \fIattr\fR, then \fBvidattr()\fR
+outputs one or more commands to request that the terminal display subsequent
+characters in that rendition. The function outputs by calling
+\fBputchar\fR(3C). The \fBvidattr()\fR function neither relies on your updates
+the model which Curses maintains of the prior rendition mode.
+.sp
+.LP
+The \fBvidputs()\fR function computes the terminal output string that
+\fBvidattr()\fR does, based on \fIattr\fR, but \fBvidputs()\fR outputs by
+calling the user-supplied function \fIputfunc\fR. The \fBvid_attr()\fR and
+\fBvid_puts()\fR functions correspond to \fBvidattr()\fR and \fBvidputs()\fR
+respectively, but take a set of arguments, one of type \fBattr_t\fR for the
+attributes, one of type \fBshort\fR for the color pair number, and a \fBvoid
+*\fR, and thus support the attribute constants with the \fBWA_\fR prefix.
+.sp
+.LP
+The \fIopts\fR argument is reserved for definition in a future release.
+Currently, it is implemented as a null pointer.
+.sp
+.LP
+The user-supplied function \fIputfunc\fR (which can be specified as an argument
+to either \fBvidputs()\fR or \fBvid_puts()\fR) is either \fBputchar()\fR or
+some other function with the same prototype.  Both the \fBvidputs()\fR and
+\fBvid_puts()\fR functions ignore the return value of \fIputfunc\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return \fBOK\fR. Otherwise, they
+return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH  USAGE
+.sp
+.LP
+After use of any of these functions, the model Curses maintains of the state of
+the terminal might not match the actual state of the terminal. The application
+should touch and refresh the window before resuming conventional use of Curses.
+.sp
+.LP
+Of these functions requires that the application contain so much information
+about a particular class of terminal that it defeats the purpose of using
+Curses.
+.sp
+.LP
+On some terminals, a command to change rendition conceptually occupies space in
+the screen buffer (with or without width). Thus, a command to set the terminal
+to a new rendition would change the rendition of some characters already
+displayed.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoupdate\fR(3XCURSES), \fBis_linetouched\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBputchar\fR(3C), \fBtigetflag\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

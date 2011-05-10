@@ -1,0 +1,70 @@
+'\" te
+.\"  Copyright 1989 AT&T 
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bzero 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+bzero \- clear memory for a given number of bytes
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBvoid\fR \fBbzero\fR(\fBvoid *\fR\fIaddr\fR, \fBsize_t\fR \fIbytes\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 9n
+.rt  
+Starting virtual address of memory to be cleared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbytes\fR\fR
+.ad
+.RS 9n
+.rt  
+The number of bytes to clear starting at \fIaddr\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbzero()\fR function clears a contiguous portion of memory by filling it
+with zeros.
+.SH CONTEXT
+.sp
+.LP
+The \fBbzero()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbcopy\fR(9F), \fBclrbuf\fR(9F), \fBkmem_zalloc\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+The address range specified must be within the kernel space. No range checking
+is done.  If an address outside of the kernel space is selected, the driver may
+corrupt the system in an unpredictable way.

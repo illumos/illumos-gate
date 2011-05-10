@@ -1,0 +1,113 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_lookup 3KSTAT "3 Aug 2004" "SunOS 5.11" "Kernel Statistics Library Functions"
+.SH NAME
+kstat_lookup, kstat_data_lookup \- find a kstat by name
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|.]
+#include <kstat.h>
+
+\fBkstat_t *\fR\fBkstat_lookup\fR(\fBkstat_ctl_t *\fR\fIkc\fR, \fBchar *\fR\fIks_module\fR, \fBint\fR \fIks_instance\fR,
+     \fBchar *\fR\fIks_name\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBkstat_data_lookup\fR(\fBkstat_t *\fR\fIksp\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkstat_lookup()\fR function traverses the kstat chain,
+\fIkc\fR->\fBkc_chain\fR, searching for a kstat with the same \fIks_module\fR,
+\fIks_instance\fR, and \fIks_name\fR fields; this triplet uniquely identifies a
+kstat.  If \fIks_module\fR is \fINULL\fR, \fIks_instance\fR is  -1, or
+\fIks_name\fR is \fINULL\fR, those fields will be ignored in the search.  For
+example, \fBkstat_lookup(kc, NULL, -1, "foo")\fR  will find the first kstat
+with name "foo".
+.sp
+.LP
+The \fBkstat_data_lookup()\fR function searches the kstat's data section for
+the record with the specified \fIname\fR. This operation is valid only for
+those kstat types that have named data records: \fBKSTAT_TYPE_NAMED\fR and
+\fBKSTAT_TYPE_TIMER\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBkstat_lookup()\fR function returns a pointer to the requested kstat if
+it is found. Otherwise it returns \fINULL\fR and sets \fBerrno\fR to indicate
+the error.
+.sp
+.LP
+The \fBkstat_data_lookup()\fR function returns a pointer to the requested data
+record if it is found. Otherwise it returns \fINULL\fR and sets \fBerrno\fR to
+indicate the error .
+.SH ERRORS
+.sp
+.LP
+The \fBkstat_lookup()\fR and \fBkstat_data_lookup()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was made to look up data for a kstat that was not of type
+\fBKSTAT_TYPE_NAMED\fR or \fBKSTAT_TYPE_TIMER\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested kstat could not be found.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/kstat\fR\fR
+.ad
+.RS 14n
+.rt  
+kernel statistics driver
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat\fR(3KSTAT), \fBkstat_chain_update\fR(3KSTAT),
+\fBkstat_open\fR(3KSTAT), \fBkstat_read\fR(3KSTAT), \fBattributes\fR(5)

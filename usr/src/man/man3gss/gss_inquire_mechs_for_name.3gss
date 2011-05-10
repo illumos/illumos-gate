@@ -1,0 +1,156 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_inquire_mechs_for_name 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_inquire_mechs_for_name \- list mechanisms that support the specified
+name-type
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag \&.\|.\|.\fR] \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR] 
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_inquire_mechs_for_name\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBconst gss_name_t\fR \fIinput_name\fR,\fBgss_OID_set *\fR\fImech_types\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_inquire_mechs_for_name()\fR function returns the set of mechanisms
+supported by the \fBGSS-API\fR that may be able to process the specified name.
+Each mechanism returned will recognize at least one element within the internal
+name.
+.sp
+.LP
+Some implementations of the \fBGSS-API\fR may perform this test by checking
+nametype information contained within the passed name and registration
+information provided by individual mechanisms.  This means that the
+\fImech_types\fR set returned by the function may indicate that a particular
+mechanism will understand the name, when in fact the mechanism would refuse to
+accept the name as input to \fBgss_canonicalize_name\fR(3GSS),
+\fBgss_init_sec_context\fR(3GSS), \fBgss_acquire_cred\fR(3GSS), or
+\fBgss_add_cred\fR(3GSS), due to some property of the name itself rather than
+the name-type. Therefore, this function should be used only as a pre-filter for
+a call to a subsequent mechanism-specific function.
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_inquire_mechs_for_name()\fR follow in
+alphabetical order:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 16n
+.rt  
+Mechanism-specific status code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput_name\fR\fR
+.ad
+.RS 16n
+.rt  
+The name to which the inquiry relates.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImech_types\fR\fR
+.ad
+.RS 16n
+.rt  
+Set of mechanisms that may support the specified name.  The returned \fBOID\fR
+set must be freed by the caller after use with a call to
+\fBgss_release_oid_set\fR(3GSS).
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The \fBgss_inquire_mechs_for_name()\fR function may return the following status
+codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 22n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_NAME\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fIinput_name\fR parameter was ill-formed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_NAMETYPE\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fIinput_name\fR parameter contained an invalid or unsupported type of
+name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 22n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_acquire_cred\fR(3GSS), \fBgss_add_cred\fR(3GSS),
+\fBgss_canonicalize_name\fR(3GSS), \fBgss_init_sec_context\fR(3GSS),
+\fBgss_release_oid_set\fR(3GSS), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

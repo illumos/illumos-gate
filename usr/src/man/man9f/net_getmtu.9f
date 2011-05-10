@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH net_getmtu 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+net_getmtu \- determine the MTU of a given network interface
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/neti.h>
+
+\fBint\fR \fBnet_getmtu\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBconst\fR \fBphy_if_t\fR \fIifp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInet\fR\fR
+.ad
+.RS 7n
+.rt  
+value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIifp\fR\fR
+.ad
+.RS 7n
+.rt  
+value returned from a successful call to \fBnet_phylookup\fR(9F) or
+\fBnet_phygetnext\fR(9F).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnet_getmtu()\fR function receives information about the current
+\fBMTU\fR of a network interface. The value returned from this function call
+should not be cached as the \fBMTU\fR of a network interface since it is not
+guaranteed to be constant.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBnet_getmtu()\fR function returns -1 if the network protocol does not
+support this feature and otherwise returns the current MTU of the network
+interface.
+.SH CONTEXT
+.sp
+.LP
+The \fBnet_getmtu()\fR function may be called from user,  kernel, or interrupt
+context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnet_phygetnext\fR(9F), \fBnet_phylookup\fR(9F),
+\fBnet_protocol_lookup\fR(9F)

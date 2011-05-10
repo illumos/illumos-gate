@@ -1,0 +1,60 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_remove_callbacks 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_remove_callbacks \- remove all callbacks for a given callback ID
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBvoid\fR \fBldi_ev_remove_callbacks\fR(\fIldi_ev_callback_id_t id\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_callback_id_t id\fR\fR
+.ad
+.sp .6
+.RS 4n
+An opaque data structure returned on successful calls to
+\fBldi_ev_register_callbacks\fR(9F).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_remove_callback()\fR function unregisters any callbacks that were
+registered via \fBldi_ev_register_callbacks\fR(9F). Once this function returns,
+the callback \fBID\fR is no longer valid.
+.sp
+.LP
+The finalize and notify callbacks exist independently of the \fBLDI\fR handle
+and are not automatically removed when the \fBLDI\fR handle is closed. The
+layered driver removes these callbacks via \fBldi_ev_remove_callbacks()\fR()
+when the callbacks are no longer needed. The \fBLDI\fR framework may panic the
+system if the entity registering the callback (a \fBdev_t\fR, \fBdip\fR or
+\fBmodule\fR) no longer exists on the system and the callbacks have not been
+unregistered.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel contexts only.
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F)

@@ -1,0 +1,413 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dpost 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+dpost \- troff postprocessor for PostScript printers
+.SH SYNOPSIS
+.LP
+.nf
+\fBdpost\fR [\fB-c\fR \fInum\fR] [\fB-e\fR \fInum\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR] [\fB-o\fR \fIlist\fR] 
+     [\fB-w\fR \fInum\fR] [\fB-x\fR \fInum\fR] [\fB-y\fR \fInum\fR] [\fB-F\fR \fIdir\fR] [\fB-H\fR \fIdir\fR] 
+     [\fB-L\fR \fIfile\fR] [\fB-O\fR] [\fB-T\fR \fIname\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/lib/lp/postscript/dpost\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdpost\fR translates \fIfiles\fR created by \fBtroff\fR(1) into PostScript
+and writes the results on the standard output. If no \fIfiles\fR are specified,
+or if \(mi is one of the input \fIfiles\fR, the standard input is read.
+.sp
+.LP
+The \fIfiles\fR should be prepared by \fBtroff\fR. The default font files in
+\fB/usr/lib/font/devpost\fR produce the best and most efficient output. They
+assume a resolution of 720 dpi, and can be used to format files by adding the
+\fB-Tpost\fR option to the \fBtroff\fR call. Older versions of the \fBeqn\fR
+and \fBpic\fR preprocessors need to know the resolution that \fBtroff\fR will
+be using to format the \fIfiles\fR. If those are the versions installed on your
+system, use the \fB-r720\fR option with \fBeqn\fR and \fB-T720\fR with
+\fBpic\fR.
+.sp
+.LP
+\fBdpost\fR makes no assumptions about resolutions. The first \fBx res\fR
+command sets the resolution used to translate the input \fIfiles\fR, the
+\fBDESC.out\fR file, usually \fB/usr/lib/font/devpost/DESC.out\fR, defines the
+resolution used in the binary font files, and the PostScript prologue is
+responsible for setting up an appropriate user coordinate system.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fInum\fR copies of each page. By default only one copy is printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Sets the text encoding level to \fInum\fR. The recognized choices are 0, 1, and
+2. The size of the output file and print time should decrease as \fInum\fR
+increases. Level 2 encoding will typically be about 20 percent faster than
+level 0, which is the default and produces output essentially identical to
+previous versions of \fBdpost\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
+about the origin, which is located near the upper left corner of each page. The
+default magnification is  \fB1.0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
+any positive integer. By default, \fInum\fR is set to  \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fI list\fR\fR
+.ad
+.RS 11n
+.rt  
+Print those pages for which numbers are given in the comma-separated
+\fIlist\fR. The list contains single numbers \fIN\fR and ranges
+\fIN1\fR\fB\(mi\fR\fIN2.\fR A missing \fIN1\fR means the lowest numbered page,
+a missing \fIN2\fR means the highest. The page range is an expression of
+logical pages rather than physical sheets of paper. For example, if you are
+printing two logical pages to a sheet, and you specified a range of \fB4\fR,
+then two sheets of paper would print, containing four page layouts. If you
+specified a page range of \fB 3-4\fR, when requesting two logical pages to a
+sheet; then \fIonly\fR page 3 and page 4 layouts would print, and they would
+appear on one physical sheet of paper.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI mode\fR\fR
+.ad
+.RS 11n
+.rt  
+Print \fIfiles\fR in either portrait or landscape \fImode\fR. Only the first
+character of \fImode\fR is significant. The default \fImode\fR is portrait.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Set the line width used to implement \fBtroff\fR graphics commands to \fInum\fR
+points, where a point is approximately 1/72 of an inch. By default, \fInum\fR
+is set to  \fB0.3\fR points.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Translate the origin \fInum\fR inches along the positive x axis. The default
+coordinate system has the origin fixed near the upper left corner of the page,
+with positive x to the right and positive y down the page. Positive \fInum\fR
+moves everything right. The default offset is  \fB0\fR inches.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR\fI num\fR\fR
+.ad
+.RS 11n
+.rt  
+Translate the origin \fInum\fR inches along the positive y axis. Positive
+\fInum\fR moves text up the page. The default offset is  \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fI dir\fR\fR
+.ad
+.RS 11n
+.rt  
+Use \fIdir\fR as the font directory. The default \fIdir\fR is
+\fB/usr/lib/font\fR, and \fBdpost\fR reads binary font files from directory
+\fB/usr/lib/font/devpost\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fI dir\fR\fR
+.ad
+.RS 11n
+.rt  
+Use \fIdir\fR as the host resident font directory. Files in this directory
+should be complete PostScript font descriptions, and must be assigned a name
+that corresponds to the appropriate two-character \fBtroff\fR font name. Each
+font file is copied to the output file only when needed and at most once during
+each job. There is no default directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fI file\fR\fR
+.ad
+.RS 11n
+.rt  
+Use \fBfile\fR as the PostScript prologue which, by default, is
+\fB/usr/lib/lp/postscript/dpost.ps\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR\fR
+.ad
+.RS 11n
+.rt  
+Disables PostScript picture inclusion. A recommended option when \fBdpost\fR is
+run by a spooler in a networked environment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR\fI name\fR\fR
+.ad
+.RS 11n
+.rt  
+Use font files for device \fIname\fR as the best description of available
+PostScript fonts. By default, \fIname\fR is set to \fBpost\fR and \fBdpost\fR
+reads binary files from \fB/usr/lib/font/devpost\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExamples of the \fBdpost\fR command.
+.sp
+.LP
+If the old versions of \fBeqn\fR and \fBpic\fR are installed on your system,
+you can obtain the best possible looking output by issuing a command line such
+as the following:
+
+.sp
+.in +2
+.nf
+example% \fBpic \fR\fB-T720\fR\fB \fR\fBfile\fR\fB | tbl | eqn \fR\fB-r720\fR\fB | troff \fR\fB-mm\fR\fB \fR\fB-Tpost\fR\fB | dpost\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Otherwise,
+
+.sp
+.in +2
+.nf
+example% \fBpic \fR\fBfile\fR\fB | tbl | eqn | troff \fR\fB-mm\fR\fB \fR\fB-Tpost\fR\fB | dpost\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+should give the best results.
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/font/devpost/*.out\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/font/devpost/charlib/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/color.ps\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/draw.ps\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/forms.ps\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lp/postscript/ps.requests\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/macros/pictures\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/macros/color\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdownload\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1), \fBpostio\fR(1),
+\fBpostmd\fR(1), \fBpostprint\fR(1), \fBpostreverse\fR(1), \fBposttek\fR(1),
+\fBtroff\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Output files often do not conform to Adobe's file structuring conventions.
+Piping the output of \fBdpost\fR through \fBpostreverse\fR(1) should produce a
+minimally conforming PostScript file.
+.sp
+.LP
+Although \fBdpost\fR can handle files formatted for any device, emulation is
+expensive and can easily double the print time and the size of the output file.
+No attempt has been made to implement the character sets or fonts available on
+all devices supported by \fBtroff\fR. Missing characters will be replaced by
+white space, and unrecognized fonts will usually default to one of the Times
+fonts (that is, \fBR\fR, \fBI\fR, \fBB\fR, or \fBBI\fR).
+.sp
+.LP
+An \fBx res\fR command  must precede the first \fBx init\fR command, and all
+the input \fIfiles\fR should have been prepared for the same output device.
+.sp
+.LP
+Use of the \fB-T\fR option is not encouraged. Its only purpose is to enable the
+use of other PostScript font and device description files, that perhaps use
+different resolutions, character sets, or fonts.
+.sp
+.LP
+Although level 0 encoding is the only scheme that has been thoroughly tested,
+level 2 is fast and may be worth a try.

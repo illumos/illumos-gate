@@ -1,0 +1,241 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_memseg_import_get 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_memseg_import_get, rsm_memseg_import_get8, rsm_memseg_import_get16,
+rsm_memseg_import_get32, rsm_memseg_import_get64 \- read from a segment
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_memseg_import_get\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
+     \fBoff_t\fR \fIoffset\fR, \fBvoid *\fR\fIdest_addr\fR, \fBsize_t\fR \fIlength\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_get8\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
+     \fBoff_t\fR \fIoffset\fR, \fBuint8_t *\fR\fIdatap\fR, \fBulong_t\fR \fIrep_cnt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_get16\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
+     \fBoff_t\fR \fIoffset\fR, \fBuint16_t *\fR\fIdatap\fR, \fBulong_t\fR \fIrep_cnt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_get32\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
+     \fBoff_t\fR \fIoffset\fR, \fBuint32_t *\fR\fIdatap\fR, \fBulong_t\fR \fIrep_cnt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_get64\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
+     \fBoff_t\fR \fIoffset\fR, \fBuint64_t *\fR\fIdatap\fR, \fBulong_t\fR \fIrep_cnt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+When using interconnects that allow memory mapping (see
+\fBrsm_memseg_import_map\fR(3RSM)), standard CPU memory operations may be used
+for accessing memory of a segment. If a mapping is not provided, then
+explicitly calling these functions facilitates reading from a segment.
+Depending on the attributes of the extension library of the specific
+interconnect, these functions may involve performing an implicit mapping before
+performing the data transfer. Applications can be made interconnect-independent
+with respect to segment reads by using these functions. The data access error
+detection is performed through the use of barriers (see
+\fBrsm_memseg_import_open_barrier\fR(3RSM)). The default barrier operation mode
+is \fBRSM_BARRIER_MODE_IMPLICIT\fR, meaning that around every get operation
+open and close barrier are performed automatically. Alternatively, explicit
+error handling may be set up for these functions (see
+\fBrsm_memseg_import_set_mode\fR(3RSM)). In either case the barrier should be
+initialized prior to using these  functions using
+\fBrsm_memseg_import_init_barrier\fR(3RSM).
+.sp
+.LP
+The \fBrsm_memseg_import_get()\fR function copies \fIlength\fR bytes from the
+imported segment \fIim_memseg\fR beginning at location \fIoffset\fR from the
+start of the segment to a local memory buffer pointed to by \fIdest_addr\fR.
+.sp
+.LP
+The \fBrsm_memseg_import_get8()\fR function copies \fIrep_cnt\fR number of
+8-bit quantities from successive locations starting from \fIoffset\fR in the
+imported segment to successive local memory locations pointed to by
+\fIdatap\fR.
+.sp
+.LP
+The \fBrsm_memseg_import_get16()\fR functions copies \fIrep_cnt\fR number of
+16-bit quantities from successive locations starting from \fIoffset\fR in the
+imported segment to successive local memory locations pointed to by
+\fIdatap\fR. The offset must be aligned at half-word address boundary.
+.sp
+.LP
+The \fBrsm_memseg_import_get32()\fR function copies \fIrep_cnt\fR number of
+32-bit quantities from successive locations starting from \fIoffset\fR in the
+imported segment to successive local memory locations pointed to by
+\fIdatap\fR. The offset must be aligned at word address boundary.
+.sp
+.LP
+The \fBrsm_memseg_import_get64()\fR function copies \fIrep_cnt\fR number of
+-bit quantities from successive locations starting from \fIoffset\fR in the
+imported segment to successive local memory locations pointed to by
+\fIdatap\fR. The offset must be aligned at double-word address boundary.
+.sp
+.LP
+The data transfer functions that transfer small quantities of data (that is,
+8-, 16-, 32-, and 64-bit quantities) perform byte swapping prior to the data
+transfer, in the event that the source and destination have incompatible endian
+characteristics.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid segment handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Bad address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_MEM_ALIGNMENT\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid memory alignment for pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_OFFSET\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid offset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LENGTH\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_PERM_DENIED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BARRIER_UNINITIALIZED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Barrier not initialized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BARRIER_FAILURE\fR \fR
+.ad
+.sp .6
+.RS 4n
+I/O completion error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_CONN_ABORTED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Connection aborted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_memseg_import_init_barrier\fR(3RSM),
+\fBrsm_memseg_import_open_barrier\fR(3RSM),
+\fBrsm_memseg_import_set_mode\fR(3RSM), \fBattributes\fR(5)

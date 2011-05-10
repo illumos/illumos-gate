@@ -1,0 +1,274 @@
+'\" te
+.\"  Copyright (c) 2008 Sun Microsystems, Inc., All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mutex 9F "21 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+mutex, mutex_enter, mutex_exit, mutex_init, mutex_destroy, mutex_owned,
+mutex_tryenter \- mutual exclusion lock routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ksynch.h> 
+
+\fBvoid\fR \fBmutex_init\fR(\fBkmutex_t *\fR\fImp\fR, \fBchar *\fR\fIname\fR, \fBkmutex_type_t\fR \fItype\fR, 
+     \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmutex_destroy\fR(\fBkmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmutex_enter\fR(\fBkmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmutex_exit\fR(\fBkmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_owned\fR(\fBkmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmutex_tryenter\fR(\fBkmutex_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to a kernel mutex lock (\fBkmutex_t\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+.rt  
+Descriptive string. This is obsolete and should be \fINULL\fR. (Non-\fINULL\fR
+strings are legal, but they are a waste of kernel memory.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 8n
+.rt  
+Type of mutex lock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 8n
+.rt  
+Type-specific argument for initialization routine.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+A mutex enforces a policy of mutual exclusion. Only one thread at a time may
+hold a particular mutex. Threads trying to lock a held mutex will block until
+the mutex is unlocked.
+.sp
+.LP
+Mutexes are strictly bracketing and may not be recursively locked, meaning that
+mutexes should be exited in the opposite order they were entered, and cannot be
+reentered before exiting.
+.sp
+.LP
+\fBmutex_init()\fR initializes a mutex. It is an error to initialize a mutex
+more than once. The \fItype\fR argument should be set to \fBMUTEX_DRIVER\fR.
+.sp
+.LP
+\fIarg\fR provides type-specific information for a given variant type of mutex.
+When \fBmutex_init()\fR is called for driver mutexes, if the mutex is used by
+the interrupt handler, the \fIarg\fR should be the interrupt priority returned
+from \fBddi_intr_get_pri\fR(9F) or \fBddi_intr_get_softint_pri\fR(9F). Note
+that \fIarg\fR should be the value of the interrupt priority cast by calling
+the \fBDDI_INTR_PRI\fR macro. If the mutex is never used inside an interrupt
+handler, the argument should be \fINULL\fR.
+.sp
+.LP
+\fBmutex_enter()\fR is used to acquire a mutex. If the mutex is already held,
+then the caller blocks. After returning, the calling thread is the owner of the
+mutex. If the mutex is already held by the calling thread, a panic ensues.
+.sp
+.LP
+\fBmutex_owned()\fR should only be used in \fBASSERT()\fR and may be enforced
+by not being defined unless the preprocessor symbol \fBDEBUG\fR is defined. Its
+return value is non-zero if the current thread (or, if that cannot be
+determined, at least some thread) holds the mutex pointed to by \fImp\fR.
+.sp
+.LP
+\fBmutex_tryenter()\fR is very similar to \fBmutex_enter()\fR except that it
+doesn't block when the mutex is already held. \fBmutex_tryenter()\fR returns
+non-zero when it acquired the mutex and 0 when the mutex is already held.
+.sp
+.LP
+\fBmutex_exit()\fR releases a mutex and will unblock another thread if any are
+blocked on the mutex.
+.sp
+.LP
+\fBmutex_destroy()\fR releases any resources that might have been allocated by
+\fBmutex_init()\fR. \fBmutex_destroy()\fR must be called before freeing the
+memory containing the mutex, and should be called with the mutex unheld (not
+owned by any thread). The caller must be sure that no other thread attempts to
+use the mutex.
+.SH RETURN VALUES
+.sp
+.LP
+\fBmutex_tryenter()\fR returns a non-zero value on success and zero on failure.
+.sp
+.LP
+\fBmutex_owned()\fR returns a non-zero value if the calling thread currently
+holds the mutex pointed to by \fImp\fR, or when that cannot be determined, if
+any thread holds the mutex. Otherwise \fBmutex_owned()\fR returns zero.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, kernel, or high-level interrupt
+context, except for \fBmutex_init()\fR and \fBmutex_destroy()\fR, which can be
+called from user or kernel context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInitializing a Mutex
+.sp
+.LP
+A driver might do this to initialize a mutex that is part of its unit structure
+and used in its interrupt routine:
+
+.sp
+.in +2
+.nf
+ddi_intr_get_pri(hdlp, &pri);
+mutex_init(&un->un_lock, NULL, MUTEX_DRIVER, DDI_INTR_PRI(pri));
+ddi_intr_add_handler(hdlp, xxintr, (caddr_t)un, NULL);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRCalling a Routine with a Lock
+.sp
+.LP
+A routine that expects to be called with a certain lock held might have the
+following ASSERT:
+
+.sp
+.in +2
+.nf
+xxstart(struct xxunit *un)
+{
+	      ASSERT(mutex_owned(&un->un_lock));
+\&...
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlockstat\fR(1M), \fBIntro\fR(9F), \fBcondvar\fR(9F),
+\fBddi_intr_alloc\fR(9F), \fBddi_intr_add_handler\fR(9F),
+\fBddi_intr_get_pri\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
+\fBrwlock\fR(9F), \fBsemaphore\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Compiling with \fB_LOCKTEST\fR or \fB_MPSTATS\fR defined has no effect. To
+gather lock statistics, see \fBlockstat\fR(1M).
+.sp
+.LP
+The address of a \fBkmutex_t\fR lock must be aligned on an 8-byte boundary for
+64-bit kernels, or a 4-byte boundary for 32-bit kernels. Violation of this
+requirement will result in undefined behavior, including, but not limited to,
+failure of mutual exclusion or a system panic.
+.sp
+.LP
+To write scalable, responsive drivers that do not hang, panic or deadlock the
+system, follow these guidelines:
+.br
+.in +2
+Never return from a driver entry point with a mutex held.
+.in -2
+.br
+.in +2
+Never hold a mutex when calling a service that may block, for example
+\fBkmem_alloc\fR(9F) with KM_SLEEP or \fBdelay\fR(9F).
+.in -2
+.br
+.in +2
+Always acquire mutexes in a consistent order. If a critical section acquires
+mutex A followed by B, and elsewhere in the driver mutex B is acquired before
+A, the driver can deadlock with one thread holding A and waiting for B and
+another thread holding B while waiting for A.
+.in -2
+.br
+.in +2
+Always use a mutex to enforce exclusive access to data, not instruction paths.
+.in -2
+.br
+.in +2
+Acquiring a lock in user context that is also acquired in interrupt context
+means that, as long as that lock is held, the driver instance holding the lock
+is subject to all the rules and limitations of interrupt context.
+.in -2
+.br
+.in +2
+In most cases, a mutex can and should be acquired and released within the same
+function.
+.in -2
+.br
+.in +2
+Liberal use of debugging aids like ASSERT(mutex_owned(&mutex)) can help find
+callers of a function which should be holding a mutex but are not. This means
+you need to test your driver compiled with DEBUG.
+.in -2
+.br
+.in +2
+Do not use a mutex to set driver state. However, you should use a mutex to
+protect driver state data.
+.in -2
+.br
+.in +2
+Use per-instance and automatic data where possible to reduce the amount of
+shared data. Per-instance data can be protected by a per-instance lock to
+improve scalability and reduce contention with multiple hardware instances.
+.in -2
+.br
+.in +2
+Avoid global data and global mutexes whenever possible.
+.in -2
+.br
+.in +2
+
+.in -2

@@ -1,0 +1,38 @@
+'\" te
+.\"  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH adb 1 "29 Nov 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+adb \- general-purpose debugger
+.SH SYNOPSIS
+.LP
+.nf
+\fBadb\fR [\fB-kw\fR] [\fB-I\fR \fIdir\fR] [\fB-P\fR \fIprompt\fR] [\fB-V\fR \fImode\fR] [\fIobject\fR [\fIcore\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBadb\fR utility is an interactive, general-purpose debugger. It can be
+used to examine files and provides a controlled environment for the execution
+of programs.
+.sp
+.LP
+The \fBadb\fR utility is now implemented as a link to the \fBmdb\fR(1) utility.
+\fBmdb\fR(1) is a low-level debugging utility that can be used to examine user
+processes as well as the live operating system or operating system crash dumps.
+The new \fBmdb\fR(1) utility provides complete backwards compatibility with the
+existing syntax and features of \fBadb\fR, including support for processing
+\fBadb\fR macro files. The \fISolaris Modular Debugger Guide\fR and
+\fBmdb\fR(1) man page describes the features of \fBmdb\fR, including its
+\fBadb\fR compatibility mode. This mode will be activated by default when the
+\fBadb\fR link is executed.
+.SH SEE ALSO
+.sp
+.LP
+\fBmdb\fR(1), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Modular Debugger Guide\fR

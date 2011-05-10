@@ -1,0 +1,200 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usba 7D "22 Apr 2009" "SunOS 5.11" "Devices"
+.SH NAME
+usba, usb \- Solaris USB Architecture (USBA)
+.SH DESCRIPTION
+.sp
+.LP
+USB provides a low-cost means for attaching peripheral devices, including
+mass-storage devices, keyboards, mice, and printers, to a system. For complete
+information on the USB architecture, visit the USB website at
+http://www.usb.org.
+.sp
+.LP
+USBA supports 126 hot-pluggable USB devices per USB bus. The maximum data
+transfer rate is 1.5 Mbits (low speed USB 1.x) or 12 Mbits (full speed USB 1.x)
+or 480 MBits (high speed USB 2.0) Mbits per second (Mbps).
+.sp
+.LP
+USBA adheres to the \fIUniversal Serial Bus 2.0\fR specification and provides a
+transport layer abstraction to USB client drivers.
+.sp
+.LP
+For information on how to write USB client drivers, see \fIWriting Device
+Drivers\fR. For the latest information on writing USB drivers, visit
+\fIhttp://developers.sun.com/solaris/developer/support/driver/usb.html\fR. For
+a complete list of USBA interfaces, see \fBIntro\fR(9F) and \fBIntro\fR(9S).
+.sp
+.LP
+Devices without a driver may have a  \fBlibusb\fR(3LIB) application. For more
+information, see \fB/usr/sfw/share/doc/libusb/libusb.txt\fR.
+.SH FILES
+.sp
+.LP
+Listed below are drivers and modules which either utilize or are utilized by
+USBA. Drivers in \fB/kernel/drv\fR are 32 bit drivers (x86 only). Drivers in
+\fB/kernel/drv/sparcv9\fR or \fB/kernel/drv/amd64\fR are 64 bit drivers.
+.sp
+.in +2
+.nf
+\fIClient Driver                           Function/Device\fR
+
+kernel/drv/[sparcv9|amd64/]hid          HID class
+kernel/drv/[sparcv9|amd64/]hubd         hub class
+kernel/drv/[sparcv9|amd64/]hwahc        HWA Host Controller class
+kernel/drv/[sparcv9|amd64/]hwarc        HWA Radio Controller class
+kernel/drv/[sparcv9|amd64/]scsa2usb     mass storage class
+kernel/drv/[sparcv9|amd64/]usbprn       printer class
+kernel/drv/[sparcv9|amd64/]usb_as       audio streaming class
+kernel/drv/[sparcv9|amd64/]usb_ac       audio control class
+kernel/drv/[sparcv9|amd64/]usbvc        video class
+kernel/drv/[sparcv9|amd64/]usb_mid      multi-interface device
+kernel/drv/[sparcv9|amd64/]usb_ia       interface-association driver
+kernel/drv/[sparcv9|amd64/]usbser_edge  Edgeport USB to serial port
+kernel/drv/[sparcv9|amd64/]usbsksp      Keyspan USB to serial port
+kernel/drv/[sparcv9|amd64/]usbsprl      pl2303 USB to serial port
+kernel/drv/[sparcv9|amd64/]usbsacm      CDC ACM class to serial port
+kernel/drv/[sparcv9|amd64/]ugen         generic USB driver
+kernel/drv/[sparcv9|amd64/]wusb_ca      WUSB Cable Association class
+kernel/drv/[sparcv9|amd64/]ohci         open host controller driver
+kernel/drv/[sparcv9|amd64/]uhci         universal host controller driver
+kernel/drv/[sparcv9|amd64/]ehci         enhanced host controller driver
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+\fIClient Streams Modules                   Function/Device\fR
+/kernel/strmod/[sparcv9|amd64]usbkbm     Keyboad
+/kernel/strmod/[sparcv9|amd64]usbms      Mouse
+/kernel/strmod/[sparcv9|amd64]usb_ah     Audio HID
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+\fIHost Controller Interface Drivers   Device\fR
+
+/kernel/drv/[sparcv9|amd64]ehci     Enhanced HCI
+/kernel/drv/[sparcv9|amd64]ohci     Open HCI
+/kernel/drv/[sparcv|amd64/]uhci     Univeral HCI
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based  systems
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcfgadm_usb\fR(1M), \fBlibusb\fR(3LIB), \fBattributes\fR(5), \fBehci\fR(7D),
+\fBhid\fR(7D), \fBhubd\fR(7D), \fBohci\fR(7D), \fBscsa2usb\fR(7D),
+\fBuhci\fR(7D), \fBusb_ac\fR(7D), \fBusb_as\fR(7D), \fBusb_ia\fR(7D),
+\fBusb_mid\fR(7D), \fBusbprn\fR(7D), \fBusbsacm\fR(7D), \fBusbser_edge\fR(7D),
+\fBusbsksp\fR(7D), \fBusbsprl\fR(7D), \fBusbvc\fR(7D), \fBugen\fR(7D),
+\fBvirtualkm\fR(7D). \fBIntro\fR(9F), \fBIntro\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR.
+.sp
+.LP
+\fIInterface Association Descriptor Engineering Change Notice (ECN)\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+http://www.sun.com
+.SH NOTES
+.sp
+.LP
+Booting from USB mass-storage devices is not supported on SPARC, but is
+supported on X86.
+.SH DIAGNOSTICS
+.sp
+.LP
+The messages described below may appear on the system console as well as being
+logged. All  messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+WARNING: Error message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.mk
+.na
+\fBNo driver found for device <device_name> (interface <number> node
+name=<node_name>)\fR
+.ad
+.sp .6
+.RS 4n
+The installed Solaris software does not contain a supported driver for this
+hardware. <number> is the interface number.  <name> is either the device path
+name or the device name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDraining callbacks timed out!\fR
+.ad
+.sp .6
+.RS 4n
+An internal error occured.  Please reboot your system.  If this problem
+persists, contact your system vendor.
+.RE
+
+.sp
+.LP
+The following messages may be logged into the system log. They are formatted in
+the following manner:
+.sp
+.in +2
+.nf
+<device path><usba<instance number>): message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.mk
+.na
+\fBIncorrect USB driver version for <n.m>.\fR
+.ad
+.sp .6
+.RS 4n
+Driver is incompatible with USBA framework.
+.RE
+

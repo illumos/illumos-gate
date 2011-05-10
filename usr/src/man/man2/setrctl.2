@@ -1,0 +1,301 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setrctl 2 "31 Jan 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+setrctl, getrctl \- set or get resource control values
+.SH SYNOPSIS
+.LP
+.nf
+#include <rctl.h>
+
+\fBint\fR \fBsetrctl\fR(\fBconst char *\fR\fIcontrolname\fR, \fBrctlblk_t *\fR\fIold_blk\fR,
+     \fBrctlblk_t *\fR\fInew_blk\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetrctl\fR(\fBconst char *\fR\fIcontrolname\fR, \fBrctlblk_t *\fR\fIold_blk\fR,
+     \fBrctlblk_t *\fR\fInew_blk\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetrctl()\fR and \fBgetrctl()\fR functions provide interfaces for the
+modification and retrieval of resource control (rctl) values on active entities
+on the system, such as processes, tasks, or projects.  All resource controls
+are unsigned 64-bit integers; however, a collection of flags are defined that
+modify which rctl value is to be set or retrieved.
+.sp
+.LP
+Resource controls are restricted to three levels: basic controls that can be
+modified by the owner of the calling process, privileged controls that can be
+modified only by privileged callers, and system controls that are fixed for the
+duration of the operating system instance.  Setting or retrieving each of these
+controls is performed by setting the privilege field of the resource control
+block to \fBRCTL_BASIC\fR, \fBRCTL_PRIVILEGED\fR, or \fBRCTL_SYSTEM\fR with
+\fBrctlblk_set_privilege()\fR (see \fBrctlblk_set_value\fR(3C)).
+.sp
+.LP
+For limits on collective entities such as the task or project, the process ID
+of the calling process is associated with the resource control value. This ID
+is available by using \fBrctlblk_get_recipient_pid()\fR (see
+\fBrctlblk_set_value\fR(3C)). These values are visible only to that process and
+privileged processes within the collective.
+.sp
+.LP
+The \fBgetrctl()\fR function provides a mechanism for iterating through all of
+the established values on a resource control.  The iteration is primed by
+calling \fBgetrctl()\fR with \fIold_blk\fR set to \fINULL\fR, a valid resource
+control block pointer in \fInew_blk\fR, and specifying \fBRCTL_FIRST\fR in the
+\fIflags\fR argument.  Once a resource control block has been obtained,
+repeated calls to \fBgetrctl()\fR with \fBRCTL_NEXT\fR in the \fIflags\fR
+argument and the obtained control in the \fIold_blk\fR argument will return the
+next resource control block in the sequence.  The iteration reports the end of
+the sequence by failing and setting \fBerrno\fR to \fBENOENT\fR.
+.sp
+.LP
+The \fBgetrctl()\fR function allows the calling process to get the current
+usage of a controlled resource using \fBRCTL_USAGE\fR as the \fIflags\fR value.
+The current value of the resource usage is placed in the value field of the
+resource control block specified by \fInew_blk\fR. This value is obtained with
+\fBrctlblk_set_value\fR(3C). All other members of the returned block are
+undefined and might be invalid.
+.sp
+.LP
+The \fBsetrctl()\fR function allows the creation, modification, or deletion of
+action-value pairs on a given resource control.  When passed \fBRCTL_INSERT\fR
+as the \fIflags\fR value, \fBsetrctl()\fR expects \fInew_blk\fR to contain a
+new action-value pair for insertion into the sequence. For \fBRCTL_DELETE\fR,
+the block indicated by \fInew_blk\fR is deleted from the sequence. For
+\fBRCTL_REPLACE\fR, the block matching \fIold_blk\fR is deleted and replaced by
+the block indicated by \fInew_blk\fR. When (\fIflags\fR &
+\fBRCTL_USE_RECIPIENT_PID\fR) is non-zero, \fBsetrctl()\fR uses the process ID
+set by \fBrctlblk_set_value\fR(3C) when selecting the rctl value to insert,
+delete, or replace basic rctls. Otherwise, the process ID of the calling
+process is used.
+.sp
+.LP
+The kernel maintains a history of which resource control values have triggered
+for a particular entity, retrievable from a resource control block with the
+\fBrctlblk_set_value\fR(3C) function. The insertion or deletion of a resource
+control value at or below the currently enforced value might cause the
+currently enforced value to be reset.  In the case of insertion, the newly
+inserted value becomes the actively enforced value.  All higher values that
+have previously triggered will have their firing times zeroed.  In the case of
+deletion of the currently enforced value, the next higher value becomes the
+actively enforced value.
+.sp
+.LP
+The various resource control block properties are described on the
+\fBrctlblk_set_value\fR(3C) manual page.
+.sp
+.LP
+Resource controls are inherited from the predecessor process or task.  One of
+the \fBexec\fR(2) functions can modify the resource controls of a process by
+resetting their histories, as noted above for insertion or deletion operations.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBsetrctl()\fR and \fBgetrctl()\fR functions
+return 0. Otherwise they return \(mi1 and set \fBerrno\fR to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBsetrctl()\fR and \fBgetrctl()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIcontrolname\fR, \fIold_blk\fR, or \fInew_blk\fR argument points to an
+illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 12n
+.rt  
+No resource control with the given name is known to the system, or the resource
+control block contains properties that are not valid for the resource control
+specified.
+.sp
+\fBRCTL_USE_RECIPIENT_PID\fR was used to set a process scope rctl and the
+process ID set by \fBrctlblk_set_value\fR(3C) does not match the process ID of
+calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 12n
+.rt  
+No value beyond the given resource control block exists.
+.sp
+\fBRCTL_USE_RECIPIENT_PID\fR was used and the process ID set by
+\fBrctlblk_set_value\fR(3C) does not exist within the current task, project, or
+zone, depending on the resource control name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 12n
+.rt  
+No value matching the given resource control block was found for any of
+\fBRCTL_NEXT\fR, \fBRCTL_DELETE\fR, or \fBRCTL_REPLACE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUPP\fR\fR
+.ad
+.RS 12n
+.rt  
+The resource control requested by \fBRCTL_USAGE\fR does not support the usage
+operation.
+.RE
+
+.sp
+.LP
+The \fBsetrctl()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The rctl value specified cannot be changed by the current process, including
+the case where the recipient process ID does not match the calling process and
+the calling process is unprivileged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt to set a system limit was attempted.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRRetrieve a rctl value.
+.sp
+.LP
+Obtain the lowest enforced rctl value on the rctl limiting the number of LWPs
+in a task.
+
+.sp
+.in +2
+.nf
+#include <rctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+\&...
+
+rctlblk_t *rblk;
+
+if ((rblk = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+        (void) fprintf(stderr, "malloc failed: %s\en",
+            strerror(errno));
+        exit(1);
+}
+
+if (getrctl("task.max-lwps", NULL, rblk, RCTL_FIRST) == -1)
+        (void) fprintf(stderr, "failed to get rctl: %s\en",
+            strerror(errno));
+else
+        (void) printf("task.max-lwps = %llu\en",
+            rctlblk_get_value(rblk));
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+Resource control blocks are matched on the value and privilege fields.
+Resource control operations act on the first matching resource control block.
+Duplicate resource control blocks are not permitted. Multiple blocks of equal
+value and privilege need to be entirely deleted and reinserted, rather than
+replaced, to have the correct outcome. Resource control blocks are sorted such
+that all blocks with the same value that lack the \fBRCTL_LOCAL_DENY\fR flag
+precede those having that flag set.
+.sp
+.LP
+Only one \fBRCPRIV_BASIC\fR resource control value is permitted per process per
+control.  Insertion of an \fBRCPRIV_BASIC\fR value will cause any existing
+\fBRCPRIV_BASIC\fR value owned by that process on the control to be deleted.
+.sp
+.LP
+The resource control facility provides the backend implementation for both
+\fBsetrctl()\fR/\fBgetrctl()\fR and \fBsetrlimit()\fR/\fBgetrlimit()\fR. The
+facility behaves consistently when either of these interfaces is used
+exclusively; when using both interfaces, the caller must be aware of the
+ordering issues above, as well as the limit equivalencies described in the
+following paragraph.
+.sp
+.LP
+The hard and soft process limits made available with \fBsetrlimit()\fR and
+\fBgetrlimit()\fR are mapped to the resource controls implementation.  (New
+process resource controls will not be made available with the rlimit
+interface.)  Because of the \fBRCTL_INSERT\fR and \fBRCTL_DELETE\fR operations,
+it is possible that the set of values defined on a resource control has more or
+fewer than the two values defined for an rlimit.  In this case, the soft limit
+is the lowest priority resource control value with the \fBRCTL_LOCAL_DENY\fR
+flag set, and the hard limit is the resource control value with the lowest
+priority equal to or exceeding \fBRCPRIV_PRIVILEGED\fR with the
+\fBRCTL_LOCAL_DENY\fR flag set.  If no identifiable soft limit exists on the
+resource control and \fBsetrlimit()\fR is called, a new resource control value
+is created.  If a resource control does not have the global
+\fBRCTL_GLOBAL_LOWERABLE\fR property set, its hard limit will not allow
+lowering by unprivileged callers.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrctladm\fR(1M), \fBgetrlimit\fR(2), \fBerrno\fR(3C),
+\fBrctlblk_set_value\fR(3C), \fBattributes\fR(5), \fBresource_controls\fR(5)

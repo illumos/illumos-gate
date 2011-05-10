@@ -1,0 +1,322 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wc 1 "13 Mar 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+wc \- display a count of lines, words and characters in a file
+.SH SYNOPSIS
+.SS "/usr/bin/wc"
+.LP
+.nf
+\fBwc\fR [\fB-c\fR | \fB-m\fR | \fB-C\fR] [\fB-lw\fR] [\fIfile\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBwc\fR [\fB-c\fR | \fB-m\fR | \fB-C\fR] [\fB-lLqw\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/wc"
+.sp
+.LP
+\fBwc\fR reads one or more input files and, by default, writes the number of
+NEWLINE characters, words and bytes contained in each input file to the
+standard output.
+.sp
+.LP
+\fBwc\fR also writes a total count for all named files, if more than one input
+file is specified.
+.sp
+.LP
+\fBwc\fR considers a \fIword\fR to be a non-zero-length string of characters
+delimited by white space (for example, \fBSPACE\fR, \fBTAB\fR). See
+\fBiswspace\fR(3C) or \fBisspace\fR(3C).
+.SS "ksh93"
+.sp
+.LP
+The \fBwc\fR built-in in \fBksh93\fR is associated with the \fB/bin\fR and
+\fB/usr/bin\fR paths. It is invoked when \fBwc\fR is executed without a
+pathname prefix and the pathname search finds a \fB/bin/wc\fR or
+\fB/usr/bin/wc\fR executable.
+.sp
+.LP
+\fBwc\fR reads one or more input files and, by default, for each file writes a
+line containing the number of NEWLINEs, words, and bytes contained in each file
+followed by the file name to standard output in that order. A word is defined
+to be a \fBnon-zero\fR length string delimited by \fBisspace\fR(3C) characters.
+.sp
+.LP
+If more than one file is specified, \fBwc\fR writes a total count for all of
+the named files with total written instead of the file name.
+.sp
+.LP
+By default, \fBwc\fR writes all three counts. Options can specified so that
+only certain counts are written. The \fB-c\fR, \fB-C\fR, and \fB-m\fR options
+are mutually exclusive.
+.sp
+.LP
+If no file is specified, or if the file is \fB-\fR, \fBwc\fR reads from
+standard input and no filename is written to standard output. The start of the
+file is defined as the current offset.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.br
+.na
+\fB\fB--bytes | chars\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the byte counts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.br
+.na
+\fB\fB--lines\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the line counts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.br
+.na
+\fB\fB--longest-line | max-line-length\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the longest line length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m | C\fR\fR
+.ad
+.br
+.na
+\fB\fB--multibyte-chars\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the character counts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.br
+.na
+\fB\fB--quiet\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppress invalid multi-byte character warnings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.br
+.na
+\fB\fB--words\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the word counts.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Counts bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 6n
+.rt  
+Same as \fB-m\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Counts lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Counts characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 6n
+.rt  
+Counts words delimited by white space characters or new line characters.
+Delimiting characters are Extended Unix Code (\fBEUC\fR) characters from any
+code set defined by \fBiswspace()\fR.
+.RE
+
+.sp
+.LP
+If no option is specified, the default is \fB-lwc\fR (counts lines, words, and
+bytes.)
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of an input file. If no \fIfile\fR operands are specified, the
+standard input is used.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBwc\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBwc\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/wc"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBksh93\fR built-in binding to \fB/bin\fR and \fB/usr/bin\fR is Volatile.
+The built-in interfaces are Uncommitted.
+.SH SEE ALSO
+.sp
+.LP
+\fBcksum\fR(1), \fBksh93\fR(1), \fBisspace\fR(3C), \fBiswalpha\fR(3C),
+\fBiswspace\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)

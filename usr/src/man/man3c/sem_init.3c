@@ -1,0 +1,140 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sem_init 3C "9 Jul 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sem_init \- initialize an unnamed semaphore
+.SH SYNOPSIS
+.LP
+.nf
+#include <semaphore.h>
+
+\fBint\fR \fBsem_init\fR(\fBsem_t *\fR\fIsem\fR, \fBint\fR \fIpshared\fR, \fBunsigned int\fR \fIvalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsem_init()\fR function is used to initialize the unnamed semaphore
+referred to by \fIsem\fR. The value of the initialized semaphore is
+\fIvalue\fR. Following a successful call to \fBsem_init()\fR, the semaphore may
+be used in subsequent calls to \fBsem_wait\fR(3C), \fBsem_trywait\fR(3C),
+\fBsem_post\fR(3C), and \fBsem_destroy\fR(3C). This semaphore remains usable
+until the semaphore is destroyed.
+.sp
+.LP
+If the \fIpshared\fR argument has a non-zero value, then the semaphore is
+shared between processes; in this case, any process that can access the
+semaphore \fIsem\fR can use \fIsem\fR for performing \fBsem_wait\fR(3C),
+\fBsem_trywait\fR(3C), \fBsem_post\fR(3C), and \fBsem_destroy\fR(3C)
+operations.
+.sp
+.LP
+Only \fIsem\fR itself may be used for performing synchronization. The result of
+referring to copies of \fIsem\fR in calls to \fBsem_wait\fR(3C),
+\fBsem_trywait\fR(3C), \fBsem_post\fR(3C), and \fBsem_destroy\fR(3C), is
+undefined.
+.sp
+.LP
+If the \fIpshared\fR argument is zero, then the semaphore is shared between
+threads of the process; any thread in this process can use \fIsem\fR for
+performing \fBsem_wait\fR(3C), \fBsem_trywait\fR(3C), \fBsem_post\fR(3C), and
+\fBsem_destroy\fR(3C) operations. The use of the semaphore by threads other
+than those created in the same process is undefined.
+.sp
+.LP
+Attempting to initialize an already initialized semaphore results in undefined
+behavior.
+.sp
+.LP
+The \fBsem_open\fR(3C) function is used with named semaphores.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the function initializes the semaphore in
+\fIsem\fR. Otherwise, it returns \fB\(mi1\fR and sets \fBerrno\fR to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsem_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fIvalue\fR argument exceeds  \fBSEM_VALUE_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR \fR
+.ad
+.RS 11n
+.rt  
+A resource required to initialize the semaphore has been exhausted, or the
+resources have reached the limit on semaphores (\fBSEM_NSEMS_MAX\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fBsem_init()\fR function is not supported by the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR \fR
+.ad
+.RS 11n
+.rt  
+The process lacks the appropriate privileges to initialize the semaphore.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsem_destroy\fR(3C), \fBsem_open\fR(3C), \fBsem_post\fR(3C),
+\fBsem_wait\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

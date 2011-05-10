@@ -1,0 +1,118 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volmgt_release 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+volmgt_release \- release removable media device reservation
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
+#include <volmgt.h>
+
+
+
+\fBint\fR \fBvolmgt_release\fR(\fBchar *\fR\fIdev\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+The  \fBvolmgt_release()\fR routine releases the removable media device
+reservation specified as \fIdev\fR. See \fBvolmgt_acquire\fR(3VOLMGT) for a
+description of \fIdev\fR.
+.sp
+.LP
+If  \fIdev\fR is reserved by the caller,  \fBvolmgt_release()\fR updates the
+internal device reservation database to indicate  that the device is no longer
+reserved. If the requested device is reserved by another process, the release
+attempt fails and \fBerrno\fR is set to  \fB0\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+On failure, \fBvolmgt_release()\fR returns  \fB0\fR, and sets  \fBerrno\fR for
+one of the following conditions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+\fIdev\fR was invalid or missing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+\fIdev\fR was not reserved by the caller.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBvolmgt_release()\fR
+.sp
+.LP
+In the following example, volume management is running, and the first floppy
+drive is reserved, accessed and released.
+
+.sp
+.in +2
+.nf
+#include <volmgt.h>
+char *errp;
+if (!volmgt_acquire("floppy0", "FileMgr", 0, &errp,
+    NULL)) {
+	/* handle error case */
+	.\|.\|.
+}
+/* floppy acquired - now access it */
+if (!volmgt_release("floppy0")) {
+	/* handle error case */
+	.\|.\|.
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvolmgt_acquire\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)

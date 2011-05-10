@@ -62,6 +62,9 @@ dir path=usr/share/lib/terminfo/5
 dir path=usr/share/lib/terminfo/G
 dir path=usr/share/lib/terminfo/P
 dir path=usr/share/lib/terminfo/a
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 dir path=var group=sys
 dir path=var/lp group=lp mode=0775 owner=lp
 dir path=var/lp/logs group=lp mode=0775 owner=lp
@@ -210,6 +213,19 @@ file path=usr/share/lib/terminfo/P/PS
 file path=usr/share/lib/terminfo/a/att477+basic1
 file path=usr/share/lib/terminfo/a/att477+basic2
 file path=usr/share/lib/terminfo/a/att583+basic
+file path=usr/share/man/man1m/conv_lp.1m
+file path=usr/share/man/man1m/conv_lpd.1m
+file path=usr/share/man/man1m/in.lpd.1m
+file path=usr/share/man/man1m/lpfilter.1m
+file path=usr/share/man/man1m/lpforms.1m
+file path=usr/share/man/man1m/lpget.1m
+file path=usr/share/man/man1m/lpsched.1m
+file path=usr/share/man/man1m/lpset.1m
+file path=usr/share/man/man1m/lpshut.1m
+file path=usr/share/man/man1m/lpsystem.1m
+file path=usr/share/man/man1m/lpusers.1m
+file path=usr/share/man/man4/printers.4
+file path=usr/share/man/man4/printers.conf.4
 file path=var/spool/cron/crontabs/lp group=root mode=0400 \
     original_name=SUNWps:var/spool/cron/crontabs/lp preserve=true
 hardlink path=usr/share/lib/terminfo/4/458 \

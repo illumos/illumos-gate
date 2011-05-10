@@ -1,0 +1,167 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pci_save_config_regs 9F "02 June 2000" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+pci_save_config_regs, pci_restore_config_regs \- save and restore the PCI
+configuration registers
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/ddi.h>\fR
+\fB#include <sys/sunddi.h>\fR
+
+
+
+\fBint\fR \fBpci_save_config_regs\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpci_restore_config_regs\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI-specific (Solaris DDI).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpci_save_config_regs()\fR saves the current configuration registers on
+persistent system memory. \fBpci_restore_config_regs()\fR restores
+configuration registers previously saved by \fBpci_save_config_regs()\fR.
+.sp
+.LP
+\fBpci_save_config_regs()\fR should be called by the driver's \fBpower()\fR
+entry point before powering a device off (to PCI state D3). Likewise,
+\fBpci_restore_config_regs()\fR should be called after powering a device on
+(from PCI state D3), but before accessing the device. See \fBpower\fR(9E).
+.SH RETURN VALUES
+.sp
+.LP
+\fBpci_save_config_regs()\fR and \fBpci_restore_config_regs()\fR return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Operation completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+Operation failed to complete successfully.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+Both these functions can be called from user or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInvoking the save and restore functions
+.sp
+.in +2
+.nf
+static int
+xx_power(dev_info_t *dip, int component, int level) {
+   struct xx *xx;
+   int rval = DDI_SUCCESS;
+
+   xx = ddi_get_soft_state(xx_softstate, ddi_get_instance(dip));
+   if (xx == NULL) {
+       return (DDI_FAILURE);
+   }
+
+   mutex_enter(&xx\(mi>x_mutex);
+
+   switch (level) {
+   case PM_LEVEL_D0:
+       XX_POWER_ON(xx);
+       if (pci_restore_config_regs(dip) == DDI_FAILURE) {
+           /*
+            * appropriate error path handling here
+            */
+           ...
+           rval = DDI_FAILURE;
+           }
+       break;
+
+   case PM_LEVEL_D3:
+       if (pci_save_config_regs(dip) == DDI_FAILURE) {
+            /*
+             * appropriate error path handling here
+             */
+            ...
+            rval = DDI_FAILURE;
+            } 
+        else {
+            XX_POWER_OFF(xx);
+        }
+        break;
+       
+    default:
+          rval = DDI_FAILURE;
+          break;
+    }
+
+    mutex_exit(&xx\(mi>x_mutex);
+    return (rval);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBpower\fR(9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIPCI Bus Power Management Interface Specification Version 1.1\fR
+.sp
+.LP
+\fIPCI Bus Specification Revision 2.1\fR

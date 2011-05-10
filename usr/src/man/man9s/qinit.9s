@@ -1,0 +1,54 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qinit 9S "11 Apr 1991" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+qinit \- STREAMS queue processing procedures structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBqinit\fR structure contains pointers to processing procedures for a
+\fBQUEUE\fR. The \fBstreamtab\fR structure for the module or driver contains
+pointers to one \fBqueue\fR(9S) structure for both upstream and downstream
+processing.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+int                 (*qi_putp)();      /* put procedure */
+int                 (*qi_srvp)();      /* service procedure */
+int                 (*qi_qopen)();     /* open procedure */
+int                 (*qi_qclose)();    /* close procedure */
+int                 (*qi_qadmin)();    /* unused */
+struct module_info  *qi_minfo;         /* module parameters */
+struct module_stat  *qi_mstat;         /* module statistics */
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBqueue\fR(9S), \fBstreamtab\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+This release includes no support for module statistics.

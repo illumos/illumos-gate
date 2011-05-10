@@ -233,6 +233,7 @@ dir path=usr/share group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/lib group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/lib/xml group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/lib/xml/dtd group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share/man/man1m
 dir path=var/fm group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=var/fm/fmd group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=var/fm/fmd/ckpt group=sys variant.opensolaris.zone=__NODEFAULT
@@ -852,6 +853,10 @@ file path=usr/sbin/fmstat mode=0555 variant.opensolaris.zone=__NODEFAULT
 #
 file path=usr/share/lib/xml/dtd/topology.dtd.1 \
     variant.opensolaris.zone=__NODEFAULT
+file path=usr/share/man/man1m/fmadm.1m
+file path=usr/share/man/man1m/fmd.1m
+file path=usr/share/man/man1m/fmdump.1m
+file path=usr/share/man/man1m/fmstat.1m
 #
 # legacy packaging and license
 #

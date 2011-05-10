@@ -1,0 +1,191 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tgetent 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+tgetent, tgetflag, tgetnum, tgetstr, tgoto \- emulate the termcap database
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <term.h>
+
+\fBint\fR \fBtgetent\fR(\fBchar *\fR\fIbp\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtgetflag\fR(\fBchar\fR \fIid\fR[2]);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtgetnum\fR(\fBchar\fR \fIid\fR[2]);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtgetstr\fR(\fBchar\fR \fIid\fR[2], \fBchar **\fR\fIarea\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtgoto\fR(\fBchar *\fR\fIcap\fR, \fBint\fR \fIcol\fR, \fBint\fR \fIrow\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 8n
+.rt  
+Is a pointer to a buffer. This parameter is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+.rt  
+Is the \fBtermcap\fR entry to look up.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcap\fR\fR
+.ad
+.RS 8n
+.rt  
+Is the pointer to a \fBtermcap\fR capability.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarea\fR\fR
+.ad
+.RS 8n
+.rt  
+Is a pointer to the area where \fBtgetstr()\fR stores the decoded string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcol\fR\fR
+.ad
+.RS 8n
+.rt  
+Is the column placement of the new cursor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrow\fR\fR
+.ad
+.RS 8n
+.rt  
+Is the row placement of the new cursor.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtgetent()\fR function looks up the \fBtermcap\fR entry for \fIname\fR.
+The emulation ignores the buffer pointer \fIbp\fR.
+.sp
+.LP
+The \fBtgetflag()\fR function gets the Boolean entry for \fIid\fR.
+.sp
+.LP
+The \fBtgetnum()\fR function gets the numeric entry for \fIid\fR.
+.sp
+.LP
+The \fBtgetstr()\fR function gets the string entry for \fIid\fR. If \fIarea\fR
+is not a null pointer and does not point to a null pointer, \fBtgetstr()\fR
+copies the string entry into the buffer pointed to by *\fIarea\fR and advances
+the variable pointed to by \fIarea\fR to the first byte after the copy of the
+string entry.
+.sp
+.LP
+The \fBtgoto()\fR function instantiates the parameters \fIcol\fR and \fIrow\fR
+into the capability \fIcap\fR and returns a pointer to the resulting string.
+.sp
+.LP
+All of the information available in the \fBterminfo\fR database need not be
+available through these functions.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, those functions that return integers return
+\fBOK\fR. Otherwise, they return \fBERR\fR.
+.sp
+.LP
+Those functions that return pointers return a null pointer when an error
+occurs.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+These functions are included as a conversion aid for programs that use the
+\fBtermcap\fR library. Their arguments are the same and the functions are
+emulated using the \fBterminfo\fR database.
+.sp
+.LP
+These functions are only guaranteed to operate reliably on character sets in
+which each character fits into a single byte, whose attributes can be expressed
+using only constants with the \fBA_\fR prefix.
+.sp
+.LP
+Any terminal capabilities from the \fBterminfo\fR database that cannot be
+retrieved using these functions can be retrieved using the functions described
+on the \fBtigetflag\fR(3XCURSES) manual page.
+.sp
+.LP
+Portable applications must use \fBtputs\fR(3XCURSES) to output the strings
+returned by \fBtgetstr()\fR and \fBtgoto()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcurses\fR(3XCURSES), \fBputp\fR(3XCURSES), \fBsetupterm\fR(3XCURSES),
+\fBtigetflag\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

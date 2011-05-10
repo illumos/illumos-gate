@@ -1,0 +1,145 @@
+'\" te
+.\" Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_create_localmemory_handle 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_create_localmemory_handle, rsm_free_localmemory_handle \- create or free
+local memory handle
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_create_localmemory_handle\fR(
+     \fBrsmapi_controller_handle_t\fR \fIhandle\fR,
+     \fBrsm_localmemory_handle_t *\fR\fIl_handle\fR,
+     \fBcaddr_t\fR \fIlocal_vaddr\fR, \fBsize_t\fR \fIlength\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_free_localmemory_handle\fR(
+     \fBrsmapi_controller_handle_t\fR \fIhandle\fR,
+     \fBrsm_localmemory_handle_t\fR \fIl_handle\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBrsm_create_localmemory_handle()\fR and
+\fBrsm_free_localmemory_handle()\fR functions are supporting functions for
+\fBrsm_memseg_import_putv\fR(3RSM) and \fBrsm_memseg_import_getv\fR(3RSM).
+.sp
+.LP
+The \fBrsm_create_localmemory_handle()\fR function creates a local memory
+handle to be used in the I/O vector component of a scatter-gather list of
+subsequent \fBrsm_memseg_import_putv()\fR and \fBrsm_memseg_import_getv()\fR
+calls. The \fIhandle\fR argument specifies the controller handle obtained from
+\fBrsm_get_controller\fR(3RSM). The \fIl_handle\fR argument is a pointer to the
+location for the function to return the local memory handle. The
+\fIlocal_vaddr\fR argument specifies the local virtual address; it should be
+aligned at a page boundary. The \fIlength\fR argument specifies the length of
+memory spanned by the handle.
+.sp
+.LP
+The \fBrsm_free_localmemory_handle()\fR function unlocks the memory range for
+the local handle specified by \fIl_handle\fR and releases the associated system
+resources. The \fIhandle\fR argument specifies the controller handle.  All
+handles created by a process are freed when the process exits, but the process
+should call \fBrsm_free_localmemory_handle()\fR as soon as possible to free the
+system resources.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_create_localmemory_handle()\fR and
+\fBrsm_free_localmemory_handle()\fR functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
+.ad
+.RS 29n
+.rt  
+Invalid controller handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LOCALMEM_HNDL\fR \fR
+.ad
+.RS 29n
+.rt  
+Invalid local memory handle.
+.RE
+
+.sp
+.LP
+The  \fBrsm_create_localmemory_handle()\fR function can return the following
+errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LENGTH\fR \fR
+.ad
+.RS 28n
+.rt  
+Invalid length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDRESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Invalid address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.RS 28n
+.rt  
+Insufficient memory.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_memseg_import_putv\fR(3RSM), \fBattributes\fR(5)

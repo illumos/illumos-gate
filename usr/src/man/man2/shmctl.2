@@ -1,0 +1,240 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH shmctl 2 "10 Apr 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+shmctl \- shared memory control operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+\fBint\fR \fBshmctl\fR(\fBint\fR \fIshmid\fR, \fBint\fR \fIcmd\fR, \fBstruct shmid_ds *\fR\fIbuf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBshmctl()\fR function provides a variety of shared memory control
+operations as specified by \fIcmd\fR. The permission required for a shared
+memory control operation is given as {\fItoken\fR}, where \fItoken\fR is the
+type of permission needed. The types of permission are interpreted as follows:
+.sp
+.in +2
+.nf
+00400    READ by user
+00200    WRITE by user
+00040    READ by group
+00020    WRITE by group
+00004    READ by others
+00002    WRITE by others
+.fi
+.in -2
+
+.sp
+.LP
+See the \fIShared Memory Operation Permissions\fR section of \fBIntro\fR(2) for
+more information.
+.sp
+.LP
+The following operations require the specified tokens:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIPC_STAT\fR\fR
+.ad
+.RS 14n
+.rt  
+Place the current value of each member of the data structure associated with
+\fIshmid\fR into the structure pointed to by \fIbuf\fR. The contents of this
+structure are defined in \fBIntro\fR(2). {\fBREAD\fR}
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIPC_SET\fR\fR
+.ad
+.RS 14n
+.rt  
+Set the value of the following members of the data structure associated with
+\fIshmid\fR to the corresponding value found in the structure pointed to by
+\fIbuf\fR:
+.sp
+.in +2
+.nf
+shm_perm.uid
+shm_perm.gid
+shm_perm.mode	/* access permission bits only */
+.fi
+.in -2
+
+This command can be executed only by a process that has appropriate privileges
+or an effective user \fBID\fR equal to the value of \fBshm_perm.cuid\fR or
+\fBshm_perm.uid\fR in the data structure associated with \fIshmid\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIPC_RMID\fR\fR
+.ad
+.RS 14n
+.rt  
+Remove the shared memory identifier specified by \fIshmid\fR from the system.
+The segment referenced by the identifier will be destroyed when all processes
+with the segment attached have either detached the segment or exited. If the
+segment is not attached to any process when \fBIPC_RMID\fR is invoked, it will
+be destroyed immediately. This command can be executed only by a process that
+has appropriate privileges or an effective user ID equal to the value of
+\fBshm_perm.cuid\fR or \fBshm_perm.uid\fR in the data structure associated with
+\fIshmid\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHM_LOCK\fR\fR
+.ad
+.RS 14n
+.rt  
+Lock the shared memory segment specified by \fIshmid\fR in memory. This command
+can be executed only by a process that has appropriate privileges.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHM_UNLOCK\fR\fR
+.ad
+.RS 14n
+.rt  
+Unlock the shared memory segment specified by \fIshmid\fR. This command can be
+executed only by a process that has appropriate privileges.
+.RE
+
+.sp
+.LP
+A shared memory segment must be explicitly removed using \fBIPC_RMID\fR before
+the system can deallocate it and the resources it uses.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBshmctl()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIcmd\fR argument is equal to \fBIPC_STAT\fR and \fB{READ}\fR operation
+permission is denied to the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIshmid\fR argument is not a valid shared memory identifier; or the
+\fIcmd\fR argument is not a valid command or is \fBIPC_SET\fR and
+\fBshm_perm.uid\fR or \fBshm_perm.gid\fR is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIcmd\fR argument is equal to \fBSHM_LOCK\fR and there is not enough
+memory, or the operation would exceed a limit or resource control on locked
+memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIcmd\fR argument is \fBIPC_STAT\fR and \fIuid\fR or \fIgid\fR is too
+large to be stored in the structure pointed to by \fIbuf\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIcmd\fR argument is equal to \fBIPC_RMID\fR or \fBIPC_SET\fR, the
+effective user ID of the calling process is not equal to the value of
+\fBshm_perm.cuid\fR or \fBshm_perm.uid\fR in the data structure associated with
+\fIshmid\fR, and {\fBPRIV_IPC_OWNER\fR} is not asserted in the effective set of
+the calling process.
+.sp
+The \fIcmd\fR argument is equal to \fBSHM_LOCK\fR or \fBSHM_UNLOCK\fR and
+{\fBPRIV_PROC_LOCK_MEMORY\fR} is not asserted in the effective set of the
+calling process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBipcs\fR(1), \fBIntro\fR(2), \fBshmget\fR(2), \fBshmop\fR(2),
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,417 @@
+'\" te
+.\" Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd. All Rights Reserved.
+.\" Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
+.\" "Software"), to deal in the Software without restriction, including
+.\" without limitation the rights to use, copy, modify, merge, publish,
+.\" distribute, and/or sell copies of the Software, and to permit persons
+.\" to whom the Software is furnished to do so, provided that the above
+.\" copyright notice(s) and this permission notice appear in all copies of
+.\" the Software and that both the above copyright notice(s) and this
+.\" permission notice appear in supporting documentation.
+.\" 
+.\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+.\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+.\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+.\" OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+.\" HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+.\" INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+.\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+.\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+.\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\" 
+.\" Except as contained in this notice, the name of a copyright holder
+.\" shall not be used in advertising or otherwise to promote the sale, use
+.\" or other dealings in this Software without prior written authorization
+.\" of the copyright holder.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.TH cpl_complete_word 3TECLA "1 Jun 2004" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.SH NAME
+cpl_complete_word, cfc_file_start, cfc_literal_escapes, cfc_set_check_fn,
+cpl_add_completion, cpl_file_completions, cpl_last_error, cpl_list_completions,
+cpl_recall_matches, cpl_record_error, del_CplFileConf, cpl_check_exe,
+del_WordCompletion, new_CplFileConf, new_WordCompletion \- look up possible
+completions for a word
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <stdio.h>
+#include <libtecla.h>
+
+\fBWordCompletion *\fR\fBnew_WordCompletion\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBWordCompletion *\fR\fBdel_WordCompletion\fR(\fBWordCompletion *\fR\fIcpl\fR);
+.fi
+
+.LP
+.nf
+\fBCPL_MATCH_FN\fR(\fBcpl_file_completions\fR);
+.fi
+
+.LP
+.nf
+\fBCplFileConf *\fR\fBnew_CplFileConf\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcfc_file_start\fR(\fB(CplFileConf *\fR\fIcfc\fR, \fBint\fR \fIstart_index\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcfc_literal_escapes\fR(\fBCplFileConf *\fR\fIcfc\fR, \fBint\fR \fIliteral\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcfc_set_check_fn\fR(\fBCplFileConf *\fR\fIcfc\fR, \fBCplCheckFn *\fR\fIchk_fn\fR,
+     \fBvoid *\fR\fIchk_data\fR);
+.fi
+
+.LP
+.nf
+\fBCPL_CHECK_FN\fR(\fBcpl_check_exe\fR);
+.fi
+
+.LP
+.nf
+\fBCplFileConf *\fR\fBdel_CplFileConf\fR(\fBCplFileConf *\fR\fIcfc\fR);
+.fi
+
+.LP
+.nf
+\fBCplMatches *\fR\fBcpl_complete_word\fR(\fBWordCompletion *\fR\fIcpl\fR, \fBconst char *\fR\fIline\fR,
+     \fBint\fR \fIword_end\fR, \fBvoid *\fR\fIdata\fR, \fBCplMatchFn *\fR\fImatch_fn\fR);
+.fi
+
+.LP
+.nf
+\fBCplMatches *\fR\fBcpl_recall_matches\fR(\fBWordCompletion *\fR\fIcpl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpl_list_completions\fR(\fBCplMatches *\fR\fIresult\fR, \fBFILE *\fR\fIfp\fR, \fBint\fR \fIterm_width\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpl_add_completion\fR(\fBWordCompletion *\fR\fIcpl\fR, \fBconst char *\fR\fIline\fR,
+     \fBint\fR \fIword_start\fR, \fBint\fR \fIword_end\fR, \fBconst char *\fR\fIsuffix\fR,
+     \fBconst char *\fR\fItype_suffix\fR, \fBconst char *\fR\fIcont_suffix\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpl_record_error\fR(\fBWordCompletion *\fR\fIcpl\fR, \fBconst char *\fR\fIerrmsg\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpl_last_error\fR(\fBWordCompletion *\fR\fIcpl\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpl_complete_word()\fR function is part of the \fBlibtecla\fR(3LIB)
+library. It is usually called behind the scenes by \fBgl_get_line\fR(3TECLA),
+but can also be called separately.
+.sp
+.LP
+Given an input line containing an incomplete word to be completed, it calls a
+user-provided callback function (or the provided file-completion callback
+function) to look up all possible completion suffixes for that word. The
+callback function is expected to look backward in the line, starting from the
+specified cursor position, to find the start of the word to be completed, then
+to look up all possible completions of that word and record them, one at a
+time, by calling \fBcpl_add_completion()\fR.
+.sp
+.LP
+The \fBnew_WordCompletion()\fR function creates the resources used by the
+\fBcpl_complete_word()\fR function. In particular, it maintains the memory that
+is used to return the results of calling \fBcpl_complete_word()\fR.
+.sp
+.LP
+The \fBdel_WordCompletion()\fR function deletes the resources that were
+returned by a previous call to \fBnew_WordCompletion()\fR. It always returns
+\fINULL\fR (that is, a deleted object). It takes no action if the \fIcpl\fR
+argument is \fINULL\fR.
+.sp
+.LP
+The callback functions that look up possible completions should be defined with
+the \fBCPL_MATCH_FN()\fR macro, which is defined in <\fBlibtecla.h\fR>.
+Functions of this type are called by \fBcpl_complete_word()\fR, and all of the
+arguments of the callback are those that were passed to said function. In
+particular, the \fIline\fR argument contains the input line containing the word
+to be completed, and \fIword_end\fR is the index of the character that follows
+the last character of the incomplete word within this string.  The callback is
+expected to look backwards from \fIword_end\fR for the start of the incomplete
+word. What constitutes the start of a word clearly depends on the application,
+so it makes sense for the callback to take on this responsibility. For example,
+the builtin filename completion function looks backwards until it encounters an
+unescaped space or the start of the line. Having found the start of the word,
+the callback should then lookup all possible completions of this word, and
+record each completion with separate calls to \fBcpl_add_completion()\fR. If
+the callback needs access to an application-specific symbol table, it can pass
+it and any other data that it needs using the \fIdata\fR argument. This removes
+any need for global variables.
+.sp
+.LP
+The callback function should return 0 if no errors occur. On failure it should
+return 1 and register a terse description of the error by calling
+\fBcpl_record_error()\fR.
+.sp
+.LP
+The last error message recorded by calling \fBcpl_record_error()\fR can
+subsequently be queried by calling \fBcpl_last_error()\fR.
+.sp
+.LP
+The \fBcpl_add_completion()\fR function is called zero or more times by the
+completion callback function to record each possible completion in the
+specified \fBWordCompletion\fR object. These completions are subsequently
+returned by \fBcpl_complete_word()\fR. The \fIcpl\fR, \fIline\fR, and
+\fIword_end\fR arguments should be those that were passed to the callback
+function. The \fIword_start\fR argument should be the index within the input
+line string of the start of the word that is being completed. This should equal
+\fIword_end\fR if a zero-length string is being completed. The \fIsuffix\fR
+argument is the string that would have to be appended to the incomplete word to
+complete it. If this needs any quoting (for example, the addition of
+backslashes before special charaters) to be valid within the displayed input
+line, this should be included. A copy of the suffix string is allocated
+internally, so there is no need to maintain your copy of the string after
+\fBcpl_add_completion()\fR returns.
+.sp
+.LP
+In the array of possible completions that the \fBcpl_complete_word()\fR
+function returns, the suffix recorded by \fBcpl_add_completion()\fR is listed
+along with the concatentation of this suffix with the word that lies between
+\fIword_start\fR and \fIword_end\fR in the input line.
+.sp
+.LP
+The \fItype_suffix\fR argument specifies an optional string to be appended to
+the completion if it is displayed as part of a list of completions by
+\fIcpl_list_completions\fR. The intention is that this indicate to the user the
+type of each completion. For example, the file completion function places a
+directory separator after completions that are directories, to indicate their
+nature to the user. Similary, if the completion were a function, you could
+indicate this to the user by setting \fItype_suffix\fR to "()". Note that the
+\fItype_suffix\fR string is not copied, so if the argument is not a literal
+string between speech marks, be sure that the string remains valid for at least
+as long as the results of \fBcpl_complete_word()\fR are needed.
+.sp
+.LP
+The \fIcont_suffix\fR argument is a continuation suffix to append to the
+completed word in the input line if this is the only completion. This is
+something that is not part of the completion itself, but that gives the user an
+indication about how they might continue to extend the token. For example, the
+file-completion callback function adds a directory separator if the completed
+word is a directory. If the completed word were a function name, you could
+similarly aid the user by arranging for an open parenthesis to be appended.
+.sp
+.LP
+The \fBcpl_complete_word()\fR is normally called behind the scenes by
+\fBgl_get_line\fR(3TECLA), but can also be called separately if you separately
+allocate a \fBWordCompletion\fR object. It performs word completion, as
+described at the beginning of this section. Its first argument is a resource
+object previously returned by \fBnew_WordCompletion()\fR. The \fIline\fR
+argument is the input line string, containing the word to be completed. The
+\fIword_end\fR argument contains the index of the character in the input line,
+that just follows the last character of the word to be completed. When called
+by \fBgl_get_line()\fR, this is the character over which the user pressed TAB.
+The \fImatch_fn\fR argument is the function pointer of the callback function
+which will lookup possible completions of the word, as described above, and the
+\fIdata\fR argument provides a way for the application to pass arbitrary data
+to the callback function.
+.sp
+.LP
+If no errors occur, the \fBcpl_complete_word()\fR function returns a pointer to
+a \fBCplMatches\fR container, as defined below. This container is allocated as
+part of the \fIcpl\fR object that was passed to \fBcpl_complete_word()\fR, and
+will thus change on each call which uses the same \fIcpl\fR argument.
+.sp
+.in +2
+.nf
+typedef struct {
+    char *completion;        /* A matching completion */
+                             /* string */
+    char *suffix;            /* The part of the */
+                             /* completion string which */
+                             /* would have to be */
+                             /* appended to complete the */
+                             /* original word. */
+    const char *type_suffix; /* A suffix to be added when */
+                             /* listing completions, to */
+                             /* indicate the type of the */
+                             /* completion. */
+} CplMatch;
+
+typedef struct {
+    char *suffix;            /* The common initial part */
+                             /* of all of the completion */
+                             /* suffixes. */
+    const char *cont_suffix; /* Optional continuation */
+                             /* string to be appended to */
+                             /* the sole completion when */
+                             /* nmatch==1. */
+    CplMatch *matches;       /* The array of possible */
+                             /* completion strings, */
+                             /* sorted into lexical */
+                             /* order. */
+    int nmatch;              /* The number of elements in */
+                             /* the above matches[] */
+                             /* array. */
+} CplMatches;
+.fi
+.in -2
+
+.sp
+.LP
+If an error occurs during completion, \fBcpl_complete_word()\fR returns
+\fINULL\fR. A description of the error can be acquired by calling the
+\fBcpl_last_error()\fR function.
+.sp
+.LP
+The \fBcpl_last_error()\fR function returns a terse description of the error
+which occurred on the last call to \fBcpl_com plete_word()\fR or
+\fBcpl_add_completion()\fR.
+.sp
+.LP
+As a convenience, the return value of the last call to
+\fBcpl_complete_word()\fR can be recalled at a later time by calling
+\fBcpl_recall_matches()\fR. If \fBcpl_complete_word()\fR returned \fINULL\fR,
+so will \fBcpl_recall_matches()\fR.
+.sp
+.LP
+When the \fBcpl_complete_word()\fR function returns multiple possible
+completions, the \fBcpl_list_completions()\fR function can be called upon to
+list them, suitably arranged across the available width of the terminal. It
+arranges for the displayed columns of completions to all have the same width,
+set by the longest completion. It also appends the \fItype_suffix\fR strings
+that were recorded with each completion, thus indicating their types to the
+user.
+.SS "Builtin Filename completion Callback"
+.sp
+.LP
+By default the \fBgl_get_line()\fR function, passes the
+\fBCPL_MATCH_FN\fR(\fBcps_file_completions\fR) completion callback function to
+\fBcpl_complete_word()\fR. This function can also be used separately, either by
+sending it to \fBcpl_complete_word()\fR, or by calling it directly from your
+own completion callback function.
+.sp
+.in +2
+.nf
+#define CPL_MATCH_FN(fn) int (fn)(WordCompletion *cpl, \e
+                              void *data, const char *line, \e
+                              int word_end)
+
+typedef CPL_MATCH_FN(CplMatchFn);
+
+CPL_MATCH_FN(cpl_file_completions);
+.fi
+.in -2
+
+.sp
+.LP
+Certain aspects of the behavior of this callback can be changed via its
+\fIdata\fR argument. If you are happy with its default behavior you can pass
+\fINULL\fR in this argument. Otherwise it should be a pointer to a
+\fBCplFileConf\fR object, previously allocated by calling
+\fBnew_CplFileConf()\fR.
+.sp
+.LP
+\fBCplFileConf\fR objects encapsulate the configuration parameters of
+\fBcpl_file_completions()\fR. These parameters, which start out with default
+values, can be changed by calling the accessor functions described below.
+.sp
+.LP
+By default, the \fBcpl_file_completions()\fR callback function searches
+backwards for the start of the filename being completed, looking for the first
+unescaped space or the start of the input line. If you wish to specify a
+different location, call \fBcfc_file_start()\fR with the index at which the
+filename starts in the input line. Passing \fIstart_index\fR=-1 reenables the
+default behavior.
+.sp
+.LP
+By default, when \fBcpl_file_completions()\fR looks at a filename in the input
+line, each lone backslash in the input line is interpreted as being a special
+character which removes any special significance of the character which follows
+it, such as a space which should be taken as part of the filename rather than
+delimiting the start of the filename. These backslashes are thus ignored while
+looking for completions, and subsequently added before spaces, tabs and literal
+back slashes in the list of completions. To have unescaped back slashes treated
+as normal characters, call \fBcfc_literal_escapes()\fR with a non-zero value in
+its \fIliteral\fR argument.
+.sp
+.LP
+By default, \fBcpl_file_completions()\fR reports all files whose names start
+with the prefix that is being completed. If you only want a selected subset of
+these files to be reported in the list of completions, you can arrange this by
+providing a callback function which takes the full pathname of a file, and
+returns 0 if the file should be ignored, or 1 if the file should be included in
+the list of completions. To register such a function for use by
+\fBcpl_file_completions()\fR, call \fBcfc_set_check_fn()\fR, and pass it a
+pointer to the function, together with a pointer to any data that you would
+like passed to this callback whenever it is called. Your callback can make its
+decisions based on any property of the file, such as the filename itself,
+whether the file is readable, writable or executable, or even based on what the
+file contains.
+.sp
+.in +2
+.nf
+#define CPL_CHECK_FN(fn) int (fn)(void *data, \e
+                                       const char *pathname)
+
+typedef CPL_CHECK_FN(CplCheckFn);
+
+void cfc_set_check_fn(CplFileConf *cfc, CplCheckFn *chk_fn, \e
+                                             void *chk_data);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBcpl_check_exe()\fR function is a provided callback of the above type,
+for use with \fBcpl_file_completions()\fR. It returns non-zero if the filename
+that it is given represents a normal file that the user has execute permission
+to. You could use this to have \fBcpl_file_completions()\fR only list
+completions of executable files.
+.sp
+.LP
+When you have finished with a \fBCplFileConf\fR variable, you can pass it to
+the \fBdel_CplFileConf()\fR destructor function to reclaim its memory.
+.SS "Thread Safety"
+.sp
+.LP
+It is safe to use the facilities of this module in multiple threads, provided
+that each thread uses a separately allocated \fBWordCompletion\fR object. In
+other words, if two threads want to do word completion, they should each call
+\fBnew_WordCompletion()\fR to allocate their own completion objects.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBef_expand_file\fR(3TECLA), \fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB),
+\fBpca_lookup_file\fR(3TECLA), \fBattributes\fR(5)

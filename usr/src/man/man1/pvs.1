@@ -1,0 +1,446 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pvs 1 "25 Sep 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+pvs \- display the internal version information of dynamic objects
+.SH SYNOPSIS
+.LP
+.nf
+\fBpvs\fR [\fB-Cdlnorsv\fR] [\fB-I\fR \fIindex-expr\fR] [\fB-N\fR \fIname\fR] \fIfile\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpvs\fR utility displays any internal version information contained
+within an \fBELF\fR file. Commonly, these files are dynamic executables and
+shared objects, and possibly relocatable objects. This version information can
+fall into one of two categories:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+version definitions
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+version dependencies
+.RE
+.sp
+.LP
+Version \fIdefinitions\fR describe the interfaces that are made available by an
+\fBELF\fR file. Each version definition is associated to a set of global
+symbols provided by the file.  Version definitions can be assigned to a file
+during its creation by the link-editor using the \fB-M\fR option and the
+associated \fImapfile\fR directives. See the \fILinker and Libraries Guide\fR
+for more details.
+.sp
+.LP
+Version \fIdependencies\fR describe the binding requirements of dynamic objects
+on the version definitions of any shared object dependencies. When a dynamic
+object is built with a shared object, the link-editor records information
+within the dynamic object indicating that the shared object is a dependency.
+This dependency must be satisfied at runtime.  If the shared object also
+contains version \fIdefinitions\fR, then those version definitions that satisfy
+the global symbol requirements of the dynamic object are also recorded in the
+dynamic object being created. At process initialization, the runtime linker
+uses any version \fIdependencies\fR as a means of validating the interface
+requirements of the dynamic objects used to construct the process.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported. If neither the \fB-d\fR or \fB-r\fR
+options are specified, both are enabled.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 18n
+.rt  
+Demangles C++ symbol names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 18n
+.rt  
+Prints version definition information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR  \fIindex-expr\fR\fR
+.ad
+.RS 18n
+.rt  
+Qualifies the versions to examine with a specific version index or index range.
+For example, the version with index 3 in an object can be displayed using:
+.sp
+.in +2
+.nf
+example% \fBpvs -I 3 \fIfilename\fR\fR
+.fi
+.in -2
+.sp
+
+An \fIindex-expr\fR can be a single non-negative integer value that specifies a
+specific version, as shown in the previous example. Alternatively, an
+\fIindex-expr\fR can consist of two such values separated by a colon (:),
+indicating a range of versions. The following example displays the versions 3,
+4, and 5 in a file:
+.sp
+.in +2
+.nf
+example% \fBpvs -I 3:5 \fIfilename\fR\fR
+.fi
+.in -2
+.sp
+
+When specifying an index range, the second value can be omitted to indicate the
+final item in the file. For example, the following statement lists all versions
+from the tenth to the end:
+.sp
+.in +2
+.nf
+example% \fBpvs -I 10: \fIfilename\fR\fR
+.fi
+.in -2
+.sp
+
+See Matching Options for additional information about the matching options
+(\fB-I\fR, \fB-N\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 18n
+.rt  
+Prints any symbols that have been reduced from global to local binding due to
+versioning. By convention, these symbol entries are located in the
+\fI\&.symtab\fR section, and fall between the \fIFILE\fR symbol representing
+the output file, and the \fIFILE\fR symbol representing the first input file
+used to generate the output file.  These reduced symbol entries are assigned
+the fabricated version definition \fB_LOCAL_\fR. No reduced symbols will be
+printed if the file has been stripped (see \fBstrip\fR(1)), or if the symbol
+entry convention cannot be determined.
+.sp
+Use of the \fB-l\fR option implicitly enables the \fB-s\fR option
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 18n
+.rt  
+Normalizes version definition information. By default, all version definitions
+within the object are displayed. However, version definitions can inherit other
+version definitions. Under normalization, only the head of each inheritance
+list is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fIname\fR\fR
+.ad
+.RS 18n
+.rt  
+When used with the \fB-d\fR option, \fB-N\fR prints only the information for
+the given version definition \fIname\fR and any of its inherited version
+definitions.
+.sp
+When used with the \fB-r\fR option, \fB-N\fR prints only the information for
+the given dependency file \fIname\fR. It is possible to qualify a specific
+version from the dependency file by including the version in parenthesis
+following the file name:
+.sp
+.in +2
+.nf
+example% \fBpvs -N 'dependency (version)' \fIfilename\fR\fR
+.fi
+.in -2
+.sp
+
+See Matching Options for additional information about the matching options
+(\fB-I\fR, \fB-N\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 18n
+.rt  
+Creates one-line version definition output. By default, file, version
+definitions, and any symbol output is indented to ease human inspection. This
+option prefixes each output line with the file and version definition name and
+can be more useful for analysis with automated  tools.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 18n
+.rt  
+Prints version dependency (requirements) information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 18n
+.rt  
+Prints the symbols associated with each version definition. Any data symbols
+from versions defined by the object are accompanied with the size, in bytes, of
+the data item.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 18n
+.rt  
+Verbose output. Indicates any weak version definitions, and any version
+definition inheritance. When used with the \fB-N\fR and \fB-d\fR options, the
+inheritance of the base version definition is also shown. When used with the
+\fB-s\fR option, the version symbol definition is also shown.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported.
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+The  \fBELF\fR file about which internal version information is displayed.
+.RE
+
+.SH USAGE
+.SS "Matching Options"
+.sp
+.LP
+The \fB-I\fR and \fB-N\fR options are collectively referred to as the
+\fBmatching options\fR. These options are used to narrow the range of versions
+to examine, by index or by name.
+.sp
+.LP
+Any number and type of matching option can be mixed in a given invocation of
+\fBpvs\fR. In this case, \fBpvs\fR displays the superset of all versions
+matched by any of the matching options used. This feature allows for the
+selection of complex groupings of items using the most convenient form for
+specifying each item.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying version definitions
+.sp
+.LP
+The following example displays the version definitions of \fBlibelf.so.1\fR:
+
+.sp
+.in +2
+.nf
+% \fBpvs -d /lib/libelf.so.1\fR
+	libelf.so.1;
+	SUNW_1.1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRCreating a one-liner display
+.sp
+.LP
+A normalized, one-liner display, suitable for creating a \fImapfile\fR version
+control directive, can be created using the \fB-n\fR and \fB-o\fR options:
+
+.sp
+.in +2
+.nf
+% \fBpvs -don /lib/libelf.so.1\fR
+/lib/libelf.so.1 -	SUNW_1.1;
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRDisplaying version requirements
+.sp
+.LP
+The following example displays the version requirements of \fBldd\fR and
+\fBpvs\fR:
+
+.sp
+.in +2
+.nf
+% \fBpvs -r /usr/bin/ldd /usr/bin/pvs\fR
+/usr/bin/ldd:
+	libelf.so.1 (SUNW_1.1);
+	libc.so.1 (SUNW_1.1);
+/usr/bin/pvs:
+	libelf.so.1 (SUNW_1.1);
+	libc.so.1 (SUNW_1.1);
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDetermining a dependency symbol version
+.sp
+.LP
+The following example displays the shared object from which the \fBldd\fR
+command expects to find the printf function at runtime, as well as the version
+it belongs to:
+
+.sp
+.in +2
+.nf
+% \fBpvs -ors /usr/bin/ldd | grep ' printf'\fR
+/usr/bin/ldd -  libc.so.1 (SYSVABI_1.3): printf;
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRDetermine all dependency symbols from a specific version
+.sp
+.LP
+The \fB-N\fR option can be used to obtain a list of all the symbols from a
+dependency that belong to a specific version. To determine the symbols that
+\fBldd\fR will find from version \fBSYSVABI_1.3\fR of \fBlibc.so.1\fR:
+
+.sp
+.in +2
+.nf
+% \fBpvs -s -N 'libc.so.1 (SYSVABI_1.3)' /usr/bin/ldd\fR
+
+       libc.so.1 (SYSVABI_1.3):
+               _exit;
+               strstr;
+               printf;
+               __fpstart;
+               strncmp;
+               lseek;
+               strcmp;
+               getopt;
+               execl;
+               close;
+               fflush;
+               wait;
+               strerror;
+               putenv;
+               sprintf;
+               getenv;
+               open;
+               perror;
+               fork;
+               strlen;
+               geteuid;
+               access;
+               setlocale;
+               atexit;
+               fprintf;
+               exit;
+               read;
+               malloc;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Note that the specific list of symbols used by \fBldd\fR may change between
+Solaris releases.
+
+.LP
+\fBExample 6 \fRDisplay base defined version by index
+.sp
+.LP
+By convention, the base global version defined by an object has the name of the
+object. For example, the base version of \fBpvs\fR is named \fB\&'pvs'\fR. The
+base version of any object is always version index 1. Therefore, the \fB-I\fR
+option can be used to display the base version of any object without having to
+specify its name:
+
+.sp
+.in +2
+.nf
+% \fBpvs -v -I 1 /usr/bin/pvs\fR
+       pvs [BASE];
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+If the requested version information is not found, a non-zero value is
+returned. Otherwise, a \fB0\fR value is returned.
+.sp
+.LP
+Version information is determined not found when any of the following is true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the \fB-d\fR option is specified and no version definitions are found.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the \fB-r\fR option is specified and no version requirements are found.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+neither the \fB-d\fR nor \fB-r\fR option is specified and no version
+definitions or version requirements are found.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBelfdump\fR(1), \fBld\fR(1), \fBldd\fR(1), \fBstrip\fR(1), \fBelf\fR(3ELF),
+\fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

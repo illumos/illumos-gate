@@ -1,0 +1,237 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_attr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_attr, attroff, wattroff, attron, wattron, attrset, wattrset, standend,
+wstandend, standout, wstandout \- curses character and window attribute control
+routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBattroff\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattroff\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattron\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattron\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattrset\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattrset\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBstandend\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwstandend\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBstandout\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwstandout\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+All of these routines manipulate the current attributes of the named window.
+The current attributes of a window are applied to all characters that are
+written into the window with \fBwaddch()\fR, \fBwaddstr()\fR, and
+\fBwprintw()\fR. Attributes are a property of the character, and move with the
+character through any scrolling and insert/delete line/character operations. To
+the extent possible on the particular terminal, they are displayed as the
+graphic rendition of characters put on the screen.
+.sp
+.LP
+The routine \fBattrset()\fR sets the current attributes of the given window to
+\fIattrs\fR. The routine \fBattroff()\fR turns off the named attributes without
+turning any other attributes on or off. The routine \fBattron()\fR turns on the
+named attributes without affecting any others. The routine \fBstandout()\fR is
+the same as \fBattron(\fR\fBA_STANDOUT)\fR. The routine \fBstandend()\fR is the
+same as \fBattrset()\fR, that is, it turns off all attributes.
+.SS "Attributes"
+.sp
+.LP
+The following video attributes, defined in \fB<curses.h>\fR, can be passed to
+the routines \fBattron()\fR, \fBattroff()\fR, and \fBattrset()\fR, or OR-ed
+with the characters passed to \fBaddch()\fR.
+.sp
+.ne 2
+.mk
+.na
+\fBA_STANDOUT\fR
+.ad
+.RS 17n
+.rt  
+Best highlighting mode of the terminal
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_UNDERLINE\fR
+.ad
+.RS 17n
+.rt  
+Underlining
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_REVERSE\fR
+.ad
+.RS 17n
+.rt  
+Reverse video
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_BLINK\fR
+.ad
+.RS 17n
+.rt  
+Blinking
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_DIM\fR
+.ad
+.RS 17n
+.rt  
+Half bright
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_BOLD\fR
+.ad
+.RS 17n
+.rt  
+Extra bright or bold
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_ALTCHARSET\fR
+.ad
+.RS 17n
+.rt  
+Alternate character set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBA_CHARTEXT\fR
+.ad
+.RS 17n
+.rt  
+Bit-mask to extract a character
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCOLOR_PAIR(\fIn\fR)\fR
+.ad
+.RS 17n
+.rt  
+Color-pair number \fIn\fR
+.RE
+
+.sp
+.LP
+The following macro is the reverse of \fBCOLOR_PAIR(\fR\fIn\fR\fB):\fR
+.sp
+.ne 2
+.mk
+.na
+\fBPAIR_NUMBER(\fIattrs\fR)\fR
+.ad
+.RS 22n
+.rt  
+Returns the pair number associated with the \fBCOLOR_PAIR(\fR\fIn\fR) attribute
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+These routines always return 1.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_addch\fR(3CURSES), \fBcurs_addstr\fR(3CURSES),
+\fBcurs_printw\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBattroff()\fR, \fBwattroff()\fR, \fBattron()\fR, \fBwattron()\fR,
+\fBwattrset()\fR, \fBstandend()\fR, and \fBstandout()\fR may be macros.

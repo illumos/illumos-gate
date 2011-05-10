@@ -1,0 +1,296 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH types.h 3HEAD "6 Oct 2004" "SunOS 5.11" "Headers"
+.SH NAME
+types.h, types \- primitive system data types
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/types.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The data types defined in <\fBsys/types.h\fR> are as follows:
+.SS "32-bit Solaris"
+.sp
+.LP
+The data types listed below are defined in <\fBsys/types.h\fR> for 32-bit
+Solaris.
+.sp
+.in +2
+.nf
+typedef    struct    { int r[1]; } *physadr;
+typedef    long              clock_t;
+typedef    long              daddr_t;
+typedef    char *            caddr_t;
+typedef    unsigned char     unchar;
+typedef    unsigned short    ushort;
+typedef    unsigned int      uint;
+typedef    unsigned long     ulong_t;
+typedef    unsigned long     ino_t;
+typedef    long              uid_t;
+typedef    long              gid_t;
+typedef    ulong_t           nlink_t;
+typedef    ulong_t           mode_t;
+typedef    short             cnt_t;
+typedef    long              time_t;
+typedef    int               label_t[10];
+typedef    ulong_t           dev_t;
+typedef    long              off_t;
+typedef    long              pid_t;
+typedef    long              paddr_t;
+typedef    int               key_t;
+typedef    unsigned char     use_t;
+typedef    short             sysid_t;
+typedef    short             index_t;
+typedef    short             lock_t;
+typedef    unsigned int      size_t;
+typedef    long              clock_t;
+typedef    long              pid_t;
+.fi
+.in -2
+
+.SS "64-bit Solaris"
+.sp
+.LP
+The data types listed below are defined in <\fBsys/types.h\fR> for 64-bit
+Solaris.
+.sp
+.in +2
+.nf
+typedef     long        blkcnt_t
+typedef     long        clock_t
+typedef     long        daddr_t
+typedef     ulong_t     dev_t
+typedef     ulong_t     fsblkcnt_t
+typedef     ulong_t     fsfilcnt_t
+typedef     int         gid_t
+typedef     int         id_t
+typedef     long        ino_t
+typedef     int         key_t
+typedef     uint_t      major_t
+typedef     uint_t      minor_t
+typedef     uint_t      mode_t
+typedef     uint_t      nlink_t
+typedef     int         pid_t
+typedef     ptrdiff_t   intptr_t
+typedef     ulong_t     rlim_t
+typedef     ulong_t     size_t
+typedef     uint_t      speed_t
+typedef     long        ssize_t
+typedef     long        suseconds_t
+typedef     uint_t      tcflag_t
+typedef     long        time_t
+typedef     int         uid_t
+typedef     int         wchar_t
+.fi
+.in -2
+
+.SS "Preprocessor Symbols"
+.sp
+.LP
+For 32-bit programs, pointers and the C data types \fBint\fR and \fBlong\fR are
+all 32-bit quantities.  For 64-bit programs, pointers and the C data type
+\fBlong\fR are defined as 64-bit quantities.
+.sp
+.LP
+The preprocessor symbol \fB_ILP32\fR, made visible by the inclusion of
+<\fBsys/types.h\fR>, can be used with the preprocessor \fB#ifdef\fR construct
+to define sections of code that will be compiled only as part of a 32-bit
+version of a given C program.
+.sp
+.LP
+The preprocessor symbol \fB_LP64\fR can be used in the same way to define
+sections of code that will be compiled only as part of a 64-bit version of a
+given C program. See EXAMPLES.
+.sp
+.LP
+This header incorporates definitions of other preprocessor symbols that can be
+useful when keeping code portable between different instruction set
+architectures.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_LITTLE_ENDIAN\fR\fR
+.ad
+.br
+.na
+\fB\fB_BIG_ENDIAN\fR\fR
+.ad
+.RS 27n
+.rt  
+The natural byte order of the processor.  A pointer to an \fBint\fR points to
+the least/most significant byte of that \fBint\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_STACK_GROWS_UPWARD\fR\fR
+.ad
+.br
+.na
+\fB\fB_STACK_GROWS_DOWNWARD\fR\fR
+.ad
+.RS 27n
+.rt  
+The processor specific direction of stack growth. A push onto the stack
+increases/decreases the stack pointer, so it stores data at successively
+higher/lower addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CHAR_IS_UNSIGNED\fR\fR
+.ad
+.br
+.na
+\fB\fB_CHAR_IS_SIGNED\fR\fR
+.ad
+.RS 27n
+.rt  
+The C Compiler implements objects of type \fBchar\fR as \fBunsigned\fR or
+\fBsigned\fR respectively. This is really an implementation choice of the
+compiler, but it is specified in the ABI and tends to be uniform across
+compilers for an instruction set architecture.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CHAR_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_SHORT_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_INT_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_LONG_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_LONG_LONG_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_DOUBLE_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_LONG_DOUBLE_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_POINTER_ALIGNMENT\fR\fR
+.ad
+.br
+.na
+\fB\fB_FLOAT_ALIGNMENT\fR\fR
+.ad
+.RS 27n
+.rt  
+The ABI defines alignment requirements of each of the primitive object types.
+Some, if not all, might be hardware requirements as well. The values are
+expressed in bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_MAX_ALIGNMENT\fR\fR
+.ad
+.RS 27n
+.rt  
+The most stringent alignment requirement as specified by the ABI. Equal to the
+maximum of all the above _\fIXXX\fR_\fBALIGNMENT\fR values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_LONG_LONG_ALIGNMENT_32\fR\fR
+.ad
+.RS 27n
+.rt  
+The 32-bit ABI supported by a 64-bit kernel may have different alignment
+requirements for primitive object types. The value of this identifier is
+expressed in bytes.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBdaddr_t\fR type is used for disk addresses except in an inode on disk.
+Times are encoded in seconds since 00:00:00 UTC, January 1, 1970. The major and
+minor parts of a device code specify kind and unit number of a device and are
+installation-dependent. Offsets are measured in bytes from the beginning of a
+file.
+.sp
+.LP
+The \fBlabel_t[\|]\fR types are used to save the processor state while another
+process is running.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse of preprocessor symbol \fB_LP64\fR.
+.sp
+.LP
+In the following example, the preprocessor symbol \fB_LP64\fR defines sections
+of code that will be compiled only as part of a 64-bit version of the given C
+program.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+\&...
+
+#ifdef _LP64
+        printf("The data model is LP64 in this environment\en");
+#else
+#ifdef _ILP32
+        printf("The data model is ILP32 in this environment\en");
+#else
+#error "Unknown data model!"
+#endif
+#endif
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtypes32.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

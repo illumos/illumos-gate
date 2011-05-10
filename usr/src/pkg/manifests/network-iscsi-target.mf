@@ -46,6 +46,9 @@ dir path=usr/include/sys/iscsit
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/sbin
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man3iscsit
+dir path=usr/share/man/man3lib
 driver name=iscsit perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/iscsit group=sys
 $(i386_ONLY)file path=kernel/drv/iscsit group=sys
@@ -62,6 +65,28 @@ file path=usr/lib/libiscsit.so.1
 file path=usr/lib/llib-liscsit
 file path=usr/lib/llib-liscsit.ln
 file path=usr/sbin/itadm mode=0555
+file path=usr/share/man/man1m/itadm.1m
+file path=usr/share/man/man3iscsit/it_config_commit.3iscsit
+file path=usr/share/man/man3iscsit/it_config_free.3iscsit
+file path=usr/share/man/man3iscsit/it_config_load.3iscsit
+file path=usr/share/man/man3iscsit/it_config_setprop.3iscsit
+file path=usr/share/man/man3iscsit/it_ini_create.3iscsit
+file path=usr/share/man/man3iscsit/it_ini_delete.3iscsit
+file path=usr/share/man/man3iscsit/it_ini_free.3iscsit
+file path=usr/share/man/man3iscsit/it_ini_setprop.3iscsit
+file path=usr/share/man/man3iscsit/it_portal_create.3iscsit
+file path=usr/share/man/man3iscsit/it_portal_delete.3iscsit
+file path=usr/share/man/man3iscsit/it_tgt_create.3iscsit
+file path=usr/share/man/man3iscsit/it_tgt_delete.3iscsit
+file path=usr/share/man/man3iscsit/it_tgt_free.3iscsit
+file path=usr/share/man/man3iscsit/it_tgt_setprop.3iscsit
+file path=usr/share/man/man3iscsit/it_tpg_create.3iscsit
+file path=usr/share/man/man3iscsit/it_tpg_delete.3iscsit
+file path=usr/share/man/man3iscsit/it_tpg_free.3iscsit
+file path=usr/share/man/man3iscsit/it_tpgt_create.3iscsit
+file path=usr/share/man/man3iscsit/it_tpgt_delete.3iscsit
+file path=usr/share/man/man3iscsit/it_tpgt_free.3iscsit
+file path=usr/share/man/man3lib/libiscsit.3lib
 legacy pkg=SUNWiscsitr desc="Sun iSCSI COMSTAR Port Provider" \
     name="Sun iSCSI COMSTAR Port Provider (root)"
 legacy pkg=SUNWiscsitu desc="Sun iSCSI COMSTAR Port Provider" \

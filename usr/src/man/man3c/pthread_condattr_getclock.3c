@@ -1,0 +1,112 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_condattr_getclock 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_condattr_getclock, pthread_condattr_setclock \- get and set the clock
+selection condition variable attribute
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_condattr_getclock\fR(
+     \fBconst pthread_condattr_t *restrict\fR \fIattr\fR,
+     \fBclockid_t *restrict\fR \fIclock_id\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_condattr_setclock\fR(\fBpthread_condattr_t *\fR\fIattr\fR
+      \fBclockid_t\fR \fIclock_id\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_condattr_getclock()\fR function obtains the value of the clock
+attribute from the attributes object referenced by \fIattr\fR. The
+\fBpthread_condattr_setclock()\fR function sets the clock attribute in an
+initialized attributes object referenced by \fIattr\fR. If
+\fBpthread_condattr_setclock()\fR is called with a \fIclock_id\fR argument that
+refers to a CPU-time clock, the call fails.
+.sp
+.LP
+The clock attribute is the clock ID of the clock that is used to measure the
+timeout service of \fBpthread_cond_timedwait\fR(3C). The default value of the
+clock attribute refers to the system clock.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_condattr_getclock()\fR function
+returns 0 and stores the value of the clock attribute of \fIattr\fR into the
+object referenced by the \fIclock_id\fR argument. Otherwise, an error number is
+returned to indicate the error.
+.sp
+.LP
+Upon successful completion, the \fBpthread_condattr_setclock()\fR function
+returns 0. Otherwise, an error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBpthread_condattr_setclock()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIclock_id\fR does not refer to a known clock, or is a
+CPU-time clock.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cond_init\fR(3C), \fBpthread_cond_timedwait\fR(3C),
+\fBpthread_condattr_destroy\fR(3C), \fBpthread_condattr_getpshared\fR(3C),
+\fBpthread_create\fR(3C), \fBpthread_mutex_init\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

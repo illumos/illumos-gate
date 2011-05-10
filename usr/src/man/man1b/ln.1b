@@ -1,0 +1,201 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ln 1B "11 Mar 1994" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+ln \- make hard or symbolic links to files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/ln\fR [\fB-fs\fR] \fIfilename\fR [\fIlinkname\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/ucb/ln\fR [\fB-fs\fR] \fIpathname\fR... \fIdirectory\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB/usr/ucb/ln\fR utility creates an additional directory entry, called a
+link, to a file or directory. Any number of links can be assigned to a file.
+The number of links does not affect other file attributes such as size,
+protections, data, etc.
+.sp
+.LP
+\fIfilename\fR is the name of the original file or directory. \fIlinkname\fR is
+the new name to associate with the file or filename.  If \fIlinkname\fR is
+omitted, the last component of \fIfilename\fR is used as the name of the link.
+.sp
+.LP
+If the last argument is the name of a directory, symbolic links are made in
+that directory for each \fIpathname\fR argument; \fB/usr/ucb/ln\fR uses the
+last component of each \fIpathname\fR as the name of each link in the named
+\fIdirectory\fR.
+.sp
+.LP
+A hard link (the default) is a standard directory entry just like the one made
+when the file was created.  Hard links can only be made to existing files.
+Hard links cannot be made across file systems (disk partitions, mounted file
+systems).  To remove a file, all hard links to it must be removed, including
+the name by which it was first created; removing the last hard link releases
+the inode associated with the file.
+.sp
+.LP
+A symbolic link, made with the \fB-s\fR option, is a special directory entry
+that points to another named file. Symbolic links can span file systems and
+point to directories.  In fact, you can create a symbolic link that points to a
+file that is currently absent from the file system; removing the file that it
+points to does not affect or alter the symbolic link itself.
+.sp
+.LP
+A symbolic link to a directory behaves differently than you might expect in
+certain cases.  While an \fBls\fR(1) on such a link displays the files in the
+pointed-to directory, an `\fBls \fR\fB-l\fR' displays information about the
+link itself:
+.sp
+.in +2
+.nf
+example% /usr/ucb/ln \fB-s\fR dir link
+example% ls link
+file1 file2 file3 file4
+example% ls \fB-l\fR link
+lrwxrwxrwx  1 user            7 Jan 11 23:27 link \(-> dir
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When you use \fBcd\fR(1) to change to a directory through a symbolic link, you
+wind up in the pointed-to location within the file system.  This means that the
+parent of the new working directory is not the parent of the symbolic link, but
+rather, the parent of the pointed-to directory.  For instance, in the following
+case the final working directory is \fB/usr\fR and not
+\fB/home/user/linktest\fR.
+.sp
+.in +2
+.nf
+example% pwd
+/home/user/linktest
+example% /usr/ucb/ln \fB-s\fR /var/tmp symlink
+example% cd symlink
+example% cd .\|.
+example% pwd
+/usr
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+C shell user's can avoid any resulting navigation problems by using the
+\fBpushd\fR and \fBpopd\fR built-in commands instead of \fBcd\fR.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Force a hard link to a directory. This option is only available to the
+super-user, and should be used with extreme caution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Create a symbolic link or links.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBln\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe \fB/usr/ucb/ln\fR command
+.sp
+.LP
+The commands below illustrate the effects of the different forms of the
+\fB/usr/ucb/ln\fR command:
+
+.sp
+.in +2
+.nf
+example% /usr/ucb/ln file link
+example% ls \fB-F\fR file link
+file   link
+example% /usr/ucb/ln \fB-s\fR file symlink
+example% ls \fB-F\fR file symlink
+file   symlink@
+example% ls \fB-li\fR file link symlink
+ 10606 -rw-r--r--  2 user            0 Jan 12 00:06 file
+ 10606 -rw-r--r--  2 user            0 Jan 12 00:06 link
+ 10607 lrwxrwxrwx  1 user            4 Jan 12 00:06 symlink \(-> file
+example% /usr/ucb/ln \fB-s\fR nonesuch devoid
+example% ls \fB-F\fR devoid
+devoid@
+example% cat devoid
+devoid: No such file or directory
+example% /usr/ucb/ln \fB-s\fR /proto/bin/* /tmp/bin
+example% ls \fB-F\fR /proto/bin /tmp/bin
+/proto/bin:
+x*      y*      z*
+
+/tmp/bin:
+x@      y@      z@
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcp\fR(1), \fBls\fR(1), \fBmv\fR(1), \fBrm\fR(1), \fBlink\fR(2),
+\fBreadlink\fR(2), \fBstat\fR(2), \fBsymlink\fR(2), \fBattributes\fR(5),
+\fBlargefile\fR(5)
+.SH NOTES
+.sp
+.LP
+When the last argument is a directory, simple basenames should not be used for
+\fIpathname\fR arguments.  If a basename is used, the resulting symbolic link
+points to itself:
+.sp
+.in +2
+.nf
+example% /usr/ucb/ln \fB-s\fR file /tmp
+example% ls \fB-l\fR /tmp/file
+lrwxrwxrwx  1 user            4 Jan 12 00:16 /tmp/file \(-> file
+example% cat /tmp/file
+/tmp/file: Too many levels of symbolic links
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To avoid this problem, use full pathnames, or prepend a reference to the
+\fBPWD\fR variable to files in the working directory:
+.sp
+.in +2
+.nf
+example% rm /tmp/file
+example% /usr/ucb/ln \fB-s\fR $PWD/file /tmp
+lrwxrwxrwx  1 user 4       Jan 12 00:16 /tmp/file \(->
+/home/user/subdir/file
+.fi
+.in -2
+.sp
+

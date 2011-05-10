@@ -1,0 +1,179 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fdopen 3C "18 Apr 2006" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fdopen \- associate a stream with a file descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBFILE *\fR\fBfdopen\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfdopen()\fR function associates a stream with a file descriptor
+\fIfildes\fR.
+.sp
+.LP
+The \fImode\fR argument is a character string having one of the following
+values:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.9i) lw(3.6i) 
+lw(1.9i) lw(3.6i) 
+.
+\fBr\fR or \fBrb\fROpen a file for reading.
+\fBw\fR or \fBwb\fROpen a file for writing.
+\fBa\fR or \fBab\fROpen a file for writing at end of file.
+\fBr+\fR, \fBrb+\fR or \fBr+b\fRT{
+Open a file for update (reading and writing).
+T}
+\fBw+\fR, \fBwb+\fR or \fBw+b\fRT{
+Open a file for update (reading and writing).
+T}
+\fBa+\fR, \fBab+\fR or \fBa+b\fRT{
+Open a file for update (reading and writing) at end of file.
+T}
+.TE
+
+.sp
+.LP
+The meaning of these flags is exactly as specified for the \fBfopen\fR(3C)
+function, except that modes beginning with \fIw\fR do not cause truncation of
+the file. A trailing \fBF\fR character can also be included in the \fImode\fR
+argument as described in \fBfopen\fR(3C) to enable extended FILE facility.
+.sp
+.LP
+The mode of the stream must be allowed by the file access mode of the open
+file. The file position indicator associated with the new stream is set to the
+position indicated by the file offset associated with the file descriptor.
+.sp
+.LP
+The \fBfdopen()\fR function preserves the offset maximum previously set for the
+open file description corresponding to  \fIfildes\fR.
+.sp
+.LP
+The error and end-of-file indicators for the stream are cleared. The
+\fBfdopen()\fR function may cause the \fBst_atime\fR field of the underlying
+file to be marked for update.
+.sp
+.LP
+If \fIfildes\fR refers to a shared memory object, the result of the
+\fBfdopen()\fR function is unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBfdopen()\fR returns a pointer to a stream.
+Otherwise, a null pointer is returned and \fBerrno\fR is set to indicate the
+error.
+.sp
+.LP
+The \fBfdopen()\fR function may fail and not set \fBerrno\fR if there are no
+free \fBstdio\fR streams.
+.SH ERRORS
+.sp
+.LP
+The \fBfdopen()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImode\fR argument is not a valid mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+{\fBFOPEN_MAX\fR} streams are currently open in the calling process.
+.sp
+{\fBSTREAM_MAX\fR} streams are currently open in the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient space to allocate a buffer.
+.RE
+
+.SH USAGE
+.sp
+.LP
+A process is allowed to have at least {\fBFOPEN_MAX\fR} \fBstdio\fR streams
+open at a time. For 32-bit applications, however, the underlying ABIs formerly
+required that no file descriptor used to access the file underlying a
+\fBstdio\fR stream have a value greater than 255. To maintain binary
+compatibility with earlier Solaris releases, this limit still constrains 32-bit
+applications.
+.sp
+.LP
+File descriptors are obtained from calls like \fBopen\fR(2), \fBdup\fR(2),
+\fBcreat\fR(2) or \fBpipe\fR(2), which open files but do not return streams.
+Streams are necessary input for almost all of the standard I/O library
+functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+.TE
+
+.sp
+.LP
+The \fBF\fR character in the \fImode\fR argument is Evolving. In all other
+respects this function is Standard.
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBdup\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBfclose\fR(3C),
+\fBfopen\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

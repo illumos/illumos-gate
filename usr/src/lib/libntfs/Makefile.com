@@ -44,8 +44,6 @@ OBJECTS=	$(LIBNTFSDIR)/attrib.o \
                 $(LIBNTFSDIR)/device.o \
                 $(LIBNTFSDIR)/device_io.o \
                 $(LIBNTFSDIR)/dir.o \
-                $(LIBNTFSDIR)/gnome-vfs-method.o \
-                $(LIBNTFSDIR)/gnome-vfs-module.o \
                 $(LIBNTFSDIR)/index.o \
                 $(LIBNTFSDIR)/inode.o \
                 $(LIBNTFSDIR)/lcnalloc.o \
@@ -78,7 +76,7 @@ CPPFLAGS +=	-DHAVE_CONFIG_H \
 		-DLTVERSION_LIBNTFS=\"10:0:0\" \
 		-I$(SRCDIR)/include/ntfs
 DYNFLAGS +=	$(ZINTERPOSE)
-LDLIBS +=	-lc -lgnomevfs-2 -lglib-2.0
+LDLIBS +=	-lc
 
 .KEEP_STATE:
 
@@ -89,35 +87,3 @@ lint:
 
 # include library targets
 include		../../Makefile.targ
-
-pics/$(LIBNTFSDIR)/gnome-vfs-method.o: ../common/$(LIBNTFSDIR)/gnome-vfs-method.c
-		$(CC) $(CFLAGS) \
-			-I/usr/include/glib-2.0 \
-			-I/usr/lib/glib-2.0/include \
-			-I/usr/include/gnome-vfs-2.0 \
-			-I/usr/include/gnome-vfs-module-2.0 \
-			-I/usr/lib/gnome-vfs-2.0/include \
-			-I/usr/include/gconf/2 \
-			-I/usr/include/orbit-2.0 \
-			-I/usr/include/dbus-1.0 \
-			-I/usr/lib/dbus-1.0/include \
-			-D_PTHREADS -DORBIT2=1 \
-			$(CPPFLAGS) -c -o $@ \
-			../common/$(LIBNTFSDIR)/gnome-vfs-method.c
-		$(POST_PROCESS_O)
-
-pics/$(LIBNTFSDIR)/gnome-vfs-module.o: ../common/$(LIBNTFSDIR)/gnome-vfs-module.c
-		$(CC) $(CFLAGS) \
-			-I/usr/include/glib-2.0 \
-			-I/usr/lib/glib-2.0/include \
-			-I/usr/include/gnome-vfs-2.0 \
-			-I/usr/include/gnome-vfs-module-2.0 \
-			-I/usr/lib/gnome-vfs-2.0/include \
-			-I/usr/include/gconf/2 \
-			-I/usr/include/orbit-2.0 \
-			-I/usr/include/dbus-1.0 \
-			-I/usr/lib/dbus-1.0/include \
-			-D_PTHREADS -DORBIT2=1 \
-			$(CPPFLAGS) -c -o $@ \
-			../common/$(LIBNTFSDIR)/gnome-vfs-module.c
-		$(POST_PROCESS_O)

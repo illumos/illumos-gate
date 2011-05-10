@@ -1,0 +1,563 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmformat 1 "19 Feb 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+rmformat \- removable rewritable media format utility
+.SH SYNOPSIS
+.LP
+.nf
+\fBrmformat\fR [\fB-DeHUv\fR] [\fB-b\fR \fIlabel\fR] [\fB-c\fR \fIblockno\fR] 
+     [\fB-F\fRquick | long | force ] [\fB-s\fR \fIfilename\fR] [\fIdevname\fR]
+.fi
+
+.LP
+.nf
+\fBrmformat\fR \fB-V\fR read | write \fIdevname\fR
+.fi
+
+.LP
+.nf
+\fBrmformat\fR \fB-l\fR [\fIdevname\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrmformat\fR utility is used to format, label, partition, and perform
+other miscellaneous functions on removable, rewritable media that include
+floppy drives, and the \fBPCMCIA\fR memory and \fBata\fR cards. The
+\fBrmformat\fR utility should also be  used with all USB mass storage devices,
+including USB hard drives. This utility can also be used for the verification
+and surface analysis and for repair of the bad sectors found during
+verification if the drive or the driver supports bad block management.
+.sp
+.LP
+After formatting, \fBrmformat\fR writes the label, which covers the full
+capacity of the media as one slice on floppy and \fBPCMCIA\fR memory cards to
+maintain compatibility with the behavior of \fBfdformat\fR. The partition
+information can be changed with the help of other options provided by
+\fBrmformat\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIlabel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Labels the media with a SUNOS label. A SUNOS volume label name is restricted to
+8 characters. For media size greater than 1 TB, an EFI label is created. For
+writing a \fBDOS\fR Volume label, the user should use \fBmkfs_pcfs\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIblockno\fR\fR
+.ad
+.sp .6
+.RS 4n
+Corrects and repairs the given block. This correct and repair option may not be
+applicable to all devices supported by \fBrmformat\fR, as some devices may have
+a drive with bad block management capability and others may have this option
+implemented in the driver. If the drive or driver supports bad block
+management, a best effort is made to rectify the bad block. If the bad block
+still cannot be rectified, a message is displayed to indicate the failure to
+repair. The block number can be provided in decimal, octal, or hexadecimal
+format.
+.sp
+The normal floppy and \fBPCMCIA\fR memory and ata cards do not support bad
+block management.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Formats a 720KB (3.5 inch) double density diskette. This is the default for
+double density type drives. This option is needed if the drive is a high or
+extended-density type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ejects the media upon completion. This feature may not be available if the
+drive does not support motorized eject.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR quick | long | force\fR
+.ad
+.sp .6
+.RS 4n
+Formats the media.
+.sp
+The \fBquick\fR option starts a format without certification or format with
+limited certification of certain tracks on the media.
+.sp
+The \fBlong\fR option starts a complete format. For some devices this might
+include the certification of the whole media by the drive itself.
+.sp
+The \fBforce\fR option to format is provided to start a long format without
+user confirmation before the format is  started.
+.sp
+In legacy media such as floppy drives, all options start a long format
+depending on the mode (Extended Density mode, High Density mode, or Double
+Density mode) with which the floppy drive operates by default. On \fBPCMCIA\fR
+memory cards, all options start a long format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.sp .6
+.RS 4n
+Formats a 1.44 MB (3.5 inch) high density diskette. This is the default for
+high density type drives. It is needed if the drive is the Extended Density
+type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists all removable devices. By default, without any options, \fBrmformat\fR
+also lists all removable devices. If the \fBdev_name\fR is given,
+\fBrmformat\fR lists the device associated with the \fBdev_name\fR. The output
+shows the device pathname, vendor information, and the device type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the user to lay out the partition information in the SUNOS label.
+.sp
+The user should provide a file as input with information about each slice in a
+format providing byte offset, size required, tags, and flags, as follows:
+.sp
+.in +2
+.nf
+slices: \fIn\fR = \fIoffset\fR, \fIsize\fR [, \fIflags\fR, \fItags\fR] 
+.fi
+.in -2
+.sp
+
+where \fIn\fR is the slice number, \fIoffset\fR is the byte offset at which the
+slice \fIn\fR starts, and \fIsize\fR is the required size for slice \fIn\fR.
+Both \fIoffset\fR and \fIsize\fR must be a multiple of 512 bytes. These numbers
+can be represented as decimal, hexadecimal, or octal numbers. No floating point
+numbers are accepted. Details about maximum number of slices can be obtained
+from the \fISystem Administration Guide: Basic Administration\fR.
+.sp
+To specify the \fIsize\fR or \fIoffset\fR in kilobytes, megabytes, or
+gigabytes, add \fBKB\fR, \fBMB\fR, \fBGB\fR, respectively. A number without a
+suffix is assumed to be a byte offset. The flags are represented as follows:
+.sp
+.in +2
+.nf
+\fBwm\fR = read-write, mountable
+\fBwu\fR = read-write, unmountable
+\fBru\fR = read-only, unmountable
+.fi
+.in -2
+.sp
+
+The tags are represented as follows: \fBunassigned\fR, \fBboot\fR, \fBroot\fR,
+\fBswap\fR, \fBusr\fR, \fBbackup\fR, \fBstand\fR, \fBvar\fR, \fBhome\fR,
+\fBalternates\fR.
+.sp
+The tags and flags can be omitted from the four tuple when finer control on
+those values is not required. It is required to omit both or include both. If
+the tags and flags are omitted from the four tuple for a particular slice, a
+default value for each is assumed. The default value for flags is \fBwm\fR and
+for tags is \fBunassigned\fR.
+.sp
+Either full tag names can be provided or an abbreviation for the tags can be
+used. The abbreviations can be the first two or more letters from the standard
+tag names. \fBrmformat\fR is case insensitive in handling the defined tags &
+flags.
+.sp
+Slice specifications are separated by :
+.sp
+For example:
+.sp
+.in +2
+.nf
+slices: 0 = 0, 30MB, "wm", "home" : 
+        1 = 30MB, 51MB : 
+        2 = 0, 100MB, "wm", "backup" :
+        6 = 81MB, 19MB
+.fi
+.in -2
+.sp
+
+\fBrmformat\fR does the necessary checking to detect any overlapping partitions
+or illegal requests to addresses beyond the capacity of the media under
+consideration. There can be only one slice information entry for each slice
+\fIn\fR. If multiple slice information entries for the same slice \fIn\fR are
+provided, an appropriate error message is displayed. The slice \fB2\fR is the
+backup slice covering the whole disk capacity. The pound sign character,
+\fB#\fR, can be used to describe a line of comments in the input file. If the
+line starts with \fB#\fR, then \fBrmformat\fR ignores all the characters
+following \fB#\fR until the end of the line.
+.sp
+Partitioning some of the media with very small capacity is permitted, but be
+cautious in using this option on such devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.sp .6
+.RS 4n
+Performs \fBumount\fR on any file systems and then formats. See
+\fBmount\fR(1M). This option unmounts all the mounted slices and issues a long
+format on the device requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR read | write\fR
+.ad
+.sp .6
+.RS 4n
+Verifies each block of media after format. The write verification is a
+destructive mechanism. The user is queried for confirmation before the
+verification is started. The output of this option is a list of block numbers,
+which are identified as bad.
+.sp
+The read verification only verifies the blocks and report the blocks which are
+prone to errors.
+.sp
+The list of block numbers displayed can be used with the \fB-c\fR option for
+repairing.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevname\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIdevname\fR can be provided as absolute device pathname or relative pathname
+for the device from the current working directory or the nickname, such as
+\fBcdrom\fR or \fBrmdisk\fR.
+.sp
+For floppy devices, to access the first drive use \fB/dev/rdiskette0\fR (for
+systems without volume management) or \fBfloppy0\fR (for systems with volume
+management). Specify \fB/dev/rdiskette1\fR (for systems without volume
+management) or \fBfloppy1\fR (for systems with volume management) to use the
+second drive.
+.sp
+For systems without volume management running, the user can also provide the
+absolute device pathname as \fB/dev/rdsk/c\fI?\fRt\fI?\fRd\fI?\fRs\fI?\fR\fR or
+the appropriate relative device pathname from the current working directory.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRFormatting a Diskette
+.sp
+.in +2
+.nf
+example$ \fBrmformat -F quick /dev/rdiskette\fR
+Formatting will erase all the data on disk.
+Do you want to continue? (y/n)\fBy\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRFormatting a Diskette for a UFS File System
+.sp
+.LP
+The following example formats a diskette and creates a UFS file system:
+
+.sp
+.in +2
+.nf
+example$ \fBrmformat -F quick /dev/aliases/floppy0\fR
+Formatting will erase all the data on disk.
+Do you want to continue? (y/n)\fBy\fR
+example$ \fBsu\fR
+# \fB/usr/sbin/newfs /dev/aliases/floppy0\fR
+newfs: construct a new file system /dev/rdiskette: (y/n)? \fBy\fR
+/dev/rdiskette: 2880 sectors in 80 cylinders of 2 tracks, 18 sectors
+         1.4MB in 5 cyl groups (16 c/g, 0.28MB/g, 128 i/g)
+ super-block backups (for fsck -F ufs -o b=#) at:
+  32, 640, 1184, 1792, 2336,
+# 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRFormatting Removable Media for a PCFS File System
+.sp
+.LP
+The following example shows how to create an alternate \fBfdisk\fR partition:
+
+.sp
+.in +2
+.nf
+example$ \fBrmformat -F quick /dev/rdsk/c0t4d0s2:c\fR
+Formatting will erase all the data on disk.
+Do you want to continue? (y/n)\fBy\fR
+example$ \fBsu\fR
+# \fBfdisk /dev/rdsk/c0t4d0s2:c\fR
+# \fBmkfs -F pcfs /dev/rdsk/c0t4d0s2:c\fR
+Construct a new FAT file system on /dev/rdsk/c0t4d0s2:c: (y/n)? \fBy\fR
+#
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example describes how to create a \fBPCFS\fR file system
+\fBwithout\fR an \fBfdisk\fR partition:
+
+.sp
+.in +2
+.nf
+example$ \fBrmformat -F quick /dev/rdiskette\fR
+Formatting will erase all the data on disk.
+Do you want to continue? (y/n)\fBy\fR
+example$ \fBsu\fR
+# \fBmkfs -F pcfs -o nofdisk,size=2 /dev/rdiskette\fR
+Construct a new FAT file system on /dev/rdiskette: (y/n)? \fBy\fR
+#
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRListing All Removable Devices
+.sp
+.LP
+The following example shows how to list removable devices. This output shows a
+long listing of such devices.
+
+.sp
+.in +2
+.nf
+example$ rmformat -l
+Looking for devices...
+Logical Node: /dev/rdsk/c5t0d0s2
+Physical Node: /pci@1e,600000/usb@b/hub@2/storage@4/disk@0,0
+Connected Device: TEAC    FD-05PUB         1026
+Device Type: Floppy drive
+Bus: USB
+Size: 1.4 MB
+Label: floppy
+Access permissions: Medium is not write protected.
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing block device access for the media in floppy drive 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rdiskette0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing character device access for the media in floppy drive 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/aliases\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing symbolic links to the character devices for the different
+media under the control of volume management using appropriate alias.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/aliases/floppy0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the media in floppy drive 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rdiskette\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link providing character device access for the media in the primary
+floppy drive, usually drive 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/dsk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing block device access for the \fBPCMCIA\fR memory and ata
+cards and removable media devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rdsk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing character device access for the \fBPCMCIA\fR memory and ata
+cards and removable media devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/aliases/pcmemS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the \fBPCMCIA\fR memory card in
+socket S, where S represents a \fBPCMCIA\fR socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/aliases/rmdisk0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the generic removable media device that is not a \fBCD-ROM\fR,
+floppy, \fBDVD-ROM\fR, \fBPCMCIA\fR memory card, and so forth.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rdsk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing character device access for the \fBPCMCIA\fR memory and ata
+cards and other removable devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/dsk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory providing block device access for the \fBPCMCIA\fR memory and ata
+cards and other removable media devices.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpio\fR(1), \fBeject\fR(1), \fBfdformat\fR(1), \fBtar\fR(1),
+\fBvolcheck\fR(1), \fBvolrmmount\fR(1), \fBformat\fR(1M), \fBmkfs_pcfs\fR(1M),
+\fBmount\fR(1M), \fBnewfs\fR(1M), \fBprtvtoc\fR(1M), \fBrmmount\fR(1M),
+\fBrpc.smserverd\fR(1M), \fBattributes\fR(5), \fBscsa2usb\fR(7D), \fBsd\fR(7D),
+\fBpcfs\fR(7FS), \fBudfs\fR(7FS)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH NOTES
+.sp
+.LP
+A rewritable media or \fBPCMCIA\fR memory card or \fBPCMCIA\fR ata card
+containing a \fBufs\fR file system created on a SPARC-based system (using
+\fBnewfs\fR(1M)) is not identical to a rewritable media or \fBPCMCIA\fR memory
+card containing a \fBufs\fR file system created on an x86 based system. Do not
+interchange any removable media containing \fBufs\fR between these platforms;
+use \fBcpio\fR(1) or \fBtar\fR(1) to transfer files on diskettes or memory
+cards between them. For interchangeable filesystems refer to \fBpcfs\fR(7FS)
+and \fBudfs\fR(7FS).
+.sp
+.LP
+\fBrmformat\fR might not list all removable devices in virtualization
+environments.
+.SH BUGS
+.sp
+.LP
+Currently, bad sector mapping is not supported on floppy diskettes or
+\fBPCMCIA\fR memory cards. Therefore, a diskette or memory card is unusable if
+\fBrmformat\fR finds an error (\fBbad sector\fR).

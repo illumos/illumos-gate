@@ -23,6 +23,10 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2011 Gary Mills
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -805,7 +809,8 @@ xfopen(char *name, char *mode)
 	FILE	*fp;
 
 	if ((fp = fopen(name, mode)) == NULL)
-		error(gettext("can't open file"));
+		errorf(gettext("cannot open file: %s"),
+		    strerror(errno));
 
 	return (fp);
 }
@@ -863,6 +868,17 @@ xcalloc(size_t nbr, size_t size)
 	ptr = xmalloc(nbr * size);
 	(void) memset(ptr, '\0', nbr * size);
 	return (ptr);
+}
+
+/* Typical format: "cannot open file: %s" */
+/* PRINTFLIKE1 */
+void
+errorf(char *str, char *serr)
+{
+	char buf[500];
+
+	(void) snprintf(buf, sizeof (buf), str, serr);
+	error(buf);
 }
 
 /* PRINTFLIKE1 */

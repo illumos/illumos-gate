@@ -1,0 +1,415 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH math.h 3HEAD "11 Aug 2004" "SunOS 5.11" "Headers"
+.SH NAME
+math.h, math \- mathematical declarations
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <math.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBmath.h\fR> header includes definitions for the following types:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfloat_t\fR\fR
+.ad
+.RS 12n
+.rt  
+A real-floating type at least as wide as \fBfloat\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdouble_t\fR\fR
+.ad
+.RS 12n
+.rt  
+A real-floating type at least as wide as \fBdouble\fR, and at least as wide as
+\fBfloat_t\fR.
+.RE
+
+.sp
+.LP
+If \fBFLT_EVAL_METHOD\fR equals 0, \fBfloat_t\fR and \fBdouble_t\fR are
+\fBfloat\fR and \fBdouble\fR, respectively. If \fBFLT_EVAL_METHOD\fR equals 1,
+they are both \fBdouble\fR. If \fBFLT_EVAL_METHOD\fR equals 2, they are both be
+\fBlong double\fR. Other values of \fBFLT_EVAL_METHOD\fR are
+implementation-defined.
+.sp
+.LP
+The <\fBmath.h\fR> header provides the following constants. The values are of
+type \fBdouble\fR and are accurate within the precision of the \fBdouble\fR
+type.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_E\fR\fR
+.ad
+.RS 14n
+.rt  
+The base of natural logarithms (\fIe\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_LOG2E\fR\fR
+.ad
+.RS 14n
+.rt  
+The base-2 logarithm of \fIe\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_LOG10E\fR\fR
+.ad
+.RS 14n
+.rt  
+The base-10 logarithm of \fIe\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_LN2\fR\fR
+.ad
+.RS 14n
+.rt  
+The natural logarithm of 2.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_LN10\fR\fR
+.ad
+.RS 14n
+.rt  
+The natural logarithm of 10.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_PI\fR\fR
+.ad
+.RS 14n
+.rt  
+\c
+.if n pi\c
+.if t \(*p
+\c
+, the ratio of the circumference of a circle to its diameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_PI_2\fR\fR
+.ad
+.RS 14n
+.rt  
+\c
+.if n pi\c
+.if t \(*p
+\c
+/2.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_PI_4\fR\fR
+.ad
+.RS 14n
+.rt  
+\c
+.if n pi\c
+.if t \(*p
+\c
+/4.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_1_PI\fR\fR
+.ad
+.RS 14n
+.rt  
+1/\c
+.if n pi\c
+.if t \(*p
+\c
+.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_2_PI\fR\fR
+.ad
+.RS 14n
+.rt  
+2/\c
+.if n pi\c
+.if t \(*p
+\c
+.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_2_SQRTPI\fR\fR
+.ad
+.RS 14n
+.rt  
+2 over the square root of \c
+.if n pi\c
+.if t \(*p
+\c
+.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_SQRT2\fR\fR
+.ad
+.RS 14n
+.rt  
+The positive square root of 2.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_SQRT1_2\fR\fR
+.ad
+.RS 14n
+.rt  
+The positive square root of 1/2.
+.RE
+
+.sp
+.LP
+The <\fBmath.h\fR> header defines the following symbolic constants:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAXFLOAT\fR\fR
+.ad
+.RS 13n
+.rt  
+The maximum value of a non-infinite single-precision floating point number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHUGE_VAL\fR\fR
+.ad
+.RS 13n
+.rt  
+A positive \fBdouble\fR expression, not necessarily representable as a float.
+Used as an error value returned by the mathematics library. \fBHUGE_VAL\fR
+evaluates to +infinity on systems supporting IEEE Std 754-1985.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHUGE_VALF\fR\fR
+.ad
+.RS 13n
+.rt  
+A positive \fBfloat\fR constant expression. Used as an error value returned by
+the mathematics library. \fBHUGE_VALF\fR evaluates to +infinity on systems
+supporting IEEE Std 754-1985.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHUGE_VALL\fR\fR
+.ad
+.RS 13n
+.rt  
+A positive \fBlong double\fR constant expression. Used as an error value
+returned by the mathematics library. \fBHUGE_VALL\fR evaluates to +infinity on
+systems supporting IEEE Std 754-1985.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFINITY\fR\fR
+.ad
+.RS 13n
+.rt  
+A constant expression of type \fBfloat\fR representing positive or unsigned
+infinity, if available; else a positive constant of type \fBfloat\fR that
+overflows at translation time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNAN\fR\fR
+.ad
+.RS 13n
+.rt  
+A constant expression of type float representing a quiet NaN. This symbolic
+constant is only defined if the implementation supports quiet NaNs for the
+\fBfloat\fR type.
+.RE
+
+.sp
+.LP
+The following macros are defined for number classification. They represent the
+mutually-exclusive kinds of floating-point values. They expand to integer
+constant expressions with distinct values
+.sp
+.in +2
+.nf
+FP_INFINITE
+FP_NAN
+FP_NORMAL
+FP_SUBNORMAL
+FP_ZERO
+.fi
+.in -2
+
+.sp
+.LP
+The following optional macros indicate whether the \fBfma()\fR family of
+functions are fast compared with direct code:
+.sp
+.in +2
+.nf
+FP_FAST_FMA
+FP_FAST_FMAF
+FP_FAST_FMAL
+.fi
+.in -2
+
+.sp
+.LP
+The \fBFP_FAST_FMA\fR macro is defined to indicate that the \fBfma()\fR
+function generally executes about as fast as, or faster than, a multiply and an
+add of \fBdouble\fR operands. The other macros have the equivalent meaning for
+the \fBfloat\fR and \fBlong double\fR versions.
+.sp
+.LP
+The following macros expand to integer constant expressions whose values are
+returned by \fBilogb\fR(\fIx\fR) if \fIx\fR is zero or NaN, respectively. The
+value of \fBFP_ILOGB0\fR is either {\fBINT_MIN\fR} or -{\fBINT_MAX\fR}. The
+value of \fBFP_ILOGBNAN\fR is either {\fBINT_MAX\fR} or {\fBINT_MIN\fR}.
+.sp
+.in +2
+.nf
+FP_ILOGB0
+FP_ILOGBNAN
+.fi
+.in -2
+
+.sp
+.LP
+The following macros expand to the integer constants 1 and 2, respectively:
+.sp
+.in +2
+.nf
+MATH_ERRNO
+MATH_ERREXCEPT
+.fi
+.in -2
+
+.sp
+.LP
+The following macro expands to an expression that has type \fBint\fR and the
+value \fBMATH_ERREXCEPT\fR:
+.sp
+.in +2
+.nf
+math_errhandling
+.fi
+.in -2
+
+.sp
+.LP
+The value of the macro \fBmath_errhandling\fR is constant for the duration of
+the program. If a macro definition is suppressed or a program defines an
+identifier with the name \fBmath_errhandling\fR, the behavior is undefined.
+.sp
+.LP
+The <\fBmath.h\fR> header defines he following external variable:
+.sp
+.in +2
+.nf
+extern int signgam;
+.fi
+.in -2
+
+.sp
+.LP
+The <\fBmath.h\fR> header defines the structure and constants used by the
+\fBmatherr\fR(3M) error-handling mechanisms.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBfenv.h\fR(3HEAD), \fBlibm\fR(3LIB), \fBlimits.h\fR(3HEAD),
+\fBmatherr\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)

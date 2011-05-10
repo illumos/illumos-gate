@@ -1,0 +1,277 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setproject 3PROJECT "10 Apr 2007" "SunOS 5.11" "Project Database Access Library Functions"
+.SH NAME
+setproject \- associate a user process with a project
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lproject\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <project.h>
+
+\fBint\fR \fBsetproject\fR(\fBconst char *\fR\fIproject_name\fR, \fBconst char *\fR\fIuser_name\fR,
+     \fBuint_t\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetproject()\fR function provides a simplified method for the
+association of a user process with a project and its various resource
+management attributes, as stored in the \fBproject\fR(4) name service database.
+These attributes include resource control settings, resource pool membership,
+and third party attributes (which are ignored by \fBsetproject()\fR.)
+.sp
+.LP
+If \fIuser_name\fR is a valid member of the project specified by
+\fIproject_name\fR, as determined by \fBinproj\fR(3PROJECT), \fBsetproject()\fR
+will create a new task with \fBsettaskid\fR(2) using task flags specified by
+\fIflags\fR, use \fBsetrctl\fR(2) to associate various resource controls with
+the process, task, and project, and bind the calling process to the appropriate
+resource pool with \fBpool_set_binding\fR(3POOL).  Resource controls not
+explicitly specified in the project entry will be preserved. If \fIuser_name\fR
+is a name of the superuser (user with UID equal to 0), the \fBsetproject()\fR
+function skips the \fBinproj\fR(3PROJECT) check described above and allows the
+superuser to join any project.
+.sp
+.LP
+The current process will not be bound to a resource pool if the resource pools
+facility (see \fBpooladm\fR(1M)) is inactive. The \fBsetproject()\fR function
+will succeed whether or not the project specified by \fIproject_name\fR
+specifies a \fBproject.pool\fR attribute. If the resource pools facility is
+active, \fBsetproject()\fR will fail if the project does not specify a
+\fBproject.pool\fR attribute and there is no designated pool accepting default
+assignments. The \fBsetproject()\fR function will also fail if there is a
+specified \fBproject.pool\fR attribute for a nonexistent pool.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsetproject()\fR returns 0. If any of the
+resource control assignments failed but the project assignment, pool binding,
+and task creation succeeded, an integer value corresponding to the offset into
+the key-value pair list of the failed attribute assignment is returned. If the
+project assignment or task creation was not successful, \fBsetproject()\fR
+returns \fBSETPROJ_ERR_TASK\fR and sets \fBerrno\fR to indicate the error. In
+the event of a pool binding failure, \fBsetproject()\fR returns
+\fBSETPROJ_ERR_POOL\fR and sets \fBerrno\fR to indicate the error. Additional
+error information can be retrieved from \fBpool_error\fR(3POOL).
+.SH ERRORS
+.sp
+.LP
+The \fBsetproject()\fR function will fail during project assignment or task
+creation if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The invoking task was created with the \fBTASK_FINAL\fR flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+A resource control limiting the number of LWPs or tasks in the target project
+or zone has been exceeded.
+.sp
+A resource control on the given project would be exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The project ID associated with the given project is not within the range of
+valid project IDs, invalid flags were specified, or \fIuser_name\fR is
+\fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The effective user of the calling process is not superuser.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified user is not a valid user of the given project, \fIuser_name\fR is
+not valid user name, or \fIproject_name\fR is not valid project name.
+.RE
+
+.sp
+.LP
+The \fBsetproject()\fR function will fail during pool binding if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+No resource pool accepting default bindings exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The effective user of the calling process is not superuser.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified resource pool is unknown
+.RE
+
+.sp
+.LP
+If \fBsetproject()\fR returns an offset into the key-value pair list, the
+returned error value is associated with \fBsetrctl\fR(2) for resource control
+attributes.
+.SH USAGE
+.sp
+.LP
+The \fBsetproject()\fR function recognizes a name-structured value pair for the
+attributes in the \fBproject\fR(4) database with the following format:
+.sp
+.in +2
+.nf
+entity.control=(\fIprivilege\fR,\fIvalue\fR,\fIaction\fR,\fIaction\fR,\&.\|.\|.),\&.\|.\|.
+.fi
+.in -2
+
+.sp
+.LP
+where \fIprivilege\fR is one of \fBBASIC\fR or \fBPRIVILEGED\fR, \fIvalue\fR is
+a numeric value with optional units, and \fIaction\fR is one of \fBnone\fR,
+\fBdeny\fR, and \fBsignal\fR=\fIsignum\fR or \fBsignal\fR=\fISIGNAME\fR. For
+instance, to set a series of progressively more assertive control values on a
+project's per-process CPU time, specify
+.sp
+.in +2
+.nf
+process.max-cpu-time=(PRIVILEGED,1000s,signal=SIGXRES), \e
+(PRIVILEGED,1250, signal=SIGTERM),(PRIVILEGED,1500,
+     signal=SIGKILL)
+.fi
+.in -2
+
+.sp
+.LP
+To prevent a task from exceeding a total of 128 LWPs, specify a resource
+control with
+.sp
+.in +2
+.nf
+task.max-lwps=(PRIVILEGED,128,deny)
+.fi
+.in -2
+
+.sp
+.LP
+Specifying a resource control name with no values causes all resource control
+values for that name to be cleared on the given project, leaving only the
+system resource control value on the specified resource control name.
+.sp
+.LP
+For example, to remove all resource control values on shared memory, specify:
+.sp
+.in +2
+.nf
+project.max-shm-memory
+.fi
+.in -2
+
+.sp
+.LP
+The project attribute, \fBproject.pool\fR, specifies the pool to which
+processes associated with the project entry should be bound. Its format is:
+.sp
+.in +2
+.nf
+project.pool=pool_name
+.fi
+.in -2
+
+.sp
+.LP
+where \fBpool_name\fR is a valid resource pool within the active configuration
+enabled with \fBpooladm\fR(1M).
+.sp
+.LP
+The final attribute is used to finalize the task created by \fBsetproject()\fR.
+See\fBsettaskid\fR(2).
+.sp
+.in +2
+.nf
+task.final
+.fi
+.in -2
+
+.sp
+.LP
+All further attempts to create new tasks, such as using \fBnewtask\fR(1) and
+\fBsu\fR(1M), will fail.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBsetrctl\fR(2), \fBsettaskid\fR(2),
+\fBinproj\fR(3PROJECT), \fBlibproject\fR(3LIB), \fBpool_error\fR(3POOL),
+\fBpool_set_binding\fR(3POOL), \fBpasswd\fR(4), \fBproject\fR(4),
+\fBattributes\fR(5)

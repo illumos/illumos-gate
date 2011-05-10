@@ -1,0 +1,379 @@
+'\" te
+.\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
+.TH lpc 1B "2 Jun 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+lpc \- line printer control program
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/lpc\fR [\fIcommand\fR [\fIparameter\fR...]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlpc\fR utility controls the operation of local printers.
+.sp
+.LP
+Use \fBlpc\fR to perform the following functions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+start or stop a printer,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+disable or enable a printer's spooling queue,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+rearrange the order of jobs in a print queue, or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+display the status of a printer print queue and printer daemon.
+.RE
+.sp
+.LP
+\fBlpc\fR can be run from the command line or interactively. Specifying
+\fBlpc\fR with the optional \fIcommand\fR and\fIparameter\fR arguments causes
+\fBlpc\fR to interpret the first argument as an \fBlpc\fR command, and all
+other arguments as parameters to that command. Specifying \fBlpc\fR without
+arguments causes it to run interactively, prompting the user for \fBlpc\fR
+commands with \fBlpc>\fR. By redirecting the standard input, \fBlpc\fR can read
+commands from a file.
+.SH USAGE
+.sp
+.LP
+\fBlpc\fR commands can be typed in their entirety or abbreviated to an
+unambiguous substring. Some \fBlpc\fR commands are available to all users;
+others are available only to super-users.
+.sp
+.LP
+All users can execute the following \fBlpc\fR commands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR [\fIcommand\fR \|.\|.\|.] | \fBhelp\fR [\fIcommand\fR \|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Displays a short description of \fIcommand\fR. \fIcommand\fR is an \fBlpc\fR
+command. If \fIcommand\fR is not specified, displays a list of \fBlpc\fR
+commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexit\fR | \fBquit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Exits from \fBlpc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Displays the status of print daemons and print queues. \fBall\fR specifies that
+this command is performed on all locally attached printers. \fIprinter\fR
+indicates this command is performed on specific printers. Specify \fIprinter\fR
+as an atomic name. See \fBprinters.conf\fR(4) for information regarding naming
+conventions for atomic names.
+.RE
+
+.sp
+.LP
+Only a super-user can execute the following \fBlpc\fR commands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBabort\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Terminates an active spooling daemon. Disables printing (by preventing new
+daemons from being started by \fBlpr\fR(1B)) for \fIprinter\fR. \fBall\fR
+specifies this command is performed on all locally attached printers.
+\fIprinter\fR indicates this command is performed on specific printers. Specify
+\fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for information
+regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclean\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+Removes files created in the print spool directory by the print daemon from
+\fIprinter\fR \fI\&'s\fR print queue. \fBall\fR specifies that this command is
+performed on all locally attached printers.\fIprinter\fR indicates this command
+is performed on specific printers. Specify \fIprinter\fR as an atomic name. See
+\fBprinters.conf\fR(4) for information regarding naming conventions for atomic
+names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisable\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Turns off the print queue for \fIprinter\fR. Prevents new printer jobs from
+being entered into the print queue for \fIprinter\fRby \fBlpr\fR(1B). \fBall\fR
+specifies that this command is performed on all locally attached printers.
+\fIprinter\fR indicates this command is performed on specific printers. Specify
+\fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for information
+regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdown\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.\|] [\fImessage\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Turns the queue for \fIprinter\fR off and disables printing on \fIprinter\fR.
+Inserts \fImessage\fR in the printer status file. \fImessage\fR does not need
+to be quoted; multiple arguments to \fImessage\fR are treated as arguments are
+to \fBecho\fR(1). Use \fBdown\fR to take a printer down and inform users.
+\fBall\fR specifies that this command is performed on all locally attached
+printers. \fIprinter\fR indicates this command is performed on specific
+printers. Specify \fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4)
+for information regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBenable\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Enables \fBlpr\fR(1B) to add new jobs in the spool queue. \fBall\fR specifies
+that this command is performed on all locally attached printers. \fIprinter\fR
+indicates this command is performed on specific printers. Specify \fIprinter\fR
+as an atomic name. See \fBprinters.conf\fR(4) for information regarding naming
+conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrestart\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Attempts to start a new printer daemon. \fBrestart\fR is useful when a print
+daemon dies unexpectedly and leaves jobs in the print queue. \fBall\fR
+specifies that this command is performed on all locally attached printers.
+\fIprinter\fR indicates that this command is performed on specific printers.
+Specify \fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for
+information regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstart\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Enables printing. Starts a spooling daemon for the \fIprinter\fR. \fBall\fR
+specifies that this command is performed on all locally attached printers.
+\fIprinter\fR indicates the command is performed on specific printers. Specify
+\fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for information
+regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+Stops a spooling daemon after the current job is complete. Disables printing at
+that time. \fBall\fR specifies that this command is performed on all locally
+attached printers. \fIprinter\fR indicates this command is performed on
+specific printers. Specify \fIprinter\fR as an atomic name. See
+\fBprinters.conf\fR(4) for information regarding naming conventions for atomic
+names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtopq\fR \fIprinter\fR[\fIrequest-ID\fR\|.\|.\|.] [\fIuser\fR
+\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Moves \fIrequest-ID\fR or print jobs belonging to \fIuser\fR on \fIprinter\fR
+to the beginning of the print queue. Specify \fIuser\fR as a user's login name.
+Specify \fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for
+information regarding naming conventions for atomic names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBup\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Turns the queue for \fIprinter\fR on and enables printing on \fIprinter\fR.
+Deletes the message in the printer status file (inserted by \fBdown\fR). Use
+\fBup\fR to undo the effects of \fBdown\fR. \fBall\fR specifies that this
+command is performed on all locally attached printers. \fIprinter\fR indicates
+this command is performed on specific printers. Specify \fIprinter\fR as an
+atomic name. See \fBprinters.conf\fR(4) for information regarding naming
+conventions for atomic names.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/printers.conf\fR\fR
+.ad
+.RS 24n
+.rt  
+ System printer configuration database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.printers\fR\fR
+.ad
+.RS 24n
+.rt  
+User-configurable printer database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprinters.conf.byname\fR\fR
+.ad
+.RS 24n
+.rt  
+NIS version of \fB/etc/printers.conf\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprinters.org_dir\fR\fR
+.ad
+.RS 24n
+.rt  
+ NIS+ version of \fB/etc/printers.conf\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBou=printers\fR\fR
+.ad
+.RS 24n
+.rt  
+LDAP version of \fB/etc/printers.conf\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1),
+\fBlpsched\fR(1M), \fBlpshut\fR(1M), \fBsvcadm\fR(1M), \fBprinters.conf\fR(4),
+\fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Use the \fBsvcs\fR(1) utility to check if \fBsvc:/application/print/server\fR
+is running. If it is not running, use \fBsvcadm enable
+svc:/application/print/server\fR to start \fBlpsched\fR. See \fBsvcadm\fR(1M).
+.SH NOTES
+.sp
+.LP
+When IPP is in use, the user is prompted for a passphrase if the remote print
+service is configured to require authentication.

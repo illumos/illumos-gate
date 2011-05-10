@@ -65,7 +65,6 @@ file path=usr/xpg4/bin/nm mode=0555
 file path=usr/xpg4/bin/nohup mode=0555
 file path=usr/xpg4/bin/pr mode=0555
 file path=usr/xpg4/bin/rm mode=0555
-file path=usr/xpg4/bin/sed mode=0555
 file path=usr/xpg4/bin/sort mode=0555
 file path=usr/xpg4/bin/stty mode=0555
 file path=usr/xpg4/bin/who mode=0555
@@ -99,6 +98,7 @@ link path=usr/xpg4/bin/kill target=../../bin/alias
 link path=usr/xpg4/bin/od target=../../bin/od
 link path=usr/xpg4/bin/pfsh target=../../bin/pfexec
 link path=usr/xpg4/bin/read target=../../bin/alias
+link path=usr/xpg4/bin/sed target=../../bin/sed
 link path=usr/xpg4/bin/sh target=../../bin/ksh93
 link path=usr/xpg4/bin/tail target=../../bin/tail
 link path=usr/xpg4/bin/test target=../../bin/alias

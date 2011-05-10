@@ -1,0 +1,113 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.   Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.TH adjtime 2 "20 Jan 2003" "SunOS 5.11" "System Calls"
+.SH NAME
+adjtime \- correct the time to allow synchronization of the system clock
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/time.h>
+
+\fBint\fR \fBadjtime\fR(\fBstruct timeval *\fR\fIdelta\fR, \fBstruct timeval *\fR\fIolddelta\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBadjtime()\fR function adjusts the system's notion of the current time as
+returned by \fBgettimeofday\fR(3C), advancing or retarding it by the amount of
+time specified in the \fBstruct\fR \fBtimeval\fR pointed to by \fIdelta\fR.
+.sp
+.LP
+The adjustment is effected by speeding up (if that amount of time is positive)
+or slowing down (if that amount of time is negative) the system's clock by some
+small percentage, generally a fraction of one percent. The time is always a
+monotonically increasing function. A time correction from an earlier call to
+\fBadjtime()\fR may not be finished when \fBadjtime()\fR is called again.
+.sp
+.LP
+If \fIdelta\fR is 0, then \fIolddelta\fR returns the status of the effects of
+the previous \fBadjtime()\fR call with no effect on the time correction as a
+result of this call. If \fIolddelta\fR is not a null pointer, then the
+structure it points to will contain, upon successful return, the number of
+seconds and/or microseconds still to be corrected from the earlier call. If
+\fIolddelta\fR is a null pointer, the corresponding information will not be
+returned.
+.sp
+.LP
+This call may be used in time servers that synchronize the clocks of computers
+in a local area network. Such time servers would slow down the clocks of some
+machines and speed up the clocks of others to bring them to the average network
+time.
+.sp
+.LP
+Only a processes with appropriate privileges can adjust the time of day.
+.sp
+.LP
+The adjustment value will be silently rounded to the resolution of the system
+clock.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBadjtime()\fR returns \fB0\fR. Otherwise, it
+returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBadjtime()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIdelta\fR or \fIolddelta\fR argument points outside the process's
+allocated address space, or \fIolddelta\fR points to a region of the process's
+allocated address space that is not writable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBtv_usec\fR member of \fIdelta\fR is not within valid range (\(mi1000000
+to 1000000).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_SYS_TIME\fR} privilege is not asserted in the effective set of the
+calling process.
+.RE
+
+.sp
+.LP
+Additionally, the \fBadjtime()\fR function will fail for 32-bit interfaces if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The size of the \fBtv_sec\fR member of the \fBtimeval\fR structure pointed to
+by \fIolddelta\fR is too small to contain the correct number of seconds.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdate\fR(1), \fBgettimeofday\fR(3C), \fBprivileges\fR(5)

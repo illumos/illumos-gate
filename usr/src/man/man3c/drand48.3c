@@ -1,0 +1,175 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH drand48 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+drand48, erand48, lrand48, nrand48, mrand48, jrand48, srand48, seed48, lcong48
+\- generate uniformly distributed pseudo-random numbers
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h> 
+
+\fBdouble\fR \fBdrand48\fR(void)
+.fi
+
+.LP
+.nf
+\fBdouble\fR \fBerand48\fR(\fBunsigned short\fR \fIx\fR(i)[3]);
+.fi
+
+.LP
+.nf
+\fBlong\fR \fBlrand48\fR(void)
+.fi
+
+.LP
+.nf
+\fBlong\fR \fBnrand48\fR(\fBunsigned short\fR \fIx\fR(i)[3]);
+.fi
+
+.LP
+.nf
+\fBlong\fR \fBmrand48\fR(void)
+.fi
+
+.LP
+.nf
+\fBlong\fR \fBjrand48\fR(\fBunsigned short\fR \fIx\fR(i)[3]);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsrand48\fR(\fBlong\fR \fIseedval\fR);
+.fi
+
+.LP
+.nf
+\fBunsigned short *\fR\fBseed48\fR(\fBunsigned short\fR \fIseed16v\fR[3]);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlcong48\fR(\fBunsigned short\fR \fIparam\fR[7]);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This family of functions generates pseudo-random numbers using the well-known
+linear congruential algorithm and 48-bit integer arithmetic.
+.sp
+.LP
+Functions \fBdrand48()\fR and \fBerand48()\fR return non-negative
+double-precision floating-point values uniformly distributed over the interval
+[0.0, 1.0).
+.sp
+.LP
+Functions \fBlrand48()\fR and \fBnrand48()\fR return non-negative long integers
+uniformly distributed over the interval [0, 2  ^31 ].
+.sp
+.LP
+Functions \fBmrand48()\fR and \fBjrand48()\fR return signed long integers
+uniformly distributed over the interval [-2 ^31  , 2 ^31  ].
+.sp
+.LP
+Functions \fBsrand48()\fR, \fBseed48()\fR, and \fBlcong48()\fR are
+initialization entry points, one of which should be invoked before either
+\fBdrand48()\fR, \fBlrand48()\fR, or \fBmrand48()\fR is called. (Although it is
+not recommended practice, constant default initializer values will be supplied
+automatically if \fBdrand48()\fR, \fBlrand48()\fR, or \fBmrand48()\fR is called
+without a prior call to an initialization entry point.) Functions
+\fBerand48(\|),\fR \fBnrand48(\|),\fR and \fBjrand48()\fR do not require an
+initialization entry point to be called first.
+.sp
+.LP
+All the routines work by generating a sequence of 48-bit integer values, X(i ),
+according to the linear congruential formula
+.sp
+.LP
+X(n+1)= (aX (n)+c)(mod m) n>=0.
+.sp
+.LP
+The parameter \fIm\fR = 2^48; hence 48-bit integer arithmetic is performed.
+Unless \fBlcong48()\fR has been invoked, the multiplier value \fIa\fRand the
+addend value \fIc\fRare given by
+.br
+.in +2
+\fIa\fR = 5DEECE66D(16) = 273673163155(8)
+.in -2
+.br
+.in +2
+\fIc\fR = B(16) = 13(8)
+.in -2
+.sp
+.LP
+The value returned by any of the functions \fBdrand48()\fR, \fBerand48()\fR,
+\fBlrand48()\fR, \fBnrand48()\fR, \fBmrand48()\fR, or \fBjrand48()\fR is
+computed by first generating the next 48-bit X(i) in the sequence. Then the
+appropriate number of bits, according to the type of data item to be returned,
+are copied from the high-order (leftmost) bits of X(i) and transformed into the
+returned value.
+.sp
+.LP
+The functions \fBdrand48()\fR, \fBlrand48()\fR, and \fBmrand48()\fR store the
+last 48-bit X(i) generated in an internal buffer. X(i) must be initialized
+prior to being invoked. The functions \fBerand48()\fR, \fBnrand48()\fR, and
+\fBjrand48()\fR require the calling program to provide storage for the
+successive X(i) values in the array specified as an argument when the functions
+are invoked. These routines do not have to be initialized; the calling program
+must place the desired initial value of X(i) into the array and pass it as an
+argument. By using different arguments, functions \fBerand48()\fR,
+\fBnrand48()\fR, and \fBjrand48()\fR allow separate modules of a large program
+to generate several \fIindependent\fR streams of pseudo-random numbers, that
+is, the sequence of numbers in each stream will \fInot\fR depend upon how many
+times the routines have been called to generate numbers for the other streams.
+.sp
+.LP
+The initializer function \fBsrand48()\fR sets the high-order 32 bits of X(i) to
+the 32 bits contained in its argument. The low-order 16 bits of X(i) are set to
+the arbitrary value 330E(16) .
+.sp
+.LP
+The initializer function \fBseed48()\fR sets the value of X(i) to the 48-bit
+value specified in the argument array. In addition, the previous value of X(i)
+is copied into a 48-bit internal buffer, used only by \fBseed48()\fR, and a
+pointer to this buffer is the value returned by \fBseed48()\fR. This returned
+pointer, which can just be ignored if not needed, is useful if a program is to
+be restarted from a given point at some future time \(em use the pointer to get
+at and store the last X(i) value, and then use this value to reinitialize using
+\fBseed48()\fR when the program is restarted.
+.sp
+.LP
+The initialization function \fBlcong48()\fR allows the user to specify the
+initial X(i) the multiplier value \fIa\fR, and the addend value \fIc\fR.
+Argument array elements \fIparam[0-2]\fR specify X(i), \fIparam[3-5]\fR specify
+the multiplier \fIa\fR, and \fIparam\fR[6] specifies the 16-bit addend \fIc\fR.
+After \fBlcong48()\fR has been called, a subsequent call to either
+\fBsrand48()\fR or \fBseed48()\fR will restore the ``standard'' multiplier and
+addend values, \fIa\fR and \fIc\fR, specified above.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

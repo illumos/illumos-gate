@@ -1,0 +1,719 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH crontab 1 "6 Apr 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+crontab \- user crontab file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/crontab\fR [\fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/crontab\fR [\fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/crontab\fR [\fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcrontab\fR utility manages a user's access with \fBcron\fR (see
+\fBcron\fR(1M)) by copying, creating, listing, and removing \fBcrontab\fR
+files. If invoked without options, \fBcrontab\fR copies the specified file, or
+the standard input if no file is specified, into a directory that holds all
+users' crontabs.
+.sp
+.LP
+If \fBcrontab\fR is invoked with \fIfilename\fR, this overwrites an existing
+\fBcrontab\fR entry for the user that invokes it.
+.SS "\fBcrontab\fR Access Control"
+.sp
+.LP
+Users: Access to \fBcrontab\fR is allowed:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if the user's name appears in \fB/etc/cron.d/cron.allow\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if \fB/etc/cron.d/cron.allow\fR does not exist and the user's name is not in
+\fB/etc/cron.d/cron.deny\fR.
+.RE
+.sp
+.LP
+Users: Access to \fBcrontab\fR is denied:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if \fB/etc/cron.d/cron.allow\fR exists and the user's name is not in it.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if \fB/etc/cron.d/cron.allow\fR does not exist and user's name is in
+\fB/etc/cron.d/cron.deny\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if neither file exists, only a user with the \fBsolaris.jobs.user\fR
+authorization is allowed to submit a job.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+if Solaris Auditing is enabled, the user's shell is not audited and the user is
+not the \fBcrontab\fR owner. This can occur if the user logs in by way of a
+program, such as some versions of \fBSSH\fR, which does not set audit
+parameters.
+.RE
+.sp
+.LP
+The rules for \fBallow\fR and \fBdeny\fR apply to \fBroot\fR only if the
+\fBallow\fR/\fBdeny\fR files exist.
+.sp
+.LP
+The \fBallow\fR/\fBdeny\fR files consist of one user name per line.
+.SS "\fBcrontab\fR Entry Format"
+.sp
+.LP
+A \fBcrontab\fR file consists of lines of six fields each. The fields are
+separated by spaces or tabs. The first five are integer patterns that specify
+the following:
+.sp
+.in +2
+.nf
+minute (0\(mi59),
+hour (0\(mi23),
+day of the month (1\(mi31),
+month of the year (1\(mi12),
+day of the week (0\(mi6 with 0=Sunday).
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each of these patterns can be either an asterisk (meaning all legal values) or
+a list of elements separated by commas. An element is either a number or two
+numbers separated by a minus sign (meaning an inclusive range). Time specified
+here is interpreted in the currently active timezone. At the top of the crontab
+file this is the timezone which is set system-wide in /etc/default/init. A user
+can add a line such as:
+.sp
+.in +2
+.nf
+TZ=\fItimezone\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...and all subsequent entries will be interpreted using that timezone, until
+a new \fBTZ=\fR\fItimezone\fR line is encountered. The specification of days
+can be made by two fields (day of the month and day of the week). Both are
+adhered to if specified as a list of elements. See \fBEXAMPLES\fR.
+.sp
+.LP
+The sixth field of a line in a \fBcrontab\fR file is a string that is executed
+by the shell at the specified times. A percent character in this field (unless
+escaped by \fB\e\fR\|) is translated to a \fINEWLINE\fR character.
+.sp
+.LP
+Only the first line (up to a \fB`\|%\|'\fR or end of line) of the command field
+is executed by the shell. Other lines are made available to the command as
+standard input. Any blank line or line beginning with a \fB`\|#\|'\fR is a
+comment and is ignored.
+.sp
+.LP
+The shell is invoked from your $HOME directory. As with $TZ, both $SHELL and
+$HOME can be set by having a line such as:
+.sp
+.in +2
+.nf
+SHELL=/usr/bin/\fIsomeshell\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...or:
+.sp
+.in +2
+.nf
+HOME=\fIsomedirectory\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...which will take precedence for all the remaining entries in the
+\fBcrontab\fR or until there is another \fBHOME\fR or \fBSHELL\fR entry. It is
+invoked with an \fBarg0\fR of the basename of the $SHELL that is currently in
+effect. A user who wants to have his \fB\&.profile\fR or equivalent file
+executed must  explicitly do so in the \fBcrontab\fR file. \fBcron\fR supplies
+a default environment for every shell, defining HOME, LOGNAME, SHELL, TZ, and
+PATH. The default PATH for user \fBcron\fR jobs is \fB/usr/bin\fR; while root
+\fBcron\fR jobs default to \fB/usr/sbin:/usr/bin\fR. The default PATH can be
+set in \fB/etc/default/cron\fR (see \fBcron\fR(1M)). The TZ, HOME, and SHELL
+environment variables are set to match those that are in effect in the
+\fBcrontab\fR file at the time.
+.sp
+.LP
+If you do not redirect the standard output and standard error of your commands,
+any generated output or errors are mailed to you.
+.SS "\fBcrontab\fR Environment Variables"
+.sp
+.LP
+The following variables are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows the user to choose and alternative directory for cron to change
+directory to prior to running the command. For example:
+.sp
+.in +2
+.nf
+HOME=/var/tmp
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHELL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the shell to use to run subsequent commands. For example:
+.sp
+.in +2
+.nf
+SHELL=/usr/bin/ksh
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTZ\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows the user to choose the timezone in which the \fBcron\fR entries are run.
+This effects both the environment of the command that is run and the timing of
+the entry. For example, to have your entries run using the timezone for
+Iceland, use:
+.sp
+.in +2
+.nf
+TZ=Iceland
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+Each of these variables affects all of the lines that follow it in the
+\fBcrontab\fR file, until it is reset by a subsequent line resetting that
+variable. Hence, it is possible to have multiple timezones supported within a
+single \fBcrontab\fR file.
+.sp
+.LP
+The lines that are not setting these environment variables are  the same as
+crontab entries that conform to the UNIX standard and are described elsewhere
+in this man page.
+.SS "Setting \fBcron\fR Jobs Across Timezones"
+.sp
+.LP
+The default timezone of the \fBcron\fR daemon sets the system-wide timezone for
+\fBcron\fR entries. This, in turn, is by set by default system-wide using
+\fB/etc/default/init\fR.
+.sp
+.LP
+If some form of \fBdaylight savings\fR or \fBsummer/winter time\fR is in
+effect, then jobs scheduled during the switchover period could be executed
+once, twice, or not at all.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 6n
+.rt  
+Edits a copy of the current user's \fBcrontab\fR file, or creates an empty file
+to edit if \fBcrontab\fR does not exist. When editing is complete, the file is
+installed as the user's \fBcrontab\fR file.
+.sp
+The environment variable \fBEDITOR\fR determines which editor is invoked with
+the \fB-e\fR option. All \fBcrontab\fR jobs should be submitted using
+\fBcrontab\fR. Do not add jobs by just editing the \fBcrontab\fR file, because
+\fBcron\fR is not aware of changes made this way.
+.sp
+If all lines in the \fBcrontab\fR file are deleted, the old \fBcrontab\fR file
+is restored. The correct way to delete all lines is to remove the \fBcrontab\fR
+file using the \fB-r\fR option.
+.sp
+If \fIusername\fR is specified, the specified user's \fBcrontab\fR file is
+edited, rather than the current user's \fBcrontab\fR file. This can only be
+done by root or by a user with the \fBsolaris.jobs.admin\fR authorization.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Lists the \fBcrontab\fR file for the invoking user. Only root or a user with
+the \fBsolaris.jobs.admin\fR authorization can specify a username following the
+\fB-l\fR option to list the \fBcrontab\fR file of the specified user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Removes a user's \fBcrontab\fR from the \fBcrontab\fR directory. Only root or a
+user with the \fBsolaris.jobs.admin\fR authorization can specify a username
+following the \fB-r\fR option to remove the \fBcrontab\fR file of the specified
+user.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCleaning up Core Files
+.sp
+.LP
+This example cleans up \fBcore\fR files every weekday morning at 3:15 am:
+
+.sp
+.in +2
+.nf
+\fB15 3 * * 1-5 find $HOME\fR \fB-name\fR\fBcore 2>/dev/null | xargs rm\fR \fB-f\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRMailing a Birthday Greeting
+.sp
+.LP
+This example mails a birthday greeting:
+
+.sp
+.in +2
+.nf
+\fB0 12 14 2 * mailx john%Happy Birthday!%Time for lunch.\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSpecifying Days of the Month and Week
+.sp
+.LP
+This example runs a command on the first and fifteenth of each month, as well
+as on every Monday:
+
+.sp
+.in +2
+.nf
+\fB0 0 1,15 * 1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To specify days by only one field, the other field should be set to *. For
+example:
+
+.sp
+.in +2
+.nf
+\fB0 0 * * 1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would run a command only on Mondays.
+
+.LP
+\fBExample 4 \fRUsing Environment Variables
+.sp
+.LP
+The following entries take advantage of \fBcrontab\fR support for certain
+environment variables.
+
+.sp
+.in +2
+.nf
+TZ=GMT
+HOME=/local/home/user
+SHELL=/usr/bin/ksh
+0 0 * * * echo $(date) >        midnight.GMT
+TZ=PST
+0 0 * * * echo $(date) >        midnight.PST
+TZ=EST
+HOME=/local/home/myuser
+SHELL=/bin/csh
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The preceding entries allow two jobs to run. The first one would run at
+midnight in the GMT timezone and the second would run at midnight in the PST
+timezone. Both would be run in the directory \fB/local/home/user\fR using the
+Korn shell. The file concludes with \fBTZ\fR, \fBHOME\fR, and \fBSHELL\fR
+entries that return those variable to their default values.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SS "\fB/usr/bin/crontab\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDITOR\fR\fR
+.ad
+.RS 10n
+.rt  
+Determine the editor to be invoked when the \fB-e\fR option is specified. This
+is overridden by the \fBVISUAL\fR environmental variable. The default editor is
+\fBvi\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPATH\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBPATH\fR in \fBcrontab\fR's environment specifies the search path used to
+find the editor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVISUAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Determine the visual editor to be invoked when the \fB-e\fR option is
+specified. If \fBVISUAL\fR is not specified, then the environment variable
+\fBEDITOR\fR is used. If that is not set, the default is \fBvi\fR(1).
+.RE
+
+.SS "\fB/usr/xpg4/bin/crontab\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDITOR\fR\fR
+.ad
+.RS 10n
+.rt  
+Determine the editor to be invoked when the \fB-e\fR option is specified. The
+default editor is \fB/usr/xpg4/bin/vi\fR.
+.RE
+
+.SS "\fB/usr/xpg6/bin/crontab\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDITOR\fR\fR
+.ad
+.RS 10n
+.rt  
+Determine the editor to be invoked when the \fB-e\fR option is specified. The
+default editor is \fB/usr/xpg6/bin/vi\fR.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/cron.d\fR\fR
+.ad
+.RS 28n
+.rt  
+main cron directory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/cron.d/cron.allow\fR\fR
+.ad
+.RS 28n
+.rt  
+list of allowed users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/default/cron\fR\fR
+.ad
+.RS 28n
+.rt  
+contains cron default settings
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/cron.d/cron.deny\fR\fR
+.ad
+.RS 28n
+.rt  
+list of denied users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/cron/log\fR\fR
+.ad
+.RS 28n
+.rt  
+accounting information
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/cron/crontabs\fR\fR
+.ad
+.RS 28n
+.rt  
+spool area for \fBcrontab\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "\fB/usr/bin/crontab\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SS "\fB/usr/xpg4/bin/crontab\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SS "\fB/usr/xpg6/bin/crontab\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBatq\fR(1), \fBatrm\fR(1), \fBauths\fR(1), \fBed\fR(1), \fBsh\fR(1),
+\fBvi\fR(1), \fBcron\fR(1M), \fBsu\fR(1M), \fBauth_attr\fR(4),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+If you inadvertently enter the \fBcrontab\fR command with no arguments, do not
+attempt to get out with Control-d. This removes all entries in your
+\fBcrontab\fR file. Instead, exit with Control-c.
+.sp
+.LP
+When updating \fBcron\fR, check first for existing \fBcrontab\fR entries that
+can be scheduled close to the time of the update. Such entries can be lost if
+the update process completes after the scheduled event. This can happen
+because, when \fBcron\fR is notified by \fBcrontab\fR to update the internal
+view of a user's \fBcrontab\fR file, it first removes the user's existing
+internal \fBcrontab\fR and any internal scheduled events. Then it reads the new
+\fBcrontab\fR file and rebuilds the internal \fBcrontab\fR and events. This
+last step takes time, especially with a large \fBcrontab\fR file, and can
+complete \fBafter\fR an existing \fBcrontab\fR entry is scheduled to run if it
+is scheduled too close to the update. To be safe, start a new job at least 60
+seconds after the current date and time.
+.sp
+.LP
+If an authorized user other than root modifies another user's \fBcrontab\fR
+file, the resulting behavior can be unpredictable. Instead, the authorized user
+should first use \fBsu\fR(1M) to become superuser to the other user's login
+before making any changes to the \fBcrontab\fR file.
+.sp
+.LP
+Care should be taken when adding \fBTZ\fR, \fBSHELL\fR and \fBHOME\fR variables
+to the \fBcrontab\fR  file when the \fBcrontab\fR file could be shared with
+applications that do not expect those variables to be changed from the default.
+Resetting the values to their defaults at the bottom of the file will minimize
+the risk of problems.

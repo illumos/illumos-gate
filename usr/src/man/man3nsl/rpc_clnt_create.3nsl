@@ -1,0 +1,591 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rpc_clnt_create 3NSL "23 Jul 2009" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+rpc_clnt_create, clnt_control, clnt_create, clnt_create_timed,
+clnt_create_vers, clnt_create_vers_timed, clnt_destroy, clnt_dg_create,
+clnt_pcreateerror, clnt_raw_create, clnt_spcreateerror, clnt_tli_create,
+clnt_tp_create, clnt_tp_create_timed, clnt_vc_create, rpc_createerr,
+clnt_door_create \- library routines for dealing with creation and manipulation
+of CLIENT handles
+.SH SYNOPSIS
+.LP
+.nf
+#include <rpc/rpc.h>
+
+\fBbool_t\fR \fBclnt_control\fR(\fBCLIENT *\fR\fIclnt\fR, \fBconst uint_t\fR \fIreq\fR, \fBchar *\fR\fIinfo\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_create\fR(\fBconst char *\fR\fIhost\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst char *\fR\fInettype\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_create_timed\fR(\fBconst char *\fR\fIhost\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst\fR \fInettype\fR,
+     \fBconst struct timeval *\fR\fItimetout\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_create_vers\fR (\fBconst char *\fR\fIhost\fR,
+     \fBconst rpcprog_t\fR \fIprognum\fR, \fBrpcvers_t *\fR\fIvers_outp\fR,
+     \fBconst rpcvers_t\fR \fIvers_low\fR, \fBconst rpcvers_t\fR \fIvers_high\fR,
+     \fBconst char *\fR\fInettype\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_create_vers_timed\fR(\fBconst char *\fR\fIhost\fR,
+     \fBconst rpcprog_t\fR \fIprognum\fR, \fBrpcvers_t *\fR\fIvers_outp\fR,
+     \fBconst rpcvers_t\fR \fIvers_low\fR, \fBconst rpcvers_t\fR \fIvers_high\fR,
+     \fBchar *\fR\fInettype\fR, \fBconst struct timeval *\fR\fItimeout\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBclnt_destroy\fR(\fBCLIENT *\fR\fIclnt\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_dg_create\fR(\fBconst int\fR \fIfildes\fR,
+     \fBconst struct netbuf *\fR\fIsvcaddr\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst uint_t\fR \fIsendsz\fR,
+     \fBconst uint_t\fR \fIrecsz\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBclnt_pcreateerror\fR(\fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_raw_create\fR(\fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBclnt_spcreateerror\fR(\fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_tli_create\fR(\fBconst int\fR \fIfildes\fR,
+     \fBconst struct netconfig *\fR\fInetconf\fR, \fBconst struct netbuf *\fR\fIsvcaddr\fR,
+     \fBconst rpcprog_t\fR \fIprognum\fR, \fBconst rpcvers_t\fR \fIversnum\fR,
+     \fBconst uint_t\fR \fIsendsz\fR, \fBconst uint_t\fR \fIrecsz\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_tp_create\fR(\fBconst char *\fR\fIhost\fR,
+     \fBconst rpcprog_t\fR \fIprognum\fR, \fBconst rpcvers_t\fR \fIversnum\fR,
+     \fBconst struct netconfig *\fR\fInetconf\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_tp_create_timed\fR(\fBconst char *\fR\fIhost\fR,
+     \fBconst rpcprog_t\fR \fIprognum\fR, \fBconst rpcvers_t\fR \fIversnum\fR,
+     \fBconst struct netconfig *\fR\fInetconf\fR, \fBconst struct timeval *\fR\fItimeout\fR);
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_vc_create\fR(\fBconst int\fR \fIfildes\fR,
+     \fBconst struct netbuf *\fR\fIsvcaddr\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst uint_t\fR \fIsendsz\fR,
+     \fBconst uint_t\fR \fIrecsz\fR);
+.fi
+
+.LP
+.nf
+\fBstruct rpc_createerr\fR \fBrpc_createerr\fR
+.fi
+
+.LP
+.nf
+\fBCLIENT *\fR\fBclnt_door_create\fR(\fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst uint_t\fR \fIsendsz\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBRPC\fR library routines allow  \fBC\fR language programs to make procedure
+calls on other machines across the network. First a \fBCLIENT\fR handle is
+created and then the client calls a procedure to send a request to the server.
+On receipt of the request, the server calls a dispatch routine to perform the
+requested service, and then sends a reply.
+.sp
+.LP
+These routines are MT-Safe. In the case of multithreaded applications, the
+\fB-mt\fR option must be specified on the command line at compilation time.
+When the \fB-mt\fR option is specified, \fBrpc_createerr()\fR becomes a macro
+that enables each thread to have its own \fBrpc_createerr()\fR. See
+\fBthreads\fR(5).
+.SS "Routines"
+.sp
+.LP
+See \fBrpc\fR(3NSL) for the definition of the \fBCLIENT\fR data structure.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_control()\fR\fR
+.ad
+.sp .6
+.RS 4n
+A function macro to change or retrieve various information about a client
+object. \fIreq\fR indicates the type of operation, and \fIinfo\fR is a pointer
+to the information. For both connectionless and connection-oriented transports,
+the supported values of \fIreq\fR and their argument types and what they do
+are:
+.sp
+.in +2
+.nf
+CLSET_TIMEOUT struct timeval * set total timeout
+CLGET_TIMEOUT	struct timeval *	get total timeout
+.fi
+.in -2
+
+If the timeout is set using \fBclnt_control()\fR, the timeout argument passed
+by \fBclnt_call()\fR is ignored in all subsequent calls. If the timeout value
+is set to  \fB0\fR, \fBclnt_control()\fR immediately returns
+\fBRPC_TIMEDOUT\fR. Set the timeout parameter to  \fB0\fR for batching calls.
+.sp
+.in +2
+.nf
+CLGET_SERVER_ADDR struct netbuf * get server's address
+CLGET_SVC_ADDR	struct netbuf *	get server's address
+CLGET_FD	int *	get associated file descriptor
+CLSET_FD_CLOSE	void	close the file descriptor when
+		destroying the client handle
+		(see \fBclnt_destroy()\fR)
+CLSET_FD_NCLOSE	void	do not close the file
+		descriptor when destroying the client handle
+CLGET_VERS   rpcvers_t get the RPC program's version
+		number associated with the
+		client handle
+CLSET_VERS	rpcvers_t set the RPC program's version
+		number associated with the
+		client handle.  This assumes
+		that the RPC server for this
+		new version is still listening
+		at the address of the previous
+		version.
+CLGET_XID	uint32_t	get the XID of the previous
+		remote procedure call
+CLSET_XID	uint32_t	set the XID of the next
+		remote procedure call
+CLGET_PROG	rpcprog_t	get program number
+CLSET_PROG	rpcprog_t	set program number
+.fi
+.in -2
+
+The following operations are valid for connection-oriented transports only:
+.sp
+.in +2
+.nf
+CLSET_IO_MODE rpciomode_t*    set the IO mode used
+ 		to send one-way requests. The argument for this operation
+		can be either: 
+   - RPC_CL_BLOCKING 	all sending operations block
+ 		until the underlying transport protocol has
+ 		accepted requests. If you specify this argument
+ 		you cannot use flush and getting and setting buffer
+ 		size is meaningless. 
+   - RPC_CL_NONBLOCKING   sending operations do not
+ 		block and return as soon as requests enter the buffer.
+ 		You can now use non-blocking I/O. The requests in the 
+		buffer are pending. The requests are sent to 
+		the server as soon as a two-way request is sent 
+		or a flush is done. You are responsible for flushing
+		the buffer. When you choose RPC_CL_NONBLOCKING argument
+ 		you have a choice of flush modes as specified by 
+		CLSET_FLUSH_MODE. 
+CLGET_IO_MODE rpciomode_t* 		get the current IO mode 
+CLSET_FLUSH_MODE rpcflushmode_t* 		set the flush mode.
+ 		The flush mode can only be used in non-blocking I/O mode. 
+		The argument can be either of the following: 	
+	- RPC_CL_BESTEFFORT_FLUSH: All flushes send requests
+ 		in the buffer until the transport end-point blocks.
+ 		If the transport connection is congested, the call
+ 		returns directly. 	
+	- RPC_CL_BLOCKING_FLUSH: Flush blocks until the
+ 		underlying transport protocol accepts all pending 
+		requests into the queue. 
+CLGET_FLUSH_MODE rpcflushmode_t*  	get the current flush mode. 
+CLFLUSH rpcflushmode_t  		flush the pending requests.
+		This command can only be used in non-blocking I/O mode. 
+		The flush policy depends on which of the following 
+		parameters is specified:
+	- RPC_CL_DEFAULT_FLUSH, or NULL:	The flush is done 
+	   according to the current flush mode policy 
+		(see CLSET_FLUSH_MODE option).
+	- RPC_CL_BESTEFFORT_FLUSH:		The flush tries
+		to send pending requests without blocking; the call
+		returns directly. If the transport connection is
+		congested, this call could return without the request
+		being sent.
+	- RPC_CL_BLOCKING_FLUSH:		The flush sends all pending 
+		requests. This call will block until all the requests 
+		have been accepted by the transport layer.
+CLSET_CONNMAXREC_SIZE int*    set the buffer size.
+ 		It is not possible to dynamically 
+		resize the buffer if it contains data. 
+		The default size of the buffer is 16 kilobytes.
+CLGET_CONNMAXREC_SIZE int*  		get the current size of the 
+		buffer
+CLGET_CURRENT_REC_SIZE int*  		get the size of 
+		the pending requests stored in the buffer. Use of this 
+		command is only recommended when you are in non-blocking 
+		I/O mode. The current size of the buffer is always zero 
+		when the handle is in blocking mode as the buffer is not 
+		used in this mode.
+.fi
+.in -2
+
+The following operations are valid for connectionless transports only:
+.sp
+.in +2
+.nf
+CLSET_RETRY_TIMEOUT  struct timeval *    set the retry timeout
+CLGET_RETRY_TIMEOUT  struct timeval *    get the retry timeout
+.fi
+.in -2
+
+The retry timeout is the time that \fBRPC\fR waits for the server to reply
+before retransmitting the request.
+.sp
+\fBclnt_control()\fR returns \fBTRUE\fR on success and \fBFALSE\fR on failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic client creation routine for program \fIprognum\fR and version
+\fIversnum\fR. \fIhost\fR identifies the name of the remote host where the
+server is located. \fInettype\fR indicates the class of transport protocol to
+use. The transports are tried in left to right order in \fBNETPATH\fR variable
+or in top to bottom order in the netconfig database.
+.sp
+\fBclnt_create()\fR tries all the transports of the \fInettype\fR class
+available from the \fBNETPATH\fR environment variable and the netconfig
+database, and chooses the first successful one. A default timeout is set and
+can be modified using \fBclnt_control()\fR. This routine returns \fINULL\fR if
+it fails. The \fBclnt_pcreateerror()\fR routine can be used to print the reason
+for failure.
+.sp
+Note that \fBclnt_create()\fR returns a valid client handle even if the
+particular version number supplied to \fBclnt_create()\fR is not registered
+with the \fBrpcbind\fR service. This mismatch will be discovered by a
+\fBclnt_call\fR later (see \fBrpc_clnt_calls\fR(3NSL)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_create_timed()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic client creation routine which is similar to \fBclnt_create()\fR but
+which also has the additional parameter \fItimeout\fR that specifies the
+maximum amount of time allowed for each transport class tried. In all other
+respects, the \fBclnt_create_timed()\fR call behaves exactly like the
+\fBclnt_create()\fR call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_create_vers()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic client creation routine which is similar to \fBclnt_create()\fR but
+which also checks for the version availability. \fIhost\fR identifies the name
+of the remote host where the server is located. \fInettype\fR indicates the
+class transport protocols to be used. If the routine is successful it returns a
+client handle created for the highest version between \fIvers_low\fR and
+\fIvers_high\fR that is supported by the server. \fIvers_outp\fR is set to this
+value. That is, after a successful return \fIvers_low\fR <= \fI*vers_outp\fR <=
+\fIvers_high\fR. If no version between \fIvers_low\fR and \fIvers_high\fR is
+supported by the server then the routine fails and returns \fBNULL.\fR A
+default timeout is set and can be modified using \fBclnt_control()\fR. This
+routine returns \fINULL\fR if it fails. The \fBclnt_pcreateerror()\fR routine
+can be used to print the reason for failure.
+.sp
+Note: \fBclnt_create()\fR returns a valid client handle even if the particular
+version number supplied to \fBclnt_create()\fR is not registered with the
+\fBrpcbind\fR service. This mismatch will be discovered by a \fBclnt_call\fR
+later (see \fBrpc_clnt_calls\fR(3NSL)). However, \fBclnt_create_vers()\fR does
+this for you and returns a valid handle only if a version within the range
+supplied is supported by the server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_create_vers_timed()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generic client creation routine similar to \fBclnt_create_vers()\fR but with
+the additional parameter  \fItimeout\fR, which specifies the maximum amount of
+time allowed for each transport class tried.   In all other respects, the
+\fBclnt_create_vers_timed()\fR call behaves exactly like the
+\fBclnt_create_vers()\fR call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_destroy()\fR\fR
+.ad
+.sp .6
+.RS 4n
+A function macro that destroys the client's \fBRPC\fR handle. Destruction
+usually involves deallocation of private data structures, including \fIclnt\fR
+itself. Use of \fIclnt\fR is undefined after calling \fBclnt_destroy()\fR. If
+the \fBRPC\fR library opened the associated file descriptor, or
+\fBCLSET_FD_CLOSE\fR was set using \fBclnt_control()\fR, the file descriptor
+will be closed.
+.sp
+The caller should call \fBauth_destroy(\fR\fIclnt\fR->\fBcl_auth)\fR (before
+calling \fBclnt_destroy()\fR) to destroy the associated \fBAUTH\fR structure
+(see \fBrpc_clnt_auth\fR(3NSL)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_dg_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This routine creates an \fBRPC\fR client for the remote program \fIprognum\fR
+and version \fIversnum\fR; the client uses a connectionless transport. The
+remote program is located at address \fIsvcaddr\fR. The parameter \fIfildes\fR
+is an open and bound file descriptor. This routine will resend the call message
+in intervals of 15 seconds until a response is received or until the call times
+out. The total time for the call to time out is specified by \fBclnt_call()\fR
+(see \fBclnt_call()\fR in \fBrpc_clnt_calls\fR(3NSL)). The retry time out and
+the total time out periods can be changed using \fBclnt_control()\fR. The user
+may set the size of the send and receive buffers with the parameters
+\fIsendsz\fR and \fIrecvsz\fR; values of \fB0\fR choose suitable defaults. This
+routine returns \fINULL\fR if it fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_pcreateerror()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print a message to standard error indicating why a client \fBRPC\fR handle
+could not be created. The message is prepended with the string \fIs\fR and a
+colon, and appended with a newline.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_raw_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This routine creates an \fBRPC\fR client handle for the remote program
+\fIprognum\fR and version \fIversnum\fR. The transport used to pass messages to
+the service is a buffer within the process's address space, so the
+corresponding \fBRPC\fR server should live in the same address space; (see
+\fBsvc_raw_create()\fR in \fBrpc_svc_create\fR(3NSL)). This allows simulation
+of \fBRPC\fR and measurement of \fBRPC\fR overheads, such as round trip times,
+without any kernel or networking interference. This routine returns \fINULL\fR
+if it fails. \fBclnt_raw_create()\fR should be called after
+\fBsvc_raw_create()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_spcreateerror()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBclnt_pcreateerror()\fR, except that it returns a string instead of
+printing to the standard error. A newline is not appended to the message in
+this case.
+.sp
+Warning: returns a pointer to a buffer that is overwritten on each call. In
+multithread applications, this buffer is implemented as thread-specific data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_tli_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This routine creates an \fBRPC\fR client handle for the remote program
+\fIprognum\fR and version \fIversnum\fR. The remote program is located at
+address \fIsvcaddr\fR. If \fIsvcaddr\fR is \fINULL\fR and it is
+connection-oriented, it is assumed that the file descriptor is connected. For
+connectionless transports, if \fIsvcaddr\fR is \fINULL\fR,
+\fBRPC_UNKNOWNADDR\fR error is set. \fIfildes\fR is a file descriptor which may
+be open, bound and connected. If it is \fBRPC_ANYFD\fR, it opens a file
+descriptor on the transport specified by \fInetconf\fR. If \fIfildes\fR is
+\fBRPC_ANYFD\fR and \fInetconf\fR is \fINULL\fR, a \fBRPC_UNKNOWNPROTO\fR error
+is set. If \fIfildes\fR is unbound, then it will attempt to bind the
+descriptor. The user may specify the size of the buffers with the parameters
+\fIsendsz\fR and \fIrecvsz\fR; values of \fB0\fR choose suitable defaults.
+Depending upon the type of the transport (connection-oriented or
+connectionless), \fBclnt_tli_create()\fR calls appropriate client creation
+routines. This routine returns \fINULL\fR if it fails. The
+\fBclnt_pcreateerror()\fR routine can be used to print the reason for failure.
+The remote \fBrpcbind\fR service (see \fBrpcbind\fR(1M)) is not consulted for
+the address of the remote service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_tp_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBclnt_create()\fR except \fBclnt_tp_create()\fR tries only one transport
+specified through \fInetconf\fR.
+.sp
+\fBclnt_tp_create()\fR creates a client handle for the program \fIprognum\fR,
+the version \fIversnum\fR, and for the transport specified by \fInetconf\fR.
+Default options are set, which can be changed using \fBclnt_control()\fR calls.
+The remote \fBrpcbind\fR service on the host \fIhost\fR is consulted for the
+address of the remote service. This routine returns \fINULL\fR if it fails. The
+\fBclnt_pcreateerror()\fR routine can be used to print the reason for failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_tp_create_timed()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBclnt_tp_create()\fR except \fBclnt_tp_create_timed()\fR has the extra
+parameter \fItimeout\fR which specifies the maximum time allowed for the
+creation attempt to succeed. In all other respects, the
+\fBclnt_tp_create_timed()\fR call behaves exactly like the
+\fBclnt_tp_create()\fR call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_vc_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This routine creates an \fBRPC\fR client for the remote program \fIprognum\fR
+and version \fIversnum\fR; the client uses a connection-oriented transport. The
+remote program is located at address \fIsvcaddr\fR. The parameter \fIfildes\fR
+is an open and bound file descriptor. The user may specify the size of the send
+and receive buffers with the parameters \fIsendsz\fR and \fIrecvsz\fR; values
+of \fB0\fR choose suitable defaults. This routine returns \fINULL\fR if it
+fails.
+.sp
+The address \fIsvcaddr\fR should not be \fINULL\fR and should point to the
+actual address of the remote program. \fBclnt_vc_create()\fR does not consult
+the remote \fBrpcbind\fR service for this information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrpc_createerr()\fR\fR
+.ad
+.sp .6
+.RS 4n
+A global variable whose value is set by any \fBRPC\fR client handle creation
+routine that fails.  It is used by the routine \fBclnt_pcreateerror()\fR to
+print the reason for the failure.
+.sp
+In multithreaded applications, \fBrpc_createerr\fR becomes a macro which
+enables each thread to have its own \fBrpc_createerr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_door_create()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This routine creates an RPC client handle over doors for the given program
+\fIprognum\fR and version \fIversnum\fR. Doors is a transport mechanism that
+facilitates fast data transfer between processes on the same machine. The user
+may set the size of the send buffer with the parameter \fIsendsz\fR. If
+\fIsendsz\fR is 0, the corresponding default buffer size is 16 Kbyte. The
+\fBclnt_door_create()\fR routine returns \fINULL\fR if it fails and sets a
+value for \fBrpc_createerr\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitectureAll
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
+\fBrpc_clnt_calls\fR(3NSL), \fBrpc_svc_create\fR(3NSL),
+\fBsvc_raw_create\fR(3NSL), \fBthreads\fR(5), \fBattributes\fR(5)

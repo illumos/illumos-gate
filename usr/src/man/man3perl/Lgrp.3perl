@@ -1,0 +1,1170 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Lgrp 3PERL "30 Aug 2006" "SunOS 5.11" "Perl Library Functions"
+.SH NAME
+Lgrp \- Perl interface to Solaris liblgrp library
+.SH SYNOPSIS
+.LP
+.nf
+use Sun::Solaris::Lgrp qw(:ALL);
+
+# initialize lgroup interface
+my $cookie = lgrp_init(LGRP_VIEW_OS | LGRP_VIEW_CALLER);
+my $l = Sun::Solaris::Lgrp->new(LGRP_VIEW_OS | 
+     LGRP_VIEW_CALLER);
+
+my $version = lgrp_version(LGRP_VER_CURRENT | LGRP_VER_NONE);
+$version = $l->version(LGRP_VER_CURRENT | LGRP_VER_NONE);
+
+$home = lgrp_home(P_PID, P_MYID);
+$home = l->home(P_PID, P_MYID);
+
+lgrp_affinity_set(P_PID, $\fIpid\fR, $\fIlgrp\fR,
+      LGRP_AFF_STRONG | LGRP_AFF_WEAK | LGRP_AFF_NONE);
+$l->affinity_set(P_PID, $\fIpid\fR, $\fIlgrp\fR,
+      LGRP_AFF_STRONG | LGRP_AFF_WEAK | LGRP_AFF_NONE);
+
+my $affinity = lgrp_affinity_get(P_PID, $\fIpid\fR, $\fIlgrp\fR);
+$affinity = $l->affinity_get(P_PID, $\fIpid\fR, $\fIlgrp\fR);
+
+my $nlgrps = lgrp_nlgrps($\fIcookie\fR);
+$nlgrps = $l->nlgrps();
+
+my $root = lgrp_root($\fIcookie\fR);
+$root = l->root();
+
+$latency = lgrp_latency($\fIlgrp1\fR, $\fIlgrp2\fR);
+$latency = $l->latency($\fIlgrp1\fR, $\fIlgrp2\fR);
+
+my @children = lgrp_children($\fIcookie\fR, $\fIlgrp\fR);
+@children = l->children($lgrp);
+
+my @parents = lgrp_parents($\fIcookie\fR, $\fIlgrp\fR);
+@parents = l->parents($\fIlgrp\fR);
+
+my @lgrps = lgrp_lgrps($\fIcookie\fR);
+@lgrps = l->lgrps();
+
+@lgrps = lgrp_lgrps($\fIcookie\fR, $\fIlgrp\fR);
+@lgrps = l->lgrps($\fIlgrp\fR);
+
+my @leaves = lgrp_leaves($\fIcookie\fR);
+@leaves = l->leaves();
+
+my $is_leaf = lgrp_isleaf($\fIcookie\fR, $\fIlgrp\fR);
+$is_leaf = $l->is_leaf($\fIlgrp\fR);
+
+my @cpus = lgrp_cpus($\fIcookie\fR, $\fIlgrp\fR,
+     LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+@cpus = l->cpus($\fIlgrp\fR, LGRP_CONTENT_HIERARCHY | 
+     LGRP_CONTENT_DIRECT);
+
+my $memsize = lgrp_mem_size($\fIcookie\fR, $\fIlgrp\fR,
+      LGRP_MEM_SZ_INSTALLED | LGRP_MEM_SZ_FREE,
+      LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+$memsize = l->mem_size($\fIlgrp\fR,
+      LGRP_MEM_SZ_INSTALLED | LGRP_MEM_SZ_FREE,
+      LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+
+my $is_stale = lgrp_cookie_stale($\fIcookie\fR);
+$stale = l->stale();
+
+lgrp_fini($\fIcookie\fR);
+
+# The following is available for API version greater than 1:
+my @lgrps = lgrp_resources($\fIcookie\fR, $\fIlgrp\fR, LGRP_RSRC_CPU);
+
+# Get latencies from cookie
+$latency = lgrp_latency_cookie($\fIcookie\fR, $\fIfrom\fR, $\fIto\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This module provides access to the \fBliblgrp\fR(3LIB) library and to various
+constants and functions defined in <\fBsys/lgrp_sys.h\fR>. It provides both the
+procedural and object interface to the library. The procedural interface
+requires (in most cases) passing around a transparent cookie. The object
+interface hides all the cookie manipulations from the user.
+.sp
+.LP
+Functions returning a scalar value indicate an error by returning \fBundef\fR.
+The caller can examine the \fB$!\fR variable to get the error value.
+.sp
+.LP
+Functions returning a list value return the number of elements in the list when
+called in scalar context. In the event of error, the empty list is returned in
+the array context and \fBundef\fR is returned in the scalar context.
+.SS "Constants"
+.sp
+.LP
+The constants are exported with \fB:CONSTANTS\fR or \fB:ALL\fR tags:
+.sp
+.in +2
+.nf
+use Sun::Solaris::Lgrp ':ALL';
+.fi
+.in -2
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+use Sun::Solaris::Lgrp ':CONSTANTS';
+.fi
+.in -2
+
+.sp
+.LP
+The following constants are available for use in Perl programs:
+.br
+.in +2
+\fBLGRP_NONE\fR
+.in -2
+.br
+.in +2
+\fBLGRP_VER_CURRENT\fR
+.in -2
+.br
+.in +2
+\fBLGRP_VER_NONE\fR
+.in -2
+.br
+.in +2
+\fBLGRP_VIEW_CALLER\fR
+.in -2
+.br
+.in +2
+\fBLGRP_VIEW_OS\fR
+.in -2
+.br
+.in +2
+\fBLGRP_AFF_NONE\fR
+.in -2
+.br
+.in +2
+\fBLGRP_AFF_STRONG\fR
+.in -2
+.br
+.in +2
+\fBLGRP_AFF_WEAK\fR
+.in -2
+.br
+.in +2
+\fBLGRP_CONTENT_DIRECT\fR
+.in -2
+.br
+.in +2
+\fBLGRP_CONTENT_HIERARCHY\fR
+.in -2
+.br
+.in +2
+\fBLGRP_MEM_SZ_FREE\fR
+.in -2
+.br
+.in +2
+\fBLGRP_MEM_SZ_FREE\fR
+.in -2
+.br
+.in +2
+\fBLGRP_RSRC_CPU\fR (1)
+.in -2
+.br
+.in +2
+\fBLGRP_RSRC_MEM\fR (1)
+.in -2
+.br
+.in +2
+\fBLGRP_CONTENT_ALL\fR (1)
+.in -2
+.br
+.in +2
+\fBLGRP_LAT_CPU_TO_MEM\fR (1)
+.in -2
+.br
+.in +2
+\fBP_PID\fR
+.in -2
+.br
+.in +2
+\fBP_LWPID\fR
+.in -2
+.br
+.in +2
+\fBP_MYID\fR
+.in -2
+.sp
+.LP
+(1) Available for versions of the \fBliblgrp\fR(3LIB) API greater than 1.
+.SS "Functions"
+.sp
+.LP
+A detailed description of each function follows. Since this module is intended
+to provide a Perl interface to the functions in \fBliblgrp\fR(3LIB), a very
+short description is given for the corresponding functions in this module and a
+reference is given to the complete description in the \fBliblgrp\fR manual
+pages. Any differences or additional functionality in the Perl module are
+highlighted and fully documented here.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_init([LGRP_VIEW_CALLER | LGRP_VIEW_OS])\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function initializes the lgroup interface and takes a snapshot of the
+lgroup hierarchy with the given view. Given the view, \fBlgrp_init()\fR returns
+a cookie representing this snapshot of the lgroup hierarchy. This cookie should
+be used with other routines in the lgroup interface needing the lgroup
+hierarchy. The \fBlgrp_fini()\fR function should be called with the cookie when
+it is no longer needed. Unlike \fBlgrp_init\fR(3LGRP), \fBLGRP_VIEW_OS\fR is
+assumed as the default if no view is provided.
+.sp
+Upon successful completion, \fBlgrp_init()\fR returns a cookie. Otherwise it
+returns \fBundef\fR and sets \fB$!\fR to indicate the error.
+.sp
+See \fBlgrp_init\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_fini\fR($\fIcookie\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie, frees the snapshot of the lgroup hierarchy
+created by \fBlgrp_init()\fR, and cleans up anything else set up by
+\fBlgrp_init()\fR. After this function is called, the cookie returned by the
+lgroup interface might no longer be valid and should not be used.
+.sp
+Upon successful completion, 1 is returned. Otherwise, \fBundef\fR is returned
+and \fB$!\fR is set to indicate the error.
+.sp
+See \fBlgrp_fini\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_view\fR($\fIcookie\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing the snapshot of the lgroup hierarchy
+and returns the snapshot's view of the lgroup hierarchy.
+.sp
+If the given view is \fBLGRP_VIEW_CALLER\fR, the snapshot contains only the
+resources that are available to the caller (such as those with respect to
+processor sets). When the view is \fBLGRP_VIEW_OS\fR, the snapshot contains
+what is available to the operating system.
+.sp
+Upon succesful completion, the function returns the view for the snapshot of
+the lgroup hierarchy represented by the given cookie.  Otherwise, \fBundef\fR
+is returned and \fB$!\fR is set to indicate the error.
+.sp
+See \fBlgrp_view\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_home\fR($\fIidtype\fR, $\fIid\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the home lgroup for the given process or thread. The
+$\fIidtype\fR argument should be \fBP_PID\fR to specify a process and the
+$\fIid\fR argument should be its process ID. Otherwise, the $\fIidtype\fR
+argument should be \fBP_LWPID\fR to specify a thread and the $\fIid\fR argument
+should be its LWP ID. The value \fBP_MYID\fR can be used for the $\fIid\fR
+argument to specify the current process or thread.
+.sp
+Upon successful completion, \fBlgrp_home()\fR returns the ID of the home lgroup
+of the specified process or thread. Otherwise, \fBundef\fR is returned and
+\fB$!\fR is set to indicate the error.
+.sp
+See \fBlgrp_home\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_cookie_stale\fR($\fIcookie\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Upon successful completion, this function returns whether the cookie is stale.
+Otherwise, it returns \fBundef\fR and sets \fB$!\fR to indicate the error.
+.sp
+The \fBlgrp_cookie_stale()\fR function will fail with \fBEINVAL\fR if the
+cookie is not valid.
+.sp
+See \fBlgrp_cookie_stale\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_cpus\fR($\fIcookie\fR, $\fIlgrp\fR, $\fIcontext\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy
+and returns the list of CPUs in the lgroup specified by $\fIlgrp\fR. The
+$\fIcontext\fR argument should be set to one of the following values to specify
+whether the direct contents or everything in this lgroup including its children
+should be returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_CONTENT_HIERARCHY\fR\fR
+.ad
+.RS 26n
+.rt  
+everything within this hierarchy
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_CONTENT_DIRECT\fR\fR
+.ad
+.RS 26n
+.rt  
+directly contained in lgroup
+.RE
+
+When called in scalar context, \fBlgrp_cpus()\fR function returns the number of
+CPUs contained in the specified lgroup.
+.sp
+In the event of error, \fBundef\fR is returned in scalar context and \fB$!\fR
+is set to indicate the error. In list context, the empty list is returned and
+\fB$!\fR is set.
+.sp
+See \fBlgrp_cpus\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_children\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy
+and returns the list of lgroups that are children of the specified lgroup.
+.sp
+When called in scalar context, \fBlgrp_children()\fR returns the number of
+children lgroups for the specified lgroup.
+.sp
+In the event of error, \fBundef\fR or empty list is returned and \fB$!\fR is
+set to indicate the error.
+.sp
+See \fBlgrp_children\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_parents\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy
+and returns the list of parents of the specified lgroup.
+.sp
+When called in scalar context, \fBlgrp_parents()\fR returns the number of
+parent lgroups for the specified lgroup.
+.sp
+In the event of error, \fBundef\fR or an empty list is returned and \fB$!\fR is
+set to indicate the error.
+.sp
+See \fBlgrp_parents\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_nlgrps\fR($\fIcookie\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy.
+It returns the number of lgroups in the hierarchy, where the number is always
+at least one.
+.sp
+In the event of error, \fBundef\fR is returned and \fB$!\fR is set to
+\fBEINVAL\fR, indicating that the cookie is not valid.
+.sp
+See \fBlgrp_nlgrps\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_root\fR($\fIcookie\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the root lgroup ID.
+.sp
+In the event of error, \fBundef\fR is returned and \fB$!\fR is set to
+\fBEINVAL\fR, indicatng that the cookie is not valid.
+.sp
+See \fBlgrp_root\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_mem_size\fR($\fIcookie\fR, $\fIlgrp\fR, $\fItype\fR,
+$\fIcontent\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy.
+The function returns the memory size of the given lgroup in bytes. The
+$\fItype\fR argument should be set to one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_MEM_SZ_FREE\fR\fR
+.ad
+.RS 25n
+.rt  
+free memory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_MEM_SZ_INSTALLED\fR\fR
+.ad
+.RS 25n
+.rt  
+installed memory
+.RE
+
+The $\fIcontent\fR argument should be set to one of the following values to
+specify whether the direct contents or everything in this lgroup including its
+children should be returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_CONTENT_HIERARCHY\fR\fR
+.ad
+.RS 26n
+.rt  
+Return everything within this hierarchy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_CONTENT_DIRECT\fR\fR
+.ad
+.RS 26n
+.rt  
+Return that which is directly contained in this lgroup.
+.RE
+
+The total sizes include all the memory in the lgroup including its children,
+while the others reflect only the memory contained directly in the given
+lgroup.
+.sp
+Upon successful completion, the size in bytes is returned. Otherwise,
+\fBundef\fR is returned and \fB$!\fR is set to indicate the error.
+.sp
+See \fBlgrp_mem_size\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_version\fR([$\fIversion\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This function takes an interface version number, $\fIversion\fR, as an argument
+and returns an lgroup interface version. The $\fIversion\fR argument should be
+the value of \fBLGRP_VER_CURRENT\fR or \fBLGRP_VER_NONE\fR to find out the
+current lgroup interface version on the running system.
+.sp
+If $\fIversion\fR is still supported by the implementation, then
+\fBlgrp_version()\fR returns the requested version. If \fBLGRP_VER_NONE\fR is
+returned, the implementation cannot support the requested version.
+.sp
+If $\fIversion\fR is \fBLGRP_VER_NONE\fR, \fBlgrp_version()\fR returns the
+current version of the library.
+.sp
+The following example tests whether the version of the interface used by the
+caller is supported:
+.sp
+.in +2
+.nf
+lgrp_version(LGRP_VER_CURRENT) == LGRP_VER_CURRENT or
+    die("Built with unsupported lgroup interface");
+.fi
+.in -2
+
+See \fBlgrp_version\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_affinity_set\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR,
+$\fIaffinity\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function sets the affinity that the LWP or set of LWPs specified by
+$\fIidtype\fR and $\fIid\fR have for the given lgroup. The lgroup affinity can
+be set to \fBLGRP_AFF_STRONG\fR, \fBLGRP_AFF_WEAK\fR, or \fBLGRP_AFF_NONE\fR.
+.sp
+If the $\fIidtype\fR is \fBP_PID\fR, the affinity is retrieved for one of the
+LWPs in the process or set for all the LWPs of the process with process ID
+(PID) $\fIid\fR. The affinity is retrieved or set for the LWP of the current
+process with LWP ID $\fIid\fR if $\fIidtype\fR is \fBP_LWPID\fR. If $\fIid\fR
+is \fBP_MYID\fR, then the current LWP or process is specified.
+.sp
+There are different levels of affinity that can be specified by a thread for a
+particuliar lgroup. The levels of affinity are the following from strongest to
+weakest:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_AFF_STRONG\fR\fR
+.ad
+.RS 19n
+.rt  
+strong affinity
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_AFF_WEAK\fR\fR
+.ad
+.RS 19n
+.rt  
+weak affinity
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_AFF_NONE\fR\fR
+.ad
+.RS 19n
+.rt  
+no affinity
+.RE
+
+Upon successful completion, \fBlgrp_affinity_set()\fR returns 1. Otherwise, it
+returns \fBundef\fR and set \fB$!\fR to indicate the error.
+.sp
+See \fBlgrp_affinity_set\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_affinity_get\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the affinity that the LWP has to a given lgroup.
+.sp
+See \fBlgrp_affinity_get\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_latency_cookie\fR($\fIcookie\fR, $\fIfrom\fR, $\fIto\fR,
+[$\fIbetween\fR=\fBLGRP_LAT_CPU_TO_MEM\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This function takes a cookie representing a snapshot of the lgroup hierarchy
+and returns the latency value between a hardware resource in the $\fIfrom\fR
+lgroup to a hardware resource in the $\fIto\fR lgroup. If $\fIfrom\fR is the
+same lgroup as $\fIto\fR, the latency value within that lgroup is returned.
+.sp
+The optional $\fIbetween\fR argument should be set to \fBLGRP_LAT_CPU_TO_MEM\fR
+to specify between which hardware resources the latency should be measured. The
+only valid value is \fBLGRP_LAT_CPU_TO_MEM\fR, which represents latency from
+CPU to memory.
+.sp
+Upon successful completion, \fBlgrp_latency_cookie()\fR return 1.  Otherwise,
+it returns \fBundef\fR and set \fB$!\fR to indicate the error. For LGRP API
+version 1, the \fBlgrp_latency_cookie()\fR is an alias for
+\fBlgrp_latency.()\fR
+.sp
+See \fBlgrp_latency_cookie\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_latency\fR($\fIfrom\fR, $\fIto\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function is similiar to the \fBlgrp_latency_cookie()\fR function, but
+returns the latency between the given lgroups at the given instant in time.
+Since lgroups can be freed and reallocated, this function might not be able to
+provide a consistent answer across calls. For that reason,
+\fBlgrp_latency_cookie()\fR should be used in its place.
+.sp
+See \fBlgrp_latency\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_resources\fR($\fIcookie\fR, $\fIlgrp\fR, $\fItype\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the list of lgroups directly containing resources of the
+specified type. The resources are represented by a set of lgroups in which each
+lgroup directly contains CPU and/or memory resources.
+.sp
+The \fItype\fR can be specified as:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_RSRC_CPU\fR\fR
+.ad
+.RS 17n
+.rt  
+CPU resources
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLGRP_RSRC_MEM\fR\fR
+.ad
+.RS 17n
+.rt  
+memory resources
+.RE
+
+In the event of error, \fBundef\fR or an empty list is returned and \fB$!\fR is
+set to indicate the error.
+.sp
+This function is available only for API version 2 and returns \fBundef\fR or an
+empty list for API version 1 and sets \fB$!\fR to \fBEINVAL\fR.
+.sp
+See \fBlgrp_resources\fR(3LGRP) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_lgrps\fR($\fIcookie\fR, [$\fIlgrp\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This function returns a list of all lgroups in a hierarchy starting from
+$\fIlgrp\fR. If $\fIlgrp\fR is not specified, uses the value of
+\fBlgrp_root\fR($\fIcookie\fR).  This function returns the empty list on
+failure.
+.sp
+When called in scalar context, this function returns the total number of
+lgroups in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_leaves\fR($\fIcookie\fR, [$\fIlgrp\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This function returns a list of all leaf lgroups in a hierarchy starting from
+$\fIlgrp\fR. If $\fIlgrp\fR is not specified, this function uses the value of
+\fBlgrp_root\fR($\fIcookie\fR). It returns \fBundef\fR or an empty list on
+failure.
+.sp
+When called in scalar context, this function returns the total number of leaf
+lgroups in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrp_isleaf\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This function returns True if $\fIlgrp\fR is a leaf (has no children).
+Otherwise it returns False.
+.RE
+
+.SS "Object methods"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnew\fR([$\fIview\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This method creates a new \fBSun::Solaris::Lgrp\fR object. An optional argument
+is passed to the \fBlgrp_init()\fR function. By default this method uses
+\fBLGRP_VIEW_OS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcookie()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This method returns a transparent cookie that can be passed to functions
+accepting the cookie.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBversion\fR([$\fIversion\fR])\fR
+.ad
+.sp .6
+.RS 4n
+Without the argument, this method returns the current version of the
+\fBliblgrp\fR(3LIB) library. This method is a wrapper for \fBlgrp_version()\fR
+with \fBLGRP_VER_NONE\fR as the default version argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstale()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This method returns T if the lgroup information in the object is stale and F
+otherwise. It is a wrapper for \fBlgrp_cookie_stale()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBview()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the snapshot's view of the lgroup hierarchy. It is a
+wrapper for \fBlgrp_view()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBroot()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the root lgroup. It is a wrapper for \fBlgrp_root()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBchildren\fR($\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the list of lgroups that are children of the specified
+lgroup. It is a wrapper for \fBlgrp_children()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBparents\fR($\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the list of lgroups that are parents of the specified
+lgroup. It is a wrapper for \fBlgrp_parents()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnlgrps()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the number of lgroups in the hierarchy. It is a wrapper for
+\fBlgrp_nlgrps()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmem_size\fR($\fIlgrp\fR, $\fItype\fR, $\fIcontent\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the memory size of the given lgroup in bytes. It is a
+wrapper for \fBlgrp_mem_size()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcpus\fR($\fIlgrp\fR, $\fIcontext\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the list of CPUs in the lgroup specified by $lgrp. It is a
+wrapper for \fBlgrp_cpus()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBresources\fR($\fIlgrp\fR, $\fItype\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the list of lgroups directly containing resources of the
+specified type. It is a wrapper for \fBlgrp_resources()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhome\fR($\fIidtype\fR, $\fIid\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the home lgroup for the given process or thread. It is a
+wrapper for \fBlgrp_home()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaffinity_get\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the affinity that the LWP has to a given lgrp. It is a
+wrapper for \fBlgrp_affinity_get()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaffinity_set\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR,
+$\fIaffinity\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method sets the affinity that the LWP or set of LWPs specified by
+$\fIidtype\fR and $\fIid\fR have for the given lgroup. It is a wrapper for
+lgrp_affinity_set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlgrps\fR([$\fIlgrp\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This method returns list of all lgroups in a hierarchy starting from
+$\fIlgrp\fR or the \fBlgrp_root()\fR if $\fIlgrp\fR is not specified. It is a
+wrapper for \fBlgrp_lgrps()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBleaves\fR([$\fIlgrp\fR])\fR
+.ad
+.sp .6
+.RS 4n
+This method returns a list of all leaf lgroups in a hierarchy starting from
+$\fIlgrp\fR.  If $\fIlgrp\fR is not specified, this method uses the value of
+\fBlgrp_root()\fR. It is a wrapper for \fBlgrp_leaves()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBisleaf\fR($\fIlgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns True if $\fIlgrp\fR is leaf (has no children) and False
+otherwise. It is a wrapper for \fBlgrp_isleaf()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlatency\fR($\fIfrom\fR, $\fIto\fR)\fR
+.ad
+.sp .6
+.RS 4n
+This method returns the latency value between a hardware resource in the
+$\fIfrom\fR lgroup to a hardware resource in the $\fIto\fR lgroup. It uses
+\fBlgrp_latency()\fR for version 1 of \fBliblgrp\fR and
+\fBlgrp_latency_cookie()\fR for newer versions.
+.RE
+
+.SS "Exports"
+.sp
+.LP
+By default nothing is exported from this module. The following tags can be used
+to selectively import constants and functions defined in this module:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:LGRP_CONSTANTS\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBLGRP_AFF_NONE\fR, \fBLGRP_AFF_STRONG\fR, \fBLGRP_AFF_WEAK\fR,
+\fBLGRP_CONTENT_DIRECT\fR, \fBLGRP_CONTENT_HIERARCHY\fR,
+\fBLGRP_MEM_SZ_FREE\fR, \fBLGRP_MEM_SZ_INSTALLED\fR, \fBLGRP_VER_CURRENT\fR,
+\fBLGRP_VER_NONE\fR, \fBLGRP_VIEW_CALLER\fR, \fBLGRP_VIEW_OS\fR,
+\fBLGRP_NONE\fR, \fBLGRP_RSRC_CPU\fR, \fBLGRP_RSRC_MEM\fR,
+\fBLGRP_CONTENT_ALL\fR, \fBLGRP_LAT_CPU_TO_MEM\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:PROC_CONSTANTS\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBP_PID\fR, \fBP_LWPID\fR, \fBP_MYID\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:CONSTANTS\fR\fR
+.ad
+.RS 19n
+.rt  
+\fB:LGRP_CONSTANTS\fR, \fB:PROC_CONSTANTS\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:FUNCTIONS\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBlgrp_affinity_get()\fR, \fBlgrp_affinity_set()\fR, \fBlgrp_children()\fR,
+\fBlgrp_cookie_stale()\fR, \fBlgrp_cpus()\fR, \fBlgrp_fini()\fR,
+\fBlgrp_home()\fR, \fBlgrp_init()\fR, \fBlgrp_latency()\fR,
+\fBlgrp_latency_cookie()\fR, \fBlgrp_mem_size()\fR, \fBlgrp_nlgrps()\fR,
+\fBlgrp_parents()\fR, \fBlgrp_root()\fR, \fBlgrp_version()\fR,
+\fBlgrp_view()\fR, \fBlgrp_resources()\fR, \fBlgrp_lgrps()\fR,
+\fBlgrp_leaves()\fR, \fBlgrp_isleaf()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:ALL\fR\fR
+.ad
+.RS 19n
+.rt  
+\fB:CONSTANTS\fR, \fB:FUNCTIONS\fR
+.RE
+
+.SS "Error values"
+.sp
+.LP
+The functions in this module return \fBundef\fR or an empty list when an
+underlying library function fails. The \fB$!\fR is set to provide more
+information values for the error. The following error codes are possible:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value supplied is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There was not enough system memory to complete an operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The effective user of the calling process does not have appropriate privileges,
+and its real or effective user ID does not match the real or effective user ID
+of one of the threads.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified process or thread was not found.
+.RE
+
+.SS "Difference in the API versions"
+.sp
+.LP
+The \fBliblgrp\fR(3LIB) library is versioned. The exact version that was used
+to compile a module is available through the \fBlgrp_version()\fR function.
+.sp
+.LP
+Version 2 of the \fBlgrp_user\fR API introduced the following constants and
+functions not present in version 1:
+.br
+.in +2
+\fBLGRP_RSRC_CPU\fR constant
+.in -2
+.br
+.in +2
+\fBLGRP_RSRC_MEM\fR constant
+.in -2
+.br
+.in +2
+\fBLGRP_CONTENT_ALL\fR constant
+.in -2
+.br
+.in +2
+\fBLGRP_LAT_CPU_TO_MEM\fR constant
+.in -2
+.br
+.in +2
+\fBlgrp_resources()\fR function
+.in -2
+.br
+.in +2
+\fBlgrp_latency_cookie()\fR function
+.in -2
+.sp
+.LP
+The \fBLGRP_RSRC_CPU\fR and \fBLGRP_RSRC_MEM\fR constants are not defined for
+version 1. The \fBlgrp_resources()\fR function is defined for version 1 but
+always returns an empty list. The \fBlgrp_latency_cookie()\fR function is an
+alias for \fBlgrp_latency()\fR for version 1.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUnstable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_affinity_get\fR(3LGRP), \fBlgrp_affinity_set\fR(3LGRP),
+\fBlgrp_children\fR(3LGRP), \fBlgrp_cookie_stale\fR(3LGRP),
+\fBlgrp_cpus\fR(3LGRP), \fBlgrp_fini\fR(3LGRP), \fBlgrp_home\fR(3LGRP),
+\fBlgrp_init\fR(3LGRP), \fBlgrp_latency\fR(3LGRP),
+\fBlgrp_latency_cookie\fR(3LGRP), \fBlgrp_mem_size\fR(3LGRP),
+\fBlgrp_nlgrps\fR(3LGRP), \fBlgrp_parents\fR(3LGRP),
+\fBlgrp_resources\fR(3LGRP), \fBlgrp_root\fR(3LGRP), \fBlgrp_version\fR(3LGRP),
+\fBlgrp_view\fR(3LGRP), \fBliblgrp\fR(3LIB), \fBattributes\fR(5)

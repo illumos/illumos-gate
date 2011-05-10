@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_cancel 3C "2 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_cancel \- cancel execution of a thread
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_cancel\fR(\fBpthread_t\fR \fItarget_thread\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_cancel()\fR function requests that \fItarget_thread\fR be
+canceled.
+.sp
+.LP
+By default, cancellation is deferred until \fItarget_thread\fR reaches a
+cancellation point. See \fBcancellation\fR(5).
+.sp
+.LP
+Cancellation cleanup handlers for \fItarget_thread\fR are called when the
+cancellation is acted on. Upon return of the last cancellation cleanup handler,
+the thread-specific data destructor functions are called for
+\fItarget_thread\fR. \fItarget_thread\fR is terminated when the last destructor
+function returns.
+.sp
+.LP
+A thread acting on a cancellation request runs with all signals blocked. All
+thread termination functions, including cancellation cleanup handlers and
+thread-specific data destructor functions, are called with all signals blocked.
+.sp
+.LP
+The cancellation processing in  \fItarget_thread\fR runs asynchronously with
+respect to the calling thread returning from \fBpthread_cancel()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_cancel()\fR function returns  \fB0\fR. Otherwise,
+an error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_cancel()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 9n
+.rt  
+No thread was found with an \fBID\fR corresponding to that specified by the
+given thread \fBID,\fR \fItarget_thread\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cleanup_pop\fR(3C), \fBpthread_cleanup_push\fR(3C),
+\fBpthread_cond_wait\fR(3C), \fBpthread_cond_timedwait\fR(3C),
+\fBpthread_exit\fR(3C), \fBpthread_join\fR(3C),
+\fBpthread_setcancelstate\fR(3C), \fBpthread_setcanceltype\fR(3C),
+\fBpthread_testcancel\fR(3C), \fBsetjmp\fR(3C), \fBattributes\fR(5),
+\fBcancellation\fR(5), \fBcondition\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+See \fBcancellation\fR(5) for a discussion of cancellation concepts.

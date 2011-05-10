@@ -1,0 +1,73 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH script 1 "30 Jan 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+script \- make record of a terminal session
+.SH SYNOPSIS
+.LP
+.nf
+\fBscript\fR [\fB-a\fR] [\fIfilename\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscript\fR utility makes a record of everything printed on your screen.
+The record is written to \fIfilename\fR. If no file name is given, the record
+is saved in the file \fBtypescript\fR. See WARNINGS.
+.sp
+.LP
+The \fBscript\fR command forks and creates a sub-shell, according to the value
+of \fB$SHELL\fR, and records the text from this session. The script ends when
+the forked shell exits or when Control-d is typed.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Appends the session record to \fIfilename\fR, rather than overwriting it.
+.RE
+
+.SH NOTES
+.sp
+.LP
+\fBscript\fR places everything that appears on the screen in \fIfilename\fR,
+including prompts.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+\fBscript\fR can pose a security risk when used in directories that are
+writable by other users (for example, \fB/tmp\fR), especially when run by a
+privileged user, that is, root. Be sure that \fBtypescript\fR is not a link
+before running \fBscript\fR.

@@ -1,0 +1,171 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.   All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_setcred 3PAM "10 Jan 2008" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_setcred \- modify or delete user credentials for an authentication service
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+
+\fBint\fR \fBpam_setcred\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_setcred()\fR function is used to establish, modify, or delete user
+credentials. It is typically called after the user has been authenticated and
+after a session has been validated. See \fBpam_authenticate\fR(3PAM) and
+\fBpam_acct_mgmt\fR(3PAM).
+.sp
+.LP
+The user is specified by a prior call to \fBpam_start()\fR or
+\fBpam_set_item()\fR, and is referenced by the authentication handle,
+\fIpamh\fR. The following flags may be set in the \fIflags\fR field.  Note that
+the first four flags are mutually exclusive:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_ESTABLISH_CRED\fR\fR
+.ad
+.RS 25n
+.rt  
+Set user credentials for an authentication service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_DELETE_CRED\fR\fR
+.ad
+.RS 25n
+.rt  
+Delete user credentials associated with an authentication service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_REINITIALIZE_CRED\fR\fR
+.ad
+.RS 25n
+.rt  
+Reinitialize user credentials.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_REFRESH_CRED\fR\fR
+.ad
+.RS 25n
+.rt  
+Extend lifetime of user credentials.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 25n
+.rt  
+Authentication service should not generate any messages.
+.RE
+
+.sp
+.LP
+If no flag is set,  \fBPAM_ESTABLISH_CRED\fR is used as the default.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBpam_setcred()\fR returns  \fBPAM_SUCCESS\fR. In addition to
+the error return values described in \fBpam\fR(3PAM) the following values may
+be returned upon error:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CRED_UNAVAIL\fR\fR
+.ad
+.RS 20n
+.rt  
+Underlying authentication service can not retrieve user credentials
+unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CRED_EXPIRED\fR\fR
+.ad
+.RS 20n
+.rt  
+User credentials expired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 20n
+.rt  
+User unknown to underlying authentication service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CRED_ERR\fR\fR
+.ad
+.RS 20n
+.rt  
+Failure setting user credentials.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Committed
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM), \fBpam_authenticate\fR(3PAM),
+\fBpam_set_item\fR(3PAM), \fBpam_start\fR(3PAM), \fBlibpam\fR(3LIB),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

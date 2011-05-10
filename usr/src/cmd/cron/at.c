@@ -48,6 +48,7 @@
 #include <libintl.h>
 #include <tzfile.h>
 #include <project.h>
+#include <paths.h>
 
 #include "cron.h"
 
@@ -606,11 +607,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 			ulimit_flag = 1;
 	} else {
 		/* SHELL is NULL or unset, therefore use default */
-#ifdef XPG4
-		Shell = shell = "/usr/xpg4/bin/sh";
-#else
-		Shell = shell = "/bin/sh";
-#endif /* XPG4 */
+		Shell = shell = _PATH_BSHELL;
 		ulimit_flag = 1;
 	}
 

@@ -1,0 +1,193 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_binding_name 3DEVINFO "22 Mar 2004" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_binding_name, di_bus_addr, di_compatible_names, di_devid, di_driver_name,
+di_driver_ops, di_driver_major, di_instance, di_nodeid, di_node_name \- return
+libdevinfo node information
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
+#include <libdevinfo.h>
+
+\fBchar *\fR\fBdi_binding_name\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBdi_bus_addr\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdi_compatible_names\fR(\fBdi_node_t\fR \fInode\fR, \fBchar **\fR\fInames\fR);
+.fi
+
+.LP
+.nf
+\fBddi_devid_t\fR \fBdi_devid\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBdi_driver_name\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBdi_driver_ops\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdi_driver_major\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdi_instance\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdi_nodeid\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBdi_node_name\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInames\fR\fR
+.ad
+.RS 9n
+.rt  
+The address of a pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInode\fR\fR
+.ad
+.RS 9n
+.rt  
+A  handle to a device  node.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions extract information associated with a device node.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdi_binding_name()\fR function returns a pointer to the binding name. The
+binding name is the name used by the system to select a driver for the device.
+.sp
+.LP
+The \fBdi_bus_addr()\fR function returns a pointer to a null-terminated string
+containing the assigned bus address for the device. \fBNULL\fR is returned if a
+bus address has not been assigned to the device. A zero-length string may be
+returned and is considered a valid bus address.
+.sp
+.LP
+The return value of \fBdi_compatible_names()\fR is the number of compatible
+names. \fInames\fR is updated to point to a buffer contained within the
+snapshot. The buffer contains a concatenation of null-terminated strings, for
+example:
+.sp
+.in +2
+.nf
+<\fIname1\fR>/0<\fIname2\fR>/0...<\fInamen\fR>/0
+.fi
+.in -2
+
+.sp
+.LP
+See the discussion of generic names in \fIWriting Device Drivers\fR for a
+description of how compatible names are used by Solaris to achieve driver
+binding for the node.
+.sp
+.LP
+The \fBdi_devid()\fR function returns the device \fBID\fR for \fInode\fR, if it
+is registered. Otherwise, a null pointer is returned. Interfaces in the
+\fBlibdevid\fR(3LIB) library may be used to manipulate the handle to the device
+id. This function is obsolete and might be removed from a future Solaris
+release. Applications should use the "devid" property instead.
+.sp
+.LP
+The \fBdi_driver_name()\fR function returns the name of the driver bound to the
+\fInode\fR. A null pointer is returned if  \fInode\fR is not bound to any
+driver.
+.sp
+.LP
+The \fBdi_driver_ops()\fR function returns a bit array of  device driver entry
+points that are supported by the driver bound to this \fInode\fR. Possible bit
+fields supported by the driver are \fBDI_CB_OPS\fR, \fBDI_BUS_OPS\fR,
+\fBDI_STREAM_OPS\fR.
+.sp
+.LP
+The \fBdi_driver_major()\fR function returns the major number associated with
+the driver bound to \fInode\fR. If there is no driver bound to the node, this
+function returns \(mi1.
+.sp
+.LP
+The \fBdi_instance()\fR function returns the instance number of the device. A
+value of \fB-1\fR indicates an instance number has not been assigned to the
+device by the system.
+.sp
+.LP
+The \fBdi_nodeid()\fR function returns  the type of device, which may be one of
+the following possible values: \fBDI_PSEUDO_NODEID\fR, \fBDI_PROM_NODEID\fR,
+and \fBDI_SID_NODEID\fR. Devices of type \fBDI_PROM_NODEID\fR may have
+additional properties that are defined by the \fBPROM\fR. See
+\fBdi_prom_prop_data\fR(3DEVINFO) and
+\fBdi_prom_prop_lookup_bytes\fR(3DEVINFO).
+.sp
+.LP
+The \fBdi_node_name()\fR function returns a pointer to a null-terminated string
+containing the node name.
+.SH EXAMPLES
+.sp
+.LP
+See \fBdi_init\fR(3DEVINFO) for an example demonstrating typical use of these
+functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving (\fBdi_devid()\fR is obsolete)
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBdi_prom_init\fR(3DEVINFO),
+\fBdi_prom_prop_data\fR(3DEVINFO), \fBdi_prom_prop_lookup_bytes\fR(3DEVINFO),
+\fBlibdevid\fR(3LIB), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

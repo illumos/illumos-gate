@@ -1,0 +1,915 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strftime 3C "5 Sep 2006" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+strftime, cftime, ascftime \- convert date and time to string
+.SH SYNOPSIS
+.LP
+.nf
+#include <time.h>
+
+\fBsize_t\fR \fBstrftime\fR(\fBchar *restrict\fR \fIs\fR, \fBsize_t\fR \fImaxsize\fR,
+     \fBconst char *restrict\fR \fIformat\fR,
+     \fBconst struct tm *restrict\fR \fItimeptr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcftime\fR(\fBchar *\fR\fIs\fR, \fBchar *\fR\fIformat\fR, \fBconst time_t *\fR\fIclock\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBascftime\fR(\fBchar *\fR\fIs\fR, \fBconst char *\fR\fIformat\fR,
+     \fBconst struct tm *\fR\fItimeptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstrftime()\fR, \fBascftime()\fR, and \fBcftime()\fR functions place
+bytes into the array pointed to by \fIs\fR as controlled by the string pointed
+to by \fIformat\fR. The \fIformat\fR string consists of zero or more conversion
+specifications and ordinary characters.  A conversion specification consists of
+a '\fB%\fR' (percent) character and one or two terminating conversion
+characters that determine the conversion specification's behavior.  All
+ordinary characters (including the terminating null byte) are copied unchanged
+into the array pointed to by \fIs\fR. If copying takes place between objects
+that overlap, the behavior is undefined. For \fBstrftime()\fR, no more than
+\fImaxsize\fR bytes are placed into the array.
+.sp
+.LP
+If \fIformat\fR is \fB(char *)0\fR, then the locale's default format is used.
+For \fBstrftime()\fR the default format is the same as \fB%c\fR; for
+\fBcftime()\fR and \fBascftime()\fR the default format is the same as \fB%C\fR.
+\fBcftime()\fR and \fBascftime()\fR first try to use the value of the
+environment variable \fBCFTIME\fR, and if that is undefined or empty, the
+default format is used.
+.sp
+.LP
+Each conversion specification is replaced by appropriate characters as
+described in the following list. The appropriate characters are determined by
+the \fBLC_TIME\fR category of the program's locale and by the values contained
+in the structure pointed to by \fItimeptr\fR for \fBstrftime()\fR and
+\fBascftime()\fR, and by the time represented by \fIclock\fR for
+\fBcftime()\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+Same as \fB%\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%a\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's abbreviated weekday name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%A\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's full weekday name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%b\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's abbreviated month name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%B\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's full month name.
+.RE
+
+.SS "Default"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%c\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's appropriate date and time represented as:
+.sp
+.in +2
+.nf
+%a %b %d %H:%M:%S %Y
+.fi
+.in -2
+
+This is the default behavior as well as standard-conforming behavior for
+standards first supported by releases prior to Solaris 2.4. See
+\fBstandards\fR(5).
+.RE
+
+.SS "Standard conforming"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%c\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's appropriate date and time represented as:
+.sp
+.in +2
+.nf
+%a %b %e %H:%M:%S %Y
+.fi
+.in -2
+
+This is standard-conforming behavior for standards first supported by Solaris
+2.4 through Solaris 10.
+.RE
+
+.SS "Default"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%C\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's date and time representation as produced by \fBdate\fR(1).
+.sp
+This is the default behavior as well as standard-conforming behavior for
+standards first supported by releases prior to Solaris 2.4.
+.RE
+
+.SS "Standard conforming"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%C\fR\fR
+.ad
+.RS 6n
+.rt  
+Century number (the year divided by 100 and truncated to an integer as a
+decimal number [01,99]).
+.sp
+This is standard-conforming behavior for standards first supported by Solaris
+2.4 through Solaris 10.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%d\fR\fR
+.ad
+.RS 6n
+.rt  
+Day of month [01,31].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%D\fR\fR
+.ad
+.RS 6n
+.rt  
+Date as \fB%m\fR/\fB%d\fR/\fB%y\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%e\fR\fR
+.ad
+.RS 6n
+.rt  
+Day of month [1,31]; single  digits are preceded by a space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%F\fR\fR
+.ad
+.RS 6n
+.rt  
+Equivalent to \fB%Y\fR-\fB%m\fR-\fB%d\fR (the ISO 8601:2000 standard date
+format).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%g\fR\fR
+.ad
+.RS 6n
+.rt  
+Week-based year within century [00,99].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%G\fR\fR
+.ad
+.RS 6n
+.rt  
+Week-based year, including the century [0000,9999].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%h\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's abbreviated month name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%H\fR\fR
+.ad
+.RS 6n
+.rt  
+Hour (24-hour clock) [00,23].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%I\fR\fR
+.ad
+.RS 6n
+.rt  
+Hour (12-hour clock) [01,12].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%j\fR\fR
+.ad
+.RS 6n
+.rt  
+Day number of year [001,366].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%k\fR\fR
+.ad
+.RS 6n
+.rt  
+Hour (24-hour clock) [0,23]; single digits are preceded by a space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%l\fR\fR
+.ad
+.RS 6n
+.rt  
+Hour (12-hour clock) [1,12]; single digits are preceded by a space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%m\fR\fR
+.ad
+.RS 6n
+.rt  
+Month number [01,12].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%M\fR\fR
+.ad
+.RS 6n
+.rt  
+Minute [00,59].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%n\fR\fR
+.ad
+.RS 6n
+.rt  
+Insert a NEWLINE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%p\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's equivalent of either a.m. or p.m.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%r\fR\fR
+.ad
+.RS 6n
+.rt  
+Appropriate time representation in 12-hour clock format with \fB%p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%R\fR\fR
+.ad
+.RS 6n
+.rt  
+Time as \fB%H\fR:\fB%M\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%S\fR\fR
+.ad
+.RS 6n
+.rt  
+Seconds [00,60]; the range of values is [00,60] rather than [00,59] to allow
+for the occasional leap second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%t\fR\fR
+.ad
+.RS 6n
+.rt  
+Insert a TAB.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%T\fR\fR
+.ad
+.RS 6n
+.rt  
+Time as \fB%H\fR:\fB%M\fR:\fB%S\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%u\fR\fR
+.ad
+.RS 6n
+.rt  
+Weekday as a decimal number [1,7], with 1 representing Monday. See \fBNOTES\fR
+below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%U\fR\fR
+.ad
+.RS 6n
+.rt  
+Week number of year as a decimal number [00,53], with Sunday as the first day
+of week 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%V\fR\fR
+.ad
+.RS 6n
+.rt  
+The ISO 8601 week number as a decimal number [01,53]. In the ISO 8601
+week-based system, weeks begin on a Monday and week 1 of the year is the week
+that includes both January 4th and the first Thursday of the year.  If the
+first Monday of January is the 2nd, 3rd, or 4th, the preceding days are part of
+the last week of the preceding year.  See \fBNOTES\fR below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%w\fR\fR
+.ad
+.RS 6n
+.rt  
+Weekday as a decimal number [0,6], with 0 representing Sunday.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%W\fR\fR
+.ad
+.RS 6n
+.rt  
+Week number of year as a decimal number [00,53], with Monday as the first day
+of week 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%x\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's appropriate date representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%X\fR\fR
+.ad
+.RS 6n
+.rt  
+Locale's appropriate time representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%y\fR\fR
+.ad
+.RS 6n
+.rt  
+Year within century [00,99].
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Y\fR\fR
+.ad
+.RS 6n
+.rt  
+Year, including the century (for example 1993).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%z\fR\fR
+.ad
+.RS 6n
+.rt  
+Replaced by offset from UTC in ISO 8601:2000 standard format (\fB+hhmm\fR or
+\fB-hhmm\fR), or by no characters if no time zone is determinable. For example,
+"-0430" means 4 hours 30 minutes behind UTC (west of Greenwich). If
+\fBtm_isdst\fR is zero, the standard time offset is used.  If \fBtm_isdst\fR is
+greater than zero, the daylight savings time offset if used. If \fBtm_isdst\fR
+is negative, no characters are returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Z\fR\fR
+.ad
+.RS 6n
+.rt  
+Time zone name or abbreviation, or no bytes if no time zone information exists.
+.RE
+
+.sp
+.LP
+If a conversion specification does not correspond to any of the above or to any
+of the modified conversion specifications listed below, the behavior is
+undefined and \fB0\fR is returned.
+.sp
+.LP
+The difference between \fB%U\fR and \fB%W\fR (and also between modified
+conversion specifications \fB%OU\fR and \fB%OW\fR) lies in which day is counted
+as the first of the week. Week number 1 is the first week in January starting
+with a Sunday for \fB%U\fR or a Monday for \fB%W\fR. Week number 0 contains
+those days before the first Sunday or Monday in January for \fB%U\fR and
+\fB%W\fR, respectively.
+.SS "Modified Conversion Specifications"
+.sp
+.LP
+Some conversion specifications can be modified by the \fBE\fR and \fBO\fR
+modifiers to indicate that an alternate format or specification should be used
+rather than the one normally used by the unmodified conversion specification.
+If the alternate format or specification does not exist in the current locale,
+the behavior will be as if the unmodified specification were used.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Ec\fR\fR
+.ad
+.RS 7n
+.rt  
+Locale's alternate appropriate date and time representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%EC\fR\fR
+.ad
+.RS 7n
+.rt  
+Name of the base year (period) in the locale's alternate representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Eg\fR\fR
+.ad
+.RS 7n
+.rt  
+Offset from \fB%EC\fR of the week-based year in the locale's alternative
+representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%EG\fR\fR
+.ad
+.RS 7n
+.rt  
+Full alternative representation of the week-based year.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Ex\fR\fR
+.ad
+.RS 7n
+.rt  
+Locale's alternate date representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%EX\fR\fR
+.ad
+.RS 7n
+.rt  
+Locale's alternate time representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Ey\fR\fR
+.ad
+.RS 7n
+.rt  
+Offset from \fB%EC\fR (year only) in the locale's alternate representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%EY\fR\fR
+.ad
+.RS 7n
+.rt  
+Full alternate year representation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Od\fR\fR
+.ad
+.RS 7n
+.rt  
+Day of the month using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Oe\fR\fR
+.ad
+.RS 7n
+.rt  
+Same as \fB%Od\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Og\fR\fR
+.ad
+.RS 7n
+.rt  
+Week-based year (offset from \fB%C\fR) in the locale's alternate representation
+and using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OH\fR\fR
+.ad
+.RS 7n
+.rt  
+Hour (24-hour clock) using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OI\fR\fR
+.ad
+.RS 7n
+.rt  
+Hour (12-hour clock) using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Om\fR\fR
+.ad
+.RS 7n
+.rt  
+Month using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OM\fR\fR
+.ad
+.RS 7n
+.rt  
+Minutes using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OS\fR\fR
+.ad
+.RS 7n
+.rt  
+Seconds using the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Ou\fR\fR
+.ad
+.RS 7n
+.rt  
+Weekday as a number in the locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OU\fR\fR
+.ad
+.RS 7n
+.rt  
+Week number of the year (Sunday as the first day of the week) using the
+locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Ow\fR\fR
+.ad
+.RS 7n
+.rt  
+Number of the weekday (Sunday=0) using the  locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%OW\fR\fR
+.ad
+.RS 7n
+.rt  
+Week number of the year (Monday as the first day of the week) using the
+locale's alternate numeric symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Oy\fR\fR
+.ad
+.RS 7n
+.rt  
+Year (offset from \fB%C\fR) in the locale's alternate representation and using
+the locale's alternate numeric symbols.
+.RE
+
+.SS "Selecting the Output Language"
+.sp
+.LP
+By default, the output of \fBstrftime()\fR, \fBcftime()\fR, and
+\fBascftime()\fR appear in U.S. English. The user can request that the output
+of \fBstrftime()\fR, \fBcftime()\fR, or \fBascftime()\fR be in a specific
+language by setting the \fBLC_TIME\fR category using \fBsetlocale()\fR.
+.SS "Time Zone"
+.sp
+.LP
+Local time zone information is used as though \fBtzset\fR(3C) were called.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBstrftime()\fR, \fBcftime()\fR, and \fBascftime()\fR functions return the
+number of characters placed into the array pointed to by \fIs\fR, not including
+the terminating null character. If the total number of resulting characters
+including the terminating null character is more than \fImaxsize\fR,
+\fBstrftime()\fR returns \fB0\fR and the contents of the array are
+indeterminate.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn example of the \fBstrftime()\fR function.
+.sp
+.LP
+The following example illustrates the use of \fBstrftime()\fR for the
+\fBPOSIX\fR locale. It shows what the string in \fIstr\fR would look like if
+the structure pointed to by \fItmptr\fR contains the values corresponding to
+Thursday, August 28, 1986 at 12:44:36.
+
+.sp
+.in +2
+.nf
+\fBstrftime (str, strsize, "%A %b %d %j", tmptr)\fR
+.fi
+.in -2
+
+.sp
+.LP
+This results in \fIstr\fR containing "Thursday Aug 28 240".
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBstrftime()\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBdate\fR(1), \fBctime\fR(3C), \fBmktime\fR(3C), \fBsetlocale\fR(3C),
+\fBstrptime\fR(3C), \fBtzset\fR(3C), \fBTIMEZONE\fR(4), \fBzoneinfo\fR(4),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The conversion specification for \fB%V\fR was changed in the Solaris 7 release.
+This change was based on the public review draft of the ISO C9x standard at
+that time. Previously, the specification stated that if the week containing 1
+January had fewer than four days in the new year, it became week 53 of the
+previous year. The ISO C9x standard committee subsequently recognized that that
+specification had been incorrect.
+.sp
+.LP
+The conversion specifications for \fB%g\fR, \fB%G\fR, \fB%Eg\fR, \fB%EG\fR, and
+\fB%Og\fR were added in the Solaris 7 release.  This change was based on the
+public review draft of the ISO C9x standard at that time. These specifications
+are evolving.  If the ISO C9x standard is finalized with a different
+conclusion, these specifications will change to conform to the ISO C9x standard
+decision.
+.sp
+.LP
+The conversion specification for \fB%u\fR was changed in the Solaris 8 release.
+This change was based on the XPG4 specification.
+.sp
+.LP
+If using the \fB%Z\fR specifier and \fBzoneinfo\fR timezones and if the input
+date is outside the range 20:45:52 UTC, December  13, 1901 to 03:14:07 UTC,
+January 19, 2038, the timezone name may not be correct.

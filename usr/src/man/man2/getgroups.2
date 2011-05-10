@@ -1,0 +1,132 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getgroups 2 "8 Sep 2006" "SunOS 5.11" "System Calls"
+.SH NAME
+getgroups, setgroups \- get or set supplementary group access list IDs
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBgetgroups\fR(\fBint\fR \fIgidsetsize\fR, \fBgid_t *\fR\fIgrouplist\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetgroups\fR(\fBint\fR \fIngroups\fR, \fBconst gid_t *\fR\fIgrouplist\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetgroups()\fR function gets the current supplemental group access list
+of the calling process and stores the result in the array of group IDs
+specified by \fIgrouplist\fR. This array has \fIgidsetsize\fR entries and must
+be large enough to contain the entire list. This list cannot be larger than
+\fBNGROUPS_UMAX\fR. If \fIgidsetsize\fR equals 0, \fBgetgroups()\fR will return
+the number of groups to which the calling process belongs without modifying the
+array pointed to by \fIgrouplist\fR.
+.sp
+.LP
+The \fBsetgroups()\fR function sets the supplementary group access list of the
+calling process from the array of group IDs specified by \fIgrouplist\fR. The
+number of entries is specified by \fIngroups\fR and can not be greater than
+\fBNGROUPS_MAX\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetgroups()\fR returns the number of
+supplementary group IDs set for the calling process and \fBsetgroups()\fR
+returns \fB0\fR. Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetgroups()\fR and \fBsetgroups()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+A referenced part of the array pointed to by \fIgrouplist\fR is an illegal
+address.
+.RE
+
+.sp
+.LP
+The \fBgetgroups()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIgidsetsize\fR is non-zero and less than the number of
+supplementary group IDs set for the calling process.
+.RE
+
+.sp
+.LP
+The \fBsetgroups()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIngroups\fR is greater than {\fBNGROUPS_MAX\fR}.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_SETID\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Use of the \fBsetgroups()\fR function requires the {\fBPRIV_PROC_SETID\fR}
+privilege.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability\fBgetgroups()\fR is Standard.
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgroups\fR(1), \fBchown\fR(2), \fBgetuid\fR(2), \fBsetuid\fR(2),
+\fBgetgrnam\fR(3C), \fBinitgroups\fR(3C), \fBattributes\fR(5),
+\fBprivileges\fR(5), \fBstandards\fR(5)

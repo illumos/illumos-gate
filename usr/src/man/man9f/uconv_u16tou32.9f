@@ -1,0 +1,540 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uconv_u16tou32 9F "18 Sep 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+uconv_u16tou32, uconv_u16tou8, uconv_u32tou16, uconv_u32tou8, uconv_u8tou16,
+uconv_u8tou32 \- Unicode encoding conversion functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBuconv_u16tou32\fR(const \fBuint16_t *\fR\fIutf16str\fR, \fBsize_t *\fR\fIutf16len\fR,
+     \fBuint32_t *\fR\fIutf32str\fR, \fBsize_t *\fR\fIutf32len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuconv_u16tou8\fR(const \fBuint16_t *\fR\fIutf16str\fR, \fBsize_t *\fR\fIutf16len\fR,
+     \fBuchar_t *\fR\fIutf8str\fR, \fBsize_t *\fR\fIutf8len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuconv_u32tou16\fR(const \fBuint32_t *\fR\fIutf32str\fR, \fBsize_t *\fR\fIutf32len\fR,
+     \fBuint16_t *\fR\fIutf16str\fR, \fBsize_t *\fR\fIutf16len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuconv_u32tou8\fR(const \fBuint32_t *\fR\fIutf32str\fR, \fBsize_t *\fR\fIutf32len\fR,
+     \fBuchar_t *\fR\fIutf8str\fR, \fBsize_t *\fR\fIutf8len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuconv_u8tou16\fR(const \fBuchar_t *\fR\fIutf8str\fR, \fBsize_t *\fR\fIutf8len\fR,
+     \fBuint16_t *\fR\fIutf16str\fR, \fBsize_t *\fR\fIutf16len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuconv_u8tou32\fR(const \fBuchar_t *\fR\fIutf8str\fR, \fBsize_t *\fR\fIutf8len\fR,
+     \fBuint32_t *\fR\fIutf32str\fR, \fBsize_t *\fR\fIutf32len\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf16str\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBUTF-16\fR character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf16len\fR\fR
+.ad
+.RS 12n
+.rt  
+As an input parameter, the number of 16-bit unsigned integers in \fIutf16str\fR
+as \fBUTF-16\fR characters to be converted or saved.
+.sp
+As an output parameter, the number of 16-bit unsigned integers in
+\fIutf16str\fR consumed or saved during conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf32str\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBUTF-32\fR character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf32len\fR\fR
+.ad
+.RS 12n
+.rt  
+As an input parameter, the number of 32-bit unsigned integers in \fIutf32str\fR
+as \fBUTF-32\fR characters to be converted or saved.
+.sp
+As an output parameter, the number of 32-bit unsigned integers in
+\fIutf32str\fR consumed or saved during conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf8str\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBUTF-8\fR character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutf8len\fR\fR
+.ad
+.RS 12n
+.rt  
+As an input parameter, the number of bytes in \fIutf8str\fR as \fBUTF-8\fR
+characters to be converted or saved.
+.sp
+As an output parameter, the number of bytes in \fIutf8str\fR consumed or saved
+during conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 12n
+.rt  
+The possible conversion options that are constructed by a bitwise-inclusive-OR
+of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_IN_BIG_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The input parameter is in big endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_OUT_BIG_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The output parameter should be in big endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_IN_SYSTEM_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The input parameter is in the default byte ordering of the current system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_OUT_SYSTEM_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The output parameter should be in the default byte ordering of the current
+system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_IN_LITTLE_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The input parameter is in little endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_OUT_LITTLE_ENDIAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The output parameter should be in little endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_IGNORE_NULL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The null or \fBU+0000\fR character should not stop the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_IN_ACCEPT_BOM\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the Byte Order Mark (\fBBOM\fR, \fBU+FEFF\fR) character exists as the first
+character of the input parameter, interpret it as the \fBBOM\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCONV_OUT_EMIT_BOM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Start the output parameter with Byte Order Mark (\fBBOM\fR, \fBU+FEFF\fR)
+character to indicate the byte ordering if the output parameter is in
+\fBUTF-16\fR or \fBUTF-32\fR.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuconv_u16tou32()\fR function reads the given \fIutf16str\fR in
+\fBUTF-16\fR until \fBU+0000\fR (zero) in \fIutf16str\fR is encountered as a
+character or until the number of 16-bit unsigned integers specified in
+\fIutf16len\fR is read. The \fBUTF-16\fR characters that are read are converted
+into \fBUTF-32\fR and the result is saved at \fIutf32str\fR. After the
+successful conversion, \fIutf32len\fR contains the number of 32-bit unsigned
+integers saved at \fIutf32str\fR as \fBUTF-32\fR characters.
+.sp
+.LP
+The \fBuconv_u16tou8()\fR function reads the given \fIutf16str\fR in
+\fBUTF-16\fR until \fBU+0000\fR (zero) in \fIutf16str\fR is encountered as a
+character or until the number of 16-bit unsigned integers specified in
+\fIutf16len\fR is read. The \fBUTF-16\fR characters that are read are converted
+into \fBUTF-8\fR and the result is saved at \fIutf8str\fR. After the successful
+conversion, \fIutf8len\fR contains the number of bytes saved at \fIutf8str\fR
+as \fBUTF-8\fR characters.
+.sp
+.LP
+The \fBuconv_u32tou16()\fR function reads the given \fIutf32str\fR in
+\fBUTF-32\fR until \fBU+0000\fR (zero) in \fIutf32str\fR is encountered as a
+character or until the number of 32-bit unsigned integers specified in
+\fIutf32len\fR is read. The \fBUTF-32\fR characters that are read are converted
+into \fBUTF-16\fR and the result is saved at \fIutf16str\fR. After the
+successful conversion, \fIutf16len\fR contains the number of 16-bit unsigned
+integers saved at \fIutf16str\fR as \fBUTF-16\fR characters.
+.sp
+.LP
+The \fBuconv_u32tou8()\fR function reads the given \fIutf32str\fR in
+\fBUTF-32\fR until \fBU+0000\fR (zero) in \fIutf32str\fR is encountered as a
+character or until the number of 32-bit unsigned integers specified in
+\fIutf32len\fR is read. The \fBUTF-32\fR characters that are read are converted
+into \fBUTF-8\fR and the result is saved at \fIutf8str\fR. After the successful
+conversion, \fIutf8len\fR contains the number of bytes saved at \fIutf8str\fR
+as \fBUTF-8\fR characters.
+.sp
+.LP
+The \fBuconv_u8tou16()\fR function reads the given \fIutf8str\fR in \fBUTF-8\fR
+until the null ('\fB\e0\fR\&') byte in \fIutf8str\fR is encountered or until
+the number of bytes specified in \fIutf8len\fR is read. The \fBUTF-8\fR
+characters that are read are converted into \fBUTF-16\fR and the result is
+saved at \fIutf16str\fR. After the successful conversion, \fIutf16len\fR
+contains the number of 16-bit unsigned integers saved at \fIutf16str\fR as
+\fBUTF-16\fR characters.
+.sp
+.LP
+The \fBuconv_u8tou32()\fR function reads the given \fIutf8str\fR in \fBUTF-8\fR
+until the null ('\fB\e0\fR\&') byte in \fIutf8str\fR is encountered or until
+the number of bytes specified in \fIutf8len\fR is read. The \fBUTF-8\fR
+characters that are read are converted into \fBUTF-32\fR and the result is
+saved at \fIutf32str\fR. After the successful conversion, \fIutf32len\fR
+contains the number of 32-bit unsigned integers saved at \fIutf32str\fR as
+\fBUTF-32\fR characters.
+.sp
+.LP
+During the conversion, the input and the output parameters are treated with
+byte orderings specified in the \fIflag\fR parameter. When not specified, the
+default byte ordering of the system is used. The byte ordering \fIflag\fR value
+that is specified for \fBUTF-8\fR is ignored.
+.sp
+.LP
+When \fBUCONV_IN_ACCEPT_BOM\fR is specified as the \fIflag\fR and the first
+character of the string pointed to by the input parameter is the \fBBOM\fR
+character, the value of the \fBBOM\fR character dictates the byte ordering of
+the subsequent characters in the string pointed to by the input parameter,
+regardless of the supplied input parameter byte ordering option \fIflag\fR
+values. If the \fBUCONV_IN_ACCEPT_BOM\fR is not specified, the \fBBOM\fR as the
+first character is treated as a regular Unicode character: Zero Width No Break
+Space (\fBZWNBSP\fR) character.
+.sp
+.LP
+When \fBUCONV_IGNORE_NULL\fR is specified, regardless of whether the input
+parameter contains \fBU+0000\fR or null byte, the conversion continues until
+the specified number of input parameter elements at \fIutf16len\fR,
+\fIutf32len\fR, or \fIutf8len\fR are entirely consumed during the conversion.
+.sp
+.LP
+As output parameters, \fIutf16len\fR, \fIutf32len\fR, and \fIutf8len\fR are not
+changed if conversion fails for any reason.
+.SH CONTEXT
+.sp
+.LP
+The \fBuconv_u16tou32()\fR, \fBuconv_u16tou8()\fR, \fBuconv_u32tou16()\fR,
+\fBuconv_u32tou8()\fR, \fBuconv_u8tou16()\fR, and \fBuconv_u8tou32()\fR
+functions can be called from user or interrupt context.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful conversion, the functions return \fB0\fR. Upon failure, the
+functions return one of the following \fBerrno\fR values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+The conversion detected an illegal or out of bound character value in the input
+parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 10n
+.rt  
+The conversion cannot finish because the size specified in the output parameter
+is too small.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The conversion stops due to an incomplete character at the end of the input
+string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+Conflicting byte-ordering option \fIflag\fR values are detected.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRConvert a \fBUTF-16\fR string in little-endian byte ordering
+into \fBUTF-8\fR string.
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+\&.
+\&.
+\&.
+uint16_t u16s[MAXNAMELEN + 1];
+uchar_t u8s[MAXNAMELEN + 1];
+size_t u16len, u8len;
+int ret;
+\&.
+\&.
+\&.
+u16len = u8len = MAXNAMELEN;
+ret = uconv_u16tou8(u16s, &u16len, u8s, &u8len, 
+    UCONV_IN_LITTLE_ENDIAN);
+if (ret != 0) {
+     /* Conversion error occurred. */
+     return (ret);
+}
+\&.
+\&.
+\&.
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRConvert a \fBUTF-32\fR string in big endian byte ordering into
+little endian \fBUTF-16\fR.
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+\&.
+\&.
+\&.
+/*
+  * An UTF-32 character can be mapped to an UTF-16 character with
+  * two 16-bit integer entities as a "surrogate pair."
+  */
+uint32_t u32s[101];
+uint16_t u16s[101];
+int ret;
+size_t u32len, u16len;
+\&.
+\&.
+\&.
+u32len = u16len = 100;
+ret = uconv_u32tou16(u32s, &u32len, u16s, &u16len, 
+    UCONV_IN_BIG_ENDIAN | UCONV_OUT_LITTLE_ENDIAN);
+if (ret == 0) {
+     return (0);
+} else if (ret == E2BIG) {
+     /* Use bigger output parameter and try just one more time. */
+     uint16_t u16s2[201];
+
+     u16len = 200;
+     ret = uconv_u32tou16(u32s, &u32len, u16s2, &u16len, 
+        UCONV_IN_BIG_ENDIAN | UCONV_OUT_LITTLE_ENDIAN);
+     if (ret == 0)
+          return (0);
+}
+
+/* Otherwise, return -1 to indicate an error condition. */
+return (-1);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRConvert a \fBUTF-8\fR string into \fBUTF-16\fR in little-endian
+byte ordering.
+.sp
+.LP
+Convert a \fBUTF-8\fR string into \fBUTF-16\fR in little-endian byte ordering
+with a Byte Order Mark (BOM) character at the beginning of the output
+parameter.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+\&.
+\&.
+\&.
+uchar_t u8s[MAXNAMELEN + 1];
+uint16_t u16s[MAXNAMELEN + 1];
+size_t u8len, u16len;
+int ret;
+\&.
+\&.
+\&.
+u8len = u16len = MAXNAMELEN;
+ret = uconv_u8tou16(u8s, &u8len, u16s, &u16len, 
+    UCONV_IN_LITTLE_ENDIAN | UCONV_EMIT_BOM);
+if (ret != 0) {
+     /* Conversion error occurred. */
+     return (ret);
+}
+\&.
+\&.
+\&.
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBuconv_u16tou32\fR(3C), \fBattributes\fR(5)
+.sp
+.LP
+The Unicode Standard (http://www.unicode.org)
+.SH NOTES
+.sp
+.LP
+Each \fBUTF-16\fR or \fBUTF-32\fR character maps to an \fBUTF-8\fR character
+that might need one to maximum of four bytes.
+.sp
+.LP
+One \fBUTF-32\fR or \fBUTF-8\fR character can yield two 16-bit unsigned
+integers as a \fBUTF-16\fR character, which is a surrogate pair if the Unicode
+scalar value is bigger than \fBU+FFFF\fR.
+.sp
+.LP
+Ill-formed \fBUTF-16\fR surrogate pairs are seen as illegal characters during
+the conversion.

@@ -1,0 +1,79 @@
+'\" te
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.TH fcoe 7D "18 Mar 2009" "SunOS 5.11" "Devices"
+.SH NAME
+fcoe \- fibre channel over Ethernet transport driver
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfcoe\fR driver is a pseudo nexus driver which supports the
+transportation of FCoE encapsualted frames. FCoE Ethernet frame will
+encapsulate the raw Fibre Channel frame.
+.sp
+.LP
+The \fBfcoe\fR driver interfaces with FCoE target mode device driver,
+\fBfcoet\fR(7D).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/fcoe\fR\fR
+.ad
+.RS 26n
+.rt  
+32-bit ELF kernel module (x86)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/drv/amd64/fcoe\fR\fR
+.ad
+.RS 26n
+.rt  
+64-bit ELF kernel module (x86)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkernel/drv/sparcv\fR\fR
+.ad
+.RS 26n
+.rt  
+64-bit ELF kernel module (SPARC)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attribute:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitectureSPARC, x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdriver.conf\fR(4), \fBattributes\fR(5), \fBfcoet\fR(7D)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIANSI X3.269-1996, Fibre Channel Protocol for SCSI (FCP)\fR

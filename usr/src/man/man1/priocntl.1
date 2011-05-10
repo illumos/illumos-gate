@@ -1,0 +1,1111 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priocntl 1 "1 Apr 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+priocntl \- display or set scheduling parameters of specified process(es)
+.SH SYNOPSIS
+.LP
+.nf
+\fBpriocntl\fR \fB-l\fR
+.fi
+
+.LP
+.nf
+\fBpriocntl\fR \fB-d\fR [\fB-i\fR \fIidtype\fR] [\fIidlist\fR]
+.fi
+
+.LP
+.nf
+\fBpriocntl\fR \fB-s\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR] 
+     [\fB-i\fR \fIidtype\fR] [\fIidlist\fR]
+.fi
+
+.LP
+.nf
+\fBpriocntl\fR \fB-e\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR] \fIcommand\fR 
+     [\fIargument(s)\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpriocntl\fR command displays or sets scheduling parameters of the
+specified process(es). It can also be used to display the current configuration
+information for the system's process scheduler or execute a command with
+specified scheduling parameters.
+.sp
+.LP
+Processes fall into distinct classes with a separate scheduling policy applied
+to each class. The process classes currently supported are the real-time class,
+time-sharing class, interactive class, fair-share class, and the fixed priority
+class. The characteristics of these classes and the class-specific options they
+accept are described below in the USAGE section under the headings \fBReal-Time
+Class\fR, \fBTime-Sharing Class\fR, \fBInter-Active Class\fR, \fBFair-Share
+Class\fR, and \fBFixed-Priority Class\fR. With appropriate permissions, the
+\fBpriocntl\fR command can change the class and other scheduling parameters
+associated with a running process.
+.sp
+.LP
+In the default configuration, a runnable real-time process runs before any
+other process. Therefore, inappropriate use of real-time processes can have a
+dramatic negative impact on system performance.
+.sp
+.LP
+If an \fIidlist\fR is present, it must appear last on the command line and the
+elements of the list must be separated by white space. If no \fIidlist\fR is
+present, an \fIidtype\fR argument of \fBpid\fR, \fBppid\fR, \fBpgid\fR,
+\fBsid\fR, \fBtaskid\fR, \fBclass\fR, \fBuid\fR, \fBgid\fR, \fBprojid\fR, or
+\fBzoneid\fR specifies the process \fBID\fR, parent process \fBID\fR, process
+group \fBID\fR, session \fBID\fR, task \fBID\fR, class, user \fBID\fR, group
+\fBID\fR, project \fBID\fR, or zone \fBID\fR, respectively, of the
+\fBpriocntl\fR command itself.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBpriocntl -d [-i \fIidtype\fR] [\fIidlist\fR]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+displays the class and class-specific scheduling parameters of the process(es)
+specified by \fIidtype\fR and \fIidlist\fR.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBpriocntl -s [-c \fIclass\fR] [\fIclass-specific options\fR] \e
+     [-i \fIidtype\fR] [\fIidlist\fR]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the class and class-specific parameters of the specified processes to the
+values given on the command line. The \fB-c\fR \fIclass\fR option specifies the
+class to be set. (The valid \fIclass\fR arguments are \fBRT\fR for real-time,
+\fBTS\fR for time-sharing, \fBIA\fR for inter-active, \fBFSS\fR for fair-share,
+or \fBFX\fR for fixed-priority.)
+.sp
+.LP
+The class-specific parameters to be set are specified by the class-specific
+options as explained under the appropriate heading below. If the \fB-c\fR
+\fIclass\fR option is omitted, \fIidtype\fR and \fIidlist\fR must specify a set
+of processes which are all in the same class, otherwise an error results. If no
+class-specific options are specified, the process's class-specific parameters
+are set to the default values for the class specified by \fB-c\fR \fIclass\fR
+(or to the default parameter values for the process's current class if the
+\fB-c\fR \fIclass\fR option is also omitted).
+.sp
+.LP
+In order to change the scheduling parameters of a process using \fBpriocntl\fR
+the real or effective user \fBID\fR (respectively, groupID) of the user
+invoking \fBpriocntl\fR must match the real or effective user \fBID\fR
+(respectively, groupID) of the receiving process or the effective user \fBID\fR
+of the user must be super-user. These are the minimum permission requirements
+enforced for all classes. An individual class can impose additional permissions
+requirements when setting processes to that class or when setting
+class-specific scheduling parameters.
+.sp
+.LP
+When \fIidtype\fR and \fIidlist\fR specify a set of processes, \fBpriocntl\fR
+acts on the processes in the set in an implementation-specific order. If
+\fBpriocntl\fR encounters an error for one or more of the target processes, it
+can or cannot continue through the set of processes, depending on the nature of
+the error.
+.sp
+.LP
+If the error is related to permissions, \fBpriocntl\fR prints an error message
+and then continues through the process set, resetting the parameters for all
+target processes for which the user has appropriate permissions. If
+\fBpriocntl\fR encounters an error other than permissions, it does not continue
+through the process set but prints an error message and exits immediately.
+.sp
+.LP
+A special \fBsys\fR scheduling class exists for the purpose of scheduling the
+execution of certain special system processes (such as the swapper process). It
+is not possible to change the class of any process to \fBsys\fR. In addition,
+any processes in the \fBsys\fR class that are included in the set of processes
+specified by \fIidtype\fR and \fIidlist\fR are disregarded by \fBpriocntl\fR.
+For example, if \fIidtype\fR were \fBuid\fR, an \fIidlist\fR consisting of a
+zero would specify all processes with a \fBUID\fR of \fB0\fR, except processes
+in the \fBsys\fR class and (if changing the parameters using the \fB-s\fR
+option) the \fBinit\fR process.
+.sp
+.LP
+The \fBinit\fR process (process \fBID\fR \fB1\fR) is a special case. In order
+for the \fBpriocntl\fR command to change the class or other scheduling
+parameters of the \fBinit\fR process, \fIidtype\fR must be \fBpid\fR and
+\fIidlist\fR must be consist of only a \fB1\fR. The \fBinit\fR process can be
+assigned to any class configured on the system, but the time-sharing class is
+almost always the appropriate choice. Other choices can be highly undesirable;
+see the \fISystem Administration Guide: Basic Administration\fR for more
+information.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBpriocntl -e [-c \fIclass\fR\fR\fB]\fR\fB [\fIclass-specific options\fR] \fIcommand\fR \e
+     [\fIargument...\fR]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+executes the specified command with the class and scheduling parameters
+specified on the command line (\fIarguments\fR are the arguments to the
+command). If the \fB-c\fR \fIclass\fR option is omitted the command is run in
+the user's current class.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIclass\fR\fR
+.ad
+.RS 13n
+.rt  
+Specifies the \fIclass\fR to be set. (The valid \fIclass\fR arguments are
+\fBRT\fR for real-time, \fBTS\fR for time-sharing, \fBIA\fR for inter-active,
+\fBFSS\fR for fair-share, or \fBFX\fR for fixed-priority.) If the specified
+class is not already configured, it is automatically configured.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 13n
+.rt  
+Displays the scheduling parameters associated with a set of processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 13n
+.rt  
+Executes a specified command with the class and scheduling parameters
+associated with a set of processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIidtype\fR\fR
+.ad
+.RS 13n
+.rt  
+This option, together with the \fIidlist\fR arguments (if any), specifies one
+or more processes to which the \fBpriocntl\fR command is to apply. The
+interpretation of \fIidlist\fR depends on the value of \fIidtype\fR. If the
+\fB-i\fR \fIidtype\fR option is omitted when using the \fB-d\fR or \fB-s\fR
+options the default \fIidtype\fR of \fBpid\fR is assumed.
+.sp
+The valid \fIidtype\fR arguments and corresponding interpretations of
+\fIidlist\fR are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBall\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fBpriocntl\fR command applies to all existing processes. No \fIidlist\fR
+should be specified (if one is specified, it is ignored). The permission
+restrictions described below still apply.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBctid\fR\fR
+.ad
+.RS 13n
+.rt  
+idlist is a list of process contract IDs. The \fBpriocntl\fR command applies to
+all processes with a process contract ID equal to an ID from the list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBclass\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR consists of a single class name (\fBRT\fR for real-time, \fBTS\fR
+for time-sharing, \fBIA\fR for inter-active, \fBFSS\fR for fair-share, or
+\fBFX\fR for fixed-priority). The \fBpriocntl\fR command applies to all
+processes in the specified class.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBgid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of group \fBID\fRs. The \fBpriocntl\fR command applies
+to all processes with an effective group \fBID\fR equal to an \fBID\fR from the
+list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBpgid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of process group \fBID\fRs. The \fBpriocntl\fR command
+applies to all processes in the specified process groups.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBpid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of process \fBID\fRs. The \fBpriocntl\fR command applies
+to the specified processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBppid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of parent process \fBID\fRs. The \fBpriocntl\fR command
+applies to all processes whose parent process \fBID\fR is in the list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBprojid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of project \fBID\fRs. The \fBpriocntl\fR command applies
+to all processes with an effective project \fBID\fR equal to an \fBID\fR from
+the list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBsid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of session \fBID\fRs. The \fBpriocntl\fR command applies
+to all processes in the specified sessions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBtaskid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of task \fBID\fRs. The \fBpriocntl\fR command applies to
+all processes in the specified tasks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBuid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of user \fBID\fRs. The \fBpriocntl\fR command applies to
+all processes with an effective user \fBID\fR equal to an \fBID\fR from the
+list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fBzoneid\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIidlist\fR is a list of zone \fBID\fRs. The \fBpriocntl\fR command applies to
+all processes with an effective zone \fBID\fR equal to an \fBID\fR from the
+list.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 13n
+.rt  
+Displays a list of the classes currently configured in the system along with
+class-specific information about each class. The format of the class-specific
+information displayed is described under USAGE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Sets the scheduling parameters associated with a set of processes.
+.RE
+
+.sp
+.LP
+The valid class-specific options for setting real-time parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIrtpri\fR\fR
+.ad
+.RS 21n
+.rt  
+Sets the real-time priority of the specified process(es) to \fIrtpri\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItqntm\fR [\fB-r\fR \fIres\fR]\fR
+.ad
+.RS 21n
+.rt  
+Sets the time quantum of the specified process(es) to \fItqntm\fR. You can
+optionally specify a resolution as explained below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR \fItqsig\fR\fR
+.ad
+.RS 21n
+.rt  
+Sets the real-time time quantum signal of the specified process(es) to
+\fItqsig\fR.
+.RE
+
+.sp
+.LP
+The valid class-specific options for setting time-sharing parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fItsuprilim\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority limit of the specified process(es) to \fItsuprilim\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fItsupri\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority of the specified process(es) to \fItsupri\fR.
+.RE
+
+.sp
+.LP
+The valid class-specific options for setting inter-active parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIiauprilim\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority limit of the specified process(es) to \fIiauprilim\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIiaupri\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority of the specified process(es) to \fIiaupri\fR.
+.RE
+
+.sp
+.LP
+The valid class-specific options for setting fair-share parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIfssuprilim\fR\fR
+.ad
+.RS 17n
+.rt  
+Sets the user priority limit of the specified process(es) to \fIfssuprilim\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIfssupri\fR\fR
+.ad
+.RS 17n
+.rt  
+Sets the user priority of the specified process(es) to \fIfssupri\fR.
+.RE
+
+.sp
+.LP
+The valid class-specific options for setting fixed-priority parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIfxuprilim\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority limit of the specified process(es) to \fIfxuprilim\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIfxupri\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the user priority of the specified process(es) to \fIfxupri\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItqntm\fR\fR
+.ad
+.RS 16n
+.rt  
+[\fB-r\fR \fIres\fR] Sets the time quantum of the specified process(es) to
+\fItqntm\fR. You can optionally specify a resolution as explained below.
+.RE
+
+.SH USAGE
+.SS "Real-Time Class"
+.sp
+.LP
+The real-time class provides a fixed priority preemptive scheduling policy for
+those processes requiring fast and deterministic response and absolute
+user/application control of scheduling priorities. If the real-time class is
+configured in the system, it should have exclusive control of the highest range
+of scheduling priorities on the system. This ensures that a runnable real-time
+process is given \fBCPU\fR service before any process belonging to any other
+class.
+.sp
+.LP
+The real-time class has a range of real-time priority (\fIrtpri\fR) values that
+can be assigned to processes within the class. Real-time priorities range from
+0 to \fIx\fR, where the value of \fIx\fR is configurable and can be displayed
+for a specific installation that has already configured a real-time scheduler,
+by using the command
+.sp
+.in +2
+.nf
+\fBpriocntl -l\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The real-time scheduling policy is a fixed priority policy. The scheduling
+priority of a real-time process never changes except as the result of an
+explicit request by the user/application to change the \fIrtpri\fR value of the
+process.
+.sp
+.LP
+For processes in the real-time class, the \fIrtpri\fR value is, for all
+practical purposes, equivalent to the scheduling priority of the process. The
+\fIrtpri\fR value completely determines the scheduling priority of a real-time
+process relative to other processes within its class. Numerically higher
+\fIrtpri\fR values represent higher priorities. Since the real-time class
+controls the highest range of scheduling priorities in the system, it is
+guaranteed that the runnable real-time process with the highest \fIrtpri\fR
+value is always selected to run before any other process in the system.
+.sp
+.LP
+In addition to providing control over priority, \fBpriocntl\fR provides for
+control over the length of the time quantum allotted to processes in the
+real-time class. The time quantum value specifies the maximum amount of time a
+process can run, assuming that it does not complete or enter a resource or
+event wait state (\fBsleep\fR). Notice that if another process becomes runnable
+at a higher priority, the currently running process can be preempted before
+receiving its full time quantum.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBpriocntl -d [-i \fIidtype\fR] [\fIidlist\fR]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+displays the real-time priority, time quantum (in millisecond resolution), and
+time quantum signal value for each real-time process in the set specified by
+\fIidtype\fR and \fIidlist\fR.
+.sp
+.LP
+Any combination of the \fB-p\fR, \fB-t\fR [\fB-r\fR], and \fB-q\fR options can
+be used with \fBpriocntl\fR \fB-s\fR or \fBpriocntl\fR \fB-e\fR for the
+real-time class. If an option is omitted and the process is currently
+real-time, the associated parameter is unaffected. If an option is omitted when
+changing the class of a process to real-time from some other class, the
+associated parameter is set to a default value. The default value for
+\fIrtpri\fR is \fB0\fR and the default for time quantum is dependent on the
+value of \fIrtpri\fR and on the system configuration; see \fBrt_dptbl\fR(4).
+.sp
+.LP
+When using the \fB-t\fR \fItqntm\fR option, you can optionally specify a
+resolution using the \fB-r\fR \fIres\fR option. (If no resolution is specified,
+millisecond resolution is assumed.) If \fIres\fR is specified, it must be a
+positive integer between \fB1\fR and \fB1,000,000,000\fR inclusively and the
+resolution used is the reciprocal of \fIres\fR in seconds. For example,
+specifying \fB-t\fR \fB10\fR \fB-r\fR \fB100\fR would set the resolution to
+hundredths of a second and the resulting time quantum length would be 10/100
+seconds (one tenth of a second). Although very fine (nanosecond) resolution can
+be specified, the time quantum length is rounded up by the system to the next
+integral multiple  of the system clock's resolution. Requests for time quantums
+of zero or quantums greater than the (typically very large)
+implementation-specific maximum quantum result in an error.
+.sp
+.LP
+The real-time time quantum signal can be used to notify runaway real-time
+processes about the consumption of their time quantum. Those processes, which
+are monitored by the real-time time quantum signal, receive the configured
+signal in the event of time quantum expiration. The default value (\fB0\fR) of
+the time quantum signal \fItqsig\fR denotes no signal delivery. A positive
+value denotes the delivery of the signal specified by the value. Like
+\fBkill\fR(1) and other commands operating on signals, the \fB-q\fR \fItqsig\fR
+option is also able to handle symbolically named signals, like \fBXCPU\fR or
+\fBKILL\fR.
+.sp
+.LP
+In order to change the class of a process to real-time (from any other class),
+the user invoking \fBpriocntl\fR must have super-user privilege. In order to
+change the \fIrtpri\fR value or time quantum of a real-time process, the user
+invoking \fBpriocntl\fR must either be super-user, or must currently be in the
+real-time class (shell running as a real-time process) with a real or effective
+user \fBID\fR matching the real or effective user \fBID\fR of the target
+process.
+.sp
+.LP
+The real-time priority, time quantum, and time quantum signal are inherited
+across the \fBfork\fR(2) and \fBexec\fR(2) system calls. When using the time
+quantum signal with a user defined signal handler across the \fBexec\fR(2)
+system call, the new image must install an appropriate user defined signal
+handler before the time quantum expires. Otherwise, unpredicable behavior would
+result.
+.SS "Time-Sharing Class"
+.sp
+.LP
+The time-sharing scheduling policy provides for a fair and effective allocation
+of the \fBCPU\fR resource among processes with varying \fBCPU\fR consumption
+characteristics. The objectives of the time-sharing policy are to provide good
+response time to interactive processes and good throughput to \fBCPU\fR-bound
+jobs, while providing a degree of user/application control over scheduling.
+.sp
+.LP
+The time-sharing class has a range of time-sharing user priority (\fItsupri\fR)
+values that can be assigned to processes within the class. User priorities
+range from \(mi\fIx\fR to +\fIx\fR, where the value of \fIx\fR is configurable.
+The range for a specific installation can be displayed by using the command
+.sp
+.in +2
+.nf
+\fBpriocntl -l\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The purpose of the user priority is to provide some degree of user/application
+control over the scheduling of processes in the time-sharing class. Raising or
+lowering the \fItsupri\fR value of a process in the time-sharing class raises
+or lowers the scheduling priority of the process. It is not guaranteed,
+however, that a time-sharing process with a higher \fItsupri\fR value runs
+before one with a lower \fItsupri\fR value. This is because the \fItsupri\fR
+value is just one factor used to determine the scheduling priority of a
+time-sharing process. The system can dynamically adjust the internal scheduling
+priority of a time-sharing process based on other factors such as recent
+\fBCPU\fR usage.
+.sp
+.LP
+In addition to the system-wide limits on user priority (displayed with
+\fBpriocntl\fR \fB-l\fR), there is a per process user priority limit
+(\fItsuprilim\fR), which specifies the maximum \fItsupri\fR value that can be
+set for a given process.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBpriocntl -d [-i \fIidtype\fR] [\fIidlist\fR]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+displays the user priority and user priority limit for each time-sharing
+process in the set specified by \fIidtype\fR and \fIidlist\fR.
+.sp
+.LP
+Any time-sharing process can lower its own \fItsuprilim\fR (or that of another
+process with the same user \fBID\fR). Only a time-sharing process with
+super-user privilege can raise a \fItsuprilim\fR. When changing the class of a
+process to time-sharing from some other class, super-user privilege is required
+in order to set the initial \fItsuprilim\fR to a value greater than zero.
+.sp
+.LP
+Any time-sharing process can set its own \fItsupri\fR (or that of another
+process with the same user \fBID\fR) to any value less than or equal to the
+process's \fItsuprilim\fR. Attempts to set the \fItsupri\fR above the
+\fItsuprilim\fR (and/or set the \fItsuprilim\fR below the \fItsupri\fR) result
+in the \fItsupri\fR being set equal to the \fItsuprilim\fR.
+.sp
+.LP
+Any combination of the \fB-m\fR and \fB-p\fR options can be used with
+\fBpriocntl\fR \fB-s\fR or \fBpriocntl\fR \fB-e\fR for the time-sharing class.
+If an option is omitted and the process is currently time-sharing, the
+associated parameter is normally unaffected. The exception is when the \fB-p\fR
+option is omitted and \fB-m\fR is used to set a \fItsuprilim\fR below the
+current \fItsupri\fR. In this case, the \fItsupri\fR is set equal to the
+\fItsuprilim\fR which is being set. If an option is omitted when changing the
+class of a process to time-sharing from some other class, the associated
+parameter is set to a default value. The default value for \fItsuprilim\fR is
+\fB0\fR and the default for \fItsupri\fR is to set it equal to the
+\fItsuprilim\fR value which is being set.
+.sp
+.LP
+The time-sharing user priority and user priority limit are inherited across the
+\fBfork\fR(2) and \fBexec\fR(2) system calls.
+.SS "Inter-Active Class"
+.sp
+.LP
+The inter-active scheduling policy provides for a fair and effective allocation
+of the \fBCPU\fR resource among processes with varying \fBCPU\fR consumption
+characteristics while providing good responsiveness for user interaction. The
+objectives of the inter-active policy are to provide good response time to
+interactive processes and good throughput to \fBCPU\fR-bound jobs. The
+priorities of processes in the inter-active class can be changed in the same
+manner as those in the time-sharing class, though the modified priorities
+continue to be adjusted to provide good responsiveness for user interaction.
+.sp
+.LP
+The inter-active user priority limit, \fIiaupri\fR, is equivalent to
+\fItsupri\fR. The inter-active per process user priority, \fIiauprilim\fR, is
+equivalent to \fItsuprilim\fR.
+.sp
+.LP
+Inter-active class processes that have the \fIiamode\fR ("interactive mode")
+bit set are given a priority boost value of \fB10\fR, which is factored into
+the user mode priority of the process when that calculation is made, that is,
+every time a process's priority is adjusted. This feature is used by the X
+windowing system, which sets this bit for those processes that run inside of
+the current active window to give them a higher priority.
+.SS "Fair-Share Class"
+.sp
+.LP
+The fair-share scheduling policy provides a fair allocation of system \fBCPU\fR
+resources among projects, independent of the number of processes they own.
+Projects are given "shares" to control their entitlement to \fBCPU\fR
+resources. Resource usage is remembered over time, so that entitlement is
+reduced  for heavy usage, and increased for light usage, with respect to other
+projects. \fBCPU\fR time is scheduled among processes according to their
+owner's entitlements, independent of the number of processes each project owns.
+.sp
+.LP
+The \fBFSS\fR scheduling class supports the notion of per-process user priority
+and user priority limit for compatibility with the time-share scheduler. The
+fair share scheduler attempts to provide an evenly graded effect across the
+whole range of user priorities. Processes with negative \fIfssupri\fR values
+receive time slices less frequently than normal,  while processes with positive
+\fIfssupri\fR values receive time slices more  frequently than normal.  Notice
+that user priorities do not interfere with shares. That is, changing a
+\fIfssupri\fR value of a process is not going to affect its project's overall
+\fBCPU\fR usage which only relates to the amount of shares it is allocated
+compared to other projects.
+.sp
+.LP
+The priorities of processes in the fair-share class can be changed in the same
+manner as those in the time-share class.
+.SS "Fixed-Priority Class"
+.sp
+.LP
+The fixed-priority class provides a fixed priority preemptive scheduling policy
+for those processes requiring that the scheduling priorities do not get
+dynamically adjusted by the system and that the user/application have control
+of the scheduling priorities.
+.sp
+.LP
+The fixed-priority class shares the same range of scheduling priorities with
+the time-sharing class, by default. The fixed-priority class has a range of
+fixed-priority user priority (\fIfxupri\fR) values that can be assigned to
+processes within the class. User priorities range from 0 to \fIx\fR, where the
+value of \fIx\fR is configurable. The range for a specific installation can be
+displayed by using the command
+.sp
+.in +2
+.nf
+\fBpriocntl -l\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The purpose of the user priority is to provide user/application control over
+the scheduling of processes in the fixed-priority class. For processes in the
+fixed-priority class, the \fIfxupri\fR value is, for all practical purposes,
+equivalent  to the scheduling priority of the process. The \fIfxupri\fR value
+completely determines the scheduling priority of a fixed-priority process
+relative to other processes within its class. Numerically higher \fIfxupri\fR
+values represent higher priorities.
+.sp
+.LP
+In addition to the system-wide limits on user priority (displayed with
+\fBpriocntl\fR  \fB-l\fR), there is a per process user priority  limit
+(\fIfxuprilim\fR), which specifies the maximum \fIfxupri\fR value that can be
+set for a given process.
+.sp
+.LP
+Any fixed-priority process can lower its own \fIfxuprilim\fR (or that of
+another process with the same user \fBID\fR). Only a process with super-user
+privilege can raise a \fIfxuprilim\fR. When changing the class of a process to
+fixed-priority from some other class, super-user privilege is required in order
+to set the initial \fIfxuprilim\fR to a value greater than zero.
+.sp
+.LP
+Any fixed-priority process can set its own \fIfxupri\fR (or that of another
+process with the same user \fBID\fR) to any value less than or equal to the
+process's \fIfxuprilim\fR. Attempts to set the \fIfxupri\fR above the
+\fIfxuprilim\fR (or set the \fIfxuprilim\fR below the \fIfxupri\fR) result in
+the \fIfxupri\fR being set equal to the \fIfxuprilim\fR.
+.sp
+.LP
+In addition to providing control over priority, \fBpriocntl\fR provides for
+control over the length of the time quantum allotted to processes in the
+fixed-priority class. The time quantum value specifies the maximum amount of
+time a process can run, before surrendering the \fBCPU\fR, assuming that it
+does not complete or enter a resource or event wait state (sleep). Notice that
+if another process becomes runnable at a higher priority, the currently running
+process can be preempted before receiving its full time quantum.
+.sp
+.LP
+Any combination of the \fB-m\fR, \fB-p\fR, and \fB-t\fR options can be used
+with \fBpriocntl\fR \fB-s\fR or \fBpriocntl\fR \fB-e\fR for the fixed-priority
+class. If an option is omitted and the process is currently fixed-priority, the
+associated parameter is normally unaffected. The exception is when the \fB-p\fR
+option is omitted and the \fB-m\fR option is used to set a \fIfxuprilim\fR
+below the current \fIfxupri\fR. In this case, the \fIfxupri\fR is set equal to
+the \fIfxuprilim\fR which is being set. If an option is omitted when changing
+the class of a process to fixed-priority from some other class, the associated
+parameter is set to a default value. The default value for \fIfxuprilim\fR is
+\fB0\fR. The default for \fIfxupri\fR is to set it equal to the \fIfxuprilim\fR
+value which is being set. The default for time quantum is dependent on the
+\fIfxupri\fR and on the system configuration. See \fBfx_dptbl\fR(4).
+.sp
+.LP
+The time quantum of processes in the fixed-priority class      can be changed
+in the same manner as those in the real-time class.
+.sp
+.LP
+The fixed-priority user priority, user priority limit, and time quantum are
+inherited across the \fBfork\fR(2) and \fBexec\fR(2) system calls.
+.SH EXAMPLES
+.sp
+.LP
+The following are real-time class examples:
+.LP
+\fBExample 1 \fRSetting the Class
+.sp
+.LP
+The following example sets the class of any non-real-time processes selected by
+\fIidtype\fR and \fIidlist\fR to real-time and sets their real-time priority to
+the default value of \fB0\fR. The real-time priorities of any processes
+currently in the real-time class are unaffected. The time quantums of all of
+the specified processes are set to \fB1/10\fR seconds.
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -s -c RT -t 1 -r 10 -i \fIidtype idlist\fR\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRExecuting a Command in Real-time
+.sp
+.LP
+The following example executes \fIcommand\fR in the real-time class with a
+real-time priority of \fB15\fR and a time quantum of \fB20\fR milliseconds:
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -e -c RT -p 15 -t 20 \fIcommand\fR\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRExecuting a Command in Real-time with a Specified Quantum
+Signal
+.sp
+.LP
+The following example executes \fIcommand\fR in the real-time class with a
+real-time priority of \fB11\fR, a time quantum of \fB250\fR milliseconds, and
+where the specified real-time quantum signal is \fBSIGXCPU\fR:
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -e -c RT -p 11 -t 250 -q XCPU \fIcommand\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following are time-sharing class examples:
+.LP
+\fBExample 4 \fRSetting the Class of non-time-sharing Processes
+.sp
+.LP
+The following example sets the class of any non-time-sharing processes selected
+by \fIidtype\fR and \fIidlist\fR to time-sharing and sets both their user
+priority limit and user priority to \fB0\fR. Processes already in the
+time-sharing class are unaffected.
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -s -c TS -i \fIidtype idlist\fR\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRExecuting a Command in the Time-sharing Class
+.sp
+.LP
+The following example executes \fIcommand\fR with the arguments \fIarguments\fR
+in the time-sharing class with a user priority limit of \fB0\fR and a user
+priority of \fB\(mi15\fR:
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -e -c TS -m 0 -p \fR\fB-15\fR \fB\fIcommand\fR [\fIarguments\fR]\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRExecuting a Command in Fixed-Priority Class
+.sp
+.LP
+The following example executes a command in the fixed-priority  class with a
+user priority limit of \fB20\fR and user priority of \fB10\fR and time quantum
+of \fB250\fR milliseconds:
+
+.sp
+.in +2
+.nf
+example% \fBpriocntl -e -c FX -m 20 -p 10 -t 250 command\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.LP
+For options \fB-d\fR, \fB-l\fR, and \fB-s\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Error condition.
+.RE
+
+.sp
+.LP
+For option \fB-e\fR:
+.sp
+.LP
+Return of the Exit Status of the executed command denotes successful operation.
+Otherwise,
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Command could not be executed at the specified priority.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBnice\fR(1), \fBps\fR(1), \fBdispadmin\fR(1M), \fBexec\fR(2),
+\fBfork\fR(2), \fBpriocntl\fR(2), \fBfx_dptbl\fR(4), \fBprocess\fR(4),
+\fBrt_dptbl\fR(4), \fBattributes\fR(5), \fBzones\fR(5), \fBFSS\fR(7)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBpriocntl\fR prints the following error messages:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBProcess(es) not found\fR\fR
+.ad
+.sp .6
+.RS 4n
+None of the specified processes exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSpecified processes from different classes\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fB-s\fR option is being used to set parameters, the \fB-c\fR \fIclass\fR
+option is not present, and processes from more than one class are specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBInvalid option or argument\fR\fR
+.ad
+.sp .6
+.RS 4n
+An unrecognized or invalid option or option argument is used.
+.RE
+

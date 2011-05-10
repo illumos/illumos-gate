@@ -1,0 +1,341 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007 Sun Microsystems, Inc. - All Rights Reserved.
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH exec 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+exec, eval, source \- shell built-in functions to execute other commands
+.SH SYNOPSIS
+.SS "sh"
+.LP
+.nf
+\fBexec\fR [\fIargument\fR]...
+.fi
+
+.LP
+.nf
+\fBeval\fR [\fIargument\fR]...
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBexec\fR \fIcommand\fR
+.fi
+
+.LP
+.nf
+\fBeval\fR \fIargument\fR...
+.fi
+
+.LP
+.nf
+\fBsource\fR [\fB-h\fR] \fIname\fR
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fB*exec\fR [\fIargument\fR]...
+.fi
+
+.LP
+.nf
+\fB*eval\fR [\fIargument\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fB+exec\fR [\fB-c\fR] [\fB-a\fR \fIname\fR] [\fIcommand\fR [\fIargument\fR ... ]]
+.fi
+
+.LP
+.nf
+\fB+eval\fR [\fIargument\fR]...
+.fi
+
+.SH DESCRIPTION
+.SS "sh"
+.sp
+.LP
+The \fBexec\fR command specified by the arguments is executed in place of this
+shell without creating a new process. Input/output arguments and appear and, if
+no other arguments are specified, cause the shell input/output to be modified.
+.sp
+.LP
+The \fIargument\fRs to the \fBeval\fR built-in are read as input to the shell
+and the resulting command(s) executed.
+.SS "csh"
+.sp
+.LP
+\fBexec\fR executes \fBcommand\fR in place of the current shell, which
+terminates.
+.sp
+.LP
+\fBeval\fR reads its \fIargument\fRs as input to the shell and executes the
+resulting command(s). This is usually used to execute commands generated as the
+result of command or variable substitution.
+.sp
+.LP
+\fBsource\fR reads commands from \fIname\fR. \fBsource\fR commands can be
+nested, but if they are nested too deeply the shell can run out of file
+descriptors. An error in a sourced file at any level terminates all nested
+\fBsource\fR commands.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Place commands from the file \fIname\fR on the history list without executing
+them.
+.RE
+
+.SS "ksh"
+.sp
+.LP
+With the \fBexec\fR built-in, if \fIarg\fR is specified, the command specified
+by the arguments is executed in place of this shell without creating a new
+process. Input/output arguments can appear and affect the current process. If
+no arguments are specified the effect of this command is to modify file
+descriptors as prescribed by the input/output redirection list. In this case,
+any file descriptor numbers greater than 2 that are opened with this mechanism
+are closed when invoking another program.
+.sp
+.LP
+The arguments to \fBeval\fR are read as input to the shell and the resulting
+command(s) executed.
+.sp
+.LP
+On this man page, \fBksh\fR(1) commands that are preceded by one or two *
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+\fBI/O\fR redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words, following a command preceded by ** that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SS "ksh93"
+.sp
+.LP
+\fBexec\fR is a special built-in command that can be used to manipulate file
+descriptors or to replace the current shell with a new command.
+.sp
+.LP
+If \fIcommand\fR is specified, then the current shell process is replaced by
+\fIcommand\fR rather than running \fIcommand\fR and waiting for it to complete.
+There is no need to use \fBexec\fR to enhance performance since the shell
+implicitly uses the \fBexec\fR mechanism internally whenever possible.
+.sp
+.LP
+If no operands are specified, \fBexec\fR can be used to open or close files, or
+to manipulate file descriptors from \fB0\fR to \fB9\fR in the current shell
+environment using the standard redirection mechanism available with all
+commands. The close-on-exec flags is set on file descriptor numbers greater
+than \fB2\fR that are opened this way so that they are closed when another
+program is invoked.
+.sp
+.LP
+Because \fBexec\fR is a special command, any failure causes the script that
+invokes it to exit. This can be prevented by invoking \fBexec\fR from the
+\fBcommand\fR  utility.
+.sp
+.LP
+\fBexec\fR cannot be invoked from a restricted shell to create files or to open
+a file for writing or appending.
+.sp
+.LP
+\fBeval\fR is a shell special built-in command that constructs a command by
+concatenating the \fIargument\fRs together, separating each with a space. The
+resulting string is taken as input to the shell and evaluated in the current
+environment. command words are expanded twice, once to construct
+\fIargument\fR, and again when the shell executes the constructed command. It
+is not an error if \fIargument\fR is not specified.
+.sp
+.LP
+On this manual page, \fBksh93\fR commands that are preceded by one or two
+\fB+\fR symbols are special built-in commands and are treated specially in the
+following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+They are not valid function names.
+.RE
+.RS +4
+.TP
+5.
+Words following a command preceded by \fB++\fR that are in the format of a
+variable assignment are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and
+field splitting and file name generation are not performed.
+.RE
+.SH OPTIONS
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by \fBksh93 exec\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIname\fR\fR
+.ad
+.RS 11n
+.rt  
+\fBargv[0]\fR is set to \fIname\fR for command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 11n
+.rt  
+Clear all environment variables before executions except variable assignments
+that are part of the current \fBexec\fR command.
+.RE
+
+.SH EXIT STATUS
+.SS "ksh"
+.sp
+.LP
+The following exit values are returned by \fBexec\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 9n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1-125\fR\fR
+.ad
+.RS 9n
+.rt  
+A redirection error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB127\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIcommand\fR was not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB126\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIcommand\fR was found, but it is not an executable utility.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following exit values are returned by \fBexec\fR. If \fIcommand\fR is
+specified, \fBexec\fR does not return.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion. All I/O redirections were successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+The following exit values are returned by \fBeval\fR:
+.sp
+.LP
+If \fIargument\fR is not specified, the exit status is \fB0\fR. Otherwise, it
+is the exit status of the command defined by the \fIargument\fR operands.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1), \fBattributes\fR(5)

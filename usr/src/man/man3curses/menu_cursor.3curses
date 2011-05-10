@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH menu_cursor 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+menu_cursor, pos_menu_cursor \- correctly position a menus cursor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lmenu\fR \fB -lcurses \fR [ \fIlibrary\fR... ]
+#include <menu.h>
+
+
+
+\fBint\fR \fBpos_menu_cursor\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpos_menu_cursor()\fR moves the cursor in the window of \fImenu\fR to the
+correct position to resume menu processing. This is needed after the
+application calls a \fBcurses\fR library I/O routine.
+.SH RETURN VALUES
+.sp
+.LP
+This routine returns one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBE_OK	\fR
+.ad
+.RS 18n
+.rt  
+The routine returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_SYSTEM_ERROR\fR
+.ad
+.RS 18n
+.rt  
+System error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_BAD_ARGUMENT\fR
+.ad
+.RS 18n
+.rt  
+An incorrect argument was passed to the routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_NOT_POSTED\fR
+.ad
+.RS 18n
+.rt  
+The menu has not been posted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBpanel_update\fR(3CURSES),
+\fBpanels\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
+\fB<curses.h>\fR\&.

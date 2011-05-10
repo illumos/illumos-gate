@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Joyent Inc.
  */
 
 /*
@@ -70,6 +71,7 @@
 #include <unistd.h>
 #include <atomic.h>
 #include <poll.h>
+#include <libscf_priv.h>
 
 #include "startd.h"
 
@@ -110,24 +112,51 @@ method_record_start(restarter_inst_t *inst)
 /*
  * method_rate_critical(restarter_inst_t *)
  *    Return true if the average start interval is less than the permitted
- *    interval.  Implicit success if insufficient measurements for an
- *    average exist.
+ *    interval.  The implicit interval defaults to RINST_FAILURE_RATE_NS and
+ *    RINST_START_TIMES but may be overridden with the svc properties
+ *    startd/critical_failure_count and startd/critical_failure_period
+ *    which represent the number of failures to consider and the amount of
+ *    time in seconds in which that number may occur, respectively. Note that
+ *    this time is measured as of the transition to 'enabled' rather than wall
+ *    clock time.
+ *    Implicit success if insufficient measurements for an average exist.
  */
 static int
 method_rate_critical(restarter_inst_t *inst)
 {
+	hrtime_t critical_failure_period = RINST_FAILURE_RATE_NS;
+	uint_t critical_failure_count = RINST_START_TIMES;
 	uint_t n = inst->ri_start_index;
 	hrtime_t avg_ns = 0;
+	uint64_t scf_fr, scf_st;
+	scf_propvec_t *prop = NULL;
+	scf_propvec_t restart_critical[] = {
+		{ "critical_failure_period", NULL, SCF_TYPE_INTEGER, NULL, 0 },
+		{ "critical_failure_count", NULL, SCF_TYPE_INTEGER, NULL, 0 },
+		{ NULL }
+	};
 
-	if (inst->ri_start_index < RINST_START_TIMES)
+	restart_critical[0].pv_ptr = &scf_fr;
+	restart_critical[1].pv_ptr = &scf_st;
+
+	if (scf_read_propvec(inst->ri_i.i_fmri, "startd",
+	    B_TRUE, restart_critical, &prop) != SCF_FAILED) {
+		/*
+		 * critical_failure_period is expressed
+		 * in seconds but tracked in ns
+		 */
+		critical_failure_period = (hrtime_t)scf_fr * NANOSEC;
+		critical_failure_count = (uint_t)scf_st;
+	}
+	if (inst->ri_start_index < critical_failure_count)
 		return (0);
 
 	avg_ns =
-	    (inst->ri_start_time[(n - 1) % RINST_START_TIMES] -
-	    inst->ri_start_time[n % RINST_START_TIMES]) /
-	    (RINST_START_TIMES - 1);
+	    (inst->ri_start_time[(n - 1) % critical_failure_count] -
+	    inst->ri_start_time[n % critical_failure_count]) /
+	    (critical_failure_count - 1);
 
-	return (avg_ns < RINST_FAILURE_RATE_NS);
+	return (avg_ns < critical_failure_period);
 }
 
 /*

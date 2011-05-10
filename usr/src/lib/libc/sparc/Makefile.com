@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -780,7 +780,6 @@ PORTI18N_COND=			\
 	wcstoul_longlong.o
 
 PORTLOCALE=			\
-	ascii.o			\
 	big5.o			\
 	btowc.o			\
 	collate.o		\
@@ -1339,19 +1338,13 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 
 # assym.h build rules
 
-GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
-
-# XXX	A hack.  Perhaps this should be 'CPPFLAGS.native' and
-#	live in Makefile.master
-
 assym.h := CFLAGS += -g
 
-CPPFLAGS.genassym = \
-	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) -I.
+GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
 
 genassym: $(GENASSYM_C)
 	$(NATIVECC) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc \
-		$(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
+		$(CPPFLAGS.native) -o $@ $(GENASSYM_C)
 
 OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 

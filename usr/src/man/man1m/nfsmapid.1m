@@ -1,0 +1,128 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nfsmapid 1M "30 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+nfsmapid \- NFS user and group id mapping daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/nfs/nfsmapid\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnfsmapid\fR daemon maps to and from NFS version 4 \fBowner\fR and
+\fBowner_group\fR identification attributes and local \fBUID\fR and \fBGID\fR
+numbers used by both the NFS version 4 client and server.
+.sp
+.LP
+\fBnfsmapid\fR uses the \fBpasswd\fR and \fBgroup\fR entries in the
+\fB/etc/nsswitch.conf\fR file to direct how it performs the mappings.
+.sp
+.LP
+The \fBnfsmapid\fR daemon has no external, customer-accessible interfaces. You
+can, however, administratively configure \fBnfsmapid\fR in one of the following
+ways:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Specify the \fBNFSMAPID_DOMAIN\fR parameter in \fBnfs\fR(4)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Specify the \fB_nfsv4idmapdomain\fR DNS resource record.
+.RE
+.sp
+.LP
+Please refer to the \fI\fR for further details.
+.SH SEE ALSO
+.sp
+.LP
+\fBsvcs\fR(1), \fBautomountd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
+\fBmount_nfs\fR(1M), \fBpassmgmt\fR(1M), \fBsvcadm\fR(1M), \fBshare_nfs\fR(1M),
+\fBuserdel\fR(1M), \fBusermod\fR(1M), \fBnfs\fR(4), \fBattributes\fR(5),
+\fBsmf\fR(5)
+.sp
+.LP
+\fI\fR
+.SH NOTES
+.sp
+.LP
+The \fBnfsmapid\fR service is managed by the service management facility,
+\fBsmf\fR(5), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/nfs/mapid
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
+status can be queried using the \fBsvcs\fR(1) command.
+.sp
+.LP
+If it is disabled, it will be enabled by \fBmount_nfs\fR(1M),
+\fBshare_nfs\fR(1M), and \fBautomountd\fR(1M), unless  its
+\fBapplication/auto_enable\fR property is set to \fBfalse\fR.
+.sp
+.LP
+\fBnfsmapid\fR caches a user's UID and GID. If a user subsequently changes a
+UID or GID, using one of the utilities listed below, the \fBnfsmapid\fR cache
+becomes stale. At this point, any NFS operation that gets or set attributes
+will result in the exchange of this stale information. To resolve this
+situation, restart \fBnfsmapid\fR, as follows:
+.sp
+.in +2
+.nf
+# \fBsvcadm restart svc:/network/nfs/mapid:default\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The utilities that allow you to change UID and GID are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBusermod\fR(1M)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBuserdel\fR(1M)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBgroupmod\fR(1M)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBgroupdel\fR(1M)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpassmgmt\fR(1M)
+.RE
+.sp
+.LP
+The \fBnfsmapid\fR daemon might not exist in a future release of Solaris.

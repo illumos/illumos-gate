@@ -1,0 +1,296 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_is_sip_uri 3SIP "10 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_is_sip_uri, sip_get_uri_scheme, sip_get_uri_host, sip_get_uri_user,
+sip_get_uri_password, sip_get_uri_port, sip_get_uri_params,
+sip_get_uri_headers, sip_get_uri_opaque, sip_get_uri_query, sip_get_uri_path,
+sip_get_uri_regname, sip_is_uri_teluser, sip_get_uri_errflags,
+sip_uri_errflags_to_str \- get URI related attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBboolean_t\fR \fIsip_is_sip_uri\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_scheme\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_user\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_password\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_host\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_uri_port\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_param_t *\fR\fIsip_get_uri_params\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_headers\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_opaque\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_query\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_path\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_uri_regname\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fIsip_is_uri_teluser\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_uri_errflags\fR(\fBconst struct sip_uri *\fR\fIsip_uri\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fIsip_uri_errflags_to_str\fR(\fBint\fR \fIuri_errflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For functions that return a pointer of type \fIsip_str_t\fR, \fIsip_str_t\fR is
+supplied by:
+.sp
+.in +2
+.nf
+typedef struct sip_str {
+     char *sip_str_ptr;
+     int  sip_str_len;
+}sip_str_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIsip_str_ptr\fR parameter points to the start of the returned value and
+\fIsip_str_len\fR supplies the length of the returned value.
+.sp
+.LP
+For example, given the following request line in a \fBSIP\fR message input to
+\fBsip_get_request_uri_str()\fR:
+.sp
+.in +2
+.nf
+INVITE sip:marconi@radio.org SIP/2.0
+.fi
+.in -2
+
+.sp
+.LP
+the return is a pointer to \fIsip_str_t\fR with the \fIsip_str_ptr\fR member
+pointing to "\fBs\fR" of \fBsip:marconi@radio.org\fR and \fIsip_str_len\fR
+being set to \fB21\fR, the length of \fBsip:marconi@radio.org\fR.
+.sp
+.LP
+The \fBsip_is_sip_uri()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR and
+returns \fBB_TRUE\fR if it is a \fBSIP[S]\fR \fBURI\fR and \fBB_FALSE\fR if it
+is not. A \fBURI\fR is a \fBSIP[S]\fR \fBURI\fR if the scheme in the \fBURI\fR
+is either "\fBsip\fR" or "\fBsips\fR".
+.sp
+.LP
+The \fBsip_get_uri_user()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the "\fBuser\fR" component, if present.
+.sp
+.LP
+The \fBsip_get_uri_password()\fR function takes a parsed \fBURI\fR
+\fIsip_uri\fR and returns the value of the "\fBpassword\fR" component, if
+present.
+.sp
+.LP
+The \fBsip_get_uri_host()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the "\fBhost\fR" component, if present.
+.sp
+.LP
+The \fBsip_get_uri_port()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the "\fBport\fR" component, if present.
+.sp
+.LP
+The \fBsip_get_uri_params()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the list of \fBURI\fR parameters, if present, from a \fBSIP[S]\fR
+\fBURI\fR.
+.sp
+.LP
+The \fBsip_get_uri_headers()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns '\fBheaders\fR' from a \fBSIP[S]\fR \fBURI\fR.
+.sp
+.LP
+The \fBsip_get_uri_query()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the '\fBquery\fR' component, if present.
+.sp
+.LP
+The \fBsip_get_uri_path()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the '\fBpath\fR' component, if present.
+.sp
+.LP
+The \fBsip_get_uri_regname()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR
+and returns the value of the '\fBregname\fR' component, if present.
+.sp
+.LP
+The \fBsip_is_uri_teluser()\fR function returns \fBB_TRUE\fR if the user
+component is a telephone-subscriber. Otherwise, \fBB_FALSE\fR is returned.
+.sp
+.LP
+The \fBsip_get_uri_errflags()\fR function returns the error flags from a parsed
+\fBURI\fR \fIsip_uri\fR. The returned value is a bitmask with the appropriate
+bit set when the parser, \fBsip_parse_uri()\fR, encounters an error. The
+following are the possible error values that could be set:
+.sp
+.in +2
+.nf
+Bit value      Error                 Comments
+_______________________________________________________________
+0x00000001     SIP_URIERR_SCHEME     invalid scheme
+0x00000002     SIP_URIERR_USER       invalid user name
+0x00000004     SIP_URIERR_PASS       invalid password
+0x00000008     SIP_URIERR_HOST       invalid host
+0x00000010     SIP_URIERR_PORT       invalid port number
+0x00000020     SIP_URIERR_PARAM      invalid URI parameters
+0x00000040     SIP_URIERR_HEADER     invalid URI headers
+0x00000080     SIP_URIERR_OPAQUE     invalid opaque
+0x00000100     SIP_URIERR_QUERY      invalid query
+0x00000200     SIP_URIERR_PATH       invalid path
+0x00000400     SIP_URIERR_REGNAME    invalid reg-name
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsip_uri_errflags_to_str()\fR function takes the error flags from a
+parsed \fBURI\fR \fIsip_uri\fR and forms a string with all the error bits that
+are set. For example, if \fBSIP_URIERR_PASS\fR and \fBSIP_URIERR_PORT\fR are
+set in a parsed \fBURI\fR \fIsip_uri\fR, the \fBsip_uri_errflags_to_str()\fR
+function returns a string such as:
+.sp
+.in +2
+.nf
+"Error(s) in PASSWORD, PORT part(s)"
+.fi
+.in -2
+
+.sp
+.LP
+The caller is responsible for freeing the returned string.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsip_get_uri_scheme()\fR, \fBsip_get_uri_user()\fR,
+\fBsip_get_uri_password()\fR, \fBsip_get_uri_host()\fR,
+\fBsip_get_uri_params()\fR, \fBsip_get_uri_headers()\fR,
+\fBsip_get_uri_opaque()\fR, \fBsip_get_uri_query()\fR,
+\fBsip_get_uri_path()\fR, \fBsip_get_uri_regname()\fR, and
+\fBsip_uri_errflags_to_str()\fR functions return the requested value on success
+and \fBNULL\fR on failure.
+.sp
+.LP
+The \fBsip_get_uri_port()\fR function returns \fIport\fR from the \fBURI\fR or
+\fB0\fR if the port is not present. The returned port is in host byte order.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+If the error is non-null, the following value is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBSIP\fR header value of the \fBSIP\fR message is \fBNULL\fR or there is
+no \fBURI\fR.
+.sp
+The input \fBURI\fR is null or the requested \fBURI\fR component is invalid.
+The error flag is set for the requested component.
+.sp
+The \fBURI\fR parameters or headers are requested from a non-\fBSIP[S]\fR
+\fBURI\fR; or the '\fBopaque\fR', '\fBquery\fR', '\fBpath\fR', '\fBreg-name\fR'
+components are requested from a \fBSIP[S]\fR \fBURI\fR.
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

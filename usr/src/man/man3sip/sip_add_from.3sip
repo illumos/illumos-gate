@@ -1,0 +1,799 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_add_from 3SIP "09 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_add_from, sip_add_to, sip_add_contact, sip_add_via, sip_add_maxforward,
+sip_add_callid, sip_add_cseq, sip_add_content_type, sip_add_content,
+sip_add_accept, sip_add_accept_enc, sip_add_accept_lang, sip_add_alert_info,
+sip_add_allow, sip_add_call_info, sip_add_content_disp, sip_add_content_enc,
+sip_add_content_lang, sip_add_date, sip_add_error_info, sip_add_expires,
+sip_add_in_reply_to, sip_add_mime_version, sip_add_min_expires, sip_add_org,
+sip_add_priority, sip_add_reply_to, sip_add_passertedid, sip_add_ppreferredid,
+sip_add_require, sip_add_retry_after, sip_add_route, sip_add_record_route,
+sip_add_server, sip_add_subject, sip_add_supported, sip_add_tstamp,
+sip_add_unsupported, sip_add_user_agent, sip_add_warning, sip_add_rseq,
+sip_add_privacy, sip_add_rack, sip_add_author, sip_add_authen_info,
+sip_add_proxy_authen, sip_add_proxy_author, sip_add_proxy_require,
+sip_add_www_authen, sip_add_allow_events, sip_add_event, sip_add_substate \-
+add specific SIP headers to the SIP message
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBint\fR \fIsip_add_from\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, \fBchar *\fR\fIfrom_uri\fR,
+     \fBchar *\fR\fIfrom_tag\fR, \fBboolean_t\fR \fIadd_aquot\fR, \fBchar *\fR\fIfrom_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_to\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, \fBchar *\fR\fIto_uri\fR, 
+     \fBchar *\fR\fIto_tag\fR, \fBboolean_t\fR \fIadd_aquot\fR, \fBchar *\fR\fIto_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_contact\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, 
+     \fBchar *\fR\fIcontact_uri\fR, \fBboolean_t\fR \fIadd_aquot\fR, \fBchar *\fR\fIcontact_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_via\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIsent_protocol_transport\fR, 
+     \fBchar *\fR\fIsent_by_host\fR, \fBint\fR \fIsent_by_port\fR, \fBchar *\fR\fIvia_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_maxforward\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBuint_t\fR \fImaxforward\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_callid\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIcallid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_cseq\fR(\fBsip_msg_t\fR \fIsip_msg,\fR \fBsip_method_t\fR \fImethod\fR, \fBuint32_t\fR \fIcseq\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_content_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR \fItype\fR, \fBchar *\fR\fIsubtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_content\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR \fIcontent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_accept\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fItype\fR, \fBchar *\fR\fIsubtype\fR, 
+     \fBchar *\fR\fImedia_param\fR, \fBchar *\fR\fIaccept_param\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_accept_enc\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIcode\fR, 
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_accept_lang\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIlang\fR, 
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_alert_info\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIalert\fR, 
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_allow\fR(\fBsip_msg_t\fR \fIsip_msg,\fR \fBsip_method_t\fR \fImethod_name\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_call_info\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIuri\fR, 
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_content_disp\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdis_type\fR, \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_content_enc\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIcode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_content_lang\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIlang\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_date\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdate\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_error_info\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIuri\fR, \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_expires\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIsecs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_in_reply_to\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIreply_id\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_mime_version\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIversion\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_min_expires\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIsecs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_org\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIorg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_priority\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIprio\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_reply_to\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, 
+     \fBchar *\fR\fIaddr\fR, \fBchar *\fR\fIparam\fR, \fBboolean_t\fR \fIadd_aquot\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_passertedid\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, 
+     \fBchar *\fR\fIaddr\fR, \fBboolean_t\fR \fIadd_aqout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_ppreferredid\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, 
+     \fBchar *\fR\fIaddr\fR, \fBboolean_t\fR \fIadd_aquot\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_require\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIreq\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_retry_after\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIsecs\fR, \fBchar *\fR\fIcmt\fR,
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_route\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR, \fBchar *\fR\fIuri\fR,
+     \fBchar *\fR\fIroute_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_record_route\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIdisplay_name\fR,
+     \fBchar *\fR\fIuri\fR, \fBchar *\fR\fIroute_params\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_server\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIsvr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_subject\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIsubject\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_supported\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIsupport\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_tstamp\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fItime\fR, \fBchar *\fR\fIdelay\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_unsupported\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIunsupport\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_user_agent\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIusr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_warning\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIcode\fR, \fBchar *\fR\fIaddr\fR, \fBchar *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_privacy\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIpriv_val\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_rseq\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIresp_num\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_rack\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint\fR \fIresp_num\fR, \fBint\fR \fIcseq\fR,
+     \fBsip_method_t\fR \fImethod\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_author\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIscheme\fR, \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_authen_info\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIainfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_proxy_authen\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIpascheme\fR,
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_proxy_author\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIpascheme\fR,
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_proxy_require\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIopt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_www_authen\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIwascheme\fR,
+     \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_allow_events\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIevents\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_event\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIevent\fR, \fBchar *\fR\fIparam\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_add_substate\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBchar *\fR\fIsub\fR, \fBchar *\fR\fIparam\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For each of the following functions that add a header to a \fBSIP\fR message,
+the function adds a \fBCRLF\fR before appending the header to the \fBSIP\fR
+message.
+.sp
+.LP
+The \fBsip_add_from()\fR and \fBsip_add_to()\fR functions appends a \fBFROM\fR
+and \fBTO\fR header respectively to the \fBSIP\fR message \fIsip_msg\fR. The
+header is created using the \fIdisplay_name\fR, if non-null, and the \fIuri\fR
+values. The \fIadd_aquot\fR parameter is used to specify whether the \fIuri\fR
+should be enclosed within '\fI<>\fR\&'. If a \fIdisplay_name\fR is provided
+then \fIadd_aquot\fR cannot be \fBB_FALSE\fR. The \fIdisplay_name\fR parameter,
+if provided, is enclosed within quotes before creating to the \fBSIP\fR header.
+Tag value for the \fBFROM/TO\fR header can be specified which will be added to
+the \fBSIP\fR header by prefixing it with "\fBTAG=\fR". Any generic parameters
+can be specified as the last argument, which will be added, as is, to the
+\fBSIP\fR header.
+.sp
+.LP
+Either the tag or the generic parameter can be specified not both, if both are
+specified, the resulting header contains only the tag parameter.
+.sp
+.LP
+The \fBsip_add_contact()\fR function appends a \fBCONTACT\fR header to the
+\fBSIP\fR message \fIsip_msg\fR using the \fIdisplay_name\fR and
+\fIcontact_uri\fR. The \fIadd_aquot\fR parameter has the same semantics as in
+\fBsip_add_from()\fR/\fBsip_add_to()\fR. Any contact parameters specified in
+\fIcontact_param\fR is added to the \fBCONTACT\fR header before appending the
+header to the message.
+.sp
+.LP
+The \fBsip_add_via()\fR function appends a \fBVIA\fR header to the \fBSIP\fR
+message \fIsip_msg\fR. The \fBVIA\fR header is constructed using
+\fBsent_protocol_transport\fR, \fBsent_by_host\fR and \fIsent_by_port\fR. A
+value of \fB0\fR for \fIsent_by_port\fR means that the port information is not
+present in the resulting \fBVIA\fR header. The \fBVIA\fR header that is created
+has the protocol set to "\fBSIP\fR" and version set to "2.0". Any parameters
+specific in \fIvia_params\fR is added to the \fBVIA\fR header before appending
+the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_maxforward()\fR function appends a \fBMAX-FORWARDS\fR header to
+the \fBSIP\fR message \fIsip_msg\fR using the value in \fImaxforward\fR. The
+\fImaxforward\fR value is a positive integer.
+.sp
+.LP
+The \fBsip_add_callid()\fR function appends a \fBCALL-ID\fR header to the
+\fBSIP\fR message \fIsip_msg\fR using the value in \fIcallid\fR, if non-null.
+If \fIcallid\fR is null, this function creates a \fBCALL-ID\fR header using a
+randomly generated value.
+.sp
+.LP
+The \fBsip_add_cseq()\fR function appends a \fBCSEQ\fR header to the \fBSIP\fR
+message using the values in \fImethod\fR and \fIcseq\fR. Permissible values for
+method include:
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.sp
+.LP
+The \fIcseq\fR value is a positive integer.
+.sp
+.LP
+The \fBsip_add_content_type()\fR function appends a \fBCONTENT-TYPE\fR to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBCONTENT-TYPE\fR is created using the
+type and subtype, both should be non-null.
+.sp
+.LP
+The \fBsip_add_content()\fR function adds a message body to the \fBSIP\fR
+message \fIsip_msg\fR. The message body is given by the null terminated string
+contents. Once the function returns, the caller may reuse or delete contents as
+\fBsip_add_content()\fR creates a new buffer and copies over contents for its
+use.
+.sp
+.LP
+The \fBsip_add_accept()\fR function appends an \fBACCEPT\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBACCEPT\fR header is created using type
+and subtype. If both type and subtype are null, then an empty \fBACCEPT\fR
+header is added to the \fBSIP\fR message. If type is non-null, but subtype is
+null, then the \fBACCEPT\fR header has the specified type and sets the subtype
+in the header to '\fB*\fR'. Any \fIaccept_param\fR or \fImedia_param\fR, if
+provided, are added to the \fBACCEPT\fR header before appending the header to
+the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_accept_enc()\fR function appends an \fBACCEPT-ENCODING\fR header
+to the \fBSIP\fR message \fIsip_msg\fR. The \fBACCEPT-ENCODING\fR is created
+using code. Any parameter specified in \fIparam\fR is added to the
+\fBACCEPT-ENCODING\fR header before appending the header to the \fBSIP\fR
+message.
+.sp
+.LP
+The \fBsip_add_accept_lang()\fR function appends an \fBACCEPT-LANGUAGE\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBACCEPT-LANGUAGE\fR header
+is created using lang. Any parameter specified in \fIparam\fR is added to the
+\fBACCEPT-LANGUAGE\fR header before appending the header to the \fBSIP\fR
+message.
+.sp
+.LP
+The \fBsip_add_alert_info()\fR function appends an \fBALERT-INFO\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBALERT-INFO\fR header is created
+using alert. Any parameter specified in \fIparam\fR is added to the
+\fBALERT-INFO\fR header before appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_allow()\fR function appends an \fBALLOW\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBALLOW\fR header is created using alert
+and method. Permissible values for method include:
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.sp
+.LP
+The \fBsip_add_call_info()\fR function appends a \fBCALL-INFO\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBCALL-INFO\fR header is created using
+\fIuri\fR. Any parameter specified in \fIparam\fR is added to the
+\fBCALL-INFO\fR before appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_content_disp()\fR function appends a \fBCONTENT-DISPOSITION\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBCONTENT-DISPOSITION\fR
+header is created using \fIdisp_type\fR. Any parameter specified in \fIparam\fR
+is added to the \fBCONTENT-DISPOSITION\fR header before appending the header to
+the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_content_enc()\fR function appends a \fBCONTENT-ENCODING\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBCONTENT-ENCODING\fR
+header is created using code.
+.sp
+.LP
+The \fBsip_add_content_lang()\fR function appends a \fBCONTENT-LANGUAGE\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBCONTENT-LANGUAGE\fR
+header is created using \fIlang\fR.
+.sp
+.LP
+The \fBsip_add_date()\fR appends a \fBDATE\fR header to the \fBSIP\fR message
+\fIsip_msg\fR. The \fBDATE\fR header is created using the date information
+specified in date. The semantics for the date string is given is RFC 3261,
+section 25.1.
+.sp
+.LP
+The \fBsip_add_error_info()\fR function appends an \fBERROR-INFO\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBERROR-INFO\fR header is created
+using \fIuri\fR. An parameters specified in \fIparam\fR is added to the
+\fBERROR-INFO\fR header before adding the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_expires()\fR function appends an \fBEXPIRES\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBEXPIRES\fR header is created using the
+seconds specified in \fIsecs\fR.
+.sp
+.LP
+The \fBsip_add_in_reply_to()\fR function appends a \fBIN-REPLY-TO\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBIN-REPLY-TO\fR header is created
+using the \fIcall-id\fR value specified in \fIreply_id\fR.
+.sp
+.LP
+The \fBsip_add_mime_version()\fR function appends a \fBMIME-VERSION\fR header
+to the \fBSIP\fR message \fIsip_msg\fR. The \fBMIME-VERSION\fR header is
+created using version.
+.sp
+.LP
+The \fBsip_add_min_expires()\fR function appends a \fBMIN-EXPIRES\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBMIN-EXPIRES\fR is created using the
+time in seconds specified in \fIsecs\fR.
+.sp
+.LP
+The \fBsip_add_org()\fR function appends a \fBORGANIZATION\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBORGANIZATION\fR header is created using
+the information specified in \fIorg\fR.
+.sp
+.LP
+The \fBsip_add_priority()\fR function appends a \fBPRIORITY\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBPRIORITY\fR header is created using the
+value specified in \fIprio\fR.
+.sp
+.LP
+The \fBsip_add_reply_to()\fR function appends a \fBREPLY-TO\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBREPLY-TO\fR header is created using the
+\fIdisplay_name\fR, if provided, and \fIaddr\fR. The \fIadd_aquot\fR parameter
+has the same semantics as in \fBsip_add_from()\fR/\fBsip_add_to()\fR. Any
+parameters specified in \fIparam\fR is added to the  \fBREPLY-TO\fR header
+before appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_passertedid()\fR function appends a \fBP-ASSERTED-IDENTITY\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBP-ASSERTED-IDENTITY\fR
+header is created using the \fIdisplay_name\fR, if provided, and the
+\fIaddr\fR. The \fIadd_aquot\fR parameter has the same semantics as in
+\fBsip_add_from()\fR/\fBsip_add_to()\fR.
+.sp
+.LP
+The \fBsip_add_ppreferredid()\fR function appends a \fBP-PREFERRED-IDENTITY\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBP-PREFERRED-IDENTITY\fR
+header is created using the \fIdisplay_name\fR, if provided, and the
+\fIaddr\fR. The \fIadd_aquot\fR parameter has the same semantics as in
+\fBsip_add_from()\fR/\fBsip_add_to()\fR.
+.sp
+.LP
+The \fBsip_add_require()\fR function appends a \fBREQUIRE\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBREQUIRE\fR header is created using the
+information in \fIreq\fR.
+.sp
+.LP
+The \fBsip_add_retry_after()\fR function appends a \fBRETRY-AFTER\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBRETRY-AFTER\fR is created using the
+time in seconds specified in \fIsecs\fR comments, if any, in \fIcmt\fR. Any
+parameters specified in \fIparam\fR, if provided, is added to the
+\fBRETRY-AFTER\fR header before appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_route()\fR function appends a \fBROUTE\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBROUTE\fR header is created using the
+\fIdisplay_name\fR, if any, and the \fIuri\fR. The \fIuri\fR is enclosed
+in '<>' before adding to the header. Parameters specified in \fIroute_params\fR
+are added to the \fBROUTE\fR header before appending the header to the
+\fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_record_route()\fR function appends a \fBRECORD-ROUTE\fR header
+to the \fBSIP\fR message \fIsip_msg\fR. The \fBRECORD-ROUTE\fR header is
+created using the \fIdisplay_name\fR, if any, and the \fIuri\fR. The \fIuri\fR
+parameter is enclosed in '<>' before adding to the header. Any parameters
+specified in \fIroute_params\fR is added to the \fBROUTE\fR header before
+appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_server()\fR function appends a \fBSERVER\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBSERVER\fR header is created using the
+information in \fIsrv\fR.
+.sp
+.LP
+The \fBsip_add_subject()\fR function appends a \fBSUBJECT\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBSUBJECT\fR header is created using the
+information in \fIsubject\fR.
+.sp
+.LP
+The \fBsip_add_supported()\fR function appends a \fBSUPPORTED\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBSUPPORTED\fR header is created using
+the information in \fIsupport\fR.
+.sp
+.LP
+The \fBsip_add_tstamp()\fR function appends a \fBTIMESTAMP\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBTIMESTAMP\fR header is created using
+the time value in \fItime\fR and the delay value, if provided, in \fIdelay\fR.
+.sp
+.LP
+The \fBsip_add_unsupported()\fR function appends an \fBUNSUPPORTED\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBUNSUPPORTED\fR header is created
+using the \fBoption-tag\fR value in \fIunsupport\fR.
+.sp
+.LP
+The \fBsip_add_user_agent()\fR function appends an \fBUSER-AGENT\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBUSER-AGENT\fR header is created
+using the \fBserver-val\fR specified in \fIusr\fR.
+.sp
+.LP
+The \fBsip_add_warning()\fR function appends a \fBWARNING\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBWARNING\fR header is created using the
+\fBwarn-code\fR in \fIcode\fR, \fBwarn-agent\fR in \fIaddr\fR and
+\fBwarn-test\fR in \fImsg\fR.
+.sp
+.LP
+The \fBsip_add_privacy()\fR function appends a \fBPRIVACY\fR header to the
+\fBSIP\fR message \fIsip_msg\fR. The \fBPRIVACY\fR header  is created using the
+privacy value specified in \fIpriv_val\fR.
+.sp
+.LP
+The \fBsip_add_rseq()\fR function appends a \fBRSEQ\fR header to the \fBSIP\fR
+message \fIsip_msg\fR. The \fBRSEQ\fR header is created using the sequence
+number specified in \fIresp_num\fR.
+.sp
+.LP
+The \fBsip_add_rack()\fR function appends a \fBRACK\fR header to the \fBSIP\fR
+message \fIsip_msg\fR. The \fBRACK\fR header is created using the sequence
+number in \fIresp_num\fR, the \fBSIP\fR method in \fImethod\fR and the
+\fBCSEQ\fR number in \fIcseq\fR. Permissible values for method include:
+\fBINVITE\fR, \fBACK\fR, \fBOPTIONS\fR, \fBBYE\fR, \fBCANCEL\fR,
+\fBREGISTER\fR, \fBREFER\fR, \fBINFO\fR, \fBSUBSCRIBE\fR, \fBNOTIFY\fR,
+\fBPRACK\fR.
+.sp
+.LP
+The \fBsip_add_author()\fR function appends an \fBAUTHORIZATION\fR header to
+the \fBSIP\fR message \fIsip_msg\fR. The \fBAUTHORIZATION\fR header is created
+using scheme. Any parameter specified in \fIparam\fR is added to the
+\fBAUTHORIZATION\fR header before the header is appended to the \fBSIP\fR
+message.
+.sp
+.LP
+The \fBsip_add_authen_info()\fR function appends an \fBAUTHENTICATION-INFO()\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBAUTHENTICATION-INFO\fR
+header is created using the authentication information in \fIainfo\fR.
+.sp
+.LP
+The \fBsip_add_proxy_authen()\fR function appends a \fBPROXY-AUTHENTICATE\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBPROXY-AUTHENTICATE\fR is
+created using the value specified in \fIpsacheme\fR. Any parameter in
+\fIparam\fR is added to the \fBPROXY-AUTHENTICATE\fR header before adding the
+header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_proxy_author()\fR function appends a \fBPROXY-AUTHORIZATION\fR
+header to the \fBSIP\fR message \fIsip_msg\fR. The \fBPROXY-AUTHORIZATION\fR
+header is created using the value specified in \fIpascheme\fR. Any parameter in
+\fIparam\fR is added to the \fBPROXY-AUTHORIZATION\fR header before adding the
+header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_proxy_require()\fR function appends a \fBPROXY-REQUIRE\fR header
+to the \fBSIP\fR message \fIsip_msg\fR. The \fBPROXY-REQUIRE\fR header is
+created using the \fBoption-tag\fR in \fIopt\fR.
+.sp
+.LP
+The \fBsip_add_www_authen()\fR function appends a \fBWWW-AUTHENTICATE\fR header
+to the \fBSIP\fR message \fIsip_msg\fR. The \fBWWW-AUTHENTICATE\fR header is
+created using the challenge in \fIwascheme\fR. Any parameter in \fIparam\fR is
+added to the \fBWWW-AUTHENTICATE\fR header before adding the header to the
+\fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_allow_events()\fR function appends an \fBALLOW-EVENTS\fR header
+to the \fBSIP\fR message The \fBALLOW-EVENTS\fR header is created using the
+event specified in events.
+.sp
+.LP
+The \fBsip_add_event()\fR function appends an \fBEVENT\fR header to the
+\fBSIP\fR message. The \fBEVENT\fR header is created using the value specified
+in \fIevent\fR. Any parameter in \fIparam\fR is added to the \fBEVENT\fR header
+before appending the header to the \fBSIP\fR message.
+.sp
+.LP
+The \fBsip_add_substate()\fR function appends a \fBSUBSCRIPTION-STATE\fR header
+to the \fBSIP\fR message. The \fBSUBSCRIPTION-STATE\fR header is created using
+the \fBstate\fR specified in \fIsub\fR. Any parameter in \fIparam\fR is added
+to the \fBSUBSCRIPTION-STATE\fR header before appending the header to the
+\fBSIP\fR message.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return \fB0\fR on success and the appropriate error value on
+failure.
+.SH ERRORS
+.sp
+.LP
+On failure, functions that return an error value can return one of the
+following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Mandatory parameters are not provided, i.e. null.
+.sp
+For \fBsip_add_from()\fR, \fBsip_add_to()\fR, \fBsip_add_contact()\fR,
+\fBsip_add_reply_to()\fR, \fBsip_add_passertedid()\fR,
+\fBsip_add_ppreferredid()\fR if \fIdisplay_name\fR is non-null and
+\fIadd_aquot\fR is \fBB_FALSE\fR.
+.sp
+For \fBsip_add_branchid_to_via()\fR the topmost \fBVIA\fR header already has a
+branch \fIparam\fR or the \fBSIP\fR message does not have a \fBVIA\fR header.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The message cannot be modified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is an error allocating memory for creating headers/parameters.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

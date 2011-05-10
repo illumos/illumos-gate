@@ -1,0 +1,66 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_parse_result 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_parse_result, ldap_parse_extended_result, ldap_parse_sasl_bind_result \-
+LDAP message result parser
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_parse_result\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR, \fBint\fR \fI*errcodep\fR,
+     \fBchar\fR \fI**matcheddnp\fR,\fBchar\fR \fI**errmsgp\fR, \fBchar\fR \fI***referralsp\fR,
+     \fBLDAPControl\fR \fI***serverctrlsp\fR,\fBint\fR \fIfreeit\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_parse_sasl_bind_result\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR,
+     \fBstruct berval\fR\fI**servercredp\fR,\fBint\fR \fIfreeit\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_parse_extended_result\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*res\fR,
+     \fBstruct berval\fR\fBchar\fR \fI**resultoidp\fR, \fI**resultdata\fR, \fBint\fR \fIfreeit\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_parse_extended_result()\fR, \fBldap_parse_result()\fR and
+\fBldap_parse_sasl_bind_result()\fR routines search for a message to parse.
+These functions skip messages of type  \fBLDAP_RES_SEARCH_ENTRY\fR and
+\fBLDAP_RES_SEARCH_REFERENCE\fR.
+.SH RETURN VALUES
+.sp
+.LP
+They return  \fBLDAP_SUCCESS\fR if the result was successfully parsed  or an
+LDAP error code if not (see \fBldap_error\fR(3LDAP)).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap_error\fR(3LDAP), \fBldap_result\fR(3LDAP), \fBattributes\fR(5)

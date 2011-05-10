@@ -1,0 +1,65 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH objfs 7FS "30 August 2004" "SunOS 5.11" "File Systems"
+.SH NAME
+objfs \- Kernel object filesystem
+.SH DESCRIPTION
+.sp
+.LP
+The \fBobjfs\fR filesystem describes the state of all modules currently loaded
+by the kernel. It is mounted during boot at \fB/system/object\fR.
+.sp
+.LP
+The contents of the filesystem are dynamic and reflect the current state of the
+system. Each module is represented by a directory containing a single
+file, 'object.' The object file is a read only ELF file which contains information
+about the object loaded in the kernel.
+.sp
+.LP
+The kernel may load and unload modules dynamically as the system runs. As a
+result, applications may observe different directory contents in
+\fB/system/object\fR if they repeatedly rescan the directory. If a module is
+unloaded, its associated \fB/system/object\fR files disappear from the
+hierarchy and subsequent attempts to open them, or to read files opened before
+the module unloaded, elicits an error.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/system/object\fR\fR
+.ad
+.RS 18n
+.rt  
+Mount point for objfs file system
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityPrivate
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvfstab\fR(4)
+.SH NOTES
+.sp
+.LP
+The content of the ELF files is private to the implementation and subject to
+change without notice.

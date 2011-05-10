@@ -1,0 +1,545 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sed 1 "23 Jul 1998" "SunOS 5.11" "User Commands"
+.SH NAME
+sed \- stream editor
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/sed\fR [\fB-n\fR] \fIscript\fR [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/sed\fR [\fB-n\fR] [\fB-e\fR \fIscript\fR]... [\fB-f\fR \fIscript_file\fR]... 
+     [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/sed\fR [\fB-n\fR] \fIscript\fR [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/sed\fR [\fB-n\fR] [\fB-e\fR \fIscript\fR]... [\fB-f\fR \fIscript_file\fR]... 
+     [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsed\fR utility is a stream editor that reads one or more text files,
+makes editing changes according to a script of editing commands, and writes the
+results to standard output. The script is obtained from either the \fIscript\fR
+operand string, or a combination of the option-arguments from the \fB-e\fR
+\fIscript\fR and \fB-f\fR \fIscript_file\fR options.
+.sp
+.LP
+The \fBsed\fR utility is a text editor. It cannot edit binary files or files
+containing ASCII NUL (\e0) characters or very long lines.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIscript\fR \fR
+.ad
+.RS 19n
+.rt  
+\fIscript\fR is an edit command for \fBsed\fR. See USAGE below for more
+information on the format of \fIscript\fR. If there is just one \fB-e\fR option
+and no \fB-f\fR options, the flag \fB-e\fR may be omitted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIscript_file\fR \fR
+.ad
+.RS 19n
+.rt  
+Takes the script from \fIscript_file\fR. \fIscript_file\fR consists of editing
+commands, one per line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fR
+.ad
+.RS 19n
+.rt  
+Suppresses the default output.
+.RE
+
+.sp
+.LP
+Multiple \fB-e\fR and \fB-f\fR options may be specified. All commands are added
+to the script in the order specified, regardless of their origin.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR \fR
+.ad
+.RS 11n
+.rt  
+A path name of a file whose contents will be read and edited. If multiple
+\fIfile\fR operands are specified, the named files will be read in the order
+specified and the concatenation will be edited. If no \fIfile\fR operands are
+specified, the standard input will be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIscript\fR \fR
+.ad
+.RS 11n
+.rt  
+A string to be used as the script of editing commands. The application must not
+present a \fIscript\fR that violates the restrictions of a text file except
+that the final character need not be a \fBNEWLINE\fR character.
+.RE
+
+.SH USAGE
+.sp
+.LP
+A script consists of editing commands, one per line, of the following form:
+.sp
+.LP
+[ \|\fIaddress\fR \|[ \|, \|\fIaddress\fR \|] \|] \|\fIcommand\fR \|[
+\|\fIarguments\fR \|]
+.sp
+.LP
+Zero or more blank characters are accepted before the first address and before
+\fIcommand\fR. Any number of semicolons are accepted before the first address.
+.sp
+.LP
+In normal operation, \fBsed\fR cyclically copies a line of input (less its
+terminating \fBNEWLINE\fR character) into a \fIpattern space\fR  (unless there
+is something left after a \fBD\fR command), applies in sequence all commands
+whose \fIaddresses\fR select that pattern space, and copies the resulting
+pattern space to the standard output (except under \fB-n\fR) and deletes the
+pattern space. Whenever the pattern space is written to standard output or a
+named file, \fBsed\fR will immediately follow it with a \fINEWLINE\fR
+character.
+.sp
+.LP
+Some of the commands use a \fIhold space\fR  to save all or part of the
+\fIpattern space\fR  for subsequent retrieval. The \fIpattern\fR and \fIhold
+spaces\fR will each be able to hold at least \fB8192\fR bytes.
+.SS "sed Addresses"
+.sp
+.LP
+An \fIaddress\fR is either empty, a decimal number that counts input lines
+cumulatively across files, a \fB$\fR that addresses the last line of input, or
+a context address, which consists of a \fB/\fR\fIregular expression\fR\fB/\fR
+as described on the \fBregexp\fR(5) manual page.
+.sp
+.LP
+A command line with no addresses selects every pattern space.
+.sp
+.LP
+A command line with one address selects each pattern space that matches the
+address.
+.sp
+.LP
+A command line with two addresses selects the inclusive range from the first
+pattern space that matches the first address through the next pattern space
+that matches the second address. Thereafter the process is repeated, looking
+again for the first address. (If the second address is a number less than or
+equal to the line number selected by the first address, only the line
+corresponding to the first address is selected.)
+.sp
+.LP
+Typically, address are separated from each other by a comma (,).  They may also
+be separated by a semicolon (;).
+.SS "sed Regular Expressions"
+.sp
+.LP
+\fBsed\fR supports the basic regular expressions described on the
+\fBregexp\fR(5) manual page, with the following additions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fI\ecREc\fR \fR
+.ad
+.RS 11n
+.rt  
+In a context address, the construction \fI\ecREc\fR, where \fIc\fR is any
+character other than a backslash or \fBNEWLINE\fR character, is identical to
+/\fIRE\fR/. If the character designated by \fIc\fR appears following a
+backslash, then it is considered to be that literal character, which does not
+terminate the RE. For example, in the context address \fB\exabc\exdefx\fR, the
+second \fBx\fR stands for itself, so that the regular expression is
+\fBabcxdef\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\en\fR \fR
+.ad
+.RS 11n
+.rt  
+The escape sequence \fB\en\fR matches a \fINEWLINE\fR character embedded in the
+pattern space.  A literal \fBNEWLINE\fR character must not be used in the
+regular expression of a context address or in the substitute command.
+.RE
+
+.sp
+.LP
+Editing commands can be applied only to non-selected pattern spaces by use of
+the negation command \fB!\fR (described below).
+.SS "sed Editing Commands"
+.sp
+.LP
+In the following list of functions the maximum number of permissible addresses
+for each function is indicated.
+.sp
+.LP
+The \fBr\fR and \fBw\fR commands take an optional \fIrfile\fR (or \fIwfile\fR)
+parameter, separated from the command letter by one or more blank characters.
+.sp
+.LP
+Multiple commands can be specified by separating them with a semicolon
+(\fB;\fR) on the same command line.
+.sp
+.LP
+The \fItext\fR argument consists of one or more lines, all but the last of
+which end with \fB\e\fR to hide the \fBNEWLINE\fR. Each embedded \fBNEWLINE\fR
+character in the text must be preceded by a backslash. Other backslashes in
+text are removed and the following character is treated literally. Backslashes
+in text are treated like backslashes in the replacement string of an \fBs\fR
+command, and may be used to protect initial blanks and tabs against the
+stripping that is done on every script line.  The \fIrfile\fR or \fIwfile\fR
+argument must terminate the command line and must be preceded by exactly one
+blank.  The use of the \fIwfile\fR parameter causes that file to be initially
+created, if it does not exist, or will replace the contents of an existing
+file. There can be at most 10 distinct \fIwfile\fR arguments.
+.sp
+.LP
+Regular expressions match entire strings, not just individual lines, but a
+\fBNEWLINE\fR character is matched by \fB\en\fR in a \fBsed\fR RE. A
+\fBNEWLINE\fR character is not allowed in an RE. Also notice that \fB\en\fR
+cannot be used to match a \fBNEWLINE\fR character at the end of an input line;
+\fBNEWLINE\fR characters appear in the pattern space as a result of the \fBN\fR
+editing command.
+.sp
+.LP
+Two of the commands take a \fIcommand-list\fR, which is a list of \fBsed\fR
+commands separated by \fBNEWLINE\fR characters, as follows:
+.sp
+.in +2
+.nf
+{ \fIcommand\fR 
+\fIcommand\fR 
+}
+.fi
+.in -2
+
+.sp
+.LP
+The \fB{\fR can be preceded with blank characters and can be followed with
+white space. The \fIcommands\fR can be preceded by white space. The terminating
+\fB}\fR must be preceded by a \fBNEWLINE\fR character and can be preceded or
+followed by <blank>s.  The braces may be preceded or followed by <blank>s. The
+command may be preceded by <blank>s, but may not be followed by <blank>s.
+.sp
+.LP
+The following table lists the functions, with the maximum number of permissible
+addresses.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(.92i) |cw(1.38i) |cw(3.21i) 
+lw(.92i) |lw(1.38i) |lw(3.21i) 
+.
+Max AddressCommandDescription
+_
+1\fBa\e\fR \fItext\fRT{
+Append by executing \fBN\fR command or beginning a new cycle. Place \fItext\fR on the output before reading the next input line.
+T}
+_
+2\fBb\fR \fIlabel\fRT{
+Branch to the \fB:\fR command bearing the \fIlabel \fR.  If \fIlabel\fR is empty, branch to the end of the script.  Labels are recognized unique up to eight characters.
+T}
+_
+2\fBc\e\fR \fItext\fRT{
+Change.  Delete the pattern space.  Place \fItext\fR on the output. Start the next cycle.
+T}
+2\fBd\fRT{
+Delete the pattern space.  Start the next cycle.
+T}
+_
+2\fBD\fRT{
+Delete the initial segment of the pattern space through the first new-line.  Start the next cycle. (See the \fBN\fR command below.)
+T}
+_
+2\fBg\fRT{
+Replace the contents of the pattern space by the contents of the hold space.
+T}
+_
+2\fBG\fRT{
+Append the contents of the hold space to the pattern space.
+T}
+_
+2\fBh\fRT{
+Replace the contents of the hold space by the contents of the pattern space.
+T}
+_
+2\fBH\fRT{
+Append the contents of the pattern space to the hold space.
+T}
+_
+1\fBi\e\fR \fItext\fRT{
+Insert.  Place \fItext\fR on the standard output.
+T}
+_
+2\fBl\fRT{
+\fB/usr/bin/sed\fR:  List the pattern space on the standard output in an unambiguous form.  Non-printable characters are displayed in octal notation and long lines are folded.
+T}
+_
+T{
+\fB/usr/xpg4/bin/sed\fR:  List the pattern space on the standard output in an unambiguous form. Non-printable characters are displayed in octal notation and long lines are folded. The characters (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\er\fR, \fB\et\fR, and \fB\ev\fR) are written as the corresponding escape sequences. Non-printable characters not in that table will be written as one three-digit octal number (with a preceding backslash character) for each byte in the character (most significant byte first). If the size of a byte on the system is greater than nine bits, the format used for non-printable characters is implementation dependent. 
+T}
+T{
+Long lines are folded, with the point of folding indicated by writing a backslash followed by a \fBNEWLINE\fR; the length at which folding occurs is unspecified, but should be appropriate for the output device.  The end of each line is marked with a \fB$\fR. 
+T}
+_
+2\fBn\fRT{
+Copy the pattern space to the standard output if default output is not suppressed.  Replace the pattern space with the next line of input.
+T}
+_
+2\fBN\fRT{
+Append the next line of input to the pattern space with an embedded new-line.  (The current line number changes.)  If no next line of input is available, the \fBN\fR command verb shall branch to the end of the script and quit without starting a new cycle and without writing the pattern space.
+T}
+_
+2\fBp\fRT{
+Print.  Copy the pattern space to the standard output.
+T}
+_
+2\fBP\fRT{
+Copy the initial segment of the pattern space through the first new-line to the standard output.
+T}
+_
+1\fBq\fRT{
+Quit.  Branch to the end of the script.  Do not start a new cycle.
+T}
+_
+2\fBr\fR \fIrfile\fRT{
+Read the contents of \fI rfile\fR.  Place them on the output before reading the next input line.  If \fIrfile\fR does not exist or cannot be read, it is treated as if it were an empty file, causing no error condition.
+T}
+_
+2\fBt\fR \fIlabel\fRT{
+Test.  Branch to the \fB:\fR command bearing the \fIlabel\fR if any substitutions have been made since the most recent reading of an input line or execution of a \fBt\fR. If \fIlabel\fR is empty, branch to the end of the script.
+T}
+_
+2\fBw\fR \fIwfile\fRT{
+Write.  Append the pattern space to \fIwfile\fR. The first occurrence of \fBw\fR will cause \fIwfile\fR to be cleared.  Subsequent invocations of \fBw\fR will append.  Each time the \fBsed\fR command is used, \fIwfile\fR is overwritten.
+T}
+_
+2\fBx\fRT{
+Exchange the contents of the pattern and hold spaces.
+T}
+_
+2\fB!\fR \fIcommand\fRT{
+Don't.  Apply the \fIcommand\fR (or group, if \fIcommand\fR is \fB{\|\fR) only to lines \fInot\fR selected by the address(es).
+T}
+_
+0\fB:\fR \fIlabel\fRT{
+This command does nothing; it bears a \fIlabel\fR for \fBb\fR and \fBt\fR commands to branch to.
+T}
+_
+1\fB=\fRT{
+Place the current line number on the standard output as a line.
+T}
+_
+2\fB{\fR\fIcommand-list\fR\fB}\fRT{
+Execute \fIcommand-list\fR only when the pattern space is selected.
+T}
+0An empty command is ignored.
+_
+0\fB#\fRT{
+If a \fB#\fR appears as the first character on a line of a script file, then that entire line is treated as a comment, with one exception: if a \fB#\fR appears on the first line and the character after the \fB#\fR is an \fBn\fR, then the default output will be suppressed.  The rest of the line after \fB#n\fR is also ignored.  A script file must contain at least one non-comment line.
+T}
+.TE
+
+.sp
+
+.sp
+.TS
+tab() box;
+cw(.92i) |cw(4.58i) 
+lw(.92i) |lw(4.58i) 
+.
+Max AddrCommand (Using \fIstrings\fR) and Description
+_
+2\fBs\fR/\fIregular expression\fR/\fIreplacement\fR/\fIflags\fR
+T{
+Substitute the \fIreplacement\fR string for instances of the \fIregular expression\fR in the pattern space.  Any character other than backslash or newline can be used instead of a slash to delimit the RE and the replacement.  Within the RE and the replacement, the RE delimiter itself can be used as a literal character if it is preceded by a backslash.
+T}
+T{
+An ampersand (\fB&\fR) appearing in the \fIreplacement\fR will be replaced by the string matching the RE.  The special meaning of \fB&\fR in this context can be suppressed by preceding it by backslash.  The characters \fB\e\fR\fIn\fR, where \fIn\fR is a digit, will be replaced by the text matched by the corresponding backreference expression.  For each backslash (\e) encountered in scanning \fIreplacement\fR from beginning to end, the following character loses its special meaning (if any).  It is unspecified what special meaning is given to any character other than &, \e or digits.
+T}
+T{
+A line can be split by substituting a \fBNEWLINE \fRcharacter into it.  The application must escape the \fBNEWLINE \fRcharacter in the \fIreplacement\fR by preceding it with backslash.  A substitution is considered to have been performed even if the replacement string is identical to the string that it replaces.
+T}
+\fIflags\fR is zero or more of:
+T{
+\fIn\fR \fIn\fR= 1 - 512.  Substitute for just the \fI n\fRth occurrence of the \fIregular expression.\fR
+T}
+T{
+\fBg\fR Global.  Substitute for all nonoverlapping instances of the \fIregular expression\fR rather than just the first one.  If both \fIg\fR and \fIn\fR are specified, the results are unspecified.
+T}
+_
+T{
+\fBp\fR Print the pattern space if a replacement was made. 
+T}
+T{
+\fBP\fR Copy the initial segment of the pattern space through the first new-line to the standard output.
+T}
+T{
+\fBw\fR \fIwfile\fR Write.  Append the pattern space to \fIwfile\fR if a replacement was made. The first occurrence of \fBw\fR will cause \fIwfile\fR to be cleared.  Subsequent invocations of \fBw\fR will append.  Each time the \fBsed\fR command is used, \fIwfile\fR is overwritten.
+T}
+_
+2\fBy\fR/ \fIstring1\fR / \fIstring2\fR /
+T{
+Transform.  Replace all occurrences of characters in \fI string1\fR with the corresponding characters in \fIstring2\fR.  \fIstring1\fR and \fIstring2\fR must have the same number of characters, or if any of the characters in \fIstring1 \fR appear more than once, the results are undefined.  Any character other than backslash or \fBNEWLINE\fR can be used instead of slash to delimit the strings.  Within \fIstring1\fR and \fIstring2\fR, the delimiter itself can be used as a literal character if it is preceded by a backslash. For example, \fBy\fR/abc/ABC/ replaces a with A, b with B, and c with C.
+T}
+.TE
+
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBsed\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn example sed script
+.sp
+.LP
+This \fBsed\fR script simulates the \fBBSD \fR\fBcat\fR \fB-s\fR command,
+squeezing excess blank lines from standard input.
+
+.sp
+.in +2
+.nf
+sed \(min '
+# Write non-empty lines.
+/./     {
+        p
+        d
+        }
+# Write a single empty line, then look for more empty lines.
+/^$/        p
+# Get next line, discard the held <newline> (empty line),
+# and look for more empty lines.
+:Empty
+/^$/        {
+        N
+        s/.//
+        b Empty
+        }
+# Write the non-empty line before going back to search
+# for the first in a set of empty lines.
+        p
+\&'
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBsed\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/sed"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSINot enabled
+.TE
+
+.SS "/usr/xpg4/bin/sed"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBawk\fR(1), \fBed\fR(1), \fBgrep\fR(1), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBlargefile\fR(5), \fBregexp\fR(5), \fBstandards\fR(5)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_macalias.h>
 #include <mdb/mdb_fmt.h>
@@ -154,7 +152,7 @@ print_wdesc(mdb_var_t *v, void *ignored)
 int
 cmd_walkers(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	if ((flags && DCMD_ADDRSPEC) || argc != 0)
+	if ((flags & DCMD_ADDRSPEC) || argc != 0)
 		return (DCMD_USAGE);
 
 	mdb_nv_sort_iter(&mdb.m_walkers, print_wdesc, NULL, UM_SLEEP | UM_GC);
@@ -176,7 +174,7 @@ print_ddesc(mdb_var_t *v, void *ignored)
 int
 cmd_dcmds(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	if ((flags && DCMD_ADDRSPEC) || argc != 0)
+	if ((flags & DCMD_ADDRSPEC) || argc != 0)
 		return (DCMD_USAGE);
 
 	mdb_nv_sort_iter(&mdb.m_dcmds, print_ddesc, NULL, UM_SLEEP | UM_GC);

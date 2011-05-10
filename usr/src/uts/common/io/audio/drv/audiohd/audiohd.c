@@ -142,7 +142,7 @@ static audiohd_codec_info_t audiohd_codecs[] = {
 	{0x10ec0883, "Realtek ALC883", 0x0},
 	{0x10ec0885, "Realtek ALC885", 0x0},
 	{0x10ec0888, "Realtek ALC888", (NO_SPDIF)},
-	{0x111d7603, "Integrated Devices 92HD75B3X5", 0x0},
+	{0x111d7603, "Integrated Devices 92HD75B3X5", (NO_MIXER)},
 	{0x111d7608, "Integrated Devices 92HD75B2X5", (NO_MIXER)},
 	{0x111d76b2, "Integrated Devices 92HD71B7X", (NO_MIXER)},
 	{0x11d4194a, "Analog Devices AD1984A", 0x0},
@@ -289,6 +289,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	case 0x80863a3e:
 		name = "Intel HD Audio";
 		vers = "ICH10";
+		break;
+	case 0x80863b56:
+		name = "Intel HD Audio";
+		vers = "PCH";
 		break;
 	}
 	/* set device information */

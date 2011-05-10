@@ -1,0 +1,67 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH seekdir 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+seekdir \- set position of directory stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <dirent.h>
+
+\fBvoid\fR \fBseekdir\fR(\fBDIR *\fR\fIdirp\fR, \fBlong int\fR \fIloc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBseekdir()\fR function sets the position of the next \fBreaddir\fR(3C)
+operation on the directory stream specified by \fIdirp\fR to the position
+specified by \fIloc\fR. The value of \fIloc\fR should have been returned from
+an earlier call to \fBtelldir\fR(3C). The new position reverts to the one
+associated with the directory stream when \fBtelldir()\fR was performed.
+.sp
+.LP
+If the value of \fIloc\fR was not obtained from an earlier call to
+\fBtelldir()\fR or if a call to \fBrewinddir\fR(3C) occurred between the call
+to \fBtelldir\fR \fB()\fR and the call to \fBseekdir()\fR, the results of
+subsequent calls to \fBreaddir()\fR are unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBseekdir()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopendir\fR(3C), \fBreaddir\fR(3C), \fBrewinddir\fR(3C), \fBtelldir\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

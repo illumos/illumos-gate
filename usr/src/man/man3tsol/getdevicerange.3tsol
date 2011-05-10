@@ -1,0 +1,125 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getdevicerange 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+getdevicerange \- get the label range of a device
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-lbsm\fR \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBblrange_t *\fR\fBgetdevicerange\fR(\fBconst char *\fR\fIdevice\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetdevicerange()\fR function returns the label range of a
+user-allocatable device.
+.sp
+.LP
+If the label range is not specified for \fIdevice\fR, \fBgetdevicerange()\fR
+returns the default values of \fBADMIN_LOW\fR for the lower bound and
+\fBADMIN_HIGH\fR for the upper bound of \fIdevice\fR.
+.sp
+.LP
+From the command line, \fBlist_devices\fR(1) can be used to see the label range
+of \fIdevice\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetdevicerange()\fR function returns \fINULL\fR on failure and sets
+\fIerrno\fR. On successful completion, it returns a pointer to a
+\fBblrange_t\fR structure which must be freed by the caller, as follows:
+.sp
+.in +2
+.nf
+blrange_t *range;
+      ...
+      m_label_free(range->lower_bound);
+      m_label_free(range->upper_bound);
+      free(range);
+.fi
+.in -2
+.sp
+
+.SH ERRORS
+.sp
+.LP
+The \fBgetdevicerange()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+There is not enough memory available to allocate the required bytes. The
+application could try later.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+The physical limits of the system are exceeded by size bytes of memory which
+cannot be allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+Invalid upper or lower bound for device.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.16i) |cw(3.34i) 
+lw(2.16i) |lw(3.34i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlist_devices\fR(1), \fBfree\fR(3C), \fBlibtsol\fR(3LIB),
+\fBm_label_free\fR(3TSOL), \fBattributes\fR(5)
+.sp
+.LP
+\fIValidating the Label Request Against the Printer\&'s Label Range\fR in
+\fISolaris Trusted Extensions Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

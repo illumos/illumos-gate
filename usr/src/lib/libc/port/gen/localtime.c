@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -685,7 +685,7 @@ mktime1(struct tm *tmptr, int usetz)
 	int	temp;
 	int	mketimerrno;
 	int	overflow;
-	void	*unused;
+	void	*unused = NULL;
 
 	mketimerrno = errno;
 

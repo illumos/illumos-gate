@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH get_pktiopb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+get_pktiopb, free_pktiopb \- allocate/free a SCSI packet in the iopb map
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fBstruct scsi_pkt *\fR\fBget_pktiopb\fR(\fBstruct scsi_address *\fR\fIap\fR,
+     \fBcaddr_t *\fR\fIdatap\fR, \fBint\fR \fIcdblen\fR, \fBint\fR \fIstatuslen\fR, \fBint\fR \fIdatalen\fR, 
+     \fBint\fR \fIreadflag\fR, \fBint (*\fR\fIcallback\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfree_pktiopb\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBcaddr_t\fR \fIdatap\fR, \fBint\fR \fIdatalen\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+These interfaces are obsolete. Use \fBscsi_alloc_consistent_buf\fR(9F) instead
+of \fBget_pktiopb()\fR. Use \fBscsi_free_consistent_buf\fR(9F) instead of
+\fBfree_pktiopb()\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the target's \fBscsi_address\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdatap\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the address of the packet, set by this function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcdblen\fR\fR
+.ad
+.RS 13n
+.rt  
+Number of bytes required for the \fBSCSI \fRcommand descriptor block (CDB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstatuslen\fR\fR
+.ad
+.RS 13n
+.rt  
+Number of bytes required for the \fBSCSI \fRstatus area.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdatalen\fR\fR
+.ad
+.RS 13n
+.rt  
+Number of bytes required for the data area of the \fBSCSI \fRcommand.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreadflag\fR\fR
+.ad
+.RS 13n
+.rt  
+If non-zero, data will be transferred from the \fBSCSI \fRtarget.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a callback function, or \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBget_pktiopb()\fR function allocates a \fBscsi_pkt\fR structure that has
+a small data area allocated. It is used by some \fBSCSI \fRcommands such as
+\fBREQUEST_SENSE\fR, which involve a small amount of data and require
+cache-consistent memory for proper operation. It uses \fBddi_iopb_alloc\fR(9F)
+for allocating the data area and \fBscsi_resalloc\fR(9F) to allocate the packet
+and \fBDMA\fR resources.
+.sp
+.LP
+\fIcallback\fR indicates what \fBget_pktiopb()\fR should do when resources are
+not available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBOther Values\fR
+.ad
+.RS 16n
+.rt  
+\fIcallback\fR points to a function which is called when resources may have
+become available. \fIcallback\fR \fBmust\fR return either \fB0\fR (indicating
+that it attempted to allocate resources but failed to do so again), in which
+case it is put back on a list to be called again later, or \fB1\fR indicating
+either success in allocating resources or indicating that it no longer cares
+for a retry.
+.RE
+
+.sp
+.LP
+The \fBfree_pktiopb()\fR function is used for freeing the packet and its
+associated resources.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBget_pktiopb()\fR function returns a pointer to the newly allocated
+\fBscsi_pkt\fR or a \fINULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+If \fIcallback\fR is \fBSLEEP_FUNC\fR, then this routine can be called only
+from user or kernel context. Otherwise, it can be called from user, interrupt,
+or kernel context. The \fIcallback\fR function should not block or call
+routines that block.
+.sp
+.LP
+The \fBfree_pktiopb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_iopb_alloc\fR(9F),
+\fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_free_consistent_buf\fR(9F),
+\fBscsi_pktalloc\fR(9F), \fBscsi_resalloc\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The \fBget_pktiopb()\fR and \fBfree_pktiopb()\fR functions are obsolete and
+will be discontinued in a future release. These functions have been replaced
+by, respectively, \fBscsi_alloc_consistent_buf\fR(9F) and
+\fBscsi_free_consistent_buf\fR(9F).
+.sp
+.LP
+The \fBget_pktiopb()\fR function uses scarce resources. For this reason and its
+obsolescence (see above), its use is discouraged.

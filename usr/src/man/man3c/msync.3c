@@ -1,0 +1,236 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH msync 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+msync \- synchronize memory with physical storage
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/mman.h>
+
+\fBint\fR \fBmsync\fR(\fBvoid *\fR\fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBmsync()\fR function writes all modified copies of pages over the range
+[\fIaddr, addr + len\fR) to the underlying hardware, or invalidates any copies
+so that further references to the pages will be obtained by the system from
+their permanent storage locations. The permanent storage for a modified
+\fBMAP_SHARED\fR mapping is the file the page is mapped to; the permanent
+storage for a modified \fBMAP_PRIVATE\fR mapping is its swap area.
+.sp
+.LP
+The \fIflags\fR argument is a bit pattern built from the following values:
+.sp
+.ne 2
+.mk
+.na
+\fBMS_ASYNC\fR
+.ad
+.RS 17n
+.rt  
+perform asynchronous writes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMS_SYNC\fR
+.ad
+.RS 17n
+.rt  
+perform synchronous writes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMS_INVALIDATE\fR
+.ad
+.RS 17n
+.rt  
+invalidate mappings
+.RE
+
+.sp
+.LP
+If \fIflags\fR is \fBMS_ASYNC\fR or \fBMS_SYNC\fR, the function synchronizes
+the file contents to match the current contents of the memory region.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All write references to the memory region made prior to the call are visible by
+subsequent read operations on the file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All writes to the same portion of the file prior to the call may or may not be
+visible by read references to the memory region.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Unmodified pages in the specified range are not written to the underlying
+hardware.
+.RE
+.sp
+.LP
+If \fIflags\fR is \fBMS_ASYNC\fR, the function may return immediately once all
+write operations are scheduled; if \fIflags\fR is \fBMS_SYNC\fR, the function
+does not return until all write operations are completed.
+.sp
+.LP
+If \fIflags\fR is \fBMS_INVALIDATE\fR, the function synchronizes the contents
+of the memory region to match the current file contents.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All writes to the mapped portion of the file made prior to the call are visible
+by subsequent read references to the mapped memory region.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All write references prior to the call, by any process, to memory regions
+mapped to the same portion of the file using \fBMAP_SHARED\fR, are visible by
+read references to the region.
+.RE
+.sp
+.LP
+If \fBmsync()\fR causes any write to the file, then the file's \fBst_ctime\fR
+and \fBst_mtime\fR fields are marked for update.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmsync()\fR returns \fB0\fR; otherwise, it
+returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmsync()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+Some or all of the addresses in the range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR)
+are locked and \fBMS_SYNC\fR with the \fBMS_INVALIDATE\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+Some or all pages in the range [\fIaddr\fR,  \fIaddr\fR +  \fIlen\fR) are
+locked for I/O.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaddr\fR argument is not a multiple of the  page size as returned by
+\fBsysconf\fR(3C).
+.sp
+The \fIflags\fR argument is not some combination of \fBMS_ASYNC\fR and
+\fBMS_INVALIDATE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+An I/O error occurred while reading from or writing to the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Addresses in the range [\fIaddr, addr + len\fR) are outside the valid range for
+the address space of a process, or specify one or more pages that are not
+mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+\fBMS_INVALIDATE\fR was specified and one or more of the pages is locked in
+memory.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBmsync()\fR function should be used by programs that require a memory
+object to be in a known state, for example in building transaction facilities.
+.sp
+.LP
+Normal system activity can cause pages to be written to disk.  Therefore, there
+are no guarantees that \fBmsync()\fR is the only control over when pages are or
+are not written to disk.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmemcntl\fR(2), \fBmmap\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,60 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH btop 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+btop \- convert size in bytes to size in pages (round down)
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+
+
+
+\fBunsigned long\fR \fBbtop\fR(\fBunsigned long\fR \fInumbytes\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInumbytes\fR\fR
+.ad
+.RS 12n
+.rt  
+Number of bytes.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbtop()\fR function returns the number of memory pages that are contained
+in the specified number of bytes, with downward rounding in the case that the
+byte count is not a page multiple. For example, if the page size is \fB2048\fR,
+then \fBbtop(4096)\fR returns \fB2\fR, and \fBbtop(4097)\fR returns \fB2\fR as
+well. \fBbtop(0)\fR returns \fB0\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The return value is always the number of pages. There are no invalid input
+values, and therefore no error return values.
+.SH CONTEXT
+.sp
+.LP
+The \fBbtop()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbtopr\fR(9F), \fBddi_btop\fR(9F), \fBptob\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

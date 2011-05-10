@@ -1,0 +1,265 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mpss.so.1 1 "20 Feb 2002" "SunOS 5.11" "User Commands"
+.SH NAME
+mpss.so.1 \- shared object for setting preferred page size
+.SH SYNOPSIS
+.LP
+.nf
+\fBmpss.so.1\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmpss.so.1\fR shared object provides a means by which the preferred stack
+and/or heap page size can be selectively configured for launched processes and
+their descendants. To enable \fBmpss.so.1\fR, the following string needs to be
+present in the environment (see \fBld.so.1\fR(1)) along with one or more
+\fBMPSS\fR (Multiple Page Size Support) environment variables:
+.sp
+.in +2
+.nf
+\fBLD_PRELOAD=$LD_PRELOAD:mpss.so.1\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+Once preloaded, the \fBmpss.so.1\fR shared object reads the following
+environment variables to determine any preferred page size requirements and any
+processes these may be specific to.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMPSSHEAP\fR=\fIsize\fR \fR
+.ad
+.br
+.na
+\fB\fBMPSSSTACK\fR=\fIsize\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBMPSSHEAP\fR and \fBMPSSSTACK\fR specify the preferred page sizes for the
+heap and stack, respectively. The specified page size(s) are applied to all
+created processes.
+.sp
+\fIsize\fR must be a supported page size (see \fBpagesize\fR(1)) or \fB0\fR, in
+which case the system will select an appropriate page size (see
+\fBmemcntl\fR(2)).
+.sp
+\fIsize\fR can be qualified with \fBK\fR, \fBM\fR, \fBG\fR, or \fBT\fR to
+specify Kilobytes, Megabytes, Gigabytes, or Terabytes respectively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMPSSCFGFILE\fR=\fIconfig-file\fR\fR
+.ad
+.RS 27n
+.rt  
+\fIconfig-file\fR is a text file which contains one or more \fBmpss\fR
+configuration entries of the form:
+.sp
+.in +2
+.nf
+\fIexec-name\fR \fIexec-args\fR:\fIheap-size\fR:\fIstack-size\fR
+.fi
+.in -2
+.sp
+
+\fIexec-name\fR specifies the name of an application or executable. The
+corresponding preferred page size(s) are set for newly created processes (see
+\fBgetexecname\fR(3C)) that match the first \fIexec-name\fR found in the file.
+.sp
+\fIexec-name\fR can be a full pathname, a base name or a pattern string. See
+\fBFile Name Generation\fR in \fBsh\fR(1) for a discussion of pattern matching.
+.sp
+\fIexec-args\fR is an optionally specified pattern string to match against
+arguments. Preferred page size(s) are set only if \fIexec-args\fR is not
+specified or occurs within the arguments to \fIexec-name\fR.
+.sp
+If \fIheap-size\fR and/or \fIstack-size\fR are not specified, the corresponding
+preferred page size(s) will not be set.
+.sp
+\fBMPSSCFGFILE\fR takes precedence over \fBMPSSHEAP\fR and \fBMPSSSTACK\fR.
+When \fBMPSSCFGFILE\fR is not set, preferred page size settings are taken from
+file \fB/etc/mpss.conf\fR if it exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMPSSERRFILE\fR=\fIpathname\fR\fR
+.ad
+.RS 27n
+.rt  
+By default, error messages are logged via \fBsyslog\fR(3C) using level
+\fBLOG_ERR\fR and facility \fBLOG_USER\fR. If \fBMPSSERRFILE\fR contains a
+valid \fIpathname\fR (such as \fB/dev/stderr\fR), error messages will be logged
+there instead.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRConfiguring preferred page sizes using MPSSCFGFILE
+.sp
+.LP
+The following Bourne shell commands (see \fBsh\fR(1)) configure the preferred
+page sizes to a select set of applications with exec names that begin with
+\fBfoo\fR, using the \fBMPSSCFGFILE\fR environment variable. The \fBMPSS\fR
+configuration file, \fBmpsscfg\fR, is assumed to have been previously created
+via a text editor like \fBvi\fR(1). The \fBcat\fR(1) command is only dumping
+out the contents.
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:mpss.so.1\fR
+example$ \fBMPSSCFGFILE=mpsscfg\fR
+example$ \fBexport LD_PRELOAD MPSSCFGFILE\fR
+example$ \fBcat $MPSSCFGFILE\fR
+foo*:512K:64K
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Once the application has been started, \fBpmap\fR (see \fBproc\fR(1)) can be
+used to view the actual page sizes configured:
+
+.sp
+.in +2
+.nf
+example$ \fBfoobar &\fR
+example$ \fBpmap -s `pgrep foobar`\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If the desired page size is not configured (shown in the \fBpmap\fR output), it
+may be due to errors in the \fBMPSS\fR configuration file or environment
+variables. Check the error log (by default: \fB/var/adm/messages\fR) for
+errors.
+
+.sp
+.LP
+If no errors can be found, resource or alignment constraints may be
+responsible. See the NOTES section.
+
+.LP
+\fBExample 2 \fRConfiguring preferred page sizes using MPSSHEAP and MPSSSTACK
+.sp
+.LP
+The following Bourne shell commands configure \fB512K\fR heap and \fB64K\fR
+stack preferred page sizes for all applications using the \fBMPSSHEAP\fR and
+\fBMPSSSTACK\fR environment variables.
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:mpss.so.1\fR
+example$ \fBMPSSHEAP=512K\fR
+example$ \fBMPSSSTACK=64K\fR
+example$ \fBexport LD_PRELOAD MPSSHEAP MPSSSTACK\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrecedence rules (continuation from Example 2)
+.sp
+.LP
+The preferred page size configuration in \fBMPSSCFGFILE\fR overrides
+\fBMPSSHEAP\fR and \fBMPSSTACK\fR. Appending the following commands to those in
+\fBExample 2\fR would mean that all applications will be configured with
+\fB512K\fR heap and \fB64K\fR stack preferred page sizes with the exception of
+those applications, the \fBls\fR command, and all applications beginning with
+\fBora\fR that have \fBora1\fR as an argument, in the configuration file.
+
+.sp
+.in +2
+.nf
+example$ \fBMPSSCFGFILE=mpsscfg2\fR
+example$ \fBexport MPSSCFGFILE\fR
+example$ \fBcat $MPSSCFGFILE\fR
+ls::
+ora* ora1:4m:4m
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/ld/map.bssalign\fR \fR
+.ad
+.RS 29n
+.rt  
+A template link-editor \fBmapfile\fR for aligning bss (see NOTES).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/mpss.conf\fR\fR
+.ad
+.RS 29n
+.rt  
+Configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcat\fR(1), \fBld\fR(1), \fBld.so.1\fR(1), \fBpagesize\fR(1), \fBppgsz\fR(1),
+\fBproc\fR(1), \fBsh\fR(1), \fBvi\fR(1), \fBexec\fR(2), \fBfork\fR(2),
+\fBmemcntl\fR(2), \fBgetexecname\fR(3C), \fBgetpagesize\fR(3C),
+\fBsyslog\fR(3C), \fBproc\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The heap and stack preferred page sizes are inherited. A child process has the
+same preferred page sizes as its parent. On \fBexec\fR(2), the preferred page
+sizes are set back to the default system page size unless a preferred page size
+has been configured via the \fBmpss\fR shared object.
+.sp
+.LP
+\fBppgsz\fR(1), a proc tool, can also be used to set the preferred stack and/or
+heap page sizes. It cannot selectively configure the page size for descendents
+based on name matches.
+.sp
+.LP
+See also NOTES under \fBppgsz\fR(1).

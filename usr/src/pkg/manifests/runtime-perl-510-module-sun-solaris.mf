@@ -71,6 +71,8 @@ dir path=usr/perl5/5.10.0/lib/Sun
 dir path=usr/perl5/5.10.0/lib/Sun/Solaris
 dir path=usr/perl5/5.10.0/lib/Sun/Solaris/BSM
 dir path=usr/perl5/5.10.0/lib/Sun/Solaris/PerlGcc
+dir path=usr/share/man
+dir path=usr/share/man/man3perl
 file path=usr/perl5/5.10.0/bin/perlgcc mode=0555
 file path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/Sun/Solaris/Exacct.pm
 file \
@@ -136,6 +138,18 @@ file \
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/BSM/_BSMparse.pm
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/PerlGcc/Config.pm
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/Pg.pm
+file path=usr/share/man/man3perl/Exacct.3perl
+file path=usr/share/man/man3perl/Exacct::Catalog.3perl
+file path=usr/share/man/man3perl/Exacct::File.3perl
+file path=usr/share/man/man3perl/Exacct::Object.3perl
+file path=usr/share/man/man3perl/Exacct::Object::Group.3perl
+file path=usr/share/man/man3perl/Exacct::Object::Item.3perl
+file path=usr/share/man/man3perl/Kstat.3perl
+file path=usr/share/man/man3perl/Lgrp.3perl
+file path=usr/share/man/man3perl/Privilege.3perl
+file path=usr/share/man/man3perl/Project.3perl
+file path=usr/share/man/man3perl/Task.3perl
+file path=usr/share/man/man3perl/Ucred.3perl
 license cr_Sun license=cr_Sun
 license usr/src/cmd/perl/THIRDPARTYLICENSE \
     license=usr/src/cmd/perl/THIRDPARTYLICENSE

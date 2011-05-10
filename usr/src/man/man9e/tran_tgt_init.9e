@@ -1,0 +1,132 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_tgt_init 9E "1 Nov 1993" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_tgt_init \- request to initialize HBA resources on behalf of a particular
+target
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid prefix\fR\fBtran_tgt_init\fR(\fBdev_info_t *\fR\fIhba_dip\fR, \fBdev_info_t *\fR\fItgt_dip\fR,
+     \fBscsi_hba_tran_t *\fR\fIhba_tran\fR, \fBstruct scsi_device *\fR\fIsd\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhba_dip\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a  \fBdev_info_t\fR structure, referring to the \fBHBA\fR device
+instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItgt_dip\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBdev_info_t\fR structure, referring to the target device
+instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhba_tran\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a  \fBscsi_hba_tran\fR(9S) structure, consisting of the \fBHBA\fR's
+transport vectors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsd\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a  \fBscsi_device\fR(9S) structure, describing the target.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_tgt_init()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
+be initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
+\fBHBA\fR driver function to be called by the system when an instance of a
+target device is being created.  The \fBtran_tgt_init()\fR vector, if not
+\fINULL\fR,is called after the \fBdev_info\fR node structure is created for
+this target device instance, but before \fBprobe\fR(9E) for this instance is
+called. Before receiving transport requests from the target driver instance,
+the \fBHBA\fR may perform any initialization required for this particular
+target during the call of the \fBtran_tgt_init()\fR vector.
+.sp
+.LP
+Note that \fIhba_tran\fR will point to a cloned copy of the
+\fBscsi_hba_tran_t\fR structure allocated by the \fBHBA\fR driver if the
+\fBSCSI_HBA_TRAN_CLONE\fR flag was specified in the call to
+\fBscsi_hba_attach\fR(9F). In this case, the \fBHBA\fR driver may choose to
+initialize the \fItran_tgt_private\fR field in the structure pointed to by
+\fIhba_tran\fR, to point to the data specific to the particular target device
+instance.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_tgt_init()\fR must return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+the \fBHBA\fR driver can support the addressed target, and was able to
+initialize per-target resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+the \fBHBA\fR driver cannot support the addressed target, or was unable to
+initialize per-target resources. In this event, the initialization of this
+instance of the target device will not be continued, the target driver's
+\fBprobe\fR(9E) will not be called, and the \fItgt_dip\fR structure destroyed.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
+\fBtran_tgt_probe\fR(9E), \fBscsi_hba_attach_setup\fR(9F),
+\fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

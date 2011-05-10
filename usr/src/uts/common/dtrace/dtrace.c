@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1857,6 +1858,75 @@ dtrace_aggregate_lquantize(uint64_t *lquanta, uint64_t nval, uint64_t incr)
 	 * This is an overflow.
 	 */
 	lquanta[levels + 1] += incr;
+}
+
+static int
+dtrace_aggregate_llquantize_bucket(uint16_t factor, uint16_t low,
+    uint16_t high, uint16_t nsteps, int64_t value)
+{
+	int64_t this = 1, last, next;
+	int base = 1, order;
+
+	ASSERT(factor <= nsteps);
+	ASSERT(nsteps % factor == 0);
+
+	for (order = 0; order < low; order++)
+		this *= factor;
+
+	/*
+	 * If our value is less than our factor taken to the power of the
+	 * low order of magnitude, it goes into the zeroth bucket.
+	 */
+	if (value < (last = this))
+		return (0);
+
+	for (this *= factor; order <= high; order++) {
+		int nbuckets = this > nsteps ? nsteps : this;
+
+		if ((next = this * factor) < this) {
+			/*
+			 * We should not generally get log/linear quantizations
+			 * with a high magnitude that allows 64-bits to
+			 * overflow, but we nonetheless protect against this
+			 * by explicitly checking for overflow, and clamping
+			 * our value accordingly.
+			 */
+			value = this - 1;
+		}
+
+		if (value < this) {
+			/*
+			 * If our value lies within this order of magnitude,
+			 * determine its position by taking the offset within
+			 * the order of magnitude, dividing by the bucket
+			 * width, and adding to our (accumulated) base.
+			 */
+			return (base + (value - last) / (this / nbuckets));
+		}
+
+		base += nbuckets - (nbuckets / factor);
+		last = this;
+		this = next;
+	}
+
+	/*
+	 * Our value is greater than or equal to our factor taken to the
+	 * power of one plus the high magnitude -- return the top bucket.
+	 */
+	return (base);
+}
+
+static void
+dtrace_aggregate_llquantize(uint64_t *llquanta, uint64_t nval, uint64_t incr)
+{
+	uint64_t arg = *llquanta++;
+	uint16_t factor = DTRACE_LLQUANTIZE_FACTOR(arg);
+	uint16_t low = DTRACE_LLQUANTIZE_LOW(arg);
+	uint16_t high = DTRACE_LLQUANTIZE_HIGH(arg);
+	uint16_t nsteps = DTRACE_LLQUANTIZE_NSTEP(arg);
+
+	llquanta[dtrace_aggregate_llquantize_bucket(factor,
+	    low, high, nsteps, nval)] += incr;
 }
 
 /*ARGSUSED*/
@@ -9376,6 +9446,35 @@ dtrace_ecb_aggregation_create(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 		break;
 	}
 
+	case DTRACEAGG_LLQUANTIZE: {
+		uint16_t factor = DTRACE_LLQUANTIZE_FACTOR(desc->dtad_arg);
+		uint16_t low = DTRACE_LLQUANTIZE_LOW(desc->dtad_arg);
+		uint16_t high = DTRACE_LLQUANTIZE_HIGH(desc->dtad_arg);
+		uint16_t nsteps = DTRACE_LLQUANTIZE_NSTEP(desc->dtad_arg);
+		int64_t v;
+
+		agg->dtag_initial = desc->dtad_arg;
+		agg->dtag_aggregate = dtrace_aggregate_llquantize;
+
+		if (factor < 2 || low >= high || nsteps < factor)
+			goto err;
+
+		/*
+		 * Now check that the number of steps evenly divides a power
+		 * of the factor.  (This assures both integer bucket size and
+		 * linearity within each magnitude.)
+		 */
+		for (v = factor; v < nsteps; v *= factor)
+			continue;
+
+		if ((v % nsteps) || (nsteps % factor))
+			goto err;
+
+		size = (dtrace_aggregate_llquantize_bucket(factor,
+		    low, high, nsteps, INT64_MAX) + 2) * sizeof (uint64_t);
+		break;
+	}
+
 	case DTRACEAGG_AVG:
 		agg->dtag_aggregate = dtrace_aggregate_avg;
 		size = sizeof (uint64_t) * 2;
@@ -10851,10 +10950,12 @@ dtrace_enabling_matchall(void)
 	 * block pending our completion.
 	 */
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
-		cred_t *cr = enab->dten_vstate->dtvs_state->dts_cred.dcr_cred;
+		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
+		cred_t *cr = dcr->dcr_cred;
+		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
 
-		if (INGLOBALZONE(curproc) ||
-		    cr != NULL && getzoneid() == crgetzoneid(cr))
+		if ((dcr->dcr_visible & DTRACE_CRV_ALLZONE) || (cr != NULL &&
+		    (zone == GLOBAL_ZONEID || getzoneid() == zone)))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 

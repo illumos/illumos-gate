@@ -1,0 +1,109 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf32_getehdr 3ELF "19 Jun 2002" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf32_getehdr, elf32_newehdr, elf64_getehdr, elf64_newehdr \- retrieve
+class-dependent object file header
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf32_Ehdr *\fR\fBelf32_getehdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf32_Ehdr *\fR\fBelf32_newehdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf64_Ehdr *\fR\fBelf64_getehdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf64_Ehdr *\fR\fBelf64_newehdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For a 32-bit class file, \fBelf32_getehdr()\fR returns a pointer to an
+\fBELF\fR header, if one is available for the \fBELF\fR descriptor \fIelf\fR.
+If no header exists for the descriptor, \fBelf32_newehdr()\fR allocates a clean
+one, but it otherwise behaves the same as \fBelf32_getehdr()\fR. It does not
+allocate a new header if one exists already. If no header exists for
+\fBelf32_getehdr()\fR, one cannot be created for \fBelf32_newehdr()\fR, a
+system error occurs, the file is not a 32-bit class file, or \fIelf\fR is
+\fINULL\fR, both functions return a null pointer.
+.sp
+.LP
+For the 64\(mibit class, replace 32 with 64 as appropriate.
+.sp
+.LP
+The header includes the following members:
+.sp
+.in +2
+.nf
+unsigned char	e_ident[EI_NIDENT];
+Elf32_Half	e_type;
+Elf32_Half	e_machine;
+Elf32_Word	e_version;
+Elf32_Addr	e_entry;
+Elf32_Off 	e_phoff;
+Elf32_Off 	e_shoff;
+Elf32_Word	e_flags;
+Elf32_Half	e_ehsize;
+Elf32_Half	e_phentsize;
+Elf32_Half	e_phnum;
+Elf32_Half	e_shentsize;
+Elf32_Half	e_shnum;
+Elf32_Half	e_shstrndx;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBelf32_newehdr()\fR function automatically sets the \fBELF_F_DIRTY\fR
+bit. See \fBelf_flagdata\fR(3ELF).
+.sp
+.LP
+An application can use \fBelf_getident()\fR to inspect the identification bytes
+from a file.
+.sp
+.LP
+An application can use \fBelf_getshnum()\fR and \fBelf_getshstrndx()\fR to
+obtain section header information. The location of this section header
+information differs between standard \fBELF\fR files to those that require
+Extended Sections.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf_begin\fR(3ELF), \fBelf_flagdata\fR(3ELF),
+\fBelf_getident\fR(3ELF), \fBelf_getshnum\fR(3ELF),
+\fBelf_getshstrndx\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)

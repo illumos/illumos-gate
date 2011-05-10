@@ -1,0 +1,334 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH papiServiceCreate 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.SH NAME
+papiServiceCreate, papiServiceDestroy, papiServiceSetUserName,
+papiServiceSetPassword, papiServiceSetEncryption, papiServiceSetAuthCB,
+papiServiceSetAppData, papiServiceGetServiceName, papiServiceGetUserName,
+papiServiceGetPassword, papiServiceGetEncryption, papiServiceGetAppData,
+papiServiceGetAttributeList, papiServiceGetStatusMessage \- service context
+manipulation
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+
+\fBpapi_status_t\fR \fBpapiServiceCreate\fR(\fBpapi_service_t *\fR\fIhandle\fR,
+     \fBchar *\fR\fIservice_name,\fR \fBchar *\fR\fIuser_name,\fR \fBchar *\fR\fIpassword\fR,
+     \fBint\fR (\fB*\fR\fIauthCB\fR)(\fBpapi_service_t\fR \fIsvc\fR, \fBvoid *\fR\fIapp_data\fR),
+     \fBpapi_encryption_t\fR \fIencryption\fR, \fBvoid *\fR\fIapp_data\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiServiceDestroy\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiServiceSetUserName\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIuser_name\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiServiceSetPassword\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBchar *\fR\fIpassword\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiServiceSetEncryption\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBpapi_encryption_t\fR \fIencryption\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiServiceSetAuthCB\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBint\fR (\fB*\fR\fIauthCB\fR)(\fBpapi_service_t\fR \fIs\fR, \fBvoid *\fR\fIapp_data\fR));
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiServiceSetAppData\fR(\fBpapi_service_t\fR \fIhandle\fR,
+     \fBvoid *\fR\fIapp_data\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBpapiServiceGetServiceName\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBpapiServiceGetUserName\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBpapiServiceGetPassword\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_encryption_t\fR \fBpapiServiceGetEncryption\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBpapiServiceGetAppData\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_attribute_t **\fR\fBpapiServiceGetAttributeList\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBpapiServiceGetStatusMessage\fR(\fBpapi_service_t\fR \fIhandle\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIapp_data\fR\fR
+.ad
+.RS 16n
+.rt  
+a set of additional data to be passed to the \fIauthCB\fR if/when it is called
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIauthCB\fR\fR
+.ad
+.RS 16n
+.rt  
+a callback routine use to gather additional authentication information on
+behalf of the print service
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIencryption\fR\fR
+.ad
+.RS 16n
+.rt  
+whether or not encryption should be used for communication with the print
+service, where applicable. If \fBPAPI_ENCRYPT_IF_REQUESTED\fR is specified,
+encryption will be used if the print service requests it.  If
+\fBPAPI_ENCRYPT_NEVER\fR is specified, encryption will not be used while
+communicating with the print service.  If \fBPAPI_ENCRYPT_REQUIRED\fR or
+\fBPAPI_ENCRYPT_ALWAYS\fR is specified, encryption will be required while
+communicating with the print service
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 16n
+.rt  
+a pointer to a handle to be used for all \fBlibpapi\fR operations.  This handle
+should be initialized to \fINULL\fR prior to creation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpassword\fR\fR
+.ad
+.RS 16n
+.rt  
+a plain text password to be used during any required user authentication with
+the print service function set with \fBpapiServiceSetAuthCB()\fR. This provides
+the callback function a means of interrogating the service context for user
+information and setting a password.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs\fR\fR
+.ad
+.RS 16n
+.rt  
+the service context passed into the the authentication callback
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIservice_name\fR\fR
+.ad
+.RS 16n
+.rt  
+the name of a print service to contact.  This can be \fINULL\fR, a print
+service name like "lpsched", a resolvable printer name, or a \fBprinter-uri\fR
+like \fBipp://server/printers/queue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsvc\fR\fR
+.ad
+.RS 16n
+.rt  
+a handle (service context) used by subsequent PAPI calls to keep/pass
+information across PAPI calls. It generally contains connection, state, and
+authentication information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser_name\fR\fR
+.ad
+.RS 16n
+.rt  
+the name of the user to act on behalf of while contacting the print service.
+If a value of \fINULL\fR is used, the user name associated with the current
+processes UID will be used. Specifying a user name might require further
+authentication with the print service.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpapiServiceCreate()\fR function creates a service context for use in
+subsequent calls to \fBlibpapi\fR functions.  The context is returned in the
+handle argument. This context must be destroyed using
+\fBpapiServiceDestroy()\fR even if the \fBpapiServiceCreate()\fR call failed.
+.sp
+.LP
+The \fBpapiServiceSet*()\fR functions modifies the requested value in the
+service context passed in.  It is recommended that these functions be avoided
+in favor of supplying the information when the context is created.
+.sp
+.LP
+The \fBpapiServiceGetStatusMessage()\fR function retrieves a detailed error
+message associated with the service context.  This message will apply to the
+last failed operation.
+.sp
+.LP
+The remaining \fBpapiServiceGet*()\fR functions return the requested
+information associated with the service context.  A value of \fINULL\fR
+indicates that the requested value was not initialized or is unavailable.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpapiServiceCreate()\fR and the
+\fBpapiServiceSet*()\fR functions return \fBPAPI_OK\fR. Otherwise, they return
+an appropriate \fBpapi_status_t\fR indicating the type of failure.
+.sp
+.LP
+Upon successful completion, the \fBpapiServiceGet*()\fR functions return a
+pointer to the requested data. Otherwise, they return \fINULL\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreate a PAPI service context.
+.sp
+.in +2
+.nf
+/*
+ * program to create a PAPI service context.
+ */
+#include <stdio.h>
+#include <papi.h>
+
+static int
+authCB(papi_service_t svc, void *app_data)
+{
+    char prompt[BUFSIZ];
+    char *user, *svc_name, *passphrase;
+
+    /* get the name of the service we are contacting */
+    if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+            return (-1);
+
+    /* find out who we are supposed to be */
+    if ((user = papiServiceGetUserName(svc)) == NULL) {
+            struct passwd *pw;
+
+            if ((pw = getpwuid(getuid())) != NULL)
+                    user = pw->pw_name;
+            else
+                    user = "nobody";
+    }
+
+    /* build the prompt string */
+    snprintf(prompt, sizeof (prompt),
+            gettext("passphrase for %s to access %s: "), user,
+                  svc_name);
+
+    /* ask for the passphrase */
+    if ((passphrase = getpassphrase(prompt)) != NULL)
+            papiServiceSetPassword(svc, passphrase);
+
+    return (0);
+}
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    char buf[BUFSIZ];
+    papi_status_t status;
+    papi_service_t *svc = NULL;
+
+    status = papiServiceCreate(&svc, av[1], NULL, NULL, authCB,
+                            PAPI_ENCRYPT_NEVER, NULL);
+
+    if (status != PAPI_OK) {
+        /* do something */
+    } else
+        printf("Failed(%s): %s: %s\en", av[1], papiStatusString(status),
+                papiStatusMessage(svc));
+
+    papiServiceDestroy(svc);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpapi\fR(3LIB), \fBattributes\fR(5)

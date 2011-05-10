@@ -52,6 +52,10 @@ dir path=usr/lib/reparse
 dir path=usr/lib/security
 dir path=usr/lib/smbsrv
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
+dir path=usr/share/man/man5
 dir path=var group=sys
 dir path=var/smb group=sys
 dir path=var/smb/cvol group=sys
@@ -94,6 +98,12 @@ file path=usr/lib/smbsrv/llib-lsmbrdr.ln
 file path=usr/lib/smbsrv/smbd mode=0555
 file path=usr/sbin/smbadm mode=0555
 file path=usr/sbin/smbstat mode=0555
+file path=usr/share/man/man1m/smbadm.1m
+file path=usr/share/man/man1m/smbd.1m
+file path=usr/share/man/man1m/smbstat.1m
+file path=usr/share/man/man4/smb.4
+file path=usr/share/man/man4/smbautohome.4
+file path=usr/share/man/man5/pam_smb_passwd.5
 file path=var/smb/cvol/windows/system32/eventlog.dll mode=0755
 file path=var/smb/smbpasswd group=sys mode=0400 \
     original_name=SUNWsmbs:var/smb/smbpasswd preserve=true

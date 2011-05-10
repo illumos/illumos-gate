@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -101,12 +102,17 @@ mlsvc_timecheck(void *arg)
 	for (;;) {
 		(void) sleep(MLSVC_TIMECHECK_INTERVAL);
 
-		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
-			if (!smb_domain_getinfo(&di))
-				continue;
+		if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+			continue;
 
-			ndr_srvsvc_timecheck(di.d_dc, di.d_primary.di_nbname);
-		}
+		/* Avoid interfering with DC discovery. */
+		if (smb_ddiscover_wait() != 0)
+			continue;
+
+		if (!smb_domain_getinfo(&di))
+			continue;
+
+		ndr_srvsvc_timecheck(di.d_dc, di.d_primary.di_nbname);
 	}
 
 	/*NOTREACHED*/

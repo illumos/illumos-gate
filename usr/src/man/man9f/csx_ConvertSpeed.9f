@@ -1,0 +1,170 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_ConvertSpeed 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_ConvertSpeed \- convert device speeds
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_ConvertSpeed\fR(\fBconvert_speed_t *\fR\fIcs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcs\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBconvert_speed_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is a Solaris-specific extension that provides a method for
+clients to convert from one type of device speed representation to another,
+that is, from \fIdevspeed\fR format to \fInS\fR and vice versa.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBconvert_speed_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     Attributes;
+uint32_t     nS;
+uint32_t     devspeed;
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR \fR
+.ad
+.RS 15n
+.rt  
+This is a bit-mapped field that identifies the type of speed conversion to be
+performed. The field is defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCONVERT_NS_TO_DEVSPEED\fR\fR
+.ad
+.RS 26n
+.rt  
+Converts \fInS\fR to \fIdevspeed\fR format
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCONVERT_DEVSPEED_TO_NS\fR\fR
+.ad
+.RS 26n
+.rt  
+Converts \fIdevspeed\fR format to \fInS\fR
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnS\fR \fR
+.ad
+.RS 15n
+.rt  
+If \fBCONVERT_NS_TO_DEVSPEED\fR is set, the value in the \fBnS\fR field is
+converted to a \fIdevspeed\fR format and returned in the \fBdevspeed\fR field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevspeed\fR \fR
+.ad
+.RS 15n
+.rt  
+If \fBCONVERT_DEVSPEED_TO_NS\fR is set, the value in the \fBdevspeed\fR field
+is converted to an \fInS\fR value and returned in the \fBnS\fR field.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SPEED\fR \fR
+.ad
+.RS 28n
+.rt  
+Invalid \fInS\fR or \fIdevspeed\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ATTRIBUTE\fR \fR
+.ad
+.RS 28n
+.rt  
+Bad \fBAttributes\fR value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_ModifyWindow\fR(9F), \fBcsx_RequestWindow\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

@@ -1,0 +1,356 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_getinfo 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_getinfo \- get protocol-specific service information
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h>
+
+
+
+\fBint\fR \fBt_getinfo\fR(\fBint\fR \fIfd\fR, \fBstruct t_info *\fR\fIinfo\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This routine is part of the \fBXTI\fR interfaces which evolved from the
+\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
+interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
+using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
+\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
+\fBCOMPATIBILITY\fR section for a description of differences between the two
+interfaces.
+.sp
+.LP
+This function returns the current characteristics of the underlying transport
+protocol and/or transport connection associated with file descriptor \fIfd\fR.
+The \fIinfo\fR pointer is used to return the same information returned by
+\fBt_open\fR(3NSL), although not necessarily precisely the same values. This
+function enables a transport user to access this information during any phase
+of communication.
+.sp
+.LP
+This argument points to a \fBt_info\fR structure which contains the following
+members:
+.sp
+.in +2
+.nf
+t_scalar_t addr;     /*max size in octets of the transport protocol address*/
+t_scalar_t options;  /*max number of bytes of protocol-specific options  */
+t_scalar_t tsdu;     /*max size in octets of a transport service data unit */
+t_scalar_t etsdu;    /*max size in octets of an expedited transport service*/
+                     /*data unit (ETSDU) */
+t_scalar_t connect;  /*max number of octets allowed on connection */
+                     /*establishment functions */
+t_scalar_t discon;   /*max number of octets of data allowed on t_snddis()  */
+                     /*and t_rcvdis() functions */
+t_scalar_t servtype; /*service type supported by the transport provider */
+t_scalar_t flags;    /*other info about the transport provider */
+.fi
+.in -2
+
+.sp
+.LP
+The values of the fields have the following meanings:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 12n
+.rt  
+A value greater than zero indicates the maximum size of a transport protocol
+address and a value of  \fBT_INVALID\fR (-2) specifies that the transport
+provider does not provide user access to transport protocol addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoptions\fR\fR
+.ad
+.RS 12n
+.rt  
+A value greater than zero indicates the maximum number of bytes of
+protocol-specific options supported by the provider, and a value of
+\fBT_INVALID\fR (-2) specifies that the transport provider does not support
+user-settable options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItsdu\fR\fR
+.ad
+.RS 12n
+.rt  
+A value greater than zero specifies the maximum size in octets of a transport
+service data unit (TSDU); a value of  \fBT_NULL\fR (zero) specifies that the
+transport provider does not support the concept of TSDU, although it does
+support the sending of a datastream with no logical boundaries preserved across
+a connection; a value of  \fBT_INFINITE\fR (-1) specifies that there is no
+limit on the size in octets of a TSDU; and a value of  \fBT_INVALID\fR (-2)
+specifies that the transfer of normal data is not supported by the transport
+provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIetsdu\fR\fR
+.ad
+.RS 12n
+.rt  
+A value greater than zero specifies the maximum size in octets of an expedited
+transport service data unit (ETSDU); a value of  \fBT_NULL\fR (zero) specifies
+that the transport provider does not support the concept of ETSDU, although it
+does support the sending of an expedited data stream with no logical boundaries
+preserved across a connection; a value of  \fBT_INFINITE\fR (-1) specifies that
+there is no limit on the size (in octets) of an ETSDU; and a value of
+\fBT_INVALID\fR (-2) specifies that the transfer of expedited data is not
+supported by the transport provider. Note that the semantics of expedited data
+may be quite different for different transport providers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconnect\fR\fR
+.ad
+.RS 12n
+.rt  
+A value greater than zero specifies the maximum number of octets that may be
+associated with connection establishment functions and a value of
+\fBT_INVALID\fR (-2) specifies that  the transport provider does not allow data
+to be sent with connection establishment functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdiscon\fR\fR
+.ad
+.RS 12n
+.rt  
+If the  \fBT_ORDRELDATA\fR bit in flags is clear, a value greater than zero
+specifies the maximum number of octets that may be associated with the
+\fBt_snddis\fR(3NSL) and \fBt_rcvdis\fR(3NSL) functions, and a value of
+\fBT_INVALID\fR (-2) specifies that  the transport provider does not allow data
+to be sent with the abortive release functions. If the  \fBT_ORDRELDATA\fR bit
+is set in flags, a value greater than zero specifies the maximum number of
+octets that may be associated with the  \fBt_sndreldata()\fR,
+\fBt_rcvreldata()\fR, \fBt_snddis\fR(3NSL) and  \fBt_rcvdis\fR(3NSL) functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIservtype\fR\fR
+.ad
+.RS 12n
+.rt  
+This field specifies the service type supported by the transport provider, as
+described below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 12n
+.rt  
+This is a bit field used to specify other information about the  communications
+provider.  If the  \fBT_ORDRELDATA\fR bit is set, the communications provider
+supports sending user data with an orderly release. If the  \fBT_SENDZERO\fR
+bit is set in flags, this indicates that the underlying transport provider
+supports the sending of zero-length TSDUs.
+.RE
+
+.sp
+.LP
+If a transport user is concerned with protocol independence, the above sizes
+may be accessed to determine how large the buffers must be to hold each piece
+of information.  Alternatively, the \fBt_alloc\fR(3NSL) function may be used to
+allocate these buffers. An error will result if a transport user exceeds the
+allowed data size on any function. The value of each field may change as a
+result of protocol option negotiation during connection establishment (the
+\fBt_optmgmt\fR(3NSL) call has no effect on the values returned by
+\fBt_getinfo()\fR\|). These values will only change from the values presented
+to \fBt_open\fR(3NSL) after the endpoint enters the  \fBT_DATAXFER\fR state.
+.sp
+.LP
+The \fIservtype\fR field of \fIinfo\fR specifies one of the following values on
+return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_COTS\fR \fR
+.ad
+.RS 15n
+.rt  
+The transport provider supports a connection-mode service but does not support
+the optional orderly release facility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_COTS_ORD\fR \fR
+.ad
+.RS 15n
+.rt  
+The transport provider supports a connection-mode service with the optional
+orderly release facility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_CLTS\fR \fR
+.ad
+.RS 15n
+.rt  
+The transport provider supports a connectionless-mode service. For this service
+type, \fBt_open\fR(3NSL) will return  \fBT_INVALID\fR (-1) for \fIetsdu\fR,
+\fIconnect\fR and \fIdiscon\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a value of  \fB0\fR is returned.  Otherwise, a
+value of  -1 is returned and \fBt_errno\fR is set to indicate an error.
+.SH VALID STATES
+.sp
+.LP
+ALL - apart from \fBT_UNINIT\fR.
+.SH ERRORS
+.sp
+.LP
+On failure, \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 11n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 11n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
+different header files. This, and other semantic differences between the two
+interfaces are described in the subsections below.
+.SS "Interface Header"
+.sp
+.LP
+The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
+should \fInot\fR use this header.  They should use the header:
+.sp
+.in +2
+.nf
+#include <tiuser.h> 
+.fi
+.in -2
+
+.SS "Error Description Values"
+.sp
+.LP
+The \fBt_errno\fR value \fBTPROTO\fR can be set by the \fBXTI\fR interface but
+not by the \fBTLI\fR interface.
+.SS "The t_info Structure"
+.sp
+.LP
+For \fBTLI\fR , the \fBt_info\fR structure referenced by \fIinfo\fR lacks the
+following structure member:
+.sp
+.in +2
+.nf
+t_scalar_t flags;    /* other info about the transport provider */
+.fi
+.in -2
+
+.sp
+.LP
+This member was added to \fBstruct\fR \fBt_info\fR in the \fBXTI\fR interfaces.
+.sp
+.LP
+When a value of -1 is observed as the return value in various \fBt_info\fR
+structure members, it signifies that the transport provider can handle an
+infinite length buffer for a corresponding attribute, such as address data,
+option data, \fBTSDU\fR (octet size), \fBETSDU\fR (octet size), connection
+data, and disconnection data. The corresponding structure members are
+\fBaddr\fR, \fBoptions\fR, \fBtsdu\fR, \fBestdu\fR, \fBconnect\fR, and
+\fBdiscon\fR, respectively.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBt_alloc\fR(3NSL), \fBt_open\fR(3NSL), \fBt_optmgmt\fR(3NSL),
+\fBt_rcvdis\fR(3NSL), \fBt_snddis\fR(3NSL), \fBattributes\fR(5)

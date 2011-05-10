@@ -1,0 +1,921 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH svcs 1 "17 Apr 2011" "SunOS 5.11" "User Commands"
+.SH NAME
+svcs \- report service status
+.SH SYNOPSIS
+.LP
+.nf
+\fBsvcs\fR [\fB-aHpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]... 
+     [\fB-sS\fR \fIcol\fR]... [\fIFMRI\fR | \fIpattern\fR]...
+.fi
+
+.LP
+.nf
+\fBsvcs\fR {\fB-d\fR | \fB-D\fR} [\fB-Hpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-sS\fR \fIcol\fR]... 
+     [\fIFMRI\fR | \fIpattern\fR] ...
+.fi
+
+.LP
+.nf
+\fBsvcs\fR [\fB-l\fR | \fB-L\fR] [\fB-vZ\fR] [\fB-z\fR \fIzone\fR] [\fIFMRI\fR | \fIpattern\fR]...
+.fi
+
+.LP
+.nf
+\fBsvcs\fR \fB-x\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fIFMRI\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsvcs\fR command displays information about service instances as recorded
+in the service configuration repository.
+.sp
+.LP
+The first form of this command prints one-line status listings for service
+instances specified by the arguments. Each instance is listed only once. With
+no arguments, all enabled service instances, even if temporarily disabled, are
+listed with the columns indicated below.
+.sp
+.LP
+The second form prints one-line status listings for the dependencies or
+dependents of the service instances specified by the arguments.
+.sp
+.LP
+The third form prints detailed information about specific services and
+instances.
+.sp
+.LP
+The fourth form explains the states of service instances. For each argument, a
+block of human-readable text is displayed which explains what state the service
+is in, and why it is in that state. With no arguments, problematic services are
+described.
+.sp
+.LP
+Error messages are printed to the standard error stream.
+.sp
+.LP
+The output of this command can be used appropriately as input to the
+\fBsvcadm\fR(1M) command.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.RS 20n
+.rt  
+Displays an extended usage message, including column specifiers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 20n
+.rt  
+Show all services, even disabled ones. This option has no effect if services
+are selected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 20n
+.rt  
+Lists the services or service instances upon which the given service instances
+depend.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 20n
+.rt  
+Lists the service instances that depend on the given services or service
+instances.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 20n
+.rt  
+Omits the column headers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 20n
+.rt  
+(The letter ell.) Displays all available information about the selected
+services and service instances, with one service attribute displayed for each
+line. Information for different instances are separated by blank lines.
+.sp
+The following specific attributes require further explanation:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdependency\fR\fR
+.ad
+.RS 14n
+.rt  
+Information about a dependency. The grouping and \fBrestart_on\fR properties
+are displayed first and are separated by a forward slash (\fB/\fR). Next, each
+entity and its state is listed. See \fBsmf\fR(5) for information about states.
+In addition to the standard states, each service dependency can have the
+following state descriptions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBabsent\fR\fR
+.ad
+.RS 12n
+.rt  
+No such service is defined on the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinvalid\fR\fR
+.ad
+.RS 12n
+.rt  
+The fault management resource identifier (FMRI) is invalid (see \fBsmf\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmultiple\fR\fR
+.ad
+.RS 12n
+.rt  
+The entity is a service with multiple instances.
+.RE
+
+File dependencies can only have one of the following state descriptions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBabsent\fR\fR
+.ad
+.RS 11n
+.rt  
+No such file on the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBonline\fR\fR
+.ad
+.RS 11n
+.rt  
+The file exists.
+.sp
+If the file did not exist the last time that \fBsvc.startd\fR evaluated the
+service's dependencies, it can consider the dependency to be unsatisfied.
+\fBsvcadm refresh\fR forces dependency re-evaluation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunknown\fR\fR
+.ad
+.RS 11n
+.rt  
+\fBstat\fR(2) failed for a reason other than \fBENOENT\fR.
+.RE
+
+See \fBsmf\fR(5) for additional details about dependencies, grouping, and
+\fBrestart_on\fR values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBenabled\fR\fR
+.ad
+.RS 14n
+.rt  
+Whether the service is enabled or not, and whether it is enabled or disabled
+temporarily (until the next system reboot). The former is specified as either
+\fBtrue\fR or \fBfalse\fR, and the latter is designated by the presence of
+\fB(temporary)\fR.
+.sp
+A service might be temporarily disabled because an administrator has run
+\fBsvcadm disable -t\fR, used \fBsvcadm milestone\fR, or booted the system to a
+specific milestone. See \fBsvcadm\fR(1M) for details.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-L\fR
+.ad
+.RS 20n
+.rt
+Display the log file of the selected services and service instances, one
+per-line.
+.RE 
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIcol\fR[,\fIcol\fR]...\fR
+.ad
+.RS 20n
+.rt  
+Prints the specified columns. Each \fIcol\fR should be a column name. See
+\fBCOLUMNS\fR below for available columns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 20n
+.rt  
+Lists processes associated with each service instance. A service instance can
+have no associated processes. The process ID, start time, and command name
+(\fBPID\fR, \fBSTIME\fR, and \fBCMD\fR fields from \fBps\fR(1)) are displayed
+for each process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIFMRI-instance\fR\fR
+.ad
+.RS 20n
+.rt  
+Selects service instances that have the given service instance as their
+restarter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIcol\fR\fR
+.ad
+.RS 20n
+.rt  
+Sorts output by column. \fIcol\fR should be a column name. See \fBCOLUMNS\fR
+below for available columns. Multiple \fB-s\fR options behave additively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR \fIcol\fR\fR
+.ad
+.RS 20n
+.rt  
+Sorts by \fIcol\fR in the opposite order as option \fB-s\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 20n
+.rt  
+Without \fB-x\fR or \fB-l\fR, displays verbose columns: \fBSTATE\fR,
+\fBNSTATE\fR, \fBSTIME\fR, \fBCTID\fR, and \fBFMRI\fR.
+.sp
+With \fB-x\fR, displays extra information for each explanation.
+.sp
+With \fB-l\fR, displays user-visible properties in property groups of type
+\fBapplication\fR and their description.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 20n
+.rt  
+Displays explanations for service states.
+.sp
+Without arguments, the \fB-x\fR option explains the states of services which:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+are enabled, but are not running.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+are preventing another enabled service from running.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-z \fIzone\fR
+.ad
+.RS 20n
+.rt
+Display only the services in the \fIzone\fR.  This option is only applicable
+in the global zone, see \fBzones\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB-Z\fR
+.ad
+.RS 20n
+.rt
+Display services from all zones, with an additional column indicating in which
+zone the service is running.  This option is only applicable in the global
+zone, see \fBzones\fR(5).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIFMRI\fR\fR
+.ad
+.RS 17n
+.rt  
+A fault management resource identifier (FMRI) that specifies one or more
+instances (see \fBsmf\fR(5)). FMRIs can be abbreviated by specifying the
+instance name, or the trailing portion of the service name. For example, given
+the FMRI:
+.sp
+.in +2
+.nf
+svc:/network/smtp:sendmail
+.fi
+.in -2
+.sp
+
+The following are valid abbreviations:
+.sp
+.in +2
+.nf
+sendmail
+:sendmail
+smtp
+smtp:sendmail
+network/smtp
+.fi
+.in -2
+.sp
+
+The following are invalid abbreviations:
+.sp
+.in +2
+.nf
+mail
+network
+network/smt
+.fi
+.in -2
+.sp
+
+If the FMRI specifies a service, then the command applies to all instances of
+that service, except when used with the \fB-D\fR option.
+.sp
+Abbreviated forms of FMRIs are unstable, and should not be used in scripts or
+other permanent tools.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpattern\fR\fR
+.ad
+.RS 17n
+.rt  
+A pattern that is matched against the \fIFMRI\fRs of service instances
+according to the "globbing" rules described by \fBfnmatch\fR(5). If the pattern
+does not begin with \fBsvc:\fR, then \fBsvc:/\fR is prepended. The following is
+a typical example of a glob pattern:
+.sp
+.in +2
+.nf
+qexample% svcs \e*keyserv\e*
+STATE          STIME     FMRI
+disabled       Aug_02    svc:/network/rpc/keyserv:default
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIFMRI-instance\fR\fR
+.ad
+.RS 17n
+.rt  
+An FMRI that specifies an instance.
+.RE
+
+.SH COLUMNS
+.sp
+.LP
+Column names are case insensitive. The default output format is equivalent to
+"\fB-o\fR \fBstate,stime,fmri\fR". The default sorting columns are \fBSTATE\fR,
+\fBSTIME\fR, \fBFMRI\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCTID\fR\fR
+.ad
+.RS 10n
+.rt  
+The primary contract ID for the service instance. Not all instances have valid
+primary contract IDs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDESC\fR\fR
+.ad
+.RS 10n
+.rt  
+A brief description of the service, from its template element. A service might
+not have a description available, in which case a hyphen (\fB\(hy\fR) is used
+to denote an empty value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFMRI\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIFMRI\fR of the service instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINST\fR\fR
+.ad
+.RS 10n
+.rt  
+The instance name of the service instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNSTA\fR\fR
+.ad
+.RS 10n
+.rt  
+The abbreviated next state of the service instance, as given in the \fBSTA\fR
+column description. A hyphen denotes that the instance is not transitioning.
+Same as \fBSTA\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNSTATE\fR\fR
+.ad
+.RS 10n
+.rt  
+The next state of the service. A hyphen is used to denote that the instance is
+not transitioning. Same as \fBSTATE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCOPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The scope name of the service instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSVC\fR\fR
+.ad
+.RS 10n
+.rt  
+The service name of the service instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTA\fR\fR
+.ad
+.RS 10n
+.rt  
+The abbreviated state of the service instance (see \fBsmf\fR(5)):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDGD\fR\fR
+.ad
+.RS 7n
+.rt  
+degraded
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDIS\fR\fR
+.ad
+.RS 7n
+.rt  
+disabled
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLRC\fR\fR
+.ad
+.RS 7n
+.rt  
+legacy \fBrc*.d\fR script-initiated instance
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMNT\fR\fR
+.ad
+.RS 7n
+.rt  
+maintenance
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOFF\fR\fR
+.ad
+.RS 7n
+.rt  
+offline
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBON\fR\fR
+.ad
+.RS 7n
+.rt  
+online
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUN\fR\fR
+.ad
+.RS 7n
+.rt  
+uninitialized
+.RE
+
+Absent or unrecognized states are denoted by a question mark (\fB?\fR)
+character. An asterisk (\fB*\fR) is appended for instances in transition,
+unless the \fBNSTA\fR or \fBNSTATE\fR column is also being displayed.
+.sp
+See \fBsmf\fR(5) for an explanation of service states.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATE\fR\fR
+.ad
+.RS 10n
+.rt  
+The state of the service instance. An asterisk is appended for instances in
+transition, unless the \fBNSTA\fR or \fBNSTATE\fR column is also being
+displayed.
+.sp
+See \fBsmf\fR(5) for an explanation of service states.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTIME\fR\fR
+.ad
+.RS 10n
+.rt  
+If the service instance entered the current state within the last 24 hours,
+this column indicates the time that it did so. Otherwise, this column indicates
+the date on which it did so, printed with underscores (\fB_\fR) in place of
+blanks.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying the Default Output
+.sp
+.LP
+This example displays default output:
+
+.sp
+.in +2
+.nf
+example% svcs
+STATE          STIME    FMRI
+\&...
+legacy_run     13:25:04 lrc:/etc/rc3_d/S42myscript
+\&...
+online         13:21:50 svc:/system/svc/restarter:default
+\&...
+online         13:25:03 svc:/milestone/multi-user:default
+\&...
+online         13:25:07 svc:/milestone/multi-user-server:default
+\&...
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRListing All Local Instances
+.sp
+.LP
+This example lists all local instances of the \fBservice1\fR service.
+
+.sp
+.in +2
+.nf
+example% svcs -o state,nstate,fmri service1
+STATE        NSTATE        FMRI
+online       -             svc:/service1:instance1
+disabled     -             svc:/service1:instance2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRListing Verbose Information
+.sp
+.LP
+This example lists verbose information.
+
+.sp
+.in +2
+.nf
+example% svcs -v network/rpc/rstat:udp
+STATE          NSTATE        STIME    CTID   FMRI
+online         -             Aug_09        - svc:/network/rpc/rstat:udp
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRListing Detailed Information
+.sp
+.LP
+This example lists detailed information about all instances of
+\fBsystem/service3\fR. Additional fields can be displayed, as appropriate to
+the managing restarter.
+
+.sp
+.in +2
+.nf
+example% svcs -l network/rpc/rstat:udp
+
+fmri         svc:/network/rpc/rstat:udp
+enabled      true
+state        online
+next_state   none
+restarter    svc:/network/inetd:default
+contract_id
+dependency   require_all/error svc:/network/rpc/bind (online)
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRListing Processes
+.sp
+.in +2
+.nf
+example% svcs -p sendmail
+STATE          STIME    FMRI
+online         13:25:13 svc:/network/smtp:sendmail
+               13:25:15   100939 sendmail
+13:25:15   100940 sendmail  
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRExplaining Service States Using \fBsvcs\fR \fB-x\fR
+.sp
+.LP
+(a) In this example, \fBsvcs\fR \fB-x\fR has identified that the print/server
+service being disabled is the root cause of two services which are enabled but
+not online. \fBsvcs\fR \fB-xv\fR shows that those services are
+\fBprint/rfc1179\fR and \fBprint/ipp-listener\fR. This situation can be
+rectified by either enabling \fBprint/server\fR or disabling \fBrfc1179\fR and
+\fBipp-listener\fR.
+
+.sp
+.in +2
+.nf
+example% svcs -x
+svc:/application/print/server:default (LP print server)
+ State: disabled since Mon Feb 13 17:56:21 2006
+Reason: Disabled by an administrator.
+   See: http://sun.com/msg/SMF-8000-05
+   See: lpsched(1M)
+Impact: 2 dependent services are not running. (Use -v for list.)
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+(b) In this example, NFS is not working:
+
+.sp
+.in +2
+.nf
+example$ svcs nfs/client
+STATE          STIME    FMRI
+offline        16:03:23 svc:/network/nfs/client:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+(c) The following example shows that the problem is \fBnfs/status\fR.
+\fBnfs/client\fR is waiting because it depends on \fBnfs/nlockmgr\fR, which
+depends on \fBnfs/status\fR:
+
+.sp
+.in +2
+.nf
+example$ svcs -xv nfs/client
+svc:/network/nfs/client:default (NFS client)
+ State: offline since Mon Feb 27 16:03:23 2006
+Reason: Service svc:/network/nfs/status:default
+        is not running because a method failed repeatedly.
+   See: http://sun.com/msg/SMF-8000-GE
+  Path: svc:/network/nfs/client:default
+          svc:/network/nfs/nlockmgr:default
+            svc:/network/nfs/status:default
+   See: man -M /usr/share/man -s 1M mount_nfs
+   See: /var/svc/log/network-nfs-client:default.log
+Impact: This service is not running.
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful command invocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Fatal error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid command line options were specified.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+Screen output is Uncommitted. The invocation is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBps\fR(1), \fBsvcprop\fR(1), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
+\fBsvc.startd\fR(1M), \fBstat\fR(2), \fBlibscf\fR(3LIB), \fBattributes\fR(5),
+\fBfnmatch\fR(5), \fBsmf\fR(5), \fBzones\fR(5)

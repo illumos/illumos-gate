@@ -1,0 +1,152 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.  Portions  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH complex.h 3HEAD "17 Dec 2003" "SunOS 5.11" "Headers"
+.SH NAME
+complex.h, complex \- complex arithmetic
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBcomplex.h\fR> 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBcomplex.h\fR> header defines the following macros:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcomplex\fR\fR
+.ad
+.RS 16n
+.rt  
+Expands to \fB_Complex\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_Complex_I\fR\fR
+.ad
+.RS 16n
+.rt  
+Expands to a constant expression of type const float \fB_Complex\fR, with the
+value of the imaginary unit (that is, a number i such that i^2=\(mi1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimaginary\fR\fR
+.ad
+.RS 16n
+.rt  
+Expands to \fB_Imaginary\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_Imaginary_I\fR\fR
+.ad
+.RS 16n
+.rt  
+Expands to a constant expression of type \fBconst float _Imaginary\fR with the
+value of the imaginary unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBI\fR\fR
+.ad
+.RS 16n
+.rt  
+Expands to either \fB_Imaginary_I\fR or \fB_Complex_I\fR. If \fB_Imaginary_I\fR
+is  not defined, \fBI\fR expands to \fB_Complex_I\fR.
+.RE
+
+.sp
+.LP
+An application can undefine and then, if appropriate, redefine the
+\fBcomplex\fR, \fBimaginary\fR, and \fBI\fR macros.
+.SH USAGE
+.sp
+.LP
+Values are interpreted as radians, not degrees.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcabs\fR(3M), \fBcacos\fR(3M), \fBcacosh\fR(3M), \fBcarg\fR(3M),
+\fBcasin\fR(3M), \fBcasinh\fR(3M), \fBcatan\fR(3M), \fBcatanh\fR(3M),
+\fBccos\fR(3M), \fBccosh\fR(3M), \fBcexp\fR(3M), \fBcimag\fR(3M),
+\fBclog\fR(3M), \fBconj\fR(3M), \fBcpow\fR(3M), \fBcproj\fR(3M),
+\fBcreal\fR(3M), \fBcsin\fR(3M), \fBcsinh\fR(3M), \fBcsqrt\fR(3M),
+\fBctan\fR(3M), \fBctanh\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The choice of \fBI\fR instead of \fBi\fR for the imaginary unit concedes to the
+widespread use of the identifier \fBi\fR for other purposes. The application
+can use a different identifier, say \fBj\fR, for the imaginary unit by
+following the inclusion of the <\fBcomplex.h\fR> header with:
+.sp
+.in +2
+.nf
+#undef I
+#define j _Imaginary_I
+.fi
+.in -2
+
+.sp
+.LP
+An \fBI\fR suffix to designate imaginary constants is not required, as
+multiplication by \fBI\fR provides a sufficiently convenient and more generally
+useful notation for imaginary terms. The corresponding real type for the
+imaginary unit is \fBfloat\fR, so that use of \fBI\fR for algorithmic or
+notational convenience does not result in widening types.
+.sp
+.LP
+On systems with imaginary types, the application has the ability to control
+whether use of the macro \fBI\fR introduces an imaginary type, by explicitly
+defining \fBI\fR to be \fB_Imaginary_I\fR or \fB_Complex_I\fR.
+.sp
+.LP
+Disallowing imaginary types is useful for some applications intended to run on
+implementations without support for such types.
+.sp
+.LP
+The macro \fB_Imaginary_I\fR provides a test for whether imaginary types are
+supported. The \fBcis()\fR function \fB(cos(x) + I*sin(x))\fR was considered
+but rejected because its implementation is easy and straightforward, even
+though some implementations could compute sine and cosine more efficiently in
+tandem.

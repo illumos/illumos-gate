@@ -1,0 +1,172 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH directio 3C "9 Apr 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+directio \- provide advice to file system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/fcntl.h>
+
+\fBint\fR \fBdirectio\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIadvice\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdirectio()\fR function provides advice to the system about the expected
+behavior of the application when accessing the data in the file associated with
+the open file descriptor \fIfildes\fR. The system uses this information to help
+optimize accesses to the file's data. The \fBdirectio()\fR function has no
+effect on the semantics of the other operations on the data, though it may
+affect the performance of other operations.
+.sp
+.LP
+The \fIadvice\fR argument is kept per file; the last caller of \fBdirectio()\fR
+sets the \fIadvice\fR for all applications using the file associated with
+\fIfildes\fR.
+.sp
+.LP
+Values for \fIadvice\fR are defined in \fB<sys/fcntl.h>\fR\&.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDIRECTIO_OFF\fR\fR
+.ad
+.RS 16n
+.rt  
+Applications get the default system behavior when accessing file data.
+.sp
+When an application reads data from a file, the data is first cached in system
+memory and then copied into the application's buffer (see \fBread\fR(2)). If
+the system detects that the application is reading sequentially from a file,
+the system will asynchronously "read ahead" from the file into system memory so
+the data is immediately available for the next \fBread\fR(2) operation.
+.sp
+When an application writes data into a file, the data is first cached in system
+memory and is written to the device at a later time (see \fBwrite\fR(2)). When
+possible, the system increases the performance of \fBwrite\fR(2) operations by
+cacheing the data in memory pages. The data is copied into system memory and
+the \fBwrite\fR(2) operation returns immediately to the application. The data
+is later written asynchronously to the device. When possible, the cached data
+is "clustered" into large chunks and written to the device in a single write
+operation.
+.sp
+The system behavior for  \fBDIRECTIO_OFF\fR can change without notice.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDIRECTIO_ON\fR\fR
+.ad
+.RS 16n
+.rt  
+The system behaves as though the application is not going to reuse the file
+data in the near future. In other words, the file data is not cached in the
+system's memory pages.
+.sp
+When possible, data is read or written directly between the application's
+memory and the device when the data is accessed with \fBread\fR(2) and
+\fBwrite\fR(2) operations. When such transfers are not possible, the system
+switches back to the default behavior, but just for that operation. In general,
+the transfer is possible when the application's buffer is aligned on a two-byte
+(short) boundary, the offset into the file is on a device sector boundary, and
+the size of the operation is a multiple of device sectors.
+.sp
+This advisory is ignored while the file associated with \fIfildes\fR is mapped
+(see \fBmmap\fR(2)).
+.sp
+The system behavior for  \fBDIRECTIO_ON\fR can change without notice.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdirectio()\fR returns \fB0\fR. Otherwise, it
+returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBdirectio()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid open file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not associated with a file system that accepts
+advisory functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value in \fIadvice\fR is invalid.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Small sequential I/O generally performs best with  \fBDIRECTIO_OFF\fR.
+.sp
+.LP
+Large sequential I/O generally performs best with  \fBDIRECTIO_ON\fR, except
+when a file is sparse or is being extended and is opened with \fBO_SYNC\fR or
+\fBO_DSYNC\fR (see  \fBopen\fR(2)).
+.sp
+.LP
+The \fBdirectio()\fR function is supported for the NFS and UFS file system
+types (see \fBfstyp\fR(1M)).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfstyp\fR(1M), \fBmmap\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBfcntl.h\fR(3HEAD), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+Switching between  \fBDIRECTIO_OFF\fR and  \fBDIRECTIO_ON\fR can slow the
+system because each switch to \fBDIRECTIO_ON\fR might entail flushing the
+file's data from the system's memory.

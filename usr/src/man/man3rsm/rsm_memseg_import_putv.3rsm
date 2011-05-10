@@ -1,0 +1,234 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_memseg_import_putv 3RSM "12 Nov 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_memseg_import_putv, rsm_memseg_import_getv \- write to a segment using a
+list of I/O requests
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_memseg_import_putv\fR(\fBrsm_scat_gath_t *\fR\fIsg_io\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_import_getv\fR(\fBrsm_scat_gath_t *\fR\fIsg_io\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrsm_memseg_import_putv()\fR and \fBrsm_memseg_import_getv()\fR functions
+provide for using a list of I/O requests rather than a single source and
+destination address as is done for the\fBrsm_memseg_import_put\fR(3RSM) and
+\fBrsm_memseg_import_get\fR(3RSM) functions.
+.sp
+.LP
+The I/O vector component of the scatter-gather list (\fIsg_io\fR), allows
+specifying local virtual addresses or local_memory_handles. When a local
+address range is used repeatedly, it is efficient to use a handle because
+allocated system resources (that is, locked down local memory) are maintained
+until the handle is freed. The supporting functions for handles are
+\fBrsm_create_localmemory_handle\fR(3RSM) and
+\fBrsm_free_localmemory_handle\fR(3RSM).
+.sp
+.LP
+Virtual addresses or handles may be gathered into the vector for writing to a
+single remote segment, or a read from a single remote segment may be scattered
+to the vector of virtual addresses or handles.
+.sp
+.LP
+Implicit mapping is supported for the scatter-gather type of access. The
+attributes of the extension library for the specific interconnect are used to
+determine whether mapping is necessary before any scatter-gather access. If
+mapping of the imported segment is a prerequisite for scatter-gather access and
+the mapping has not already been performed, an implicit mapping is performed
+for the imported segment. The I/O for the vector is then initiated.
+.sp
+.LP
+I/O for the entire vector is initiated before returning. The barrier mode
+attribute of the import segment determines if the I/O has completed before the
+function returns.  A barrier mode attribute setting of \fBIMPLICIT\fR
+guarantees that the transfer of data is completed in the order as entered in
+the I/O vector. An implicit barrier open and close surrounds each list entry.
+If an error is detected, I/O for the vector is terminated and the function
+returns immediately. The residual count indicates the number of entries for
+which the I/O either did not complete or was not initiated.
+.sp
+.LP
+The number of entries in the I/O vector component of the scatter-gather list is
+specified in the \fBio_request_count\fR field of the \fBrsm_scat_gath_t\fR
+pointed to by \fIsg_io\fR. The \fBio_request_count\fR is valid if greater than
+0 and less than or equal to \fBRSM_MAX_SGIOREQS\fR.  If \fBio_request_count\fR
+is not in the valid range, \fBrsm_memseg_import_putv()\fR and
+\fBrsm_memseg_import_getv()\fR returns \fBRSMERR_BAD_SGIO\fR.
+.sp
+.LP
+Optionally, the scatter-gather list allows support for an implicit signal post
+after the I/O for the entire vector has completed. This alleviates the need to
+do an explicit signal post after ever I/O transfer operation. The means of
+enabling the implicit signal post involves setting the \fBflags\fR field within
+the scatter-gather list to \fBRSM_IMPLICIT_SIGPOST\fR. The \fBflags\fR field
+may also be set to \fBRSM_SIG_POST_NO_ACCUMULATE\fR, which will be passed on to
+the signal post operation when \fBRSM_IMPLICIT_SIGPOST\fR is set.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_memseg_import_putv()\fR and \fBrsm_memseg_import_getv()\fR functions
+can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SGIO\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid scatter-gather structure pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid segment handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid controller handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_OFFSET\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid offset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LENGTH\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Bad address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INTERRUPTED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The operation was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_PERM_DENIED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BARRIER_FAILURE\fR \fR
+.ad
+.sp .6
+.RS 4n
+I/O completion error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_REMOTE_NODE_UNREACHABLE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Remote node not reachable.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_create_localmemory_handle\fR(3RSM),
+\fBrsm_free_localmemory_handle\fR(3RSM), \fBattributes\fR(5)

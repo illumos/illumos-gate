@@ -1,0 +1,240 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sha2 3EXT "13 Nov 2007" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+sha2, SHA2Init, SHA2Update, SHA2Final, SHA256Init, SHA256Update, SHA256Final,
+SHA384Init, SHA384Update, SHA384Final, SHA512Init, SHA512Update, SHA512Final \-
+SHA2 digest functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lmd\fR [ \fIlibrary\fR ... ]
+#include <sha2.h>
+
+\fBvoid\fR \fBSHA2Init\fR(\fBuint64_t\fR \fImech\fR, \fBSHA2_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA2Update\fR(\fBSHA2_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA2Final\fR(\fBunsigned char *\fR\fIoutput\fR, \fBSHA2_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA256Init\fR(\fBSHA256_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA256Update\fR(\fBSHA256_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA256Final\fR(\fBunsigned char *\fR\fIoutput\fR, \fBSHA256_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA384Init\fR(\fBSHA384_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA384Update\fR(\fBSHA384_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA384Final\fR(\fBunsigned char *\fR\fIoutput\fR, \fB384_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA512Init\fR(\fBSHA512_CTX *\fR\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA512Update\fR(\fBSHA512_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
+     \fBunsigned int\fR \fIinlen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSHA512Final\fR(\fBunsigned char *\fR\fIoutput\fR, \fB512_CTX *\fR\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSHA2Init()\fR, \fBSHA2Update()\fR, \fBSHA2Final()\fR functions implement
+the \fBSHA256\fR, \fBSHA384\fR and \fBSHA512\fR message-digest algorithms. The
+algorithms take as input a message of arbitrary length and produces a 200-bit
+"fingerprint" or "message digest" as output. The \fBSHA2\fR message-digest
+algorithms are intended for digital signature applications in which large files
+are "compressed" in a secure manner before being encrypted with a private
+(secret) key under a public-key cryptosystem such as RSA.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHA2Init()\fR, \fBSHA2Update()\fR, \fBSHA2Final()\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBSHA2Init()\fR, \fBSHA2Update()\fR, and \fBSHA2Final()\fR functions allow
+an \fBSHA2\fR digest to be computed over multiple message blocks. Between
+blocks, the state of the \fBSHA2\fR computation is held in an \fBSHA2\fR
+context structure allocated by the caller. A complete digest computation
+consists of calls to \fBSHA2\fR functions in the following order: one call to
+\fBSHA2Init()\fR, one or more calls to \fBSHA2Update()\fR, and one call to
+\fBSHA2Final()\fR.
+.sp
+The \fBSHA2Init()\fR function initializes the SHA2 context structure pointed to
+by \fIcontext\fR. The \fImech\fR argument is one of \fBSHA256\fR, \fBSHA512\fR,
+\fBSHA384\fR.
+.sp
+The \fBSHA2Update()\fR function computes a partial \fBSHA2\fR digest on the
+\fIinlen\fR-byte message block pointed to by \fIinput\fR, and updates the
+\fBSHA2\fR context structure pointed to by \fIcontext\fR accordingly.
+.sp
+The \fBSHA2Final()\fR function generates the final \fBSHA2Final\fR digest,
+using the \fBSHA2\fR context structure pointed to by \fIcontext\fR. The
+\fBSHA2\fR digest is written to output. After a call to \fBSHA2Final()\fR, the
+state of the context structure is undefined. It must be reinitialized with
+\fBSHA2Init()\fR before it can be used again.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHA256Init()\fR, \fBSHA256Update()\fR, \fBSHA256Final()\fR,
+\fBSHA384Init()\fR, \fBSHA384Update()\fR, \fBSHA384Final()\fR,
+\fBSHA512Init()\fR, \fBSHA512Update()\fR, \fBSHA512Final()\fR\fR
+.ad
+.sp .6
+.RS 4n
+Alternative APIs exist as named above. The \fBUpdate()\fR and \fBFinal()\fR
+sets of functions operate exactly as the previously described
+\fBSHA2Update()\fR and \fBSHA2Final()\fR functions. The \fBSHA256Init()\fR,
+\fBSHA384Init()\fR, and \fBSHA512Init()\fR functions do not take the \fImech\fR
+argument as it is implicit in the function names.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+These functions do not return a value.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAuthenticate a message found in multiple buffers
+.sp
+.LP
+The following is a sample function that authenticates a message found in
+multiple buffers. The calling function provides an authentication buffer to
+contain the result of the \fBSHA2\fR digest.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sha2.h>
+
+int
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+                *messageIov, unsigned int num_buffers)
+{
+    SHA2_CTX sha2_context;
+    unsigned int i;
+
+    SHA2Init(SHA384, &sha2_context);
+
+    for(i=0; i<num_buffers; i++)
+    {
+         SHA2Update(&sha2_context, messageIov->iov_base,
+                   messageIov->iov_len);
+         messageIov += sizeof(struct iovec);
+    }
+
+    SHA2Final(auth_buffer, &sha2_context);
+
+    return 0;
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRAuthenticate a message found in multiple buffers
+.sp
+.LP
+The following is a sample function that authenticates a message found in
+multiple buffers. The calling function provides an authentication buffer that
+will contain the result of the \fBSHA384\fR digest, using alternative
+interfaces.
+
+.sp
+.in +2
+.nf
+int
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+                *messageIov, unsigned int num_buffers)
+{
+    SHA384_CTX ctx;
+    unsigned int i;
+
+    SHA384Init(&ctx);
+
+    for(i=0, i<num_buffers; i++
+    {
+         SHA384Update(&ctx, messageIov->iov_base,
+                   messageIov->iov_len);
+         messageIov += sizeof(struct iovec);
+    }
+
+    SHA384Final(auth_buffer, &ctx);
+
+    return 0;
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibmd\fR(3LIB)
+.sp
+.LP
+FIPS 180-2

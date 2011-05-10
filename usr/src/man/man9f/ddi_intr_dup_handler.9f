@@ -1,0 +1,312 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_intr_dup_handler 9F "09 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_intr_dup_handler \- reuse interrupt handler and arguments for MSI-X
+interrupts
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_intr_dup_handler\fR(\fBddi_intr_handle_t\fR \fIprimary\fR, \fBint\fR \fIvector\fR, 
+     \fBddi_intr_handle_t *\fR\fInew\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprimary\fR\fR
+.ad
+.RS 11n
+.rt  
+Original DDI interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvector\fR\fR
+.ad
+.RS 11n
+.rt  
+Interrupt number to duplicate
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInew\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to new DDI interrupt handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_intr_dup_handler()\fR function is a feature for MSI-X interrupts
+that allows an unallocated interrupt vector of a device to use a previously
+initialized or added primary MSI-X interrupt vector in order to share the same
+vector address, vector data, interrupt handler, and handler arguments. This
+feature allows a driver to alias the resources provided by the Solaris
+Operating System to the unallocated interrupt vectors on an associated device.
+For example, if 2 MSI-X interrupts were allocated to a driver and 32 interrupts
+were supported on the device, the driver could alias the 2 interrupts it
+received to the 30 remaining on the device.
+.sp
+.LP
+The \fBddi_intr_dup_handler()\fR function must be called after the primary
+interrupt handle has been added to the system or enabled by
+\fBddi_intr_add_handler\fR(9F) and \fBddi_intr_enable\fR(9F) calls,
+respectively. If successful, the function returns the new interrupt handle for
+a given vector in the \fInew\fR argument passed to the function. The new
+interrupt handle must not have been previously allocated with
+\fBddi_intr_alloc\fR(9F). Otherwise, the \fBddi_intr_dup_handler()\fR call will
+fail.
+.sp
+.LP
+The only supported calls on \fIdup-ed\fR interrupt handles are
+\fBddi_intr_set_mask\fR(9F), \fBddi_intr_clr_mask\fR(9F),
+\fBddi_intr_get_pending\fR(9F), \fBddi_intr_enable\fR(9F),
+\fBddi_intr_disable\fR(9F), and \fBddi_intr_free\fR(9F).
+.sp
+.LP
+A call to \fBddi_intr_dup_handler()\fR does not imply that the interrupt source
+is automatically enabled. Initially, the dup-ed handle is in the disabled state
+and must be enabled before it can be used by calling \fBddi_intr_enable()\fR.
+Likewise, \fBddi_intr_disable()\fR must be called to disable the enabled dup-ed
+interrupt source.
+.sp
+.LP
+A dup-ed interrupt is removed by calling \fBddi_intr_free()\fR after it has
+been disabled. The \fBddi_intr_remove_handler\fR(9F) call is not required for a
+dup-ed handle.
+.sp
+.LP
+Before removing the original MSI-X interrupt handler, all dup-ed interrupt
+handlers associated with this MSI-X interrupt must have been disabled and
+freed. Otherwise, calls to \fBddi_intr_remove_handler()\fR will fail with
+\fBDDI_FAILURE\fR.
+.sp
+.LP
+See the EXAMPLES section for code that illustrates the use of the
+\fBddi_intr_dup_handler()\fR function.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_intr_dup_handler()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+On success.
+.sp
+Note that the interface should be verified to ensure that the return value is
+not equal to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could
+result in inconsistent behavior among platforms.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EINVAL\fR\fR
+.ad
+.RS 15n
+.rt  
+On encountering invalid input parameters. \fBDDI_EINVAL\fR is also returned if
+a dup is attempted from a dup-ed interrupt or if the hardware device is found
+not to support MSI-X interrupts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+On any implementation specific failure.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBddi_intr_dup_handler()\fR function
+.sp
+.in +2
+.nf
+int
+add_msix_interrupts(intr_state_t *state)
+{
+  int x, y;
+
+  /*
+   * For this example, assume the device supports multiple
+   * interrupt vectors, but only request to be allocated
+   * 1 MSI-X to use and then dup the rest.
+   */
+  if (ddi_intr_get_nintrs(state->dip, DDI_INTR_TYPE_MSIX,
+     &state->intr_count) != DDI_SUCCESS) {
+          cmn_err(CE_WARN, "Failed to retrieve the MSI-X interrupt count");
+          return (DDI_FAILURE);
+  }
+
+  state->intr_size = state->intr_count * sizeof (ddi_intr_handle_t);
+  state->intr_htable = kmem_zalloc(state->intr_size, KM_SLEEP);
+
+  /* Allocate one MSI-X interrupt handle */
+  if (ddi_intr_alloc(state->dip, state->intr_htable,
+      DDI_INTR_TYPE_MSIX, state->inum, 1, &state->actual,
+      DDI_INTR_ALLOC_STRICT) != DDI_SUCCESS) {
+          cmn_err(CE_WARN, "Failed to allocate MSI-X interrupt");
+          kmem_free(state->intr_htable, state->intr_size);
+          return (DDI_FAILURE);
+  }
+
+  /* Get the count of how many MSI-X interrupts we dup */
+  state->dup_cnt = state->intr_count - state->actual;
+
+  if (ddi_intr_get_pri(state->intr_htable[0],
+      &state->intr_pri) != DDI_SUCCESS) {
+          cmn_err(CE_WARN, "Failed to get interrupt priority");
+          goto error1;
+  }
+
+  /* Make sure the MSI-X priority is below 'high level' */
+  if (state->intr_pri >= ddi_intr_get_hilevel_pri()) {
+         cmn_err(CE_WARN, "Interrupt PRI is too high");
+          goto error1;
+  }
+
+  /*
+   * Add the handler for the interrupt
+   */
+  if (ddi_intr_add_handler(state->intr_htable[0],
+      (ddi_intr_handler_t *)intr_isr, (caddr_t)state,
+      NULL) != DDI_SUCCESS) {
+          cmn_err(CE_WARN, "Failed to add interrupt handler");
+          goto error1;
+  }
+
+  /* Enable the main MSI-X handle first */
+  if (ddi_intr_enable(state->intr_htable[0]) != DDI_SUCCESS) {
+          cmn_err(CE_WARN, "Failed to enable interrupt");
+          goto error2;
+  }
+
+  /*
+   * Create and enable dups of the original MSI-X handler, note
+   * that the inum we are using starts at 0.
+   */
+  for (x = 1; x < state->dup_cnt; x++) {
+      if (ddi_intr_dup_handler(state->intr_htable[0],
+          state->inum + x, &state->intr_htable[x]) != DDI_SUCCESS) {
+              for (y = x - 1; y > 0; y--) {
+                  (void) ddi_intr_disable(state->intr_htable[y]);
+                  (void) ddi_intr_free(state->intr_htable[y]);
+              }
+
+          goto error2;
+      }
+      if (ddi_intr_enable(state->intr_htable[x]) != DDI_SUCCESS) {
+          for (y = x; y > 0; y--) {
+              (void) ddi_intr_disable(state->intr_htable[y]);
+              (void) ddi_intr_free(state->intr_htable[y]);
+          }
+                
+          goto error2;
+      }
+  }
+
+  return (DDI_SUCCESS);
+
+error2:
+    (void) ddi_intr_remove_handler(state->intr_htable[0]);
+error1:
+    (void) ddi_intr_free(state->intr_htable[0]);
+
+    kmem_free(state->intr_htable, state->intr_size);
+    return (DDI_FAILURE);
+}
+
+void
+remove_msix_interrupts(intr_state_t *state)
+{
+    int x;
+
+    /* 
+     * Disable all the handles and free the dup-ed handles
+     * before we can remove the main MSI-X interrupt handle.
+     */
+    for (x = 1; x < state->dup_cnt; x++) {
+        (void) ddi_intr_disable(state->intr_htable[x]);
+        (void) ddi_intr_free(state->intr_htable[x]);
+    }
+
+    /*
+     * We can remove and free the main MSI-X handler now
+     * that all the dups have been freed.
+     */
+    (void) ddi_intr_disable(state->intr_htable[0]);
+    (void) ddi_intr_remove_handler(state->intr_htable[0]);
+    (void) ddi_intr_free(state->intr_htable[0]);
+
+    kmem_free(state->intr_htable, state->intr_size);
+}
+.fi
+.in -2
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_intr_dup_handler()\fR function can be called from kernel
+non-interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_intr_add_handler\fR(9F), \fBddi_intr_alloc\fR(9F),
+\fBddi_intr_clr_mask\fR(9F), \fBddi_intr_disable\fR(9F),
+\fBddi_intr_enable\fR(9F), \fBddi_intr_free\fR(9F),
+\fBddi_intr_get_pending\fR(9F), \fBddi_intr_get_supported_types\fR(9F),
+\fBddi_intr_set_mask\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

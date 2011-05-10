@@ -1,0 +1,100 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aiocancel 3C "5 Feb 1997" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aiocancel \- cancel an asynchronous operation
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/asynch.h>
+
+\fBint\fR \fBaiocancel\fR(\fBaio_result_t *\fR\fIresultp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBaiocancel()\fR cancels the asynchronous operation associated with the result
+buffer pointed to by \fIresultp\fR. It may not be possible to immediately
+cancel an operation which is in progress and in this case, \fBaiocancel()\fR
+will not wait to cancel it.
+.sp
+.LP
+Upon successful completion, \fBaiocancel()\fR returns  \fB0\fR and the
+requested operation is cancelled.  The application will not receive the
+\fBSIGIO\fR completion signal for an asynchronous operation that is
+successfully cancelled.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBaiocancel()\fR returns \fB0\fR. Upon failure,
+\fBaiocancel()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+\fBaiocancel()\fR will fail if any of the following are true:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The parameter \fIresultp\fR does not correspond to any outstanding asynchronous
+operation, although there is at least one currently outstanding.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+\fIresultp\fR points to an address outside the address space of the requesting
+process.  See \fBNOTES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+There are not any outstanding requests to cancel.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaioread\fR(3C), \fBaiowait\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Passing an illegal address as \fIresultp\fR will result in setting \fBerrno\fR
+to \fBEFAULT\fR \fIonly\fR if it is detected by the application process.

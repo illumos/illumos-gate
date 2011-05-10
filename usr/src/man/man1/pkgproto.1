@@ -1,0 +1,175 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pkgproto 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+pkgproto \- generate prototype file entries for input to pkgmk command
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkgproto\fR [\fB-i\fR] [\fB-c\fR \fIclass\fR] [\fIpath1\fR]
+.fi
+
+.LP
+.nf
+\fBpkgproto\fR [\fB-i\fR] [\fB-c\fR \fIclass\fR] [\fIpath1=path2\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpkgproto\fR scans the indicated paths and generates \fBprototype\fR(4) file
+entries that may be used as input to the \fBpkgmk\fR(1) command.
+.sp
+.LP
+If no paths are specified on the command line, standard input is assumed to be
+a list of paths. If the pathname listed on the command line is a directory,
+the contents of the directory is searched. However, if input is read from
+\fBstdin\fR, a directory specified as a pathname will not be searched.
+.sp
+.LP
+Package commands, such as \fBpkgproto\fR, are \fBlargefile\fR(5)-aware. They
+handle files larger than 2 GB in the same way they handle smaller files. In
+their current implementations, \fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other
+package commands can process a datastream of  up to 4 GB.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 12n
+.rt  
+Ignores symbolic links and records the paths as \fBftype\fR=\fBf\fR (a file)
+versus \fBftype\fR=\fBs\fR (symbolic link).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIclass\fR\fR
+.ad
+.RS 12n
+.rt  
+Maps the class of all paths to \fIclass\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpath1\fR\fR
+.ad
+.RS 9n
+.rt  
+Pathname where objects are located.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpath2\fR\fR
+.ad
+.RS 9n
+.rt  
+Pathname which should be substituted on output for \fIpath1\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRBasic Usage
+.sp
+.LP
+The following example shows a common usage of \fBpkgproto\fR and a partial
+listing of the output produced.
+
+.sp
+.in +2
+.nf
+\fBexample%\fR \fBpkgproto\fR /bin=bin /usr/bin=usrbin /etc=etc
+f none bin/sed=/bin/sed 0775 bin bin
+f none bin/sh=/bin/sh 0755 bin daemon
+f none bin/sort=/bin/sort 0755 bin bin
+f none usrbin/sdb=/usr/bin/sdb 0775 bin bin
+f none usrbin/shl=/usr/bin/shl 4755 bin bin
+d none etc/master.d 0755 root daemon
+f none etc/master.d/kernel=/etc/master.d/kernel 0644 root daemon
+f none etc/rc=/etc/rc 0744 root daemon 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing \fBpkgproto\fR in a Pipeline
+.sp
+.LP
+The following command shows \fBpkgproto\fR accepting the output of the
+\fBfind\fR command.
+
+.sp
+.in +2
+.nf
+\fBexample% find /\fR \fB-type\fR d \fB-print\fR | pkgproto
+d none / 755 root root
+d none /bin 755 bin bin
+d none /usr 755 root root
+d none /usr/bin 775 bin bin
+d none /etc 755 root root
+d none /tmp 777 root root
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgtrans\fR(1), \fBpkgadd\fR(1M),
+\fBprototype\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.sp
+.LP
+\fIApplication Packaging Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+By default, \fBpkgproto\fR creates symbolic link entries for any symbolic link
+encountered (\fBftype\fR=\fBs\fR). When you use the \fB-i\fR option,
+\fBpkgproto\fR creates a file entry for symbolic links (\fBftype\fR=\fBf\fR).
+The \fBprototype\fR(4) file would have to be edited to assign such file types
+as \fBv\fR (volatile), \fBe\fR (editable), or \fBx\fR (exclusive directory).
+\fBpkgproto\fR detects linked files. If multiple files are linked together, the
+first path encountered is considered the source of the link.
+.sp
+.LP
+By default, \fBpkgproto\fR prints prototype entries on the standard output.
+However, the output should be saved in a file (named \fBPrototype\fR or
+\fBprototype\fR, for convenience) to be used as input to the \fBpkgmk\fR(1)
+command.

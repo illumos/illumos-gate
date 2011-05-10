@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -147,12 +147,16 @@ __setrunelocale(const char *encoding)
 
 	if (strcmp(rl->__encoding, "NONE") == 0)
 		ret = _none_init(rl);
-	else if (strcmp(rl->__encoding, "ASCII") == 0)
-		ret = _ascii_init(rl);
 	else if (strcmp(rl->__encoding, "UTF-8") == 0)
 		ret = _UTF8_init(rl);
-	else if (strcmp(rl->__encoding, "EUC") == 0)
-		ret = _EUC_init(rl);
+	else if (strcmp(rl->__encoding, "EUC-CN") == 0)
+		ret = _EUC_CN_init(rl);
+	else if (strcmp(rl->__encoding, "EUC-JP") == 0)
+		ret = _EUC_JP_init(rl);
+	else if (strcmp(rl->__encoding, "EUC-KR") == 0)
+		ret = _EUC_KR_init(rl);
+	else if (strcmp(rl->__encoding, "EUC-TW") == 0)
+		ret = _EUC_TW_init(rl);
 	else if (strcmp(rl->__encoding, "GB18030") == 0)
 		ret = _GB18030_init(rl);
 	else if (strcmp(rl->__encoding, "GB2312") == 0)
@@ -168,9 +172,6 @@ __setrunelocale(const char *encoding)
 
 	if (ret == 0) {
 		if (CachedRuneLocale != NULL) {
-			/* See euc.c */
-			if (strcmp(CachedRuneLocale->__encoding, "EUC") == 0)
-				free(CachedRuneLocale->__variable);
 			free(CachedRuneLocale);
 		}
 		CachedRuneLocale = _CurrentRuneLocale;

@@ -1,0 +1,699 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stat 2 "10 Oct 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+stat, lstat, fstat, fstatat \- get file status
+.SH SYNOPSIS
+.LP
+.nf
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+\fBint\fR \fBstat\fR(\fBconst char *restrict\fR \fIpath\fR, \fBstruct stat *restrict\fR \fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBlstat\fR(\fBconst char *restrict\fR \fIpath\fR, \fBstruct stat *restrict\fR \fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstat\fR(\fBint\fR \fIfildes\fR, \fBstruct stat *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstatat\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIpath\fR, \fBstruct stat *\fR\fIbuf\fR,
+     \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstat()\fR function obtains information about the file pointed to by
+\fIpath\fR. Read, write, or execute permission of the named file is not
+required, but all directories listed in the path name leading to the file must
+be searchable.
+.sp
+.LP
+The \fBlstat()\fR function obtains file attributes similar to \fBstat()\fR,
+except when the named file is a symbolic link; in that case \fBlstat()\fR
+returns information about the link, while \fBstat()\fR returns information
+about the file the link references.
+.sp
+.LP
+The \fBfstat()\fR function obtains information about an open file known by the
+file descriptor \fIfildes\fR, obtained from a successful \fBopen\fR(2),
+\fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), or \fBpipe\fR(2) function. If
+\fIfildes\fR references a shared memory object, the system updates in the
+\fBstat\fR structure pointed to by the \fIbuf\fR argument only the
+\fBst_uid\fR, \fBst_gid\fR, \fBst_size\fR, and \fBst_mode\fR fields, and only
+the \fBS_IRUSR\fR, \fBS_IWUSR\fR, \fBS_IRGRP\fR, \fBS_IWGRP\fR, \fBS_IROTH\fR,
+and \fBS_IWOTH\fR file permission bits need be valid. The system can update
+other fields and flags. The \fBfstat()\fR function updates any pending
+time-related fields before writing to the \fBstat\fR structure.
+.sp
+.LP
+The \fBfstatat()\fR function obtains file attributes similar to the
+\fBstat()\fR, \fBlstat()\fR, and \fBfstat()\fR functions.  If the \fIpath\fR
+argument is a relative path, it is resolved relative to the \fIfildes\fR
+argument rather than the current working directory.  If \fIpath\fR is absolute,
+the \fIfildes\fR argument is unused.  If the \fIfildes\fR argument has the
+special value \fBAT_FDCWD\fR, relative paths are resolved from the current
+working directory. If \fBAT_SYMLINK_NOFOLLOW\fR is set in the \fIflag\fR
+argument, the function behaves like \fBlstat()\fR and does not automatically
+follow symbolic links. See \fBfsattr\fR(5). If \fB_ATTR_TRIGGER\fR is set in
+the  \fIflag\fR argument and the vnode is a trigger mount point, the mount is
+performed and the function returns the attributes of the root of the mounted
+filesystem.
+.sp
+.LP
+The \fIbuf\fR argument is a pointer to a \fBstat\fR structure into which
+information is placed concerning the file. A \fBstat\fR structure includes the
+following members:
+.sp
+.in +2
+.nf
+mode_t   st_mode;          /* File mode (see mknod(2)) */
+ino_t    st_ino;           /* Inode number */
+dev_t    st_dev;           /* ID of device containing */
+                           /* a directory entry for this file */
+dev_t    st_rdev;          /* ID of device */
+                           /* This entry is defined only for */
+                           /* char special or block special files */
+nlink_t  st_nlink;         /* Number of links */
+uid_t    st_uid;           /* User ID of the file's owner */
+gid_t    st_gid;           /* Group ID of the file's group */
+off_t    st_size;          /* File size in bytes */
+time_t   st_atime;         /* Time of last access */
+time_t   st_mtime;         /* Time of last data modification */
+time_t   st_ctime;         /* Time of last file status change */
+                           /* Times measured in seconds since */
+                           /* 00:00:00 UTC, Jan. 1, 1970 */
+long     st_blksize;       /* Preferred I/O block size */
+blkcnt_t st_blocks;        /* Number of 512 byte blocks allocated*/
+char     st_fstype[_ST_FSTYPSZ];
+                           /* Null-terminated type of filesystem */
+.fi
+.in -2
+
+.sp
+.LP
+Descriptions of structure members are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_mode\fR\fR
+.ad
+.RS 14n
+.rt  
+The mode of the file as described for the \fBmknod()\fR function. In addition
+to the modes described on the \fBmknod\fR(2) manual page, the mode of a file
+can also be \fBS_IFSOCK\fR if the file is a socket, \fBS_IFDOOR\fR if the file
+is a door, \fBS_IFPORT\fR if the file is an event port, or \fBS_IFLNK\fR if the
+file is a symbolic link. \fBS_IFLNK\fR can be returned either by \fBlstat()\fR
+or by \fBfstat()\fR when the \fBAT_SYMLINK_NOFOLLOW\fR flag is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_ino\fR\fR
+.ad
+.RS 14n
+.rt  
+This field uniquely identifies the file in a given file system. The pair
+\fBst_ino\fR and  \fBst_dev\fR uniquely identifies regular files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_dev\fR\fR
+.ad
+.RS 14n
+.rt  
+This field uniquely identifies the file system that contains the file. Its
+value may be used as input to the \fBustat()\fR function to determine more
+information about this file system. No other meaning is associated with this
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_rdev\fR\fR
+.ad
+.RS 14n
+.rt  
+This field should be used only by administrative commands. It is valid only for
+block special or character special files and only has meaning on the system
+where the file was configured.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_nlink\fR\fR
+.ad
+.RS 14n
+.rt  
+This field should be used only by administrative commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_uid\fR\fR
+.ad
+.RS 14n
+.rt  
+The user \fBID\fR of the file's owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_gid\fR\fR
+.ad
+.RS 14n
+.rt  
+The group \fBID\fR of the file's group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_size\fR\fR
+.ad
+.RS 14n
+.rt  
+For regular files, this is the address of the end of the file. For block
+special or character special, this is not defined. See also \fBpipe\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_atime\fR\fR
+.ad
+.RS 14n
+.rt  
+Time when file data was last accessed. Some of the functions that change this
+member are: \fBcreat()\fR, \fBmknod()\fR, \fBpipe()\fR, \fButime\fR(2), and
+\fBread\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_mtime\fR\fR
+.ad
+.RS 14n
+.rt  
+Time when data was last modified. Some of the functions that change this member
+are: \fBcreat()\fR, \fBmknod()\fR, \fBpipe()\fR, \fButime()\fR, and
+\fBwrite\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_ctime\fR\fR
+.ad
+.RS 14n
+.rt  
+Time when file status was last changed. Some of the functions that change this
+member are: \fBchmod\fR(2), \fBchown\fR(2), \fBcreat\fR(2), \fBlink\fR(2),
+\fBmknod\fR(2), \fBpipe\fR(2), \fBrename\fR(2), \fBunlink\fR(2),
+\fButime\fR(2), and \fBwrite\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_blksize\fR\fR
+.ad
+.RS 14n
+.rt  
+A hint as to the "best" unit size for I/O operations. This field is not defined
+for block special or character special files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_blocks\fR\fR
+.ad
+.RS 14n
+.rt  
+The total number of physical blocks of size 512 bytes actually allocated on
+disk. This field is not defined for block special or character special files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst_fstype\fR\fR
+.ad
+.RS 14n
+.rt  
+A null-teminated string that uniquely identifies the type of the filesystem
+that contains the file.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBstat()\fR, \fBfstat()\fR, \fBlstat()\fR, and \fBfstatat()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 13n
+.rt  
+An error occurred while reading from the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The file size in bytes or the number of blocks allocated to the file or the
+file serial number cannot be represented correctly in the structure pointed to
+by \fIbuf\fR.
+.RE
+
+.sp
+.LP
+The \fBstat()\fR, \fBlstat()\fR, and \fBfstatat()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied for a component of the path prefix.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The  \fIbuf\fR or \fIpath\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+A signal was caught during the execution of the  \fBstat()\fR or \fBlstat()\fR
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+A loop exists in symbolic links encountered during the resolution of the
+\fIpath\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds {\fBPATH_MAX\fR}, or the length
+of a \fIpath\fR component exceeds {\fBNAME_MAX\fR} while \fB_POSIX_NO_TRUNC\fR
+is in effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of \fIpath\fR does not name an existing file or \fIpath\fR is an
+empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix is not a directory, or the \fIfildes\fR argument
+does not refer to a valid directory when given a non-null relative path.
+.RE
+
+.sp
+.LP
+The \fBfstat()\fR and \fBfstatat()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is not a valid open file descriptor. The \fIfildes\fR
+argument to \fBfstatat()\fR can also have the valid value of \fBAT_FDCWD\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 11n
+.rt  
+A signal was caught during the execution of the \fBfstat()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument points to a remote machine and the link to that
+machine is no longer active.
+.RE
+
+.sp
+.LP
+The \fBstat()\fR, \fBfstat()\fR, and \fBlstat()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+One of the members is too large to store in the \fBstat\fR structure pointed to
+by \fIbuf\fR.
+.RE
+
+.sp
+.LP
+The \fBstat()\fR and \fBlstat()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+More than {\fBSYMLOOP_MAX\fR} symbolic links were encountered during the
+resolution of the \fIpath\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+As a result of encountering a symbolic link in resolution of the\fIpath\fR
+argument, the length of the substituted pathname strings exceeds
+{\fBPATH_MAX\fR}.
+.RE
+
+.sp
+.LP
+The \fBstat()\fR and \fBfstatat()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fIpath\fR argument names a character or block device special file and the
+corresponding I/O device has been retired by the fault management framework.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBstat()\fR to obtain file status information.
+.sp
+.LP
+The following example shows how to obtain file status information for a file
+named \fB/home/cnd/mod1\fR. The structure variable buffer is defined for the
+\fBstat\fR structure.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+struct stat buffer;
+int         status;
+\&...
+status = stat("/home/cnd/mod1", &buffer);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUse \fBstat()\fR to get directory information.
+.sp
+.LP
+The following example fragment gets status information for each entry in a
+directory. The call to the \fBstat()\fR function stores file information in the
+\fBstat\fR structure pointed to by \fIstatbuf\fR. The lines that follow the
+\fBstat()\fR call format the fields in the \fBstat\fR structure for
+presentation to the user of the program.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <pwd.h>
+#include <grp.h>
+#include <time.h>
+#include <locale.h>
+#include <langinfo.h>
+#include <stdio.h>
+#include <stdint.h>
+struct dirent *dp;
+struct stat   statbuf;
+struct passwd *pwd;
+struct group  *grp;
+struct tm     *tm;
+char          datestring[256];
+\&...
+/* Loop through directory entries */
+while ((dp = readdir(dir)) != NULL) {
+    /* Get entry's information. */
+    if (stat(dp->d_name, &statbuf) == -1)
+    continue;
+ 
+     /* Print out type, permissions, and number of links. */
+     printf("%10.10s", sperm (statbuf.st_mode));
+     printf("%4d", statbuf.st_nlink);
+ 
+     /* Print out owners name if it is found using getpwuid(). */
+     if ((pwd = getpwuid(statbuf.st_uid)) != NULL)
+        printf(" %-8.8s", pwd->pw_name);
+     else
+        printf(" %-8d", statbuf.st_uid);
+ 
+     /* Print out group name if it's found using getgrgid(). */
+     if ((grp = getgrgid(statbuf.st_gid)) != NULL)
+        printf(" %-8.8s", grp->gr_name);
+     else
+        printf(" %-8d", statbuf.st_gid);
+
+     /* Print size of file. */
+     printf(" %9jd", (intmax_t)statbuf.st_size);
+     tm = localtime(&statbuf.st_mtime);
+ 
+     /* Get localized date string. */
+     strftime(datestring, sizeof(datestring), nl_langinfo(D_T_FMT), tm);
+ 
+     printf(" %s %s\en", datestring, dp->d_name);
+ }
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRUse \fBfstat()\fR to obtain file status information.
+.sp
+.LP
+The following example shows how to obtain file status information for a file
+named \fB/home/cnd/mod1\fR. The structure variable buffer is defined for the
+\fBstat\fR structure. The \fB/home/cnd/mod1 file\fR is opened with read/write
+privileges and is passed to the open file descriptor \fIfildes\fR.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+struct stat buffer;
+int         status;
+\&...
+fildes = open("/home/cnd/mod1", O_RDWR);
+status = fstat(fildes, &buffer);
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRUse \fBlstat()\fR to obtain symbolic link status information.
+.sp
+.LP
+The following example shows how to obtain status information for a symbolic
+link named \fB/modules/pass1\fR. The structure variable buffer is defined for
+the \fBstat\fR structure. If the \fIpath\fR argument specified the filename for
+the file pointed to by the symbolic link (\fB/home/cnd/mod1\fR), the results of
+calling the function would be the same as those returned by a call to the
+\fBstat()\fR function.
+
+.sp
+.in +2
+.nf
+#include <sys/stat.h>
+struct stat buffer;
+int         status;
+\&...
+status = lstat("/modules/pass1", &buffer);
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+If \fBchmod()\fR or \fBfchmod()\fR is used to change the file group owner
+permissions on a file with non-trivial ACL entries, only the ACL mask is set to
+the new permissions and the group owner permission bits in the file's mode
+field (defined in \fBmknod\fR(2)) are unchanged.  A non-trivial ACL entry is
+one whose meaning cannot be represented in the file's mode field alone. The new
+ACL mask permissions  might change the effective permissions for additional
+users and groups that have ACL entries on the file.
+.sp
+.LP
+The \fBstat()\fR, \fBfstat()\fR, and \fBlstat()\fR functions have transitional
+interfaces for 64-bit file offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+Standard See below.
+.TE
+
+.sp
+.LP
+For \fBstat()\fR, \fBfstat()\fR, and \fBlstat()\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBaccess\fR(2), \fBchmod\fR(2), \fBchown\fR(2), \fBcreat\fR(2), \fBlink\fR(2),
+\fBmknod\fR(2), \fBpipe\fR(2), \fBread\fR(2), \fBtime\fR(2), \fBunlink\fR(2),
+\fButime\fR(2), \fBwrite\fR(2), \fBfattach\fR(3C), \fBstat.h\fR(3HEAD),
+\fBattributes\fR(5), \fBfsattr\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

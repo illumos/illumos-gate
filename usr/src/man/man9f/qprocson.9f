@@ -1,0 +1,87 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qprocson 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qprocson, qprocsoff \- enable, disable put and service routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+#include <sys/ddi.h> 
+
+\fBvoid\fR \fBqprocson\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBqprocsoff\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the \fBRD\fR side of a streams queue pair.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqprocson()\fR enables the put and service routines of the driver or
+module whose read queue is pointed to by \fIq\fR. Threads cannot enter the
+module instance through the put and service routines while they are disabled.
+.sp
+.LP
+The \fBqprocson()\fR function must be called by the open routine of a driver or
+module before returning, and after any initialization necessary for the proper
+functioning of the put and service routines.
+.sp
+.LP
+The \fBqprocson()\fR function must be called before calling \fBput\fR(9F),
+\fBputnext\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F), \fBqwait\fR(9F), or
+\fBqwait_sig\fR(9F).
+.sp
+.LP
+The \fBqprocsoff()\fR function must be called by the close routine of a driver
+or module before returning, and before deallocating any resources necessary for
+the proper functioning of the put and service routines. It also removes the
+queue's service routines from the service queue, and blocks until any pending
+service processing completes.
+.sp
+.LP
+The module or driver instance is guaranteed to be single-threaded before
+\fBqprocson()\fR is called and after \fBqprocsoff()\fR is called, except for
+threads executing asynchronous events such as interrupt handlers and callbacks,
+which must be handled separately.
+.SH CONTEXT
+.sp
+.LP
+These routines can be called from user, interrupt, or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E), \fBput\fR(9F),
+\fBputnext\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F), \fBqwait\fR(9F),
+\fBqwait_sig\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The caller may not have the stream frozen during either of these calls.

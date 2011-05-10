@@ -1,0 +1,356 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH expr 1B "6 Jun 2000" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+expr \- evaluate arguments as a logical, arithmetic, or string expression
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/expr\fR \fIargument\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBexpr\fR utility evaluates expressions as specified by its arguments.
+After evaluation, the result is written on the standard output. Each token of
+the expression is a separate argument, so terms of the expression must be
+separated by blanks. Characters special to the shell must be escaped. Note:
+\fB0\fR is returned to indicate a zero value, rather than the null string.
+Strings containing blanks or other special characters should be quoted.
+Integer-valued arguments may be preceded by a unary minus sign. Internally,
+integers are treated as 32-bit, two's-complement numbers.
+.sp
+.LP
+The operators and keywords are listed below. Characters that need to be escaped
+are preceded by `\fB\e\fR\&'. The list is in order of increasing precedence,
+with equal precedence operators grouped within \fB{\|}\fR symbols.
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR\fB \e| \fR\fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the evaluation of the first \fIexpr\fR if it is neither \fINULL\fR nor
+\fB0\fR; otherwise, returns the evaluation of the second \fIexpr\fR if it is
+not \fINULL\fR; otherwise, \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR\fB \e& \fR\fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the first \fIexpr\fR if neither \fIexpr\fR is \fINULL\fR or \fB0\fR,
+otherwise returns \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR { \fB=,\fR \e\fB,\fR \e , \fB\e<\fR,\fB \e<=\fR,\fB != \fR}
+\fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the result of an integer comparison if both arguments are integers,
+otherwise returns the result of a lexical comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR { \fB+\fR,\fB \(mi \fR} \fIexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Addition or subtraction of integer-valued arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIexpr\fR { \fB\e\fR,\fB /\fR,\fB % \fR} \fBexpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Multiplication, division, or remainder of the integer-valued arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR\fB : \fR\fIregular-expression\fR\fR
+.ad
+.br
+.na
+\fB\fBmatch\fR\fI string regular-expression\fR\fR
+.ad
+.sp .6
+.RS 4n
+The two forms of the matching operator above are synonymous. The matching
+operators \fB:\fR and \fBmatch\fR compare the first argument with the second
+argument which must be a regular expression. Regular expression syntax is the
+same as that of \fBregexp\fR(5), except that all patterns are "anchored"
+(treated as if they begin with \fB^\fR) and therefore \fB^\fR is not a special
+character, in that context. Normally, the matching operator returns the number
+of characters matched (\fB0\fR on failure). Alternatively, the
+\fB\e\|.\|.\|.\|\e\fR pattern symbols can be used to return a portion of the
+first argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsubstr\fR \fIstring integer-1 integer-2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Extracts the substring of  \fIstring\fR starting at position \fIinteger-1\fR
+and of length \fIinteger-2\fR characters. If \fIinteger-1\fR has a value
+greater than the length of \fIstring\fR, \fBexpr\fR returns a null string. If
+you try to extract more characters than there are in \fIstring\fR, \fBexpr\fR
+returns all the remaining characters from \fIstring\fR. Beware of using
+negative values for either \fIinteger-1\fR or \fIinteger-2\fR as  \fBexpr\fR
+tends to run forever in these cases.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBindex\fR \fIstring character-list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reports the first position in \fIstring\fR at which any one of the characters
+in \fIcharacter-list\fR matches a character in  \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlength\fR \fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the length (that is, the number of characters) of \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB( expr )\fR\fR
+.ad
+.sp .6
+.RS 4n
+Parentheses may be used for grouping.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAdding an integer to a shell variable
+.sp
+.LP
+Add 1 to the shell variable \fBa\fR.
+
+.sp
+.in +2
+.nf
+\fBa='expr $a + 1'\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRReturning a path name segment
+.sp
+.LP
+Return the last segment of a path name (that is, the filename part). Watch out
+for \fB/\fR alone as an argument: \fBexpr\fR will take it as the division
+operator (see \fBBUGS\fR below).
+
+.sp
+.in +2
+.nf
+\fB# 'For $a equal to either "/usr/abc/file" or just "file"'
+expr  $a  :  '.*/\e  \e  $a\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing // characters to simplify the expression
+.sp
+.LP
+The addition of the \fB//\fR characters eliminates any ambiguity about the
+division operator and simplifies the whole expression.
+
+.sp
+.in +2
+.nf
+\fB# A better representation of example 2.
+expr  //$a  :  '.*/\e\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRReturning the value of a variable
+.sp
+.LP
+Returns the number of characters in \fB$VAR\fR.
+
+.sp
+.in +2
+.nf
+\fBexpr  $VAR  :  '.*'\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+\fBexpr\fR returns the following exit codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+If the expression is neither  \fINULL\fR nor \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+If the expression \fIis\fR \fINULL\fR or \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+For invalid expressions.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsh\fR(1), \fBtest\fR(1), \fBattributes\fR(5), \fBregexp\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsyntax\fR \fBerror\fR\fR
+.ad
+.RS 24n
+.rt  
+for operator/operand errors
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-numeric argument\fR\fR
+.ad
+.RS 24n
+.rt  
+if arithmetic is attempted on such a string
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdivision by zero\fR\fR
+.ad
+.RS 24n
+.rt  
+if an attempt to divide by zero is made
+.RE
+
+.SH BUGS
+.sp
+.LP
+After argument processing by the shell, \fBexpr\fR cannot tell the difference
+between an operator and an operand except by the value. If \fB$a\fR is an
+\fB=\fR, the command:
+.sp
+.in +2
+.nf
+\fBexpr  $a  =  '='\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+looks like:
+.sp
+.in +2
+.nf
+\fBexpr  =  =  =\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+as the arguments are passed to \fBexpr\fR (and they will all be taken as the
+\fB=\fR operator). The following works:
+.sp
+.in +2
+.nf
+\fBexpr  X$a  =  X=\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Note: the \fBmatch\fR, \fBsubstr\fR, \fBlength\fR, and \fBindex\fR operators
+cannot themselves be used as ordinary strings.  That is, the expression:
+.sp
+.in +2
+.nf
+example% \fBexpr index expurgatorious length\fR
+syntax error
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+generates the `\fBsyntax error\fR' message as shown instead of the value
+\fB1\fR as you might expect.

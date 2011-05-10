@@ -1,0 +1,992 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH printf 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+printf \- write formatted output
+.SH SYNOPSIS
+.SS "/usr/bin/printf"
+.LP
+.nf
+\fBprintf\fR \fIformat\fR [\fIargument\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBprintf\fR \fIformat\fR [\fIstring\fR...]
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/printf"
+.sp
+.LP
+The \fBprintf\fR utility writes each string operand to standard output using
+\fIformat\fR to control the output format.
+.SH OPERANDS
+.SS "/usr/bin/printf"
+.sp
+.LP
+The following operands are supported by \fB/usr/bin/printf\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIformat\fR\fR
+.ad
+.RS 12n
+.rt  
+A string describing the format to use to write the remaining operands. The
+\fIformat\fR operand is used as the \fIformat\fR string described on the
+\fBformats\fR(5) manual page, with the following exceptions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A \fBSPACE\fR character in the format string, in any context other than a flag
+of a conversion specification, is treated as an ordinary character that is
+copied to the output.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A character in the format string is treated as a character, not as a
+\fBSPACE\fR character.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In addition to the escape sequences described on the \fBformats\fR(5) manual
+page (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR,
+\fB\et\fR, \fB\ev\fR), \fB\e\fR\fIddd\fR, where \fIddd\fR is a one-, two- or
+three-digit octal number, is written as a byte with the numeric value specified
+by the octal number.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The program does not precede or follow output from the \fBd\fR or \fBu\fR
+conversion specifications with blank characters not specified by the
+\fIformat\fR operand.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The program does not precede output from the \fBo\fR conversion specification
+with zeros not specified by the \fIformat\fR operand.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An additional conversion character, \fBb\fR, is supported as follows. The
+argument is taken to be a string that can contain backslash-escape sequences.
+The following backslash-escape sequences are supported:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the escape sequences listed on the \fBformats\fR(5) manual page (\fB\e\e\fR,
+\fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR),
+which are converted to the characters they represent
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB\e0\fR\fIddd\fR, where \fIddd\fR is a zero-, one-, two- or three-digit octal
+number that is converted to a byte with the numeric value specified by the
+octal number
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB\ec\fR, which is written and causes \fBprintf\fR to ignore any remaining
+characters in the string operand containing it, any remaining string operands
+and any additional characters in the \fIformat\fR operand.
+.RE
+.RE
+The interpretation of a backslash followed by any other sequence of characters
+is unspecified.
+.sp
+Bytes from the converted string are written until the end of the string or the
+number of bytes indicated by the precision specification is reached. If the
+precision is omitted, it is taken to be infinite, so all bytes up to the end of
+the converted string are written. For each specification that consumes an
+argument, the next argument operand is evaluated and converted to the
+appropriate type for the conversion as specified below. The \fIformat\fR
+operand is reused as often as necessary to satisfy the argument operands. Any
+extra \fBc\fR or \fBs\fR conversion specifications are evaluated as if a null
+string argument were supplied; other extra conversion specifications are
+evaluated as if a zero argument were supplied. If the \fIformat\fR operand
+contains no conversion specifications and \fIargument\fR operands are present,
+the results are unspecified. If a character sequence in the \fIformat\fR
+operand begins with a \fB%\fR character, but does not form a valid conversion
+specification, the behavior is unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIargument\fR\fR
+.ad
+.RS 12n
+.rt  
+The strings to be written to standard output, under the control of
+\fBformat\fR. The \fIargument\fR operands are treated as strings if the
+corresponding conversion character is \fBb\fR, \fBc\fR or \fBs\fR. Otherwise,
+it is evaluated as a C constant, as described by the ISO C standard, with the
+following extensions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A leading plus or minus sign is allowed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the leading character is a single- or double-quote, the value is the numeric
+value in the underlying codeset of the character following the single- or
+double-quote.
+.RE
+If an argument operand cannot be completely converted into an internal value
+appropriate to the corresponding conversion specification, a diagnostic message
+is written to standard error and the utility does not exit with a zero exit
+status, but continues processing any remaining operands and writes the value
+accumulated at the time the error was detected to standard output.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The \fIformat\fR operands support the full range of ANSI C/C99/XPG6 formatting
+specifiers as well as additional specifiers:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%b\fR\fR
+.ad
+.RS 6n
+.rt  
+Each character in the string operand is processed specially, as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ea\fR\fR
+.ad
+.RS 8n
+.rt  
+Alert character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\eb\fR\fR
+.ad
+.RS 8n
+.rt  
+Backspace character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ec\fR\fR
+.ad
+.RS 8n
+.rt  
+Terminate output without appending NEWLINE. The remaining string operands are
+ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\eE\fR\fR
+.ad
+.RS 8n
+.rt  
+Escape character (\fBASCII\fR octal \fB033\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ef\fR\fR
+.ad
+.RS 8n
+.rt  
+FORM FEED character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\en\fR\fR
+.ad
+.RS 8n
+.rt  
+NEWLINE character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\et\fR\fR
+.ad
+.RS 8n
+.rt  
+TAB character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ev\fR\fR
+.ad
+.RS 8n
+.rt  
+Vertical tab character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e\e\fR\fR
+.ad
+.RS 8n
+.rt  
+Backslash character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e0\fR\fIx\fR\fR
+.ad
+.RS 8n
+.rt  
+The 8-bit character whose \fBASCII\fR code is the \fB1\fR-, \fB2\fR-, or
+\fB3\fR-digit octal number \fIx\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%B\fR\fR
+.ad
+.RS 6n
+.rt  
+Treat the argument as a variable name and output the value without converting
+it to a string. This is most useful for variables of type \fB-b\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%H\fR\fR
+.ad
+.RS 6n
+.rt  
+Output string with characters \fB<\fR, \fB&\fR, \fB>\fR, \fB"\fR, and
+non-printable characters, properly escaped for use in HTML and XML documents.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%P\fR\fR
+.ad
+.RS 6n
+.rt  
+Treat \fIstring\fR as an extended regular expression and convert it to a shell
+pattern.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%q\fR\fR
+.ad
+.RS 6n
+.rt  
+Output \fIstring\fR quoted in a manner that it can be read in by the shell to
+get back the same string. However, empty strings resulting from missing string
+operands are not quoted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%R\fR\fR
+.ad
+.RS 6n
+.rt  
+Treat \fIstring\fR as an shell pattern expression and convert it to an extended
+regular expression.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%T\fR\fR
+.ad
+.RS 6n
+.rt  
+Treat \fIstring\fR as a date/time string and format it. The \fBT\fR can be
+preceded by (\fIdformat\fR), where \fIdformat\fR is a date format as defined by
+the \fBdate\fR(1) command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Z\fR\fR
+.ad
+.RS 6n
+.rt  
+Output a byte whose value is \fB0\fR.
+.RE
+
+.sp
+.LP
+When performing conversions of \fIstring\fR to satisfy a numeric format
+specifier, if the first character of \fIstring\fR is \fB"or'\fR, the value is
+the numeric value in the underlying code set of the character following the
+\fB"or'\fR. Otherwise, \fIstring\fR is treated like a shell arithmetic
+expression and evaluated.
+.sp
+.LP
+If a \fIstring\fR operand cannot be completely converted into a value
+appropriate for that format specifier, an error occurs, but remaining
+\fIstring\fR operands continue to be processed.
+.sp
+.LP
+In addition to the format specifier extensions, the following extensions of
+ANSI C/C99/XPG6 are permitted in format specifiers:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The escape sequences \fB\eE\fR and \fB\ee\fR expand to the escape character
+which is octal 033 in ASCII.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The escape sequence \fB\ecx\fR expands to CTRL-x.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The escape sequence \fB\eC[.\fR\fIname\fR\fB\&.]\fR expands to the collating
+element \fIname\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The escape sequence \fB\ex{hex}\fRexpands to the character corresponding to the
+hexadecimal value \fBhex\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The format modifier flag = can be used to center a field to a specified width.
+When the output is a terminal, the character width is used rather than the
+number of bytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each of the integral format specifiers can have a third modifier after width
+and precision that specifies the base of the conversion from 2 to 64. In this
+case, the \fB#\fR modifier causes \fIbase\fR\fB#\fR to be prepended to the
+value.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fB#\fR modifier can be used with the \fBd\fR specifier when no base is
+specified to cause the output to be written in units of 1000 with a suffix of
+one of \fBk M G T P E\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fB#\fR modifier can be used with the \fBi\fR specifier to cause the output
+to be written in units of \fB1024\fR with a suffix of one of \fBKi Mi Gi Ti Pi
+Ei\fR.
+.RE
+.sp
+.LP
+If there are more \fIstring\fR operands than format specifiers, the format
+string is reprocessed from the beginning. If there are fewer \fIstring\fR
+operands than format specifiers, then \fIstring\fR specifiers are treated as if
+empty strings were supplied, numeric conversions are treated as if \fB0\fR was
+supplied, and time conversions are treated as if \fBnow\fR was supplied.
+.sp
+.LP
+\fB/usr/bin/printf\fR is equivalent to \fBksh93\fR's \fBprintf\fR built-in and
+\fBprint -f\fR, which allows additional options to be specified.
+.SH USAGE
+.SS "/usr/bin/printf"
+.sp
+.LP
+The \fBprintf\fR utility, like the \fBprintf\fR(3C) function on which it is
+based, makes no special provision for dealing with multi-byte characters when
+using the \fB%c\fR conversion specification. Applications should be extremely
+cautious using either of these features when there are multi-byte characters in
+the character set.
+.sp
+.LP
+Field widths and precisions cannot be specified as \fB*\fR.
+.sp
+.LP
+The \fB%b\fR conversion specification is not part of the ISO C standard; it has
+been added here as a portable way to process backslash escapes expanded in
+string operands as provided by the \fBecho\fR utility. See also the USAGE
+section of the \fBecho\fR(1) manual page for ways to use \fBprintf\fR as a
+replacement for all of the traditional versions of the \fBecho\fR utility.
+.sp
+.LP
+If an argument cannot be parsed correctly for the corresponding conversion
+specification, the \fBprintf\fR utility reports an error. Thus, overflow and
+extraneous characters at the end of an argument being used for a numeric
+conversion are to be reported as errors.
+.sp
+.LP
+It is not considered an error if an argument operand is not completely used for
+a \fBc\fR or \fBs\fR conversion or if a string operand's first or second
+character is used to get the numeric value of a character.
+.SH EXAMPLES
+.SS "/usr/bin/printf"
+.LP
+\fBExample 1 \fRPrinting a Series of Prompts
+.sp
+.LP
+The following example alerts the user, then prints and reads a series of
+prompts:
+
+.sp
+.in +2
+.nf
+example% \fBprintf "\eaPlease fill in the following: \enName: "
+read name
+printf "Phone number: "
+read phone\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRPrinting a Table of Calculations
+.sp
+.LP
+The following example prints a table of calculations. It reads out a list of
+right and wrong answers from a file, calculates the percentage correctly, and
+prints them out. The numbers are right-justified and separated by a single tab
+character. The percentage is written to one decimal place of accuracy:
+
+.sp
+.in +2
+.nf
+example% \fBwhile read right wrong ; do
+   percent=$(echo "scale=1;($right*100)/($right+$wrong)" | bc)
+   printf "%2d right\et%2d wrong\et(%s%%)\en" \e
+	   $right $wrong $percent
+done < database_file\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrinting number strings
+.sp
+.LP
+The command:
+
+.sp
+.in +2
+.nf
+example% \fBprintf "%5d%4d\en" 1 21 321 4321 54321\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+    1  21
+  3214321
+54321   0
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fIformat\fR operand is used three times to print all of the given strings
+and that a \fB0\fR was supplied by \fBprintf\fR to satisfy the last \fB%4d\fR
+conversion specification.
+
+.LP
+\fBExample 4 \fRTabulating Conversion Errors
+.sp
+.LP
+The following example tabulates conversion errors.
+
+.sp
+.LP
+The \fBprintf\fR utility tells the user when conversion errors are detected
+while producing numeric output. These results would be expected on an
+implementation with 32-bit twos-complement integers when \fB%d\fR is specified
+as the \fIformat\fR operand:
+
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.27i) cw(1.27i) cw(2.96i) 
+lw(1.27i) lw(1.27i) lw(2.96i) 
+.
+ArgumentsStandardDiagnostic
+5a5printf: 5a not completely converted
+99999999992147483647printf: 9999999999: Results too large 
+-9999999999-2147483648printf: -9999999999: Results too large 
+ABC0printf: ABC expected numeric value
+.TE
+
+.sp
+.LP
+The value shown on standard output is what would be expected as the return
+value from the function \fBstrtol\fR(3C). A similar correspondence exists
+between \fB%u\fR and \fBstrtoul\fR(3C), and \fB%e\fR, \fB%f\fR and \fB%g\fR and
+\fBstrtod\fR(3C).
+
+.LP
+\fBExample 5 \fRPrinting Output for a Specific Locale
+.sp
+.LP
+The following example prints output for a specific locale. In a locale using
+the ISO/IEC 646:1991 standard as the underlying codeset, the command:
+
+.sp
+.in +2
+.nf
+example% \fBprintf "%d\en" 3 +3 -3 \e'3 \e"+3 "'-3"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+
+.sp
+.TS
+tab() box;
+lw(.5i) lw(5i) 
+lw(.5i) lw(5i) 
+.
+\fB3\fRNumeric value of constant 3
+\fB3\fRNumeric value of constant 3
+\fB\(mi3\fRNumeric value of constant \(mi3
+\fB51\fRT{
+Numeric value of the character `3' in the ISO/IEC 646:1991 standard codeset
+T}
+\fB43\fRT{
+Numeric value of the character `+' in the ISO/IEC 646:1991 standard codeset
+T}
+\fB45\fRT{
+Numeric value of the character `\(mi' in the SO/IEC 646:1991 standard codeset
+T}
+.TE
+
+.sp
+.LP
+In a locale with multi-byte characters, the value of a character is intended to
+be the value of the equivalent of the \fBwchar_t\fR representation of the
+character.
+
+.sp
+.LP
+If an argument operand cannot be completely converted into an internal value
+appropriate to the corresponding conversion specification, a diagnostic message
+is written to standard error and the utility does exit with a zero exit status,
+but continues processing any remaining operands and writes the value
+accumulated at the time the error was detected to standard output.
+
+.LP
+\fBExample 6 \fRAlternative floating point representation 1
+.sp
+.LP
+The \fBprintf\fR utility supports an alternative floating point representation
+(see \fBprintf\fR(3C) entry for the "\fB%a\fR"/"\fB%A\fR"), which allows the
+output of floating-point values in a format that avoids the usual base16 to
+base10 rounding errors.
+
+.sp
+.in +2
+.nf
+example% printf "%a\n" 2 3.1 NaN
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+0x1.0000000000000000000000000000p+01
+0x1.8ccccccccccccccccccccccccccdp+01
+nan
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRAlternative floating point representation 2
+.sp
+.LP
+The following example shows two different representations of the same
+floating-point value.
+
+.sp
+.in +2
+.nf
+example% x=2 ; printf "%f == %a\n" x x
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+2.000000 == 0x1.0000000000000000000000000000p+01
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fROutput of unicode values
+.sp
+.LP
+The following command will print the EURO unicode symbol (code-point 0x20ac).
+
+.sp
+.in +2
+.nf
+example% LC_ALL=en_US.UTF-8 printf "\u[20ac]\n"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+<euro>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where "<euro>" represents the EURO currency symbol character.
+
+.LP
+\fBExample 9 \fRConvert unicode character to unicode code-point value
+.sp
+.LP
+The following command will print the hexadecimal value of a given character.
+
+.sp
+.in +2
+.nf
+example% export LC_ALL=en_US.UTF-8
+example% printf "%x\n" "'<euro>"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where "<euro>" represents the EURO currency symbol character (code-point
+0x20ac).
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+20ac
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRPrint the numeric value of an ASCII character
+.sp
+.in +2
+.nf
+example% printf "%d\n" "'A"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces:
+
+.sp
+.in +2
+.nf
+65
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 11 \fRPrint the language-independent date and time format
+.sp
+.LP
+To print the language-independent date and time format, the following statement
+could be used:
+
+.sp
+.in +2
+.nf
+example% printf "format" weekday month day hour min
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For example,
+
+.sp
+.in +2
+.nf
+$ printf format "Sunday" "July" 3 10 2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For American usage, format could be the string:
+
+.sp
+.in +2
+.nf
+"%s, %s %d, %d:%.2d\n"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+producing the message:
+
+.sp
+.in +2
+.nf
+Sunday, July 3, 10:02
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Whereas for EU usage, format could be the string:
+
+.sp
+.in +2
+.nf
+"%1$s, %3$d. %2$s, %4$d:%5$.2d\n"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Note that the '$' characters must be properly escaped, such as
+
+.sp
+.in +2
+.nf
+"%1\$s, %3\$d. %2\$s, %4\$d:%5\$.2d\n" in this case
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+producing the message:
+
+.sp
+.in +2
+.nf
+Sunday, 3. July, 10:02
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBprintf\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_NUMERIC\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/printf"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBawk\fR(1), \fBbc\fR(1), \fBdate\fR(1), \fBecho\fR(1), \fBksh93\fR(1),
+\fBprintf\fR(3C), \fBstrtod\fR(3C), \fBstrtol\fR(3C), \fBstrtoul\fR(3C),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBformats\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Using format specifiers (characters following '%') which are not listed in the
+\fBprintf\fR(3C) or this manual page will result in undefined behavior.
+.sp
+.LP
+Using escape sequences (the character following a backslash ('\')) which are
+not listed in the \fBprintf\fR(3C) or this manual page will result in undefined
+behavior.
+.sp
+.LP
+Floating-point values follow C99, XPG6 and IEEE 754 standard behavior and can
+handle values the same way as the platform's |\fBlong double\fR| datatype.
+.sp
+.LP
+Floating-point values handle the sign separately which allows signs for values
+like NaN (for example, -nan), Infinite (for example, -inf) and zero (for
+example, -0.0).

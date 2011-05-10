@@ -1,0 +1,84 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_get_size 9F "18 Mar 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_get_size \- Retrieve device size
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_get_size\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint64_t *\fR\fIsizep\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR \fR
+.ad
+.RS 10n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsizep\fR \fR
+.ad
+.RS 10n
+.rt  
+Pointer to the caller's unsigned 64-bit integer buffer.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_get_size()\fR function uses the layered driver handle to calculate
+and return a device's size. The device size is returned within the caller
+supplied buffer (*\fIsizep\fR). A valid layered driver handle must be obtained
+via the \fBldi_open_by_name\fR(9F) interface prior to calling
+\fBldi_get_size()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_get_size()\fR function returns the following values:
+.sp
+.ne 2
+.mk
+.na
+\fBDDI_SUCCESS\fR
+.ad
+.RS 15n
+.rt  
+The device size has been returned within the caller supplied buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDDI_FAILURE\fR
+.ad
+.RS 15n
+.rt  
+The device size could not be found or determined.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_open_by_name\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

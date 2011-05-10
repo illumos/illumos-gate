@@ -1,0 +1,168 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stmfCreateLu 3STMF "8 May 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.SH NAME
+stmfCreateLu \- create a logical unit
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
+#include <libstmf.h>
+
+\fBint\fR \fBstmfCreateLu\fR(\fBluResource\fR \fIhdl\fR, \fBstmfGuid *\fR\fIluGuid\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhdl\fR\fR
+.ad
+.RS 10n
+.rt  
+The logical unit resource returned from a previous call to
+\fBstmfCreateLuResource\fR(3STMF).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIluGuid\fR\fR
+.ad
+.RS 10n
+.rt  
+If non-null, it must contain a pointer to an \fBstmfGuid\fR structure allocated
+by the caller. On successful return from this API, it will contain the guid of
+the newly created logical unit. If \fIluGuid\fR is \fINULL\fR, this argument is
+ignored.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The stmfCreateLu function creates a logical unit in stmf using the properties
+of \fIhdl\fR. See \fBstmfSetLuProp\fR(3STMF) for a complete description of
+properties and their possible values.
+.SH RETURN VALUES
+.sp
+.LP
+The following values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_STATUS_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The API call was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_FILE_IN_USE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The filename specified by the \fBSTMF_LU_PROP_DATA_FILENAME\fR or
+\fBSTMF_LU_PROP_META_FILENAME\fR was in use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_GUID_IN_USE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The guid specified by the \fBSTMF_LU_PROP_GUID\fR property is already being
+used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_INVALID_BLKSIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The blocksize specified by \fBSTMF_LU_PROP_BLOCK_SIZE\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_WRITE_CACHE_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+The requested write cache setting could not be provided.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_SIZE_OUT_OF_RANGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified logical unit size is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_META_FILE_NAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified meta file could not be accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_DATA_FILE_NAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified data file could not be accessed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibstmf\fR(3LIB), \fBstmfCreateLuResource\fR(3STMF),
+\fBstmfSetLuProp\fR(3STMF), \fBattributes\fR(5)

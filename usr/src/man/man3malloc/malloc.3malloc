@@ -1,0 +1,279 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH malloc 3MALLOC "11 May 2005" "SunOS 5.11" "Memory Allocation Library Functions"
+.SH NAME
+malloc, free, memalign, realloc, valloc, calloc, mallopt, mallinfo \- memory
+allocator
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lmalloc\fR [ \fIlibrary\fR ... ]
+#include <stdlib.h>
+
+\fBvoid *\fR\fBmalloc\fR(\fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfree\fR(\fBvoid *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemalign\fR(\fBsize_t\fR \fIalignment\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBrealloc\fR(\fBvoid *\fR\fIptr\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBvalloc\fR(\fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBcalloc\fR(\fBsize_t\fR \fInelem\fR, \fBsize_t\fR \fIelsize\fR);
+.fi
+
+.LP
+.nf
+#include <malloc.h>
+
+\fBint\fR \fBmallopt\fR(\fBint\fR \fIcmd\fR, \fBint\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBstruct mallinfo\fR \fBmallinfo\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmalloc()\fR and \fBfree()\fR functions provide a simple general-purpose
+memory allocation package.
+.sp
+.LP
+The \fBmalloc()\fR function returns a pointer to a block of at least \fIsize\fR
+bytes suitably aligned for any use.
+.sp
+.LP
+The argument to \fBfree()\fR is a pointer to a block previously allocated by
+\fBmalloc()\fR. After \fBfree()\fR is performed, this space is made available
+for further allocation, and its contents have been destroyed. See
+\fBmallopt()\fR below for a way to change this behavior. If \fIptr\fR is a null
+pointer, no action occurs.
+.sp
+.LP
+Undefined results occur if the space assigned by \fBmalloc()\fR is overrun or
+if some random number is handed to \fBfree()\fR.
+.sp
+.LP
+The \fBfree()\fR function does not set \fBerrno\fR.
+.sp
+.LP
+The \fBmemalign()\fR function allocates \fIsize\fR bytes on a specified
+alignment boundary and returns a pointer to the allocated block. The value of
+the returned address is guaranteed to be an even multiple of \fIalignment\fR.
+The value of \fIalignment\fR must be a power of two and must be greater than or
+equal to the size of a word.
+.sp
+.LP
+The \fBrealloc()\fR function changes the size of the block pointed to by
+\fIptr\fR to \fIsize\fR bytes and returns a pointer to the (possibly moved)
+block. The contents will be unchanged up to the lesser of the new and old
+sizes. If the new size of the block requires movement of the block, the space
+for the previous instantiation of the block is freed. If the new size is
+larger, the contents of the newly allocated portion of the block are
+unspecified. If \fIptr\fR is \fINULL\fR, \fBrealloc()\fR behaves like
+\fBmalloc()\fR for the specified size. If \fIsize\fR is 0 and \fIptr\fR is not
+a null pointer, the space pointed to is freed.
+.sp
+.LP
+The \fBvalloc()\fR function has the same effect as \fBmalloc()\fR, except that
+the allocated memory will be aligned to a multiple of the value returned by
+\fBsysconf\fR(\fB_SC_PAGESIZE\fR).
+.sp
+.LP
+The \fBcalloc()\fR function allocates space for an array of \fInelem\fR
+elements of size \fIelsize\fR. The space is initialized to zeros.
+.sp
+.LP
+The \fBmallopt()\fR function provides for control over the allocation
+algorithm. The available values for \fIcmd\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_MXFAST\fR\fR
+.ad
+.RS 12n
+.rt  
+Set \fImaxfast\fR to  \fIvalue\fR. The algorithm allocates all blocks below the
+size of \fImaxfast\fR in large groups and then doles them out very quickly. The
+default value for \fImaxfast\fR is 24.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_NLBLKS\fR\fR
+.ad
+.RS 12n
+.rt  
+Set \fInumlblks\fR to \fIvalue\fR. The above mentioned ``large groups'' each
+contain \fInumlblks\fR blocks.   \fInumlblks\fR must be greater than 0. The
+default value for \fInumlblks\fR is 100.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_GRAIN\fR\fR
+.ad
+.RS 12n
+.rt  
+Set \fIgrain\fR to  \fIvalue\fR. The sizes of all blocks smaller than
+\fImaxfast\fR are considered to be rounded up to the nearest multiple of
+\fIgrain\fR. \fIgrain\fR must be greater than 0. The default value of
+\fIgrain\fR is the smallest number of bytes that will allow alignment of any
+data type. Value will be rounded up to a multiple of the default when
+\fIgrain\fR is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_KEEP\fR\fR
+.ad
+.RS 12n
+.rt  
+Preserve data in a freed block until the next \fBmalloc()\fR, \fBrealloc()\fR,
+or \fBcalloc()\fR. This option is provided only for compatibility with the old
+version of \fBmalloc()\fR, and it is not recommended.
+.RE
+
+.sp
+.LP
+These values are defined in the \fB<malloc.h>\fR header.
+.sp
+.LP
+The \fBmallopt()\fR function can be called repeatedly, but cannot be called
+after the first small block is allocated.
+.sp
+.LP
+The \fBmallinfo()\fR function provides instrumentation describing space usage.
+It returns the \fBmallinfo\fR structure with the following members:
+.sp
+.in +2
+.nf
+unsigned long arena;      /* total space in arena */
+unsigned long ordblks;    /* number of ordinary blocks */
+unsigned long smblks;     /* number of small blocks */
+unsigned long hblkhd;     /* space in holding block headers */
+unsigned long hblks;      /* number of holding blocks */
+unsigned long usmblks;    /* space in small blocks in use */
+unsigned long fsmblks;    /* space in free small blocks */
+unsigned long uordblks;   /* space in ordinary blocks in use */
+unsigned long fordblks;   /* space in free ordinary blocks */
+unsigned long keepcost;   /* space penalty if keep option */
+                          /* is used */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBmallinfo\fR structure is defined in the <\fBmalloc.h\fR> header.
+.sp
+.LP
+Each of the allocation routines returns a pointer to space suitably aligned
+(after possible pointer coercion) for storage of any type of object.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBmalloc()\fR, \fBmemalign()\fR, \fBrealloc()\fR, \fBvalloc()\fR, and
+\fBcalloc()\fR functions return a null pointer if there is not enough available
+memory. When \fBrealloc()\fR returns \fINULL\fR, the block pointed to by
+\fIptr\fR is left intact. If \fIsize\fR, \fInelem\fR, or \fIelsize\fR is 0,
+either a null pointer or a unique pointer that can be passed to \fBfree()\fR is
+returned. If \fBmallopt()\fR is called after any allocation or if \fIcmd\fR or
+\fIvalue\fR are invalid, a non-zero value is returned. Otherwise, it returns 0.
+.SH ERRORS
+.sp
+.LP
+If \fBmalloc()\fR, \fBcalloc()\fR, or \fBrealloc()\fR returns  unsuccessfully,
+\fBerrno\fR is set to indicate the error:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+\fIsize\fR bytes of memory exceeds the physical limits of your system, and
+cannot be allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+There is not enough memory available at this point in time to allocate
+\fIsize\fR bytes of memory; but the application could try again later.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Unlike \fBmalloc\fR(3C), this package does not preserve the contents of a block
+when it is freed, unless  the \fBM_KEEP\fR option of \fBmallopt()\fR is used.
+.sp
+.LP
+Undocumented features of  \fBmalloc\fR(3C) have not been duplicated.
+.sp
+.LP
+Function prototypes for \fBmalloc()\fR, \fBrealloc()\fR, \fBcalloc()\fR, and
+\fBfree()\fR are also defined in the <\fBmalloc.h\fR> header for compatibility
+with old applications. New applications  should include <\fBstdlib.h\fR> to
+access the prototypes for these functions.
+.sp
+.LP
+Comparative features of the various allocation libraries can be found in the
+\fBumem_alloc\fR(3MALLOC) manual page.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbrk\fR(2), \fBbsdmalloc\fR(3MALLOC), \fBlibmtmalloc\fR(3LIB),
+\fBmalloc\fR(3C), \fBmapmalloc\fR(3MALLOC), \fBmtmalloc\fR(3MALLOC),
+\fBumem_alloc\fR(3MALLOC), \fBwatchmalloc\fR(3MALLOC), \fBattributes\fR(5)

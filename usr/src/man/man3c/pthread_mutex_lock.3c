@@ -1,0 +1,304 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_mutex_lock 3C "11 Nov 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_mutex_lock, pthread_mutex_trylock, pthread_mutex_unlock \- lock or
+unlock a mutex
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_mutex_lock\fR(\fBpthread_mutex_t *\fR\fImutex\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutex_trylock\fR(\fBpthread_mutex_t *\fR\fImutex\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutex_unlock\fR(\fBpthread_mutex_t *\fR\fImutex\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The mutex object referenced by mutex is locked by calling
+\fBpthread_mutex_lock()\fR. If the mutex is already locked, the calling thread
+blocks until the mutex becomes available. This operation returns with the mutex
+object referenced by mutex in the locked state with the calling thread as its
+owner.
+.sp
+.LP
+If the mutex type is  \fBPTHREAD_MUTEX_NORMAL\fR, deadlock detection is not
+provided. Attempting to relock the mutex causes deadlock. If a thread attempts
+to unlock a mutex that it has not locked or a mutex that is unlocked, undefined
+behavior results.
+.sp
+.LP
+If the mutex type is  \fBPTHREAD_MUTEX_ERRORCHECK\fR, then error checking is
+provided. If a thread attempts to relock a mutex that it has already locked, an
+error will be returned. If a thread attempts to unlock a mutex that it has not
+locked or a mutex which is unlocked, an error will be returned.
+.sp
+.LP
+If the mutex type is  \fBPTHREAD_MUTEX_RECURSIVE\fR, then the mutex  maintains
+the concept of a lock count. When a thread successfully acquires a mutex for
+the first time, the lock count is set to 1. Every time a thread relocks this
+mutex, the lock count is  incremented by one. Each time the thread unlocks the
+mutex, the lock count is decremented by one. When the lock count reaches
+\fB0\fR, the mutex becomes available for other threads to acquire. If a thread
+attempts to unlock a mutex that it has not locked or a mutex that is unlocked,
+an error will be returned.
+.sp
+.LP
+If the mutex type is  \fBPTHREAD_MUTEX_DEFAULT\fR, attempting to recursively
+lock the mutex results in undefined behavior. Attempting to  unlock the mutex
+if it was not locked by the calling thread results in undefined behavior.
+Attempting to unlock the mutex if it is not locked results in undefined
+behavior.
+.sp
+.LP
+The \fBpthread_mutex_trylock()\fR function is identical to
+\fBpthread_mutex_lock()\fR except that if the mutex object referenced by
+\fImutex\fR is currently locked (by any thread, including the current thread),
+the call fails immediately with \fBEBUSY\fR.
+.sp
+.LP
+The \fBpthread_mutex_unlock()\fR function releases the mutex object referenced
+by \fImutex\fR. The manner in which a mutex is released is dependent upon the
+mutex's type attribute. If there are threads blocked on the mutex object
+referenced by \fImutex\fR when \fBpthread_mutex_unlock()\fR is called,
+resulting in the mutex  becoming available, the scheduling policy is used to
+determine  which thread will acquire the mutex. (In the case of
+\fBPTHREAD_MUTEX_RECURSIVE\fR mutexes, the mutex becomes available when the
+count reaches  \fB0\fR and the calling thread no longer has any locks on this
+mutex.)
+.sp
+.LP
+If a signal is delivered to a thread waiting for a mutex, upon return from the
+signal handler the thread resumes waiting for the mutex as if it was not
+interrupted.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the  \fBpthread_mutex_lock()\fR and
+\fBpthread_mutex_unlock()\fR functions return  \fB0\fR. Otherwise, an error
+number is returned to indicate the error.
+.sp
+.LP
+The  \fBpthread_mutex_trylock()\fR function returns  \fB0\fR if a lock on the
+mutex object referenced by \fImutex\fR is acquired. Otherwise, an error number
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_mutex_lock()\fR and \fBpthread_mutex_trylock()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex could not be acquired because the maximum number of recursive locks
+for mutex has been exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImutex\fR was created with the protocol attribute having the value
+\fBPTHREAD_PRIO_PROTECT\fR and the calling thread's priority is higher than the
+mutex's current priority ceiling.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The mutex was created with the protocol attribute having the value
+\fBPTHREAD_PRIO_PROTECT\fR and the calling thread is not in the real-time class
+(\fBSCHED_RR\fR or \fBSCHED_FIFO\fR scheduling class).
+.RE
+
+.sp
+.LP
+The  \fBpthread_mutex_trylock()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fImutex\fR could not be acquired because it was already locked.
+.RE
+
+.sp
+.LP
+The  \fBpthread_mutex_lock()\fR, \fBpthread_mutex_trylock()\fR and
+\fBpthread_mutex_unlock()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fImutex\fR does not refer to an initialized mutex
+object.
+.RE
+
+.sp
+.LP
+The  \fBpthread_mutex_lock()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The current thread already owns the mutex.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+The limit on the number of simultaneously held mutexes has been exceeded.
+.RE
+
+.sp
+.LP
+The  \fBpthread_mutex_unlock()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+.rt  
+The mutex type is PTHREAD_MUTEX_ERRORCHECK or the mutex is a robust mutex, and
+the current thread does not own the mutex.
+.RE
+
+.sp
+.LP
+When a thread makes a call to \fBpthread_mutex_lock()\fR or
+\fBpthread_mutex_trylock()\fR, if the mutex is initialized with the robustness
+attribute having the value \fBPTHREAD_MUTEX_ROBUST\fR (see
+\fBpthread_mutexattr_getrobust\fR(3C)), the call will return these error values
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOWNERDEAD\fR\fR
+.ad
+.RS 19n
+.rt  
+The last owner of this mutex died while holding the mutex, or the process
+containing the owner of the mutex unmapped the memory containing the mutex or
+performed one of the \fBexec\fR(2) functions. This mutex is now owned by the
+caller. The caller must now attempt to make the state protected by the mutex
+consistent. If it is able to clean up the state, then it should call
+\fBpthread_mutex_consistent()\fR for the mutex and unlock the mutex. Subsequent
+calls to \fBpthread_mutex_lock()\fR and \fBpthread_mutex_trylock()\fR will
+behave normally, as before. If the caller is not able to clean up the state,
+\fBpthread_mutex_consistent()\fR should not be called for the mutex, but the
+mutex should be unlocked. Subsequent calls to \fBpthread_mutex_lock()\fR and
+\fBpthread_mutex_trylock()\fR will fail to acquire the mutex with the error
+value \fBENOTRECOVERABLE\fR. If the owner who acquired the lock with
+\fBEOWNERDEAD\fR dies, the next owner will acquire the lock with
+\fBEOWNERDEAD\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTRECOVERABLE\fR\fR
+.ad
+.RS 19n
+.rt  
+The mutex trying to be acquired was protecting the state that has been left
+irrecoverable by the mutex's last owner. The mutex has not been acquired. This
+condition can occur when the lock was previously acquired with
+\fBEOWNERDEAD\fR, and the owner was not able to clean up the state and unlocked
+the mutex without calling \fBpthread_mutex_consistent()\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_mutex_consistent\fR(3C), \fBpthread_mutex_init\fR(3C),
+\fBpthread_mutexattr_setprotocol\fR(3C), \fBpthread_mutexattr_setrobust\fR(3C),
+\fBpthread_mutexattr_settype\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+In the current implementation of threads, \fBpthread_mutex_lock()\fR,
+\fBpthread_mutex_unlock()\fR, \fBmutex_lock()\fR, \fBmutex_unlock()\fR,
+\fBpthread_mutex_trylock()\fR, and \fBmutex_trylock()\fR do not validate the
+mutex type.  Therefore, an uninitialized mutex or a mutex with an invalid type
+does not return  \fBEINVAL\fR. Interfaces for mutexes with an invalid type have
+unspecified behavior.
+.sp
+.LP
+Uninitialized mutexes that are allocated locally may contain junk data. Such
+mutexes need to be initialized using  \fBpthread_mutex_init()\fR or
+\fBmutex_init()\fR.

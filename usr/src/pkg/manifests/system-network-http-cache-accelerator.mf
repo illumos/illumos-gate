@@ -53,6 +53,10 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 driver name=nca
 file path=etc/init.d/ncakmod group=sys mode=0744 \
     original_name=SUNWnca:etc/init.d/ncakmod preserve=true
@@ -75,6 +79,16 @@ file path=usr/bin/ncab2clf mode=0555
 file path=usr/lib/$(ARCH64)/ncad_addr.so.1
 file path=usr/lib/inet/ncaconfd mode=0555
 file path=usr/lib/ncad_addr.so.1
+file path=usr/share/man/man1/nca.1
+file path=usr/share/man/man1/ncab2clf.1
+file path=usr/share/man/man1/ncakmod.1
+file path=usr/share/man/man1/snca.1
+file path=usr/share/man/man1m/ncaconfd.1m
+file path=usr/share/man/man4/nca.if.4
+file path=usr/share/man/man4/ncad_addr.4
+file path=usr/share/man/man4/ncakmod.conf.4
+file path=usr/share/man/man4/ncalogd.conf.4
+file path=usr/share/man/man4/ncaport.conf.4
 hardlink path=etc/rc0.d/K34ncalogd target=../../etc/init.d/ncalogd
 hardlink path=etc/rc1.d/K34ncalogd target=../../etc/init.d/ncalogd
 hardlink path=etc/rc2.d/S42ncakmod target=../../etc/init.d/ncakmod

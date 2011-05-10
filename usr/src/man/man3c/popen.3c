@@ -1,0 +1,215 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.   All Rights Reserved.
+.\" Copyright 1989 AT&T.
+.\" Portions Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH popen 3C "14 Dec 2006" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+popen, pclose \- initiate a pipe to or from a process
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBFILE *\fR\fBpopen\fR(\fBconst char *\fR\fIcommand\fR, \fBconst char *\fR\fImode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpclose\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpopen()\fR function creates a pipe between the calling program and the
+command to be executed.  The arguments to \fBpopen()\fR are pointers to
+null-terminated strings.  The \fIcommand\fR argument consists of a shell
+command line.  The \fImode\fR argument is an I/O mode, either \fBr\fR for
+reading or \fIw\fR for writing. The value returned is a stream pointer such
+that one can write to the standard input of the command, if the I/O mode is
+\fIw\fR, by writing to the file \fIstream\fR (see \fBIntro\fR(3)); and one can
+read from the standard output of the command, if the I/O mode is \fBr\fR, by
+reading from the file \fIstream\fR. Because open files are shared, a type
+\fBr\fR command may be used as an input filter and a type \fIw\fR as an output
+filter. A trailing \fBF\fR character can also be included in the \fImode\fR
+argument as described in \fBfopen\fR(3C) to enable extended FILE facility.
+.sp
+.LP
+The environment of the executed command will be as if a child process were
+created within the \fBpopen()\fR call using \fBfork\fR(2).  The child is
+created as if invoked with the call:
+.sp
+.LP
+\fBexecl("/usr/bin/sh", "sh", "\fR\fB-c\fR\fB", \fR\fIcommand\fR, \fB(char
+*)0);\fR
+.sp
+.LP
+The \fBpclose()\fR function closes a stream opened by \fBpopen()\fR by closing
+the pipe. It waits for the associated process to terminate and returns the
+termination status of the process running the command language interpreter.
+This is the value returned by \fBwaitpid\fR(3C). See \fBwait.h\fR(3HEAD) for
+more information on termination status. If, however, a call to \fBwaitpid()\fR
+with a \fIpid\fR argument equal to the process ID of the command line
+interpreter causes the termination status to be unavailable to \fBpclose()\fR,
+then \fBpclose()\fR returns \(mi1 with \fBerrno\fR set to \fBECHILD\fR to
+report this condition.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBpopen()\fR returns a pointer to an open stream
+that can be used to read or write to the pipe. Otherwise, it returns a null
+pointer and may set \fBerrno\fR to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBpclose()\fR returns the termination status of
+the command language interpreter as returned by \fBwaitpid()\fR.  Otherwise, it
+returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpclose()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECHILD\fR\fR
+.ad
+.RS 10n
+.rt  
+The status of the child process could not be obtained, as described in the
+DESCRIPTION.
+.RE
+
+.sp
+.LP
+The \fBpopen()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+There are currently \fBFOPEN_MAX\fR or \fBSTREAM_MAX\fR streams open in the
+calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImode\fR argument is invalid.
+.RE
+
+.sp
+.LP
+The \fBpopen()\fR function may also set \fBerrno\fR values as described by
+\fBfork\fR(2) or \fBpipe\fR(2).
+.SH USAGE
+.sp
+.LP
+If the original and \fBpopen()\fR processes concurrently read or write a common
+file, neither should use buffered I/O. Problems with an output filter may be
+forestalled by careful buffer flushing, for example, with \fBfflush()\fR (see
+\fBfclose\fR(3C)). A security hole exists through the \fBIFS\fR and \fBPATH\fR
+environment variables.  Full pathnames should be used (or \fBPATH\fR reset) and
+\fBIFS\fR should be set to space and tab (\fB" \et"\fR).
+.sp
+.LP
+Even if the process has established a signal handler for \fBSIGCHLD\fR, it will
+be called when the command terminates.  Even if another thread in the same
+process issues a \fBwait\fR(3C) call, it will interfere with the return value
+of \fBpclose()\fR. Even if the process's signal handler for \fBSIGCHLD\fR has
+been set to ignore the signal, there will be no effect on \fBpclose()\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBpopen()\fR example
+.sp
+.LP
+The following program will print on the standard output (see \fBstdio\fR(3C))
+the names of files in the current directory with a \fB\&.c\fR suffix.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+main(\|)
+{
+        char *cmd = "/usr/bin/ls *.c";
+        char buf[BUFSIZ];
+        FILE *ptr;
+
+        if ((ptr = popen(cmd, "r")) != NULL) {
+                while (fgets(buf, BUFSIZ, ptr) != NULL)
+                        (void) printf("%s", buf);
+                (void) pclose(ptr);
+        }
+        return 0;
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fR\fBsystem()\fR replacement
+.sp
+.LP
+The following function can be used in a multithreaded process in place of the
+most common usage of the Unsafe \fBsystem\fR(3C) function:
+
+.sp
+.in +2
+.nf
+int my_system(const char *cmd) 
+{
+        FILE *p;
+  
+        if ((p = popen(cmd, "w")) == NULL) 
+                return (-1); 
+        return (pclose(p)); 
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelSafe
+.TE
+
+.sp
+.LP
+The \fBF\fR character in the \fImode\fR argument of \fBpopen()\fR is Evolving.
+In all other respects this function is Standard. The \fBpclose()\fR function is
+Standard.
+.SH SEE ALSO
+.sp
+.LP
+\fBksh\fR(1), \fBpipe\fR(2), \fBfclose\fR(3C), \fBfopen\fR(3C),
+\fBposix_spawn\fR(3C), \fBstdio\fR(3C), \fBsystem\fR(3C), \fBwait\fR(3C),
+\fBwaitpid\fR(3C), \fBwait.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

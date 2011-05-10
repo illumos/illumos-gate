@@ -1,0 +1,78 @@
+'\" te
+.\" Copyright 1989 AT&T  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ungetc 3C "10 Sep 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ungetc \- push byte back into input stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBint\fR \fBungetc\fR(\fBint\fR \fIc\fR, \fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBungetc()\fR function pushes the byte specified by \fIc\fR (converted to
+an \fBunsigned char\fR) back onto the input stream pointed to by \fIstream\fR.
+The pushed-back bytes will be returned by subsequent reads on that stream in
+the reverse order of their pushing. A successful intervening call (with the
+stream pointed to by \fIstream\fR) to a file-positioning function (
+\fBfseek\fR(3C), \fBfsetpos\fR(3C) or \fBrewind\fR(3C)) discards any
+pushed-back bytes for the stream. The external storage corresponding to the
+stream is unchanged.
+.sp
+.LP
+Four bytes of push-back are guaranteed.  If \fBungetc()\fR is called too many
+times on the same stream without an intervening read or file-positioning
+operation on that stream, the operation may fail.
+.sp
+.LP
+If the value of \fIc\fR equals that of the macro \fBEOF\fR, the operation fails
+and the input stream is unchanged.
+.sp
+.LP
+A successful call to \fBungetc()\fR clears the end-of-file indicator for the
+stream. The value of the file-position indicator for the stream after reading
+or discarding all pushed-back bytes will be the same as it was before the bytes
+were pushed back. The file-position indicator is decremented by each successful
+call to \fBungetc()\fR; if its value was 0 before a call, its value is
+indeterminate after the call.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBungetc()\fR returns the byte pushed back after
+conversion.  Otherwise it returns \fBEOF.\fR
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBIntro\fR(3), \fB__fsetlocking\fR(3C), \fBfseek\fR(3C),
+\fBfsetpos\fR(3C), \fBgetc\fR(3C), \fBsetbuf\fR(3C), \fBstdio\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

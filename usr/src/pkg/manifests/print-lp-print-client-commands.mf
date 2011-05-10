@@ -40,6 +40,8 @@ dir path=usr/share group=sys
 dir path=usr/share/applications group=other
 dir path=usr/share/gnome group=other
 dir path=usr/share/gnome/autostart
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
 file path=usr/bin/desktop-print-management-applet mode=0555
 file path=usr/lib/lp/bin/desktop-print-management mode=0555
 file path=usr/lib/lp/bin/desktop-print-management-applet mode=0555
@@ -48,6 +50,16 @@ file path=usr/sbin/print-service mode=0555
 file path=usr/share/applications/desktop-print-management-prefs.desktop
 file path=usr/share/applications/desktop-print-management.desktop
 file path=usr/share/gnome/autostart/desktop-print-management-applet.desktop
+file path=usr/share/man/man1/cancel.1
+file path=usr/share/man/man1/disable.1
+file path=usr/share/man/man1/enable.1
+file path=usr/share/man/man1/lp.1
+file path=usr/share/man/man1/lpstat.1
+file path=usr/share/man/man1m/accept.1m
+file path=usr/share/man/man1m/lpadmin.1m
+file path=usr/share/man/man1m/lpmove.1m
+file path=usr/share/man/man1m/print-service.1m
+file path=usr/share/man/man1m/reject.1m
 legacy pkg=SUNWpcu \
     desc="client configuration files and utilities for the print service" \
     name="Solaris Print - Client, (usr)" version=13.1,REV=2009.11.11

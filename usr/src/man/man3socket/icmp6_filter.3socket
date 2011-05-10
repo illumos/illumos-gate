@@ -1,0 +1,98 @@
+'\" te
+.\"  Copyright 2003 AT&T 
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH icmp6_filter 3SOCKET "13 Dec 2003" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+icmp6_filter \- Variable allocation datatype
+.SH SYNOPSIS
+.LP
+.nf
+\fBvoid\fR \fBICMP6_FILTER_SETPASSALL\fR (\fBstruct icmp6_filter *\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBICMP6_FILTER_SETBLOCKALL\fR (\fBstruct icmp6_filter *\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBICMP6_FILTER_SETPASS\fR (\fBint,\fR \fIstruct icmp6_filter *\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBICMP6_FILTER_SETBLOCK\fR (\fBint,\fR \fIstruct icmp6_filter *\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBICMP6_FILTER_WILLPASS\fR (\fBint,\fR \fIconst struct icmp6_filter *\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBICMP6_FILTER_WILLBLOCK\fR (\fBint,\fR \fIconst struct icmp6_filter *\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBicmp6_filter\fR structure is similar to the \fBfd_set\fR datatype used
+with the \fBselect()\fR function in the sockets API. The \fBicmp6_filter\fR
+structure is an opaque datatype and the application should not care how it is
+implemented. The application allocates a variable of this type, then passes a
+pointer to it. Next it passes a pointer to a variable of this type to
+\fBgetsockopt()\fR and \fBsetsockopt()\fR and operates on a variable of this
+type using the six macros defined below.
+.sp
+.LP
+The \fBSETPASSALL\fR and \fBSETBLOCKALL\fR functions enable you to specify that
+all ICMPv6 messages are passed to the application or that all ICMPv6 messages
+are blocked from being passed.
+.sp
+.LP
+The \fBSETPASS\fR and \fBSETBLOCKALL\fR functions enable you to specify that
+messages of a given ICMPv6 type should be passed to the application or not
+passed to the application (blocked).
+.sp
+.LP
+The \fBWILLPASS\fR and \fBWILLBLOCK\fR return true or false depending whether
+the specified message type is passed to the application or blocked from being
+passed to the application by the filter pointed to by the second argument.
+.sp
+.LP
+The pointer argument to all six \fBicmp6_filter\fR macros is a pointer to a
+filter that is modified by the first four macros and is examined by
+\fBICMP6_FILTER_SETBLOCK\fR and \fBICMP6_FILTER_WILLBLOCK\fR. The first
+argument, (an integer), to the \fBICMP6_FILTER_BLOCKALL\fR,
+\fBICMP6_FILTER_SETPASS\fR, \fBICMP6_FILTER_SETBLOCK\fR, and
+\fBICMP6_FILTER_WILLBLOCK\fR macros is an ICMPv6 message type, between 0 and
+255.
+.sp
+.LP
+The current filter is fetched and stored using \fBgetsockopt()\fR and
+\fBsetsockopt()\fR with a level of IPPROTO_ICMPV6 and an option name of
+ICMP6_FILTER.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+_
+Interface StabilityStandard
+.TE
+

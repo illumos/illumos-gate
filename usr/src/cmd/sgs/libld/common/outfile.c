@@ -24,6 +24,8 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011, Richard Lowe.
  */
 
 /*
@@ -428,6 +430,7 @@ ld_create_outfile(Ofl_desc *ofl)
 		Phdr	*phdr = &(sgp->sg_phdr);
 		Word	ptype = phdr->p_type;
 		Aliste	idx2;
+		Os_desc *nonempty = NULL; /* First non-empty section */
 
 		/*
 		 * Count the number of segments that will go in the program
@@ -670,6 +673,10 @@ ld_create_outfile(Ofl_desc *ofl)
 
 					data->d_align = (size_t)align;
 				}
+
+				if ((data->d_size != 0) && (nonempty == NULL)) {
+					nonempty = osp;
+				}
 			}
 
 			/*
@@ -677,6 +684,38 @@ ld_create_outfile(Ofl_desc *ofl)
 			 * again in the building of relocs.  See machrel.c.
 			 */
 			osp->os_szoutrels = 0;
+		}
+
+		/*
+		 * We need to raise the alignment of any empty sections at the
+		 * start of a segment to be at least as aligned as the first
+		 * non-empty section, such that the empty and first non-empty
+		 * sections are placed at the same offset.
+		 */
+		if (nonempty != NULL) {
+			Elf_Data	*ne = NULL;
+			Xword		pad_align = 1;
+
+			ne = elf_getdata(nonempty->os_scn, NULL);
+			assert(ne != NULL);
+
+			do {
+				pad_align = ld_lcm(pad_align, ne->d_align);
+				ne = elf_getdata(nonempty->os_scn, ne);
+			} while (ne != NULL);
+
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+				Elf_Data	*d = NULL;
+
+				/* Stop at the first non-empty section */
+				if (osp == nonempty)
+					break;
+
+				d = elf_getdata(osp->os_scn, NULL);
+				assert(d != NULL);
+
+				d->d_align = pad_align;
+			}
 		}
 	}
 

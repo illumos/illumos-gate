@@ -1,0 +1,234 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fenv.h 3HEAD "15 Dec 2003" "SunOS 5.11" "Headers"
+.SH NAME
+fenv.h, fenv \- floating-point environment
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBfenv.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBfenv.h\fR> header defines the following data types through
+\fBtypedef\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfenv_t\fR\fR
+.ad
+.RS 13n
+.rt  
+Represents the entire floating-point environment. The floating-point
+environment refers collectively to any floating-point status flags and control
+modes supported by the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfexcept_t\fR\fR
+.ad
+.RS 13n
+.rt  
+Represents the floating-point status flags collectively, including any status
+the implementation associates with the flags. A floating-point status flag is a
+system variable whose value is set (but never cleared) when a floating-point
+exception is raised, which occurs as a side effect of exceptional
+floating-point arithmetic to provide auxiliary information. A floating-point
+control mode is a system variable whose value can be set by the user to affect
+the subsequent behavior of floating-point arithmetic.
+.RE
+
+.sp
+.LP
+The <\fBfenv.h\fR> header defines the following constants if and only if the
+implementation supports the floating-point exception by means of the
+floating-point functions \fBfeclearexcept()\fR, \fBfegetexceptflag()\fR,
+\fBferaiseexcept()\fR, \fBfesetexceptflag()\fR,  and \fBfetestexcept()\fR. Each
+expands to an integer constant expression with values such that
+bitwise-inclusive ORs of all combinations of the constants result in distinct
+values.
+.sp
+.in +2
+.nf
+FE_DIVBYZERO
+FE_INEXACT
+FE_INVALID
+FE_OVERFLOW
+FE_UNDERFLOW
+.fi
+.in -2
+
+.sp
+.LP
+The <\fBfenv.h\fR> header defines the following constant, which is simply the
+bitwise-inclusive OR of all floating-point exception constants defined above:
+.sp
+.in +2
+.nf
+FE_ALL_EXCEPT
+.fi
+.in -2
+
+.sp
+.LP
+The <\fBfenv.h\fR> header defines the following constants. Each expands to an
+integer constant expression whose values are distinct non-negative values.
+.sp
+.in +2
+.nf
+FE_DOWNWARD
+FE_TONEAREST
+FE_TOWARDZERO
+FE_UPWARD
+.fi
+.in -2
+
+.sp
+.LP
+The <\fBfenv.h\fR> header defines the following constant, which represents the
+default floating-point environment (that is, the one installed at program
+startup) and has type pointer to const-qualified \fBfenv_t\fR. It can be used
+as an argument to the functions within the <\fBfenv.h\fR> header that manage
+the floating-point environment.
+.sp
+.in +2
+.nf
+FE_DFL_ENV
+.fi
+.in -2
+
+.sp
+.LP
+The \fBFENV_ACCESS\fR pragma provides a means to inform the implementation when
+an application might access the floating-point environment to test
+floating-point status flags or run under non-default floating-point control
+modes. The pragma occurs either outside external declarations or preceding all
+explicit declarations and statements inside a compound statement. When outside
+external declarations, the pragma takes effect from its occurrence until
+another \fBFENV_ACCESS\fR pragma is encountered, or until the end of the
+translation unit. When inside a compound statement, the pragma takes effect
+from its occurrence until another \fBFENV_ACCESS\fR pragma is encountered
+(including within a nested compound statement), or until the end of the
+compound statement; at the end of a compound statement the state for the pragma
+is restored to its condition just before the compound statement. If this pragma
+is used in any other context, the behavior is undefined.
+.sp
+.LP
+If part of an application tests floating-point status flags, sets
+floating-point control modes, or runs under non-default mode settings, but was
+translated with the state for the \fBFENV_ ACCESS\fR pragma off, the behavior
+is undefined. The default state (on or off) for the pragma is
+implementation-defined. (When execution passes from a part of the application
+translated with \fBFENV_ACCESS\fR off to a part translated with
+\fBFENV_ACCESS\fR on, the state of the floating-point status flags is
+unspecified and the floating-point control modes have their default settings.)
+.SH USAGE
+.sp
+.LP
+This header is designed to support the floating-point exception status flags
+and directed-rounding control modes required by the IEC 60559: 1989 standard,
+and other similar floating-point state information. Also, it is designed to
+facilitate code portability among all systems.  Certain application programming
+conventions support the intended model of use for the floating-point
+environment:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A function call does not alter its caller's floating-point control modes, clear
+its caller's floating-point status flags, or depend on the state of its
+caller's floating-point status flags unless the function is so documented.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A function call is assumed to require default floating-point control modes,
+unless its documentation promises otherwise.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A function call is assumed to have the potential for raising floating-point
+exceptions, unless its documentation promises otherwise.
+.RE
+.sp
+.LP
+With these conventions, an application can safely assume default floating-point
+control modes (or be unaware of them). The responsibilities associated with
+accessing the floating-point environment fall on the application that does so
+explicitly.
+.sp
+.LP
+Even though the rounding direction macros might expand to constants
+corresponding to the values of \fBFLT_ROUNDS\fR, they are not required to do
+so. For example:
+.sp
+.in +2
+.nf
+#include <fenv.h>
+void f(double x)
+{
+    #pragma STDC FENV_ACCESS ON
+    void g(double);
+    void h(double);
+    /* ... */
+    g(x + 1);
+    h(x + 1);
+    /* ... */
+}
+.fi
+.in -2
+
+.sp
+.LP
+If the function \fIg\fR() might depend on status flags set as a side effect of
+the first \fIx\fR+1, or if the second \fIx\fR+1 might depend on control modes
+set as a side effect of the call to function \fIg\fR(), then the application
+must contain an appropriately placed invocation as follows:
+.sp
+.in +2
+.nf
+#pragma STDC FENV_ACCESS ON
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M), \fBfegetexceptflag\fR(3M),
+\fBfegetround\fR(3M), \fBfeholdexcept\fR(3M), \fBferaiseexcept\fR(3M),
+\fBfesetenv\fR(3M), \fBfesetexceptflag\fR(3M), \fBfesetround\fR(3M),
+\fBfetestexcept\fR(3M), \fBfeupdateenv\fR(3M), \fBattributes\fR(5),
+\fBstandards\fR(5)

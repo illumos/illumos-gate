@@ -1,0 +1,961 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_Parse_CISTPL_CFTABLE_ENTRY 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_Parse_CISTPL_CFTABLE_ENTRY \- parse 16-bit Card Configuration Table Entry
+tuple
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR,
+     \fBcistpl_cftable_entry_t *\fR\fIcft\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItu\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned  by  a call
+to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcft\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBcistpl_cftable_entry_t\fR structure which contains the parsed
+\fBCISTPL_CFTABLE_ENTRY\fR tuple information upon return from this function.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function parses the 16 bit Card Configuration Table Entry tuple,
+\fBCISTPL_CFTABLE_ENTRY,\fR into a form usable by \fBPC \fRCard drivers.
+.sp
+.LP
+The \fBCISTPL_CFTABLE_ENTRY\fR tuple is used to describe each possible
+configuration of a \fBPC \fRCard and to distinguish among the permitted
+configurations. The \fBCISTPL_CONFIG\fR tuple must precede all
+\fBCISTPL_CFTABLE_ENTRY\fR tuples.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t                      flags;     /* valid descriptions */
+uint32_t                      ifc;       /* interface description */
+                                         /*	information */
+uint32_t                      pin;       /* values for PRR */
+uint32_t                      index;     /* configuration index number */
+cistpl_cftable_entry_pd_t     pd;        /* power requirements */
+                                         /* description */
+cistpl_cftable_entry_speed_t  speed;     /* device speed description */
+cistpl_cftable_entry_io_t     io;        /* device I/O map */
+cistpl_cftable_entry_irq_t    irq;       /* device IRQ utilization */
+cistpl_cftable_entry_mem_t    mem;       /* device memory space */
+cistpl_cftable_entry_misc_t   misc;      /* miscellaneous 
+                                         /* device features */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBflags\fR field is defined and bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_DEFAULT\fR
+.ad
+.sp .6
+.RS 4n
+This is a default configuration
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF\fR
+.ad
+.sp .6
+.RS 4n
+If configuration byte exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_PWR\fR
+.ad
+.sp .6
+.RS 4n
+Power information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_TD\fR
+.ad
+.sp .6
+.RS 4n
+Timing information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IO\fR
+.ad
+.sp .6
+.RS 4n
+I/O information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IRQ\fR
+.ad
+.sp .6
+.RS 4n
+IRQ information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MEM\fR
+.ad
+.sp .6
+.RS 4n
+MEM space information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MISC\fR
+.ad
+.sp .6
+.RS 4n
+MISC information exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_STCE_EV\fR
+.ad
+.sp .6
+.RS 4n
+STCE_EV exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_STCE_PD\fR
+.ad
+.sp .6
+.RS 4n
+STCE_PD exists
+.RE
+
+.sp
+.LP
+If the \fBCISTPL_CFTABLE_TPCE_IF\fR flag is set,  the \fBifc\fR field is
+bit-mapped and defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_MEMORY\fR
+.ad
+.sp .6
+.RS 4n
+Memory interface
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_IO_MEM\fR
+.ad
+.sp .6
+.RS 4n
+IO and memory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_0\fR
+.ad
+.sp .6
+.RS 4n
+Custom interface 0
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_1\fR
+.ad
+.sp .6
+.RS 4n
+Custom interface 1
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_2\fR
+.ad
+.sp .6
+.RS 4n
+Custom interface 2
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_3\fR
+.ad
+.sp .6
+.RS 4n
+Custom interface 3
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_MASK\fR
+.ad
+.sp .6
+.RS 4n
+Interface type mask
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_BVD\fR
+.ad
+.sp .6
+.RS 4n
+BVD active in PRR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_WP\fR
+.ad
+.sp .6
+.RS 4n
+WP active in PRR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_RDY\fR
+.ad
+.sp .6
+.RS 4n
+RDY active in PRR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_IF_MWAIT\fR
+.ad
+.sp .6
+.RS 4n
+WAIT - mem cycles
+.RE
+
+.sp
+.LP
+\fBpin\fR is a value for the Pin Replacement Register.
+.sp
+.LP
+\fBindex\fR is a configuration index number.
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_pd_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t                    flags;     /* which descriptions are valid */
+cistpl_cftable_entry_pwr_t  pd_vcc;    /* VCC power description */
+cistpl_cftable_entry_pwr_t  pd_vpp1;   /* Vpp1 power description */
+cistpl_cftable_entry_pwr_t  pd_vpp2;   /* Vpp2 power description */
+.fi
+.in -2
+
+.sp
+.LP
+This \fBflags\fR field is bit-mapped and defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_PWR_VCC\fR
+.ad
+.sp .6
+.RS 4n
+Vcc description valid
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_PWR_VPP1\fR
+.ad
+.sp .6
+.RS 4n
+Vpp1 description valid
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_PWR_VPP2\fR
+.ad
+.sp .6
+.RS 4n
+Vpp2 description valid
+.RE
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_pwr_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     nomV;        /* nominal supply voltage */
+uint32_t     nomV_flags;
+uint32_t     minV;        /* minimum supply voltage */
+uint32_t     minV_flags;
+uint32_t     maxV;        /* maximum supply voltage */
+uint32_t     maxV_flags;
+uint32_t     staticI;     /* continuous supply current */
+uint32_t     staticI_flags;
+uint32_t     avgI;        /* max current required averaged over 1 sec. */
+uint32_t     avgI_flags;
+uint32_t     peakI;       /* max current required averaged over 10mS */
+uint32_t     peakI_flags;
+uint32_t     pdownI;      /* power down supply current required */
+uint32_t     pdownI_flags;
+.fi
+.in -2
+
+.sp
+.LP
+\fBnomV\fR, \fBminV\fR, \fBmaxV\fR,  \fBstaticI\fR, \fBavgI\fR,
+\fBpeakI_flag\fR, and \fBpdownI\fR are defined and bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_NOMV\fR
+.ad
+.RS 29n
+.rt  
+Nominal supply voltage
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_MINV\fR
+.ad
+.RS 29n
+.rt  
+Minimum supply voltage
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_MAXV\fR
+.ad
+.RS 29n
+.rt  
+Maximum supply voltage
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_STATICI\fR
+.ad
+.RS 29n
+.rt  
+Continuous supply current
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_AVGI\fR
+.ad
+.RS 29n
+.rt  
+Maximum current required averaged       over 1 second
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_PEAKI\fR
+.ad
+.RS 29n
+.rt  
+Maximum current required averaged       over 10mS
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_PDOWNI\fR
+.ad
+.RS 29n
+.rt  
+Power down supply current required
+.RE
+
+.sp
+.LP
+\fBnomV_flags\fR, \fBminV_flags\fR, \fBmaxV_flags\fR, \fBstaticI_flags\fR,
+\fBavgI_flags\fR, \fBpeakI_flags\fR, and \fBpdownI_flags\fR are defined and
+bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_EXISTS\fR
+.ad
+.RS 30n
+.rt  
+This parameter exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_MUL10\fR
+.ad
+.RS 30n
+.rt  
+Multiply return value by 10
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_NC_SLEEP\fR
+.ad
+.RS 30n
+.rt  
+No connection on sleep/power down
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_ZERO\fR
+.ad
+.RS 30n
+.rt  
+Zero value required
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_PD_NC\fR
+.ad
+.RS 30n
+.rt  
+No connection ever
+.RE
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_speed_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t    flags;       /* which timing information is present */
+uint32_t    wait;        /* max WAIT time in device speed format */
+uint32_t    nS_wait;     /* max WAIT time in nS */
+uint32_t    rdybsy;      /* max RDY/BSY time in device speed format */
+uint32_t    nS_rdybsy;   /* max RDY/BSY time in nS */
+uint32_t    rsvd;        /* max RSVD time in device speed format */
+uint32_t    nS_rsvd;     /* max RSVD time in nS */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBflags\fR field is bit-mapped and defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_TD_WAIT\fR
+.ad
+.sp .6
+.RS 4n
+WAIT timing exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_TD_RDY\fR
+.ad
+.sp .6
+.RS 4n
+RDY/BSY timing exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_TD_RSVD\fR
+.ad
+.sp .6
+.RS 4n
+RSVD timing exists
+.RE
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_io_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     flags;        /* direct copy of TPCE_IO byte in tuple */
+uint32_t     addr_lines;   /* number of decoded I/O address lines */
+uint32_t     ranges;       /* number of I/O ranges */
+cistpl_cftable_entry_io_range_t
+              range[CISTPL_CFTABLE_ENTRY_MAX_IO_RANGES];
+.fi
+.in -2
+
+.sp
+.LP
+The \fBflags\fR field is defined and bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IO_BUS\fR
+.ad
+.sp .6
+.RS 4n
+Bus width mask
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IO_BUS8\fR
+.ad
+.sp .6
+.RS 4n
+8-bit flag
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IO_BUS16\fR
+.ad
+.sp .6
+.RS 4n
+16-bit flag
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_IO_RANGE\fR
+.ad
+.sp .6
+.RS 4n
+IO address ranges exist
+.RE
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_io_range_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     addr;     /* I/O start address */
+uint32_t     length;   /* I/O register length */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_irq_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     flags;   /* direct copy of TPCE_IR byte in tuple */
+uint32_t     irqs;    /* bit mask for each allowed IRQ */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_mem_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     flags;     /* memory descriptor type and host addr info */
+uint32_t     windows;   /* number of memory space descriptors */
+cistpl_cftable_entry_mem_window_t
+         window[CISTPL_CFTABLE_ENTRY_MAX_MEM_WINDOWS];
+.fi
+.in -2
+
+.sp
+.LP
+The \fBflags\fR field is defined and bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MEM3\fR
+.ad
+.sp .6
+.RS 4n
+Space descriptors
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MEM2\fR
+.ad
+.sp .6
+.RS 4n
+\fBhost_addr\fR=\fBcard_addr\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MEM1\fR
+.ad
+.sp .6
+.RS 4n
+Card address=0 any host address
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_FS_MEM_HOST\fR
+.ad
+.sp .6
+.RS 4n
+If host address is present in MEM3
+.RE
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_mem_window_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     length;     /* length of this window */
+uint32_t     card_addr;  /* card address */
+uint32_t     host_addr;  /* host address */
+.fi
+.in -2
+
+.sp
+.LP
+The structure members of \fBcistpl_cftable_entry_misc_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     flags;      /* miscellaneous features flags */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBflags\fR field is defined and bit-mapped as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_MTC_MASK\fR
+.ad
+.sp .6
+.RS 4n
+Max twin cards mask
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_AUDIO\fR
+.ad
+.sp .6
+.RS 4n
+Audio on BVD2
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_READONLY\fR
+.ad
+.sp .6
+.RS 4n
+R/O storage
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_PWRDOWN\fR
+.ad
+.sp .6
+.RS 4n
+Powerdown capable
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DRQ_MASK\fR
+.ad
+.sp .6
+.RS 4n
+DMAREQ mask
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DRQ_SPK\fR
+.ad
+.sp .6
+.RS 4n
+DMAREQ on SPKR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DRQ_IOIS\fR
+.ad
+.sp .6
+.RS 4n
+DMAREQ on IOIS16
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DRQ_INP\fR
+.ad
+.sp .6
+.RS 4n
+DMAREQ on INPACK
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DMA_8\fR
+.ad
+.sp .6
+.RS 4n
+DMA width 8 bits
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCISTPL_CFTABLE_TPCE_MI_DMA_16\fR
+.ad
+.sp .6
+.RS 4n
+DMA width 16 bits
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNKNOWN_TUPLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Parser does not know how to parse tuple.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CIS\fR\fR
+.ad
+.RS 27n
+.rt  
+No Card Information Structure (CIS) on \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
+\fBcsx_Parse_CISTPL_CONFIG\fR(9F), \fBcsx_RegisterClient\fR(9F),
+\fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

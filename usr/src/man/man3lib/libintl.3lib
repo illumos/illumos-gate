@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libintl 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libintl \- internationalization library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lintl\fR [ \fIlibrary\fR... ]
+#include <\fBlibintl.h\fR>
+#include <\fBlocale.h\fR> /* needed for \fBdcgettext()\fR only */
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Historically, functions in this library provided wide character translations.
+This functionality now resides in \fBlibc\fR(3LIB).
+.sp
+.LP
+This library is maintained to provide backward compatibility for both runtime
+and compilation environments. The shared object is implemented as a filter on
+\fBlibc.so.1\fR. New application development need not specify \fB-lintl\fR.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibintl.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBbindtextdomain\fR\fBdcgettext\fR
+\fBdgettext\fR\fBgettext\fR
+\fBtextdomain\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/libintl.so.1\fR\fR
+.ad
+.RS 24n
+.rt  
+a filter on \fB/lib/libc.so.1\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/libintl.so.1\fR\fR
+.ad
+.RS 24n
+.rt  
+a filter on \fB/lib/64/libc.so.1\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpvs\fR(1), \fBIntro\fR(3), \fBgettext\fR(3C), \fBlibc\fR(3LIB),
+\fBattributes\fR(5)

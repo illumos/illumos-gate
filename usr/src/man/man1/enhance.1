@@ -1,0 +1,100 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH enhance 1 "18 May 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+enhance \- enhanced command-line editing facilities
+.SH SYNOPSIS
+.LP
+.nf
+\fBenhance\fR \fIcommand\fR [\fIargument\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBenhance\fR program provides enhanced command-line editing facilities to
+users of third party applications, to which one doesn't have any source code.
+It does this by placing a pseudo-terminal between the application and the real
+terminal. It uses the \fBtecla\fR command-line editing library to read input
+from the real terminal, then forwards each just completed input line to the
+application via the pseudo-terminal. All output from the application is
+forwarded back unchanged to the real terminal.
+.sp
+.LP
+Whenever the application stops generating output for more than a tenth of a
+second, the enhance program treats the latest incomplete output line as the
+prompt, and re-displays any incompleted input line that the user has typed
+after it. The small delay, which is imperceptible to the user, isn't necessary
+for correct operation of the program. It is just an optimization, designed to
+stop the input line from being re-displayed so often that it slows down output.
+.sp
+.LP
+The user-level command-line editing facilities provided by the Tecla library
+are documented in the \fBtecla\fR(5) man page
+.SS "DEFICIENCIES"
+.sp
+.LP
+The one major problem that hasn't been solved yet, is how to deal with
+applications that change whether typed input is echo'd by their controlling
+terminal. For example, programs that ask for a password, such as \fBftp\fR and
+\fBtelnet\fR, temporarily tell their controlling terminal not to echo what the
+user types. Since this request goes to the application side of the pseudo
+terminal, the enhance program has no way of knowing that this has happened, and
+continues to echo typed input to its controlling terminal, while the user types
+their password.
+.sp
+.LP
+Furthermore, before executing the host application, the enhance program
+initially sets the pseudo terminal to \fBnoecho\fR mode, so that everything
+that it sends to the program doesn't get redundantly echoed. If a program that
+switches  to \fBnoecho\fR mode explicitly restores  echoing afterwards, rather
+than restoring the terminal modes that were previously in force, then
+subsequently, every time that you enter a new input line, a duplicate copy will
+be displayed on the next line.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libtecla.so\fR\fR
+.ad
+.RS 24n
+.rt  
+\fBtecla\fR library
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.teclarc\fR\fR
+.ad
+.RS 24n
+.rt  
+\fBtecla\fR personal customization file.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibtecla\fR(3LIB), \fBattributes\fR(5), \fBtecla\fR(5)

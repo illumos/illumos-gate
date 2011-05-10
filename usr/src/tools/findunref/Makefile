@@ -33,7 +33,7 @@ include ../Makefile.tools
 
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 
-EXCEPTION_SRC=	$(SCM_TYPE:none=) common open
+EXCEPTION_SRC= common open
 $(CLOSED_BUILD)EXCEPTION_SRC += closed
 EXCEPTION_LISTS=	$(EXCEPTION_SRC:%=exception_list.%)
 

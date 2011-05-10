@@ -1,0 +1,444 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cputrack 1 "19 Apr 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+cputrack \- monitor process and LWP behavior using CPU performance counters
+.SH SYNOPSIS
+.LP
+.nf
+\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... [\fB-efntvD\fR] 
+     [\fB-N\fR \fIcount\fR] [\fB-o\fR \fIpathname\fR] [\fB-T\fR \fIinterval\fR] \fIcommand\fR [\fIargs\fR]
+.fi
+
+.LP
+.nf
+\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... \fB-p\fR \fIpid\fR [\fB-efntvD\fR] 
+     [\fB-N\fR \fIcount\fR] [\fB-o\fR \fIpathname\fR] [\fB-T\fR \fIinterval\fR]
+.fi
+
+.LP
+.nf
+\fBcputrack\fR \fB-h\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcputrack\fR utility allows \fBCPU\fR performance counters to be used to
+monitor the behavior of a process or family of processes running on the system.
+If \fIinterval\fR is specified with the \fB-T\fR option, \fBcputrack\fR samples
+activity every \fIinterval\fR seconds, repeating forever. If a \fIcount\fR is
+specified with the \fB-N\fR option, the statistics are repeated \fIcount\fR
+times for each process tracked. If neither are specified, an interval of one
+second is used. If \fIcommand\fR and optional \fIargs\fR are specified,
+\fBcputrack\fR runs the command with the arguments given while monitoring the
+specified \fBCPU\fR performance events. Alternatively, the process \fBID\fR of
+an existing process can be specified using the \fB-p\fR option.
+.sp
+.LP
+Because \fBcputrack\fR is an unprivileged program, it is subject to the same
+restrictions that apply to \fBtruss\fR(1). For example, \fBsetuid\fR(2)
+executables cannot be tracked.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIeventspec\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies a set of events for the \fBCPU\fR performance counters to monitor.
+The syntax of these event specifications is:
+.sp
+.in +2
+.nf
+[picn=]\fIeventn\fR[,attr[\fIn\fR][=\fIval\fR]][,[picn=]\fIeventn\fR
+     [,attr[n][=\fIval\fR]],...,]
+.fi
+.in -2
+.sp
+
+You can use the \fB-h\fR option to obtain a list of available events and
+attributes. This causes generation of the usage message. You can omit an
+explicit counter assignment, in which case \fBcpustat\fR attempts to choose a
+capable counter automatically.
+.sp
+Attribute values can be expressed in hexadecimal, octal, or decimal notation,
+in a format suitable for \fBstrtoll\fR(3C). An attribute present in the event
+specification without an explicit value receives a default value of \fB1\fR. An
+attribute without a corresponding counter number is applied to all counters in
+the specification.
+.sp
+The semantics of these event specifications can be determined by reading the
+\fBCPU\fR manufacturer's documentation for the events.
+.sp
+Multiple \fB-c\fR options can be specified, in which case \fBcputrack\fR cycles
+between the different event settings on each sample.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 16n
+.rt  
+Enables debug mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 16n
+.rt  
+Follows all \fBexec\fR(2), or \fBexecve\fR(2) system calls.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 16n
+.rt  
+Follows all children created by \fBfork\fR(2), \fBfork1\fR(2), or
+\fBvfork\fR(2) system calls.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 16n
+.rt  
+Prints an extended help message on how to use the utility, how to program the
+processor-dependent counters, and where to look for more detailed information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 16n
+.rt  
+Omits all header output (useful if \fBcputrack\fR is the beginning of a
+pipeline).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fIcount\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the maximum number of \fBCPU\fR performance counter samples to take
+before exiting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIoutfile\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies file to be used for the \fBcputrack\fR output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpid\fR\fR
+.ad
+.RS 16n
+.rt  
+Interprets the argument as the process \fBID\fR of an existing process to which
+process counter context should be attached and monitored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 16n
+.rt  
+Prints an additional column of processor cycle counts, if available on the
+current architecture.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fIinterval\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the interval between \fBCPU\fR performance counter samples in
+seconds. Very small intervals may cause some samples to be skipped. See
+WARNINGS.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 16n
+.rt  
+Enables more verbose output.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The operating system enforces certain restrictions on the tracing of processes.
+In particular, a command whose object file cannot be read by a user cannot be
+tracked by that user; set-uid and set-gid commands can only be tracked by a
+privileged user. Unless it is run by a privileged user, \fBcputrack\fR loses
+control of any process that performs an \fBexec()\fR of a set-id or unreadable
+object file. Such processes continue normally, though independently of
+\fBcputrack\fR, from the point of the \fBexec()\fR.
+.sp
+.LP
+The system may run out of per-user process slots when the \fB-f\fR option is
+used, since \fBcputrack\fR runs one controlling process for each process being
+tracked.
+.sp
+.LP
+The times printed by \fBcputrack\fR correspond to the wallclock time when the
+hardware counters were actually sample. The time is derived from the same
+timebase as \fBgethrtime\fR(3C).
+.sp
+.LP
+The \fBcputrack\fR utility attaches performance counter context to each process
+that it examines. The presence of this context allows the performance counters
+to be multiplexed between different processes on the system, but it cannot be
+used at the same time as the \fBcpustat\fR(1M) utility.
+.sp
+.LP
+Once an instance of the \fBcpustat\fR utility is running, further attempts to
+run \fBcputrack\fR will fail until all instances of \fBcpustat\fR terminate.
+.sp
+.LP
+Sometimes \fBcputrack\fR provides sufficient flexibility and prints sufficient
+statistics to make adding the observation code to an application unnecessary.
+However, more control is occasionally desired. Because the same performance
+counter context is used by both the application itself and by the agent LWP
+injected into the application by \fBcputrack\fR, it is possible for an
+application to interact with the counter context to achieve some interesting
+capabilities. See \fBcpc_enable\fR(3CPC).
+.sp
+.LP
+The processor cycle counts enabled by the \fB-t\fR option always apply to both
+user and system modes, regardless of the settings applied to the performance
+counter registers.
+.sp
+.LP
+The output of \fBcputrack\fR is designed to be readily parseable by
+\fBnawk\fR(1) and \fBperl\fR(1), thereby allowing performance tools to be
+composed by embedding \fBcputrack\fR in scripts. Alternatively, tools may be
+constructed directly using the same \fBAPI\fRs that \fBcputrack\fR is built
+upon, using the facilities of \fBlibcpc\fR(3LIB) and \fBlibpctx\fR(3LIB). See
+\fBcpc\fR(3CPC).
+.sp
+.LP
+Although \fBcputrack\fR uses performance counter context to maintain separate
+performance counter values for each LWP, some of the events that can be counted
+will inevitably be impacted by other activities occurring on the system,
+particularly for limited resources that are shared between processes (for
+example, cache miss rates). For such events, it may also be interesting to
+observe overall system behavior with \fBcpustat\fR(1M).
+.sp
+.LP
+For the \fB-T\fR \fIinterval\fR option, if \fIinterval\fR is specified as zero,
+no periodic sampling is performed. The performance counters are only sampled
+when the process creates or destroys an \fBLWP\fR, or it invokes \fBfork\fR(2),
+\fBexec\fR(2), or \fBexit\fR(2).
+.SH EXAMPLES
+.SS "SPARC"
+.LP
+\fBExample 1 \fRUsing Performance Counters to Count Clock Cycles
+.sp
+.LP
+In this example, the utility is being used on a machine containing an
+UltraSPARC-III+ processor. The counters are set to count processor clock cycles
+and instructions dispatched in user mode while running the \fBsleep\fR(1)
+command.
+
+.sp
+.in +2
+.nf
+example% \fBcputrack -c pic0=Cycle_cnt,pic1=Instr_cnt sleep 10\fR
+   
+
+  time lwp      event      pic0      pic1
+ 1.007   1       tick    765308    219233
+ 2.007   1       tick         0         0
+ 4.017   1       tick         0         0
+ 6.007   1       tick         0         0
+ 8.007   1       tick         0         0
+10.007   1       tick         0         0
+10.017   1       exit    844703    228058
+  
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRCounting External Cache References and Misses
+.sp
+.LP
+This example shows more verbose output while following the \fBfork()\fR and
+\fBexec()\fR of a simple shell script on an UltraSPARC machine. The counters
+are measuring the number of external cache references and external cache
+misses. Notice that the explicit \fBpic0\fR and \fBpic1\fR names can be omitted
+where there are no ambiguities.
+
+.sp
+.in +2
+.nf
+example% \fBcputrack -fev -c EC_ref,EC_hit /bin/ulimit -c\fR
+   
+
+time    pid lwp      event      pic0      pic1
+0.007 101142   1   init_lwp    805286     20023 
+0.023 101142   1       fork                     # 101143
+0.026 101143   1   init_lwp   1015382     24461 
+0.029 101143   1   fini_lwp   1025546     25074 
+0.029 101143   1       exec   1025546     25074 
+0.000 101143   1       exec                     \e
+                                      # '/usr/bin/sh /usr/bin/basename\e 
+                                         /bin/ulimit'
+0.039 101143   1   init_lwp   1025546     25074 
+0.050 101143   1   fini_lwp   1140482     27806 
+0.050 101143   1       exec   1140482     27806 
+0.000 101143   1       exec                     # '/usr/bin/expr \e
+   //bin/ulimit : \(.*[^/]\)/*$ : .*/\(..*\) : \(.*\)$ | //bin/ulimi'
+0.059 101143   1   init_lwp   1140482     27806 
+0.075 101143   1   fini_lwp   1237647     30207 
+0.075 101143   1       exit   1237647     30207 
+unlimited
+0.081 101142   1   fini_lwp    953383     23814 
+0.081 101142   1       exit    953383     23814 
+.fi
+.in -2
+.sp
+
+.SS "x86"
+.LP
+\fBExample 3 \fRCounting Instructions
+.sp
+.LP
+This example shows how many instructions were executed in the application and
+in the kernel to print the date on a Pentium III machine:
+
+.sp
+.in +2
+.nf
+example% \fBcputrack -c inst_retired,inst_retired,nouser1,sys1 date\fR
+   
+
+   time lwp      event      pic0      pic1
+Fri Aug 20 20:03:08 PDT 1999
+  0.072   1       exit    246725    339666
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRCounting TLB Hits
+.sp
+.LP
+This example shows how to use processor-specific attributes to count TLB hits
+on a Pentium 4 machine:
+
+.sp
+.in +2
+.nf
+example% \fBcputrack -c ITLB_reference,emask=1 date\fR
+   
+
+    time lwp      event      pic0
+      Fri Aug 20 20:03:08 PDT 1999
+   0.072   1       exit    246725
+.fi
+.in -2
+.sp
+
+.SH WARNINGS
+.sp
+.LP
+By running any instance of the \fBcpustat\fR(1M) utility, all existing
+performance counter context is forcibly invalidated across the machine. This
+may in turn cause all invocations of the \fBcputrack\fR command to exit
+prematurely with unspecified errors.
+.sp
+.LP
+If \fBcpustat\fR is invoked on a system that has \fBCPU\fR performance counters
+which are not supported by Solaris, the following message appears:
+.sp
+.in +2
+.nf
+cputrack: cannot access performance counters - Operation not applicable
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This error message implies that \fBcpc_open()\fR has failed and is documented
+in \fBcpc_open\fR(3CPC). Review this documentation for more information about
+the problem and possible solutions.
+.sp
+.LP
+If a short interval is requested, \fBcputrack\fR may not be able to keep up
+with the desired sample rate. In this case, some samples may be dropped.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnawk\fR(1), \fBperl\fR(1), \fBproc\fR(1), \fBtruss\fR(1), \fBprstat\fR(1M),
+\fBcpustat\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2),
+\fBsetuid\fR(2), \fBvfork\fR(2), \fBgethrtime\fR(3C), \fBstrtoll\fR(3C),
+\fBcpc\fR(3CPC), \fBcpc_bind_pctx\fR(3CPC), \fBcpc_enable\fR(3CPC),
+\fBcpc_open\fR(3CPC), \fBlibcpc\fR(3LIB), \fBlibpctx\fR(3LIB), \fBproc\fR(4),
+\fBattributes\fR(5)

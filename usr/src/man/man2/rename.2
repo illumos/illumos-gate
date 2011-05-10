@@ -1,0 +1,421 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rename 2 "4 Oct 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+rename, renameat \- change the name of a file
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBint\fR \fBrename\fR(\fBconst char *\fR\fIold\fR, \fBconst char *\fR\fInew\fR);
+.fi
+
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBrenameat\fR(\fBint\fR \fIfromfd\fR, \fBconst char *\fR\fIold\fR, \fBint\fR \fItofd\fR,
+     \fBconst char *\fR\fInew\fR);
+.fi
+
+.SS "XPG3"
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBrename\fR(\fBconst char *\fR\fIold\fR, \fBconst char *\fR\fInew\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBrename()\fR function changes the name of a file. The \fIold\fR argument
+points to the pathname of the file to be renamed. The \fInew\fR argument points
+to the new path name of the file.
+.sp
+.LP
+The \fBrenameat()\fR function renames an entry in a directory, possibly moving
+the entry into a different directory.  See \fBfsattr\fR(5). If the \fIold\fR
+argument is an absolute path, the \fIfromfd\fR is ignored.  Otherwise it is
+resolved relative to the \fIfromfd\fR argument rather than the current working
+directory.  Similarly, if the \fInew\fR argument is not absolute, it is
+resolved relative to the \fItofd\fR argument.  If either \fIfromfd\fR or
+\fItofd\fR have the value \fBAT_FDCWD\fR, defined in <\fBfcntl.h\fR>, and their
+respective paths are relative, the path is resolved relative to the current
+working directory.
+.sp
+.LP
+Current implementation restrictions will cause the \fBrenameat()\fR function to
+return an error if an attempt is made to rename an extended attribute file to a
+regular (non-attribute) file, or to rename a regular file to an extended
+attribute file.
+.sp
+.LP
+If \fIold\fR and \fInew\fR both refer to the same existing file, the
+\fBrename()\fR and \fBrenameat()\fR functions return successfully and performs
+no other action.
+.sp
+.LP
+If \fIold\fR points to the pathname of a file that is not a directory,
+\fInew\fR must not point to the pathname of a directory. If the link named by
+\fInew\fR exists, it will be removed and \fIold\fR will be renamed to
+\fInew\fR. In this case, a link named \fInew\fR must remain visible to other
+processes throughout the renaming operation and will refer to either the file
+referred to by \fInew\fR or the file referred to as \fIold\fR before the
+operation began.
+.sp
+.LP
+If \fIold\fR points to the pathname of a directory, \fInew\fR  must not point
+to the pathname of a file that is not a directory. If the directory named by
+\fInew\fR exists, it will be removed and \fIold\fR will be renamed to
+\fInew\fR. In this case, a link named \fInew\fR  will exist throughout the
+renaming operation and will refer to either the file referred to by \fInew\fR
+or the file referred to as \fIold\fR before the operation began. Thus, if
+\fInew\fR names  an existing directory, it must be an empty directory.
+.sp
+.LP
+The \fInew\fR pathname must not contain a path prefix that names \fIold\fR.
+Write access permission is required for both the directory containing \fIold\fR
+and the directory containing \fInew\fR. If \fIold\fR points to the  pathname of
+a directory, write access permission is required for the  directory named by
+\fIold\fR, and, if it exists, the directory  named by \fInew\fR.
+.sp
+.LP
+If the directory containing \fIold\fR has the sticky bit set,  at least one of
+the following conditions listed below must be true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must own \fIold\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must own the directory containing \fIold\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIold\fR must be writable by the user
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must be a privileged user
+.RE
+.sp
+.LP
+If \fInew\fR exists, and the directory containing \fInew\fR is writable and has
+the sticky bit set, at least  one of the following conditions must be true:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must own \fInew\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must own the directory containing \fInew\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fInew\fR must be writable by the user
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user must be a privileged user
+.RE
+.sp
+.LP
+If the link named by \fInew\fR exists, the file's link count becomes zero when
+it is removed, and no process has the file open, then  the space occupied by
+the file will be freed and the file will no longer be accessible. If one or
+more processes have the file open when the last link is removed, the link will
+be removed before \fBrename()\fR or \fBrenameat()\fR returns, but the removal
+of the file contents will be postponed until all references to the file have
+been closed.
+.sp
+.LP
+Upon successful completion, the \fBrename()\fR and \fBrenameat()\fR functions
+will mark for update the \fBst_ctime\fR and \fBst_mtime\fR fields of the parent
+directory of each file.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate an error.
+.SH ERRORS
+.sp
+.LP
+The \fBrename()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of either path prefix denies search permission; one of the
+directories containing \fIold\fR and \fInew\fR denies write permissions; or
+write permission is denied by a directory pointed to by \fIold\fR or \fInew\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fInew\fR argument is a directory and the mount point for a mounted file
+system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDQUOT\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory where the new name entry is being placed cannot be extended
+because the user's quota of disk blocks on that file system has been exhausted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 16n
+.rt  
+The link named by \fInew\fR is a directory containing entries other than
+`\fB\&.\fR' (the directory itself) and `\fB\&..\fR' (the parent directory).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+Either \fIold\fR or \fInew\fR references an invalid address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 16n
+.rt  
+The path argument includes non-UTF8 characters and the file system accepts only
+file names where all characters are part of the UTF-8 character codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fInew\fR argument directory pathname contains a path prefix that names the
+\fIold\fR directory, or an attempt was made to rename a regular file to an
+extended attribute or from an extended attribute to a regular file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error occurred while making or updating a directory entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEISDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fInew\fR argument points to a directory but \fIold\fR points to a file
+that is not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating the pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of \fIold\fR or \fInew\fR exceeds  \fBPATH_MAX\fR, or a pathname
+component is longer than  \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The file named by \fIold\fR is a directory, and the link count of  the parent
+directory of \fInew\fR would exceed  \fBLINK_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+The link named by \fIold\fR does not name an existing file, a component of the
+path prefix of \fInew\fR does not exist, or either \fIold\fR or \fInew\fR
+points to an empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 16n
+.rt  
+The directory that would contain \fInew\fR cannot be extended.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of either path prefix is not a directory, or \fIold\fR names a
+directory and \fInew\fR names a file that is not a directory, or \fItofd\fR and
+\fIdirfd\fR in \fBrenameat()\fR do not reference a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The requested operation requires writing in a directory on a read-only file
+system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXDEV\fR\fR
+.ad
+.RS 16n
+.rt  
+The links named by \fIold\fR and \fInew\fR are on different file systems.
+.RE
+
+.sp
+.LP
+The \fBrenameat()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+An attempt was made to rename a regular file as an attribute file or to rename
+an attribute file as a regular file.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardFor \fBrename()\fR, see \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(2), \fBlink\fR(2), \fBunlink\fR(2), \fBattributes\fR(5),
+\fBfsattr\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The system can deadlock if there is a loop in the file system graph. Such a
+loop can occur if there is an entry in directory \fBa\fR, \fBa/name1\fR, that
+is a hard link to directory \fBb\fR, and an entry in directory \fBb\fR,
+\fBb/name2\fR, that is a hard link to directory \fBa\fR. When such a loop
+exists and two separate processes attempt to rename \fBa/name1\fR to
+\fBb/name2\fR and \fBb/name2\fR to \fBa/name1\fR, the system may deadlock
+attempting to lock  both directories for modification.  Use symbolic links
+instead of hard links  for directories.

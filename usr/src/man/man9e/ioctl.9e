@@ -1,0 +1,307 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ioctl 9E "3 Dec 1996" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+ioctl \- control a character device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/cred.h>
+#include <sys/file.h>
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBioctl\fR(\fBdev_t\fR \fIdev\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR, 
+     \fBcred_t *\fR\fIcred_p\fR, \fBint *\fR\fIrval_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is \fBoptional\fR.
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 10n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 10n
+.rt  
+Command argument the driver  \fBioctl()\fR routine interprets as the  operation
+to be performed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 10n
+.rt  
+Passes parameters between a user program and the driver.  When used with
+terminals, the argument is the address of a user program structure containing
+driver or hardware settings.  Alternatively, the argument may be a value that
+has meaning only to the driver. The interpretation of the argument is driver
+dependent and usually depends on the command type; the kernel does not
+interpret the argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImode\fR\fR
+.ad
+.RS 10n
+.rt  
+A bit field that contains:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Information set when the device was opened. The driver may use it to determine
+if the device was opened for reading or writing. The driver can make this
+determination by checking the  \fBFREAD\fR or \fBFWRITE\fR flags. See the
+\fIflag\fR argument description of the  \fBopen()\fR routine for further
+values.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Information on whether the caller is a 32-bit or 64-bit thread.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In some circumstances address space information about the \fIarg\fR argument.
+See below.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcred_p\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to the  user credential structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrval_p\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to return value for calling process.  The driver may elect to set the
+value which is valid only if the  \fBioctl()\fR succeeds.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBioctl()\fR provides character-access drivers with an alternate entry point
+that can be used for almost any operation other than a simple transfer of
+characters in and out of buffers. Most often,  \fBioctl()\fR is used to control
+device hardware parameters and establish the protocol used by the driver in
+processing data.
+.sp
+.LP
+The kernel determines that this is a character device, and looks up the entry
+point routines in  \fBcb_ops\fR(9S). The kernel then packages the user request
+and arguments as integers and passes them to the driver's  \fBioctl()\fR
+routine. The kernel itself does no processing of the passed command, so it is
+up to the user program and the driver to agree on what the arguments mean.
+.sp
+.LP
+I/O control commands are used to implement the terminal settings passed from
+\fBttymon\fR(1M) and  \fBstty\fR(1), to format disk devices, to implement a
+trace driver for debugging, and to clean up character queues. Since the kernel
+does not interpret the command type that defines the operation, a driver is
+free to define its own commands.
+.sp
+.LP
+Drivers that use an  \fBioctl()\fR routine typically have a command to ``read''
+the current  \fBioctl()\fR settings, and at least one other that sets new
+settings. Drivers can use the \fImode\fR argument to determine if the device
+unit was opened for reading or writing, if necessary, by checking the
+\fBFREAD\fR or  \fBFWRITE\fR setting.
+.sp
+.LP
+If the third argument,  \fIarg\fR, is a pointer to a user buffer, the driver
+can call the  \fBcopyin\fR(9F) and \fBcopyout\fR(9F) functions to transfer data
+between kernel and user space.
+.sp
+.LP
+Other kernel subsystems may need to call into the drivers \fBioctl()\fR
+routine.  Drivers that intend to allow their \fBioctl()\fR routine to be used
+in this way should publish the \fBddi-kernel-ioctl\fR property on the
+associated devinfo node(s).
+.sp
+.LP
+When the \fBddi-kernel-ioctl\fR property is present, the \fImode\fR argument is
+used to pass address space information about \fIarg\fR through to the driver.
+If the driver expects \fIarg\fR to contain a buffer address, and the
+\fBFKIOCTL\fR flag is set in \fImode\fR, then the driver should assume that it
+is being handed a kernel buffer address.  Otherwise, \fIarg\fR may be the
+address of a buffer from a user program. The driver can use
+\fBddi_copyin\fR(9F) and \fBddi_copyout\fR(9F) perform the correct type of copy
+operation for either kernel or user address spaces.  See the example on
+\fBddi_copyout\fR(9F).
+.sp
+.LP
+Drivers have to interact with 32-bit and 64-bit applications. If a device
+driver shares data structures with the application (for example, through
+exported kernel memory) and the driver gets recompiled for a 64-bit kernel but
+the application remains 32-bit, binary layout of any data structures will be
+incompatible if they contain longs or pointers. The driver needs to know
+whether there is a model mismatch between the current thread and the kernel and
+take necessary action. The \fImode\fR argument has additional bits set to
+determine the C Language Type Model which the current thread expects.
+\fImode\fR has \fBFILP32\fR set if the current thread expects 32-bit (
+\fIILP32\fR) semantics, or \fBFLP64\fR if the current thread expects 64-bit (
+\fILP64\fR) semantics. \fImode\fR is used in combination with
+\fBddi_model_convert_from\fR(9F) and the \fBFMODELS\fR mask to determine
+whether there is a data model mismatch between the current thread and the
+device driver (see the example below). The device driver might have to adjust
+the shape of data structures before exporting them to a user thread which
+supports a different data model.
+.sp
+.LP
+To implement I/O control commands for a driver the following two steps are
+required:
+.RS +4
+.TP
+1.
+Define the I/O control command names and the associated value in the
+driver's header and comment the commands.
+.RE
+.RS +4
+.TP
+2.
+Code the  \fBioctl()\fR routine in the driver that defines the functionality
+for each I/O control command name that is in the header.
+.RE
+.sp
+.LP
+The  \fBioctl()\fR routine is coded with instructions on the proper action to
+take for each command. It is commonly a  \fBswitch\fR statement, with each
+\fBcase\fR definition corresponding to an  \fBioctl()\fR name to identify the
+action that should be taken. However, the command passed to the driver by the
+user process is an integer value associated with the command name in the
+header.
+.SH RETURN VALUES
+.sp
+.LP
+\fBioctl()\fR should return  \fB0\fR on success, or the appropriate error
+number. The driver may also set the value returned to the calling process
+through \fIrval_p\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBioctl()\fR entry point
+.sp
+.LP
+The following is an example of the \fBioctl()\fR entry point and how to support
+32-bit and 64-bit applications with the same device driver.
+
+.sp
+.in +2
+.nf
+struct passargs32 {
+        int len;
+        caddr32_t addr;
+};
+ 
+struct passargs {
+        int len;
+        caddr_t addr;
+};
+ 
+xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp) {
+        struct passargs pa;
+ 
+#ifdef  _MULTI_DATAMODEL
+        switch (ddi_model_convert_from(mode & FMODELS)) {
+            case DDI_MODEL_ILP32:
+            {
+                struct passargs32 pa32;
+ 
+                ddi_copyin(arg, &pa32, sizeof (struct passargs32),\e
+                mode);
+                pa.len = pa32.len;
+                pa.address = pa32.address;
+                break;
+            }
+            case DDI_MODEL_NONE:
+                ddi_copyin(arg, &pa, sizeof (struct passargs),\e
+                mode);
+                break;
+        }
+#else /* _MULTI_DATAMODEL */
+        ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+#endif  /* _MULTI_DATAMODEL */
+ 
+        do_ioctl(&pa);
+        .\|.\|.\|.
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstty\fR(1), \fBttymon\fR(1M), \fBdkio\fR(7I), \fBfbio\fR(7I),
+\fBtermio\fR(7I), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
+\fBcopyin\fR(9F), \fBcopyout\fR(9F), \fBddi_copyin\fR(9F),
+\fBddi_copyout\fR(9F), \fBddi_model_convert_from\fR(9F), \fBcb_ops\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+Non-STREAMS driver  \fBioctl()\fR routines must make sure that user data is
+copied into or out of the kernel address space explicitly using
+\fBcopyin\fR(9F), \fBcopyout\fR(9F), \fBddi_copyin\fR(9F), or
+\fBddi_copyout\fR(9F), as appropriate.
+.sp
+.LP
+It is a severe error to simply dereference pointers to the user address space,
+even when in user context.
+.sp
+.LP
+Failure to use the appropriate copying routines can result in panics under load
+on some platforms, and reproducible panics on others.
+.SH NOTES
+.sp
+.LP
+STREAMS drivers do not have  \fBioctl()\fR routines. The stream head converts
+I/O control commands to  \fBM_IOCTL\fR messages, which are handled by the
+driver's  \fBput\fR(9E) or \fBsrv\fR(9E) routine.

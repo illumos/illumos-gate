@@ -1,0 +1,149 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ttyname 3C "31 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ttyname, ttyname_r \- find pathname of a terminal
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h> 
+
+\fBchar *\fR\fBttyname\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBttyname_r\fR(\fBint\fR \fIfildes\fR, \fBchar *\fR\fIname\fR, \fBint\fR \fInamelen\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+cc [ \fIflag\fR...] \fIfile\fR ... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\fR ... ]
+
+\fBint\fR \fBttyname_r\fR(\fBint\fR \fIfildes\fR, \fBchar *\fR\fIname\fR, \fBsize_t\fR \fInamesize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBttyname()\fR function returns a pointer to a string containing the
+null-terminated path name of the terminal device associated with file
+descriptor \fIfildes\fR. The return value points to thread-specific data whose
+content is overwritten by each call from the same thread.
+.sp
+.LP
+The \fBttyname_r()\fR function has the same functionality as \fBttyname()\fR
+except that the caller must supply a buffer \fIname\fR with length
+\fInamelen\fR to store the result; this buffer must be at least
+\fB_POSIX_PATH_MAX\fR in size (defined in <\fBlimits.h\fR>). The
+standard-conforming version (see \fBstandards\fR(5)) of \fBttyname_r()\fR takes
+a \fInamesize\fR parameter of type \fBsize_t\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBttyname()\fR and \fBttyname_r()\fR return a
+pointer to a string. Otherwise, a null pointer is returned and \fBerrno\fR is
+set to indicate the error.
+.sp
+.LP
+The standard-conforming \fBttyname_r()\fR returns 0 if successful or the error
+number upon failure.
+.SH ERRORS
+.sp
+.LP
+The \fBttyname()\fR and \fBttyname_r()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor. This condition is
+reported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument does not refer to a terminal device. This condition
+is reported.
+.RE
+
+.sp
+.LP
+The \fBttyname_r()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fInamesize\fR is smaller than the length of the string to be
+returned including the terminating null character.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded applications, see \fBIntro\fR(3), \fINotes On
+Multithreaded Applications\fR.
+.sp
+.LP
+Messages printed from this function are in the native language specified by the
+\fBLC_MESSAGES\fR locale category. See \fBsetlocale\fR(3C).
+.sp
+.LP
+The return value of \fBttyname()\fR points to thread-specific data whose
+content is overwritten by each call from the same thread. This function is safe
+to use in multithreaded applications, but its use is discouraged. The
+\fBttyname_r()\fR function should used instead.
+.sp
+.LP
+Solaris 2.4 and earlier releases provided definitions of the \fBttyname_r()\fR
+interface as specified in POSIX.1c Draft 6. The final POSIX.1c standard changed
+the interface as described above. Support for the Draft 6 interface is provided
+for compatibility only and might not be supported in future releases. New
+applications and libraries should use the standard-conforming interface.

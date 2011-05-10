@@ -1,0 +1,52 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH streamtab 9S "11 Apr 1991" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+streamtab \- STREAMS entity declaration structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+Each STREAMS driver or module must have a \fBstreamtab\fR structure.
+.sp
+.LP
+\fBstreamtab\fR is made up of \fBqinit\fR structures for both the read and
+write queue portions of each module or driver. Multiplexing drivers require
+both upper and lower \fBqinit\fR structures. The \fBqinit\fR structure contains
+the entry points through which the module or driver routines are called.
+.sp
+.LP
+Normally, the read \fBQUEUE\fR contains the \fBopen\fR and \fBclose\fR
+routines. Both the read and write queue can contain \fBput\fR and service
+procedures.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+struct qinit    *st_rdinit;    /* read QUEUE */
+struct qinit    *st_wrinit;    /* write QUEUE */
+struct qinit    *st_muxrinit;  /* lower read QUEUE*/
+struct qinit    *st_muxwinit;  /* lower write QUEUE*/
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBqinit\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

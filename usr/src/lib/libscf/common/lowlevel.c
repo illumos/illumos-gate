@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -49,7 +50,9 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/sysmacros.h>
+#include <libzonecfg.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #define	ENV_SCF_DEBUG		"LIBSCF_DEBUG"
 #define	ENV_SCF_DOORPATH	"LIBSCF_DOORPATH"
@@ -879,6 +882,67 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		}
 		return (0);
 	}
+
+	if (strcmp(name, "zone") == 0) {
+		char zone[MAXPATHLEN], root[MAXPATHLEN], door[MAXPATHLEN];
+		static int (*zone_get_rootpath)(char *, char *, size_t);
+		ssize_t len;
+
+		/*
+		 * In order to be able to set the zone on a handle, we want
+		 * to determine the zone's path, which requires us to call into
+		 * libzonecfg -- but libzonecfg.so links against libscf.so so
+		 * we must not explicitly link to it.  To circumvent the
+		 * circular dependency, we will pull it in here via dlopen().
+		 */
+		if (zone_get_rootpath == NULL) {
+			void *dl = dlopen("libzonecfg.so.1", RTLD_LAZY), *sym;
+
+			if (dl == NULL)
+				return (scf_set_error(SCF_ERROR_NOT_FOUND));
+
+			if ((sym = dlsym(dl, "zone_get_rootpath")) == NULL) {
+				(void) dlclose(dl);
+				return (scf_set_error(SCF_ERROR_INTERNAL));
+			}
+
+			zone_get_rootpath = (int(*)(char *, char *, size_t))sym;
+		}
+
+		if (v == SCF_DECORATE_CLEAR) {
+			(void) pthread_mutex_lock(&handle->rh_lock);
+			handle->rh_doorpath[0] = 0;
+			(void) pthread_mutex_unlock(&handle->rh_lock);
+
+			return (0);
+		}
+
+		if ((len = scf_value_get_astring(v, zone, sizeof (zone))) < 0)
+			return (-1);
+
+		if (len == 0 || len >= sizeof (zone))
+			return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
+
+		if (zone_get_rootpath(zone, root, sizeof (root)) != Z_OK) {
+			if (strcmp(zone, GLOBAL_ZONENAME) == 0) {
+				root[0] = '\0';
+			} else {
+				return (scf_set_error(SCF_ERROR_NOT_FOUND));
+			}
+		}
+
+		if (snprintf(door, sizeof (door), "%s/%s", root,
+		    default_door_path) >= sizeof (door))
+			return (scf_set_error(SCF_ERROR_INTERNAL));
+
+		(void) pthread_mutex_lock(&handle->rh_lock);
+		(void) strlcpy(handle->rh_doorpath, door,
+		    sizeof (handle->rh_doorpath));
+		(void) pthread_mutex_unlock(&handle->rh_lock);
+
+		return (0);
+	}
+
 	return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 }
 

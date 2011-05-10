@@ -1,0 +1,151 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_fm_acc_err_get 9F "13 May 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_fm_acc_err_get, ddi_fm_dma_err_get \- get the error status for an access or
+DMA handle
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ndifma.h>
+
+\fBvoid\fR \fBddi_fm_acc_err_get\fR(\fBddi_acc_handle_t\fR \fIacc_handle\fR,
+     \fBddi_fm_error_t\fR *\fIerror_status\fR, \fBint\fR \fIversion\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_fm_dma_err_get\fR(\fBddi_dma_handle_t\fR \fIdma_handle\fR,
+     \fBddi_fm_error_t\fR *\fIerror_status\fR, \fBint\fR \fIversion\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIacc_handle\fR\fR
+.ad
+.RS 16n
+.rt  
+Data access handle obtained from a previous call to
+\fBddi_regs_map_setup\fR(9F), \fBddi_dma_mem_alloc\fR(9F), or to a similar
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdma_handle\fR\fR
+.ad
+.RS 16n
+.rt  
+\fBDMA\fR handle obtained from a previous call to \fBddi_dma_mem_alloc\fR(9F)
+or one of its derivatives.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerror_status\fR\fR
+.ad
+.RS 16n
+.rt  
+Pointer to where the error status for the access or \fBDMA\fR handle should be
+returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIversion\fR\fR
+.ad
+.RS 16n
+.rt  
+Version number of \fBddi_fm_error_t\fR. The driver should always set this to
+\fBDDI_FME_VERSION\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_fm_dma_err_get()\fR and \fBddi_fm_acc_err_get()\fR functions return
+the error status for a \fBDMA\fR or access handle respectively. If a fault has
+occurred that affects the resource mapped by the supplied handle, the supplied
+\fIerror_status\fR structure is updated to reflect error information captured
+during error handling by a bus or other device driver in the \fBI/O\fR data
+path.
+.sp
+.LP
+If an error is indicated for an access handle, the driver might no longer be
+able to access the mapped registers or memory using programmed \fBI/O\fR
+through the handle. Typically, this might occur after the device has failed to
+respond to an \fBI/O\fR access - in the case of a bus error, for instance, or a
+timeout. The effect of programmed \fBI/O\fR access made at the time of a fault
+is undefined. Read access via \fBddi_get8\fR(9F), for example, can return
+random values, while write access via \fBddi_put8\fR(9F) might or might not
+have an effect. It is possible, however, that the error might be transient. In
+that case, the driver can attempt to recover by calling
+\fBddi_fm_acc_err_clear()\fR, resetting the device to return it to a known
+state, then retrying any potentially failed transactions.
+.sp
+.LP
+If an error is indicated for a \fBDMA\fR handle, it implies that an error has
+been detected that has or will affect \fBDMA\fR transactions between the device
+and the memory currently bound to the handle - or the memory most recently
+bound, if the handle is currently unbound. Possible causes include the failure
+of a component in the \fBDMA\fR data path or an attempt by the device to make
+an invalid \fBDMA\fR access. The contents of any memory currently or previously
+bound to the handle should be considered indeterminate. The driver might be
+able to continue by freeing memory that is bound to the handle back to the
+system, resetting the device to return it to a known state, then retrying any
+potentially failed transactions.
+.sp
+.LP
+If the driver is unable to recover, the operating state should be changed by a
+call to \fBddi_fm_service_impact()\fR that specifies \fBDDI_SERVICE_LOST\fR for
+the impacted device instance. If the recovery and retry succeed, a call should
+still be made to \fBddi_fm_service_impact()\fR but \fBDDI_SERVICE_UNAFFECTED\fR
+should be specified.
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_fm_acc_err_get()\fR and \fBddi_fm_dma_err_get()\fR functions can be
+called from user, kernel, or high-level interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_dma_mem_alloc\fR(9F),
+\fBddi_fm_acc_err_clear\fR(9F), \fBddi_fm_service_impact\fR(9F),
+\fBddi_get8\fR(9F), \fBddi_put8\fR(9F), \fBddi_regs_map_setup\fR(9F),
+\fBddi_fm_error\fR(9S),
+.sp
+.LP
+\fIWriting Device Drivers\fR

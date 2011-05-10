@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mcopyin 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+mcopyin \- Convert an M_IOCTL or M_IOCDATA message to an M_COPYIN
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBvoid\fR \fBmcopyin\fR(\fBmblk_t *\fR\fImp\fR, \fBvoid *\fR\fIprivate\fR, \fBsize_t\fR \fIsize\fR, 
+     \fBvoid *\fR \fIuseraddr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 12n
+.rt  
+M_IOCTL or M_IOCDATA message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprivate\fR\fR
+.ad
+.RS 12n
+.rt  
+Value to which the \fBcq_private\fR field of \fBcopyreq\fR(9S) is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 12n
+.rt  
+Value to which the \fBcq_size\fR field of \fBcopyreq\fR(9S) is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuseraddr\fR\fR
+.ad
+.RS 12n
+.rt  
+Optionally, the value to which the \fBcq_addr\fR field of \fBcopyreq\fR(9S) is
+set.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmcopyin()\fR function converts an M_IOCTL or M_IOCDATA message into an
+M_COPYIN message using the supplied arguments.
+.sp
+.LP
+To convert the message, \fBmcopyin()\fR changes the message type to M_COPYIN,
+and its payload from a \fBiocblk\fR(9S) to a \fBcopyreq\fR(9S). Since the
+\fBiocblk\fR(9S) and \fBcopyreq\fR(9S) are designed to overlay one another, the
+only fields which must be updated are \fBcq_private\fR, \fBcq_size\fR, and
+\fBcq_addr\fR, which are set to the supplied values. If \fIuseraddr\fR is
+passed as NULL, \fImp\fR must be a transparent M_IOCTL, and \fBcq_addr\fR is
+assigned the pointer-sized quantity found at \fBmp->b_cont->b_rptr\fR.
+.sp
+.LP
+Any trailing message blocks associated with \fImp\fR are freed.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBmcopyout\fR(9F), \fBcopyreq\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,556 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_simple_prop_get 3SCF "7 Nov 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_simple_prop_get, scf_simple_prop_free, scf_simple_app_props_get,
+scf_simple_app_props_free, scf_simple_app_props_next,
+scf_simple_app_props_search, scf_simple_prop_numvalues, scf_simple_prop_type,
+scf_simple_prop_name, scf_simple_prop_pgname, scf_simple_prop_next_boolean,
+scf_simple_prop_next_count, scf_simple_prop_next_integer,
+scf_simple_prop_next_time, scf_simple_prop_next_astring,
+scf_simple_prop_next_ustring, scf_simple_prop_next_opaque,
+scf_simple_prop_next_reset \- simplified property read interface to Service
+Configuration Facility
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBscf_simple_prop_t *\fR\fBscf_simple_prop_get\fR(\fBscf_handle_t *\fR\fIhandle\fR,
+     \fBconst char *\fR\fIinstance\fR, \fBconst char *\fR\fIpgname\fR, \fBconst char *\fR\fIpropname\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_simple_prop_free\fR(\fBscf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBscf_simple_app_props_t *\fR\fBscf_simple_app_props_get\fR(\fBscf_handle_t *\fR\fIhandle\fR,
+     \fBconst char *\fR\fIinstance\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_simple_app_props_free\fR(\fBscf_simple_app_props_t *\fR\fIpropblock\fR);
+.fi
+
+.LP
+.nf
+\fBconst scf_simple_prop_t *\fR\fBscf_simple_app_props_next\fR
+     (\fBconst scf_simple_app_props_t *\fR\fIpropblock\fR,\fBscf_simple_prop_t *\fR\fIlast\fR);
+.fi
+
+.LP
+.nf
+\fBconst scf_simple_prop_t *\fR\fBscf_simple_app_props_search\fR
+     (\fBconst scf_simple_app_props_t *\fR\fIpropblock\fR, \fBconst char *\fR\fIpgname\fR,
+     \fBconst char *\fR\fIpropname\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_simple_prop_numvalues\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBscf_type_t\fR \fBscf_simple_prop_type\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBscf_simple_prop_name\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBscf_simple_prop_pgname\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBuint8_t *\fR\fBscf_simple_prop_next_boolean\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBuint64_t *\fR\fBscf_simple_prop_next_count\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBint64_t *\fR\fBscf_simple_prop_next_integer\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBint64_t *\fR\fBscf_simple_prop_next_time\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR,
+     \fBint32_t *\fR\fInsec\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscf_simple_prop_next_astring\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBscf_simple_prop_next_ustring\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBscf_simple_prop_next_opaque\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR,
+     \fBsize_t *\fR\fIlength\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBscf_simple_prop_next_reset\fR(\fBconst scf_simple_prop_t *\fR\fIprop\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The simplified read interface to the Service Configuration Facility deals with
+properties and blocks of properties.
+.sp
+.LP
+The \fBscf_simple_prop_get()\fR function pulls a single property. The
+\fBscf_simple_prop_*()\fR functions operate on the resulting
+\fBscf_simple_prop_t\fR.
+.sp
+.LP
+The application might need to get many properties or iterate through all
+properties. The \fBscf_simple_app_props_get()\fR function gets all properties
+from the service instance that are in property groups of type 'application'.
+Individual properties are pulled from the block using the
+\fBscf_simple_app_props_next()\fR function for iteration or
+\fBscf_simple_app_props_search()\fR to search. The pointer to the
+\fBscf_simple_prop_t\fR returned from iteration or searching can be acted upon
+using the \fBscf_simple_prop_*()\fR functions. Each \fBscf_*_get()\fR function
+has an accompanying \fBscf_*_free\fR function. The application does not free
+the pointer to the \fBscf_simple_prop_t\fR returned from the
+\fBscf_simple_app_props_next()\fR and \fBscf_simple_app_props_search()\fR
+calls. A free call is only used with a corresponding get call.
+.sp
+.LP
+The \fBscf_simple_prop_*()\fR functions return references to the read-only
+in-memory copy of the property information. Any changes to this information
+results in unstable behavior and inaccurate results. The simplified read
+interface provides read access only, with no provisions to modify data in the
+service configuration facility repository.
+.sp
+.LP
+The \fBscf_simple_prop_get()\fR function takes as arguments a bound handle, a
+service instance FMRI, and the property group and property name of a property.
+If \fIhandle\fR is \fINULL\fR, the library uses a temporary handle created for
+the purpose. If \fIinstance\fR is \fINULL\fR the library automatically finds
+the FMRI of the calling process. If \fIpgname\fR is \fINULL\fR, the library
+uses the default application property group. The caller is responsible for
+freeing the returned property with \fBscf_simple_prop_free()\fR.
+.sp
+.LP
+The \fBscf_simple_prop_free()\fR function frees the \fBscf_simple_prop_t\fR
+allocated by \fBscf_simple_prop_get()\fR.
+.sp
+.LP
+The \fBscf_simple_app_props_get()\fR function takes a bound handle and a
+service instance FMRI and pulls all the application properties into an
+\fBscf_simple_app_props_t\fR. If \fIhandle\fR is \fINULL\fR, the library uses a
+temporary handle created for the purpose. If \fIinstance\fR is \fINULL\fR, the
+library looks up the instance FMRI of the process calling the function. The
+caller is responsible for freeing the \fBscf_simple_app_props_t\fR with
+\fBscf_simple_app_props_free()\fR.
+.sp
+.LP
+The \fBscf_simple_app_props_free()\fR function frees the
+\fBscf_simple_app_props_t\fR allocated by \fBscf_simple_app_props_get()\fR.
+.sp
+.LP
+The \fBscf_simple_app_props_next()\fR function iterates over each property in
+an \fBscf_simple_app_props_t\fR. It takes an \fBscf_simple_app_props_t\fR
+pointer and the last property returned from the previous call and returns the
+next property in the \fBscf_simple_app_props_t\fR. Because the property is a
+reference into the \fBscf_simple_app_props_t\fR, its lifetime extends only
+until that structure is freed.
+.sp
+.LP
+The\fBscf_simple_app_props_search()\fR function queries for an exact match on a
+property in a property group. It takes an apps prop object, a property group
+name, and a property name, and returns a property pointer. Because the property
+is a reference into the \fBscf_simple_app_props_t\fR, its lifetime extends only
+until that structure is freed. If the property group name, \fIpgname\fR, is
+\fINULL\fR, "application" is used.
+.sp
+.LP
+The \fBscf_simple_prop_numvalues()\fR function takes a pointer to a property
+and returns the number of values in that property.
+.sp
+.LP
+The \fBscf_simple_prop_type()\fR function takes a pointer to a property and
+returns the type of the property in an \fBscf_type_t\fR.
+.sp
+.LP
+The \fBscf_simple_prop_name()\fR function takes a pointer to a property and
+returns a pointer to the property name string.
+.sp
+.LP
+The \fBscf_simple_prop_pgname()\fR function takes a pointer to a property and
+returns a pointer to the property group name string. The
+\fBscf_simple_prop_next_boolean()\fR, \fBscf_simple_prop_next_count()\fR,
+\fBscf_simple_prop_next_integer()\fR, \fBscf_simple_prop_next_astring()\fR, and
+\fBscf_simple_prop_next_ustring()\fR functions take a pointer to a property and
+return the first value in the property.  Subsequent calls iterate over all the
+values in the property. The property's internal iteration can be reset with
+\fBscf_simple_prop_next_reset()\fR.
+.sp
+.LP
+The \fBscf_simple_prop_next_time()\fR function takes a pointer to a property
+and the address of an allocated \fBint32_t\fR to hold the nanoseconds field,
+and returns the first value in the property. Subsequent calls iterate over the
+property values.
+.sp
+.LP
+The \fBscf_simple_prop_next_opaque()\fR function takes a pointer to a property
+and the address of an allocated integer to hold the size of the opaque buffer.
+It returns the first value in the property. Subsequent calls iterate over the
+property values, as do the \fBscf_simple_prop_next_*()\fR functions. The
+\fBscf_simple_prop_next_opaque()\fR function writes the size of the opaque
+buffer into the allocated integer.
+.sp
+.LP
+The \fBscf_simple_prop_next_reset()\fR function resets iteration on a property,
+so that a call to one of the \fBscf_simple_prop_next_*()\fR functions returns
+the first value in the property.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_simple_prop_get()\fR returns a pointer to an
+allocated \fBscf_simple_prop_t\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_app_props_get()\fR returns a pointer
+to an allocated \fBscf_simple_app_props_t\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_app_props_next()\fR returns a pointer
+to an \fBscf_simple_prop_t\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_app_props_search()\fR returns a
+pointer to an \fBscf_simple_prop_t\fR. Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_prop_numvalues()\fR returns the
+number of values in a property. Otherwise, it returns -1.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_prop_type()\fR returns an
+\fBscf_type_t\fR. Otherwise, it returns -1.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_prop_name()\fR and
+\fBscf_simple_prop_pgname()\fR return character pointers. Otherwise, they
+return \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_simple_prop_next_boolean()\fR,
+\fBscf_simple_prop_next_count()\fR, \fBscf_simple_prop_next_integer()\fR,
+\fBscf_simple_prop_next_time()\fR, \fBscf_simple_prop_next_astring()\fR,
+\fBscf_simple_prop_next_ustring()\fR, and \fBscf_simple_prop_next_opaque()\fR
+return a pointer to the next value in the property. After all values have been
+returned, NULL is returned and \fBSCF_ERROR_NONE\fR is set. On failure,
+\fINULL\fR is returned and the appropriate error value is set.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_simple_prop_get()\fR and \fBscf_simple_app_props_get()\fR functions
+will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the datastore is broken.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The instance FMRI is invalid or property name is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The memory allocation failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection handle is not bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_FOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified instance or property does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The caller is not authorized to read the property's value(s).
+.RE
+
+.sp
+.LP
+The \fBscf_simple_app_props_next()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 21n
+.rt  
+The value of the \fIpropblock\fR argument is \fINULL\fR.
+.RE
+
+.sp
+.LP
+The \fBscf_simple_app_props_search()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_FOUND\fR\fR
+.ad
+.RS 23n
+.rt  
+The property was not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 23n
+.rt  
+The value of the \fIpropblock\fR or \fIpropname\fR argument is \fINULL\fR.
+.RE
+
+.sp
+.LP
+The \fBscf_simple_prop_numvalues()\fR, \fBscf_simple_prop_type()\fR,
+\fBscf_simple_prop_name()\fR, and \fBscf_simple_prop_pgname()\fR functions will
+fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 21n
+.rt  
+The property is \fINULL\fR.
+.RE
+
+.sp
+.LP
+The \fBscf_simple_prop_next_boolean()\fR, \fBscf_simple_prop_next_count()\fR,
+\fBscf_simple_prop_next_integer()\fR, \fBscf_simple_prop_next_time()\fR,
+\fBscf_simple_prop_next_astring()\fR, \fBscf_simple_prop_next_ustring()\fR, and
+\fBscf_simple_prop_next_opaque()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 27n
+.rt  
+The property is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
+.ad
+.RS 27n
+.rt  
+The requested type does not match the property type.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSimple Property Get
+.sp
+.in +2
+.nf
+/*
+ * In this example, we pull the property named "size" from the
+ * default property group.  We make sure that the property
+ * isn't empty, and then copy it into the sizeval variable.
+ */
+
+scf_simple_prop_t       *prop;
+ssize_t                 numvals;
+int64_t                 *sizeval;
+
+prop = scf_simple_prop_get(
+        "svc://localhost/category/service/instance",
+        NULL, "size");
+
+numvals = scf_simple_prop_numvalues(prop);
+
+if(numvals > 0){
+        sizeval = scf_simple_prop_next_integer(prop);
+}
+
+scf_simple_prop_free(prop);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRProperty Iteration
+.sp
+.in +2
+.nf
+scf_simple_prop_t              *prop;
+scf_simple_app_props_t         *appprops;
+
+appprops = scf_simple_app_props_get(
+        "svc://localhost/category/service/instance");
+
+prop = scf_simple_app_props_next(appprops, NULL);
+
+while(prop != NULL)
+{
+        /*
+         * This iteration will go through every property in the
+         * instance's application block.  The user can use
+         * the set of property functions to pull the values out
+         * of prop, as seen in other examples.
+         */
+
+        (...code acting on each property...)
+
+
+prop = scf_simple_app_props_next(appprops, prop);
+
+}
+
+scf_simple_app_props_free(appprops);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRProperty Searching
+.sp
+.in +2
+.nf
+/*
+ * In this example, we pull the property block from the instance,
+ * and then query it.  Generally speaking, the simple get would
+ * be used for an example like this, but for the purposes of
+ * illustration, the non-simple approach is used.  The property
+ * is a list of integers that are pulled into an array.
+ * Note how val is passed back into each call, as described above.
+ */
+ 
+scf_simple_app_props_t         *appprops;
+scf_simple_prop_t              *prop;
+int                     i;
+int64_t                 *intlist;
+ssize_t                 numvals;
+ 
+appprops = scf_simple_app_props_get(
+              "svc://localhost/category/service/instance");
+ 
+prop = scf_simple_app_props_search(appprops, "appname", "numlist");
+ 
+if(prop != NULL){
+ 
+        numvals = scf_simple_prop_numvalues(prop);
+ 
+        if(numvals > 0){
+ 
+        intlist = malloc(numvals * sizeof(int64_t));
+ 
+        val = scf_simple_prop_next_integer(prop);
+ 
+                for(i=0, i < numvals, i++){
+                        intlist[i] = *val;
+                        val = scf_simple_prop_next_integer(prop);
+                }
+        }
+}
+ 
+scf_simple_app_props_free(appprops);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBattributes\fR(5)

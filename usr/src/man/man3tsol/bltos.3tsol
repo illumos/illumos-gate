@@ -1,0 +1,263 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bltos 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+bltos, bsltos, bcleartos \- translate binary labels to character coded labels
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBint\fR \fBbsltos\fR(\fBconst m_label_t *\fR\fIlabel\fR, char **\fIstring\fR,
+     const int \fIstr_len\fR, const int \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBbcleartos\fR(\fBconst m_label_t *\fR\fIlabel\fR, char **\fIstring\fR,
+     const int \fIstr_len\fR, const int \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions translate binary labels into strings controlled by the value of
+the \fIflags\fR parameter.
+.sp
+.LP
+The \fBbsltos()\fR function translates a binary sensitivity label into a
+string. The applicable \fIflags\fR are \fBLONG_CLASSIFICATION\fR or
+\fBSHORT_CLASSIFICATION\fR, \fBLONG_WORDS\fR or \fBSHORT_WORDS\fR,
+\fBVIEW_EXTERNAL\fR or \fBVIEW_INTERNAL\fR, and \fBNO_CLASSIFICATION\fR. A
+\fIflags\fR value \fB0\fR is equivalent to (\fBSHORT_CLASSIFICATION\fR |
+\fBLONG_WORDS\fR).
+.sp
+.LP
+The \fBbcleartos()\fR function translates a binary clearance into a string. The
+applicable \fIflags\fR are \fBLONG_CLASSIFICATION\fR or
+\fBSHORT_CLASSIFICATION\fR, \fBLONG_WORDS\fR or \fBSHORT_WORDS\fR,
+\fBVIEW_EXTERNAL\fR or \fBVIEW_INTERNAL\fR, and \fBNO_CLASSIFICATION\fR. A
+\fIflags\fR value 0 is equivalent to (\fBSHORT_CLASSIFICATION\fR |
+\fBLONG_WORDS\fR). The translation of a clearance might not be the same as the
+translation of a sensitivity label. These functions use different
+\fBlabel_encodings\fR file tables that might contain different words and
+constraints.
+.sp
+.LP
+The calling process must have \fBPRIV_SYS_TRANS_LABEL\fR in its set of
+effective privileges to perform label translation on labels that dominate the
+current process's sensitivity label.
+.sp
+.LP
+The generic form of an output character-coded label is:
+.sp
+.in +2
+.nf
+CLASSIFICATION WORD1 WORD2 WORD3/WORD4 SUFFIX PREFIX WORD5/WORD6
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Capital letters are used to display all \fBCLASSIFICATION\fR names and
+\fBWORD\fRs. The ` ' (space) character separates classifications and words from
+other words in all character-coded labels except where multiple words that
+require the same \fBPREFIX\fR or \fBSUFFIX\fR are present, in which case the
+multiple words are separated from each other by the `\fB/\fR' (slash)
+character.
+.sp
+.LP
+The \fIstring\fR argument can point to either a pointer to pre-allocated
+memory, or the value \fB(char *)0\fR. If \fIstring\fR points to a pointer to
+pre-allocated memory, then \fIstr_len\fR indicates the size of that memory. If
+\fIstring\fR points to the value \fB(char\ *)0\fR, memory is allocated using
+\fBmalloc()\fR to contain the translated character-coded labels. The translated
+\fIlabel\fR is copied into allocated or pre-allocated memory.
+.sp
+.LP
+The \fIflags\fR argument is \fB0\fR or the logical sum of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_WORDS\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate using long names of words defined in \fIlabel\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHORT_WORDS\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate using short names of words defined in \fIlabel\fR. If no short name
+is defined in the \fBlabel_encodings\fR file for a word, the long name is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_CLASSIFICATION\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate using long name of classification defined in \fIlabel\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHORT_CLASSIFICATION\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate using short name of classification defined in \fIlabel\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBACCESS_RELATED\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate only \fBaccess-related\fR entries defined in information label
+\fIlabel\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVIEW_EXTERNAL\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels to the lowest and highest
+labels defined in the \fBlabel_encodings\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVIEW_INTERNAL\fR\fR
+.ad
+.RS 24n
+.rt  
+Translate \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels to the \fBadmin low\fR
+\fBname\fR and \fBadmin high\fR \fBname\fR strings specified in the
+\fBlabel_encodings\fR file. If no strings are specified, the strings
+"\fBADMIN_LOW\fR" and "\fBADMIN_HIGH\fR" are used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO_CLASSIFICATION\fR\fR
+.ad
+.RS 24n
+.rt  
+Do not translate classification defined in \fIlabel\fR.
+.RE
+
+.SS "Process Attributes"
+.sp
+.LP
+If the \fBVIEW_EXTERNAL\fR or \fBVIEW_INTERNAL\fR flags are not specified,
+translation of \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels is controlled by the
+label view process attribute flags. If no label view process attribute flags
+are defined, their translation is controlled by the label view configured in
+the \fBlabel_encodings\fR file. A value of \fBExternal\fR specifies that
+\fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels are mapped to the lowest and
+highest labels defined in the \fBlabel_encodings\fR file. A value of
+\fBInternal\fR specifies that the \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels
+are translated to the \fBadmin low\fR and \fBadmin high\fR name strings
+specified in the \fBlabel_encodings\fR file. If no such names are specified,
+the strings "\fBADMIN_LOW\fR" and "\fBADMIN_HIGH\fR" are used.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBbsltos()\fR and \fBbcleartos()\fR functions
+return the length of the character-coded label, including the \fINULL\fR
+terminator.
+.sp
+.LP
+If the label is not of the valid defined required type, if the label is not
+dominated by the process sensitivity label and the process does not have
+\fBPRIV_SYS_TRANS_LABEL\fR in its set of effective privileges, or if the
+\fBlabel_encodings\fR file is inaccessible, these functions return \(mi1.
+.sp
+.LP
+If memory cannot be allocated for the return string or if the pre-allocated
+return string memory is insufficient to hold the string, these functions return
+0. The value of the pre-allocated string is set to the \fINULL\fR string
+(\fB*string[0]='\00';\fR).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/tsol/label_encodings\fR\fR
+.ad
+.sp .6
+.RS 4n
+The label encodings file contains the classification names, words, constraints,
+and values for the defined labels of this system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.sp
+.LP
+The \fBbsltos()\fR and \fBbcleartos()\fR functions are Obsolete. Use the
+\fBlabel_to_str\fR(3TSOL) function instead.
+.SH SEE ALSO
+.sp
+.LP
+\fBfree\fR(3C), \fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB),
+\fBmalloc\fR(3C), \fBlabel_encodings\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.
+.sp
+.LP
+If memory is allocated by these functions, the caller must free the memory with
+\fBfree\fR(3C) when the memory is no longer in use.

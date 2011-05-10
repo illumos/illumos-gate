@@ -1,0 +1,207 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priv_policy 9F "3 Apr 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+priv_policy, priv_policy_only, priv_policy_choice \- check, report, and audit
+privileges
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/policy.h>
+
+\fBint\fR \fBpriv_policy\fR(\fBconst cred_t  *\fR\fIcr\fR, \fBint\fR \fIpriv\fR, \fBint\fR \fIerr\fR,
+     \fBboolean_t\fR \fIflag\fR, \fBconst char  *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_policy_only\fR(\fBconst cred_t  *\fR\fIcr\fR, \fBint\fR \fIpriv\fR,
+     \fBboolean_t\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBpriv_policy_choice\fR(\fBconst cred_t  *\fR\fIcr\fR, \fBint\fR \fIpriv\fR,
+     \fBboolean_t\fR \fIflag\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcr\fR\fR
+.ad
+.RS 8n
+.rt  
+The credential to be checked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpriv\fR\fR
+.ad
+.RS 8n
+.rt  
+The integer value of the privilege to test.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 8n
+.rt  
+All zone privileges flag. Set to \fBB_FALSE\fR for most tests or \fBB_TRUE\fR
+if the operation requires the caller to have all available privileges in the
+zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerr\fR\fR
+.ad
+.RS 8n
+.rt  
+The error code to return.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsg\fR\fR
+.ad
+.RS 8n
+.rt  
+String that is added to the privilege debugging message if one is generated.
+NULL if no additional information is needed. Because the function name is
+included in the output, NULL is usually the best value to pass as a parameter.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions aid in privilege checking and privilege debugging.
+.sp
+.LP
+The \fBpriv_policy()\fR, \fBpriv_policy_only()\fR, and
+\fBpriv_policy_choice()\fR functions all check whether \fIpriv\fR is asserted
+in the effective set of the credential. The special value \fBPRIV_ALL\fR tests
+for all privileges.
+.sp
+.LP
+The \fBpriv_policy()\fR function updates the ASU accounting flag and records
+the privilege used on success in the audit trail if the required privilege was
+not a basic privilege.
+.sp
+.LP
+The \fBpriv_policy_only()\fR function checks whether a privilege is asserted
+and has no side effects.
+.sp
+.LP
+The \fBpriv_policy_choice()\fR function behaves like \fBpriv_policy_only()\fR
+but records the successfully used non-basic privileges in the audit trail.
+.SH RETURN VALUES
+.sp
+.LP
+On success, \fBpriv_policy()\fR return 0. On failure it returns its parameter
+\fIerr\fR.
+.sp
+.LP
+On success, \fBpriv_policy_choice()\fR and \fBpriv_policy_only()\fR return 1,
+on failure both return 0.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+This might be caused by any of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fIflags\fR parameter is invalid.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The specified privilege does not exist.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fIpriv\fR parameter contains invalid characters.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 16n
+.rt  
+There is no room to allocate another privilege.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+An attempt was made to allocate a privilege that was longer than
+\fB{PRIVNAME_MAX}\fR characters.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This functions can be called from user, interrupt, or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBacct\fR(3HEAD), \fBattributes\fR(5), \fBprivileges\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

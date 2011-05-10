@@ -1,0 +1,392 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ber_encode 3LDAP "6 Oct 2008" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ber_encode, ber_alloc, ber_printf, ber_put_int, ber_put_ostring,
+ber_put_string, ber_put_null, ber_put_boolean, ber_put_bitstring,
+ber_start_seq, ber_start_set, ber_put_seq, ber_put_set \- simplified Basic
+Encoding Rules library encoding functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+
+\fBBerElement *\fR\fBber_alloc\fR();
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_printf\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fI**fmt\fR[, \fIarg\fR... ]);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_int\fR(\fBBerElement\fR \fI*ber\fR, \fBlong\fR \fInum\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_ostring\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fI**str\fR, \fBunsigned long\fR \fIlen\fR,
+     \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_string\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fI**str\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_null\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_boolean\fR(\fBBerElement\fR \fI*ber\fR, \fBint\fR \fIbool\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_bitstring\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fI*str\fR, \fBint\fR \fIblen\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_start_seq\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_start_set\fR(\fBBerElement\fR \fI*ber\fR, \fBchar\fR \fItag\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_seq\fR(\fBBerElement\fR \fI*ber\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBber_put_set\fR(\fBBerElement\fR \fI*ber\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide a subfunction interface to a simplified implementation
+of the Basic Encoding Rules of ASN.1.  The version of BER these functions
+support is the one defined for the LDAP protocol.  The encoding rules are the
+same as BER, except that  only definite form lengths are used, and bitstrings
+and octet strings are always encoded in primitive form.  In addition, these
+lightweight BER functions restrict tags and class to fit in a single octet
+(this means the actual tag must be less than 31). When a "tag"is specified in
+the descriptions below, it refers to the tag, class, and primitive or
+constructed bit in the first octet of the encoding.  This man page describes
+the encoding functions in the lber library.  See \fBber_decode\fR(3LDAP) for
+details on the corresponding decoding functions.
+.sp
+.LP
+Normally, the only functions that need be called by an application are
+\fBber_alloc()\fR, to allocate a \fBBER\fR element, and \fBber_printf()\fR to
+do the actual encoding.  The other functions are provided for those
+applications that need more control than  \fBber_printf()\fR provides.  In
+general, these functions return the length of the element encoded, or
+\fB\(mi1\fR if an error occurred.
+.sp
+.LP
+The  \fBber_alloc()\fR function is used to allocate a new BER element.
+.sp
+.LP
+The  \fBber_printf()\fR function is used to encode a BER element in much the
+same way that  \fBsprintf(3S)\fR works.  One important difference, though, is
+that some state information is kept with the \fIber\fR parameter so that
+multiple calls can be made to  \fBber_printf()\fR to append things to the end
+of the BER element.   \fBBer_printf()\fR writes to \fIber\fR, a pointer to a
+\fBBerElement\fR such as returned by  \fBber_alloc()\fR. It interprets and
+formats its arguments according to the format string \fBfmt\fR. The format
+string can contain the following characters:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb\fR\fR
+.ad
+.RS 5n
+.rt  
+Boolean.  An integer parameter should be supplied.  A boolean element is
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBB\fR\fR
+.ad
+.RS 5n
+.rt  
+Bitstring.  A \fBchar *\fR pointer to the start of the bitstring is supplied,
+followed by the number of bits in the bitstring.  A bitstring element is
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 5n
+.rt  
+Integer.  An integer parameter should be supplied.  An integer element is
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 5n
+.rt  
+Null.  No parameter is required.  A null element is output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A \fBchar *\fR is supplied, followed by the length of the string
+pointed to.  An octet string element is output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A \fBstruct berval *\fR is supplied.  An octet string element is
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A null-terminated string is supplied.  An octet string element
+is output, not including the trailing null octet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 5n
+.rt  
+Tag.  An int specifying the tag to give the next element is provided. This
+works across calls.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBv\fR\fR
+.ad
+.RS 5n
+.rt  
+Several octet strings.  A null-terminated array of \fBchar *\fR is supplied.
+Note that a construct like '{v}' is required to get an actual sequence of octet
+strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB{\fR\fR
+.ad
+.RS 5n
+.rt  
+Begin sequence.  No parameter is required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB}\fR\fR
+.ad
+.RS 5n
+.rt  
+End sequence.  No parameter is required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR\fR
+.ad
+.RS 5n
+.rt  
+Begin set.  No parameter is required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB]\fR\fR
+.ad
+.RS 5n
+.rt  
+End set.  No parameter is required.
+.RE
+
+.sp
+.LP
+The  \fBber_put_int()\fR function writes the integer element \fInum\fR to the
+BER element \fIber\fR.
+.sp
+.LP
+The  \fBber_put_boolean()\fR function writes the boolean value given by
+\fIbool\fR to the BER element.
+.sp
+.LP
+The  \fBber_put_bitstring()\fR function writes \fIblen\fR bits starting at
+\fIstr\fR as a bitstring value to the given BER element.  Note that \fIblen\fR
+is the length in \fIbits\fR of the bitstring.
+.sp
+.LP
+The  \fBber_put_ostring()\fR function writes \fIlen\fR bytes starting at
+\fIstr\fR to the BER element as an octet string.
+.sp
+.LP
+The  \fBber_put_string()\fR function writes the null-terminated string (minus
+the terminating '') to the BER element as an octet string.
+.sp
+.LP
+The  \fBber_put_null()\fR function writes a  \fINULL\fR element to the BER
+element.
+.sp
+.LP
+The  \fBber_start_seq()\fR function is used to start a sequence in the BER
+element.  The  \fBber_start_set()\fR function works similarly. The end of the
+sequence or set is marked by the nearest matching call to  \fBber_put_seq()\fR
+or  \fBber_put_set()\fR, respectively.
+.sp
+.LP
+The  \fBber_first_element()\fR function is used to return the tag and length of
+the first element in a set or sequence.  It also returns in \fIcookie\fR a
+magic cookie parameter that should be passed to subsequent calls to
+\fBber_next_element()\fR, which returns similar information.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAssuming the following variable declarations, and that the
+variables have been assigned appropriately, an BER encoding of the following
+ASN.1 object:
+.sp
+.in +2
+.nf
+      AlmostASearchRequest := SEQUENCE {
+          baseObject      DistinguishedName,
+          scope           ENUMERATED {
+              baseObject    (0),
+              singleLevel   (1),
+              wholeSubtree  (2)
+          },
+          derefAliases    ENUMERATED {
+              neverDerefaliases   (0),
+              derefInSearching    (1),
+              derefFindingBaseObj (2),
+              alwaysDerefAliases  (3N)
+          },
+          sizelimit       INTEGER (0 .. 65535),
+          timelimit       INTEGER (0 .. 65535),
+          attrsOnly       BOOLEAN,
+          attributes      SEQUENCE OF AttributeType
+      }
+.fi
+.in -2
+
+.sp
+.LP
+can be achieved like so:
+.sp
+.in +2
+.nf
+      int    scope, ali, size, time, attrsonly;
+      char   *dn, **attrs;
+
+      /* ... fill in values ... */
+      if ( (ber = ber_alloc(\|)) == NULLBER )
+      /* error */
+
+      if ( ber_printf( ber, "{siiiib{v}}", dn, scope, ali,
+          size, time, attrsonly, attrs ) == -1 )
+              /* error */
+      else
+              /* success */
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+If an error occurs during encoding, \fBber_alloc()\fR returns \fINULL\fR; other
+functions generally return \fB\(mi1\fR\&.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBber_decode\fR(3LDAP), \fBattributes\fR(5)
+.sp
+.LP
+Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access
+Protocol", OSI-DS-26, April 1992.
+.sp
+.LP
+Information Processing - Open Systems Interconnection - Model and Notation -
+Service Definition - Specification of Basic Encoding Rules for Abstract Syntax
+Notation One, International Organization for Standardization, International
+Standard 8825.
+.SH NOTES
+.sp
+.LP
+The return values for all of these functions are declared in \fB<lber.h>\fR.

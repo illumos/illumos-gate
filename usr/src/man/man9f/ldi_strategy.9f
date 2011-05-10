@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_strategy 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_strategy \- Device strategy request
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_strategy\fR(\fBldi_handle_t\fR \fIlh\fR, \fB struct buf *\fR\fIbp\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR \fR
+.ad
+.RS 7n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to the \fBbuf(9S)\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_strategy()\fR function passes a strategy request to the device entry
+point for the device specified by the layered handle. This operation is
+supported for block devices.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_strategy()\fR function returns \fB0\fR if the strategy request has
+been passed on to the target device. Other possible return values are:
+.sp
+.ne 2
+.mk
+.na
+\fBEINVAL\fR
+.ad
+.RS 11n
+.rt  
+Invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBENOTSUP\fR
+.ad
+.RS 11n
+.rt  
+Operation is not supported for this device.
+.RE
+
+.sp
+.LP
+Once the request has been passed on to the target devices strategy entry point,
+any further errors will be reported by \fBbioerror\fR(9F) and
+\fBbiodone\fR(9F). See the \fBstrategy\fR(9E) entry point for more information.
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.

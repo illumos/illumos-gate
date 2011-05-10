@@ -1,0 +1,539 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bc 1 "29 Aug 2003" "SunOS 5.11" "User Commands"
+.SH NAME
+bc \- arbitrary precision arithmetic language
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/bc\fR [\fB-c\fR] [\fB-l\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/bc\fR [\fB-c\fR] [\fB-l\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbc\fR utility implements an arbitrary precision calculator. It takes
+input from any files given, then reads from the standard input. If the standard
+input and standard output to \fBbc\fR are attached to a terminal, the
+invocation of \fBbc\fR is  \fIinteractive\fR, causing behavioral constraints
+described in the following sections. \fBbc\fR processes a language that
+resembles C and is a preprocessor for the desk calculator program \fBdc\fR,
+which it invokes automatically unless the \fB-c\fR option is specified. In this
+case the \fBdc\fR input is sent to the standard output instead.
+.SH USAGE
+.sp
+.LP
+The syntax for  \fBbc\fR programs is as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIL\fR\fR
+.ad
+.RS 5n
+.rt  
+Means a letter \fBa\fR\(mi\fBz\fR,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIE\fR\fR
+.ad
+.RS 5n
+.rt  
+Means an expression: a (mathematical or logical) value, an operand  that takes
+a value, or a combination of operands and operators that evaluates to a value,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIS\fR\fR
+.ad
+.RS 5n
+.rt  
+Means a statement.
+.RE
+
+.SS "Comments"
+.sp
+.LP
+Enclosed in \fB/*\fR and \fB*/\fR.
+.SS "Names (Operands)"
+.br
+.in +2
+Simple variables: \fIL\fR.
+.in -2
+.br
+.in +2
+Array elements: \fIL\fR [ \fIE\fR ] (up to \fBBC_DIM_MAX\fR dimensions).
+.in -2
+.br
+.in +2
+The words \fBibase\fR, \fBobase\fR (limited to \fBBC_BASE_MAX\fR), and
+\fBscale\fR (limited to \fBBC_SCALE_MAX\fR).
+.in -2
+.SS "Other Operands"
+.sp
+.LP
+Arbitrarily long numbers with optional sign and decimal point. Strings of fewer
+than \fBBC_STRING_MAX\fR characters, between double quotes ("). \fB(\fR \fIE\fR
+\fB)\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsqrt ( \fR\fIE\fR\fB )\fR\fR
+.ad
+.RS 21n
+.rt  
+Square root
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlength ( \fR\fIE\fR\fB )\fR\fR
+.ad
+.RS 21n
+.rt  
+Number of significant decimal digits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBscale ( \fR\fIE\fR\fB )\fR\fR
+.ad
+.RS 21n
+.rt  
+Number of digits right of decimal point.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIL \fR\fB( \fR\fIE\fR , ... , \fIE\fR\fB )\fR\fR
+.ad
+.RS 21n
+.rt  
+ 
+.RE
+
+.SS "Operators"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+   \(mi   *   /   %   ^\fR\fR
+.ad
+.sp .6
+.RS 4n
+(\fB%\fR is remainder; \fB^\fR is power)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB++   \(mi\(mi \fR\fR
+.ad
+.sp .6
+.RS 4n
+(prefix and postfix; apply to names)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB==   <=   >=   !=   <   >\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=   =+   =\(mi   =*   =/   =%   =^\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.SS "Statements"
+.br
+.in +2
+\fIE\fR
+.in -2
+.br
+.in +2
+\fB{\fR \fIS\fR \fB;\fR.\|.\|. \fB;\fR \fIS\fR \fB}\fR
+.in -2
+.br
+.in +2
+\fBif (\fR \fIE\fR \fB)\fR \fIS\fR
+.in -2
+.br
+.in +2
+\fBwhile (\fR \fIE\fR \fB)\fR \fIS\fR
+.in -2
+.br
+.in +2
+\fBfor (\fR \fIE\fR \fB;\fR \fIE\fR \fB;\fR \fIE\fR \fB)\fR \fIS\fR
+.in -2
+.br
+.in +2
+null statement
+.in -2
+.br
+.in +2
+\fBbreak\fR
+.in -2
+.br
+.in +2
+\fBquit\fR
+.in -2
+.sp
+.LP
+\&.string
+.SS "Function Definitions"
+.br
+.in +2
+\fBdefine\fR \fIL\fR \fB(\fR \fIL\fR \fB,\fR.\|.\|.\|\fB,\fR \fIL\fR \fB) {\fR
+.in -2
+.br
+.in +2
+\fB	auto\fR \fIL\fR \fB,\fR.\|.\|.\|\fB,\fR \fIL\fR
+.in -2
+.br
+.in +2
+\fI	S\fR \fB;\fR.\|.\|.\| \fIS\fR
+.in -2
+.br
+.in +2
+\fB	return (\fR \fIE\fR \fB)\fR
+.in -2
+.br
+.in +2
+\fB}\fR
+.in -2
+.SS "Functions in \fB-l\fR Math Library"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs(\fR\fIx\fR\fB)\fR\fR
+.ad
+.RS 10n
+.rt  
+sine
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc(\fR\fIx\fR\fB)\fR\fR
+.ad
+.RS 10n
+.rt  
+cosine
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe(\fR\fIx\fR\fB)\fR\fR
+.ad
+.RS 10n
+.rt  
+exponential
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl(\fR\fIx\fR\fB)\fR\fR
+.ad
+.RS 10n
+.rt  
+log
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa(\fR\fIx\fR\fB)\fR\fR
+.ad
+.RS 10n
+.rt  
+arctangent
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBj(\fR\fIn\fR\fB,\fR\fIx)\fR\fR
+.ad
+.RS 10n
+.rt  
+Bessel function
+.RE
+
+.sp
+.LP
+All function arguments are passed by value.
+.sp
+.LP
+The value of a statement that is an expression is printed unless the main
+operator is an assignment. Either semicolons or new-lines may separate
+statements. Assignment to \fBscale\fR influences the number of digits to be
+retained on arithmetic operations in the manner of \fBdc\fR. Assignments to
+\fBibase\fR or \fBobase\fR set the input and output number radix respectively.
+.sp
+.LP
+The same letter may be used as an array, a function, and a simple variable
+simultaneously. All variables are global to the program. \fBauto\fR variables
+are stacked during function calls. When using arrays as function arguments or
+defining them as automatic variables, empty square brackets must follow the
+array name.
+.SH OPTIONS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Compiles only. The output is \fBdc\fR commands that are sent to the standard
+output.
+.RE
+
+.SS "/usr/bin/bc"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Defines the math functions and initializes \fBscale\fR to \fB20\fR, instead of
+the default zero.
+.RE
+
+.SS "/usr/xpg6/bin/bc"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Defines the math functions and initializes \fBscale\fR to \fB20\fR, instead of
+the default zero. All math results have the scale of \fB20\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A pathname of a text file containing \fBbc\fR program statements. After all
+cases of \fIfile\fR have been read, \fBbc\fR reads the standard input.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSetting the precision of a variable
+.sp
+.LP
+In the shell, the following assigns an approximation of the first ten digits of
+\fBn\fR to the variable \fIx\fR:
+
+.sp
+.in +2
+.nf
+\fBx=$(printf "%s\en" 'scale = 10; 104348/33215' | bc)\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDefining a computing function
+.sp
+.LP
+Defines a function to compute an approximate value of the exponential function:
+
+.sp
+.in +2
+.nf
+\fBscale = 20
+define e(x){
+	auto a, b, c, i, s
+	a = 1
+	b = 1
+	s = 1
+	for(i=1; 1==1; i++){
+		a = a*x
+		b = b*i
+		c = a/b
+		if(c == 0) return(s)
+		s = s+c
+	}
+}\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrinting the approximate values of the function
+.sp
+.LP
+Prints approximate values of the exponential function of the first ten
+integers:
+
+.sp
+.in +2
+.nf
+\fBfor(i=1; i<=10; i++) e(i)\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+\fBfor (i = 1; i <= 10; ++i) {         e(i) }\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBbc\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 15n
+.rt  
+All input files were processed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunspecified\fR\fR
+.ad
+.RS 15n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lib.b\fR\fR
+.ad
+.RS 25n
+.rt  
+mathematical library
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/include/limits.h\fR\fR
+.ad
+.RS 25n
+.rt  
+to define BC_ parameters
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdc\fR(1), \fBawk\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBbc\fR command does not recognize the logical operators \fB&&\fR and
+\fB|\||\fR.
+.sp
+.LP
+The \fBfor\fR statement must have all three expressions (\fIE\fR's).

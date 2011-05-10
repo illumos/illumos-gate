@@ -1,0 +1,177 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 2002 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH srv 9E "12 Nov 1992" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+srv \- service queued messages
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/stropts.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBintprefix\fR\fBrsrv\fR(\fBqueue_t *\fR\fIq\fR/* read side */
+.fi
+
+.LP
+.nf
+\fBintprefix\fR\fBwsrv\fR(\fBqueue_t *\fR\fIq\fR/* write side */
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is required for
+\fBSTREAMS\fR.
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the \fBqueue\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The optional service \fBsrv()\fR routine may be included in a \fBSTREAMS
+\fRmodule or driver for many possible reasons, including:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to provide greater control over the flow of messages in a stream;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to make it possible to defer the processing of some messages to avoid depleting
+system resources;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to combine small messages into larger ones, or break large messages into
+smaller ones;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+to recover from resource allocation failure. A module's or driver's
+\fBput\fR(9E) routine can test for the availability of a resource, and if it is
+not available, enqueue the message for later processing by the \fBsrv()\fR
+routine.
+.RE
+.sp
+.LP
+A message is first passed to a module's or driver's \fBput\fR(9E) routine,
+which may or may not do some processing. It must then either:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Pass the message to the next stream component with \fBputnext\fR(9F).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If a \fBsrv()\fR routine has been included, it may call \fBputq\fR(9F) to place
+the message on the queue.
+.RE
+.sp
+.LP
+Once a message has been enqueued, the \fBSTREAMS \fRscheduler controls the
+service routine's invocation. The scheduler calls the service routines in
+\fBFIFO \fRorder. The scheduler cannot guarantee a maximum delay \fBsrv()\fR
+routine to be called except that it will happen before any user level process
+are run.
+.sp
+.LP
+Every stream component (stream head, module or driver) has limit values it uses
+to implement flow control. Each component should check the tunable high and low
+water marks to stop and restart the flow of message processing. Flow control
+limits apply only between two adjacent components with \fBsrv()\fR routines.
+.sp
+.LP
+\fBSTREAMS \fR messages can be defined to have up to 256 different priorities
+to support requirements for multiple bands of data flow. At a minimum, a stream
+must distinguish between normal (priority zero) messages and high priority
+messages (such as \fBM_IOCACK\fR). High priority messages are always placed at
+the head of the \fBsrv()\fR routine's queue, after any other enqueued high
+priority messages. Next are messages from all included priority bands, which
+are enqueued in decreasing order of priority. Each priority band has its own
+flow control limits. If a flow controlled band is stopped, all lower priority
+bands are also stopped.
+.sp
+.LP
+Once the \fBSTREAMS \fRscheduler calls a \fBsrv()\fR routine, it must process
+all messages on its queue. The following steps are general guidelines for
+processing messages. Keep in mind that many of the details of how a \fBsrv()\fR
+routine should be written depend of the implementation, the direction of flow
+(upstream or downstream), and whether it is for a module or a driver.
+.RS +4
+.TP
+1.
+Use \fBgetq\fR(9F) to get the next enqueued message.
+.RE
+.RS +4
+.TP
+2.
+If the message is high priority, process (if appropriate) and pass to the
+next stream component with \fBputnext\fR(9F).
+.RE
+.RS +4
+.TP
+3.
+If it is not a high priority message (and therefore subject to flow
+control), attempt to send it to the next stream component with a \fBsrv()\fR
+routine. Use \fBbcanputnext\fR(9F) to determine if this can be done.
+.RE
+.RS +4
+.TP
+4.
+If the message cannot be passed, put it back on the queue with
+\fBputbq\fR(9F). If it can be passed, process (if appropriate) and pass with
+\fBputnext()\fR.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+Ignored.
+.SH SEE ALSO
+.sp
+.LP
+\fBput\fR(9E), \fBbcanput\fR(9F), \fBbcanputnext\fR(9F), \fBcanput\fR(9F),
+\fBcanputnext\fR(9F), \fBgetq\fR(9F), \fBnulldev\fR(9F), \fBputbq\fR(9F),
+\fBputnext\fR(9F), \fBputq\fR(9F), \fBqinit\fR(9S), \fBqueue\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH WARNINGS
+.sp
+.LP
+Each stream module must specify a read and a write service \fBsrv()\fR routine.
+If a service routine is not needed (because the \fBput()\fR routine processes
+all messages), a \fBNULL\fR pointer should be placed in module's
+\fBqinit\fR(9S) structure. Do not use \fBnulldev\fR(9F) instead of the
+\fBNULL\fR pointer. Use  of\fBnulldev\fR(9F) for a \fBsrv()\fR routine can
+result in flow control errors.

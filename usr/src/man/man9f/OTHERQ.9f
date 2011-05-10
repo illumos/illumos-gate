@@ -1,0 +1,91 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH OTHERQ 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+OTHERQ, otherq \- get pointer to queue's partner queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBqueue_t *\fR\fBOTHERQ\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the queue.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBOTHERQ()\fR function returns a pointer to the other of the two
+\fBqueue\fR structures that make up a STREAMS module or driver. If \fIq\fR
+points to the read queue the write queue will be returned, and vice versa.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBOTHERQ()\fR function returns a pointer to a queue's partner.
+.SH CONTEXT
+.sp
+.LP
+The \fBOTHERQ()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSetting Queues
+.sp
+.LP
+This routine sets the minimum packet size, the maximum packet size, the high
+water mark, and the low water mark for the read and write queues of a given
+module or driver. It is passed either one of the queues.  This could be used if
+a module or driver wished to update its queue parameters dynamically.
+
+.sp
+.in +2
+.nf
+ 1  void
+ 2  set_q_params(q, min, max, hi, lo)
+ 3      queue_t *q;
+ 4      short min;
+ 5      short max;
+ 6      ushort_t hi;
+ 7      ushort_t lo;
+ 8  {
+ 9	        q->q_minpsz = min;
+10	        q->q_maxpsz = max;
+11	        q->q_hiwat = hi;
+12   	     q->q_lowat = lo;
+13	        OTHERQ(q)->q_minpsz = min;
+14	        OTHERQ(q)->q_maxpsz = max;
+15	        OTHERQ(q)->q_hiwat = hi;
+16	        OTHERQ(q)->q_lowat = lo;
+17  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

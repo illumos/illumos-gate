@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gets 3C "15 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+gets, fgets \- get a string from a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBchar *\fR\fBgets\fR(\fBchar *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBfgets\fR(\fBchar *\fR\fIs\fR, \fBint\fR \fIn\fR, \fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgets()\fR function reads bytes from the standard input stream (see
+\fBIntro\fR(3)), \fBstdin\fR, into the array pointed to by \fIs\fR, until a
+newline character is read or an end-of-file condition is encountered. The
+newline character is discarded and the string is terminated with a null byte.
+.sp
+.LP
+If the length of an input line exceeds the size of \fIs\fR, indeterminate
+behavior may result. For this reason, it is strongly recommended that
+\fBgets()\fR be avoided in favor of \fBfgets()\fR.
+.sp
+.LP
+The \fBfgets()\fR function reads bytes from the \fIstream\fR into the array
+pointed to by \fIs\fR, until \fIn\fR\(mi1 bytes are read, or a newline
+character is read and transferred to \fIs\fR, or an end-of-file condition is
+encountered. The string is then terminated with a null byte.
+.sp
+.LP
+The \fBfgets()\fR and \fBgets()\fR functions may mark the \fBst_atime\fR field
+of the file associated with \fIstream\fR for update. The \fBst_atime\fR field
+will be marked for update by the first successful execution of \fBfgetc\fR(3C),
+\fBfgets()\fR, \fBfread\fR(3C), \fBfscanf\fR(3C), \fBgetc\fR(3C),
+\fBgetchar\fR(3C), \fBgets()\fR, or \fBscanf\fR(3C) using \fIstream\fR that
+returns data not supplied by a prior call to \fBungetc\fR(3C) or
+\fBungetwc\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+If end-of-file is encountered and no bytes have been read, no bytes are
+transferred to \fIs\fR and a null pointer is returned. For standard-conforming
+(see \fBstandards\fR(5)) applications, if the end-of-file indicator for the
+stream is set, no bytes are transferred to \fIs\fR and a null pointer is
+returned whether or not the stream is at end-of-file. If a read error occurs,
+such as trying to use these functions on a file that has not been opened for
+reading, a null pointer is returned and the error indicator for the stream is
+set. If end-of-file is encountered, the \fBEOF\fR indicator for the stream is
+set.  Otherwise \fIs\fR is returned.
+.SH ERRORS
+.sp
+.LP
+Refer to \fBfgetc\fR(3C).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlseek\fR(2), \fBread\fR(2), \fBferror\fR(3C), \fBfgetc\fR(3C),
+\fBfgetwc\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBgetchar\fR(3C),
+\fBscanf\fR(3C), \fBstdio\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

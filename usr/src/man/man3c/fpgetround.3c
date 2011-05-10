@@ -1,0 +1,178 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fpgetround 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fpgetround, fpsetround, fpgetmask, fpsetmask, fpgetsticky, fpsetsticky \- IEEE
+floating-point environment control
+.SH SYNOPSIS
+.LP
+.nf
+#include <ieeefp.h>
+
+\fBfp_rnd\fR \fBfpgetround\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBfp_rnd\fR \fBfpsetround\fR(\fBfp_rnd\fR \fIrnd_dir\fR);
+.fi
+
+.LP
+.nf
+\fBfp_except\fR \fBfpgetmask\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBfp_except\fR \fBfpsetmask\fR(\fBfp_except\fR \fImask\fR);
+.fi
+
+.LP
+.nf
+\fBfp_except\fR \fBfpgetsticky\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBfp_except\fR \fBfpsetsticky\fR(\fBfp_except\fR \fIsticky\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+There are five floating-point exceptions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+divide-by-zero,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+overflow,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+underflow,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+imprecise (inexact) result, and
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+invalid operation.
+.RE
+.sp
+.LP
+When a floating-point exception occurs, the corresponding sticky bit is set
+(1), and if the mask bit is enabled (1), the trap takes place. These routines
+let the user change the behavior on occurrence of any of these exceptions, as
+well as change the rounding mode for floating-point operations.
+.sp
+.LP
+The \fImask\fR argument is formed by the logical OR operation of the following
+floating-point exception masks:
+.sp
+.in +2
+.nf
+\fBFP_X_INV       /* invalid operation exception */
+FP_X_OFL       /* overflow exception */
+FP_X_UFL       /* underflow exception */
+FP_X_DZ        /* divide-by-zero exception */
+FP_X_IMP       /* imprecise (loss of precision) */\fR
+.fi
+.in -2
+
+.sp
+.LP
+The following floating-point rounding modes are passed to  \fBfpsetround\fR and
+returned by  \fBfpgetround()\fR.
+.sp
+.in +2
+.nf
+FP_RN       /* round to nearest representative number */
+FP_RP       /* round to plus infinity */
+FP_RM       /* round to minus infinity */
+FP_RZ       /* round to zero (truncate) */
+.fi
+.in -2
+
+.sp
+.LP
+The default environment is rounding mode set to nearest (\fBFP_RN\fR) and all
+traps disabled.
+.sp
+.LP
+The \fBfpsetsticky()\fR function modifies all sticky flags. The
+\fBfpsetmask()\fR function changes all mask bits. The \fBfpsetmask()\fR
+function clears the sticky bit corresponding to any exception being enabled.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfpgetround()\fR function returns the current rounding mode.
+.sp
+.LP
+The \fBfpsetround()\fR function sets the rounding mode and returns the previous
+rounding mode.
+.sp
+.LP
+The \fBfpgetmask()\fR function returns the current exception masks.
+.sp
+.LP
+The \fBfpsetmask()\fR function sets the exception masks and returns the
+previous setting.
+.sp
+.LP
+The \fBfpgetsticky()\fR function returns the current exception sticky flags.
+.sp
+.LP
+The \fBfpsetsticky()\fR function sets (clears) the exception sticky flags and
+returns the previous setting.
+.SH USAGE
+.sp
+.LP
+The C programming language requires truncation (round to zero) for floating
+point to integral conversions. The current rounding mode has no effect on these
+conversions.
+.sp
+.LP
+The sticky bit must be cleared to recover from the trap  and proceed.  If the
+sticky bit is not cleared before the next trap occurs, a wrong exception type
+may be signaled.
+.sp
+.LP
+Individual bits may be examined using the constants defined in
+\fB<ieeefp.h>\fR\&.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisnand\fR(3C), \fBattributes\fR(5)

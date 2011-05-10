@@ -1,0 +1,93 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH keylogin 1 "2 Dec 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+keylogin \- decrypt and store secret key with keyserv
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/keylogin\fR [\fB-r\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkeylogin\fR command prompts for a password, and uses it to decrypt the
+user's secret key. The key can be found in the \fB/etc/publickey\fR file (see
+\fBpublickey\fR(4)) or the  NIS map ``publickey.byname'' or the  NIS+ table
+``cred.org_dir'' in the user's home domain. The sources and their lookup order
+are specified in the \fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(4).
+Once decrypted, the user's secret key is stored by the local key server
+process, \fBkeyserv\fR(1M). This stored key is used when issuing requests to
+any secure RPC services, such as \fBNFS\fR or NIS+. The program
+\fBkeylogout\fR(1) can be used to delete the key stored by \fBkeyserv\fR
+\fB\&.\fR
+.sp
+.LP
+\fBkeylogin\fR fails if it cannot get the caller's key, or the password given
+is incorrect. For a new user or host, a new key can be added using
+\fBnewkey\fR(1M), \fBnisaddcred\fR(1M), or \fBnisclient\fR(1M).
+.sp
+.LP
+If multiple authentication mechanisms are configured for the system, each of
+the configured mechanism's secret key is decrypted and stored by
+\fBkeyserv\fR(1M). See \fBnisauthconf\fR(1M) for information on configuring
+multiple authentication mechanisms.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Update the \fB/etc/.rootkey\fR file. This file holds the unencrypted secret key
+of the superuser. Only the superuser can use this option. It is used so that
+processes running as superuser can issue authenticated requests without
+requiring that the administrator explicitly run \fBkeylogin\fR as superuser at
+system startup time. See \fBkeyserv\fR(1M). The \fB-r\fR option should be used
+by the administrator when the host's entry in the publickey database has
+changed, and the \fB/etc/.rootkey\fR file has become out-of-date with  respect
+to the actual key pair stored in the publickey database. The permissions on the
+\fB/etc/.rootkey\fR file are such that it can be read and written by the
+superuser but by no other user on the system.
+.sp
+If multiple authentication mechanisms are configured for the system, each of
+the configured mechanism's secret keys is stored in the \fB/etc/.rootkey\fR
+file.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/.rootkey\fR\fR
+.ad
+.RS 17n
+.rt  
+superuser's secret key
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchkey\fR(1), \fBkeylogout\fR(1), \fBlogin\fR(1), \fBkeyserv\fR(1M),
+\fBnewkey\fR(1M), \fBnisaddcred\fR(1M), \fBnisauthconf\fR(1M),
+\fBnisclient\fR(1M), \fBnsswitch.conf\fR(4), \fBpublickey\fR(4),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+NIS+ might not be supported in future releases of the Solaris operating system.
+Tools to aid the migration from NIS+ to LDAP are available in the current
+Solaris release. For more information, visit
+http://www.sun.com/directory/nisplus/transition.html.

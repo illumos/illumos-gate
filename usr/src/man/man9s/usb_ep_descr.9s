@@ -1,0 +1,148 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usb_ep_descr 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+usb_ep_descr \- USB endpoint descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/usba.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusb_ep_descr_t\fR endpoint descriptor defines endpoint attributes.  An
+endpoint is a uniquely addressable portion of a USB device that is a source or
+sink of data.
+.sp
+.LP
+Please refer to Section \fI9.6.6\fR of the \fIUSB 2.0\fR specification. The
+\fIUSB 2.0\fR specification is available at \fIwww.usb.org\fR.
+.sp
+.LP
+One or more endpoint descriptors are retrieved from a USB device during device
+enumeration.  They can be accessed via \fBusb_get_dev_data\fR(9F).
+.sp
+.LP
+A endpoint descriptor has the following fields:
+.sp
+.in +2
+.nf
+uint8_t    bLength                 Size of this descriptor
+                                   in bytes.
+
+uint8_t    bDescriptorType         Set to USB_DESCR_TYPE_EP.
+
+uint8_t    bEndpointAddress        Endpoint address.
+
+uint8_t    bmAttributes            Endpoint attrib. (see below.)
+
+uint16_t   wMaxPacketSize          Maximum pkt size.
+
+uint8_t    bInterval               Polling interval for interrupt
+                                   and isochro. endpoints.
+                                   NAK rate for high-speed control
+                                   and bulk endpoints.
+
+Endpoint descriptor bEndpointAddress bitmasks contain address number
+and direction fields as follows:
+    USB_EP_NUM_MASK        Address bits
+    USB_EP_DIR_MASK        Direction bit
+    USB_EP_DIR_OUT         OUT towards device
+    USB_EP_DIR_IN          IN towards host
+
+Endpoint descriptor transfer type bmAttributes values and mask:
+    USB_EP_ATTR_CONTROL    Endpoint supports control transfers
+    USB_EP_ATTR_ISOCH      Endpoint supports isochronous xfers
+    USB_EP_ATTR_BULK       Endpoint supports bulk transfers
+    USB_EP_ATTR_INTR       Endpoint supports interrupt transfers
+    USB_EP_ATTR_MASK       bmAttributes transfer-type bit field
+
+Endpoint descriptor synchronization type bmAttributes values and mask
+for isochronous endpoints:
+    USB_EP_SYNC_NONE       Endpoint supports no synchronization
+    USB_EP_SYNC_ASYNC      Endpoint supports asynchronous sync
+    USB_EP_SYNC_ADPT       Endpoint supports adaptive sync
+    USB_EP_SYNC_SYNC       Endpoint supports synchronous sync
+    USB_EP_SYNC_MASK       bmAttributes sync type bit field
+
+Endpoint descriptor feedback type bmAttributes values and mask for
+isochronous endpoints:
+    USB_EP_USAGE_DATA                 Data endpoint
+    USB_EP_USAGE_FEED                 Feedback endpoint
+    USB_EP_USAGE_IMPL                 Implicit feedback data endpoint
+    USB_EP_USAGE_MASK                 bmAttributes feedback type bit fld
+
+Endpoint descriptor additional-transaction-opportunities-
+per-microframe wMaxPacketSize values and mask for high speed 
+isochronous and interrupt endpoints:
+    USB_EP_MAX_PKTSZ_MASK             Mask for packetsize bits
+    USB_EP_MAX_XACTS_MASK             Bits for additional transfers per
+                                      microframe
+    USB_EP_MAX_XACTS_SHIFT            Left-shift this number of bits to
+                                      get to additional-transfers-per-
+                                      microframe bitfield
+
+Endpoint descriptor polling bInterval range values:
+    USB_EP_MIN_HIGH_CONTROL_INTRVL    Min NAK rate for highspd ctrl e/p
+    USB_EP_MAX_HIGH_CONTROL_INTRVL    Max NAK rate for highspd ctrl e/p
+
+    USB_EP_MIN_HIGH_BULK_INTRVL       Min NAK rate for highspd bulk e/p
+    USB_EP_MAX_HIGH_BULK_INTRVL       Max NAK rate for highspd bulk e/p
+
+    USB_EP_MIN_LOW_INTR_INTRVL        Min poll interval, lowspd intr e/p
+    USB_EP_MAX_LOW_INTR_INTRVL        Max poll interval, lowspd intr e/p
+
+    USB_EP_MIN_FULL_INTR_INTRVL       Min poll interval, fullspd intr e/p
+    USB_EP_MAX_FULL_INTR_INTRVL       Max poll interval, fullspd intr e/p
+
+Note that for the following polling bInterval range values, the interval
+is 2**(value-1). See Section 9.6.6 of the USB 2.0 specification.
+
+    USB_EP_MIN_HIGH_INTR_INTRVL       Min poll interval, highspd intr e/p
+    USB_EP_MAX_HIGH_INTR_INTRVL       Max poll interval, highspd intr e/p
+
+    USB_EP_MIN_FULL_ISOCH_INTRVL      Min poll interval, fullspd isoc e/p
+    USB_EP_MAX_FULL_ISOCH_INTRVL      Max poll interval, fullspd isoc e/p
+
+    USB_EP_MIN_HIGH_ISOCH_INTRVL      Min poll interval, highspd isoc e/p
+    USB_EP_MAX_HIGH_ISOCH_INTRVL      Max poll interval, highspd isoc e/p
+        
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based systems
+_
+Interface stabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F),
+\fBusb_get_dev_data\fR(9F), \fBusb_get_string_descr\fR(9F),
+\fBusb_parse_data\fR(9F), \fBusb_cfg_descr\fR(9S), \fBusb_ctrl_request\fR(9S),
+\fBusb_dev_descr\fR(9S), \fBusb_dev_qlf_descr\fR(9S), \fBusb_if_descr\fR(9S),
+\fBusb_other_speed_cfg_descr\fR(9S), \fBusb_string_descr\fR(9S)

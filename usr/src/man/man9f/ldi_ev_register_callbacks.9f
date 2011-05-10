@@ -1,0 +1,538 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_register_callbacks 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_register_callbacks \- add a notify and/or finalize callback
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIldi_ev_cookie_t *cookie\fR, 
+      \fIldi_ev_callback_t *callb\fR, \fBvoid\fR \fI*arg\fR, \fIldi_ev_callback_id_t *id\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_handle_t lh\fR\fR
+.ad
+.sp .6
+.RS 4n
+A layered handle representing the device for which the event notification was
+requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_cookie_t *cookie\fR\fR
+.ad
+.sp .6
+.RS 4n
+An opaque event cookie for the event type returned by a previous call to
+\fBldi_ev_get_cookie\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_callback_t *callb\fR\fR
+.ad
+.sp .6
+.RS 4n
+A data structure which currently has the following members:
+.sp
+.in +2
+.nf
+struct ldi_ev_callback {
+        uint_t  cb_vers;
+        int     (*cb_notify)(ldi_handle_t,
+                             ldi_ev_cookie_t cookie,
+                             void *arg, void *ev_data);
+        void    (*cb_finalize)(ldi_handle_t,
+                               ldi_ev_cookie_t cookie,
+                               int ldi_result,
+                               void *arg,
+                               void *ev_data);
+ } ldi_ev_callback_t;
+.fi
+.in -2
+
+where
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcb_vers\fR\fR
+.ad
+.RS 11n
+.rt  
+Version of callback vector. Must be set to \fBLDI_EV_CB_VERS\fR by the caller.
+.sp
+The arguments passed into the callbacks when they are invoked, include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBint ldi_result\fR\fR
+.ad
+.sp .6
+.RS 4n
+The actual result of the state change operation/event passed to finalize
+callback: \fBLDI_EV_SUCCESS\fR: The state change succeeded
+\fBLDI_EV_FAILURE\fR: The state change failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid *ev_data\fR\fR
+.ad
+.sp .6
+.RS 4n
+Event specific data.
+.RE
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid *arg\fR\fR
+.ad
+.sp .6
+.RS 4n
+A pointer to opaque caller private data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBldi_ev_callback_id_t *id\fR\fR
+.ad
+.sp .6
+.RS 4n
+Unique system wide registration id returned by ldi_ev_register_callbacks(9F)
+upon successful registration.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_register_callbacks()\fR interface allows layered drivers to
+register notify and finalize callbacks for certain events. These events are
+listed in the \fBldi_ev_get_cookie\fR(9F) man page. The notify callback is
+invoked only for events that can be blocked, just before the event occurs. The
+notify event is not called for events serviced by the \fBNDI\fR event  service
+framework since such events are by definition asynchronous. Only  the finalize
+callback is invoked for such events. Layered drivers that have registered
+notify callbacks for that event have the opportunity of blocking such events.
+The finalize callback is invoked once the final disposition of the state of a
+device (specifically a device minor node) is known. The callback is invoked
+with this result, either \fBLDI_EV_SUCCESS\fR (state change succeeded) or
+\fBLDI_EV_FAILURE\fR (state change failed). This allows layered driver
+consumers to finalize any changes they made in response to a previous "notify"
+callback.
+.sp
+.LP
+For example, a layered driver's notify callback may be invoked in response to a
+\fBLDI_EV_OFFLINE\fR event. The layered driver may reconfigure itself to stop
+using the device and permit the change to go forward. Once that happens, the
+\fBI/O\fR framework attempts to actually take the device offline. This offline
+attempt can have two possible outcomes: success or failure. In the former case,
+the finalize callback is invoked with the \fIldi_result\fR argument set to
+\fBLDI_EV_SUCCESS\fR and the layered driver knows that the device has been
+taken offline. In the latter case, finalize is invoked with the
+\fIldi_result\fR set to \fBLDI_EV_FAILURE\fR and the layered driver knows that
+the state change failed. In this case, it may choose to reconfigure itself to
+start using the device again.
+.sp
+.LP
+Finalize callbacks can be registered for all events including events that
+cannot be blocked.
+.sp
+.LP
+A layered driver can also propagate these events up the software stack by using
+interfaces offered by the \fBLDI\fR event framework. The layered driver may use
+\fBldi_ev_notify()\fR to propagate notify events occurring on minors it imports
+onto minors it exports. Similarly, it may use \fBldi_ev_finalize()\fR to
+propagate finalize events. Both \fBldi_ev_notify()\fR and
+\fBldi_ev_finalize()\fR propagate events to device contracts as well as LDI
+callbacks  registered against the exported minor nodes.
+.sp
+.LP
+The \fBLDI\fR event framework has the following guarantees and requirements
+with respect to these callbacks:
+.RS +4
+.TP
+1.
+The \fBnotify()\fR callback is invoked before an event (represented by the
+event cookie) occurs on a device (represented by the layered driver handle) and
+is invoked only for events that can be blocked. If the callback returns
+\fBLDI_EV_FAILURE\fR, the event is blocked. If the callback returns
+\fBLDI_EV_SUCCESS\fR, the event is allowed to proceed. If any other value is
+returned, it is an error. An error message is logged and the event is blocked.
+An example of an event that can be blocked and for which notify callbacks may
+be invoked is the offline event \fBLDI_EV_OFFLINE\fR.
+.RE
+.RS +4
+.TP
+2.
+The finalize callback is invoked for all events (including events that
+cannot be blocked) after the event has occurred. It is invoked with either
+\fBLDI_EV_SUCCESS\fR indicating that the event successfully happened or
+\fBLDI_EV_FAILURE\fR indicating that the event did not occur. The finalize
+callback returns no values. Good examples of events that cannot be blocked are
+the degrade event (\fBLDI_EV_DEGRADE\fR) and events serviced by the \fBNDI\fR
+event service framework.
+.RE
+.RS +4
+.TP
+3.
+Layered drivers may register one or both of these callbacks (that is, only
+for a notify event or only for a finalize event or for both) against any
+\fBLDI\fR handle that they may possess. If a finalize or notify event is not
+being registered, the corresponding pointer in the \fIldi_ev_callback_t\fR
+structure must be set to \fBNULL\fR. It is an error to attempt a registration
+with both callbacks set to \fBNULL\fR.
+.RE
+.RS +4
+.TP
+4.
+A notify and/or finalize callback is invoked only if the corresponding
+\fBLDI\fR handle is open. If an \fBLDI\fR handle against which the callbacks
+are registered is closed, the corresponding finalize and notify callbacks is
+not invoked as it is assumed that the layered driver is no longer interested in
+the device. See number 5 below for the exception to this rule.
+.RE
+.RS +4
+.TP
+5.
+A layered driver that closes it's \fBLDI\fR handle in it's notify routine
+receives the corresponding finalize callback after the event has occurred.
+Because the \fBLDI\fR handle has been closed, the finalize callback is invoked
+with a \fBNULL\fR \fBLDI\fR handle. It is the responsibility of the layered
+driver to maintain state in it's private "\fIarg\fR" parameter so that it can
+reopen the device (if desired) in it's finalize callback.
+.sp
+One example where this may happen is with the \fBLDI_EV_OFFLINE\fR event. A
+layered driver's notify callback may be invoked for an offline event. The
+layered driver may choose to allow this event to proceed. In that case, since
+it has a layered open of the device, it must close the \fBLDI\fR handle so that
+the offline event can succeed (an offline of a device does not succeed if there
+is any open of the device, layered or otherwise). Since the layered driver has
+closed the \fBLDI\fR handle in the notify routine, it's finalize callback (if
+any) is invoked with a \fBNULL\fR \fBLDI\fR handle. It is the responsibility of
+the layered driver to maintain state (such as the device path or \fBdevid\fR)
+in it's private "\fIarg\fR" parameter, so that in the finalize routine, it can
+do a layered open of the device if the device offline failed.
+.sp
+This is the only exception where the finalize callback is invoked if the
+\fBLDI\fR handle has been closed. In all other cases if the \fBLDI\fR handle
+has been closed, no corresponding callbacks is invoked.
+.RE
+.RS +4
+.TP
+6.
+In order for the offline event to succeed (\fBLDI_EV_OFFLINE\fR), it is
+imperative that there be no opens (including \fBLDI\fR handles) to the device.
+If a layered driver's notify callback is invoked for an offline event and the
+driver intends to allow the offline to proceed, the driver must close the
+corresponding \fBLDI\fR handle.
+.RE
+.RS +4
+.TP
+7.
+The notify and finalize callbacks are not automatically unregistered even if
+the corresponding \fBLDI\fR handle has been closed. It is the responsibility of
+the layered driver to unregister these callbacks when they are not required. It
+may do so using the \fBldi_ev_remove_callbacks\fR(9F) interface. The \fBLDI\fR
+framework may panic if the entity registering the callback (such as a
+\fBdip\fR, \fBdev_t\fR or \fBmodule\fR) no longer exists on the system and the
+corresponding callbacks have not been unregistered.
+.RE
+.RS +4
+.TP
+8.
+The \fBLDI\fR event framework guarantees that if a layered driver receives a
+notify event, it also receives a finalize event except if the layered consumer
+itself blocked the event (that is, it returned \fBLDI_EV_FAILURE\fR from it's
+notify callback. In this case, the layered driver knows that the event has been
+blocked and therefore does not need the finalize callback.
+.RE
+.RS +4
+.TP
+9.
+If a layered driver propagates notify events on minors it imports to minors
+it exports, it must first propagate these events up the software stack via
+\fBldi_eve_notify()\fR in it's notify callback. It must do so before attempting
+to check if it blocks the event. This is required, because a layered driver
+cannot release the device if consumers up the stack are still using the device.
+If \fBldi_ev_notify()\fR returns \fBLDI_EV_FAILURE\fR, the callback must
+immediately return \fBLDI_EV_FAILURE\fR from it's notify callback. If
+\fBldi_ev_notify()\fR  returns \fBLDI_EV_SUCCESS\fR, then the state change is
+permissible as far as consumers higher up in the software stack are concerned.
+The layered driver must then determine if it can permit the state change. If
+the state change is to be allowed, the layered driver must return
+\fBLDI_EV_SUCCESS\fR. If the layered driver determines that the state change
+should not be permitted, it must invoke \fBldi_ev_finalize()\fR  on minors it
+exports with a result of \fBLDI_EV_FAILURE\fR (to inform consumers up the
+stack) and then return \fBLDI_EV_FAILURE\fR from it's notify callback.
+.RE
+.RS +4
+.TP
+10.
+The \fBLDI\fR event framework generates finalize events at the earliest
+point where a failure is detected. If the failure is detected in the framework
+(such as in \fBldi_ev_notify()\fR) the framework generates the finalize events.
+In the event that a failure is first detected in a layered driver (that is, in
+the notify callback of a layered driver) the layered driver must use
+\fBldi_ev_finalize()\fR  to send finalize events up the software stack . See
+the examples for code snippets describing this scenario.
+.RE
+.RS +4
+.TP
+11.
+The finalize callback must first reconfigure itself before attempting to
+propagate the event up the software stack via \fBldi_ev_finalize\fR(9F). This
+is so that the minors it exports are available and ready for use before the
+finalize event is propagated up the software stack.
+.RE
+.RS +4
+.TP
+12.
+It may so happen that the event propagated up the software stack is not the
+same as the event for which a layered driver's notify/finalize callback is
+invoked. For example, a layered driver's callback(s) may be invoked for an
+offline event, but the driver may choose to only propagate the degraded event
+to its consumers (since it may have a mirror/copy of the data on the device.)
+In that case, the layered driver must generate a different event cookie (that
+is, one corresponding to the degraded event via \fBldi_ev_get_cookie\fR(9F))
+and use that cookie in its propagation calls (that is, \fBldi_ev_notify\fR(9F)
+and \fBldi_ev_finalize\fR(9F)).
+.RE
+.sp
+.LP
+Once the registration of the callback(s) is successful, an opaque
+\fIldi_ev_callback_id_t\fR structure is returned which may be used to
+unregister the callback(s) later.
+.SH RETURN VALUES
+.sp
+.LP
+The return values for this function are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Callback(s) added successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_FAILURE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Failed to add callback(s).
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel contexts only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRRegistration and Callbacks for the OFFLINE Event
+.sp
+.LP
+The following example shows how the \fBldi_ev_register_callbacks()\fR function
+performs a registration and callback for the offline event:
+
+.sp
+.in +2
+.nf
+static int
+event_register(void)
+{
+        ldi_handle_t lh;
+        ldi_ev_callback_t callb;
+        ldi_ev_cookie_t off_cookie;
+
+        if (ldi_ev_get_cookie(lh, LDI_EV_OFFLINE, &off_cookie)
+            == LDI_EV_FAILURE)
+                goto fail;
+
+
+        callb.cb_vers = LDI_EV_CB_VERS;
+        callb.cb_notify = off_notify;
+        callb.cb_finalize = off_finalize;
+
+        if (ldi_ev_register_callbacks(lh, off_cookie, &callb, arg, &id)
+            != LDI_EV_SUCCESS)
+                goto fail;
+}
+
+static void
+event_unregister(ldi_ev_callback_id_t id)
+{
+        ldi_ev_remove_callbacks(id);
+}
+
+static int
+off_notify(ldi_handle_t lh, ldi_ev_cookie_t off_cookie, void *arg,
+    void *ev_data)
+{
+
+        ASSERT(strcmp(ldi_ev_get_type(off_cookie), LDI_EV_OFFLINE) == 0);
+
+        /* Map imported minors to exported minor */
+        widget_map(lh, &minor, &spec_type);
+
+        /*
+         * Call ldi_ev_notify() to propagate events to our consumers.
+         * This *must* happen before we check if offline should be blocked
+         */
+        if (ldi_ev_notify(dip, minor, spec_type, off_cookie, ev_data)
+            != LDI_EV_SUCCESS)
+                return (LDI_EV_FAILURE);
+
+        /*
+         * Next, check if we can allow the offline
+         */
+        if (widget_check(lh) == WIDGET_SUCCESS) {
+                widget_save_path(arg, lh);
+                widget_reconfigure(lh, RELEASE);
+                ldi_close(lh);
+                return (LDI_EV_SUCCESS)
+        }
+
+        /*
+         * We cannot permit the offline. The first layer that detects
+         * failure i.e. us, must generate finalize events for our 
+           consumers
+         */
+        ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE, off_cookie,
+            ev_data);
+
+        return (LDI_EV_FAILURE);
+}
+
+/*
+/*
+ * The finalize callback will only be called if we returned LDI_EV_SUCCESS
+ * in our notify callback. ldi_result passed in may be SUCCESS or FAILURE
+ */
+static void
+off_finalize(ldi_handle_t NULL_lh, ldi_ev_cookie_t off_cookie, 
+    int ldi_result, void *arg, void *ev_data)
+{
+        ldi_handle_t lh;
+
+        ASSERT(strcmp(ldi_ev_get_type(off_cookie), LDI_EV_OFFLINE) == 0);
+
+        path = widget_get_path(arg);
+
+        widget_map_by_path(path, &minor, &spec_type);
+
+        if (ldi_result == LDI_EV_SUCCESS) {
+                ldi_ev_finalize(dip, minor, spec_type, LDI_EV_SUCCESS,
+                    off_cookie, ev_data);
+                return;
+        }
+
+        /* The offline failed. Reopen the device */
+        ldi_open_by_name(path, &lh);
+        widget_reconfigure(lh, REACQUIRE);
+
+        ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE, off_cookie,
+            ev_data);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRRegistration and Callbacks for the DEGRADE Event
+.sp
+.LP
+The following example shows how the \fBldi_ev_register_callbacks()\fR function
+performs a registration and callback for the degrade event:
+
+.sp
+.in +2
+.nf
+static int
+event_register(void)
+{
+        ldi_handle_t lh;
+        ldi_ev_callback_t callb;
+        ldi_ev_cookie_t dgrd_cookie;
+
+        if (ldi_ev_get_cookie(lh, LDI_EV_DEGRADE, &dgrd_cookie)
+            == LDI_EV_FAILURE)
+                goto fail;
+
+        /* no notify callbacks allowed for degrade events */
+        callb.cb_vers = LDI_EV_CB_VERS;
+        callb.cb_notify = NULL; /* NULL, notify cannot be used for 
+                                   DEGRADE */
+        callb.cb_finalize = dgrd_finalize;
+
+        if (ldi_ev_register_callbacks(lh, dgrd_cookie, &callb, arg, &id)
+            != LDI_EV_SUCCESS)
+                goto fail;
+}
+
+static void
+event_unregister(ldi_ev_callback_id_t id)
+{
+        ldi_ev_remove_callbacks(id);
+}
+
+/*
+ * For degrade events. ldi_result will always be LDI_EV_SUCCESS
+ */
+static void
+dgrd_finalize(ldi_handle_t lh, ldi_ev_cookie_t off_cookie, 
+    int ldi_result, void *arg, void *ev_data)
+{
+        ASSERT(ldi_result == LDI_EV_SUCCESS);
+        ASSERT(strcmp(ldi_ev_get_type(off_cookie), LDI_EV_DEGRADE) == 0);
+
+        widget_map(lh, &minor, &spec_type);
+
+        widget_reconfigure(lh, RELEASE);
+
+        ldi_ev_finalize(dip, minor, spec_type, LDI_EV_SUCCESS, d
+            grd_cookie, ev_data);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_finalize\fR(9F), \fBldi_ev_get_cookie\fR(9F),
+\fBldi_ev_notify\fR(9F), \fBldi_ev_remove_callbacks\fR(9F)

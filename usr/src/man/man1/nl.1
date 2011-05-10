@@ -1,0 +1,431 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nl 1 "28 Mar 1995" "SunOS 5.11" "User Commands"
+.SH NAME
+nl \- line numbering filter
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/nl\fR [\fB-p\fR] [\fB-b\fR [\fItype\fR]] [\fB-d\fR [\fIdelim\fR]] [\fB-f\fR [\fItype\fR]] 
+     [\fB-h\fR [\fItype\fR]] [\fB-i\fR [\fIincr\fR]] [\fB-l\fR [\fInum\fR]] [\fB-n\fR [\fIformat\fR]] 
+     [\fB-s\fR [\fIsep\fR]] [\fB-w\fR [\fIwidth\fR]] [\fB-v\fR [\fIstartnum\fR]] [\fIfile\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/nl\fR [\fB-p\fR] [\fB-b\fR \fItype\fR] [\fB-d\fR \fIdelim\fR] [\fB-f\fR \fItype\fR] 
+     [\fB-h\fR \fItype\fR] [\fB-i\fR \fIincr\fR] [\fB-l\fR \fInum\fR] [\fB-n\fR \fIformat\fR] [\fB-s\fR \fIsep\fR] 
+     [\fB-w\fR \fIwidth\fR] [\fB-v\fR \fIstartnum\fR] [\fIfile\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnl\fR utility reads lines from the named \fIfile\fR, or the standard
+input if no \fIfile\fR is named, and reproduces the lines on the standard
+output. Lines are numbered on the left in accordance with the command options
+in effect.
+.sp
+.LP
+\fBnl\fR views the text it reads in terms of logical pages. Line numbering is
+reset at the start of each logical page. A logical page consists of a header, a
+body, and a footer section. Empty sections are valid. Different line numbering
+options are independently available for header, body, and footer. For example,
+\fB-bt\fR (the default) numbers non-blank lines in the body section and does
+not number any lines in the header and footer sections.
+.sp
+.LP
+The start of logical page sections are signaled by input lines containing
+nothing but the following delimiter character(s):
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+Line contentsStart Of
+_
+\e:\e:\e:header
+_
+\e:\e:body
+_
+\e:footer
+.TE
+
+.sp
+.LP
+Unless optioned otherwise, \fBnl\fR assumes the text being read is in a single
+logical page body.
+.SH OPTIONS
+.sp
+.LP
+Command options may appear in any order and may be intermingled with an
+optional file name. Only one file may be named. The specified default is used
+when the option is not entered on the command line. \fB/usr/xpg4/bin/nl\fR
+options require option arguments.  A \fBSPACE\fR character \fBmay\fR separate
+options from option arguments. \fB/usr/bin/nl\fR options  \fBmay\fR have option
+arguments. If option-arguments of \fB/usr/bin/nl\fR options are not specified,
+these options result in the default. The supported options are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fItype\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies which logical page body lines are to be numbered. Recognized
+\fItype\fRs and their meanings are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR\fR
+.ad
+.RS 8n
+.rt  
+number all lines
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 8n
+.rt  
+number all non-empty lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 8n
+.rt  
+no line numbering
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fIexp\fR\fR\fR
+.ad
+.RS 8n
+.rt  
+number only lines that contain the regular expression specified in \fIexp\fR.
+See NOTES below.
+.RE
+
+Default \fItype\fR for logical page body is \fBt\fR (text lines numbered).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fItype\fR\fR
+.ad
+.RS 14n
+.rt  
+Same as \fB-b\fR\fItype\fR except for footer. Default \fItype\fR for logical
+page footer is \fBn\fR (no lines numbered).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fIdelim\fR\fR
+.ad
+.RS 14n
+.rt  
+The two delimiter characters specifying the start of a logical page section may
+be changed from the default characters (\e\|:\|) to two user-specified
+characters. If only one character is entered, the second character remains the
+default character (:). No space should appear between the \fB-d\fR and the
+delimiter characters. To enter a backslash, use two backslashes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fItype\fR\fR
+.ad
+.RS 14n
+.rt  
+Same as \fB-b\fR\fItype\fR except for header. Default \fItype\fR for logical
+page header is \fBn\fR (no lines numbered).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fIincr\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIincr\fR is the increment value used to number logical page lines. Default
+\fIincr\fR is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fInum\fR\fR
+.ad
+.RS 14n
+.rt  
+\fInum\fR is the number of blank lines to be considered as one. For example,
+\fB\(mil2\fR results in only the second adjacent blank being numbered (if the
+appropriate \fB-ha\fR, \fB-ba\fR, and/or \fB-fa\fR option is set). Default
+\fInum\fR is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fIformat\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIformat\fR is the line numbering format. Recognized values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBln\fR\fR
+.ad
+.RS 6n
+.rt  
+left justified, leading zeroes suppressed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrn\fR\fR
+.ad
+.RS 6n
+.rt  
+right justified, leading zeroes suppressed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrz\fR\fR
+.ad
+.RS 6n
+.rt  
+right justified, leading zeroes kept
+.RE
+
+Default \fIformat\fR is \fBrn\fR (right justified).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 14n
+.rt  
+Do not restart numbering at logical page delimiters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fIsep\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIsep\fR is the character(s) used in separating the line number and the
+corresponding text line. Default \fIsep\fR is a \fBTAB\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fIstartnum\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIstartnum\fR is the initial value used to number logical page lines. Default
+\fIstartnum\fR is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fIwidth\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIwidth\fR is the number of characters to be used for the line number. Default
+\fIwidth\fR is \fB6\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of a text file to be line-numbered.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn example of the nl command
+.sp
+.LP
+The command:
+
+.sp
+.in +2
+.nf
+example% \fBnl -v10 -i10 -d!+ filename1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will cause the first line of the page body to be numbered \fB10\fR, the second
+line of the page body to be numbered \fB20\fR, the third \fB30\fR, and so
+forth. The logical page delimiters are !+.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBnl\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocale\fR/LC_COLLATE/CollTable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Collation table generated by \fBlocaledef\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocale\fR/LC_COLLATE/coll.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shared object containing string transformation library routines
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/xpg4/bin/nl"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpr\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBregex\fR(5),
+\fBregexp\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Internationalized Regular Expressions are used in the POSIX and "C" locales. In
+other locales, Internationalized Regular Expressions are used if the following
+two conditions are met:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/usr/lib/locale/\fIlocale\fR/LC_COLLATE/CollTable\fR is present.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/usr/lib/locale/\fIlocale\fR/LC_COLLATE/coll.so\fR is not present.
+.RE
+.sp
+.LP
+Otherwise, Simple Regular Expressions are used.
+.sp
+.LP
+Internationalized Regular Expressions are explained on \fBregex\fR(5). Simple
+Regular Expressions are explained on  \fBregexp\fR(5).

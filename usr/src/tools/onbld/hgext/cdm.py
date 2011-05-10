@@ -15,7 +15,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2008, 2010 Richard Lowe
+# Copyright 2008, 2011 Richard Lowe
 #
 
 '''OpenSolaris extensions to Mercurial
@@ -28,11 +28,6 @@ prepare your changes for integration.
 
 
 The Parent
-
-    To provide a uniform notion of parent workspace regardless of
-filesystem-based access, Cadmium uses the highest numbered changeset
-on the current branch that is also in the parent workspace to
-represent the parent workspace.
 
     To provide a uniform notion of parent workspace regardless of
 filesystem-based access, Cadmium uses the highest numbered changeset
@@ -104,9 +99,9 @@ try:
 except Version.VersionMismatch, badversion:
     raise util.Abort("Version Mismatch:\n %s\n" % badversion)
 
-from mercurial import cmdutil, ignore, node
+from mercurial import cmdutil, ignore, node, patch
 
-from onbld.Scm.WorkSpace import ActiveEntry, WorkSpace
+from onbld.Scm.WorkSpace import WorkSpace, WorkList
 from onbld.Scm.Backup import CdmBackup
 from onbld.Checks import Cddl, Comments, Copyright, CStyle, HdrChk
 from onbld.Checks import JStyle, Keywords, Mapfile
@@ -242,9 +237,22 @@ def cdm_pdiffs(ui, repo, *pats, **opts):
     cdm').
     '''
 
-    parent = opts['parent']
+    act = wslist[repo].active(opts.get('parent'))
+    if not act.revs:
+        return
 
-    diffs = wslist[repo].pdiff(pats, opts, parent=parent)
+    #
+    # If no patterns were specified, either explicitly or via -I or -X
+    # use the active list files to avoid a workspace walk.
+    #
+    if pats or opts.get('include') or opts.get('exclude'):
+        matchfunc = wslist[repo].matcher(pats=pats, opts=opts)
+    else:
+        matchfunc = wslist[repo].matcher(files=act.files())
+
+    opts = patch.diffopts(ui, opts)
+    diffs = wslist[repo].diff(act.parenttip.node(), act.localtip.node(),
+                              match=matchfunc, opts=opts)
     if diffs:
         ui.write(diffs)
 
@@ -268,41 +276,30 @@ def cdm_list(ui, repo, **opts):
     and --removed.  By default, all files are shown.
     '''
 
-    wanted = []
-
-    if opts['added']:
-        wanted.append(ActiveEntry.ADDED)
-    if opts['modified']:
-        wanted.append(ActiveEntry.MODIFIED)
-    if opts['removed']:
-        wanted.append(ActiveEntry.REMOVED)
-
     act = wslist[repo].active(opts['parent'])
-    chngmap = {ActiveEntry.MODIFIED: 'modified',
-               ActiveEntry.ADDED: 'added',
-               ActiveEntry.REMOVED: 'removed'}
+    wanted = set(x for x in ('added', 'modified', 'removed') if opts[x])
+    changes = {}
 
-    lst = {}
     for entry in act:
         if wanted and (entry.change not in wanted):
             continue
 
-        chngstr = chngmap[entry.change]
-        if chngstr not in lst:
-            lst[chngstr] = []
-        lst[chngstr].append(entry)
+        if entry.change not in changes:
+            changes[entry.change] = []
+        changes[entry.change].append(entry)
 
-    for chng in sorted(lst.keys()):
-        ui.write(chng + ':\n')
-        for elt in sorted(lst[chng]):
-            if elt.is_renamed():
-                ui.write('\t%s (renamed from %s)\n' % (elt.name,
-                                                      elt.parentname))
-            elif elt.is_copied():
-                ui.write('\t%s (copied from %s)\n' % (elt.name,
-                                                      elt.parentname))
+    for change in sorted(changes.keys()):
+        ui.write(change + ':\n')
+
+        for entry in sorted(changes[change]):
+            if entry.is_renamed():
+                ui.write('\t%s (renamed from %s)\n' % (entry.name,
+                                                      entry.parentname))
+            elif entry.is_copied():
+                ui.write('\t%s (copied from %s)\n' % (entry.name,
+                                                      entry.parentname))
             else:
-                ui.write('\t%s\n' % elt.name)
+                ui.write('\t%s\n' % entry.name)
 
 
 def cdm_bugs(ui, repo, parent=None):
@@ -913,6 +910,11 @@ def cdm_recommit(ui, repo, **opts):
                 ui.warn('\t%d\n' % head)
             raise util.Abort('you must merge before recommitting')
 
+        #
+        # We can safely use the worklist here, as we know (from the
+        # abort_if_dirty() check above) that the working copy has not been
+        # modified.
+        #
         active = ws.active(parent)
 
         if filter(lambda b: len(b.parents()) > 1, active.bases()):
@@ -1264,6 +1266,120 @@ def cdm_webrev(ui, repo, **opts):
     return 0
 
 
+def cdm_debugcdmal(ui, repo, *pats, **opts):
+    '''dump the active list for the sake of debugging/testing'''
+
+    ui.write(wslist[repo].active(opts['parent']).as_text(pats))
+
+
+def cdm_changed(ui, repo, *pats, **opts):
+    '''mark a file as changed in the working copy
+
+    Maintain a list of files checked for modification in the working
+    copy.  If the list exists, most cadmium commands will only check
+    the working copy for changes to those files, rather than checking
+    the whole workspace (this does not apply to committed changes,
+    which are always seen).
+
+    Since this list functions only as a hint as to where in the
+    working copy to look for changes, entries that have not actually
+    been modified (in the working copy, or in general) are not
+    problematic.
+
+
+    Note: If such a list exists, it must be kept up-to-date.
+
+
+    Renamed files can be added with reference only to their new name:
+      $ hg mv foo bar
+      $ hg changed bar
+
+    Without arguments, 'hg changed' will list all files recorded as
+    altered, such that, for instance:
+      $ hg status $(hg changed)
+      $ hg diff $(hg changed)
+    Become useful (generally faster than their unadorned counterparts)
+
+    To create an initially empty list:
+      $ hg changed -i
+    Until files are added to the list it is equivalent to saying
+    "Nothing has been changed"
+
+    Update the list based on the current active list:
+      $ hg changed -u
+    The old list is emptied, and replaced with paths from the
+    current active list.
+
+    Remove the list entirely:
+      $ hg changed -d
+    '''
+
+    def modded_files(repo, parent):
+        out = wslist[repo].findoutgoing(wslist[repo].parent(parent))
+        outnodes = repo.changelog.nodesbetween(out)[0]
+
+        files = set()
+        for n in outnodes:
+            files.update(repo.changectx(n).files())
+
+        files.update(wslist[repo].status().keys())
+        return files
+
+    #
+    # specced_pats is convenient to treat as a boolean indicating
+    # whether any file patterns or paths were specified.
+    #
+    specced_pats = pats or opts['include'] or opts['exclude']
+    if len(filter(None, [opts['delete'], opts['update'], opts['init'],
+                         specced_pats])) > 1:
+        raise util.Abort("-d, -u, -i and patterns are mutually exclusive")
+
+    wl = WorkList(wslist[repo])
+
+    if (not wl and specced_pats) or opts['init']:
+        wl.delete()
+        if yes_no(ui, "Create a list based on your changes thus far?", True):
+            map(wl.add, modded_files(repo, opts.get('parent')))
+
+    if opts['delete']:
+        wl.delete()
+    elif opts['update']:
+        wl.delete()
+        map(wl.add, modded_files(repo, opts.get('parent')))
+        wl.write()
+    elif opts['init']:       # Any possible old list was deleted above
+        wl.write()
+    elif specced_pats:
+        sources = []
+
+        match = wslist[repo].matcher(pats=pats, opts=opts)
+        for abso in repo.walk(match):
+            if abso in repo.dirstate:
+                wl.add(abso)
+                #
+                # Store the source name of any copy.  We use this so
+                # both the add and delete of a rename can be entered
+                # into the WorkList with only the destination name
+                # explicitly being mentioned.
+                #
+                fctx = wslist[repo].workingctx().filectx(abso)
+                rn = fctx.renamed()
+                if rn:
+                    sources.append(rn[0])
+            else:
+                ui.warn("%s is not version controlled -- skipping\n" %
+                        match.rel(abso))
+
+        if sources:
+            for fname, chng in wslist[repo].status(files=sources).iteritems():
+                if chng == 'removed':
+                    wl.add(fname)
+        wl.write()
+    else:
+        for elt in sorted(wl.list()):
+            ui.write("%s\n" % wslist[repo].filepath(elt))
+
+
 cmdtable = {
     'apply': (cdm_apply, [('p', 'parent', '', 'parent workspace'),
                           ('r', 'remain', None, 'do not change directory')],
@@ -1277,6 +1393,18 @@ cmdtable = {
              'hg bugs [-p PARENT]'),
     'cddlchk': (cdm_cddlchk, [('p', 'parent', '', 'parent workspace')],
                 'hg cddlchk [-p PARENT]'),
+    'changed': (cdm_changed, [('d', 'delete', None, 'delete the file list'),
+                              ('u', 'update', None, 'mark all changed files'),
+                              ('i', 'init', None, 'create an empty file list'),
+                              ('p', 'parent', '', 'parent workspace'),
+                              ('I', 'include', [],
+                               'include names matching the given patterns'),
+                              ('X', 'exclude', [],
+                               'exclude names matching the given patterns')],
+                'hg changed -d\n'
+                'hg changed -u\n'
+                'hg changed -i\n'
+                'hg changed [-I PATTERN...] [-X PATTERN...] [FILE...]'),
     'comchk': (cdm_comchk, [('p', 'parent', '', 'parent workspace'),
                             ('N', 'nocheck', None,
                              'do not compare comments with databases')],
@@ -1287,6 +1415,8 @@ cmdtable = {
                   'hg copyright [-p PARENT]'),
     'cstyle': (cdm_cstyle, [('p', 'parent', '', 'parent workspace')],
                'hg cstyle [-p PARENT]'),
+    'debugcdmal': (cdm_debugcdmal, [('p', 'parent', '', 'parent workspace')],
+                   'hg debugcdmal [-p PARENT] [FILE...]'),
     'eval': (cdm_eval, [('p', 'parent', '', 'parent workspace'),
                         ('r', 'remain', None, 'do not change directory')],
              'hg eval [-p PARENT] [-r] command...'),

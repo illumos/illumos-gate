@@ -1,0 +1,347 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc. - All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH print 1 "27 Mar 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+print \- shell built-in function to output characters to the screen or window
+.SH SYNOPSIS
+.SS "ksh"
+.LP
+.nf
+\fBprint\fR [\fB-Rnprsu\fR [\fIn\fR]] [\fIarg\fR]...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBprint\fR [\fB-Renprs\fR] [\fB-f\fR \fIformat\fR] [\fB-u\fR \fIfd\fR] [\fIstring\fR...]
+.fi
+
+.SH DESCRIPTION
+.SS "ksh"
+.sp
+.LP
+The shell output mechanism. When no options are specified, or when an option
+followed by \fB\&'\fR a \fB\(mi\fR is specified, or when just \fB-\fR is
+specified, the arguments are printed on standard output as described by
+\fBecho\fR(1).
+.SS "ksh93"
+.sp
+.LP
+By default, \fBprint\fR writes each string operand to standard output and
+appends a NEWLINE character.
+.sp
+.LP
+Unless, the \fB-r\fR, \fB-R\fR, or \fB-f\fR option is speciifed, each \fB\e\fR
+character in each string operand is processed specially as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ea\fR\fR
+.ad
+.RS 8n
+.rt  
+Alert character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\eb\fR\fR
+.ad
+.RS 8n
+.rt  
+Backspace character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ec\fR\fR
+.ad
+.RS 8n
+.rt  
+Terminate output without appending NEWLINE. The remaining string operands are
+ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\eE\fR\fR
+.ad
+.RS 8n
+.rt  
+Escape character (\fBASCII\fR octal \fB033\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ef\fR\fR
+.ad
+.RS 8n
+.rt  
+FORM FEED character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\en\fR\fR
+.ad
+.RS 8n
+.rt  
+NEWLINE character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\et\fR\fR
+.ad
+.RS 8n
+.rt  
+Tab character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\ev\fR\fR
+.ad
+.RS 8n
+.rt  
+Vertical tab character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e\e\fR\fR
+.ad
+.RS 8n
+.rt  
+Backslash character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\e0\fR\fIx\fR\fR
+.ad
+.RS 8n
+.rt  
+The 8-bit character whose \fBASCII\fR code is the \fB1\fR-, \fB2\fR-, or
+\fB3\fR-digit octal number \fIx\fR.
+.RE
+
+.SH OPTIONS
+.SS "ksh"
+.sp
+.LP
+The following options are supported by \fBksh\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 12n
+.rt  
+Suppresses \fBnew-line\fR from being added to the output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fB-R\fR\fR
+.ad
+.RS 12n
+.rt  
+Raw mode. Ignore the escape conventions of \fBecho\fR. The \fB-R\fR option
+prints all subsequent arguments and options other than \fB-n\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 12n
+.rt  
+Cause the arguments to be written onto the pipe of the process spawned with
+\fB|&\fR instead of standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 12n
+.rt  
+Cause the arguments to be written onto the history file instead of standard
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR [ \fIn\fR ]\fR
+.ad
+.RS 12n
+.rt  
+Specify a one digit file descriptor unit number \fIn\fR on which the output is
+placed. The default is 1.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fI\fR\fR
+.ad
+.RS 13n
+.rt  
+Unless \fB-f\fR is specified, process \fB\e\fR sequences in each string operand
+as described above. This is the default behavior.
+.sp
+If both \fB-e\fR and \fB-r\fR are specified, the last one specified is the one
+that is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIformat\fR\fR
+.ad
+.RS 13n
+.rt  
+Write the string arguments using the format string \fIformat\fR and do not
+append a NEWLINE. See \fBprintf\fR(1) for details on how to specify format.
+.sp
+When the \fB-f\fR option is specified and there are more string operands than
+format specifiers, the format string is reprocessed from the beginning. If
+there are fewer string operands than format specifiers, then outputting ends at
+the first unneeded format specifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 13n
+.rt  
+Do not append a NEWLINE character to the output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 13n
+.rt  
+Write to the current co-process instead of standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.br
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 13n
+.rt  
+Do not process \fB\e\fR sequences in each string operand as described above.
+.sp
+If both \fB-e\fR and \fB-r\fR are specified, the last one specified is the one
+that is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Write the output as an entry in the shell history file instead of standard
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIfd\fR\fR
+.ad
+.RS 13n
+.rt  
+Write to file descriptor number \fIfd\fR instead of standard output. The
+default value is \fB1\fR.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+Output file is not open for writing.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBecho\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBprintf\fR(1),
+\fBattributes\fR(5)

@@ -1,0 +1,70 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH panel_userptr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+panel_userptr, set_panel_userptr \- associate application data with a panels
+panel
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpanel\fR \fB -lcurses \fR [ \fIlibrary\fR .. ]
+#include <panel.h>
+
+
+
+\fBint\fR \fBset_panel_userptr\fR(\fBPANEL *\fR\fIpanel\fR, \fBchar *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR \fBpanel_userptr\fR(\fBPANEL *\fR\fIpanel\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Each panel has a user pointer available for maintaining relevant information.
+.sp
+.LP
+\fBset_panel_userptr()\fR sets the user pointer of \fIpanel\fR to \fIptr\fR.
+.sp
+.LP
+\fBpanel_userptr()\fR returns the user pointer of \fIpanel\fR.
+.SH RETURN VALUES
+.sp
+.LP
+\fBset_panel_userptr\fR returns \fBOK\fR if successful, \fBERR\fR otherwise.
+.sp
+.LP
+\fBpanel_userptr\fR returns \fINULL\fR if there is no user pointer assigned to
+\fIpanel\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBpanels\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<panel.h>\fR automatically includes the header
+\fB<curses.h>\fR\&.

@@ -1,0 +1,109 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmallocmap 9F "20 Nov 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+rmallocmap, rmallocmap_wait, rmfreemap \- allocate and free resource maps
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBstruct map *\fR\fBrmallocmap\fR(\fBsize_t\fR \fImapsize\fR);
+.fi
+
+.LP
+.nf
+\fBstruct map *\fR\fBrmallocmap_wait\fR(\fBsize_t\fR \fImapsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrmfreemap\fR(\fBstruct map *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (\fBDDI/DKI\fR).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImapsize\fR \fR
+.ad
+.RS 12n
+.rt  
+Number of entries for the map.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR \fR
+.ad
+.RS 12n
+.rt  
+A pointer to the map structure to be deallocated.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBrmallocmap()\fR dynamically allocates a resource map structure. The argument
+\fImapsize\fR defines the total number of entries in the map.  In  particular,
+it is the total number of allocations that can be outstanding at any one time.
+.sp
+.LP
+\fBrmallocmap()\fR initializes the map but does not associate it with the
+actual resource. In order to associate  the map with the actual resource, a
+call to \fBrmfree\fR(9F) is used to make the entirety of the actual resource
+available for allocation, starting from the first index into the resource.
+Typically, the call to \fBrmallocmap()\fR is followed by a call to
+\fBrmfree\fR(9F), passing the address of the map returned from
+\fBrmallocmap()\fR, the total size of the resource, and the first index into
+the actual resource.
+.sp
+.LP
+The resource map allocated by \fBrmallocmap()\fR can be used to describe an
+arbitrary resource in whatever allocation units are appropriate, such as
+blocks, pages, or data structures. This resource can then be managed by the
+system by subsequent calls to  \fBrmalloc\fR(9F), \fBrmalloc_wait\fR(9F), and
+\fBrmfree\fR(9F).
+.sp
+.LP
+\fBrmallocmap_wait()\fR is similar to  \fBrmallocmap()\fR, with the exception
+that it will wait for space to become available if necessary.
+.sp
+.LP
+\fBrmfreemap()\fR deallocates a resource map structure previously allocated by
+\fBrmallocmap()\fR or \fBrmallocmap_wait()\fR. The argument \fImp\fR is a
+pointer to the map structure to be deallocated.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBrmallocmap()\fR and  \fBrmallocmap_wait()\fR
+return a pointer to the newly allocated map structure. Upon failure,
+\fBrmallocmap()\fR returns a  \fBNULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+\fBrmallocmap()\fR and \fBrmfreemap()\fR can be called from user, kernel, or
+interrupt context.
+.sp
+.LP
+\fBrmallocmap_wait()\fR can only be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBrmalloc\fR(9F), \fBrmalloc_wait\fR(9F), \fBrmfree\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

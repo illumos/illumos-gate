@@ -1,0 +1,298 @@
+'\" te
+.\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH getnetbyname 3SOCKET "4 Nov 2004" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+getnetbyname, getnetbyname_r, getnetbyaddr, getnetbyaddr_r, getnetent,
+getnetent_r, setnetent, endnetent \- get network entry
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <netdb.h>
+
+\fBstruct netent *\fR\fBgetnetbyname\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netent *\fR\fBgetnetbyname_r\fR(\fBconst char *\fR\fIname\fR, \fBstruct netent *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netent *\fR\fBgetnetbyaddr\fR(\fBlong\fR \fInet\fR, \fBint\fR \fItype\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netent *\fR\fBgetnetbyaddr_r\fR(\fBlong\fR \fInet\fR, \fBint\fR \fItype\fR, \fBstruct netent *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netent *\fR\fBgetnetent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netent *\fR\fBgetnetent_r\fR(\fBstruct netent *\fR\fIresult\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetnetent\fR(\fBint\fR \fIstayopen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBendnetent\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to obtain entries for networks. An entry may come from
+any of the sources for \fBnetworks\fR specified in the \fB/etc/nsswitch.conf\fR
+file. See \fBnsswitch.conf\fR(4).
+.sp
+.LP
+\fBgetnetbyname()\fR searches for a network entry with the network name
+specified by the character string parameter \fIname\fR.
+.sp
+.LP
+\fBgetnetbyaddr()\fR searches for a network entry with the network address
+specified by \fInet\fR. The parameter \fBtype\fR specifies the family of the
+address. This should be one of the address families defined in
+<\fBsys/socket.h\fR>. See the \fBNOTES\fR section below for more information.
+.sp
+.LP
+Network numbers and local address parts are returned as machine format integer
+values, that is, in host byte order. See also \fBinet\fR(3SOCKET).
+.sp
+.LP
+The \fBnetent.n_net\fR member in the \fBnetent\fR structure pointed to by the
+return value of the above functions is calculated by \fBinet_network()\fR. The
+\fBinet_network()\fR function returns a value in host byte order that is
+aligned based upon the input string. For example:
+.sp
+
+.sp
+.TS
+tab();
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+TextValue
+\fB"10"\fR\fB0x0000000a\fR
+\fB"10.0"\fR\fB0x00000a00\fR
+\fB"10.0.1"\fR\fB0a000a0001\fR
+\fB"10.0.1.28\fR"\fB0x0a000180\fR
+.TE
+
+.sp
+.LP
+Commonly, the alignment of the returned value is used as a crude approximate of
+pre-CIDR (Classless Inter-Domain Routing) subnet mask. For example:
+.sp
+.in +2
+.nf
+in_addr_t addr, mask;
+
+addr = inet_network(net_name);
+mask= ~(in_addr_t)0;
+if ((addr & IN_CLASSA_NET) == 0)
+       addr <<= 8, mask <<= 8;
+if ((addr & IN_CLASSA_NET) == 0)
+       addr <<= 8, mask <<= 8;
+if ((addr & IN_CLASSA_NET) == 0)
+       addr <<= 8, mask <<= 8;
+.fi
+.in -2
+
+.sp
+.LP
+This usage is deprecated by the CIDR requirements. See Fuller, V., Li, T., Yu,
+J., and Varadhan, K. \fIRFC 1519, Classless Inter-Domain Routing (CIDR): an
+Address Assignment and Aggregation Strategy\fR. Network Working Group.
+September 1993.
+.sp
+.LP
+The functions \fBsetnetent()\fR, \fBgetnetent()\fR, and \fBendnetent()\fR are
+used to enumerate network entries from the database.
+.sp
+.LP
+\fBsetnetent()\fR sets (or resets) the enumeration to the beginning of the set
+of network entries. This function should be called before the first call to
+\fBgetnetent()\fR. Calls to \fBgetnetbyname()\fR and \fBgetnetbyaddr()\fR leave
+the enumeration position in an indeterminate state. If the \fIstayopen\fR flag
+is non-zero, the system may keep allocated resources such as open file
+descriptors until a subsequent call to \fBendnetent()\fR.
+.sp
+.LP
+Successive calls to \fBgetnetent()\fR return either successive entries or
+\fBNULL\fR, indicating the end of the enumeration.
+.sp
+.LP
+\fBendnetent()\fR may be called to indicate that the caller expects to do no
+further network entry retrieval operations; the system may then deallocate
+resources it was using. It is still allowed, but possibly less efficient, for
+the process to call more network entry retrieval functions after calling
+\fBendnetent()\fR.
+.SS "Reentrant Interfaces"
+.sp
+.LP
+The functions \fBgetnetbyname()\fR, \fBgetnetbyaddr()\fR, and \fBgetnetent()\fR
+use static storage that is reused in each call, making these routines unsafe
+for use in multi-threaded applications.
+.sp
+.LP
+The functions \fBgetnetbyname_r()\fR, \fBgetnetbyaddr_r()\fR, and
+\fBgetnetent_r()\fR provide reentrant interfaces for these operations.
+.sp
+.LP
+Each reentrant interface performs the same operation as its non-reentrant
+counterpart, named by removing the ``\fB_r\fR'' suffix. The reentrant
+interfaces, however, use buffers supplied by the caller to store returned
+results, and are safe for use in both single-threaded and multi-threaded
+applications.
+.sp
+.LP
+Each reentrant interface takes the same parameters as its non-reentrant
+counterpart, as well as the following additional parameters. The parameter
+\fIresult\fR must be a pointer to a \fBstruct netent\fR structure allocated by
+the caller. On successful completion, the function returns the network entry in
+this structure. The parameter \fIbuffer\fR must be a pointer to a buffer
+supplied by the caller. This buffer is used as storage space for the network
+entry data. All of the pointers within the returned \fBstruct netent\fR
+\fIresult\fR point to data stored within this buffer. See \fBRETURN VALUES\fR.
+The buffer must be large enough to hold all of the data associated with the
+network entry. The parameter \fIbuflen\fR should give the size in bytes of the
+buffer indicated by \fIbuffer\fR.
+.sp
+.LP
+For enumeration in multi-threaded applications, the position within the
+enumeration is a process-wide property shared by all threads. \fBsetnetent()\fR
+may be used in a multi-threaded application but resets the enumeration position
+for all threads. If multiple threads interleave calls to \fBgetnetent_r()\fR,
+the threads will enumerate disjointed subsets of the network database.
+.sp
+.LP
+Like their non-reentrant counterparts, \fBgetnetbyname_r()\fR and
+\fBgetnetbyaddr_r()\fR leave the enumeration position in an indeterminate
+state.
+.SH RETURN VALUES
+.sp
+.LP
+Network entries are represented by the \fBstruct netent\fR structure defined in
+\fB<netdb.h>\fR\&.
+.sp
+.LP
+The functions \fBgetnetbyname()\fR, \fBgetnetbyname_r\fR, \fBgetnetbyaddr\fR,
+and \fBgetnetbyaddr_r()\fR each return a pointer to a \fBstruct netent\fR if
+they successfully locate the requested entry; otherwise they return \fBNULL\fR.
+.sp
+.LP
+The functions \fBgetnetent()\fR and \fBgetnetent_r()\fR each return a pointer
+to a \fBstruct netent\fR if they successfully enumerate an entry; otherwise
+they return \fBNULL\fR, indicating the end of the enumeration.
+.sp
+.LP
+The functions \fBgetnetbyname()\fR, \fBgetnetbyaddr()\fR, and \fBgetnetent()\fR
+use static storage, so returned data must be copied before a subsequent call to
+any of these functions if the data is to be saved.
+.sp
+.LP
+When the pointer returned by the reentrant functions \fBgetnetbyname_r()\fR,
+\fBgetnetbyaddr_r()\fR, and \fBgetnetent_r()\fR is non-\fBNULL\fR, it is always
+equal to the \fIresult\fR pointer that was supplied by the caller.
+.sp
+.LP
+The functions \fBsetnetent()\fR and \fBendnetent()\fR return \fB0\fR on
+success.
+.SH ERRORS
+.sp
+.LP
+The reentrant functions \fBgetnetbyname_r()\fR, \fBgetnetbyaddr_r\fR and
+\fBgetnetent_r()\fR will return \fBNULL\fR and set \fIerrno\fR to \fBERANGE\fR
+if the length of the buffer supplied by caller is not large enough to store the
+result. See \fBIntro\fR(2) for the proper usage and interpretation of
+\fIerrno\fR in multi-threaded applications.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/networks\fR\fR
+.ad
+.RS 22n
+.rt  
+network name database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 22n
+.rt  
+configuration file for the name service switch
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBIntro\fR(3), \fBbyteorder\fR(3SOCKET), \fBinet\fR(3SOCKET),
+\fBnetdb.h\fR(3HEAD), \fBnetworks\fR(4), \fBnsswitch.conf\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+Fuller, V., Li, T., Yu, J., and Varadhan, K. \fIRFC 1519, Classless
+Inter-Domain Routing (CIDR): an Address Assignment and Aggregation Strategy\fR.
+Network Working Group. September 1993.
+.SH WARNINGS
+.sp
+.LP
+The reentrant interfaces \fBgetnetbyname_r()\fR, \fBgetnetbyaddr_r()\fR, and
+\fBgetnetent_r()\fR are included in this release on an uncommitted basis only,
+and are subject to change or removal in future minor releases.
+.SH NOTES
+.sp
+.LP
+The current implementation of these functions only return or accept network
+numbers for the Internet address family (type \fBAF_INET\fR). The functions
+described in \fBinet\fR(3SOCKET) may be helpful in constructing and
+manipulating addresses and network numbers in this form.
+.sp
+.LP
+When compiling multi-threaded applications, see \fBIntro\fR(3), \fINotes On
+Multithread Applications\fR, for information about the use of the
+\fB_REENTRANT\fR flag.
+.sp
+.LP
+Use of the enumeration interfaces \fBgetnetent()\fR and \fBgetnetent_r()\fR is
+discouraged; enumeration may not be supported for all database sources. The
+semantics of enumeration are discussed further in \fBnsswitch.conf\fR(4).

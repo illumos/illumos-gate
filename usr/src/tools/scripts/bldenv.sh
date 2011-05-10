@@ -22,11 +22,18 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
 # and incrementally.
 #
+
+function fatal_error
+{
+	print -u2 "${progname}: $*"
+	exit 1
+}
 
 function usage
 {
@@ -166,7 +173,7 @@ typeset flags=(
 	)
 )
 
-typeset progname="$(basename "${0}")"
+typeset progname="$(basename -- "${0}")"
 
 OPTIND=1
 SUFFIX="-nd"
@@ -258,7 +265,10 @@ shift
 # STDENV_START
 # STDENV_END
 
-#MACH=$(uname -p)
+# Check if we have sufficient data to continue...
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
+[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
 # must match the getopts in nightly.sh
 OPTIND=1
@@ -283,7 +293,7 @@ if [ -z "$RELEASE_DATE" ]; then
 	RELEASE_DATE=$(LC_ALL=C date +"%B %Y")
 fi
 BUILD_DATE=$(LC_ALL=C date +%Y-%b-%d)
-BASEWSDIR=$(basename $CODEMGR_WS)
+BASEWSDIR=$(basename -- "${CODEMGR_WS}")
 DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 export DEV_CM RELEASE_DATE POUND_SIGN
 
@@ -303,7 +313,7 @@ else
 	unset EXTRA_CFLAGS
 fi
 
-[[ "${flags.O}" ]] && export MULTI_PROTO="yes"
+[[ "${flags.O}" == "true" ]] && export MULTI_PROTO="yes"
 
 # update build-type variables
 PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
@@ -328,16 +338,6 @@ if "${flags.s.o}" ; then
         VERSION+=":OPEN_ONLY"
 	SRC="${OPEN_SRCDIR}/usr/src"
 fi
- 
-#
-# Keep track of this now, before we manipulate $PATH
-#
-WHICH_SCM=$(dirname $(whence $0))/which_scm
-if [[ ! -x $WHICH_SCM ]]; then
-	WHICH_SCM=which_scm
-fi
-$WHICH_SCM | read SCM_TYPE junk
-
 
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
@@ -447,8 +447,7 @@ export \
 	ENVCPPFLAGS4 \
         MAKEFLAGS \
         PARENT_ROOT \
-        PARENT_TOOLS_ROOT \
-	SCM_TYPE
+        PARENT_TOOLS_ROOT
 
 printf 'RELEASE      is %s\n'   "$RELEASE"
 printf 'VERSION      is %s\n'   "$VERSION"
@@ -471,7 +470,7 @@ fi
 /usr/bin/newtask -c $$ ${BUILD_PROJECT:+-p$BUILD_PROJECT}
 
 if [[ "${flags.c}" == "false" && -x "$SHELL" && \
-    "$(basename "${SHELL}")" != "csh" ]]; then
+    "$(basename -- "${SHELL}")" != "csh" ]]; then
 	# $SHELL is set, and it's not csh.
 
 	if "${flags.f}" ; then

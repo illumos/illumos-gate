@@ -1,0 +1,519 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH msgfmt 1 "17 Sep 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+msgfmt \- create a message object from a message file
+.SH SYNOPSIS
+.LP
+.nf
+\fBmsgfmt\fR [\fB-D\fR \fIdir\fR | \fB-\(midirectory\fR=\fIdir\fR] 
+     [\fB-f\fR | \fB-\(miuse-fuzzy\fR] [\fB-g\fR] 
+     [\fB-o\fR \fIoutput-file\fR | \fB-\(mioutput-file\fR=\fIoutput-file\fR] 
+     [\fB-s\fR] [\fB-\(mistrict\fR] [\fB-v\fR] [\fB-\(miverbose\fR] \fIfilename\fR.po...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmsgfmt\fR utility creates message object files from portable object
+files (\fIfilename\fR\fB\&.po\fR), without changing the portable object files.
+.sp
+.LP
+The \fB\&.po\fR file contains messages displayed to users by system commands or
+by application programs. \fB\&.po\fR files can be edited. The messages in these
+files can be rewritten in any language supported by the system.
+.sp
+.LP
+The \fBxgettext\fR(1) command can be used to create \fB\&.po\fR files from
+script or programs.
+.sp
+.LP
+\fBmsgfmt\fR interprets data as characters according to the current setting of
+the \fBLC_CTYPE\fR locale category or according to the codeset specified in the
+\fB\&.po\fR file.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR \fIdir\fR\fR
+.ad
+.br
+.na
+\fB\fB-\(midirectory=\fR\fIdir\fR\fR
+.ad
+.RS 27n
+.rt  
+Adds \fIdir\fR to the list for input files search.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.br
+.na
+\fB\fB-\(miuse-fuzzy\fR\fR
+.ad
+.RS 27n
+.rt  
+Uses fuzzy entries in output. If this option is not specified, fuzzy entries
+are not included into the output. These options are ignored if Solaris message
+catalogs are processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 27n
+.rt  
+Directs the utility to generate the GNU-compatible message catalog file. This
+option cannot be specified with the \fB-s\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIoutput-file\fR\fR
+.ad
+.br
+.na
+\fB\fB-\(mioutput=\fR\fIoutput-file\fR\fR
+.ad
+.RS 27n
+.rt  
+Specifies the output file name as \fIoutput-file\fR. All domain directives and
+duplicate msgids in the .\fBpo\fR file are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 27n
+.rt  
+Directs the utility to generate the Solaris message catalog file. This option
+cannot be specified with the \fB-g\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\(mistrict\fR\fR
+.ad
+.RS 27n
+.rt  
+Directs the utility to append the suffix \fB\&.mo\fR to the generating message
+object file name if it doesn't have this suffix. This option is ignored if
+Solaris message catalogs are processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.br
+.na
+\fB\fB-\(miverbose\fR\fR
+.ad
+.RS 27n
+.rt  
+Verbose. Lists duplicate message identifiers if Solaris message catalog files
+are processed. Message strings are not redefined.
+.sp
+If GNU-compatible message files are processed, this option detects and
+diagnoses input file anomalies which might represent translation errors. The
+msgid and msgstr strings are studied and compared. It is considered abnormal if
+one string starts or ends with a newline while the other does not. Also, if the
+string represents a format string used in a printf-like function, both strings
+should have the same number of % format specifiers, with matching types. If the
+flag \fBc-format\fR appears in the special comment '\fB#\fR' for this entry, a
+check is performed.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The format of portable object files (\fB\&.po\fR files) is defined as follows.
+Each \fB\&.po\fR file contains one or more lines, with each line containing
+either a comment or a statement. Comments start the line with a pound sign
+(\fB#\fR) and end with the newline character. All comments (except special
+comments described later) and empty lines are ignored. The format of a
+statement is:
+.sp
+.in +2
+.nf
+\fIdirective\fR     \fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each \fIdirective\fR starts at the beginning of the line and is separated from
+\fIvalue\fR by white space (such as one or more space or tab characters).
+\fIvalue\fR consists of one or more quoted strings separated by white space.
+Use any of the following types of directives for the Solaris message file:
+.sp
+.in +2
+.nf
+domain \fIdomainname\fR
+msgid \fImessage_identifier\fR
+msgstr \fImessage_string\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For a GNU-compatible message file, use any of the following types of
+directives:
+.sp
+.in +2
+.nf
+domain \fIdomainname\fR
+msgid \fImessage_identifier\fR
+msgid_plural \fIuntranslated_string_plural\fR
+msgstr \fImessage_string\fR
+msgstr[\fIn\fR] \fImessage_string\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The behavior of the \fBdomain\fR directive is affected by the options used. See
+OPTIONS for the behavior when the \fB-o\fR or \fB-\(mioutput-file\fR options
+are specified. If the \fB-o\fR or \fB-\(mioutput-file\fR options are not
+specified, the behavior of the \fBdomain\fR directive is as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All msgids from the beginning of each \fB\&.po\fR file to the first
+\fBdomain\fR directive are put into a default message object file. The default
+message object file is named \fBmessages.mo\fR, if the Solaris message catalog
+file format is used to generate the message object file or if the
+\fB-\(mistrict\fR option is specified. Otherwise, the default message object
+file is named \fBmessages\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When \fBmsgfmt\fR encounters a \fBdomain\fR \fIdomainname\fR directive in the
+\fB\&.po\fR file, all following msgids until the next \fBdomain\fR directive
+are put into the message object file, named \fBdomainname.mo\fR, if the Solaris
+message catalog file format is used to generate the message object file or if
+the \fB-\(mistrict\fR option is specified. Otherwise, the msgids are put into
+the message object file named \fBdomainname\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Duplicate msgids are defined in the scope of each domain. That is, a msgid is
+considered a duplicate only if the identical msgid exists in the same domain.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All duplicate msgids are ignored.
+.RE
+.sp
+.LP
+The \fBmsgid\fR directive specifies the value of a message identifier
+associated with the directive that follows it. The \fBmsgid_plural\fR directive
+specifies the plural form message specified to the plural message handling
+functions \fBngettext()\fR, \fBdngettext()\fR, or \fBdcngettext()\fR. The
+\fImessage_identifier\fR string identifies a target string to be used at
+retrieval time. Each statement containing a \fBmsgid\fR directive must be
+followed by a statement containing a \fBmsgstr\fR directive or
+\fBmsgstr\fR[\fIn\fR] directives.
+.sp
+.LP
+The \fBmsgstr\fR directive specifies the target string associated with the
+\fImessage_identifier\fR string declared in the immediately preceding
+\fBmsgid\fR directive.
+.sp
+.LP
+The directive \fBmsgstr\fR[\fIn\fR] (where \fIn\fR = 0, 1, 2, ...) specifies
+the target string to be used with plural form handling functions
+\fBngettext()\fR, \fBdngettext()\fR, and \fBdcngetttext()\fR.
+.sp
+.LP
+Message strings can contain the escape sequences \fB\n\fR for newline, \fB\t\fR
+for tab, \fB\v\fR for vertical tab, \fB\b\fR for backspace, \fB\r\fR for
+carriage return, \fB\f\fR for formfeed, \fB\\\fR for  backslash, \fB\"\fR for
+double quote, \fB\a\fR for alarm, \fB\ddd\fR for octal bit pattern, and
+\fB\xDD\fR for hexadecimal bit pattern.
+.sp
+.LP
+Comments for a GNU-compatible message file should be in one of the following
+formats (the \fBmsgfmt\fR utility will ignore these comments when processing
+Solaris message files):
+.sp
+.in +2
+.nf
+# \fItranslator-comments\fR
+#. \fIautomatic-comments\fR
+#: \fIreference\fR..
+#, \fIflag\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The '\fB#:\fR' comments indicate the location of the msgid string in the source
+files in \fIfilename\fR:\fIline\fR format. The '\fB#\fR', '\fB#.\fR',
+and '\fB#:\fR' comments are informative only and are silently ignored by the
+\fBmsgfmt\fR utility. The '\fB#,\fR' comments require one or more flags
+separated by the comma character. The following \fIflag\fRs can be specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfuzzy\fR\fR
+.ad
+.RS 15n
+.rt  
+This flag can be inserted by the translator. It shows that the \fBmsgstr\fR
+string might not be a correct translation (anymore). Only the translator can
+judge if the translation requires further modification or is acceptable as is.
+Once satisfied with the translation, the translator removes this \fBfuzzy\fR
+flag. If this flag is specified, the \fBmsgfmt\fR utility will not generate the
+entry for the immediately following msgid in the output message catalog.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc-format\fR\fR
+.ad
+.br
+.na
+\fB\fBno-c-format\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fBc-format\fR flag indicates that the \fBmsgid\fR string is used as a
+format string by printf-like functions. In case the \fBc-format\fR flag is
+given for a string, the \fBmsgfmt\fR utility does some more tests to check the
+validity of the translation.
+.RE
+
+.sp
+.LP
+In the GNU-compatible message file, the \fBmsgid\fR entry with empty string
+("") is called the header entry and treated specially. If the message string
+for the header entry contains \fBnplurals\fR=\fIvalue\fR, the value indicates
+the number of plural forms. For example, if \fBnplurals\fR=4, there are four
+plural forms. If \fBnplurals\fR is defined, the same line should contain
+\fBplural=\fR\fIexpression\fR, separated by a semicolon character. The
+\fIexpression\fR is a C language expression to determine which version of
+\fBmsgstr\fR[\fIn\fR] is to be used based on the value of \fIn\fR, the last
+argument of \fBngettext()\fR, \fBdngettext()\fR, or \fBdcngettext()\fR. For
+example,
+.sp
+.in +2
+.nf
+nplurals=2; plural= n == 1 ? 0 : 1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+indicates that there are two plural forms in the language. msgstr[0] is used if
+n == 1, otherwise msgstr[1] is used. For another example:
+.sp
+.in +2
+.nf
+nplurals=3; plural= n == 1 ? 0 : n == 2 ? 1 : 2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+indicates that there are three plural forms in the language. msgstr[0] is used
+if n == 1, msgstr[1] is used if n == 2, otherwise msgstr[2] is used.
+.sp
+.LP
+If the header entry contains a \fBcharset\fR=\fIcodeset\fR string, the
+\fIcodeset\fR is used to indicate the codeset to be used to encode the message
+strings. If the output string's codeset is different from the message string's
+codeset, codeset conversion from the message string's codeset to the output
+string's codeset will be performed upon the call of \fBgettext()\fR,
+\fBdgettext()\fR, \fBdcgettext()\fR, \fBngettext()\fR, \fBdngettext()\fR, and
+\fBdcngettext()\fR for the GNU-compatible message catalogs. The output string's
+codeset is determined by the current locale's codeset (the return value of
+\fBnl_langinfo(CODESET\fR)) by default, and can be changed by the call of
+\fBbind_textdomain_codeset()\fR.
+.SS "Message catalog file format"
+.sp
+.LP
+The \fBmsgfmt\fR utility can generate the message object both in Solaris
+message catalog file format and in GNU-compatible message catalog file format.
+If the \fB-s\fR option is specified and the input file is a Solaris \fB\&.po\fR
+file, the \fBmsgfmt\fR utility generates the message object in Solaris message
+catalog file format. If the \fB-g\fR option is specified and the input file is
+a GNU \fB\&.po\fR file, the \fBmsgfmt\fR utility generates the message object
+in GNU-compatible message catalog file format. If neither the \fB-s\fR nor
+\fB-g\fR option is specified, the \fBmsgfmt\fR utility determines the message
+catalog file format as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB\&.po\fR file contains a valid GNU header entry (having an empty
+string for \fBmsgid\fR), the \fBmsgfmt\fR utility uses the GNU-compatible
+message catalog file format.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, the \fBmsgfmt\fR utility uses the Solaris message catalog file
+format.
+.RE
+.sp
+.LP
+If the \fBmsgfmt\fR utility determined that the Solaris message catalog file
+format is used, as above, but found the \fB\&.po\fR file contains directives
+that are specific to the GNU-compatible message catalog file format, such as
+\fBmsgid_plural\fR and \fBmsgstr\fR[\fIn\fR], the \fBmsgfmt\fR utility handles
+those directives as invalid specifications.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating message objects from message files
+.sp
+.LP
+In this example, \fBmodule1.po\fR and \fBmodule2.po\fR are portable message
+objects files.
+
+.sp
+.in +2
+.nf
+example% \fBcat module1.po\fR
+# default domain "messages.mo"
+msgid  "msg 1"
+msgstr "msg 1 translation"
+#
+domain "help_domain"
+msgid  "help 2"
+msgstr "help 2 translation"
+#
+domain "error_domain"
+msgid  "error 3"
+msgstr "error 3 translation"
+example% \fBcat module2.po\fR
+# default domain "messages.mo"
+msgid  "mesg 4"
+msgstr "mesg 4 translation"
+#
+domain "error_domain"
+msgid  "error 5"
+msgstr "error 5 translation"
+#
+domain "window_domain"
+msgid  "window 6"
+msgstr "window 6 translation"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command will produce the output files \fBmessages.mo\fR,
+\fBhelp_domain.mo\fR, and \fBerror_domain.mo\fR in Solaris message catalog file
+format:
+
+.sp
+.in +2
+.nf
+example% \fBmsgfmt module1.po\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command will produce the output files \fBmessages.mo\fR,
+\fBhelp_domain.mo\fR, \fBerror_domain.mo\fR, and \fBwindow_domain.mo\fR in
+Solaris message catalog file format:
+
+.sp
+.in +2
+.nf
+example% \fBmsgfmt module1.po module2.po\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command will produce the output file \fBhello.mo\fR in Solaris
+message catalog file format:
+
+.sp
+.in +2
+.nf
+example% \fBmsgfmt -o hello.mo module1.po module2.po\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environmental variables
+that affect the execution of \fBmsgfmt\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+and \fBNLSPATH\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBxgettext\fR(1), \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+Installing message catalogs under the C locale is pointless, since they are
+ignored for the sake of efficiency.

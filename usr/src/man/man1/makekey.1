@@ -1,0 +1,53 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH makekey 1 "3 Mar 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+makekey \- generate encryption key
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/makekey\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmakekey\fR improves the usefulness of encryption schemes that depend on a
+key by increasing the amount of time required to search the key space. It
+attempts to read 8 bytes for its \fIkey\fR (the first eight input bytes), then
+it attempts to read 2 bytes for its \fIsalt\fR (the last two input bytes). The
+output depends on the input in a way intended to be difficult to compute (that
+is, to require a substantial fraction of a second).
+.sp
+.LP
+The first eight input bytes (the \fIinput key\fR) can be arbitrary \fBASCII\fR
+characters. The last two (the \fIsalt\fR) are best chosen from the set of
+digits, \fB\&.\fR, \fB/\fR, upper- and lower-case letters. The salt characters
+are repeated as the first two characters of the output. The remaining 11 output
+characters are chosen from the same set as the  \fIsalt\fR and constitute the
+\fIoutput key\fR.
+.sp
+.LP
+The transformation performed is essentially the following: the  \fIsalt\fR is
+used to select one of 4,096 cryptographic machines all based on the National
+Bureau of Standards \fBDES\fR algorithm, but broken in 4,096 different ways.
+Using the \fIinput\fR \fIkey\fR as key, a constant string is fed into the
+machine and recirculated a number of times. The 64 bits that come out are
+distributed into the 66 \fIoutput\fR \fIkey\fR bits in the result.
+.sp
+.LP
+\fBmakekey\fR is intended for programs that perform encryption. Usually, its
+input and output will be pipes.
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBvi\fR(1), \fBpasswd\fR(4)
+.SH NOTES
+.sp
+.LP
+\fBmakekey\fR can produce different results depending upon whether the input is
+typed at the terminal or redirected from a file.

@@ -1,0 +1,115 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mexchange 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+mexchange \- Exchange one message for another
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBmblk_t *\fR\fBmexchange\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBsize_t\fR \fIsize\fR, 
+     \fBuchar_t\fR \fItype\fR, \fBint32_t\fR \fIprimtype\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwq\fR\fR
+.ad
+.RS 12n
+.rt  
+Optionally, write queue associated with the read queue to be used on failure
+(see below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 12n
+.rt  
+Optionally, the message to exchange.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 12n
+.rt  
+Size of the returned message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 12n
+.rt  
+Type of the returned message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprimtype\fR\fR
+.ad
+.RS 12n
+.rt  
+Optionally, a 4 byte value to store at the beginning of the returned message.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmexchange()\fR function exchanges the passed in message for another
+message of the specified \fIsize\fR and \fItype\fR.
+.sp
+.LP
+If \fImp\fR is not NULL, is of at least \fIsize\fR bytes, and has only one
+reference (see \fBdupmsg\fR(9F)), \fImp\fR is converted to be of the specified
+\fIsize\fR and \fItype\fR. Otherwise, a new message of the specified \fIsize\fR
+and \fItype\fR is allocated. If allocation fails, and \fIwq\fR is not NULL,
+\fBmerror\fR(9F) attempts to send an error to the stream head.
+.sp
+.LP
+Finally, if \fIprimtype\fR is not -1 and \fIsize\fR is at least 4 bytes, the
+first 4 bytes are assigned to be \fIprimtype\fR. This is chiefly useful for
+STREAMS-based protocols such as \fBDLPI\fR and \fBTPI\fR which store the
+protocol message type in the first 4 bytes of each message.
+.SH RETURN VALUES
+.sp
+.LP
+A pointer to the requested message is returned on success. NULL is returned on
+failure.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdupmsg\fR(9F), \fBmerror\fR(9F)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

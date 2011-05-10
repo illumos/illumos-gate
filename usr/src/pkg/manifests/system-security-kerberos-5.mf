@@ -46,6 +46,10 @@ dir path=usr/sbin
 dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/ldif group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
+dir path=usr/share/man/man5
 dir path=var group=sys
 dir path=var/krb5 group=sys
 file path=etc/krb5/kadm5.acl group=sys \
@@ -92,6 +96,25 @@ file path=usr/sbin/kdb5_util mode=0555
 file path=usr/sbin/kdcmgr mode=0555
 file path=usr/sbin/kproplog mode=0555
 file path=usr/share/lib/ldif/kerberos.ldif
+file path=usr/share/man/man1m/k5srvutil.1m
+file path=usr/share/man/man1m/kadmin.1m
+file path=usr/share/man/man1m/kadmin.local.1m
+file path=usr/share/man/man1m/kadmind.1m
+file path=usr/share/man/man1m/kclient.1m
+file path=usr/share/man/man1m/kdb5_ldap_util.1m
+file path=usr/share/man/man1m/kdb5_util.1m
+file path=usr/share/man/man1m/kdcmgr.1m
+file path=usr/share/man/man1m/kprop.1m
+file path=usr/share/man/man1m/kpropd.1m
+file path=usr/share/man/man1m/kproplog.1m
+file path=usr/share/man/man1m/krb5kdc.1m
+file path=usr/share/man/man4/kadm5.acl.4
+file path=usr/share/man/man4/kdc.conf.4
+file path=usr/share/man/man4/krb5.conf.4
+file path=usr/share/man/man4/warn.conf.4
+file path=usr/share/man/man5/kerberos.5
+file path=usr/share/man/man5/krb5_auth_rules.5
+file path=usr/share/man/man5/krb5envvar.5
 legacy pkg=SUNWkdcr desc="Kerberos V5 KDC (root)" \
     name="Kerberos V5 KDC (root)"
 legacy pkg=SUNWkdcu desc=" Kerberos V5 Master KDC (user)" \

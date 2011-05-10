@@ -1,0 +1,323 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH newform 1 "21 Jul 1997" "SunOS 5.11" "User Commands"
+.SH NAME
+newform \- change the format of a text file
+.SH SYNOPSIS
+.LP
+.nf
+\fBnewform\fR [\fB-s\fR] [\fB-i\fR\fItabspec\fR] [\fB-o\fR\fItabspec\fR] [\fB-b\fR\fIn\fR] [\fB-e\fR\fIn\fR] [\fB-p\fR\fIn\fR] 
+     [\fB-a\fR\fIn\fR] [\fB-f\fR] [\fB-c\fR\fIchar\fR] [\fB-l\fR\fIn\fR] [\fIfilename\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBnewform\fR reads lines from the named \fIfilename\fRs, or the standard input
+if no input file is named, and reproduces the lines on the standard output.
+Lines are reformatted in accordance with command line options in effect.
+.sp
+.LP
+Except for \fB-s\fR, command line options may appear in any order, may be
+repeated, and may be intermingled with the optional \fIfilename\fRs. Command
+line options are processed in the order specified. This means that option
+sequences like ``\fB-e\fR15 \fB-l\fR60'' will yield results different from
+``\fB-l\fR60 \fB-e\fR15''. Options are applied to all \fIfilename\fRs on the
+command line.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 14n
+.rt  
+Shears off leading characters on each line up to the first tab and places up to
+8 of the sheared characters at the end of the line. If more than 8 characters
+(not counting the first tab) are sheared, the eighth character is replaced by a
+\fB*\fR and any characters to the right of it are discarded. The first tab is
+always discarded.
+.sp
+An error message and program exit will occur if this option is used on a file
+without a tab on each line. The characters sheared off are saved internally
+until all other options specified are applied to that line. The characters are
+then added at the end of the processed line.
+.sp
+For example, to convert a file with leading digits, one or more tabs, and text
+on each line, to a file beginning with the text, all tabs after the first
+expanded to spaces, padded with spaces out to column 72 (or truncated to column
+72), and the leading digits placed starting at column 73, the command would be:
+.sp
+\fBnewform \|\fR\fB-s\fR\fB \|\fR\fB-i\fR\fB \|\fR\fB-l\fR\fB \|\fR\fB-a\fR\fB
+\|\fR\fB-e\fR\fB \|\fIfilename\fR\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fItabspec\fR \fR
+.ad
+.RS 14n
+.rt  
+Input tab specification: expands tabs to spaces, according to the tab
+specifications given. \fITabspec\fR recognizes all tab specification forms
+described in \fBtabs\fR(1). In addition, \fItabspec\fR may be \fB-\fR, in which
+\fBnewform\fR assumes that the tab specification is to be found in the first
+line read from the standard input (see \fBfspec\fR(4)). If no \fItabspec\fR is
+given, \fItabspec\fR defaults to \fB\(mi8\fR\&. A \fItabspec\fR of \fB\(mi0\fR
+expects no tabs; if any are found, they are treated as \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fItabspec\fR \fR
+.ad
+.RS 14n
+.rt  
+Output tab specification: replaces spaces by tabs, according to the tab
+specifications given. The tab specifications are the same as for
+\fB-i\fR\fItabspec\fR. If no \fItabspec\fR is given, \fItabspec\fR defaults to
+\fB\(mi8\fR\&. A \fItabspec\fR of \fB\(mi0\fR means that no spaces will be
+converted to tabs on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fIn\fR \fR
+.ad
+.RS 14n
+.rt  
+Truncate \fIn\fR characters from the beginning of the line when the line length
+is greater than the effective line length (see \fB\(mil\fIn\fR\fR). Default is
+to truncate the number of characters necessary to obtain the effective line
+length. The default value is used when \fB-b\fR with no \fIn\fR is used. This
+option can be used to delete the sequence numbers from a \fBCOBOL\fR program as
+follows:
+.sp
+\fBnewform \|\fR\fB-l\fR\fB1 \|\fR\fB-b\fR\fB7 \|\fIfilename\fR\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fIn\fR\fR
+.ad
+.RS 14n
+.rt  
+Same as \fB-b\fR\fIn\fR except that characters are truncated from the end of
+the line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fIn\fR\fR
+.ad
+.RS 14n
+.rt  
+Prefix \fIn\fR characters (see \fB-c\fR\fIchar\fR) to the beginning of a line
+when the line length is less than the effective line length. Default is to
+prefix the number of characters necessary to obtain the effective line length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fIn\fR\fR
+.ad
+.RS 14n
+.rt  
+Same as \fB-p\fR\fIn\fR except characters are appended to the end of a line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 14n
+.rt  
+Write the tab specification format line on the standard output before any other
+lines are output. The tab specification format line which is printed will
+correspond to the format specified in the \fBlast\fR \fB-o\fR option. If no
+\fB-o\fR option is specified, the line which is printed will contain the
+default specification of \fB\(mi8\fR\&.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fIchar\fR\fR
+.ad
+.RS 14n
+.rt  
+Change the prefix/append character to \fIchar\fR. Default character for
+\fIchar\fR is a space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fIn\fR\fR
+.ad
+.RS 14n
+.rt  
+Set the effective line length to \fIn\fR characters. If \fIn\fR is not entered,
+\fB-l\fR defaults to 72. The default line length without the \fB-l\fR option is
+80 characters. Note:  Tabs and backspaces are considered to be one character
+(use \fB-i\fR to expand tabs to spaces).
+.sp
+The \fB\(mil1\fR must be used to set the effective line length shorter than any
+existing line in the file so that the \fB-b\fR option is activated.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilename\fR \fR
+.ad
+.RS 13n
+.rt  
+Input file
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 6n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 6n
+.rt  
+Operation failed.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsplit\fR(1), \fBtabs\fR(1), \fBfspec\fR(4), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+All diagnostics are fatal.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBusage:\fR \fB \|.\|.\|.\fR \fR
+.ad
+.sp .6
+.RS 4n
+\fBnewform\fR was called with a bad option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB"not \fR\fB-s\fR\fB format"\fR\fR
+.ad
+.sp .6
+.RS 4n
+There was no tab on one line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB"can't open file"\fR\fR
+.ad
+.sp .6
+.RS 4n
+Self-explanatory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB"internal line too long"\fR\fR
+.ad
+.sp .6
+.RS 4n
+A line exceeds 512 characters after being expanded in the internal work buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB"tabspec in error" \fR\fR
+.ad
+.sp .6
+.RS 4n
+A tab specification is incorrectly formatted, or specified tab stops are not
+ascending.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB"tabspec indirection illegal" \fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fItabspec\fR read from a file (or standard input) may not contain a
+\fItabspec\fR referencing another file (or standard input).
+.RE
+
+.SH NOTES
+.sp
+.LP
+\fBnewform\fR normally only keeps track of physical characters; however, for
+the \fB-i\fR and \fB-o\fR options, \fBnewform\fR will keep track of backspaces
+in order to line up tabs in the appropriate logical columns.
+.sp
+.LP
+\fBnewform\fR will not prompt the user if a \fItabspec\fR is to be read from
+the standard input (by use of \fB\fR\fB-i\fR\fB-\fR or \fB\fR\fB-o\fR\fB-\fR).
+.sp
+.LP
+If the \fB-f\fR option is used, and the last \fB-o\fR option specified was
+\fB\fR\fB-o\fR\fB-\fR, and was preceded by either a \fB\fR\fB-o\fR\fB-\fR or a
+\fB\fR\fB-i\fR\fB-\fR, the tab specification format line will be incorrect.

@@ -1,0 +1,186 @@
+'\" te
+.\" Copyright (c) 1997, Sun Microsystems, Inc.,
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH physio 9F "2 Apr 1993" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+physio, minphys \- perform physical I/O
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/buf.h>
+#include <sys/uio.h>
+
+
+
+\fBint\fR \fBphysio\fR(\fBint\fR(\fI*strat\fR)(\fIstruct buf *\fR), \fBstruct buf\fR \fI*bp\fR, \fBdev_t\fR \fIdev\fR, 
+     \fBint\fR \fIrw\fR, \fBvoid\fR (\fI*mincnt\fR)(\fIstruct buf *\fR), \fBstruct uio\fR \fI*uio\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBminphys\fR(\fBstruct buf\fR \fI*bp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.SS "\fBphysio()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstrat\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to device strategy routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to a \fBbuf\fR(9S) structure describing the transfer. If \fIbp\fR is
+set to \fINULL\fR then \fBphysio()\fR allocates one which is automatically
+released upon completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 11n
+.rt  
+The device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 11n
+.rt  
+Read/write flag. This is either \fBB_READ\fR when reading from the device, or
+\fBB_WRITE\fR when writing to the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImincnt\fR \fR
+.ad
+.RS 11n
+.rt  
+Routine which bounds the maximum transfer unit size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuio\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to the \fBuio\fR structure which describes the user \fBI/O\fR request.
+.RE
+
+.SS "\fBminphys()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBbuf\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBphysio()\fR performs unbuffered \fBI/O\fR operations between the device
+\fIdev\fR and the address space described in the \fBuio\fR structure.
+.sp
+.LP
+Prior to the start of the transfer \fBphysio()\fR verifies the requested
+operation is valid by checking the protection of the address space specified in
+the \fBuio\fR structure. It then locks the pages involved in the \fBI/O\fR
+transfer so they can not be paged out. The device strategy routine,
+\fBstrat()\fR, is then called one or more times to perform the physical
+\fBI/O\fR operations. \fBphysio()\fR uses \fBbiowait\fR(9F) to block until
+\fBstrat()\fR has completed each transfer. Upon completion, or detection of an
+error, \fBphysio()\fR unlocks the pages and returns the error status.
+.sp
+.LP
+\fBphysio()\fR uses \fBmincnt()\fR to bound the maximum transfer unit size to
+the system, or device, maximum length. \fBminphys()\fR is the system
+\fBmincnt()\fR routine for use with \fBphysio()\fR operations. Drivers which do
+not provide their own local \fBmincnt()\fR routines should call \fBphysio()\fR
+with \fBminphys()\fR.
+.sp
+.LP
+\fBminphys()\fR limits the value of \fIbp\fR\fB->b_bcount\fR to a sensible
+default for the capabilities of the system. Drivers that provide their own
+\fBmincnt()\fR routine should also call \fBminphys()\fR to make sure they do
+not exceed the system limit.
+.SH RETURN VALUES
+.sp
+.LP
+\fBphysio()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Upon success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+Upon failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBphysio()\fR can be called from user context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBstrategy\fR(9E), \fBbiodone\fR(9F), \fBbiowait\fR(9F), \fBbuf\fR(9S),
+\fBuio\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+Since \fBphysio()\fR calls \fBbiowait()\fR to block until each buf transfer is
+complete, it is the drivers responsibility to call \fBbiodone\fR(9F) when the
+transfer is complete, or \fBphysio()\fR will block forever.

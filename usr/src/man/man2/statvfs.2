@@ -1,0 +1,294 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH statvfs 2 "22 Mar 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+statvfs, fstatvfs \- get file system information
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/statvfs.h> 
+
+\fBint\fR \fBstatvfs\fR(\fBconst char *restrict\fR \fIpath\fR, \fBstruct statvfs *restrict\fR \fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstatvfs\fR(\fBint\fR \fIfildes\fR, \fBstruct statvfs *\fR\fIbuf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstatvfs()\fR function returns a "generic superblock" describing a file
+system; it can be used to acquire information about mounted  file systems.  The
+\fIbuf\fR argument is a pointer to a structure (described below) that is filled
+by the function.
+.sp
+.LP
+The \fIpath\fR argument should name a file that resides on that file system.
+The file system type is known to the operating system. Read, write, or execute
+permission for the named file is not required, but all directories listed in
+the path name leading to the file must be searchable.
+.sp
+.LP
+The \fBstatvfs\fR structure pointed to by \fIbuf\fR includes the following
+members:
+.sp
+.in +2
+.nf
+u_long      f_bsize;             /* preferred file system block size */
+u_long      f_frsize;            /* fundamental filesystem block
+                                    (size if supported) */
+fsblkcnt_t  f_blocks;            /* total # of blocks on file system
+                                    in units of f_frsize */
+fsblkcnt_t  f_bfree;             /* total # of free blocks */
+fsblkcnt_t  f_bavail;            /* # of free blocks avail to
+                                    non-privileged user */
+fsfilcnt_t  f_files;             /* total # of file nodes (inodes) */
+fsfilcnt_t  f_ffree;             /* total # of free file nodes */
+fsfilcnt_t  f_favail;            /* # of inodes avail to
+                                    non-privileged user*/
+u_long      f_fsid;              /* file system id (dev for now) */
+char        f_basetype[FSTYPSZ]; /* target fs type name, 
+                                    null-terminated */
+u_long      f_flag;              /* bit mask of flags */
+u_long      f_namemax;           /* maximum file name length */
+char        f_fstr[32];          /* file system specific string */
+u_long      f_filler[16];        /* reserved for future expansion */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBf_basetype\fR member contains a null-terminated FSType name of the
+mounted target.
+.sp
+.LP
+The following values can be returned in the \fBf_flag\fR field:
+.sp
+.in +2
+.nf
+ST_RDONLY    0x01    /* read-only file system */
+ST_NOSUID    0x02    /* does not support setuid/setgid semantics */
+ST_NOTRUNC   0x04    /* does not truncate file names longer than
+                        NAME_MAX */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfstatvfs()\fR function is similar to \fBstatvfs()\fR, except that the
+file named by \fIpath\fR in \fBstatvfs()\fR is instead identified by an open
+file descriptor \fIfildes\fR obtained from a successful \fBopen\fR(2),
+\fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), or \fBpipe\fR(2) function call.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBstatvfs()\fR and \fBfstatvfs()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+One of the values to be returned cannot be represented correctly in the
+structure pointed to by \fIbuf\fR.
+.RE
+
+.sp
+.LP
+The \fBstatvfs()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied on a component of the path prefix.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR or \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+A signal was caught during the execution of the \fBstatvfs()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error occurred while reading the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating \fIpath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of a \fIpath\fR component exceeds \fBNAME_MAX\fR characters, or the
+length of \fIpath\fR The exceeds \fBPATH_MAX\fR characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+Either a component of the path prefix or the file referred to by \fIpath\fR
+does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix of \fIpath\fR is not a directory.
+.RE
+
+.sp
+.LP
+The \fBfstatvfs()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not an open file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was caught during the execution of the \fBfstatvfs()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+An I/O error occurred while reading the file system.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBstatvfs()\fR and \fBfstatvfs()\fR functions have transitional interfaces
+for 64-bit file offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(2), \fBchown\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
+\fBlink\fR(2), \fBmknod\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBread\fR(2),
+\fBtime\fR(2), \fBunlink\fR(2), \fButime\fR(2), \fBwrite\fR(2),
+\fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.SH BUGS
+.sp
+.LP
+The values returned for \fBf_files\fR, \fBf_ffree\fR, and \fBf_favail\fR may
+not be valid for \fBNFS\fR mounted file systems.

@@ -1,0 +1,389 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH secure_rpc 3NSL "19 Feb 2004" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+secure_rpc, authdes_getucred, authdes_seccreate, getnetname, host2netname,
+key_decryptsession, key_encryptsession, key_gendes, key_setsecret,
+key_secretkey_is_set, netname2host, netname2user, user2netname \- library
+routines for secure remote procedure calls
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnsl\fR [ \fIlibrary\fR...]
+#include <rpc/rpc.h>
+#include <sys/types.h>
+\fBint\fR \fBauthdes_getucred\fR(\fBconst struct authdes_cred *\fR\fIadc\fR, \fBuid_t *\fR\fIuidp\fR,
+     \fBgid_t *\fR\fIgidp\fR, \fBshort *\fR\fIgidlenp\fR, \fBgid_t *\fR\fIgidlist\fR);
+.fi
+
+.LP
+.nf
+\fBAUTH *\fR\fBauthdes_seccreate\fR(\fBconst char *\fR\fIname\fR, \fBconst uint_t\fR \fIwindow\fR,
+     \fBconst char *\fR\fItimehost\fR, \fIckey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetnetname\fR(\fBchar\fR \fIname\fR \fB[MAXNETNAMELEN+1]\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhost2netname\fR(\fBchar\fR \fIname\fR \fB[MAXNETNAMELEN+1]\fR, \fBconst char *\fR\fIhost\fR,
+     \fBconst char *\fR\fIdomain\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkey_decryptsession\fR(\fBconst char *\fR\fIremotename\fR, \fBdes_block *\fR\fIdeskey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkey_encryptsession\fR(\fBconst char *\fR\fIremotename\fR, \fBdes_block *\fR\fIdeskey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkey_gendes\fR(\fBdes_block *\fR\fIdeskey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkey_setsecret\fR(\fBconst char *\fR\fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkey_secretkey_is_set\fR(void)
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnetname2host\fR(\fBconst char *\fR\fIname\fR, \fBchar *\fR\fIhost\fR, \fBconst int\fR \fIhostlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnetname2user\fR(\fBconst char *\fR\fIname\fR, \fBuid_t *\fR\fIuidp\fR, \fBgid_t *\fR\fIgidp\fR, \fBint *\fR\fIgidlenp\fR,
+     \fBgid_t *\fR\fIgidlist\fR \fB[NGRPS]\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBuser2netname\fR(\fBchar\fR \fIname\fR \fB[MAXNETNAMELEN+1]\fR, \fBconst uid_t\fR \fIuid\fR,
+     \fBconst char *\fR\fIdomain\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBRPC\fR library functions allow C programs to make procedure calls on
+other machines across the network.
+.sp
+.LP
+\fBRPC\fR supports various authentication flavors. Among them are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTH_NONE\fR\fR
+.ad
+.RS 13n
+.rt  
+No authentication (none).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTH_SYS\fR\fR
+.ad
+.RS 13n
+.rt  
+Traditional \fBUNIX-style\fR authentication.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTH_DES\fR\fR
+.ad
+.RS 13n
+.rt  
+\fBDES\fR encryption-based authentication.
+.RE
+
+.sp
+.LP
+The \fBauthdes_getucred()\fR and \fBauthdes_seccreate()\fR functions implement
+the \fBAUTH_DES\fR authentication style. The keyserver daemon \fBkeyserv\fR(1M)
+must be running for the \fBAUTH_DES\fR authentication system to work and
+\fBkeylogin\fR(1) must have been run. The \fBAUTH_DES\fR style of
+authentication is discussed here. For information about the \fBAUTH_NONE\fR and
+\fBAUTH_SYS\fR flavors of authentication, refer to \fBrpc_clnt_auth\fR(3NSL).
+See \fBrpc\fR(3NSL) for the definition of the \fBAUTH\fR data structure.
+.sp
+.LP
+The following functions documented on this page are MT-Safe. For the MT-levels
+of other authentication styles, see relevant man pages.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthdes_getucred()\fR\fR
+.ad
+.RS 26n
+.rt  
+This is the first of two functions that interface to the \fBRPC\fR secure
+authentication system \fBAUTH_DES\fR. The second is the
+\fBauthdes_seccreate()\fR function. The \fBauthdes_getucred()\fR function is
+used on the server side to convert an \fBAUTH_DES\fR credential, which is
+operating system independent, to an \fBAUTH_SYS\fR credential. The
+\fBauthdes_getucred()\fR function returns \fB1\fR if it succeeds, \fB0\fR if it
+fails.
+.sp
+The \fB*\fR\fIuidp\fR parameter is set to the user's numerical \fBID\fR
+associated with \fIadc\fR. The \fB*\fR\fIgidp\fR parameter is set to the
+numerical \fBID\fR of the user's group. The \fB*\fR\fIgidlist\fR parameter
+contains the numerical \fBIDs\fR of the other groups to which the user belongs.
+The \fB*\fR\fIgidlenp\fR parameter is set to the number of valid group ID
+entries specified by the \fB*\fR\fIgidlist\fR parameter.
+.sp
+The \fBauthdes_getucred()\fR function fails if the \fBauthdes_cred\fR structure
+was created with the netname of a host. In such a case, \fBnetname2host()\fR
+should be used to get the host name from the host netname in the
+\fBauthdes_cred\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthdes_seccreate()\fR\fR
+.ad
+.RS 26n
+.rt  
+The second of two \fBAUTH_DES\fR authentication functions, the
+\fBauthdes_seccreate()\fR function is used on the client side to return an
+authentication handle that enables the use of the secure authentication system.
+The first field, \fIname\fR, specifies the network name \fInetname\fR of the
+owner of the server process. The field usually represents a hostname derived
+from the \fBhost2netname()\fR utility, but the field might also represent a
+user name converted with the \fBuser2netname()\fR utility.
+.sp
+The second field, \fIwindow\fR, specifies the validity of the client credential
+in seconds. If the difference in time between the client's clock and the
+server's clock exceeds \fIwindow\fR, the server rejects the client's
+credentials and the clock will have to be resynchronized. A small window is
+more secure than a large one, but choosing too small a window increases the
+frequency of resynchronization due to clock drift.
+.sp
+The third parameter, \fItimehost\fR, is the host's name and is optional. If
+\fItimehost\fR is \fINULL\fR, the authentication system assumes that the local
+clock is always in sync with the \fItimehost\fR clock and does not attempt
+resynchronization. If a timehost is supplied, the system consults the remote
+time service whenever resynchronization is required. The \fItimehost\fR
+parameter is usually the name of the host on which the server is running.
+.sp
+The final parameter, \fIckey\fR, is also optional. If \fIckey\fR is \fINULL,\fR
+the authentication system generates a random \fBDES\fR key to be used for the
+encryption of credentials. If \fIckey\fR is supplied, it is used for
+encryption.
+.sp
+If \fBauthdes_seccreate()\fR fails, it returns \fINULL.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetnetname()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function returns the unique, operating system independent netname of the
+caller in the fixed-length array \fIname\fR. The function returns \fB1\fR if it
+succeeds and \fB0\fR if it fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhost2netname()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function converts a domain-specific hostname \fIhost\fR to an operating
+system independent netname. The function returns \fB1\fR if it succeeds and
+\fB0\fR if it fails. The \fBhost2netname()\fR function is the inverse of the
+\fBnetname2host()\fR function. If the \fIdomain\fR is \fINULL\fR,
+\fBhost2netname()\fR uses the default domain name of the machine. If \fIhost\fR
+is \fINULL\fR, it defaults to that machine itself. If \fIdomain\fR is
+\fINULL\fR and \fIhost\fR is an NIS name such as \fBmyhost.sun.example.com\fR,
+the \fBhost2netname()\fR function uses the domain \fBsun.example.com\fR rather
+than the default domain name of the machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkey_decryptsession()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function is an interface to the keyserver daemon, which is associated with
+\fBRPC's\fR secure authentication system (\fBAUTH_DES\fR authentication). User
+programs rarely need to call \fBkey_decryptsession()\fR or the associated
+functions \fBkey_encryptsession()\fR, \fBkey_gendes()\fR, and
+\fBkey_setsecret()\fR.
+.sp
+The \fBkey_decryptsession()\fR function takes a server netname \fIremotename\fR
+and a \fBDES\fR key \fIdeskey\fR, and decrypts the key by using the the public
+key of the server and the secret key associated with the effective \fBUID\fR of
+the calling process. The \fBkey_decryptsession()\fR function is the inverse of
+\fBkey_encryptsession()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkey_encryptsession()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function is a keyserver interface that takes a server netname
+\fIremotename\fR and a \fBDES\fR key \fIdeskey\fR, and encrypts the key using
+the public key of the the server and the secret key associated with the
+effective \fBUID\fR of the calling process. If the keyserver does not have a
+key registered for the UID, it falls back to using the secret key for the
+netname \fBnobody\fR unless this feature has been disabled. See
+\fBkeyserv\fR(1M). The \fBkey_encryptsession()\fR function is the inverse of
+\fBkey_decryptsession()\fR function. The \fBkey_encryptsession()\fR function
+returns \fB0\fR if it succeeds, \fB\(mi1\fR if it fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkey_gendes()\fR\fR
+.ad
+.RS 26n
+.rt  
+This is a keyserver interface function used to ask the keyserver for a secure
+conversation key. Selecting a conversion key at random is generally not secure
+because the common ways of choosing random numbers are too easy to guess. The
+\fBkey_gendes()\fR function returns \fB0\fR if it succeeds, \fB\(mi1\fR if it
+fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkey_setsecret()\fR\fR
+.ad
+.RS 26n
+.rt  
+This is a keyserver interface function used to set the key for the effective
+\fBUID\fR of the calling process. This function returns \fB0\fR if it succeeds,
+\fB\(mi1\fR if it fails.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkey_secretkey_is_set()\fR\fR
+.ad
+.RS 26n
+.rt  
+This is a keyserver interface function used to determine if a key has been set
+for the effective \fBUID\fR of the calling process. If the keyserver has a key
+stored for the effective \fBUID\fR of the calling process, the
+\fBkey_secretkey_is_set()\fR function returns \fB1\fR. Otherwise it returns
+\fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnetname2host()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function converts an operating system independent netname \fIname\fR to a
+domain-specific hostname \fIhost\fR. The \fIhostlen\fR parameter is the maximum
+size of \fIhost\fR. The \fBnetname2host()\fR function returns \fB1\fR if it
+succeeds and \fB0\fR if it fails. The function is the inverse of the
+\fBhost2netname()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnetname2user()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function converts an operating system independent netname to a
+domain-specific user \fBID\fR. The \fBnetname2user()\fR function returns
+\fB1\fR if it succeeds and \fB0\fR if it fails.The function is the inverse of
+the \fBuser2netname()\fR function.
+.sp
+The \fB*\fR\fIuidp\fR parameter is set to the user's numerical \fBID\fR
+associated with \fIname\fR. The \fB*\fR\fIgidp\fR parameter is set to the
+numerical \fBID\fR of the user's group. The \fIgidlist\fR parameter contains
+the numerical \fBIDs\fR of the other groups to which the user belongs. The
+\fB*\fR\fIgidlenp\fR parameter is set to the number of valid group \fBID\fR
+entries specified by the \fIgidlist\fR parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuser2netname()\fR\fR
+.ad
+.RS 26n
+.rt  
+This function converts a domain-specific username to an operating system
+independent netname. The \fBuser2netname()\fR function returns \fB1\fR if it
+succeeds and \fB0\fR if it fails. The function is the inverse of
+\fBnetname2user()\fR function.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchkey\fR(1), \fBkeylogin\fR(1), \fBkeyserv\fR(1M), \fBnewkey\fR(1M),
+\fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL), \fBattributes\fR(5)

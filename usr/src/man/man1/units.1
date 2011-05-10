@@ -1,0 +1,158 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH units 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+units \- converts quantities expressed in standard scales to other scales
+.SH SYNOPSIS
+.LP
+.nf
+\fBunits\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBunits\fR converts quantities expressed in various standard scales to their
+equivalents in other scales. It works interactively in this fashion:
+.sp
+.in +2
+.nf
+You have:~~\fBinch\fR
+You want:~~\fBcm\fR
+        * 2.540000e+00
+/ 3.937008e\(mi01
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A quantity is specified as a multiplicative combination of units optionally
+preceded by a numeric multiplier. Powers are indicated by suffixed positive
+integers, division by the usual sign:
+.sp
+.in +2
+.nf
+You have:~~\fB15 lbs force/in2\fR
+You want:~~\fBatm\fR
+        * 1.020689e+00
+        / 9.797299e\(mi01
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBunits\fR only does multiplicative scale changes; thus it can convert Kelvin
+to Rankine, but not Celsius to Fahrenheit. Most familiar units, abbreviations,
+and metric prefixes are recognized, together with a generous leavening of
+exotica and a few constants of nature including:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpi\fR\fR
+.ad
+.RS 9n
+.rt  
+ratio of circumference to diameter,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.RS 9n
+.rt  
+speed of light,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 9n
+.rt  
+charge on an electron,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 9n
+.rt  
+acceleration of gravity,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBforce\fR\fR
+.ad
+.RS 9n
+.rt  
+same as \fBg\fR,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmole\fR\fR
+.ad
+.RS 9n
+.rt  
+Avogadro's number,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwater\fR\fR
+.ad
+.RS 9n
+.rt  
+pressure head per unit height of water,
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBau\fR\fR
+.ad
+.RS 9n
+.rt  
+astronomical unit.
+.RE
+
+.sp
+.LP
+\fBPound\fR is not recognized as a unit of mass; \fBlb\fR is. Compound names
+are run together, (for example, \fBlightyear\fR). British units that differ
+from their U.S. counterparts are prefixed thus: \fBbrgallon\fR. For a complete
+list of units, type:
+.sp
+.LP
+\fBcat /usr/share/lib/unittab\fR
+.SH FILES
+.sp
+.LP
+\fB/usr/share/lib/unittab\fR
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

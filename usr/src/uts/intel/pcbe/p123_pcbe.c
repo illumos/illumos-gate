@@ -444,7 +444,8 @@ static const ptm_generic_event_t _P6_generic_names[] = {
 	{ "PAPI_fp_ins",	"flops",		0x0 },
 	{ "PAPI_fp_ops",	"flops",		0x0 },
 	{ "PAPI_fml_ins",	"mul",			0x0 },
-	{ "PAPI_fdv_ins",	"div",			0x0 }
+	{ "PAPI_fdv_ins",	"div",			0x0 },
+	CPC_GEN_END
 };
 
 static const ptm_generic_event_t *P6_generic_names[2] = {

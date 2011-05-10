@@ -1,0 +1,196 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_SetEventMask 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_SetEventMask, csx_GetEventMask \- set or return the client event mask for
+the client
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_SetEventMask\fR(\fBclient_handle_t\fR \fIch\fR, \fBsockevent_t *\fR\fIse\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_GetEventMask\fR(\fBclient_handle_t\fR \fIch\fR, \fBsockevent_t *\fR\fIse\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIse\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBsockevent_t\fR structure
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The function \fBcsx_SetEventMask()\fR sets the client or global event mask for
+the client.
+.sp
+.LP
+The function \fBcsx_GetEventMask()\fR returns the client or global event mask
+for the client.
+.sp
+.LP
+\fBcsx_RequestSocketMask\fR(9F) must be called before calling
+\fBcsx_SetEventMask()\fR for the client event mask for this socket.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBsockevent_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t   uint32_t     /* attribute flags for call */
+uint32_t   EventMask;   /* event mask to set or return */
+uint32_t   Socket;      /* socket number if necessary */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 14n
+.rt  
+This is a bit-mapped field that identifies the type of event mask to be
+returned. The field is defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCONF_EVENT_MASK_GLOBAL\fR \fR
+.ad
+.RS 27n
+.rt  
+Client's global event mask. If set, the client's global event mask is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCONF_EVENT_MASK_CLIENT\fR \fR
+.ad
+.RS 27n
+.rt  
+Client's local event mask. If set, the client's local event mask is returned.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEventMask\fR \fR
+.ad
+.RS 14n
+.rt  
+This field is bit-mapped. Card Services performs event notification based on
+this field. See \fBcsx_event_handler\fR(9E) for valid event definitions and for
+additional information about handling events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR \fR
+.ad
+.RS 14n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SOCKET\fR \fR
+.ad
+.RS 28n
+.rt  
+\fBcsx_RequestSocketMask\fR(9F) not called for \fBCONF_EVENT_MASK_CLIENT.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_event_handler\fR(9E), \fBcsx_RegisterClient\fR(9F),
+\fBcsx_ReleaseSocketMask\fR(9F), \fBcsx_RequestSocketMask\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard,\fR  PCMCIA/JEIDA

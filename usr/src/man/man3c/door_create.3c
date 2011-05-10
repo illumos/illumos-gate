@@ -1,0 +1,240 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH door_create 3C "22 Jan 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+door_create \- create a door descriptor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <door.h>
+
+\fBint\fR \fBdoor_create\fR(\fBvoid (*\fR\fIserver_procedure\fR) (void *\fIcookie\fR, \fBchar *\fR\fIargp\fR,
+     \fBsize_t\fR \fIarg_size\fR, \fBdoor_desc_t *\fR\fIdp\fR, \fBuint_t\fR \fIn_desc\fR), \fBvoid *\fR\fIcookie\fR,
+     \fBuint_t\fR \fIattributes\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdoor_create()\fR function creates a door descriptor that describes the
+procedure specified by  the function \fIserver_procedure\fR. The data item,
+\fIcookie\fR, is associated with the door descriptor,  and is passed as an
+argument to the invoked function \fIserver_procedure\fR during
+\fBdoor_call\fR(3C) invocations.  Other arguments passed to
+\fIserver_procedure\fR from an associated \fBdoor_call()\fR are placed on the
+stack and include \fIargp\fR and \fIdp\fR. The \fIargp\fR argument points to
+\fIarg_size\fR bytes of data and the \fIdp\fR argument points to \fIn_desc\fR
+\fBdoor_desc_t\fR structures. The \fIattributes\fR argument specifies
+attributes  associated with the newly created door. Valid values for
+\fIattributes\fR are constructed by OR-ing one or more of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delivers a special invocation on the door when the number of descriptors that
+refer to  this door drops to one.  In order to trigger this condition, more
+than one descriptor must have referred to this door at some time.
+\fBDOOR_UNREF_DATA\fR designates an unreferenced invocation, as the \fIargp\fR
+argument passed to \fIserver_procedure\fR. In the case of an unreferenced
+invocation, the values for  \fIarg_size\fR, \fIdp\fR and \fIn_did\fR are
+\fB0\fR. Only one unreferenced invocation is delivered on behalf of a door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF_MULTI\fR\fR
+.ad
+.sp .6
+.RS 4n
+Similar to \fBDOOR_UNREF\fR, except multiple unreferenced invocations can be
+delivered on the same door if the number of descriptors referring to the door
+drops to one more than once.  Since an additional reference may have been
+passed by the time an unreferenced invocation arrives, the \fBDOOR_IS_UNREF\fR
+attribute returned by the \fBdoor_info\fR(3C) call can be used to determine if
+the door is still unreferenced.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_PRIVATE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maintains a separate pool of server threads on behalf  of the door. Server
+threads are associated with a door's  private server pool using
+\fBdoor_bind\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_REFUSE_DESC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Any attempt to call \fBdoor_call\fR(3C) on this door with argument descriptors
+will fail with \fBENOTSUP\fR. When this flag is set, the door's server
+procedure will always be invoked with an \fIn_desc\fR argument of 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_NO_CANCEL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Clients which abort calls to \fBdoor_call()\fR on this door will not cause the
+cancellation of the server thread handling the request.  See
+\fBcancellation\fR(5).
+.RE
+
+.sp
+.LP
+The descriptor returned from \fBdoor_create()\fR will be marked as close on
+exec (\fBFD_CLOEXEC\fR). Information about a door is available for all clients
+of a door using \fBdoor_info()\fR. Applications concerned with security should
+not place secure information in door data that is accessible by
+\fBdoor_info()\fR. In particular, secure data should not be stored in the data
+item \fIcookie\fR.
+.sp
+.LP
+By default, additional threads are created as needed to handle concurrent
+\fBdoor_call()\fR invocations.   See \fBdoor_server_create\fR(3C) for
+information on how to change this behavior.
+.sp
+.LP
+A process can advertise a door in the file system name space using
+\fBfattach\fR(3C).
+.sp
+.LP
+After creation, \fBdoor_setparam\fR(3C) can be used to set limits on the amount
+of data and descriptors clients can send over the door.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdoor_create()\fR returns a non-negative value.
+Otherwise, \fBdoor_create\fR returns \fB\(mi1\fR and sets \fBerrno\fR to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBdoor_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Invalid attributes are passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The process has too many open descriptors.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreate a door and use \fBfattach()\fR to advertise the door in
+the file system namespace.
+.sp
+.LP
+The following example creates a door and uses \fBfattach()\fR to advertise the
+door in the file system namespace.
+
+.sp
+.in +2
+.nf
+void
+server(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
+    uint_t n_desc)
+{
+    door_return(NULL, 0, NULL, 0);
+    /* NOTREACHED */
+}
+
+int
+main(int argc, char *argv[])
+{
+    int did;
+    struct stat buf;
+
+    if ((did = door_create(server, 0, 0)) < 0) {
+        perror("door_create");
+        exit(1);
+    }
+
+    /* make sure file system location exists */
+    if (stat("/tmp/door", &buf) < 0) {
+        int newfd;
+        if ((newfd = creat("/tmp/door", 0444)) < 0) {
+            perror("creat");
+            exit(1);
+        }
+        (void) close(newfd);
+    }
+
+    /* make sure nothing else is attached */
+    (void) fdetach("/tmp/door");
+
+    /* attach to file system */
+    if (fattach(did, "/tmp/door") < 0) {
+        perror("fattach");
+        exit(2);
+    }
+    [...]
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoor_bind\fR(3C), \fBdoor_call\fR(3C), \fBdoor_info\fR(3C),
+\fBdoor_revoke\fR(3C), \fBdoor_setparam\fR(3C), \fBdoor_server_create\fR(3C),
+\fBfattach\fR(3C), \fBlibdoor\fR(3LIB), \fBattributes\fR(5),
+\fBcancellation\fR(5)

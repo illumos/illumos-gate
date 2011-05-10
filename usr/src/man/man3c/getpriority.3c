@@ -1,0 +1,226 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.TH getpriority 3C "1 Apr 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getpriority, setpriority \- get and set the nice value
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/resource.h>
+
+\fBint\fR \fBgetpriority\fR(\fBint\fR \fIwhich\fR, \fBid_t\fR \fIwho\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetpriority\fR(\fBint\fR \fIwhich\fR, \fBid_t\fR \fIwho\fR, \fBint\fR \fIvalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetpriority()\fR function obtains the nice value of a process, thread,
+or set of processes.  The \fBsetpriority()\fR function sets the nice value of a
+process, thread, or set of processes to \fIvalue\fR+\fBNZERO\fR, where
+\fBNZERO\fR is defined to be 20.
+.sp
+.LP
+Target entities are specified by the values of the \fIwhich\fR and \fIwho\fR
+arguments.  The \fIwhich\fR argument can be one of the following values:
+\fBPRIO_PROCESS\fR, \fBPRIO_PGRP\fR, \fBPRIO_USER\fR, \fBPRIO_GROUP\fR,
+\fBPRIO_SESSION\fR, \fBPRIO_LWP\fR, \fBPRIO_TASK\fR, \fBPRIO_PROJECT\fR,
+\fBPRIO_ZONE\fR, or \fBPRIO_CONTRACT\fR, indicating that the \fIwho\fR argument
+is to be interpreted as a process ID, a process group ID, an effective user ID,
+an effective group ID, a session ID, a thread (lwp) ID, a task ID, a project
+ID, a zone ID, or a process contract ID, respectively.  A 0 value for the
+\fIwho\fR argument specifies the current process, process group, or user. A 0
+value for the \fIwho\fR argument is treated as valid group ID, session ID,
+thread (lwp) ID, task ID, project ID, zone ID, or process contract ID. A
+\fBP_MYID\fR value for the \fIwho\fR argument can be used to specify the
+current group, session, thread, task, project, zone, or process contract,
+respectively.
+.sp
+.LP
+If a specified process is multi-threaded, the nice value set with
+\fBsetpriority()\fR affects all threads in the process.
+.sp
+.LP
+If more than one process is specified, \fBgetpriority()\fR returns \fBNZERO\fR
+less than the lowest nice value pertaining to any of the specified entities,
+and \fBsetpriority()\fR sets the nice values of all of the specified processes
+to \fIvalue\fR+\fBNZERO\fR.
+.sp
+.LP
+The default nice value is \fBNZERO\fR. Lower nice values cause more favorable
+scheduling. The range of valid nice values is 0 to \fBNZERO\fR*2-1. If
+\fIvalue\fR+\fBNZERO\fR is less than the system's lowest supported nice value,
+\fBsetpriority()\fR sets the nice value to the lowest supported value. If
+\fIvalue\fR+\fBNZERO\fR is greater than the system's highest supported nice
+value, \fBsetpriority()\fR sets the nice value to the highest supported value.
+.sp
+.LP
+Only a process with appropriate privileges can lower the nice value.
+.sp
+.LP
+Any process or thread using \fBSCHED_FIFO\fR or \fBSCHED_RR\fR is unaffected by
+a call to \fBsetpriority()\fR. This is not considered an error. A process or
+thread that subsequently reverts to \fBSCHED_OTHER\fR will not have its
+priority affected by such a \fBsetpriority()\fR call.
+.sp
+.LP
+The effect of changing the nice value varies depending on the scheduling policy
+in effect.
+.sp
+.LP
+Since \fBgetpriority()\fR can return the value -1 on successful completion, it
+is necessary to set \fBerrno\fR to 0 prior to a call to \fBgetpriority()\fR. If
+\fBgetpriority()\fR returns the value -1, then \fBerrno\fR can be checked to
+see if an error occurred or if the value is a legitimate nice value.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetpriority()\fR returns an integer in the range
+from -\fBNZERO\fR to \fBNZERO\fR-1.  Otherwise, \fB\(mi1\fR is returned and
+\fBerrno\fR is set to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBsetpriority()\fR returns \fB0\fR. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetpriority()\fR and \fBsetpriority()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+No process or thread could be located using the \fIwhich\fR and \fIwho\fR
+argument values specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIwhich\fR argument was not recognized, or the value of the
+\fIwho\fR argument is not a valid process ID, process group ID, user ID, group
+ID, session ID, thread (lwp) ID, task ID, project ID, or zone ID.
+.RE
+
+.sp
+.LP
+In addition, \fBsetpriority()\fR may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+A process was located, but neither the real nor effective user ID of the
+executing process match the effective user ID of the process whose nice value
+is being changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+A request was made to change the nice value to a lower numeric value and the
+current process does not have appropriate privileges.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample using \fBgetpriority()\fR
+.sp
+.LP
+The following example returns the current scheduling priority for the process
+ID returned by the call to \fBgetpid\fR(2).
+
+.sp
+.in +2
+.nf
+#include <sys/resource.h>
+\&...
+int which = PRIO_PROCESS;
+id_t pid;
+int ret;
+ 
+pid = getpid();
+ret = getpriority(which, pid);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRExample using \fBsetpriority()\fR
+.sp
+.LP
+The following example sets the nice value for the current process to 0.
+
+.sp
+.in +2
+.nf
+#include <sys/resource.h>
+\&...
+int which = PRIO_PROCESS;
+id_t pid;
+int value = -20;
+int ret;
+ 
+pid = getpid();
+ret = setpriority(which, pid, value);
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+The \fBgetpriority()\fR and \fBsetpriority()\fR functions work with an offset
+nice value (\fIvalue\fR-\fBNZERO\fR). The nice value is in the range 0 to
+2*\fBNZERO\fR-1, while the return value for \fBgetpriority()\fR and the third
+parameter for \fBsetpriority()\fR are in the range -\fBNZERO\fR to
+\fBNZERO\fR-1.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnice\fR(1), \fBrenice\fR(1), \fBsched_get_priority_max\fR(3C),
+\fBsched_setscheduler\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

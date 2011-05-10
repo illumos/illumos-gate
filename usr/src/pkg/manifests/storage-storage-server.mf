@@ -65,7 +65,6 @@ depend fmri=service/storage/isns type=require
 depend fmri=service/storage/ndmp type=require
 depend fmri=service/storage/removable-media type=require
 depend fmri=service/storage/virus-scan type=require
-depend fmri=service/storage/zfs-auto-snapshot type=require
 depend fmri=storage/avs/point-in-time-copy type=require
 depend fmri=storage/avs/remote-mirror type=require
 depend fmri=storage/metassist type=require

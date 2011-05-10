@@ -1,0 +1,139 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nlsrequest 3NSL "14 Nov 2002" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+nlsrequest \- format and send listener service request message
+.SH SYNOPSIS
+.LP
+.nf
+#include <listen.h>
+\fBint\fR \fBnlsrequest\fR(\fBint\fR \fIfildes\fR, \fBchar \fR*\fIservice_code\fR);
+\fBextern int\fR \fI_nlslogt_errno\fR;
+\fBextern char\fR *\fI_nlsrmsg\fR;
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Given a virtual circuit to a listener process (\fIfildes\fR) and a  service
+code of a server process, \fBnlsrequest()\fR formats and sends a \fIservice
+request message\fR to the remote listener process  requesting that it start the
+given service.   \fBnlsrequest()\fR waits for the remote listener process to
+return a \fIservice request response message\fR,  which is made available to
+the caller in the static, null-terminated data buffer pointed to by
+\fB_nlsrmsg\fR. The \fIservice request response message\fR includes a success
+or failure code and a text message. The entire message is printable.
+.SH RETURN VALUES
+.sp
+.LP
+The success or failure code is the integer return code from \fBnlsrequest()\fR.
+Zero indicates success, other negative  values indicate \fBnlsrequest()\fR
+failures as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi1\fR\fR
+.ad
+.RS 9n
+.rt  
+Error encountered by \fBnlsrequest()\fR, see \fBt_errno\fR.
+.RE
+
+.sp
+.LP
+Positive values are error return codes from the \fIlistener\fR process.
+Mnemonics for these codes are defined in \fB<listen.h>\fR\&.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Request message not interpretable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+Request service code unknown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+.rt  
+Service code known, but currently disabled.
+.RE
+
+.sp
+.LP
+If non-null, \fB_nlsrmsg\fR contains a pointer to a static, null-terminated
+character buffer containing the \fIservice request response message\fR. Note
+that both \fB_nlsrmsg\fR and the data buffer are overwritten by each call to
+\fBnlsrequest()\fR.
+.sp
+.LP
+If \fB_nlslog\fR is non-zero, \fBnlsrequest()\fR prints error messages on
+stderr. Initially, \fB_nlslog\fR is zero.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libnls.so.1\fR\fR
+.ad
+.RS 24n
+.rt  
+shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnlsadmin\fR(1M), \fBt_error\fR(3NSL), \fBt_snd\fR(3NSL), \fBt_rcv\fR(3NSL),
+\fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+\fBnlsrequest()\fR cannot always be certain that the remote server process has
+been successfully started.  In this case, \fBnlsrequest()\fR returns with no
+indication of an error and the caller will receive notification of a disconnect
+event by way of a \fBT_LOOK\fR error before or during the first \fBt_snd()\fR
+or \fBt_rcv()\fR call.
+.SH NOTES
+.sp
+.LP
+These interfaces are unsafe in multithreaded applications.  Unsafe interfaces
+should be called only from the main thread.

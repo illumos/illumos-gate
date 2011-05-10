@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <synch.h>
 #include <spawn.h>
+#include <paths.h>
 #include "libc.h"
 
 extern const char **_environ;
@@ -124,14 +125,10 @@ system(const char *cmd)
 	int error;
 	sigset_t mask;
 	struct stat64 buf;
-	const char *shpath;
+	const char *shpath = _PATH_BSHELL;
 	char *argv[4];
 	posix_spawnattr_t attr;
-	static const char *sun_path = "/bin/sh";
-	static const char *xpg4_path = "/usr/xpg4/bin/sh";
 	static const char *shell = "sh";
-
-	shpath = __xpg4? xpg4_path : sun_path;
 
 	if (cmd == NULL) {
 		if (stat64(shpath, &buf) != 0) {

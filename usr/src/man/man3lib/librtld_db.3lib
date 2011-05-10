@@ -1,0 +1,96 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH librtld_db 3LIB "12 Oct 2007" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+librtld_db \- runtime linker debugging library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lrtld_db\fR [ \fIlibrary\fR ... ]
+#include <\fBproc_service.h\fR>
+#include <\fBrtld_db.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions is this library are useful for building debuggers for dynamically
+linked programs. For a full description of these interfaces refer to the
+\fILinker and Libraries Guide\fR.
+.sp
+.LP
+To use \fBlibrtld_db\fR, applications need to implement the interfaces
+documented in \fBps_pread\fR(3PROC) and \fBproc_service\fR(3PROC).
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibrtld_db.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBrd_delete\fR\fBrd_errstr\fR
+\fBrd_event_addr\fR\fBrd_event_enable\fR
+\fBrd_event_getmsg\fR\fBrd_init\fR
+\fBrd_loadobj_iter\fR\fBrd_log\fR
+\fBrd_new\fR\fBrd_objpad_enable\fR
+\fBrd_plt_resolution\fR\fBrd_reset\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/librtld_db.so.1\fR\fR
+.ad
+.RS 27n
+.rt  
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/librtld_db.so.1\fR\fR
+.ad
+.RS 27n
+.rt  
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld.so.1\fR(1), \fBpvs\fR(1), \fBIntro\fR(3), \fBproc_service\fR(3PROC),
+\fBps_pread\fR(3PROC), \fBrtld_db\fR(3EXT), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

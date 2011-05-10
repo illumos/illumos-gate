@@ -1,0 +1,331 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH slk_attroff 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+slk_attroff, slk_attr_off, slk_attron, slk_attr_on, slk_attrset, slk_attr_set,
+slk_clear, slk_color, slk_init, slk_label, slk_noutrefresh, slk_refresh,
+slk_restore, slk_set, slk_touch, slk_wset \- soft label functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBslk_attroff\fR(\fBconst chtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attr_off\fR(\fBconst attr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attron\fR(\fBconst chtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attr_on\fR(\fBconst attr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attrset\fR(\fBconst chtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attr_set\fR(\fBconst attr_t\fR \fIattrs\fR, \fBshort\fR \fIcolor_pair_number\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_clear\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_color\fR(\fBshort\fR \fIcolor_pair_number\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_init\fR(\fBint\fR \fIfmt\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBslk_label\fR(\fBint\fR \fIlabnum\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_noutrefresh\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_refresh\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_restore\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_set\fR(\fBint\fR \fIlabnum\fR, \fBconst char *\fR\fIlabel\fR, \fBint\fR \fIjustify\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_touch\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_wset\fR(\fBint\fR \fIlabnum\fR, \fBconst wchar_t *\fR\fIlabel\fR, \fBint\fR \fIjustify\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattrs\fR\fR
+.ad
+.RS 21n
+.rt  
+are the window attributes to be added or removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIopts\fR\fR
+.ad
+.RS 21n
+.rt  
+Is reserved for future use. Currently, this must be a null pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcolor_pair_number\fR\fR
+.ad
+.RS 21n
+.rt  
+Is a color pair.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfmt\fR\fR
+.ad
+.RS 21n
+.rt  
+Is the format of how the labels are arranged on the screen.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlabnum\fR\fR
+.ad
+.RS 21n
+.rt  
+Is the number of the soft label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlabel\fR\fR
+.ad
+.RS 21n
+.rt  
+Is the name to be given to a soft label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjustify\fR\fR
+.ad
+.RS 21n
+.rt  
+Is a number indicating how to justify the label name.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The Curses interface manipulates the set of soft function-key labels that exist
+on many terminals. For those terminals that do not have soft labels, Curses
+takes over the bottom line of \fIstdscr\fR, reducing the size of \fIstdscr\fR
+and the value of the \fBLINES\fR external variable. There can be up to eight
+labels of up to eight display columns each.
+.sp
+.LP
+To use soft labels, \fBslk_init()\fR must be called before calling
+\fBinitscr\fR(3XCURSES), \fBnewterm\fR(3XCURSES), or
+\fBripoffline\fR(3XCURSES). If \fBinitscr()\fR eventually uses a line from
+\fIstdscr\fR to emulate the soft labels, then \fIfmt\fR determines how the
+labels are arranged on the screen. Setting \fIfmt\fR to 0 indicates a 3-2-3
+arrangement of the labels; 1 indicates a 4-4 arrangement. Other values for
+\fIfmt\fR are unspecified.
+.sp
+.LP
+The \fBslk_init()\fR function has the effect of calling \fBripoffline()\fR to
+reserve one screen line to accommodate the requested format.
+.sp
+.LP
+The \fBslk_set()\fR and \fBslk_wset()\fR functions specify the text of soft
+label number \fIlabnum\fR, within the range from 1 to and including 8. The
+\fIlabel\fR argument is the string to be put the lable. With \fBslk_set()\fR
+and \fBslk_wset()\fR, the width of the label is limited to eight columns
+positions. A null string or a null pointer specifies a blank label. The
+\fIjustify\fR argument can have the following values to indicate how to justify
+\fIlabel\fR within the space reserved for it:
+.sp
+.ne 2
+.mk
+.na
+\fB0\fR
+.ad
+.RS 5n
+.rt  
+Align the start of \fIlabel\fR with the start of the space
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1\fR
+.ad
+.RS 5n
+.rt  
+Center \fIlabel\fR within the space
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB2\fR
+.ad
+.RS 5n
+.rt  
+Align the end of \fIlabel\fR with the end of the space
+.RE
+
+.sp
+.LP
+The \fBslk_refresh()\fR and \fBslk_noutrefresh()\fR functions correspond to the
+\fBwrefresh\fR(3XCURSES) and \fBwnoutrefresh\fR(3XCURSES) functions.
+.sp
+.LP
+The \fBslk_label()\fR function obtains soft label number \fIlabnum\fR.
+.sp
+.LP
+The \fBslk_clear()\fR function immediately clears the soft labels from the
+screen.
+.sp
+.LP
+The \fBslk_restore()\fR function immediately restores the soft labels to the
+screen after a call to \fBslk_clear()\fR.
+.sp
+.LP
+The \fBslk_touch()\fR function forces all the soft labels to be output the next
+time \fBslk_refresh()\fR or \fBslk_noutrefresh()\fR is called.
+.sp
+.LP
+The \fBslk_attron()\fR, \fBslk_attrset()\fR, and \fBslk_attroff()\fR functions
+correspond to the \fBattron\fR(3XCURSES), \fBattrset\fR(3XCURSES), and
+\fBattroff\fR(3XCURSES) functions. They have an effect only if soft labels are
+stimulated on the bottom line of the screen.
+.sp
+.LP
+The \fBslk_attr_on()\fR, \fBslk_attr_off()\fR, \fBslk_attr_set()\fR and
+\fBslk_color()\fR functions correspond to the \fBattr_on\fR(3XCURSES),
+\fBattr_off\fR(3XCURSES), \fBattr_set\fR(3XCURSES), and
+\fBcolor_set\fR(3XCURSES) functions. As a result, they support color and the
+attribute constants with the \fBWA_\fR prefix.
+.sp
+.LP
+The \fIopts\fR argument is reserved for definition in a future release.
+Currently, the \fIopts\fR argument is a null pointer.
+.SH RETURN VALUES
+.sp
+.LP
+ Upon successful completion, the \fBslk_label()\fR function returns the
+requested label with leading and trailing blanks stripped. Otherwise, it
+returns a null pointer.
+.sp
+.LP
+ Upon successful completion, the other functions return \fBOK\fR. Otherwise,
+they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+ When using multi-byte character sets, applications should check the width of
+the string by calling \fBmbstowcs\fR(3C) and then \fBwcswidth\fR(3C) before
+calling \fBslk_set()\fR. When using wide characters, applications should check
+the width of the string by calling \fBwcswidth()\fR before calling
+\fBslk_set()\fR.
+.sp
+.LP
+Since the number of columns that a wide string will occupy is codeset-specific,
+call \fBwcwidth\fR(3C) and \fBwcswidth\fR(3C) to check the number of column
+positions in the string before calling \fBslk_wset()\fR.
+.sp
+.LP
+ Most applications would use \fBslk_noutrefresh()\fR because a \fBwrefresh()\fR
+is likely to follow soon.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattr_get\fR(3XCURSES), \fBattroff\fR(3XCURSES), \fBdelscreen\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBmbstowcs\fR(3C), \fBripoffline\fR(3XCURSES),
+\fBwcswidth\fR(3C), \fBwcwidth\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

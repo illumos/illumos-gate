@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * This module contains functions used to bring up and tear down the
  * Virtual Platform: [un]mounting file-systems, [un]plumbing network
  * interfaces, [un]configuring devices, establishing resource controls,
@@ -2515,10 +2519,10 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 		if (err != DLADM_STATUS_OK) {
 			zerror(zlogp, B_FALSE, "WARNING: unable to set "
 			    "pool %s to datalink %s", pool_name, dlname);
-			bzero(pool_name, MAXPATHLEN);
+			bzero(pool_name, sizeof (pool_name));
 		}
 	} else {
-		bzero(pool_name, MAXPATHLEN);
+		bzero(pool_name, sizeof (pool_name));
 	}
 	return (0);
 }
@@ -3046,7 +3050,7 @@ remove_datalink_pool(zlog_t *zlogp, zoneid_t zoneid)
 			return (-1);
 		}
 
-		bzero(pool_name, MAXPATHLEN);
+		bzero(pool_name, sizeof (pool_name));
 		for (i = 0, dllink = dllinks; i < dlnum; i++, dllink++) {
 			err = dladm_set_linkprop(dld_handle, *dllink, "pool",
 			    NULL, 0, DLADM_OPT_ACTIVE);
@@ -4520,7 +4524,8 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	}
 
 	/* Update saved pool name in case it has changed */
-	(void) zonecfg_get_poolname(handle, zone_name, pool_name, MAXPATHLEN);
+	(void) zonecfg_get_poolname(handle, zone_name, pool_name,
+	    sizeof (pool_name));
 
 	zonecfg_fini_handle(handle);
 	return (Z_OK);

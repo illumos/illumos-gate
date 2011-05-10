@@ -35,6 +35,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -66,7 +68,6 @@
 
 extern char *optarg;
 extern int optind;
-int enable_noacl_option = 0;
 
 static char mount_point[MAXPATHLEN + 1];
 static void usage(void);
@@ -169,7 +170,7 @@ main(int argc, char *argv[])
 	struct stat st;
 	int opt, error, err2;
 	static char *fstype = MNTTYPE_SMBFS;
-	char *env, *state;
+	char *env;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -203,15 +204,6 @@ main(int argc, char *argv[])
 	}
 	if (argc < 3)
 		usage();
-
-	state = smf_get_state(SERVICE);
-	if (state == NULL || strcmp(state, SCF_STATE_STRING_ONLINE) != 0) {
-		fprintf(stderr,
-		    gettext("mount_smbfs: service \"%s\" not enabled.\n"),
-		    SERVICE);
-		exit(RET_ERR);
-	}
-	free(state);
 
 	/* Debugging support. */
 	if ((env = getenv("SMBFS_DEBUG")) != NULL) {
@@ -309,10 +301,11 @@ main(int argc, char *argv[])
 	mnt.mnt_special = argv[optind];
 	mnt.mnt_mountp = argv[optind+1];
 
-	realpath(argv[optind+1], mount_point);
-	if (stat(mount_point, &st) == -1)
+	if ((realpath(argv[optind+1], mount_point) == NULL) ||
+	    (stat(mount_point, &st) == -1)) {
 		err(EX_MNT, gettext("could not find mount point %s"),
-		    mount_point);
+		    argv[optind+1]);
+	}
 	if (!S_ISDIR(st.st_mode)) {
 		errno = ENOTDIR;
 		err(EX_MNT, gettext("can't mount on %s"), mount_point);
@@ -441,10 +434,6 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 
 	case OPT_ACL:
 	case OPT_NOACL:
-		/* Some of our tests use this. */
-		if (enable_noacl_option == 0)
-			goto badopt;
-		/* fallthrough */
 	case OPT_SUID:
 	case OPT_NOSUID:
 	case OPT_DEVICES:
@@ -623,7 +612,7 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 static void
 usage(void)
 {
-	fprintf(stderr, "%s\n",
+	(void) fprintf(stderr, "%s\n",
 	gettext("usage: mount -F smbfs [-Orq] [-o option[,option]]"
 	"	//[workgroup;][user[:password]@]server[/share] path"));
 

@@ -1,0 +1,340 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pfmt 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pfmt \- display error message in standard format
+.SH SYNOPSIS
+.LP
+.nf
+#include <pfmt.h>
+
+\fBint\fR \fBpfmt\fR(\fBFILE *\fR\fIstream\fR, \fBlong\fR \fIflags\fR, \fBchar *\fR\fIformat\fR, \fB\&... /*\fR \fIarg */\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpfmt()\fR retrieves a format string from a locale-specific message
+database (unless \fBMM_NOGET\fR is specified) and uses it for \fBprintf\fR(3C)
+style formatting of \fIargs\fR. The output is displayed on \fIstream\fR.
+.sp
+.LP
+The \fBpfmt()\fR function encapsulates the output in the standard error message
+format (unless \fBMM_NOSTD\fR is specified, in which case the output is similar
+to \fBprintf()\fR).
+.sp
+.LP
+If the \fBprintf()\fR format string is to be retrieved from a message database,
+the \fBformat\fR argument must have the following structure:
+.sp
+.LP
+\fI<catalog>\fR\fB:\fR\fI<msgnum>\fR\fB:\fR\fI<defmsg>\fR\&.
+.sp
+.LP
+If \fBMM_NOGET\fR is specified, only the \fIdefmsg\fR field must be specified.
+.sp
+.LP
+The \fIcatalog\fR field is used to indicate the message database that contains
+the localized version of the format string. This field must be limited to 14
+characters selected from the set of all characters values, excluding \fB\e0\fR
+(null) and the ASCII codes for \fB/\fR (slash) and \fB:\fR (colon).
+.sp
+.LP
+The \fImsgnum\fR field is a positive number that indicates the index of the
+string into the message database.
+.sp
+.LP
+If the catalog does not exist in the locale (specified by the last call to
+\fBsetlocale\fR(3C) using the \fBLC_ALL\fR or \fBLC_MESSAGES\fR categories), or
+if the message number is out of bound, \fBpfmt()\fR will attempt to retrieve
+the message from the C locale. If this second retrieval fails, \fBpfmt()\fR
+uses the \fIdefmsg\fR field of the \fBformat\fR argument.
+.sp
+.LP
+If \fIcatalog\fR is omitted, \fBpfmt()\fR will attempt to retrieve the string
+from the default catalog specified by the last call to \fBsetcat\fR(3C). In
+this case, the \fBformat\fR argument has the following structure:
+.sp
+.LP
+\fB:\fR\fI<msgnum>\fR\fB:\fR\fI<defmsg>\fR\&.
+.sp
+.LP
+The \fBpfmt()\fR will output \fBMessage not found!!\en\fR as format string if
+\fIcatalog\fR is not a valid catalog name, if no catalog is specified (either
+explicitely or with \fBsetcat()\fR), if \fImsgnum\fR is not a valid number, or
+if no message could be retrieved from the message databases and \fIdefmsg\fR
+was omitted.
+.sp
+.LP
+The \fIflags\fR argument determine the type of output (such as whether the
+\fBformat\fR should be interpreted as is or encapsulated in the standard
+message format), and the access to message catalogs to retrieve a localized
+version of \fBformat\fR.
+.sp
+.LP
+The \fIflags\fR argument is composed of several groups, and can take the
+following values (one from each group):
+.sp
+.LP
+\fIOutput format control\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_NOSTD\fR\fR
+.ad
+.RS 12n
+.rt  
+Do not use the standard message format, interpret \fBformat\fR as
+\fBprintf()\fR \fBformat\fR. Only \fIcatalog access control flags\fR should be
+specified if \fBMM_NOSTD\fR is used; all other flags will be ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_STD\fR\fR
+.ad
+.RS 12n
+.rt  
+Output using the standard message format (default value 0).
+.RE
+
+.sp
+.LP
+\fICatalog access control\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_NOGET\fR\fR
+.ad
+.RS 12n
+.rt  
+Do not retrieve a localized version of \fBformat\fR. In this case, only the
+\fIdefmsg\fR field of the \fBformat\fR is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_GET\fR\fR
+.ad
+.RS 12n
+.rt  
+Retrieve a localized version of \fBformat\fR from the \fIcatalog\fR, using
+\fImsgid\fR as the index and \fIdefmsg\fR as the default message (default value
+0).
+.RE
+
+.sp
+.LP
+\fISeverity (standard message format only)\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_HALT\fR\fR
+.ad
+.RS 14n
+.rt  
+Generate a localized version of \fBHALT,\fR but do not halt the machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_ERROR\fR\fR
+.ad
+.RS 14n
+.rt  
+Generate a localized version of \fBERROR\fR (default value 0).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_WARNING\fR\fR
+.ad
+.RS 14n
+.rt  
+Generate a localized version of \fBWARNING.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_INFO\fR\fR
+.ad
+.RS 14n
+.rt  
+Generate a localized version of \fBINFO.\fR
+.RE
+
+.sp
+.LP
+Additional severities can be defined. Add-on severities can be defined with
+number-string pairs with numeric values from the range [5-255], using
+\fBaddsev\fR(3C). The specified severity will be generated from the bitwise
+\fBOR\fR operation of the numeric value and other \fIflags\fR If the severity
+is not defined, \fBpfmt()\fR uses the string \fBSEV=\fR\fIN\fR, where \fIN\fR
+is replaced by the integer severity value passed in \fIflags\fR.
+.sp
+.LP
+Multiple severities passed in \fIflags\fR will not be detected as an error. Any
+combination of severities will be summed and the numeric value will cause the
+display of either a severity string (if defined) or the string
+\fBSEV=\fR\fIN\fR (if undefined).
+.sp
+.LP
+\fIAction\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMM_ACTION\fR\fR
+.ad
+.RS 13n
+.rt  
+Specify an action message. Any severity value is superseded and replaced by a
+localized version of \fBTO FIX\fR.
+.RE
+
+.SH STANDARD ERROR MESSAGE FORMAT
+.sp
+.LP
+The \fBpfmt()\fR function displays error messages in the following format:
+.sp
+.in +2
+.nf
+\fIlabel\fR: \fIseverity\fR: \fItext\fR
+.fi
+.in -2
+
+.sp
+.LP
+If no \fIlabel\fR was defined by a call to \fBsetlabel\fR(3C), the message is
+displayed in the format:
+.sp
+.in +2
+.nf
+\fIseverity\fR: \fItext\fR
+.fi
+.in -2
+
+.sp
+.LP
+If \fBpfmt()\fR is called twice to display an error message and a helpful
+\fIaction\fR or recovery message, the output can look like:
+.sp
+.in +2
+.nf
+\fIlabel\fR: \fIseverity\fR: \fItext\fR\fIlabel\fR: TO FIX: \fItext\fR
+.fi
+.in -2
+
+.br
+.in +2
+
+.in -2
+.br
+.in +2
+
+.in -2
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBpfmt()\fR returns the number of bytes transmitted. Upon
+failure, it returns a negative value:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi1\fR\fR
+.ad
+.RS 9n
+.rt  
+Write error to \fIstream\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBpfmt()\fR function.
+.sp
+.LP
+Example 1:
+
+.sp
+.in +2
+.nf
+setlabel("UX:test");
+pfmt(stderr, MM_ERROR, "test:2:Cannot open file: %s\en",
+     strerror(errno));
+
+displays the message:
+
+UX:test: ERROR: Cannot open file: No such file or directory
+.fi
+.in -2
+
+.sp
+.LP
+Example 2:
+
+.sp
+.in +2
+.nf
+setlabel("UX:test");
+setcat("test");
+pfmt(stderr, MM_ERROR, ":10:Syntax error\en");
+pfmt(stderr, MM_ACTION, "55:Usage ...\en");
+.fi
+.in -2
+
+.sp
+.LP
+displays the message
+
+.sp
+.in +2
+.nf
+UX:test: ERROR: Syntax error
+UX:test: TO FIX: Usage ...
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+Since it uses \fBgettxt\fR(3C), \fBpfmt()\fR should not be used.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddsev\fR(3C), \fBgettxt\fR(3C), \fBlfmt\fR(3C), \fBprintf\fR(3C),
+\fBsetcat\fR(3C), \fBsetlabel\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5)

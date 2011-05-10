@@ -1,0 +1,246 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH growfs 1M "20 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+growfs \- non-destructively expand a UFS file system
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/growfs\fR [\fB-M\fR \fImount-point\fR] [\fInewfs-options\fR] 
+     [\fIraw-device\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBgrowfs\fR non-destructively expands a mounted or unmounted UNIX file system
+(UFS) to the size of the file system's slice(s).
+.sp
+.LP
+Typically, disk space is expanded by first adding a slice to a metadevice, then
+running the \fBgrowfs\fR command. When adding space to a mirror, you expand
+each submirror before expanding the file system.
+.sp
+.LP
+\fBgrowfs\fR will ``write-lock'' (see \fBlockfs\fR(1M)) a mounted file system
+when expanding. The length of time the file system is write-locked can be
+shortened by expanding the file system in stages. For instance, to expand a 1
+Gbyte file system to 2 Gbytes, the file system can be grown in 16 Mbyte stages
+using the \fB-s\fR option to specify the total size of the new file system at
+each stage. The argument for \fB-s\fR is the number of sectors, and must be a
+multiple of the cylinder size. Note: The file system cannot be grown if a
+cylinder size of less than 2 is specified. Refer to the \fBnewfs\fR(1M) man
+page for information on the options available when growing a file system.
+.sp
+.LP
+\fBgrowfs\fR displays the same information as \fBmkfs\fR during the expansion
+of the file system.
+.sp
+.LP
+If \fBgrowfs\fR is aborted, recover any lost free space by unmounting the file
+system and running the \fBfsck\fR command, or run the \fBgrowfs\fR command
+again.
+.sp
+.LP
+\fBNote:\fR If \fBgrowfs\fR is aborted and the file system is used before
+\fBfsck\fR is run on it, UFS metadata might be left in an incomplete state,
+with the result that the file system would be corrupted. In such a
+circumstance, you would have to restore the file system from backups.
+.SH OPTIONS
+.sp
+.LP
+Root privileges are required for all of the following options.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR \fImount-point\fR\fR
+.ad
+.RS 18n
+.rt  
+The file system to be expanded is mounted on \fImount-point\fR. File system
+locking (\fBlockfs\fR) will be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInewfs-options\fR\fR
+.ad
+.RS 18n
+.rt  
+The options are documented in the \fBnewfs\fR man page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIraw-device\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the name of a raw metadevice or raw special device, residing in
+\fB/dev/md/rdsk\fR, or \fB/dev/rdsk\fR, respectively, including the disk slice,
+where you want the file system to be grown.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExpanding nonmetadevice slice for \fB/export\fR file system
+.sp
+.LP
+The following example expands a nonmetadevice slice for the \fB/export\fR file
+system. In this example, the existing slice, \fB/dev/dsk/c1t0d0s3\fR, is
+converted to a metadevice so additional slices can be concatenated.
+
+.sp
+.in +2
+.nf
+# metainit -f d8 2 1 c1t0d0s3 1 c2t0d0s3
+# umount /export
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRAssociate \fB/export\fR with new metadevice
+.sp
+.LP
+Edit the \fB/etc/vfstab\fR file to change the entry for \fB/export\fR to the
+newly defined metadevice, \fBd8\fR.
+
+.sp
+.in +2
+.nf
+# mount /export
+# growfs -M /export /dev/md/rdsk/d8
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The first example starts by running the \fBmetainit\fR command with the
+\fB-f\fR option to force the creation of a new concatenated metadevice
+\fBd8\fR, which consists of the existing slice \fB/dev/dsk/c1t0d0s3\fR and a
+new slice \fB/dev/dsk/c2t0d0s3\fR. Next, the file system on \fB/export\fR must
+be unmounted. The \fB/etc/vfstab\fR file is edited to change the entry for
+\fB/export\fR to the newly defined metadevice name, rather than the slice name.
+After the file system is remounted, the \fBgrowfs\fR command is run to expand
+the file system. The file system will span the entire metadevice when
+\fBgrowfs\fR completes. The \fB-M\fR option enables the \fBgrowfs\fR command to
+expand a mounted file system. During the expansion, write access for
+\fB/export\fR is suspended until \fBgrowfs\fR unlocks the file system. Read
+access is not affected, though access times are not kept when the lock is in
+effect.
+
+.LP
+\fBExample 3 \fRDynamic Expansion of \fB/export\fR file system
+.sp
+.LP
+The following example picks up from the previous one. Here, the \fB/export\fR
+file system mounted on metadevice \fBd8\fR is dynamically expanded.
+
+.sp
+.in +2
+.nf
+# metattach d8 c0t1d0s2
+# growfs -M /export /dev/md/rdsk/d8
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This example begins by using the \fBmetattach\fR command to dynamically
+concatenate a new slice, \fB/dev/dsk/c0t1d0s2\fR, to the end of an existing
+metadevice, \fBd8\fR. Next, the \fBgrowfs\fR command specifies that the
+mount-point is \fB/export\fR and that it is to be expanded onto the raw
+metadevice \fB/dev/md/rdsk/d8\fR. The file system will span the entire
+metadevice when \fBgrowfs\fR completes. During the expansion, write access for
+\fB/export\fR is suspended until \fBgrowfs\fR unlocks the file system. Read
+access is not affected, though access times are not kept when the lock is in
+effect.
+
+.LP
+\fBExample 4 \fRExpanding mounted file system to existing mirror
+.sp
+.LP
+The following example expands a mounted file system \fB/files\fR, to an
+existing mirror, \fBd80\fR, which contains two submirrors, \fBd9\fR and
+\fBd10\fR.
+
+.sp
+.in +2
+.nf
+# metattach d9 c0t2d0s5
+# metattach d10 c0t3d0s5
+# growfs -M /files /dev/md/rdsk/d80
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example, the \fBmetattach\fR command dynamically concatenates the new
+slices to each submirror. The \fBmetattach\fR command must be run for each
+submirror. The mirror will automatically grow when the last submirror is
+dynamically concatenated. The mirror will grow to the size of the smallest
+submirror. The \fBgrowfs\fR command then expands the file system. The
+\fBgrowfs\fR command specifies that the mount-point is \fB/files\fR and that it
+is to be expanded onto the raw metadevice \fB/dev/md/rdsk/d80\fR. The file
+system will span the entire mirror when the \fBgrowfs\fR command completes.
+During the expansion, write access for the file system is suspended until
+\fBgrowfs\fR unlocks the file system. Read access is not affected, though
+access times are not kept when the lock is in effect.
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfsck\fR(1M), \fBlockfs\fR(1M), \fBmkfs\fR(1M), \fBmetattach\fR(1M),
+\fBnewfs\fR(1M), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Volume Manager Administration Guide\fR
+.SH LIMITATIONS
+.sp
+.LP
+Only UFS file systems (either mounted or unmounted) can be expanded using the
+\fBgrowfs\fR command. Once a file system is expanded, it cannot be decreased in
+size. The following conditions prevent you from expanding file systems: When
+\fBacct\fR is activated and the accounting file is on the target device. When
+C2 security is activated and the logging file is on the target file system.
+When there is a local \fBswap\fR file in the target file system. When the file
+system is root (\fB/\fR), \fB/usr\fR, or \fBswap\fR.

@@ -1,0 +1,47 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH linkblk 9S "7 Jul 1994" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+linkblk \- STREAMS data structure sent to multiplexor drivers to indicate a
+link
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBlinkblk\fR structure is used to connect a lower Stream to an upper
+STREAMS multiplexor driver.  This structure is used in conjunction with the
+\fBI_LINK\fR, \fBI_UNLINK\fR,  \fBP_LINK\fR, and \fBP_UNLINK\fR ioctl commands.
+See  \fBstreamio\fR(7I). The  \fBM_DATA\fR portion of the  \fBM_IOCTL\fR
+message contains the  \fBlinkblk\fR structure.  Note that the \fBlinkblk\fR
+structure is allocated and initialized by the Stream head as a result of  one
+of the above ioctl commands.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+queue_t   *l_qtop;   /* lowest level write queue of upper stream */
+                     /* (set to NULL for persistent links) */
+queue_t   *l_qbot;   /* highest level write queue of lower stream */
+int       l_index;   /* index for lower stream. */
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBioctl\fR(2), \fBstreamio\fR(7I)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

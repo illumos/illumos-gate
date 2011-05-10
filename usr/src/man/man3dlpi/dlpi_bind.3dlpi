@@ -1,0 +1,116 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_bind 3DLPI "22 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_bind \- bind DLPI handle
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_bind\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fIsap\fR, \fBuint_t *\fR\fIboundsap\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_bind()\fR function attempts to bind the \fBDLPI\fR handle \fIdh\fR
+to the \fBSAP\fR \fIsap\fR. The handle must be in the \fBDL_UNBOUND\fR
+\fBDLPI\fR state and will transition to the \fBDL_IDLE\fR \fBDLPI\fR state upon
+success. Some \fBDLPI\fR \fBMAC\fR types can bind to a different \fBSAP\fR than
+the \fBSAP\fR requested, in which case \fIboundsap\fR returns the actual bound
+\fBSAP\fR. If \fIboundsap\fR is set to \fBNULL\fR, \fBdlpi_bind()\fR fails if
+the bound \fBSAP\fR does not match the requested \fBSAP\fR. If the caller does
+not care which \fBSAP\fR is chosen, \fBDLPI_ANY_SAP\fR can be specified for
+\fIsap\fR. This is primarily useful in conjunction with \fBdlpi_promiscon()\fR
+and \fBDL_PROMISC_SAP\fR to receive traffic from all \fBSAP\fRs. If
+\fBDLPI_ANY_SAP\fR is specified, any transmitted messages must explicitly
+specify a \fBSAP\fR using \fBdlpi_send\fR(3DLPI).
+.sp
+.LP
+Upon success, the caller can use \fBdlpi_recv\fR(3DLPI) to receive data
+matching the bound \fBSAP\fR that is sent to the \fBDLPI\fR link associated
+with \fIdh\fR. In addition, the caller can use \fBdlpi_send\fR(3DLPI) to send
+data over the bound \fBSAP\fR address associated with \fBDLPI\fR handle
+\fIdh\fR. The physical address of the bound handle can be retrieved with
+\fBdlpi_info\fR(3DLPI).
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or an error value listed
+in the following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EBADMSG\fR\fR
+.ad
+.RS 20n
+.rt  
+Bad DLPI message
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 20n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 20n
+.rt  
+\fBDLPI\fR operation timed out
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EUNAVAILSAP\fR\fR
+.ad
+.RS 20n
+.rt  
+Unavailable \fBDLPI\fR \fBSAP\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_info\fR(3DLPI), \fBdlpi_recv\fR(3DLPI), \fBdlpi_send\fR(3DLPI),
+\fBdlpi_unbind\fR(3DLPI), \fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

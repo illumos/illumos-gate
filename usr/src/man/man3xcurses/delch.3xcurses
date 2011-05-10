@@ -1,0 +1,115 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH delch 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+delch, mvdelch, mvwdelch, wdelch \- remove a character
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBdelch\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvdelch\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwdelch\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwdelch\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdelch()\fR and \fBwdelch()\fR functions delete the character at  the
+current cursor position from \fBstdscr\fR and \fIwin\fR, respectively.  All
+remaining characters after cursor through to the end of the line are shifted
+one character towards the start of the line. The last character on the line
+becomes a space; characters on other lines are  not affected.
+.sp
+.LP
+The \fBmvdelch()\fR and \fBmvwdelch()\fR functions delete the character at  the
+position specified by the \fIx\fR and \fIy\fR parameters; the former  deletes
+the character from \fBstdscr\fR; the latter from \fIwin\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the y (row) coordinate of the position of the character  to be removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the x (column) coordinate of the position of the character  to be removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to the window containing the character to be removed.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbkgdset\fR(3XCURSES), \fBinsch\fR(3XCURSES), \fBlibcurses\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

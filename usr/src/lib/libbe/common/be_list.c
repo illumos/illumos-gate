@@ -23,6 +23,10 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <assert.h>
 #include <libintl.h>
 #include <libnvpair.h>
@@ -153,9 +157,14 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	list_callback_data_t cb = { 0 };
 	be_transaction_data_t bt = { 0 };
 	int ret = BE_SUCCESS;
+	zpool_handle_t *zphp;
+	char *rpool = NULL;
+	struct be_defaults be_defaults;
 
 	if (be_nodes == NULL)
 		return (BE_ERR_INVAL);
+
+	be_get_defaults(&be_defaults);
 
 	if (be_find_current_be(&bt) != BE_SUCCESS) {
 		/*
@@ -167,6 +176,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	} else {
 		(void) strncpy(cb.current_be, bt.obe_name,
 		    sizeof (cb.current_be));
+		rpool = bt.obe_zpool;
 	}
 
 	/*
@@ -176,13 +186,25 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	if (be_name != NULL)
 		cb.be_name = strdup(be_name);
 
-	if ((zpool_iter(g_zfs, be_get_list_callback, &cb)) != 0) {
-		if (cb.be_nodes_head != NULL) {
-			be_free_list(cb.be_nodes_head);
-			cb.be_nodes_head = NULL;
-			cb.be_nodes = NULL;
+	if (be_defaults.be_deflt_rpool_container && rpool != NULL) {
+		if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
+			be_print_err(gettext("be_get_node_data: failed to "
+			    "open rpool (%s): %s\n"), rpool,
+			    libzfs_error_description(g_zfs));
+			free(cb.be_name);
+			return (zfs_err_to_be_err(g_zfs));
 		}
-		ret = BE_ERR_BE_NOENT;
+
+		ret = be_get_list_callback(zphp, &cb);
+	} else {
+		if ((zpool_iter(g_zfs, be_get_list_callback, &cb)) != 0) {
+			if (cb.be_nodes_head != NULL) {
+				be_free_list(cb.be_nodes_head);
+				cb.be_nodes_head = NULL;
+				cb.be_nodes = NULL;
+			}
+			ret = BE_ERR_BE_NOENT;
+		}
 	}
 
 	if (cb.be_nodes_head == NULL) {
@@ -367,6 +389,8 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 	 * the information for the specified BE.
 	 */
 	if (cb->be_name != NULL) {
+		if (!be_valid_be_name(cb->be_name))
+			return (BE_ERR_INVAL);
 		/*
 		 * Generate string for the BE root dataset
 		 */
@@ -398,16 +422,6 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 		return (ret);
 	}
 
-	if (cb->be_nodes_head == NULL) {
-		if ((cb->be_nodes_head = be_list_alloc(&ret,
-		    sizeof (be_node_list_t))) == NULL) {
-			ZFS_CLOSE(zhp);
-			zpool_close(zlp);
-			return (ret);
-		}
-		cb->be_nodes = cb->be_nodes_head;
-	}
-
 	/*
 	 * If a BE name was specified we iterate through the datasets
 	 * and snapshots for this BE only. Otherwise we will iterate
@@ -415,6 +429,16 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 	 * within the pool
 	 */
 	if (cb->be_name != NULL) {
+		if (cb->be_nodes_head == NULL) {
+			if ((cb->be_nodes_head = be_list_alloc(&ret,
+			    sizeof (be_node_list_t))) == NULL) {
+				ZFS_CLOSE(zhp);
+				zpool_close(zlp);
+				return (ret);
+			}
+			cb->be_nodes = cb->be_nodes_head;
+		}
+
 		if ((ret = be_get_node_data(zhp, cb->be_nodes, cb->be_name,
 		    rpool, cb->current_be, be_ds)) != BE_SUCCESS) {
 			ZFS_CLOSE(zhp);
@@ -454,6 +478,9 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 	list_callback_data_t	*cb = (list_callback_data_t *)data;
 	char			*str = NULL, *ds_path = NULL;
 	int			ret = 0;
+	struct be_defaults be_defaults;
+
+	be_get_defaults(&be_defaults);
 
 	ds_path = str = strdup(zfs_get_name(zhp));
 
@@ -461,6 +488,21 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 	 * get past the end of the container dataset plus the trailing "/"
 	 */
 	str = str + (strlen(be_container_ds) + 1);
+	if (be_defaults.be_deflt_bename_starts_with != '\0') {
+		/* just skip if invalid */
+		if (!be_valid_be_name(str))
+			return (BE_SUCCESS);
+	}
+
+	if (cb->be_nodes_head == NULL) {
+		if ((cb->be_nodes_head = be_list_alloc(&ret,
+		    sizeof (be_node_list_t))) == NULL) {
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
+		cb->be_nodes = cb->be_nodes_head;
+	}
+
 	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT && !zone_be) {
 		be_snapshot_list_t *snapshots = NULL;
 		if (cb->be_nodes->be_node_snapshots == NULL) {

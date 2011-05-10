@@ -1,0 +1,1810 @@
+'\" te
+.\" Copyright 1989 AT&T. Copyright (c) 2004 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH limits.h 3HEAD "8 April 2004" "SunOS 5.11" "Headers"
+.SH NAME
+limits.h, limits \- implementation-defined constants
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <limits.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBlimits.h\fR> header defines various symbolic names. Different
+categories of names are described below.
+.sp
+.LP
+The names represent various limits on resources that the implementation imposes
+on applications. Symbolic constant names beginning with _POSIX can be found in
+\fBunistd.h\fR(3HEAD).
+.sp
+.LP
+Applications should not assume any particular value for a limit. An application
+wishing to avail itself of the full amount of a resource available on an
+implementation can make use of the value given in limits.h on that particular
+implementation by using the symbolic names listed below. Many of the listed
+limits are not invariant, and at runtime, the value of the limit might differ
+from those given in this header, for the following reasons:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The limit is pathname-dependent.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The limit differs between the compile and runtime machines.
+.RE
+.sp
+.LP
+For these reasons, an application can use the \fBfpathconf\fR(2),
+\fBpathconf\fR(2), and \fBsysconf\fR(3C) functions to determine the actual
+value of a limit at runtime.
+.SS "Runtime Invariant Values (Possibly Indeterminate)"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAIO_LISTIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of I/O operations in a single list I/O call supported by the
+implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of outstanding asynchronous I/O operations supported by the
+implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAIO_PRIO_DELTA_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum amount by which a process can decrease its asynchronous I/O
+priority level from its own scheduling priority.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBARG_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of argument to the \fBexec\fR(2) functions including environment
+data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBATEXIT_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of functions that can be registered with \fBatexit\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHILD_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of simultaneous processes per real user ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCLK_TCK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Number of clock ticks per second returned by the \fBtimes\fR(2) function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDELAYTIMER_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of timer expiration overruns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOST_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of a host name (not including the terminating null) as returned
+from the \fBgethostname\fR(3C) function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIOV_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of \fBiovec\fR structures that one process has available for use
+with \fBread\fR(2) or \fBwrite\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOGIN_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of a login name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMQ_OPEN_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of open message queue descriptors a process is allowed to
+hold.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOGIN_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of a login name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMQ_OPEN_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of open message queue descriptors a process is allowed to
+hold.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMQ_PRIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of message priorities supported by the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOPEN_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of files that one process can have open at any one time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAGESIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Size in bytes of a page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAGE_SIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Equivalent to \fBPAGESIZE\fR. If either \fBPAGESIZE\fR or \fBPAGE_SIZE\fR is
+defined, the other is defined with the same value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPASS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of significant bytes in a password, not including the
+terminating null.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPTHREAD_DESTRUCTOR_ITERATIONS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of attempts made to destroy a thread's thread-specific data
+values on thread exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPTHREAD_KEYS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of data keys that can be created by a process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPTHREAD_STACK_MIN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Minimum size in bytes of thread stack storage.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPTHREAD_THREADS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of threads that can be created per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRE_DUP_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of repeated occurrences of a BRE permitted by the \fBregexec\fR(3C)
+and \fBregcomp\fR(3C) functions when using the interval notation
+{\e(\fIm\fR,\fIn\fR\e}.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTSIG_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of realtime signals reserved for application use in this
+implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEM_NSEMS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of semaphores that a process can have.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEM_VALUE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum value a semaphore can have.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGQUEUE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of queued signals that a process can send and have pending at
+the receiver(s) at any time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSS_REPL_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of replenishment operations that may be simultaneously
+pending for a particular sporadic server scheduler.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTREAM_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of streams that one process can have open at one time. If defined,
+it has the same value as \fBFOPEN_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSYMLOOP_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of symbolic links that can be reliably traversed in the
+resolution of a pathname in the absence of a loop.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIMER_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of timers per process supported by the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRACE_EVENT_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of the trace event name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRACE_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of the trace generation version string or of the trace stream
+name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRACE_SYS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of trace streams that may simultaneously exist in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRACE_USER_EVENT_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of user trace event type identifiers that may simultaneously
+exist in a traced process, including the predefined user trace event
+\fBPOSIX_TRACE_UNNAMED_USER_EVENT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTTY_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of terminal device name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTZNAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes supported for the name of a timezone (not of the TZ
+variable).
+.RE
+
+.SS "Pathname Variable Values"
+.sp
+.LP
+The values in the following list can be constants within an implementation or
+can vary from one pathname to another. For example, file systems or directories
+can have different characteristics. The value supported for a specific pathname
+is provided by the \fBpathconf\fR(2) function.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFILESIZEBITS\fR\fR
+.ad
+.RS 28n
+.rt  
+Minimum number of bits needed to represent, as a signed integer value, the
+maximum size of a regular file allowed in the specified directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLINK_MAX\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of links to a single file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAX_CANON\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of bytes in a terminal canonical input line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAX_INPUT\fR\fR
+.ad
+.RS 28n
+.rt  
+Minimum number of bytes for which space is available in a terminal input queue;
+therefore, the maximum number of bytes a conforming application may require to
+be typed as input before reading them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNAME_MAX\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of bytes in a filename (not including terminating null).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPATH_MAX\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of bytes in a pathname, including the terminating null
+character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPIPE_BUF\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of bytes that is guaranteed to be atomic when writing to a pipe.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOSIX_ALLOC_SIZE_MIN\fR\fR
+.ad
+.RS 28n
+.rt  
+Minimum number of bytes of storage actually allocated for any portion of a
+file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOSIX_REC_INCR_XFER_SIZE\fR\fR
+.ad
+.RS 28n
+.rt  
+Recommended increment for file transfer sizes between the
+\fBPOSIX_REC_MIN_XFER_SIZE\fR and \fBPOSIX_REC_MAX_XFER_SIZE\fR values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOSIX_REC_MAX_XFER_SIZE\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum recommended file transfer size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOSIX_REC_MIN_XFER_SIZE\fR\fR
+.ad
+.RS 28n
+.rt  
+Minimum recommended file transfer size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOSIX_REC_XFER_ALIGN\fR\fR
+.ad
+.RS 28n
+.rt  
+Recommended file transfer buffer alignment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSYMLINK_MAX\fR\fR
+.ad
+.RS 28n
+.rt  
+Maximum number of bytes in a symbolic link.
+.RE
+
+.SS "Runtime Increasable Values"
+.sp
+.LP
+The magnitude limitations in the following list are fixed by specific
+implementations. An application should assume that the value supplied by
+<\fBlimits.h\fR> in a specific implementation is the minimum that pertains
+whenever the application is run under that implementation. A specific instance
+of a specific implementation can increase the value relative to that supplied
+by <\fBlimits.h\fR> for that implementation. The actual value supported by a
+specific instance is provided by the \fBsysconf\fR(3C) function.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBC_BASE_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum obase values allowed by the \fBbc\fR(1) utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBC_DIM_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of elements permitted in an array by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBC_SCALE_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum scale value allowed by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBC_STRING_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum length of a string constant accepted by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHARCLASS_NAME_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of bytes in a character class name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCOLL_WEIGHTS_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of weights that can be assigned to an entry of the
+\fBLC_COLLATE\fR order keyword in the locale definition file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXPR_NEST_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of expressions that can be nested within parentheses by the
+\fBexpr\fR(1) utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXPR_NEST_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of expressions that can be nested within parentheses by the
+\fBexpr\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLINE_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Unless otherwise noted, the maximum length, in bytes, of a utility's input line
+(either standard input or another file), when the utility is described as
+processing text files. The length includes room for the trailing <newline>.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNGROUPS_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of simultaneous supplementary group IDs per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRE_DUP_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of repeated occurrences of a regular expression permitted when
+using the interval notation \e{\fIm\fR,\fIn\fR\e}.
+.RE
+
+.SS "Maximum Values"
+.sp
+.LP
+The symbolic constants in the following list are symbolic names for the most
+restrictive value for certain features on an implementation supporting the
+POSIX Timers option.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_CLOCKRES_MIN\fR\fR
+.ad
+.RS 23n
+.rt  
+The resolution of the \fBCLOCK_REALTIME\fR clock, in nanoseconds.
+.RE
+
+.SS "Minimum Values"
+.sp
+.LP
+The symbolic constants in the following list are symbolic names for the most
+restrictive value for certain features on an implementation conforming to
+various POSIX and Single Unix Specification requirements. See
+\fBstandards\fR(5).
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_AIO_LISTIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of I/O operations that can be specified in a list I/O call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_AIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of outstanding asynchronous I/O operations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_ARG_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of argument to the \fBexec\fR(2) functions including environment
+data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_CHILD_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of simultaneous processes per real user ID.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_DELAYTIMER_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of timer expiration overruns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_HOST_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of a host name (not including the terminating null) as returned
+from the \fBgethostname\fR(3C) function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_LINK_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of links to a single file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_LOGIN_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The size of the storage required for a login name, in bytes, including the
+terminating null.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MAX_CANON\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a terminal canonical input queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MAX_INPUT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes allowed in a terminal input queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MQ_OPEN_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of message queues that can be open for a single process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MQ_PRIO_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum number of message priorities supported by the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a filename (not including terminating null).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_NGROUPS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of simultaneous supplementary group IDs per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_OPEN_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of files that one process can have open at any one time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_PATH_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_PIPE_BUF\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes that is guaranteed to be atomic when writing to a pipe.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_RE_DUP_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of repeated occurrences of a BRE permitted by the \fBregexec()\fR
+and \fBregcomp()\fR functions when using the interval notation
+{\e(\fIm\fR,\fIn\fR\e}
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_RTSIG_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of realtime signal numbers reserved for application use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SEM_NSEMS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of semaphores that a process can have.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SEM_VALUE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The maximum value a semaphore can have.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SIGQUEUE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of queued signals that a process can send and have pending at the
+receiver(s) at any time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SSIZE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value that can be stored in an object of type \fBssize_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_STREAM_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of streams that one process can have open at one time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SS_REPL_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of replenishment operations that can be simultaneously pending for a
+particular sporadic server scheduler.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SYMLINK_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of bytes in a symbolic link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SYMLOOP_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of symbolic links that can be traversed in the resolution of a
+pathname in the absence of a loop.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_DESTRUCTOR_ITERATIONS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of attempts made to destroy a thread's thread-specific data values
+on thread exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_KEYS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of data keys per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_THREADS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of threads per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TIMER_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The per-process number of timers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_EVENT_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The length in bytes of a trace event name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The length in bytes of a trace generation version string or a trace stream
+name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_SYS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of trace streams that can simultaneously exist in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_USER_EVENT_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of user trace event type identifiers that may simultaneously exist
+in a traced process, including the predefined user trace event
+\fBPOSIX_TRACE_UNNAMED_USER_EVENT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TTY_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+The size of the storage required for a terminal device name, in bytes,
+including the terminating null.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TZNAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes supported for the name of a timezone (not of the TZ
+variable).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_BC_BASE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum obase values allowed by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_BC_DIM_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of elements permitted in an array by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_BC_SCALE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum scale value allowed by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_BC_STRING_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum length of a string constant accepted by the \fBbc\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_CHARCLASS_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a character class name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_COLL_WEIGHTS_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of weights that can be assigned to an entry of the
+\fBLC_COLLATE\fR order keyword in the locale definition file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_EXPR_NEST_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of expressions that can be nested within parentheses by the
+\fBexpr\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_LINE_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Unless otherwise noted, the maximum length, in bytes, of a utility's input line
+(either standard input or another file), when the utility is described as
+processing text files. The length includes room for the trailing <newline>.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_RE_DUP_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of repeated occurrences of a regular expression permitted when
+using the interval notation \e{\fIm\fR,\fIn\fR\e}.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_IOV_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of \fBiovec\fR structures that one process has available for use
+with \fBread\fR(2) or \fBwrite\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_NAME_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a filename (not including the terminating null).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_PATH_MAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of bytes in a pathname.
+.RE
+
+.SS "Numerical Limits"
+.sp
+.LP
+The values in the following lists shall be defined in <\fBlimits.h\fR> and are
+constant expressions suitable for use in \fB#if\fR preprocessing directives.
+Moreover, except for \fBCHAR_BIT\fR, \fBDBL_DIG\fR, \fBDBL_MAX\fR,
+\fBFLT_DIG\fR, \fBFLT_MAX\fR, \fBLONG_BIT\fR, \fBWORD_BIT\fR, and
+\fBMB_LEN_MAX\fR, the symbolic names are defined as expressions of the correct
+type.
+.sp
+.LP
+If the value of an object of type \fBchar\fR is treated as a signed integer
+when used in an expression, the value of \fBCHAR_MIN\fR is the same as that of
+\fBSCHAR_MIN\fR and the value of \fBCHAR_MAX\fR is the same as that of
+\fBSCHAR_MAX\fR. Otherwise, the value of \fBCHAR_MIN\fR is 0 and the value of
+\fBCHAR_MAX\fR is the same as that of \fBUCHAR_MAX\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHAR_BIT\fR\fR
+.ad
+.RS 14n
+.rt  
+Number of bits in a type \fBchar\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHAR_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBchar\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHAR_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBchar\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDBL_DIG\fR\fR
+.ad
+.RS 14n
+.rt  
+Digits of precision of type \fBdouble\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDBL_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum decimal value of a \fBdouble\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDBL_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum decimal value of a \fBdouble\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFLT_DIG\fR\fR
+.ad
+.RS 14n
+.rt  
+Digits of precision of type \fBfloat\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFLT_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum decimal value of a \fBfloat\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFLT_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum decimal value of a \fBfloat\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINT_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBint\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINT_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of an \fBint\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLLONG_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBlong long\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLLONG_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBlong long\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_BIT\fR\fR
+.ad
+.RS 14n
+.rt  
+Number of bits in a \fBlong\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBlong\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of a \fBlong\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMB_LEN_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum number of bytes in a character, for any supported locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCHAR_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBsigned char\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCHAR_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBsigned char\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHRT_MIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum value of type \fBshort\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHRT_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBshort\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSSIZE_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of an object of type \fBssize_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMP_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Minimum number of unique filename generated by \fBtmpnam\fR(3C). Maximum number
+of times an application can call \fBtmpnam()\fR reliably.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUCHAR_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBunsigned char\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUINT_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBunsigned\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBULLONG_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type unsigned \fBlong long\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBULONG_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value of type \fBunsigned long\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSHRT_MAX\fR\fR
+.ad
+.RS 14n
+.rt  
+Maximum value for a type \fBunsigned short\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWORD_BIT\fR\fR
+.ad
+.RS 14n
+.rt  
+Number of bits in a word or type \fBint\fR.
+.RE
+
+.SS "Other Invariant Values"
+.sp
+.LP
+The following constants are defined in <\fBlimits.h\fR>.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCHARCLASS_NAME_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of bytes in a character class name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLOGNAME_MAX\fR\fR
+.ad
+.RS 22n
+.rt  
+The maximum number of bytes supported in a user's login name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_ARGMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum value of digit in calls to the \fBprintf\fR(3C) and \fBscanf\fR(3C)
+functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_LANGMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of bytes in a \fBLANG\fR name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_MSGMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum message number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_NMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of bytes in an N-to-1 collation mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_SETMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum set number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNL_TEXTMAX\fR\fR
+.ad
+.RS 22n
+.rt  
+Maximum number of bytes in a message string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNZERO\fR\fR
+.ad
+.RS 22n
+.rt  
+Default process priority.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfpathconf\fR(2), \fBpathconf\fR(2), \fBsysconf\fR(3C), \fBstandards\fR(5)

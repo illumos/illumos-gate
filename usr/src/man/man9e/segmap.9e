@@ -1,0 +1,301 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\" Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH segmap 9E "14 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+segmap \- map device memory into user space
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/param.h>
+#include <sys/vm.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBsegmap\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoff\fR, \fBstruct as *\fR\fIasp\fR, \fBcaddr_t *\fR\fIaddrp\fR,
+     \fBoff_t\fR \fIlen\fR, \fBunsigned int\fR \fIprot\fR, \fBunsigned int\fR \fImaxprot\fR, \fBunsigned int\fR \fIflags\fR,
+     \fBcred_t *\fR\fIcred_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 2 (DKI only).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 12n
+.rt  
+Device whose memory is to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 12n
+.rt  
+Offset within device memory at which mapping begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIasp\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to the address space into which the device memory should be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddrp\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to the address in the address space to which the device memory should
+be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 12n
+.rt  
+Length (in bytes) of the memory to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprot\fR \fR
+.ad
+.RS 12n
+.rt  
+A bit field that specifies the protections. Possible settings are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_READ\fR \fR
+.ad
+.RS 15n
+.rt  
+Read access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_WRITE\fR \fR
+.ad
+.RS 15n
+.rt  
+Write access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_EXEC\fR \fR
+.ad
+.RS 15n
+.rt  
+Execute access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_USER\fR \fR
+.ad
+.RS 15n
+.rt  
+User-level access is desired (the mapping is  being done as a result of a
+\fBmmap\fR(2) system call).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_ALL\fR \fR
+.ad
+.RS 15n
+.rt  
+All access is desired.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImaxprot\fR \fR
+.ad
+.RS 12n
+.rt  
+Maximum protection flag possible for attempted mapping; the \fBPROT_WRITE\fR
+bit may be masked out if the user opened the special file read-only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR \fR
+.ad
+.RS 12n
+.rt  
+Flags indicating type of mapping. Possible values are (other bits may be set):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_SHARED\fR \fR
+.ad
+.RS 16n
+.rt  
+Changes should be shared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_PRIVATE\fR \fR
+.ad
+.RS 16n
+.rt  
+Changes are private.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcred_p\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to the  user credentials structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBsegmap()\fR entry point is an optional routine for character drivers
+that support memory mapping.  The  \fBmmap\fR(2) system call, when applied to a
+character special file, allows device memory to be mapped into user space for
+direct access by the user application.
+.sp
+.LP
+Typically, a character driver that needs to support the  \fBmmap\fR(2) system
+call supplies either an \fBdevmap\fR(9E) entry point, or both an
+\fBdevmap\fR(9E) and a  \fBsegmap()\fR entry point routine (see the
+\fBdevmap\fR(9E) reference page). If no \fBsegmap()\fR entry point is provided
+for the driver,  \fBdevmap_setup\fR(9F) is used as a default.
+.sp
+.LP
+A driver for a memory-mapped device would provide a  \fBsegmap()\fR entry point
+if it:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+needs to maintain a separate context for each user mapping.  See
+\fBdevmap_setup\fR(9F) for details.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+needs to assign device access attributes to the user mapping.
+.RE
+.sp
+.LP
+The responsibilities of a  \fBsegmap()\fR entry point are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Verify that the range, defined by  \fIoffset\fR and  \fIlen\fR, to be mapped is
+valid for  the device. Typically, this task is performed by calling the
+\fBdevmap\fR(9E) entry point. Note that if you are using
+\fBddi_devmap_segmap\fR(9F) or \fBdevmap_setup\fR(9F) to set up the mapping, it
+will call your \fBdevmap\fR(9E) entry point for you to validate the range to be
+mapped.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Assign device access attributes to the mapping.  See
+\fBddi_devmap_segmap\fR(9F), and \fBddi_device_acc_attr\fR(9S) for details.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Set up device contexts for the user mapping if your device requires  context
+switching.  See \fBdevmap_setup\fR(9F) for details.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Perform the mapping with \fBddi_devmap_segmap\fR(9F), or \fBdevmap_setup\fR(9F)
+and return the status if it fails.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsegmap()\fR routine should return  \fB0\fR if the driver is successful
+in performing the memory map of its device address space into the specified
+address space.
+.sp
+.LP
+The \fBsegmap()\fR must return an error number on failure. For example, valid
+error numbers would be  \fBENXIO\fR if the offset/length pair specified exceeds
+the limits of the device memory, or  \fBEINVAL\fR if the driver detects an
+invalid type of mapping attempted.
+.sp
+.LP
+If one of the mapping routines \fBddi_devmap_segmap()\fR or
+\fBdevmap_setup()\fRfails, you must return the error number returned by the
+respective routine.
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBdevmap\fR(9E), \fBdevmap_setup\fR(9F),
+\fBddi_devmap_segmap\fR(9F), \fBddi_device_acc_attr\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

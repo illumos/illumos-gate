@@ -1,0 +1,211 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_copyin 9F "19 Apr 2000" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_copyin \- copy data to a driver buffer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_copyin\fR(\fBconst void *\fR\fIbuf\fR, \fBvoid *\fR\fIdriverbuf\fR, \fBsize_t\fR \fIcn\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuf\fR\fR
+.ad
+.RS 13n
+.rt  
+Source address from which data is transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdriverbuf\fR\fR
+.ad
+.RS 13n
+.rt  
+Driver destination address to which data is transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcn\fR\fR
+.ad
+.RS 13n
+.rt  
+Number of bytes transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 13n
+.rt  
+Set of flag bits that provide address space information about \fIbuf\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This routine is designed for use in driver \fBioctl\fR(9E) routines for drivers
+that support layered ioctls. \fBddi_copyin()\fR copies data from a source
+address to a driver buffer.  The driver developer must ensure that adequate
+space is allocated for the destination address.
+.sp
+.LP
+The \fIflags\fR argument determines the address space information about
+\fIbuf\fR. If the \fBFKIOCTL\fR flag is set, this indicates that \fIbuf\fR is a
+kernel address, and  \fBddi_copyin()\fR behaves like \fBbcopy\fR(9F).
+Otherwise, \fIbuf\fR is interpreted as a user buffer address, and
+\fBddi_copyin()\fR behaves like \fBcopyin\fR(9F).
+.sp
+.LP
+Addresses that are word-aligned are moved most efficiently.  However, the
+driver developer is not obliged to ensure alignment.  This function
+automatically finds the most efficient move according to address alignment.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_copyin()\fR returns \fB0\fR, indicating a successful copy. It returns
+\(mi\fB1\fR if one of the following occurs:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Paging fault; the driver tried to access a page of memory for which it did not
+have read or write access.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invalid user address, such as a user area or stack area.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invalid address that would have resulted in data being copied into the user
+block.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Hardware fault; a hardware error prevented access to the specified user memory.
+For example, an uncorrectable parity or \fBECC\fR error occurred.
+.RE
+.sp
+.LP
+If \(mi\fB1\fR is returned to the caller, driver entry point routines should
+return \fBEFAULT\fR.
+.SH CONTEXT
+.sp
+.LP
+\fBddi_copyin()\fR can be called from user or kernel context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBddi_copyin()\fR example
+.sp
+.LP
+A driver \fBioctl\fR(9E) routine (line 12) can be used to get or set device
+attributes or registers. For the \fBXX_SETREGS\fR condition (line 25), the
+driver copies the user data in \fIarg\fR to the device registers.  If the
+specified argument contains an invalid address, an error code is returned.
+
+.sp
+.in +2
+.nf
+1 struct device {           /* layout of physical device registers */
+ 2     int      control;     /* physical device control word */
+ 3     int      status;      /* physical device status word  */
+ 4     short    recv_char;   /* receive character from device */
+ 5     short    xmit_char    /* transmit character to device */
+ 6  };
+ 7  struct device_state {
+ 8     volatile struct device *regsp;   /* pointer to device registers */
+ 9     kmutex_t reg_mutex;              /* protect device registers */
+       . . .
+10  };
+
+11  static void *statep;	/* for soft state routines */
+
+12  xxioctl(dev_t dev, int cmd, int arg, int mode,
+13      cred_t *cred_p, int *rval_p)
+14  {
+15      struct device_state *sp;
+16      volatile struct device *rp;
+17      struct device reg_buf;	/* temporary buffer for registers */
+18      int instance;
+
+19      instance = getminor(dev);
+20      sp = ddi_get_soft_state(statep, instance);
+21      if (sp == NULL)
+22          return (ENXIO);
+23      rp = sp->regsp;
+        . . .
+24      switch (cmd)  {
+
+25      case XX_GETREGS:	/* copy data to temp. regs. buf */
+26            if (ddi_copyin(arg, &reg_buf,
+27                sizeof (struct device), mode) != 0) {
+28                    return (EFAULT);
+29            }  
+
+30            mutex_enter(&sp->reg_mutex);
+31            /*
+32             * Copy data from temporary device register 
+33             * buffer to device registers.
+34             * e.g. rp->control = reg_buf.control;
+35             */
+36            mutex_exit(&sp->reg_mutex);
+
+37            break;
+38      }
+39  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyin\fR(9F), \fBcopyout\fR(9F),
+\fBddi_copyout\fR(9F), \fBuiomove\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The value of the \fIflags\fR argument to \fBddi_copyin()\fR should be passed
+through directly from the \fImode\fR argument of \fBioctl()\fR untranslated.
+.sp
+.LP
+Driver defined locks should not be held across calls to this function.
+.sp
+.LP
+\fBddi_copyin()\fR should not be used from a streams driver. See \fBM_COPYIN\fR
+and \fBM_COPYOUT\fR in \fISTREAMS Programming Guide\fR.

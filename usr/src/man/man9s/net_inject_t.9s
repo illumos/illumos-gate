@@ -1,0 +1,92 @@
+'\" te
+.\"  Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH net_inject_t 9S "1 May 2008" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+net_inject_t \- structure for describing how to transmit a packet
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/neti.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnet_inject_t\fR data structure passes information in to \fBnet_inject\fR
+about how to transmit a packet. Transmit includes sending the packet up into
+the system as well as out of it.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+ mblk_t                  *ni_packet;   /* start of the packet */
+  struct sockaddr_storage ni_addr;      /* address of next hop */
+  phy_if_t                ni_physical;  /* network interface to use */
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBni_packet\fR\fR
+.ad
+.RS 15n
+.rt  
+Pointer to the first the \fBmblk_t\fR data structure that makes up this packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBni_addr\fR\fR
+.ad
+.RS 15n
+.rt  
+This field is only required to be initialized if \fBNI_DIRECT_OUT\fR is being
+used to transmit the packet. The \fBsockaddr_storage\fR field must be set to
+indicate whether the destination address contained in the structure is
+\fBIPv4\fR (cast \fIni_addr\fR to struct \fIsockaddr_in\fR) or \fBIPv6\fR (cast
+\fIni_addr\fR to struct \fIsockaddr_in6\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBni_physical\fR\fR
+.ad
+.RS 15n
+.rt  
+The physical interface where the packet will be injected.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnet_inject\fR(9F), \fBnetinfo\fR(9F), \fBattributes\fR(5)

@@ -1,0 +1,992 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libkrb5 3LIB "2 Sep 2009" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libkrb5 \- MIT Kerberos 5 library
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-I/usr/include/kerberosv5\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lkrb5\fR [ \fIlibrary\fR...]
+#include <\fBkrb5.h\fR>
+#include <\fBcom_err.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The functions in this library are the routines that comprise the MIT Kerberos 5
+library.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibkrb5.so\fR provides the public interface defined below.
+.sp
+.LP
+The \fBkrb5\fR library is provided as a convenience to allow native \fBkrb5\fR
+applications to be built and to run. Compatability between Solaris releases of
+the \fBkrb5\fR interface is not guaranteed. For new applications that require
+these features, \fBlibgss\fR(3LIB) is recomended.
+.sp
+.LP
+For detailed documentation on the \fBkrb5\fR interface, see the MIT Kerberos 5
+web site at \fBhttp://web.mit.edu/kerberos\fR.
+.sp
+.LP
+The \fBkrb5_cc_gen_new\fR routine, listed in \fBkrb5.h\fR section, is flawed
+and should be avoided. Until a new routine is available from MIT, the following
+can be done:
+.sp
+.in +2
+.nf
+char ccname[40];
+int tmpfd;
+
+snprintf(ccname,sizeof(ccname),"FILE:/tmp/krb5cc_%d_XXXXXX",
+        geteuid());
+
+if ((tmpfd = mkstemp(ccname+strlen("FILE:")))==-1) {
+        log("mkstemp(): %.100s", strerror(errno));
+        problem = errno;
+        goto fail;
+}
+if (fchmod(tmpfd,S_IRUSR | S_IWUSR) == -1) {
+        log("fchmod(): %.100s", strerror(errno));
+        close(tmpfd);
+        problem = errno;
+        goto fail;
+}
+ close(tmpfd);
+problem = krb5_cc_resolve(authctxt->krb5_ctx, ccname, &ccache);
+\&...
+fail:
+.fi
+.in -2
+
+.sp
+.LP
+The \fBkrb5_string_to_key\fR and \fBkrb5_string_to_key\fR routines, listed in
+\fBkrb5.h\fR section, are part of the old cryptosystem and should not be used
+in new apps.
+.SS "com_err.h"
+.br
+.in +2
+\fBcom_err\fR
+.in -2
+.br
+.in +2
+\fBcom_err_va\fR
+.in -2
+.br
+.in +2
+\fBerror_message\fR
+.in -2
+.SS "krb5.h"
+.br
+.in +2
+\fBkrb5_address_compare\fR
+.in -2
+.br
+.in +2
+\fBkrb5_address_order\fR
+.in -2
+.br
+.in +2
+\fBkrb5_address_search\fR
+.in -2
+.br
+.in +2
+\fBkrb5_aname_to_localname\fR
+.in -2
+.br
+.in +2
+\fBkrb5_appdefault_boolean\fR
+.in -2
+.br
+.in +2
+\fBkrb5_appdefault_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_free\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_genaddrs\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_get_checksum_func\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getaddrs\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getauthenticator\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getflags\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getlocalseqnumber\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getrcache\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getrecvsubkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getremoteseqnumber\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_getsendsubkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_init\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_set_checksum_func\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setaddrs\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setflags\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setports\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setrcache\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setrecvsubkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setsendsubkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_auth_con_setuseruserkey\fR
+.in -2
+.br
+.in +2
+\fBkrb5_build_principal\fR
+.in -2
+.br
+.in +2
+\fBkrb5_build_principal_ext\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_block_size\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_checksum_length\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_decrypt\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_encrypt\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_encrypt_length\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_enctype_compare\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_free_state\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_init_state\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_is_coll_proof_cksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_is_keyed_cksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_keyed_checksum_types\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_make_checksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_make_random_key\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_random_make_octets\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_string_to_key\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_string_to_key_with_params\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_valid_cksumtype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_valid_enctype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_c_verify_checksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_close\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_copy_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_default\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_default_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_destroy\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_end_seq_get\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_gen_new\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_get_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_get_principal\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_get_type\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_initialize\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_next_cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_remove_cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_resolve\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_retrieve_cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_set_default_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_set_flags\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_start_seq_get\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cc_store_cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_change_password\fR
+.in -2
+.br
+.in +2
+\fBkrb5_cksumtype_to_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_addresses\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_authdata\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_authenticator\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_checksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_data\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_keyblock\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_keyblock_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_principal\fR
+.in -2
+.br
+.in +2
+\fBkrb5_copy_ticket\fR
+.in -2
+.br
+.in +2
+\fBkrb5_decode_authdata_container\fR
+.in -2
+.br
+.in +2
+\fBkrb5_decode_ticket\fR
+.in -2
+.br
+.in +2
+\fBkrb5_deltat_to_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_encode_authdata_container\fR
+.in -2
+.br
+.in +2
+\fBkrb5_enctype_to_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_addresses\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_ap_rep_enc_part\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_authdata\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_authenticator\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_checksum\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_checksum_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_cksumtypes\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_context\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_cred_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_data\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_data_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_default_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_error\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_host_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_keyblock\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_keyblock_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_keytab_entry_contents\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_principal\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_realm_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_tgt_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_ticket\fR
+.in -2
+.br
+.in +2
+\fBkrb5_free_unparsed_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_fwd_tgt_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_credentials\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_credentials_renew\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_credentials_validate\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_default_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_host_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_keytab\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_init\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_address_list\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_etype_list\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_forwardable\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_preauth_list\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_proxiable\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_renew_life\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_salt\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_opt_set_tkt_life\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_key_data\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_key_enctype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_key_length\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_init_creds_password\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_permitted_enctypes\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_profile\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_prompt_types\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_renewed_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_server_rcache\fR
+.in -2
+.br
+.in +2
+\fBkrb5_get_validated_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_init_allocated_keyblock\fR
+.in -2
+.br
+.in +2
+\fBkrb5_init_context\fR
+.in -2
+.br
+.in +2
+\fBkrb5_init_keyblock\fR
+.in -2
+.br
+.in +2
+\fBkrb5_init_secure_context\fR
+.in -2
+.br
+.in +2
+\fBkrb5_is_thread_safe\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_add_entry\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_close\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_default\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_default_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_end_seq_get\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_get_entry\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_get_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_get_type\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_next_entry\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_read_service_key\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_remove_entry\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_resolve\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kt_start_seq_get\fR
+.in -2
+.br
+.in +2
+\fBkrb5_kuserok\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_error\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_ncred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_priv\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_rep\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_req\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_req_extended\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_safe\fR
+.in -2
+.br
+.in +2
+\fBkrb5_mk_1cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_os_localaddr\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_add_buffer\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_free\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_get_types\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_get_buffer\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_init\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_parse\fR
+.in -2
+.br
+.in +2
+\fBkrb5_pac_verify\fR
+.in -2
+.br
+.in +2
+\fBkrb5_parse_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_principal_compare\fR
+.in -2
+.br
+.in +2
+\fBkrb5_principal2salt\fR
+.in -2
+.br
+.in +2
+\fBkrb5_prompter_posix\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_cred\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_error\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_priv\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_rep\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_req\fR
+.in -2
+.br
+.in +2
+\fBkrb5_rd_safe\fR
+.in -2
+.br
+.in +2
+\fBkrb5_read_password\fR
+.in -2
+.br
+.in +2
+\fBkrb5_realm_compare\fR
+.in -2
+.br
+.in +2
+\fBkrb5_realm_iterator\fR
+.in -2
+.br
+.in +2
+\fBkrb5_realm_iterator_create\fR
+.in -2
+.br
+.in +2
+\fBkrb5_realm_iterator_free\fR
+.in -2
+.br
+.in +2
+\fBkrb5_recvauth\fR
+.in -2
+.br
+.in +2
+\fBkrb5_recvauth_version\fR
+.in -2
+.br
+.in +2
+\fBkrb5_salttype_to_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_sendauth\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_default_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_default_tgs_enctypes\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_key_data\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_key_enctype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_key_length\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_password\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_password_using_ccache\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_principal_realm\fR
+.in -2
+.br
+.in +2
+\fBkrb5_set_real_time\fR
+.in -2
+.br
+.in +2
+\fBkrb5_sname_to_principal\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_cksumtype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_deltat\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_enctype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_key\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_salttype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_string_to_timestamp\fR
+.in -2
+.br
+.in +2
+\fBkrb5_timeofday\fR
+.in -2
+.br
+.in +2
+\fBkrb5_timestamp_to_sfstring\fR
+.in -2
+.br
+.in +2
+\fBkrb5_timestamp_to_string\fR
+.in -2
+.br
+.in +2
+\fBkrb5_unparse_name\fR
+.in -2
+.br
+.in +2
+\fBkrb5_unparse_name_ext\fR
+.in -2
+.br
+.in +2
+\fBkrb5_us_timeofday\fR
+.in -2
+.br
+.in +2
+\fBkrb5_use_enctype\fR
+.in -2
+.br
+.in +2
+\fBkrb5_verify_init_creds\fR
+.in -2
+.br
+.in +2
+\fBkrb5_verify_init_creds_opt_init\fR
+.in -2
+.br
+.in +2
+\fBkrb5_verify_init_creds_opt_set_ap_req_nofail\fR
+.in -2
+.br
+.in +2
+\fBkrb5_xfree\fR
+.in -2
+.br
+.in +2
+\fBkrb5_xfree_wrap\fR
+.in -2
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libkrb5.so.1\fR\fR
+.ad
+.RS 28n
+.rt  
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/64/libkrb5.so.1\fR\fR
+.ad
+.RS 28n
+.rt  
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkrb5-config\fR(1), \fBlibgss\fR(3LIB), \fBattributes\fR(5)

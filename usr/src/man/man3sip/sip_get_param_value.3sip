@@ -1,0 +1,128 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_get_param_value 3SIP "25 Jan 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_get_param_value, sip_get_params, sip_is_param_present \- get parameter
+information for a SIP header value
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBconst sip_str_t *\fR\fIsip_get_param_value\fR
+     (\fBsip_header_value_t\fR \fIheader_value\fR, \fBchar *\fR\fIparam_name\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_param_t *\fR\fIsip_get_params\fR
+     (\fBsip_header_value_t\fR \fIheader_value\fR, \fBint *\fR\fIerror\fR);;
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fIsip_is_param_present\fR
+     (\fBconst sip_param_t *\fR\fIparam_list\fR, \fBchar *\fR\fIparam_name\fR, \fBint\fR \fIparam_len\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_get_param_value()\fR function returns the value for the parameter
+name specified by \fIparam_name\fR from the \fBSIP\fR header value
+\fIheader_value\fR.
+.sp
+.LP
+For functions that return a pointer of type \fBsip_str_t\fR, \fBsip_str_t\fR is
+supplied by:
+.sp
+.in +2
+.nf
+typedef struct sip_str {
+	char	*sip_str_ptr;
+	int	sip_str_len;
+}sip_str_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIsip_str_ptr\fR parameter points to the start of the returned value and
+\fIsip_str_len\fR supplies the length of the returned value.
+.sp
+.LP
+The \fBsip_get_params()\fR function returns the parameter list, if any, for the
+\fBSIP\fR header value \fIheader_value\fR.
+.sp
+.LP
+The \fBsip_is_param_present()\fR function returns \fBB_TRUE\fR if the parameter
+specified by \fIparam_name\fR of length supplied in \fIparam_len\fR is present
+in the parameter list, \fIparam_list\fR. Otherwise, it returns \fBB_FALSE\fR.
+.SH RETURN VALUES
+.sp
+.LP
+With the exception of \fBsip_is_param_present()\fR, these functions return the
+queried value on success and \fBNULL\fR on failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+If the error is non-null, one of the following values is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+If any of the required input is \fBNULL\fR or if the specified \fBSIP\fR header
+value is marked deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPROTO\fR\fR
+.ad
+.RS 10n
+.rt  
+If the returned \fBSIP\fR header value is invalid (i.e. the parser encountered
+errors when parsing the value).
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

@@ -65,6 +65,7 @@
 ./usr/bin/localedef
 ./usr/bin/od
 ./usr/bin/printf
+./usr/bin/sed
 ./usr/bin/tr
 ./usr/bin/tail
 ./usr/platform/i86pc
@@ -81,6 +82,7 @@
 ./usr/xpg4/bin/kill
 ./usr/xpg4/bin/od
 ./usr/xpg4/bin/read
+./usr/xpg4/bin/sed
 ./usr/xpg4/bin/sh
 ./usr/xpg4/bin/tail
 ./usr/xpg4/bin/test

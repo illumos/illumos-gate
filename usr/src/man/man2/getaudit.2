@@ -1,0 +1,156 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getaudit 2 "16 Apr 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+getaudit, setaudit, getaudit_addr, setaudit_addr \- get or set process audit
+information
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR  [ \fIlibrary\fR ... ]
+#include <sys/param.h>
+#include <bsm/libbsm.h>
+
+\fBint\fR \fBgetaudit\fR(\fBstruct auditinfo *\fR\fIinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetaudit\fR(\fBstruct auditinfo *\fR\fIinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetaudit_addr\fR(\fBstruct auditinfo_addr *\fR\fIinfo\fR, \fBint\fR \fIlength\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetaudit_addr\fR(\fBstruct auditinfo_addr *\fR\fIinfo\fR, \fBint\fR \fIlength\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetaudit()\fR function gets the audit \fBID\fR, the preselection mask,
+the terminal \fBID\fR and the audit session \fBID\fR for the current process.
+.sp
+.LP
+The \fBgetaudit()\fR function can fail and return an \fBE2BIG\fR errno if the
+address field in the terminal \fBID\fR is larger than 32 bits. In this case,
+\fBgetaudit_addr()\fR should be used.
+.sp
+.LP
+The \fBsetaudit()\fR function sets the audit \fBID\fR, the preselection mask,
+the terminal \fBID\fR and the audit session \fBID\fR for the current process.
+.sp
+.LP
+The \fBgetaudit_addr()\fR function returns a variable length
+\fBauditinfo_addr\fR structure that contains the audit \fBID\fR, the
+preselection mask, the terminal \fBID\fR, and the audit session \fBID\fR for
+the current process. The terminal \fBID\fR contains a size field that indicates
+the size of the network address.
+.sp
+.LP
+The \fBsetaudit_addr()\fR function sets the audit \fBID\fR, the preselection
+mask, the terminal \fBID\fR, and  the audit session \fBID\fR for the current
+process. The values are taken from the variable length struture
+\fBauditinfo_addr\fR. The terminal \fBID\fR contains a size field that
+indicates the size of the network address.
+.sp
+.LP
+The \fBauditinfo\fR structure is used to pass the process audit information and
+contains the following members:
+.sp
+.in +2
+.nf
+au_id_t     ai_auid;        /* audit user ID */
+au_mask_t   ai_mask;        /* preselection mask */
+au_tid_t    ai_termid;      /* terminal ID */
+au_asid_t   ai_asid;        /* audit session ID */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBauditinfo_addr\fR structure is used to pass the process audit
+information and contains the following members:
+.sp
+.in +2
+.nf
+au_id_t        ai_auid;      /* audit user ID */
+au_mask_t      ai_mask;      /* preselection mask */
+au_tid_addr_t  ai_termid;    /* terminal ID */
+au_asid_t      ai_asid;      /* audit session ID */
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetaudit()\fR and  \fBsetaudit()\fR return
+\fB0\fR. Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetaudit()\fR and \fBsetaudit()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIinfo\fR parameter points outside the process's allocated address space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_SYS_AUDIT\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The calling process must have the {\fBPRIV_SYS_AUDIT\fR} privilege asserted in
+its effective set.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbsmconv\fR(1M), \fBaudit\fR(2), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described in this man page is available only if the Solaris
+Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

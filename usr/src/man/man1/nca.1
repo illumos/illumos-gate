@@ -1,0 +1,173 @@
+'\" te
+.\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nca 1 "22 Feb 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+nca, snca \- the Solaris Network Cache and Accelerator (NCA)
+.SH DESCRIPTION
+.sp
+.LP
+The Solaris Network Cache and Accelerator ("\fBNCA\fR") is a kernel module
+designed to provide improved web server performance. The kernel module,
+\fBncakmod\fR, services \fBHTTP\fR requests. To improve the performance of
+servicing \fBHTTP\fR requests, the \fBNCA\fR kernel module maintains an
+in-kernel cache of web pages. If the \fBNCA\fR kernel module cannot service the
+request itself, it passes the request to the \fBhttp\fR daemon (\fBhttpd\fR).
+It uses either a sockets interface, with family type designated \fBPF_NCA\fR,
+or a private Solaris doors interface that is based on the Solaris doors RPC
+mechanism, to pass the request.
+.sp
+.LP
+To use the sockets interface, the web server must open a socket of family type
+\fBPF_NCA\fR. The \fBPF_NCA\fR family supports only \fBSOCK_STREAM\fR and
+protocol 0, otherwise an error occurs.
+.sp
+.LP
+The following features are not presently supported:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+You cannot initiate a connection from a \fBPF_NCA\fR type socket. The
+\fBconnect\fR(3SOCKET) interface on \fBPF_NCA\fR fails.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+System calls that are associated with type \fBSO_DGRAM\fR, such as
+\fBsend()\fR, \fBsendto()\fR, \fBsendmsg()\fR, \fBrecv()\fR, \fBrecvfrom()\fR,
+and \fBrecvmsg()\fR, fails.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+You cannot set TCP or IP options on a \fBPF_NCA\fR type socket through
+\fBsetsockopt\fR(3SOCKET).
+.RE
+.sp
+.LP
+The \fBNCA\fR cache consistency is maintained by honoring \fBHTTP\fR headers
+that deal with a given content type and expiration date, much the same way as a
+proxy cache.
+.sp
+.LP
+For configuration information, see \fISystem Administration Guide: IP
+Services\fR
+.sp
+.LP
+When native \fBPF_NCA\fR socket support does not exist in the web server, the
+\fBncad_addr\fR(4) interface must be used to provide NCA support in that web
+server.
+.sp
+.LP
+\fBNCA\fR is intended to be run on a dedicated web server. Running other large
+processes while running \fBNCA\fR might cause undesirable behavior.
+.sp
+.LP
+\fBNCA\fR supports the logging of in-kernel cache hits. See
+\fBncalogd.conf\fR(4). \fBNCA\fR stores logs in a binary format. Use the
+\fBncab2clf\fR(1) utility to convert the log from a binary format to the Common
+Log File format.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nca/ncakmod.conf\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists configuration parameters for \fBNCA\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nca/ncalogd.conf\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists configuration parameters for \fBNCA\fR logging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nca/nca.if\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists the physical interfaces on which \fBNCA\fR runs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nca/ncaport.conf\fR\fR
+.ad
+.RS 25n
+.rt  
+\fBncaport\fR configuration file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hostname.{}{0-9}\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists all physical interfaces configured on the server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists all host names associated with the server. Entries in this file must
+match with entries in \fB/etc/hostname.{}{0-9}\fR for \fBNCA\fR to function.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBncab2clf\fR(1), \fBncakmod\fR(1), \fBclose\fR(2), \fBread\fR(2),
+\fBwrite\fR(2), \fBsendfilev\fR(3EXT), \fBaccept\fR(3SOCKET),
+\fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET), \fBdoor_bind\fR(3C),
+\fBdoor_call\fR(3C), \fBdoor_create\fR(3C), \fBgetsockopt\fR(3SOCKET),
+\fBlisten\fR(3SOCKET), \fBsetsockopt\fR(3SOCKET), \fBshutdown\fR(3SOCKET),
+\fBsocket.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBncad_addr\fR(4),
+\fBnca.if\fR(4), \fBncakmod.conf\fR(4), \fBncaport.conf\fR(4),
+\fBncalogd.conf\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: IP Services\fR

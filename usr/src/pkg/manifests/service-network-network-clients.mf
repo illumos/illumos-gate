@@ -33,6 +33,8 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/sbin
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
 file path=usr/bin/filesync mode=0555
 file path=usr/bin/rcp mode=4555
 file path=usr/bin/rdate mode=0555
@@ -47,6 +49,24 @@ file path=usr/sbin/rmt mode=0555
 file path=usr/sbin/rwall mode=0555
 file path=usr/sbin/snoop mode=0555
 file path=usr/sbin/spray mode=0555
+file path=usr/share/man/man1/filesync.1
+file path=usr/share/man/man1/rcp.1
+file path=usr/share/man/man1/rdist.1
+file path=usr/share/man/man1/remote_shell.1
+file path=usr/share/man/man1/remsh.1
+file path=usr/share/man/man1/rlogin.1
+file path=usr/share/man/man1/rsh.1
+file path=usr/share/man/man1/rup.1
+file path=usr/share/man/man1/ruptime.1
+file path=usr/share/man/man1/rusers.1
+file path=usr/share/man/man1/whois.1
+file path=usr/share/man/man1m/rdate.1m
+file path=usr/share/man/man1m/restricted_shell.1m
+file path=usr/share/man/man1m/rmt.1m
+file path=usr/share/man/man1m/rsh.1m
+file path=usr/share/man/man1m/rwall.1m
+file path=usr/share/man/man1m/snoop.1m
+file path=usr/share/man/man1m/spray.1m
 legacy pkg=SUNWrcmdc \
     desc="Remote Network Client Commands (rsh, rlogin, rcp, rsh, ...)" \
     name="Remote Network Client Commands"

@@ -1,0 +1,130 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_pctx_bind_event 3CPC "05 Mar 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_pctx_bind_event, cpc_pctx_take_sample, cpc_pctx_rele, cpc_pctx_invalidate
+\- access CPU performance counters in other processes
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc \(milpctx [ \fIlibrary\fR... ]
+#include <libpctx.h>
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_pctx_bind_event\fR(\fBpctx_t *\fR\fIpctx\fR, \fBid_t\fR \fIlwpid\fR, \fBcpc_event_t *\fR\fIevent\fR,
+     \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_pctx_take_sample\fR(\fBpctx_t *\fR\fIpctx\fR, \fBid_t\fR \fIlwpid\fR, \fBcpc_event_t *\fR\fIevent\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_pctx_rele\fR(\fBpctx_t *\fR\fIpctx\fR, \fBid_t\fR \fIlwpid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_pctx_invalidate\fR(\fBpctx_t *\fR\fIpctx\fR, \fBid_t\fR \fIlwpid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are designed to be run in the context of an event handler
+created using the \fBlibpctx\fR(3LIB) family of functions that allow the
+caller, also known as the \fIcontrolling process\fR, to manipulate the
+performance counters in the context of a \fIcontrolled process\fR. The
+controlled process is described by the \fIpctx\fR argument, which must be
+obtained from an invocation of \fBpctx_capture\fR(3CPC) or
+\fBpctx_create\fR(3CPC) and passed to the functions described on this page in
+the context of an event handler.
+.sp
+.LP
+The semantics of the functions \fBcpc_pctx_bind_event()\fR,
+\fBcpc_pctx_take_sample()\fR, and \fBcpc_pctx_rele()\fR are directly analogous
+to those of \fBcpc_bind_event()\fR, \fBcpc_take_sample()\fR, and
+\fBcpc_rele()\fR described on the \fBcpc_bind_event\fR(3CPC) manual page.
+.sp
+.LP
+The \fBcpc_pctx_invalidate()\fR function allows the performance context to be
+invalidated in an \fBLWP\fR in the controlled process.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return \fB0\fR on success.  On failure, they return \fB\(mi1\fR
+and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBcpc_pctx_bind_event()\fR, \fBcpc_pctx_take_sample()\fR, and
+\fBcpc_pctx_rele()\fR functions return the same \fBerrno\fR values the
+analogous functions described on the \fBcpc_bind_event\fR(3CPC) manual page. In
+addition, these function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+For \fBcpc_pctx_bind_event()\fR, access to the requested hypervisor event was
+denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIlwpid\fR argument is invalid in the context of the
+controlled process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc\fR(3CPC), \fBcpc_bind_event\fR(3CPC), \fBlibcpc\fR(3LIB),
+\fBpctx_capture\fR(3CPC), \fBpctx_create\fR(3CPC), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_pctx_bind_event()\fR, \fBcpc_pctx_invalidate()\fR,
+\fBcpc_pctx_rele()\fR, and \fBcpc_pctx_take_sample()\fR functions exist for
+binary compatibility only. Source containing these functions will not compile.
+These functions are obsolete and might be removed in a future release.
+Applications should use \fBcpc_bind_pctx\fR(3CPC), \fBcpc_unbind\fR(3CPC), and
+\fBcpc_set_sample\fR(3CPC) instead.
+.sp
+.LP
+The capability to create and analyze overflow events in other processes is not
+available, though it may be made available in a future version of this API.  In
+the current implementation, the \fIflags\fR field must be specified as 0.

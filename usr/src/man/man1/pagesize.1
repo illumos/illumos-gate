@@ -1,0 +1,41 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pagesize 1 "4 May 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+pagesize \- display the size or sizes of a page of memory
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/pagesize\fR [\fB-a\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpagesize\fR utility prints the default size of a page of memory in
+bytes, as returned by \fBgetpagesize\fR(3C). This program is useful in
+constructing portable shell scripts.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Prints out all possible hardware address translation sizes supported by the
+system.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBppgsz\fR(1), \fBgetpagesize\fR(3C), \fBgetpagesizes\fR(3C),
+\fBattributes\fR(5)

@@ -1,0 +1,323 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH postio 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+postio \- serial interface for PostScript printers
+.SH SYNOPSIS
+.LP
+.nf
+\fBpostio\fR \fB-l\fR \fIline\fR [\fB-D\fR] [\fB-i\fR] [\fB-q\fR] [\fB-t\fR] [\fB-S\fR] [\fB-b\fR \fIspeed\fR] [\fB-B\fR \fInum\fR] 
+     [\fB-L\fR \fIfile\fR] [\fB-P\fR \fIstring\fR] [\fB-R\fR \fInum\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/lib/lp/postscript/postio\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpostio\fR sends \fIfiles\fR to the PostScript printer attached to
+\fIline.\fR If no \fIfiles\fR are specified the standard input is sent.
+.SH OPTIONS
+.sp
+.LP
+The first group of \fIoptions\fR should be sufficient for most applications:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 13n
+.rt  
+Enable debug mode. Guarantees that everything read on \fBline\fR will be added
+to the log file (standard error by default).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 13n
+.rt  
+Prevents status queries while \fIfiles\fR are being sent to the printer. When
+status queries are disabled a dummy message is appended to the log file before
+each block is transmitted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fI speed\fR\fR
+.ad
+.RS 13n
+.rt  
+Transmit data over \fBline\fR at baud rate \fIspeed\fR. Recognized baud rates
+are 1200, 2400, 4800, 9600, and 19200. The default \fIspeed\fR is  \fB9600\fR
+baud.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fI num\fR\fR
+.ad
+.RS 13n
+.rt  
+Set the internal buffer size for reading and writing \fIfiles\fR to \fInum\fR
+bytes. By default \fInum\fR is  \fB2048\fR bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fI line\fR\fR
+.ad
+.RS 13n
+.rt  
+Connect to the printer attached to \fBline\fR. In most cases there is no
+default  and \fBpostio\fR must be able to read and write \fBline\fR. If the
+\fBline\fR does not begin with a \fB/\fR it may be treated as a Datakit
+destination.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fI file\fR\fR
+.ad
+.RS 13n
+.rt  
+Data received on \fBline\fR gets put in \fBfile\fR. The default log \fBfile\fR
+is standard error. Printer or status messages that don't show a change in state
+are not normally written to \fBfile\fR but can be forced out using the \fB-D\fR
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fI string\fR\fR
+.ad
+.RS 13n
+.rt  
+Send \fIstring\fR to the printer before any of the input files. The default
+\fIstring\fR is simple PostScript code that disables timeouts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fI num\fR\fR
+.ad
+.RS 13n
+.rt  
+Run \fBpostio\fR as a single process if \fInum\fR is 1 or as separate read and
+write processes if \fInum\fR is 2. By default \fBpostio\fR runs as a single
+process.
+.RE
+
+.sp
+.LP
+The next two \fIoptions\fR are provided for users who expect to run
+\fBpostio\fR on their own. Neither is suitable for use in spooler interface
+programs:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Run the program in interactive mode. Any \fIfiles\fR are sent first and
+followed by the standard input. Forces separate read and write processes and
+overrides many other options. To exit interactive mode use your interrupt or
+quit character. To get a friendly interactive connection with the printer type
+\fBexecutive\fR on a line by itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Data received on \fBline\fR and not recognized as printer or status information
+is written to the standard output. Forces separate read and write processes.
+Convenient if you have a PostScript program that will be returning useful data
+to the host.
+.RE
+
+.sp
+.LP
+The last option is not generally recommended and should only be used if all
+else fails to provide a reliable connection:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 6n
+.rt  
+Slow the transmission of data to the printer. Severely limits throughput, runs
+as a single process, disables the \fB-q\fR option, limits the internal buffer
+size to 1024 bytes, can use an excessive amount of CPU time, and does nothing
+in interactive mode.
+.RE
+
+.sp
+.LP
+The best performance will usually be obtained by using a large internal buffer
+(the \fB-B\fR option) and by running the program as separate read and write
+processes (the \fB\fR\fB-R\fR\fB 2\fR option). Inability to fork the additional
+process causes \fBpostio\fR to continue as a single read/write process. When
+one process is used, only data sent to the printer is flow controlled.
+.sp
+.LP
+The \fIoptions\fR are not all mutually exclusive. The \fB-i\fR option always
+wins,  selecting its own settings for whatever is needed to run interactive
+mode, independent of anything else found on the command line. Interactive mode
+runs as separate read and write processes and few of the other \fIoptions\fR
+accomplish anything in the presence of the \fB-i\fR option. The \fB-t\fR option
+needs a reliable two way connection to the printer and therefore tries to force
+separate read and write processes. The \fB-S\fR option relies on the status
+query mechanism, so \fB-q\fR is disabled and the program runs as a single
+process.
+.sp
+.LP
+In most cases \fBpostio\fR starts by making a connection to \fBline\fR and then
+attempts to force the printer into the  IDLE state by sending an appropriate
+sequence of  \fB^T\fR (status query), \fB^C\fR (interrupt), and  \fB^D\fR (end
+of job) characters. When the printer goes IDLE, \fIfiles\fR are transmitted
+along with an occasional  \fB^T\fR (unless the \fB-q\fR option was used). After
+all the \fIfiles\fR are sent the program waits until it's reasonably sure the
+job is complete. Printer generated error messages received at any time  except
+while establishing the initial connection (or when running interactive mode)
+cause \fB postio\fR to exit with a non-zero status. In addition to being added
+to the log file, printer error messages are also echoed to standard error.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExamples of the \fBpostio\fR command.
+.sp
+.LP
+Run as a single process at 9600 baud and send  \fIfile1\fR and \fIfile2\fR to
+the printer attached to \fB/dev/tty01\fR:
+
+.sp
+.in +2
+.nf
+\fBexample% postio \fR\fB-l\fR\fB /dev/tty01 \fR\fIfile1 file2\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Same as above except two processes are used, the internal buffer is set to 4096
+bytes, and data returned by the printer gets put in file \fIlog\fR:
+
+.sp
+.in +2
+.nf
+\fBexample% postio \fR\fB-R\fR\fB 2 \fR\fB-B\fR\fB 4096 \fR\fB-l/dev/tty01\fR\fB \fR\fB-L\fR\fB \fIlog file1 file2\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Establish an interactive connection with  the printer at Datakit destination
+\fImy/printer\fR:
+
+.sp
+.in +2
+.nf
+\fBexample% postio \fR\fB-i\fR\fB \fR\fB-l\fR\fB \fImy/printer\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Send file program to the printer connected to  \fB/dev/tty22\fR, recover any
+data in file results,  and put log messages in file \fIlog\fR:
+
+.sp
+.in +2
+.nf
+\fBexample% postio \fR\fB-t\fR\fB \fR\fB-l\fR\fB /dev/tty22 \fR\fB-L\fR\fB \fIlog program\fR >\fIresults\fR\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdownload\fR(1), \fBdpost\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1),
+\fBpostmd\fR(1), \fBpostprint\fR(1), \fBpostreverse\fR(1), \fBposttek\fR(1),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The input \fIfiles\fR are handled as a single PostScript job. Sending several
+different jobs, each with their own internal end of job mark (\fB^D\fR) is not
+guaranteed to work properly. \fBpostio\fR may quit before all the jobs have
+completed and could be restarted before the last one finishes.
+.sp
+.LP
+All the capabilities described above may not be available on every machine or
+even across  the different versions of the UNIX system that are currently
+supported by the program.
+.sp
+.LP
+There may be no default \fBline\fR, so using the \fB-l\fR option  is strongly
+recommended. If omitted, \fBpostio\fR may attempt to connect to the printer
+using the standard output. If Datakit is involved,  the \fB-b\fR option may be
+ineffective  and attempts by \fBpostio\fR to impose flow control over data in
+both directions may not work. The \fB-q\fR option can help if the printer is
+connected to RADIAN. The \fB-S\fR option  is not generally recommended and
+should be used only if all other attempts to establish a reliable connection
+fail.

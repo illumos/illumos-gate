@@ -1,0 +1,323 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap 9E "15 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+devmap \- validate and translate virtual mapping for memory mapped device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBdevmap\fR(\fBdev_t\fR \fIdev\fR, \fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, 
+     \fBsize_t\fR \fIlen\fR, \fBsize_t *\fR\fImaplen\fR, \fBuint_t\fR \fImodel\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 11n
+.rt  
+Device whose memory is to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdhp\fR \fR
+.ad
+.RS 11n
+.rt  
+An opaque mapping handle that the system uses to describe the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 11n
+.rt  
+User offset within the logical device memory at which the mapping begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 11n
+.rt  
+Length (in bytes) of the mapping to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImaplen\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to length (in bytes) of mapping that has been validated. \fImaplen\fR
+is less than or equal to  \fIlen\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImodel\fR \fR
+.ad
+.RS 11n
+.rt  
+The data model type of the current thread.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdevmap()\fR is a required entry point for character drivers supporting
+memory-mapped devices if the drivers use the devmap framework to set up the
+mapping. A memory mapped device has memory  that can be mapped into a process's
+address space. The \fBmmap\fR(2) system call, when applied to a character
+special file, allows this device memory to be mapped into user space for direct
+access by the user applications.
+.sp
+.LP
+As a result of a \fBmmap\fR(2) system call, the system calls the \fBdevmap()\fR
+entry point during the mapping setup when \fBD_DEVMAP\fR is set in the
+\fBcb_flag\fR field of the \fBcb_ops\fR(9S) structure, and any of the following
+conditions apply:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBddi_devmap_segmap\fR(9F) is used as the \fBsegmap\fR(9E) entry point.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBsegmap\fR(9E) entry point is set to \fINULL.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBmmap\fR(9E) entry point is set to \fINULL.\fR
+.RE
+.sp
+.LP
+Otherwise \fBEINVAL\fR will be returned to \fBmmap\fR(2).
+.sp
+.LP
+Device drivers should use \fBdevmap()\fR to validate the user mappings to the
+device, to translate the logical offset,  \fIoff\fR, to the corresponding
+physical offset within the device address space, and to pass the mapping
+information to the system for setting up the mapping.
+.sp
+.LP
+\fIdhp\fR is a device mapping handle that the system uses to describe a mapping
+to a memory that is either contiguous in physical address space or in kernel
+virtual address space. The system may create multiple mapping  handles in one
+\fBmmap\fR(2) system call (for example, if the mapping contains multiple
+physically discontiguous memory regions).
+.sp
+.LP
+\fImodel\fR returns the C Language Type Model which the current thread expects.
+It is set to \fBDDI_MODEL_ILP32\fR if the current thread expects 32-bit (
+\fIILP32\fR) semantics, or \fBDDI_MODEL_LP64\fR if the current thread expects
+64-bit ( \fILP64\fR) semantics. \fImodel\fR is used in combination with
+\fBddi_model_convert_from\fR(9F) to determine whether there is a data model
+mismatch between the current thread and the device driver. The device driver
+might have to adjust the shape of data structures before exporting them to a
+user thread which supports a different data model.
+.sp
+.LP
+\fBdevmap()\fR should return \fBEINVAL\fR if the logical offset, \fIoff\fR, is
+out of the range of memory exported by the device to user space. If \fIoff\fR +
+\fIlen\fR exceeds the range of the contiguous memory, \fBdevmap()\fR should
+return the length from  \fIoff\fR to the end of the contiguous memory region.
+The system will repeatedly call \fBdevmap()\fR until the original mapping
+length is satisfied. The driver sets \fI*maplen\fR to the validated length
+which must be either less than or equal to \fIlen\fR.
+.sp
+.LP
+The \fBdevmap()\fR entry point must initialize the mapping parameters before
+passing them to the system through either \fBdevmap_devmem_setup\fR(9F) (if the
+memory being mapped is device memory) or \fBdevmap_umem_setup\fR(9F) (if the
+memory being mapped is kernel memory). The \fBdevmap()\fR entry point
+initializes the mapping parameters by mapping the control callback structure
+(see \fBdevmap_callback_ctl\fR(9S)), the device access attributes, mapping
+length, maximum protection possible for the mapping, and optional mapping
+flags. See \fBdevmap_devmem_setup\fR(9F) and \fBdevmap_umem_setup\fR(9F) for
+further information on initializing the mapping parameters.
+.sp
+.LP
+The system will copy the driver's \fBdevmap_callback_ctl\fR(9S) data into its
+private memory so the drivers do not need to keep the data structure after the
+return from either \fBdevmap_devmem_setup\fR(9F) or
+\fBdevmap_umem_setup\fR(9F).
+.sp
+.LP
+For device mappings, the system establishes the mapping to the physical address
+that corresponds to \fIoff\fR by passing the register number and the offset
+within the register address space to  \fBdevmap_devmem_setup\fR(9F).
+.sp
+.LP
+For kernel memory mapping, the system selects a user virtual address that is
+aligned with the kernel address being mapped for cache coherence.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRImplementing the \fBdevmap()\fR Entry Point
+.sp
+.LP
+The following is an example of the implementation for the \fBdevmap()\fR entry
+point. For mapping device memory, \fBdevmap()\fR calls
+\fBdevmap_devmem_setup\fR(9F) with the register number, \fIrnumber\fR, and the
+offset within the register, \fIroff\fR. For mapping kernel memory, the driver
+must first allocate the kernel memory using \fBddi_umem_alloc\fR(9F). For
+example, \fBddi_umem_alloc\fR(9F) can be called in the \fBattach\fR(9E)
+routine. The resulting kernel memory cookie is stored in the driver soft state
+structure, which is accessible from the \fBdevmap()\fR entry point. See
+\fBddi_soft_state\fR(9F). \fBdevmap()\fR passes the cookie obtained from
+\fBddi_umem_alloc\fR(9F) and the offset within the allocated kernel memory to
+\fBdevmap_umem_setup\fR(9F). The corresponding \fBddi_umem_free\fR(9F) can be
+made in the \fBdetach\fR(9E) routine to free up the kernel memory.
+
+.sp
+.in +2
+.nf
+\&.\|.\|.
+#define MAPPING_SIZE 0x2000        /* size of the mapping */
+#define MAPPING_START 0x70000000   /* logical offset at beginning 
+                                      of the mapping */
+static
+struct devmap_callback_ctl xxmap_ops = {
+	   DEVMAP_OPS_REV,                /* devmap_ops version number */
+	   xxmap_map,                     /* devmap_ops map routine */
+	   xxmap_access,                  /* devmap_ops access routine */
+	   xxmap_dup,                     /* devmap_ops dup routine */
+	   xxmap_unmap,                   /* devmap_ops unmap routine  */
+};
+
+ 
+static int
+xxdevmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
+   size_t *maplen, uint_t model)
+{
+   int    instance;
+   struct xxstate *xsp;
+   struct ddi_device_acc_attr *endian_attr;
+   struct devmap_callback_ctl *callbackops = NULL;
+   ddi_umem_cookie_t cookie;
+   dev_info_t *dip;
+   offset_t   roff;
+   offset_t   koff;
+   uint_t rnumber;
+   uint_t maxprot;
+   uint_t flags = 0;
+   size_t length;
+   int    err;
+
+   /* get device soft state */
+   instance = getminor(dev);
+   xsp = ddi_get_soft_state(statep, instance);
+   if (xsp == NULL)
+      return (-1);
+
+   dip = xsp->dip;
+   /* check for a valid offset */
+   if ( \fIoff is invalid\fR )
+      return (-1);
+   /* check if len is within the range of contiguous memory */
+   if ( \fB(\fR\fIoff\fR\fB + \fR\fIlen\fR\fB)\fR \fIis contiguous\fR\fB\&.)\fR
+       length = len;
+   else
+       length = MAPPING_START + MAPPING_SIZE - off;
+
+   /* device access attributes */
+   endian_attr = xsp->endian_attr;
+
+   if ( \fI off is referring to a device memory. \fR ) {
+                                 /* assign register related parameters */
+      rnumber = XXX;             /* index to register set at off */
+      roff = XXX;                /* offset of rnumber at local bus */
+      callbackops = &xxmap_ops;  /* do all callbacks for this mapping */
+      maxprot = PROT_ALL;        /* allowing all access */
+      if ((err = devmap_devmem_setup(dhp, dip, callbackops, rnumber, roff,
+               length, maxprot, flags, endian_attr)) < 0)
+
+           
+          return (err);
+
+   } else if (\fI off is referring to a kernel memory.\fR) {
+      cookie = xsp->cookie;      /* cookie is obtained from 
+                                    ddi_umem_alloc(9F) */
+      koff = XXX;                /* offset within the kernel memory. */
+      callbackops = NULL;        /* don't do callback for this mapping */
+      maxprot = PROT_ALL;        /* allowing all access */
+      if ((err = devmap_umem_setup(dhp, dip, callbackops, cookie, koff,
+               length, maxprot, flags, endian_attr)) < 0)
+         return (err);
+  }
+
+	    *maplen = length;
+    return (0);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBattach\fR(9E), \fBdetach\fR(9E), \fBmmap\fR(9E),
+\fBsegmap\fR(9E), \fBddi_devmap_segmap\fR(9F),
+\fBddi_model_convert_from\fR(9F), \fBddi_soft_state\fR(9F),
+\fBddi_umem_alloc\fR(9F), \fBddi_umem_free\fR(9F),
+\fBdevmap_devmem_setup\fR(9F), \fBdevmap_setup\fR(9F),
+\fBdevmap_umem_setup\fR(9F), \fBcb_ops\fR(9S), \fBdevmap_callback_ctl\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

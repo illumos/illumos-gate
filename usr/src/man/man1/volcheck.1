@@ -1,0 +1,139 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volcheck 1 "28 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+volcheck \- checks for media in a drive and by default checks all floppy media
+.SH SYNOPSIS
+.LP
+.nf
+\fBvolcheck\fR [\fB-v\fR] [\fB-i\fR \fIsecs\fR] [\fB-t\fR \fIsecs\fR] \fIpathname\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvolcheck\fR utility tells volume management to look at each
+\fBdev/\fR\fIpathname\fR in sequence and determine if new media has been
+inserted in the drive.
+.sp
+.LP
+The default action is to \fBvolcheck\fR all checkable media managed by volume
+management.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIsecs\fR\fR
+.ad
+.RS 11n
+.rt  
+Set the frequency of device checking to \fIsecs\fR seconds.  The default is 2
+seconds.  The minimum frequency is 1 second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fI secs\fR\fR
+.ad
+.RS 11n
+.rt  
+Check the named device(s) for the next \fIsecs\fR seconds.  The maximum number
+of seconds allowed is 28800, which is 8 hours. The frequency of checking is
+specified by \fB-i\fR. There is no default total time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 11n
+.rt  
+Verbose.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpathname\fR\fR
+.ad
+.RS 12n
+.rt  
+The path name of a media device.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample of the \fBvolcheck\fR command.
+.sp
+.LP
+The following example
+
+.sp
+.in +2
+.nf
+        example% volcheck \(miv /dev/diskette
+        /dev/diskette has media
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+asks volume management to examine the floppy drive for new media.
+
+.sp
+.LP
+The following example
+
+.sp
+.in +2
+.nf
+        example% volcheck \(mii 2 \(mit 600 /dev/diskette1 &
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+asks volume management if there is a floppy in the floppy drive every 2 seconds
+for 600 seconds (10 minutes).
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/volctl\fR\fR
+.ad
+.RS 15n
+.rt  
+volume management control port
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBeject\fR(1), \fBrmmount\fR(1M), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+Due to a hardware limitation in many floppy drives, the act of checking for
+media causes mechanical action in the floppy drive.   \fBContinuous polling of
+the floppy drive will cause the drive to wear out.\fR It is recommended that
+polling the drive only be performed during periods of high use.

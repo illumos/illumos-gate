@@ -1,0 +1,82 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_children 3LGRP "16 Apr 2003" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_children \- get children of given lgroup
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <sys/lgrp_user.h>
+
+\fBint\fR \fBlgrp_children\fR(\fBlgrp_cookie_t\fR \fIcookie\fR, \fBlgrp_id_t\fR \fIparent\fR,
+     \fBlgrp_id_t *\fR\fIlgrp_array\fR, \fBuint_t\fR \fIlgrp_array_size\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_children()\fR function takes a \fIcookie\fR representing a snapshot
+of the lgroup hierarchy retrieved from \fBlgrp_init\fR(3LGRP) and returns the
+number of lgroups that are children of the specified lgroup. If the
+\fIlgrp_array\fR and \fIlgrp_array_size\fR arguments are non-null, the array is
+filled with as many of the children lgroup IDs as will fit, given the size of
+the array.
+.SH RETURN VALUES
+.sp
+.LP
+\(mi returns the number of child lgroup IDs. Otherwise, it returns \(mi1 and
+sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBlgrp_children()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified lgroup ID is not valid or the cookie is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified lgroup ID was not found.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_init\fR(3LGRP), \fBlgrp_nlgrps\fR(3LGRP), \fBlgrp_parents\fR(3LGRP),
+\fBliblgrp\fR(3LIB), \fBattributes\fR(5)

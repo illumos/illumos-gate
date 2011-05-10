@@ -1,0 +1,117 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_get_interconnect_topology 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_get_interconnect_topology, rsm_free_interconnect_topology \- get or free
+interconnect topology
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h>
+
+\fBint\fR \fBrsm_get_interconnect_topology\fR(\fBrsm_topology_t **\fR\fItopology_data\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrsm_free_interconnect_topology\fR(\fBrsm_topology_t *\fR\fItopology_data\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The rsm_get_interconnect_topology(3RSM) and
+\fBrsm_free_interconnect_topology\fR(3RSM) functions provide for access to the
+interconnect controller and connection data. The key interconnect data required
+for export and import operations includes the respective cluster nodeids and
+the controller names. To facilitate applications in the establishment of proper
+and efficient export and import policies, a delineation of the interconnect
+topology is provided by this interface. The data provided includes local
+nodeid, local controller name, its hardware address, and remote connection
+specification for each local controller.  An application component exporting
+memory can thus find the set of existing local controllers and correctly assign
+controllers for the creation and publishing of segments. Exported segments may
+also be efficiently distributed over the set of controllers consistent with the
+hardware interconnect and application software. An application component which
+is to import memory must be informed of the segment id(s) and controller(s)
+used in the exporting of memory, this needs to be done using some out-of-band
+mechanism. The topology data structures are defined in the <\fBrsmapi.h\fR>
+header.
+.sp
+.LP
+The \fBrsm_get_interconnect_topology()\fR returns a pointer to the topology
+data in a location specified by the \fItopology_data\fR argument.
+.sp
+.LP
+The  \fBrsm_free_interconnect_topology()\fR frees the resources allocated by
+\fBrsm_get_interconnect_topology()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBrsm_get_interconnect_topology()\fR returns 0.
+Otherwise, an error value is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_get_interconnect_topology()\fR function can return the following
+errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_TOPOLOGY_PTR\fR \fR
+.ad
+.RS 28n
+.rt  
+Invalid topology pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.RS 28n
+.rt  
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.RS 28n
+.rt  
+Bad address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

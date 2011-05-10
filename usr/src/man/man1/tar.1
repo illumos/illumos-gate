@@ -1,0 +1,1297 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tar 1 "26 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+tar \- create tape archives and add or extract files
+.SH SYNOPSIS
+.LP
+.nf
+\fBtar\fR c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...] [\fIblocksize\fR] 
+     [\fItarfile\fR] [\fIsize\fR] [\fIexclude-file\fR]... 
+     {\fIfile\fR | \(miI \fIinclude-file\fR | \(miC \fIdirectory\fR \fIfile\fR}...
+.fi
+
+.LP
+.nf
+\fBtar\fR r[BDeEFhilnqTvw@/[0-7]][bfk] [\fIblocksize\fR] [\fItarfile\fR] 
+     [\fIsize\fR] 
+     {\fIfile\fR | \(miI \fIinclude-file\fR | \(miC \fIdirectory\fR \fIfile\fR}...
+.fi
+
+.LP
+.nf
+\fBtar\fR t[BeFhilnqTv[0-7]][fk][X...] [\fItarfile\fR] [\fIsize\fR] 
+     [\fIexclude-file\fR]... {\fIfile\fR | \(miI \fIinclude-file\fR}...
+.fi
+
+.LP
+.nf
+\fBtar\fR u[BDeEFhilnqTvw@/[0-7]][bfk] [\fIblocksize\fR] [\fItarfile\fR] 
+     [\fIsize\fR] \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fBtar\fR x[BeFhilmnopqTvw@/[0-7]][fk][X...] [\fItarfile\fR] [\fIsize\fR] 
+     [\fIexclude-file\fR]... [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtar\fR command archives and extracts files to and from a single file
+called a \fItarfile\fR. A tarfile is usually a magnetic tape, but it can be any
+file. \fBtar\fR's actions are controlled by the \fIkey\fR argument. The
+\fIkey\fR is a string of characters containing exactly one function letter
+(\fBc\fR, \fBr\fR, \fBt\fR , \fBu\fR, or \fBx\fR) and zero or more function
+modifiers (letters or digits), depending on the function letter used. The
+\fIkey\fR string contains no SPACE characters. Function modifier arguments are
+listed on the command line in the same order as their corresponding function
+modifiers appear in the \fIkey\fR string.
+.sp
+.LP
+The \fB\(miI\fR \fIinclude-file\fR, \fB\(miC\fR \fIdirectory file\fR, and
+\fIfile\fR arguments specify which files or directories are to be archived or
+extracted. In all cases, appearance of a directory name refers to the files and
+(recursively) subdirectories of that directory. Arguments appearing within
+braces (\fB{ }\fR) indicate that one of the arguments must be specified.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(miC\fR \fIdirectory file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Performs a \fBchdir\fR (see \fBcd\fR(1)) operation on \fIdirectory\fR and
+performs the \fBc\fR (create) or \fBr\fR (replace) operation on \fIfile\fR. Use
+short relative path names for \fIfile\fR. If \fIfile\fR is "\fB\&.\fR", archive
+all files in \fIdirectory\fR. This operand enables archiving files from
+multiple directories not related by a close common parent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(miI\fR \fIinclude-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Opens \fIinclude-file\fR containing a list of files, one per line, and treats
+it as if each file appeared separately on the command line. Be careful of
+trailing white spaces. Also beware of leading white spaces, since, for each
+line in the included file, the entire line (apart from the newline) is used to
+match against the initial string of files to include. In the case where
+excluded files (see \fBX\fR function modifier) are also specified, they take
+precedence over all included files. If a file is specified in both the
+\fIexclude-file\fR and the \fIinclude-file\fR (or on the command line), it is
+excluded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+A path name of a regular file or directory to be archived (when the \fBc\fR,
+\fBr\fR or \fBu\fR functions are specified), extracted (\fBx\fR) or listed
+(\fBt\fR). When \fIfile\fR is the path name of a directory, the action applies
+to all of the files and (recursively) subdirectories of that directory.
+.sp
+When a file is archived, and the \fBE\fR flag (see \fBFunction Modifiers\fR) is
+not specified, the filename cannot exceed 256 characters. In addition, it must
+be possible to split the name between parent directory names so that the prefix
+is no longer than 155 characters and the name is no longer than 100 characters.
+If \fBE\fR is specified, a name of up to \fIPATH_MAX\fR characters can be
+specified.
+.sp
+For example, a file whose basename is longer than 100 characters could not be
+archived without using the \fBE\fR flag. A file whose directory portion is 200
+characters and whose basename is 50 characters could be archived (without using
+\fBE\fR) if a slash appears in the directory name somewhere in character
+positions 151-156.
+.RE
+
+.SS "Function Letters"
+.sp
+.LP
+The function portion of the key is specified by one of the following letters:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create. Writing begins at the beginning of the tarfile, instead of at the end.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Replace. The named \fIfile\fRs are written at the end of the tarfile. A file
+created with extended headers must be updated with extended headers (see
+\fBE\fR flag under \fBFunction Modifiers\fR). A file created without extended
+headers cannot be modified with extended headers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Table of Contents. The names of the specified files are listed each time they
+occur in the tarfile. If no \fIfile\fR argument is specified, the names of all
+files and any associated extended attributes in the tarfile are listed. With
+the \fBv\fR function modifier, additional information for the specified files
+is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR\fR
+.ad
+.sp .6
+.RS 4n
+Update. The named \fIfile\fRs are written at the end of the tarfile if they are
+not already in the tarfile, or if they have been modified since last written to
+that tarfile. An update can be rather slow. A tarfile created on a 5.x system
+cannot be updated on a 4.x system. A file created with extended headers must be
+updated with extended headers (see \fBE\fR flag under \fBFunction
+Modifiers\fR). A file created without extended headers cannot be modified with
+extended headers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.sp .6
+.RS 4n
+Extract or restore. The named \fIfile\fRs are extracted from the tarfile and
+written to the directory specified in the tarfile, relative to the current
+directory. Use the relative path names of files and directories to be
+extracted.
+.sp
+Absolute path names contained in the tar archive are unpacked using the
+absolute path names, that is, the leading forward slash (\fB/\fR) is \fBnot\fR
+stripped off.
+.sp
+If a named file matches a directory whose contents has been written to the
+tarfile, this directory is recursively extracted. The owner, modification time,
+and mode are restored (if possible); otherwise, to restore owner, you must be
+the super-user. Character-special and block-special devices (created by
+\fBmknod\fR(1M)) can only be extracted by the super-user. If no \fIfile\fR
+argument is specified, the entire content of the tarfile is extracted. If the
+tarfile contains several files with the same name, each file is written to the
+appropriate directory, overwriting the previous one. Filename substitution
+wildcards cannot be used for extracting files from the archive. Rather, use a
+command of the form:
+.sp
+.in +2
+.nf
+\fBtar xvf ... /dev/rmt/0 \(gatar tf ... /dev/rmt/0 | \e
+     grep '\fIpattern\fR' \(ga\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+When extracting tapes created with the \fBr\fR or \fBu\fR functions, directory
+modification times can not be set correctly. These same functions cannot be
+used with many tape drives due to tape drive limitations such as the absence of
+backspace or append capabilities.
+.sp
+.LP
+When using the \fBr\fR, \fBu\fR, or \fBx\fR functions or the \fBX\fR function
+modifier, the named files must match exactly the corresponding files in the
+\fItarfile\fR. For example, to extract \fB\&./\fR\fIthisfile\fR, you must
+specify \fB\&./\fR\fIthisfile,\fR and not \fIthisfile\fR. The \fBt\fR function
+displays how each file was archived.
+.SS "Function Modifiers"
+.sp
+.LP
+The characters below can be used in conjunction with the letter that selects
+the desired function.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb\fR \fIblocksize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Blocking Factor. Use when reading or writing to raw magnetic archives (see
+\fBf\fR below). The \fIblocksize\fR argument specifies the number of 512-byte
+tape blocks to be included in each read or write operation performed on the
+tarfile. The minimum is \fB1\fR, the default is \fB20\fR. The maximum value is
+a function of the amount of memory available and the blocking requirements of
+the specific tape device involved (see \fBmtio\fR(7I) for details.) The maximum
+cannot exceed \fBINT_MAX\fR/512 (\fB4194303\fR).
+.sp
+When a tape archive is being read, its actual blocking factor is automatically
+detected, provided that it is less than or equal to the nominal blocking factor
+(the value of the \fIblocksize\fR argument, or the default value if the \fBb\fR
+modifier is not specified). If the actual blocking factor is greater than the
+nominal blocking factor, a read error results. See Example 5 in EXAMPLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBB\fR\fR
+.ad
+.sp .6
+.RS 4n
+Block. Force \fBtar\fR to perform multiple reads (if necessary) to read exactly
+enough bytes to fill a block. This function modifier enables \fBtar\fR to work
+across the Ethernet, since pipes and sockets return partial blocks even when
+more data is coming. When reading from standard input, "\fB\(mi\fR", this
+function modifier is selected by default to ensure that \fBtar\fR can recover
+from short reads.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Data change warnings. Used with \fBc\fR, \fBr\fR, or \fBu\fR function letters.
+Ignored with \fBt\fR or \fBx\fR function letters. If the size of a file changes
+while the file is being archived, treat this condition as a warning instead of
+as an error. A warning message is still written, but the exit status is not
+affected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.sp .6
+.RS 4n
+Error. Exit immediately with a positive exit status if any unexpected errors
+occur. The \fBSYSV3\fR environment variable overrides the default behavior.
+(See ENVIRONMENT VARIABLES section below.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write a tarfile with extended headers. (Used with \fBc\fR, \fBr\fR, or \fBu\fR
+function letters. Ignored with \fBt\fR or \fBx\fR function letters.) When a
+tarfile is written with extended headers, the modification time is maintained
+with a granularity of microseconds rather than seconds. In addition, filenames
+no longer than \fBPATH_MAX\fR characters that could not be archived without
+\fBE\fR, and file sizes greater than \fB8GB\fR, are supported. The \fBE\fR flag
+is required whenever the larger files and/or files with longer names, or whose
+\fBUID/GID\fR exceed \fB2097151\fR, are to be archived, or if time granularity
+of microseconds is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf\fR\fR
+.ad
+.sp .6
+.RS 4n
+File. Use the \fItarfile\fR argument as the name of the tarfile. If \fBf\fR is
+specified, \fB/etc/default/tar\fR is not searched. If \fBf\fR is omitted,
+\fBtar\fR uses the device indicated by the \fBTAPE\fR environment variable, if
+set. Otherwise, \fBtar\fR uses the default values defined in
+\fB/etc/default/tar\fR. The number matching the \fBarchive\fR\fIN\fR string is
+used as the output device with the blocking and size specifications from the
+file. For example,
+.sp
+.in +2
+.nf
+\fBtar -c 2/tmp/*\fR
+.fi
+.in -2
+.sp
+
+writes the output to the device specified as \fBarchive2\fR in
+\fB/etc/default/tar\fR.
+.sp
+If the name of the tarfile is "\fB\(mi\fR", \fBtar\fR writes to the standard
+output or reads from the standard input, whichever is appropriate. \fBtar\fR
+can be used as the head or tail of a pipeline. \fBtar\fR can also be used to
+move hierarchies with the command:
+.sp
+.in +2
+.nf
+example% \fBcd fromdir; tar cf \(mi .| (cd todir; tar xfBp \(mi)\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF\fR\fR
+.ad
+.sp .6
+.RS 4n
+With one \fBF\fR argument, \fBtar\fR excludes all directories named \fBSCCS\fR
+and \fBRCS\fR from the tarfile. With two arguments, \fBFF\fR, \fBtar\fR
+excludes all directories named SCCS and RCS, all files with \fB\&.o\fR as their
+suffix, and all files named \fBerrs\fR, \fBcore\fR, and \fBa.out\fR. The
+\fBSYSV3\fR environment variable overrides the default behavior. (See
+ENVIRONMENT VARIABLES section below.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fR\fR
+.ad
+.sp .6
+.RS 4n
+Follow symbolic links as if they were normal files or directories. Normally,
+\fBtar\fR does not follow symbolic links.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ignore directory checksum errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBk\fR \fIsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requires \fBtar\fR to use the size argument as the size of an archive in
+kilobytes. This is useful when the archive is intended for a fixed size device
+such as floppy disks. Large files are then split across volumes if they do not
+fit in the specified size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Link. Output error message if unable to resolve all links to the files being
+archived. If \fBl\fR is not specified, no error messages are printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modify. The modification time of the file is the time of extraction. This
+function modifier is valid only with the \fBx\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file being read is a non-tape device. Reading of the archive is faster
+since \fBtar\fR can randomly seek around the archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ownership. Assign to extracted files the user and group identifiers of the user
+running the program, rather than those on tarfile. This is the default behavior
+for users other than root. If the \fBo\fR function modifier is not set and the
+user is root, the extracted files takes on the group and user identifiers of
+the files on tarfile (see \fBchown\fR(1) for more information). The \fBo\fR
+function modifier is only valid with the \fBx\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Restore the named files to their original modes, and \fBACL\fRs if applicable,
+ignoring the present \fBumask\fR(1). This is the default behavior if invoked as
+super-user with the \fBx\fR function letter specified. If super-user,
+\fBSETUID\fR, and sticky information are also extracted, and files are restored
+with their original owners and permissions, rather than owned by root. When
+this function modifier is used with the \fBc\fR function, \fBACL\fRs are
+created in the tarfile along with other information. Errors occur when a
+tarfile with \fBACL\fRs is extracted by previous versions of \fBtar\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppress the addition of a trailing "\fB/\fR" on directory entries in the
+archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stop after extracting the first occurrence of the named file. \fBtar\fR
+normally continues reading the archive after finding an occurrence of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT\fR\fR
+.ad
+.sp .6
+.RS 4n
+This modifier is only available if the system is configured with Trusted
+Extensions.
+.sp
+When this modifier is used with the function letter \fBc\fR, \fBr,\fR or
+\fBu\fR for creating, replacing or updating a tarfile, the sensitivity label
+associated with each archived file and directory is stored in the tarfile.
+.sp
+Specifying \fBT\fR implies the function modifier \fBp\fR.
+.sp
+When used with the function letter \fBx\fR for extracting a tarfile, the tar
+program verifies that the file's sensitivity label specified in the archive
+equals the sensitivity label of the destination directory. If not, the file is
+not restored. This operation must be invoked from the global zone. If the
+archived file has a relative pathname, it is restored to the corresponding
+directory with the same label, if available. This is done by prepending to the
+current destination directory the root pathname of the zone whose label equals
+the file. If no such zone exists, the file is not restored.
+.sp
+Limited support is provided for extracting labeled archives from Trusted
+Solaris 8. Only sensitivity labels, and multi-level directory specifications
+are interpreted. Privilege specifications and audit attribute flags are
+silently ignored. Multilevel directory specifications including symbolic links
+to single level directories are are mapped into zone-relative pathnames if a
+zone with the same label is available. This support is intended to facilitate
+migration of home directories. Architectural differences preclude the
+extraction of arbitrarily labeled files from Trusted Solaris 8 into identical
+pathnames in Trusted Extensions. Files cannot be extracted unless their
+archived label matches the destination label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBv\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose. Output the name of each file preceded by the function letter. With the
+\fBt\fR function, \fBv\fR provides additional information about the tarfile
+entries. The listing is similar to the format produced by the \fB-l\fR option
+of the \fBls\fR(1) command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBw\fR\fR
+.ad
+.sp .6
+.RS 4n
+What. Output the action to be taken and the name of the file, then await the
+user's confirmation. If the response is affirmative, the action is performed;
+otherwise, the action is not performed. This function modifier cannot be used
+with the \fBt\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX\fR\fR
+.ad
+.sp .6
+.RS 4n
+Exclude. Use the \fIexclude-file\fR argument as a file containing a list of
+relative path names for files (or directories) to be excluded from the tarfile
+when using the functions \fBc\fR, \fBx\fR, or \fBt\fR. Be careful of trailing
+white spaces. Also beware of leading white spaces, since, for each line in the
+excluded file, the entire line (apart from the newline) is used to match
+against the initial string of files to exclude. Lines in the exclude file are
+matched exactly, so an entry like "\fB/var\fR" does \fBnot\fR exclude the
+\fB/var\fR directory if \fBtar\fR is backing up relative pathnames. The entry
+should read "\fB\&./var\fR" under these circumstances. The \fBtar\fR command
+does not expand shell metacharacters in the exclude file, so specifying entries
+like "\fB*.o\fR" does not have the effect of excluding all files with names
+suffixed with "\fB\&.o\fR". If a complex list of files is to be excluded, the
+exclude file should be generated by some means such as the \fBfind\fR(1)
+command with appropriate conditions.
+.sp
+Multiple \fBX\fR arguments can be used, with one \fIexclude-file\fR per
+argument. In the case where included files (see \fB\(miI\fR \fIinclude-file\fR
+operand) are also specified, the excluded files take precedence over all
+included files. If a file is specified in both the \fIexclude-file\fR and the
+\fIinclude-file\fR (or on the command line), it is excluded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB@\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include extended attributes in archive. By default, \fBtar\fR does not place
+extended attributes in the archive. With this flag, \fBtar\fR looks for
+extended attributes on the files to be placed in the archive and add them to
+the archive. Extended attributes go in the archive as special files with a
+special type label. When this modifier is used with the \fBx\fR function,
+extended attributes are extracted from the tape along with the normal file
+data. Extended attribute files can only be extracted from an archive as part of
+a normal file extract. Attempts to explicitly extract attribute records are
+ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include extended system attributes in archive. By default, \fBtar\fR does not
+place extended system attributes in the archive. With this flag, \fBtar\fR
+looks for extended system attributes on the files to be placed in the archive
+and adds them to the archive. Extended system attributes go in the archive as
+special files with a special type label. When this modifier is used with the
+\fBx\fR function, extended system attributes are extracted from the tape along
+with the normal file data. Extended system attribute files can only be
+extracted from an archive as part of a normal file extract. Attempts to
+explicitly extract attribute records are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[0-7]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Select an alternative drive on which the tape is mounted. The default entries
+are specified in \fB/etc/default/tar\fR. If no digit or \fBf\fR function
+modifier is specified, the entry in \fB/etc/default/tar\fR with digit "\fB0\fR"
+is the default.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBtar\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.sp
+.LP
+The automatic determination of the actual blocking factor can be fooled when
+reading from a pipe or a socket (see the \fBB\fR function modifier below).
+.sp
+.LP
+1/4" streaming tape has an inherent blocking factor of one 512-byte block. It
+can be read or written using any blocking factor.
+.sp
+.LP
+This function modifier works for archives on disk files and block special
+devices, among others, but is intended principally for tape devices.
+.sp
+.LP
+For information on \fBtar\fR header format, see \fBarchives.h\fR(3HEAD).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating an archive of your home directory
+.sp
+.LP
+The following is an example using \fBtar\fR to create an archive of your home
+directory on a tape mounted on drive \fB/dev/rmt/0\fR:
+
+.sp
+.in +2
+.nf
+example% \fBcd\fR
+example% \fBtar cvf /dev/rmt/0\fR .
+\fImessages from\fR tar 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBc\fR function letter means create the archive. The \fBv\fR function
+modifier outputs messages explaining what \fBtar\fR is doing. The \fBf\fR
+function modifier indicates that the tarfile is being specified
+(\fB/dev/rmt/0\fR in this example). The dot (\fB\&.\fR) at the end of the
+command line indicates the current directory and is the argument of the \fBf\fR
+function modifier.
+
+.sp
+.LP
+Display the table of contents of the tarfile with the following command:
+
+.sp
+.in +2
+.nf
+example% \fBtar tvf /dev/rmt/0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The output is similar to the following for the POSIX locale:
+
+.sp
+.in +2
+.nf
+rw\(mir\(mi\(mir\(mi\(mi   1677/40    2123    Nov  7 18:15 1985    ./test.c
+\&...
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The columns have the following meanings:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+column 1 is the access permissions to \fB\&./test.c\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+column 2 is the \fIuser-id\fR/\fIgroup-id\fR of \fB\&./test.c\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+column 3 is the size of \fB\&./test.c\fR in bytes
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+column 4 is the modification date of \fB\&./test.c\fR. When the \fBLC_TIME\fR
+category is not set to the POSIX locale, a different format and date order
+field can be used.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+column 5 is the name of \fB\&./test.c\fR
+.RE
+.sp
+.LP
+To extract files from the archive:
+
+.sp
+.in +2
+.nf
+example% \fBtar xvf /dev/rmt/0\fR
+\fImessages from\fR tar
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If there are multiple archive files on a tape, each is separated from the
+following one by an EOF marker. To have \fBtar\fR read the first and second
+archives from a tape with multiple archives on it, the \fInon-rewinding\fR
+version of the tape device name must be used with the \fBf\fR function
+modifier, as follows:
+
+.sp
+.in +2
+.nf
+example% \fBtar xvfp /dev/rmt/0n \fIread first archive from tape\fR\fR
+\fImessages from\fR tar
+example% \fBtar xvfp /dev/rmt/0n \fIread second archive from tape\fR\fR
+\fImessages from\fR tar
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that in some earlier releases, the above scenario did not work
+correctly, and intervention with \fBmt\fR(1) between \fBtar\fR invocations was
+necessary. To emulate the old behavior, use the non-rewind device name
+containing the letter \fBb\fR for BSD behavior. See the \fBClose Operations\fR
+section of the \fBmtio\fR(7I) manual page.
+
+.LP
+\fBExample 2 \fRArchiving files from /usr/include and from /etc to default tape
+drive 0
+.sp
+.LP
+To archive files from \fB/usr/include\fR and from \fB/etc\fR to default tape
+drive \fB0\fR:
+
+.sp
+.in +2
+.nf
+example% \fBtar c -C /usr include -C /etc .\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The table of contents from the resulting tarfile would produce output like the
+following:
+
+.sp
+.in +2
+.nf
+include/ 
+include/a.out.h
+\fIand all the other files in\fR \fB/usr/include ...\fR
+\&./chown \fIand all the other files in\fR /etc 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To extract all files in the \fBinclude\fR directory:
+
+.sp
+.in +2
+.nf
+example% \fBtar xv include
+x include/, 0 bytes, 0 tape blocks \e 
+    \fIand all files under\fR include ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRTransferring files across the network
+.sp
+.LP
+The following is an example using \fBtar\fR to transfer files across the
+network. First, here is how to archive files from the local machine
+(\fBexample\fR) to a tape on a remote system (\fBhost\fR):
+
+.sp
+.in +2
+.nf
+example% \fBtar cvfb \(mi 20 \fIfiles\fR| \e
+    rsh \fIhost\fR dd of=/dev/rmt/0 obs=20b\fR
+\fImessages from\fR tar
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In the example above, we are \fIcreating\fR a \fItarfile\fR with the \fBc\fR
+key letter, asking for \fIverbose\fR output from \fBtar\fR with the \fBv\fR
+function modifier, specifying the name of the output \fItarfile\fR using the
+\fBf\fR function modifier (the standard output is where the \fItarfile\fR
+appears, as indicated by the `\fB\(mi\fR\&' sign), and specifying the blocksize
+(\fB20\fR) with the \fBb\fR function modifier. If you want to change the
+blocksize, you must change the blocksize arguments both on the \fBtar\fR
+command \fIand\fR on the \fBdd\fR command.
+
+.LP
+\fBExample 4 \fRRetrieving files from a tape on the remote system back to the
+local system
+.sp
+.LP
+The following is an example that uses \fBtar\fR to retrieve files from a tape
+on the remote system back to the local system:
+
+.sp
+.in +2
+.nf
+example% \fBrsh -n host dd if=/dev/rmt/0 bs=20b | \e
+    tar xvBfb \(mi 20 \fIfiles\fR\fR
+\fImessages from\fR tar
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In the example above, we are \fIextracting\fR from the \fItarfile\fR with the
+\fBx\fR key letter, asking for \fIverbose\fR \fIoutput\fR \fIfrom\fR \fBtar\fR
+with the \fBv\fR function modifier, telling \fBtar\fR it is reading from a pipe
+with the \fBB\fR function modifier, specifying the name of the input
+\fItarfile\fR using the \fBf\fR function modifier (the standard input is where
+the \fItarfile\fR appears, as indicated by the "\fB\(mi\fR" sign), and
+specifying the blocksize (\fB20\fR) with the \fBb\fR function modifier.
+
+.LP
+\fBExample 5 \fRCreating an archive of the home directory
+.sp
+.LP
+The following example creates an archive of the home directory on
+\fB/dev/rmt/0\fR with an actual blocking factor of \fB19\fR:
+
+.sp
+.in +2
+.nf
+example% \fBtar cvfb /dev/rmt/0 19 $HOME\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To recognize this archive's actual blocking factor without using the \fBb\fR
+function modifier:
+
+.sp
+.in +2
+.nf
+example% \fBtar tvf /dev/rmt/0\fR
+tar: blocksize = 19
+\&...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To recognize this archive's actual blocking factor using a larger nominal
+blocking factor:
+
+.sp
+.in +2
+.nf
+example% \fBtar tvf /dev/rmt/0 30\fR
+tar: blocksize = 19
+\&...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Attempt to recognize this archive's actual blocking factor using a nominal
+blocking factor that is too small:
+
+.sp
+.in +2
+.nf
+example% \fBtar tvf /dev/rmt/0 10\fR
+tar: tape read error
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSYSV3\fR\fR
+.ad
+.sp .6
+.RS 4n
+This variable is used to override the default behavior of \fBtar\fR, provide
+compatibility with INTERACTIVE UNIX Systems and SCO UNIX installation scripts,
+and should not be used in new scripts. (It is intended for compatibility
+purposes only.) When set, the following function modifiers behave differently:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF\fR \fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses \fIfilename\fR to obtain a list of command line switches and files on
+which to operate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prevents files from being split across volumes. If there is insufficient room
+on one volume, \fBtar\fR prompts for a new volume. If the file does not fit on
+the new volume, \fBtar\fR exits with an error.
+.RE
+
+.RE
+
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBtar\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
+\fBLC_MESSAGES\fR, \fBLC_TIME\fR, \fBTZ\fR, and \fBNLSPATH\fR.
+.sp
+.LP
+Affirmative responses are processed using the extended regular expression
+defined for the \fByesexpr\fR keyword in the \fBLC_MESSAGES\fR category of the
+user's locale. The locale specified in the \fBLC_COLLATE\fR category defines
+the behavior of ranges, equivalence classes, and multi-character collating
+elements used in the expression defined for \fByesexpr\fR. The locale specified
+in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
+bytes of text data a characters, the behavior of character classes used in the
+expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7][b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7]l[b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7]m[b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7]h[b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7]u[b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/rmt/[0-7]c[b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/default/tar\fR\fR
+.ad
+.sp .6
+.RS 4n
+Settings might look like this:
+.br
+.in +2
+\fBarchive0=/dev/rmt/0\fR
+.in -2
+.br
+.in +2
+\fBarchive1=/dev/rmt/0n\fR
+.in -2
+.br
+.in +2
+\fBarchive2=/dev/rmt/1\fR
+.in -2
+.br
+.in +2
+\fBarchive3=/dev/rmt/1n\fR
+.in -2
+.br
+.in +2
+\fBarchive4=/dev/rmt/0\fR
+.in -2
+.br
+.in +2
+\fBarchive5=/dev/rmt/0n\fR
+.in -2
+.br
+.in +2
+\fBarchive6=/dev/rmt/1\fR
+.in -2
+.br
+.in +2
+\fBarchive7=/dev/rmt/1n\fR
+.in -2
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/tar*\fR\fR
+.ad
+.sp .6
+.RS 4n
+ 
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBbasename\fR(1), \fBcd\fR(1), \fBchown\fR(1), \fBcpio\fR(1),
+\fBcsh\fR(1), \fBdirname\fR(1), \fBfind\fR(1), \fBls\fR(1), \fBmt\fR(1),
+\fBpax\fR(1), \fBsetfacl\fR(1), \fBumask\fR(1), \fBmknod\fR(1M),
+\fBarchives.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBfsattr\fR(5), \fBlargefile\fR(5), \fBmtio\fR(7I)
+.SH DIAGNOSTICS
+.sp
+.LP
+Diagnostic messages are output for bad key characters and tape read/write
+errors, and for insufficient memory to hold the link tables.
+.SH NOTES
+.sp
+.LP
+There is no way to access the \fIn\fR-th occurrence of a file.
+.sp
+.LP
+Tape errors are handled ungracefully.
+.sp
+.LP
+The \fBtar\fR archive format allows \fBUID\fRs and \fBGID\fRs up to
+\fB2097151\fR to be stored in the archive header. Files with \fBUID\fRs and
+\fBGID\fRs greater than this value is archived with the \fBUID\fR and \fBGID\fR
+of \fB60001\fR.
+.sp
+.LP
+If an archive is created that contains files whose names were created by
+processes running in multiple locales, a single locale that uses a full 8-bit
+codeset (for example, the \fBen_US\fR locale) should be used both to create the
+archive and to extract files from the archive.
+.sp
+.LP
+Neither the \fBr\fR function letter nor the \fBu\fR function letter can be used
+with quarter-inch archive tapes, since these tape drives cannot backspace.
+.sp
+.LP
+Since \fBtar\fR has no options, the standard "\fB\(mi\(mi\fR" argument that is
+normally used in other utilities to terminate recognition of options is not
+needed. If used, it is recognized only as the first argument and is ignored.
+.sp
+.LP
+Since \fB\(miC\fR \fIdirectory\fR \fIfile\fR and \fB\(miI\fR \fIinclude-file\fR
+are multi-argument operands, any of the following methods can be used to
+archive or extract a file named \fB\(miC\fR or \fB\(miI\fR:
+.RS +4
+.TP
+1.
+Specify them using file operands containing a \fB/\fR character on the
+command line (such as \fB/home/joe/\(miC\fR or \fB\&./\(miI\fR).
+.RE
+.RS +4
+.TP
+2.
+Include them in an include file with \fB\(miI\fR \fIinclude-file\fR.
+.RE
+.RS +4
+.TP
+3.
+Specify the directory in which the file resides:
+.sp
+.in +2
+.nf
+\fB-C \fIdirectory\fR -C\fR
+.fi
+.in -2
+.sp
+
+or
+.sp
+.in +2
+.nf
+\fB-C \fIdirectory\fR -I\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+4.
+Specify the entire directory in which the file resides:
+.sp
+.in +2
+.nf
+\fB-C \fIdirectory\fR .\fR
+.fi
+.in -2
+.sp
+
+.RE

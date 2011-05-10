@@ -1,0 +1,134 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_border 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_border, border, wborder, box, whline, wvline \- create curses borders,
+horizontal and vertical lines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBborder\fR(\fBchtype\fR \fIls\fR, \fBchtype\fR \fIrs\fR, \fBchtype\fR \fIts\fR, \fBchtype\fR \fIbs\fR, \fBchtype\fR \fItl\fR,
+     \fBchtype\fR \fItr\fR, \fBchtype\fR \fIbl\fR,\fBchtype\fR \fIbr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwborder\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIls\fR, \fBchtype\fR \fIrs\fR, \fBchtype\fR \fIts\fR,
+     \fBchtype\fR \fIbs\fR, \fBchtype\fR \fItl\fR, \fBchtype\fR \fItr\fR, \fBchtype\fR \fIbl\fR, \fBchtype\fR \fIbr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBbox\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIverch\fR, \fBchtype\fR \fIhorch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhline\fR(\fBchtype\fR \fIch\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwhline\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIch\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvline\fR(\fBchtype\fR \fIch\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwvline\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIch\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+With the \fBborder()\fR, \fBwborder()\fR, and  \fBbox()\fR routines, a border
+is drawn around the edges of the window. The arguments and attributes are:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBls\fRleft side of the border
+\fBrs\fRright side of the border
+\fBts\fRtop side of the border
+\fBbs\fRbottom side of the border
+\fBtl\fRtop left-hand corner
+\fBtr\fRtop right-hand corner
+\fBbl\fRbottom left-hand corner 
+\fBbr\fRbottom right-hand corner
+.TE
+
+.sp
+.LP
+If any of these arguments is zero, then the following default values (defined
+in <\fBcurses.h\fR>) are used respectively instead: \fBACS_VLINE\fR,
+\fBACS_VLINE\fR, \fBACS_HLINE\fR, \fBACS_HLINE\fR, \fBACS_ULCORNER\fR,
+\fBACS_URCORNER\fR, \fBACS_BLCORNER\fR, \fBACS_BRCORNER\fR.
+.sp
+.LP
+\fBbox(\fR\fIwin\fR\fB,\fR \fIverch\fR\fB,\fR \fIhorch\fR\fB)\fR is a shorthand
+for the following call:
+.sp
+.LP
+\fBwborder(\fR\fIwin\fR\fB,\fR \fIverch\fR\fB,\fR \fIverch\fR\fB,\fR
+\fIhorch\fR\fB,\fR \fBhorch , 0, 0, 0, 0)\fR
+.sp
+.LP
+\fBhline()\fR and \fBwhline()\fR draw a horizontal (left to right) line using
+\fIch\fR starting at the current cursor position in the window. The current
+cursor position is not changed. The line is at most \fIn\fR characters long, or
+as many as fit into the window.
+.sp
+.LP
+\fBvline()\fR and \fBwvline()\fR draw a vertical (top to bottom) line using
+\fIch\fR starting at the current cursor position in the window. The current
+cursor position is not changed. The line is at most \fIn\fR characters long, or
+as many as fit into the window.
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBOK\fR, or a non-negative integer if
+\fBimmedok()\fR is set. See \fBcurs_outopts\fR(3CURSES).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_outopts\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBborder()\fR and \fBbox()\fR may be macros.

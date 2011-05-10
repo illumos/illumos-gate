@@ -1,0 +1,98 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH meta 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+meta \- enable/disable meta keys
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBmeta\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is an ignored parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbf\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a Boolean expression.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Whether a terminal returns 7 or 8 significant bits initially depends on the
+control mode of the terminal driver.  The \fBmeta()\fR function forces the
+number of bits to be returned by  \fBgetch\fR(3XCURSES) to be 7 (if \fIbf\fR is
+\fBFALSE\fR) or 8 (if \fIbf\fR is  \fBTRUE\fR).
+.sp
+.LP
+If the program handling the data can only pass 7-bit characters or strips the
+8th bit, 8 bits cannot be handled.
+.sp
+.LP
+If the \fBterminfo\fR capabilities \fBsmm\fR (meta_on) and \fBrmm\fR (meta_off)
+are defined for the terminal, \fBsmm\fR is sent to the terminal  when
+\fBmeta(\fR\fIwin\fR\fB, TRUE)\fR is called, and \fBrmm\fR is sent when
+\fBmeta(\fR\fIwin\fR\fB, FALSE)\fR is called.
+.sp
+.LP
+This function is useful when extending the non-text command set in applications
+where the META key is used.
+.SH RETURN VALUES
+.sp
+.LP
+On success, the \fBmeta()\fR function returns \fBOK\fR. Otherwise, it returns
+\fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetch\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

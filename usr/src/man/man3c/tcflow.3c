@@ -1,0 +1,146 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tcflow 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+tcflow \- suspend or restart the transmission or reception of data
+.SH SYNOPSIS
+.LP
+.nf
+#include <termios.h>
+
+\fBint\fR \fBtcflow\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIaction\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtcflow()\fR function suspends transmission or reception of data on the
+object referred to by \fIfildes\fR, depending on the value of \fIaction\fR. The
+\fIfildes\fR argument is an open file descriptor associated with a terminal.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIaction\fR is \fBTCOOFF\fR, output is suspended.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIaction\fR is \fBTCOON\fR, suspended output is restarted.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIaction\fR is \fBTCIOFF\fR, the system transmits a \fBSTOP\fR character,
+which is intended to cause the terminal device to stop transmitting data to the
+system.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIaction\fR is \fBTCION\fR, the system transmits a \fBSTART\fR character,
+which is intended to cause the terminal device to start transmitting data to
+the system.
+.RE
+.sp
+.LP
+The default on the opening of a terminal file is that neither its input nor its
+output are suspended.
+.sp
+.LP
+Attempts to use \fBtcflow()\fR from a process which is a member of a background
+process group on a \fIfildes\fR associated with its controlling terminal, will
+cause the process group to be sent a \fBSIGTTOU\fR signal. If the calling
+process is blocking or ignoring \fBSIGTTOU\fR signals, the process is allowed
+to perform the operation, and no signal is sent.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtcflow()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaction\fR argument is not a supported value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The file associated with \fIfildes\fR is not a terminal.
+.RE
+
+.sp
+.LP
+The \fBtcflow()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 7n
+.rt  
+The process group of the writing process is orphaned, and the writing process
+is not ignoring or blocking \fBSIGTTOU\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe, and Async-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtcsendbreak\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5),
+\fBtermio\fR(7I)

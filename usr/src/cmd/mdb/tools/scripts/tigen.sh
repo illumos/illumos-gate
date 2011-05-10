@@ -24,7 +24,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -122,7 +121,7 @@ for term in $termlist; do
 	$verbose && echo "loading terminfo for $term ... \c" >& 2
 	echo "static const termio_attr_t ${cterm}_attrs[] = {"
 
-	sed -n '/termio_attrs\[\] = /,/^\}/p' $termio_c | \
+	sed -n '/termio_attrs\[\] = /,/^}/p' $termio_c | \
 	    sed -n \ 's/{ "\([a-z0-9]*\)", \([A-Z_]*\),.*/\1 \2/p' | \
 	    while read attr type; do
 

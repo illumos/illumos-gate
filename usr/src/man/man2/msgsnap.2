@@ -1,0 +1,217 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH msgsnap 2 "8 Mar 2000" "SunOS 5.11" "System Calls"
+.SH NAME
+msgsnap \- message queue snapshot operation
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/msg.h>
+
+\fB\fR\fBmsgsnap\fR(\fBint\fR \fImsqid\fR, \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIbufsz\fR, \fBlong\fR \fImsgtyp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmsgsnap()\fR function reads all of the messages of type \fImsgtyp\fR
+from the queue associated with the message queue identifier specified by
+\fImsqid\fR and places them in the user-defined buffer pointed to by \fIbuf\fR.
+.sp
+.LP
+The \fIbuf\fR argument points to a user-defined buffer that on return will
+contain first a buffer header structure:
+.sp
+.in +2
+.nf
+struct msgsnap_head {
+     size_t  msgsnap_size;   /* bytes used/required in the buffer */
+     size_t  msgsnap_nmsg;   /* number of messages in the buffer */
+};
+.fi
+.in -2
+
+.sp
+.LP
+followed by \fBmsgsnap_nmsg\fR messages, each of which starts with a message
+header:
+.sp
+.in +2
+.nf
+struct msgsnap_mhead {
+     size_t  msgsnap_mlen;   /* number of bytes in the message */
+     long    msgsnap_mtype;  /* message type */
+};
+.fi
+.in -2
+
+.sp
+.LP
+and followed by \fBmsgsnap_mlen\fR bytes containing the message contents.
+.sp
+.LP
+Each subsequent message header is located at the first byte following the
+previous message contents, rounded up to a \fBsizeof(size_t)\fR boundary.
+.sp
+.LP
+The \fIbufsz\fR argument specifies the size  of \fIbuf\fR in bytes.  If
+\fIbufsz\fR is less than \fBsizeof(msgsnap_head)\fR, \fBmsgsnap()\fR fails with
+\fBEINVAL\fR.  If \fIbufsz\fR is insufficient to contain all of the requested
+messages, \fBmsgsnap()\fR succeeds but returns with \fBmsgsnap_nmsg\fR set to 0
+and with \fBmsgsnap_size\fR set to the required size of the buffer in bytes.
+.sp
+.LP
+The \fImsgtyp\fR argument specifies the types of messages requested as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fImsgtyp\fR is 0, all of the messages on the queue are read.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fImsgtyp\fR is greater than 0, all messages of type \fImsgtyp\fR are read.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fImsgtyp\fR is less than 0, all messages with type less than or equal to
+the absolute value of \fImsgtyp\fR are read.
+.RE
+.sp
+.LP
+The \fBmsgsnap()\fR function is a non-destructive operation. Upon completion,
+no changes are made to the data structures associated with \fImsqid\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmsgsnap()\fR returns \fB0\fR.  Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmsgsnap()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+Operation permission is denied to the calling process.  See \fBIntro\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImsqid\fR argument is not a valid message queue identifier or the value
+of \fIbufsz\fR is less than \fBsizeof(struct msgsnap_head)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBmsgsnap()\fR function returns a snapshot of messages on a message queue
+at one point in time.  The queue contents can change immediately following
+return from \fBmsgsnap()\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBmsgsnap()\fR example
+.sp
+.LP
+This is sample C code indicating how to use the msgsnap function (see
+\fBmsgids\fR(2)).
+
+.sp
+.in +2
+.nf
+void
+process_msgid(int msqid)
+{
+     size_t bufsize;
+     struct msgsnap_head *buf;
+     struct msgsnap_mhead *mhead;
+     int i;
+
+     /* allocate a minimum-size buffer */
+     buf = malloc(bufsize = sizeof(struct msgsnap_head));
+
+     /* read all of the messages from the queue */
+     for (;;) {
+          if (msgsnap(msqid, buf, bufsize, 0) != 0) {
+               perror("msgsnap");
+                    free(buf);
+                    return;
+          }
+          if (bufsize >= buf->msgsnap_size)  /* we got them all */
+               break;
+          /* we need a bigger buffer */
+          buf = realloc(buf, bufsize = buf->msgsnap_size);
+     }   
+
+     /* process each message in the queue (there may be none) */
+     mhead = (struct msgsnap_mhead *)(buf + 1);  /* first message */
+     for (i = 0; i < buf->msgsnap_nmsg; i++) {
+          size_t mlen = mhead->msgsnap_mlen;
+
+          /* process the message contents */
+          process_message(mhead->msgsnap_mtype, (char *)(mhead+1), mlen);
+
+          /* advance to the next message header */
+          mhead = (struct msgsnap_mhead *)
+               ((char *)mhead + sizeof(struct msgsnap_mhead) +
+               ((mlen + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1)));
+     }   
+
+     free(buf);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBipcrm\fR(1), \fBipcs\fR(1), \fBIntro\fR(2), \fBmsgctl\fR(2),
+\fBmsgget\fR(2), \fBmsgids\fR(2), \fBmsgrcv\fR(2), \fBmsgsnd\fR(2),
+\fBattributes\fR(5)

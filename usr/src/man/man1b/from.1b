@@ -1,0 +1,56 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH from 1B "28 Jan 2004" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+from \- display the sender and date of newly-arrived mail messages
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/from\fR [\fB-s\fR \fIsender\fR] [\fIusername\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfrom\fR utility prints out the mail header lines in your mailbox file to
+show you who your mail is from. If  \fIusername\fR is specified,
+\fIusername\fR's mailbox is examined instead of your own.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIsender\fR\fR
+.ad
+.RS 13n
+.rt  
+Only display headers for mail sent by  \fIsender\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBfrom\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/mail/*\fR\fR
+.ad
+.RS 15n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbiff\fR(1B), \fBmail\fR(1B), \fBattributes\fR(5), \fBlargefile\fR(5)

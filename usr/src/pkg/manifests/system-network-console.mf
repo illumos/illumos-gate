@@ -50,6 +50,9 @@ dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/lib
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=cvc perms="* 0600 root sys"
 driver name=cvcredir perms="* 0600 root sys"
 file path=lib/svc/manifest/system/cvc.xml group=sys mode=0444
@@ -67,6 +70,9 @@ file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvc.conf group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvcredir.conf \
     group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/lib/cvcd group=sys mode=0700
+file path=usr/share/man/man1m/cvcd.1m
+file path=usr/share/man/man7d/cvc.7d
+file path=usr/share/man/man7d/cvcredir.7d
 legacy pkg=SUNWcvc.u arch=$(ARCH).sun4u desc="Network Console" \
     name="Network Console"
 legacy pkg=SUNWcvcr.u arch=$(ARCH).sun4u desc="Network Console daemon" \

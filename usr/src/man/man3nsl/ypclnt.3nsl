@@ -1,0 +1,598 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ypclnt 3NSL "23 Jan 2004" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+ypclnt, yp_get_default_domain, yp_bind, yp_unbind, yp_match, yp_first, yp_next,
+yp_all, yp_order, yp_master, yperr_string, ypprot_err \- NIS Version 2 client
+interface
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fB-flag\fR... ] \fIfile\fR\&.\|.\|. \fB-lnsl\fR [ \fIlibrary\fR...]
+#include <rpcsvc/ypclnt.h>
+#include <rpcsvc/yp_prot.h>
+
+
+
+\fBint\fR \fByp_bind\fR(\fBchar *\fR\fIindomain\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fByp_unbind\fR (\fBchar *\fR\fIindomain\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_get_default_domain\fR(\fBchar **\fR\fIoutdomain\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_match\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBchar *\fR\fIinkey\fR, \fBint\fR \fIinkeylen\fR,
+     \fBchar *\fR\fBchar **\fR\fIoutval\fR, \fBint *\fR\fIoutvallen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_first\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBchar **\fR\fIoutkey\fR, \fBint *\fR\fIoutkeylen\fR,
+     \fBchar **\fR\fIoutval\fR, \fBint *\fR\fIoutvallen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_next\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBchar *\fR\fIinkey\fR, \fBint *\fR\fIinkeylen\fR,
+     \fBchar **\fR\fIoutkey\fR, \fBint *\fR\fIoutkeylen\fR, \fBchar **\fR\fIoutval\fR,
+     \fBint *\fR\fIoutvallen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_all\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBstruct ypall_callback *\fR\fIincallback\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_order\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBunsigned long *\fR\fIoutorder\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fByp_master\fR(\fBchar *\fR\fIindomain\fR, \fBchar *\fR\fIinmap\fR, \fBchar **\fR\fIoutname\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fByperr_string\fR(\fBint\fR \fIincode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBypprot_err\fR(\fBchar *\fR\fIdomain\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This package of functions provides an interface to \fBNIS\fR, Network
+Information Service Version 2, formerly referred to as \fBYP\fR. In this
+version of SunOS, \fBNIS\fR version 2 is supported only for compatibility with
+previous versions. The recommended enterprise level information service is
+\fBNIS+\fR or \fBNIS\fR version 3. See \fBNIS+\fR(1). The current SunOS
+supports only the client interface to \fBNIS\fR version 2. This client
+interface will in turn be served either by an existing \fBypserv\fR process
+running on another machine on the network that has an earlier version of SunOS,
+or by a \fBNIS+\fR server running in "YP-compatibility mode". See
+\fBrpc.nisd\fR(1M). The \fBNOTES\fR section in \fBypfiles\fR(4) discusses the
+implications of being an \fBNIS\fR client of an \fBNIS+\fR server in
+\fBYP-compatibility mode\fR. For commands used to access \fBNIS\fR from a
+client machine, see \fBypbind\fR(1M), \fBypwhich\fR(1), \fBypmatch\fR(1), and
+\fBypcat\fR(1). The package can be loaded from the standard library,
+\fB/usr/lib/libnsl.so.1\fR.
+.sp
+.LP
+All input parameter names begin with \fIin\fR. Output parameters begin with
+\fIout\fR. Output parameters of type \fBchar **\fR should be addresses of
+uninitialized character pointers. Memory is allocated by the NIS client package
+using \fBmalloc\fR(3C) and can be freed by the user code if it has no
+continuing need for it. For each \fIoutkey\fR and \fIoutval\fR, two extra bytes
+of memory are allocated at the end that contain NEWLINE and \fInull\fR,
+respectively, but these two bytes are not reflected in \fIoutkeylen\fR or
+\fIoutvallen\fR. The \fIindomain\fR and \fIinmap\fR strings must be non-null
+and null-terminated. String parameters that are accompanied by a count
+parameter may not be \fInull\fR, but they may point to null strings, with the
+count parameter indicating this. Counted strings need not be null-terminated.
+.sp
+.LP
+All functions in this package of type \fIint\fR return \fB0\fR if they succeed.
+Otherwise, they return a failure code (\fBYPERR_\fR\fIxxxx\fR). Failure codes
+are described in the \fBERRORS\fR section.
+.SS "Routines"
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_bind()\fR\fR
+.ad
+.RS 27n
+.rt  
+To use the NIS name services, the client process must be "bound" to an NIS
+server that serves the appropriate domain using \fByp_bind()\fR. Binding need
+not be done explicitly by user code. Binding is done automatically whenever an
+NIS lookup function is called. The \fByp_bind()\fR function can be called
+directly for processes that make use of a backup strategy , for example, a
+local file in cases when NIS services are not available. A process should call
+\fByp_unbind()\fR when it is finished using \fBNIS\fR in order to free up
+resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_unbind()\fR\fR
+.ad
+.RS 27n
+.rt  
+Each binding allocates or uses up one client process socket descriptor. Each
+bound domain costs one socket descriptor. However, multiple requests to the
+same domain use that same descriptor. The \fByp_unbind()\fR function is
+available at the client interface for processes that explicitly manage their
+socket descriptors while accessing multiple domains. The call to
+\fByp_unbind()\fR makes the domain \fIunbound\fR, and frees all per-process and
+per-node resources used to bind it.
+.sp
+If an RPC failure results upon use of a binding, that domain will be unbound
+automatically. At that point, the \fBypclnt()\fR layer will retry a few more
+times or until the operation succeeds, provided that \fBrpcbind\fR(1M) and
+\fBypbind\fR(1M) are running, and either:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The client process cannot bind a server for the proper domain; or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+RPC requests to the server fail.
+.RE
+.sp
+.LP
+Under the following circumstances, the \fBypclnt\fR layer will return control
+to the user code, with either an error or success code and the results:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an error is not RPC-related.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBrpcbind\fR is not running.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBypbind\fR is not running.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If a bound \fBypserv\fR process returns any answer (success or failure).
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_get_default_domain()\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBNIS\fR lookup calls require a map name and a domain name, at minimum. The
+client process should know the name of the map of interest. Client processes
+fetch the node's default domain by calling \fByp_get_default_domain()\fR and
+use the returned \fIoutdomain\fR as the \fIindomain\fR parameter to successive
+\fBNIS\fR name service calls. The domain returned is the same as that returned
+using the \fBSI_SRPC_DOMAIN\fR command to the \fBsysinfo\fR(2) system call. The
+value returned in \fIoutdomain\fR should not be freed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_match()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_match()\fR function returns the value associated with a passed key.
+This key must be exact because no pattern matching is available.
+\fByp_match()\fR requires a full YP map name, such as \fBhosts.byname\fR,
+instead of the nickname \fBhosts\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_first()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_first()\fR function returns the first key-value pair from the named
+map in the named domain.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_next()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_next()\fR function returns the next key-value pair in a named map.
+The \fIinkey\fR parameter must be the \fIoutkey\fR returned from an initial
+call to \fByp_first()\fR (to get the second key-value pair) or the one returned
+from the \fIn\fRth call to \fByp_next()\fR (to get the \fIn\fRth + second
+key-value pair). Similarly, the \fIinkeylen\fR parameter must be the
+\fIoutkeylen\fR returned from the earlier \fByp_first()\fR or \fByp_next()\fR
+call.
+.sp
+The concept of first and next is particular to the structure of the NIS map
+being processed. Retrieval order is not related to either the lexical order
+within any original (non-NIS name service) data base, or to any obvious
+numerical sorting order on the keys, values, or key-value pairs. The only
+ordering guarantee is that if the \fByp_first()\fR function is called on a
+particular map, and then the \fByp_next()\fR function is repeatedly called on
+the same map at the same server until the call fails with a reason of
+\fBYPERR_NOMORE\fR, every entry in the data base is seen exactly once. Further,
+if the same sequence of operations is performed on the same map at the same
+server, the entries are seen in the same order.
+.sp
+Under conditions of heavy server load or server failure, the domain can become
+unbound, then bound once again (perhaps to a different server) while a client
+is running. This binding can cause a break in one of the enumeration rules.
+Specific entries may be seen twice by the client, or not at all. This approach
+protects the client from error messages that would otherwise be returned in the
+midst of the enumeration. For a better solution to enumerating all entries in a
+map, see \fByp_all()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_all()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_all()\fR function provides a way to transfer an entire map from
+server to client in a single request using TCP (rather than UDP as with other
+functions in this package). The entire transaction takes place as a single RPC
+request and response. The \fByp_all()\fR function can be used just like any
+other NIS name service procedure to identify the map in the normal manner and
+to supply the name of a function that will be called to process each key-value
+pair within the map. The call to \fByp_all()\fR returns only when the
+transaction is completed (successfully or unsuccessfully), or the
+\fBforeach()\fR function decides that it does not want to see any more
+key-value pairs.
+.sp
+The third parameter to \fByp_all()\fR is:
+.sp
+.in +2
+.nf
+struct ypall_callback *incallback {
+	int (*foreach)(\|);
+	char *data;
+};
+.fi
+.in -2
+
+The function \fBforeach()\fR is called:
+.sp
+.in +2
+.nf
+foreach(int \fIinstatus\fR, char *\fIinkey\fR, 
+int \fIinkeylen\fR, char *\fIinval\fR, 
+int \fIinvallen\fR, char *\fIindata\fR);
+.fi
+.in -2
+
+The \fIinstatus\fR parameter holds one of the return status values defined in
+<\fBrpcsvc/yp_prot.h\fR>, either \fBYP_TRUE\fR or an error code. See
+\fBypprot_err()\fR, for a function that converts an NIS name service protocol
+error code to a \fBypclnt\fR layer error code.
+.sp
+The key and value parameters are somewhat different than defined in the
+synopsis section above. First, the memory pointed to by the \fIinkey\fR and
+\fIinval\fR parameters is private to the \fByp_all()\fR function, and is
+overwritten with the arrival of each new key-value pair. The \fBforeach()\fR
+function must do something useful with the contents of that memory, but it does
+not own the memory itself. Key and value objects presented to the
+\fBforeach()\fR function look exactly as they do in the server's map. If they
+were not NEWLINE-terminated or null-terminated in the map, they would not be
+here either.
+.sp
+The \fIindata\fR parameter is the contents of the \fIincallback\fR->\fIdata\fR
+element passed to \fByp_all()\fR. The \fBdata\fR element of the callback
+structure can be used to share state information between the \fBforeach()\fR
+function and the mainline code. Its use is optional, and no part of the NIS
+client package inspects its contents; cast it to something useful, or ignore
+it. The \fBforeach()\fR function is Boolean. It should return \fB0\fR to
+indicate that it wants to be called again for further received key-value pairs,
+or non-zero to stop the flow of key-value pairs. If \fBforeach()\fR returns a
+non-zero value, it is not called again. The functional value of \fByp_all()\fR
+is then \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_order()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_order()\fR function returns the order number for a map. The function
+is not supported if the \fBypbind\fR process on the client's system is bound to
+an \fBNIS+\fR server running in "YP-compatibility mode".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByp_master()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByp_master()\fR function returns the machine name of the master NIS
+server for a map.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fByperr_string()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fByperr_string()\fR function returns a pointer to an error message string
+that is null-terminated but contains no period or NEWLINE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBypprot_err()\fR\fR
+.ad
+.RS 27n
+.rt  
+The \fBypprot_err()\fR function takes an NIS name service protocol error code
+as input, and returns a \fBypclnt()\fR layer error code, which can be used as
+an input to \fByperr_string()\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+All integer functions return \fB0\fR if the requested operation is successful,
+or one of the following errors if the operation fails:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_ACCESS\fR\fR
+.ad
+.RS 17n
+.rt  
+Access violation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_BADARGS\fR\fR
+.ad
+.RS 17n
+.rt  
+The arguments to the function are bad.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_BADDB\fR\fR
+.ad
+.RS 17n
+.rt  
+The \fBYP\fR database is bad.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_BUSY\fR\fR
+.ad
+.RS 17n
+.rt  
+The database is busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_DOMAIN\fR\fR
+.ad
+.RS 17n
+.rt  
+Cannot bind to server on this domain.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_KEY\fR\fR
+.ad
+.RS 17n
+.rt  
+No such key in map.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_MAP\fR\fR
+.ad
+.RS 17n
+.rt  
+No such map in server's domain.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_NODOM\fR\fR
+.ad
+.RS 17n
+.rt  
+Local domain name not set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_NOMORE\fR\fR
+.ad
+.RS 17n
+.rt  
+No more records in map database.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_PMAP\fR\fR
+.ad
+.RS 17n
+.rt  
+Cannot communicate with \fBrpcbind\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_RESRC\fR\fR
+.ad
+.RS 17n
+.rt  
+Resource allocation failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_RPC\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBRPC\fR failure; domain has been unbound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_YPBIND\fR\fR
+.ad
+.RS 17n
+.rt  
+Cannot communicate with \fBypbind\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_YPERR\fR\fR
+.ad
+.RS 17n
+.rt  
+Internal \fBYP\fR server or client error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_YPSERV\fR\fR
+.ad
+.RS 17n
+.rt  
+Cannot communicate with \fBypserv\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYPERR_VERS\fR\fR
+.ad
+.RS 17n
+.rt  
+\fBYP\fR version mismatch.
+.RE
+
+.SH FILES
+.sp
+.LP
+\fB/usr/lib/libnsl.so.1\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBNIS+\fR(1), \fBypcat\fR(1), \fBypmatch\fR(1), \fBypwhich\fR(1),
+\fBrpc.nisd\fR(1M), \fBrpcbind\fR(1M), \fBypbind\fR(1M), \fBypserv\fR(1M),
+\fBsysinfo\fR(2), \fBmalloc\fR(3C), \fBypfiles\fR(4), \fBattributes\fR(5)

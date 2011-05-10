@@ -1,0 +1,126 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setbuf 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+setbuf, setvbuf \- assign buffering to a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBvoid\fR \fBsetbuf\fR(\fBFILE *\fR\fIstream\fR, \fBchar *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetvbuf\fR(\fBFILE *\fR\fIstream\fR, \fBchar *\fR\fIbuf\fR, \fBint\fR \fItype\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetbuf()\fR function may be used after the stream pointed to by
+\fIstream\fR (see \fBIntro\fR(3)) is opened but before it is read or written.
+It causes the array pointed to by \fIbuf\fR to be used instead of an
+automatically allocated buffer. If \fIbuf\fR is the null pointer, input/output
+will be completely unbuffered.  The constant  \fBBUFSIZ\fR, defined in the
+<\fBstdio.h\fR> header, indicates the size of the array pointed to by
+\fIbuf\fR.
+.sp
+.LP
+The \fBsetvbuf()\fR function may be used after a stream is opened  but before
+it is read or written.  The \fItype\fR argument determines how  \fIstream\fR
+will be buffered. Legal values for  \fItype\fR (defined in <\fBstdio.h\fR>)
+are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_IOFBF\fR\fR
+.ad
+.RS 10n
+.rt  
+Input/output to be fully buffered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_IOLBF\fR\fR
+.ad
+.RS 10n
+.rt  
+Output to be line buffered;  the buffer will be flushed when a \fBNEWLINE\fR is
+written, the buffer is full, or input is requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_IONBF\fR\fR
+.ad
+.RS 10n
+.rt  
+Input/output to be completely unbuffered.
+.RE
+
+.sp
+.LP
+If \fIbuf\fR is not the null pointer, the array it points to will be used for
+buffering, instead of an automatically allocated buffer.  The \fIsize\fR
+argument specifies the size of the buffer to be used. If input/output is
+unbuffered,  \fIbuf\fR and  \fIsize\fR are ignored.
+.sp
+.LP
+For a further discussion of buffering, see \fBstdio\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+If an illegal value for  \fItype\fR is provided, \fBsetvbuf()\fR returns a
+non-zero value.   Otherwise, it returns \fB0\fR.
+.SH USAGE
+.sp
+.LP
+A common source of error is allocating buffer space as an "automatic" variable
+in a code block, and then failing to close the stream in the same block.
+.sp
+.LP
+When using \fBsetbuf()\fR, \fIbuf\fR should always be sized using \fBBUFSIZ\fR.
+If the array pointed to by \fIbuf\fR is larger than \fBBUFSIZ\fR, a portion of
+\fIbuf\fR will not be used.  If \fIbuf\fR is smaller than \fBBUFSIZ\fR, other
+memory may be unexpectedly overwritten.
+.sp
+.LP
+Parts of \fBbuf\fR will be used for internal bookkeeping of the stream and,
+therefore, \fBbuf\fR will contain less than \fIsize\fR bytes when full. It is
+recommended that  \fBstdio\fR(3C) be used to handle buffer allocation when
+using \fBsetvbuf()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfopen\fR(3C), \fBgetc\fR(3C), \fBmalloc\fR(3C), \fBputc\fR(3C),
+\fBstdio\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

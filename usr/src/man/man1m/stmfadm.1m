@@ -1,0 +1,1210 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stmfadm 1M "30 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+stmfadm \- SCSI target mode framework command line interface
+.SH SYNOPSIS
+.LP
+.nf
+\fBstmfadm\fR \fBadd-hg-member\fR \fB-g\fR, \fB--group-name\fR \fIgroup-name\fR \fIgroup-member\fR...
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBadd-tg-member\fR \fB-g\fR, \fB--group-name\fR \fIgroup-name\fR \fIgroup-member\fR...
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBadd-view\fR [\fB-n\fR, \fB--lun\fR \fIlogical-unit-number\fR
+     \fB-t\fR, \fB--target-group\fR \fIgroup-name\fR \fB-h\fR, \fB--host-group\fR \fIgroup-name\fR] \fIlu-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBcreate-hg\fR \fIgroup-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBcreate-lu\fR [\fB-p\fR, \fB--lu-prop\fR \fIlogical-unit-property\fR=\fIval\fR
+     \fB-s\fR, \fB--size\fR \fIsize\fR] \fIlu-file\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBcreate-tg\fR \fIgroup-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBdelete-hg\fR \fIgroup-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBdelete-lu\fR \fIlu-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBdelete-tg\fR \fIgroup-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBimport-lu\fR \fIlu-file\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-hg\fR [\fB-v\fR] [\fIhost-group-name\fR...]
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-tg\fR [\fB-v\fR] [\fItarget-group-name\fR...]
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-lu\fR [\fB-v\fR] [\fIlu-name\fR...]
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-target\fR [\fB-v\fR] [\fItarget-name\fR...]
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-view\fR \fB-l\fR, \fB--lu-name\fR \fIlu-name\fR [\fIentry-name\fR...]
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBlist-state\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBmodify-lu\fR [\fB-p\fR, \fB--lu-prop\fR \fIlogical-unit-property\fR=\fIval\fR
+     \fB-s\fR, \fB--size\fR \fIsize\fR, \fB-f\fR, \fB--file\fR] \fIlu-name\fR|\fIlu-file\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBonline-lu\fR \fIlu-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBoffline-lu\fR \fIlu-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBonline-lu\fR \fItarget-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBoffline-lu\fR \fItarget-name\fR
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBremove-hg-member\fR \fB-g\fR, \fB--group-name\fR \fIgroup-name\fR \fIgroup-member\fR...
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBremove-tg-member\fR \fB-g\fR, \fB--group-name\fR \fIgroup-name\fR \fIgroup-member\fR...
+.fi
+
+.LP
+.nf
+\fBstmfadm\fR \fBremove-view\fR \fB-l\fR, \fB--lu-name\fR \fIlu-name\fR \fIentry-name\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstmfadm\fR command configures logical units within the SCSI Target Mode
+Framework (STMF) framework. The framework and this man page use the following
+terminology:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinitiator\fR\fR
+.ad
+.sp .6
+.RS 4n
+A device responsible for issuing SCSI I/O commands to a SCSI target and logical
+unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtarget\fR\fR
+.ad
+.sp .6
+.RS 4n
+A device responsible for receiving SCSI I/O commands for a logical unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogical unit\fR\fR
+.ad
+.sp .6
+.RS 4n
+A device within a target responsible for executing SCSI I/O commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogical unit number\fR\fR
+.ad
+.sp .6
+.RS 4n
+The identifier of a logical unit within a target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinitiator group\fR\fR
+.ad
+.sp .6
+.RS 4n
+An initiator group is a set of one or more initiators that are combined for the
+purposes of being applied to a \fBview\fR (see below). An initiator cannot be a
+member of more than one initiator group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtarget group\fR\fR
+.ad
+.sp .6
+.RS 4n
+A target group is a set of one or more SCSI target ports that are treated the
+same when creating a \fBview\fR (see below). The set of logical units that a
+particular SCSI initiator can see is determined by the combined set of  views.
+.sp
+Each logical unit has a set of view entries, and each view entry specifies a
+target group, host group, and a LUN. An initiator from that host group, when
+connecting through that target group, is able to identify and connect to that
+logical unit using the specified LUN. You can use views to restrict the set of
+logical units that a specific initiator can see, and assign the set of LUNs
+that will be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBview\fR\fR
+.ad
+.sp .6
+.RS 4n
+A view defines the association of an initiator group, a target group, and a
+logical unit number with a specified logical unit. Any view entry added to a
+logical unit must not be in conflict with existing view entries for that
+logical unit. A view entry is considered to be in conflict when an attempt is
+made to duplicate the association of any given initiator, target and logical
+unit number. As an example, logical unit \fBLU_0\fR has the following view
+entry associated with it:
+.sp
+.in +2
+.nf
+Logical Unit: LU_0
+			View Entry: 0	
+				initiator group: HostA
+				target group: All targets
+				logical unit number: 32
+.fi
+.in -2
+.sp
+
+If you attempted the following:
+.sp
+.in +2
+.nf
+# \fBstmf add-view -n 31 -h HostA LU_0\fR
+.fi
+.in -2
+.sp
+
+\&...the operation would return an error with a message indicating that the
+view entry is in conflict with one or more existing view entries. This conflict
+arises because the existing view entry, \fB0\fR, already has mapped \fBLU_0\fR
+to logical unit number 32 for the initiator group \fBHostA\fR.
+.RE
+
+.SH SUB-COMMANDS
+.sp
+.LP
+The \fBstmfadm\fR command supports the subcommands listed below.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBadd-view\fR [\fB-n\fR, \fB--lun\fR \fIlogical-unit-number\fR \fB-t\fR,
+\fB--target-group\fR \fIgroup-name\fR \fB-h\fR, \fB--host-group\fR
+\fIgroup-name\fR] \fIlu-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Adds a logical unit view entry to a logical unit \fIlu-name\fR, where
+\fIlu-name\fR is the STMF name for the logical unit as displayed by the
+\fBlist-lu\fR subcommand. The \fBadd-view\fR subcommand provides the user with
+a mechanism to implement access control for a logical unit and also provides a
+means of assigning a logical unit number to a logical unit for a given set of
+initiators and targets. A logical unit will not be available to any initiators
+until at least one view is applied. Each view entry gets assigned an entry
+name, which can be used to reference the entry in the \fBremove-view\fR and
+\fBlist-view\fR subcommands.
+.sp
+\fBadd-view\fR supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR, \fB--lun\fR \fIlogical-unit-number\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIlogical-unit-number\fR is an integer in the range 0-16383 to be assigned to
+the logical unit for this view entry. If this option is not specified, a
+logical unit number will be assigned by the STMF framework.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR, \fB--target-group\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIgroup-name\fR is the name of a target group previously created using the
+STMF \fBcreate-tg\fR subcommand. If this option is not specified, the logical
+unit will be available through all targets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR, \fB-host-group\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIgroup-name\fR is the name of an host group previously created using the STMF
+\fBcreate-hg\fR subcommand. If this option is not specified, the logical unit
+will be available to all initiators that log in to the STMF framework.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBadd-hg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Add a host group member to a host group. \fIgroup-name\fR must be an existing
+group created using the \fBcreate-hg\fR subcommand. \fIgroup member\fR can be
+specified as \fIname_type\fR.\fIname_value\fR, where \fIname_type\fR can be one
+of the following:
+.sp
+.in +2
+.nf
+wwn
+iqn
+eui
+.fi
+.in -2
+.sp
+
+\&...and \fIname_value\fR is the value of the initiator name. As an example, to
+add a fibre channel initiator port world-wide name \fB200000e08b909221\fR to
+the host group \fBHostA\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-hg-member -g HostA wwn.200000e08b909221\fR
+.fi
+.in -2
+.sp
+
+To add an ISCSI initiator node member with the name
+\fBiqn.1986-03.com.sun:01.46f7e262\fR to \fBHostA\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262\fR
+.fi
+.in -2
+.sp
+
+Alternatively, members can be specified using their SCSI name string
+identifiers. To add the two initiators above using their SCSI name string
+identifiers, the commands would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-hg-member -g HostA eui.200000e08b909221\fR
+# \fBstmfadm add-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262\fR
+.fi
+.in -2
+.sp
+
+A host group member cannot be a member of more than one host group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBadd-tg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Add a target group member to a target group. \fIgroup-name\fR must be an
+existing group created using the \fBcreate-tg\fR subcommand. \fIgroup member\fR
+can be specified as \fIname_type\fR.\fIname_value\fR, where \fIname_type\fR can
+be one of the following:
+.sp
+.in +2
+.nf
+wwn
+iqn
+eui
+.fi
+.in -2
+.sp
+
+\&...and \fIname_value\fR is the value of the target name. As an example, to
+add a fibre channel target port world-wide name \fB501000e092376af7\fR to the
+target group \fBTG0\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-tg-member -g TG0 wwn.501000e092376af7\fR
+.fi
+.in -2
+.sp
+
+To add an ISCSI target member with the name
+\fBiqn.1986-03.com.sun:target.01.01110\fR to \fBTG0\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110\fR
+.fi
+.in -2
+.sp
+
+Alternatively, members can be specified using their SCSI name string
+identifiers. To add the two targets above using their SCSI name string
+identifiers, the commands would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm add-tg-member -g TG0 eui.501000e092376af7\fR
+# \fBstmfadm add-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110\fR
+.fi
+.in -2
+.sp
+
+A target group member cannot be a member of more than one target group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcreate-hg\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create an initiator group with the name \fIgroup-name\fR. \fIgroup-name\fR is a
+string of Unicode characters with a maximum length of 255. The group name must
+be unique within the STMF system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcreate-lu\fR [\fB-p\fR, \fB--lu-prop\fR
+\fIlogical-unit-property\fR=\fIval\fR \fB--s\fR, \fB--size\fR \fIsize\fR]
+\fIlu-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create a logical unit that can be registered with STMF. For the \fB-p\fR
+option, \fIlogical-unit-property\fR can be one of the following properties:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalias\fR\fR
+.ad
+.sp .6
+.RS 4n
+Up to 255 characters, representing a user-defined name for the device. The
+default is the name of the backing store.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBblk\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the block size for the device. The default is 512.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBguid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Thirty-two hexadecimal ASCII characters representing a valid NAA Registered
+Extended Identifier. The default is set by the STMF to a generated value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmeta\fR\fR
+.ad
+.sp .6
+.RS 4n
+Metadata file name. When specified, will be used to hold the SCSI metadata for
+the logical unit. There is no default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmgmt-url\fR\fR
+.ad
+.sp .6
+.RS 4n
+Up to 1024 characters representing a Management Network Address URL. More than
+one URL can be passed as a single parameter by using space-delimited URLs
+enclosed inside a single pair of quotation marks (\fB"\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoui\fR\fR
+.ad
+.sp .6
+.RS 4n
+Organizational Unique Identifier. Six hexadecimal ASCII characters representing
+the IEEE OUI company ID assignment. This will be used to generate the device
+identifier (GUID). The default is \fB00144F\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sixteen characters of product identification SCSI SPC-3. This value will be
+reflected in the Standard \fBINQUIRY\fR data returned for the device. The
+default is \fBCOMSTAR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBserial\fR\fR
+.ad
+.sp .6
+.RS 4n
+Serial Number. Specifies the SCSI Vital Product Data Serial Number (page
+\fB80h\fR). It is a character value up to 252 bytes in length. There is no
+default value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Eight characters of vendor identification per SCSI SPC-3. This value will be
+reflected in the Standard \fBINQUIRY\fR data returned for the device. The
+default is \fBSUN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwcd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write-back cache disable. Specify \fBtrue\fR or \fBfalse\fRto determine
+write-back cache disable behavior. The default is the write-back cache setting
+of the backing store device specified by the \fIlu-file\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write-protect bit. Specify \fBtrue\fR or \fBfalse\fR to determine whether the
+device reports as write-protected. The default is \fBfalse\fR.
+.RE
+
+For the \fB-s\fR option, \fIsize\fR is an integer followed by one of the
+following letters, to indicate a unit of size:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBk\fR\fR
+.ad
+.RS 5n
+.rt  
+kilobyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fR\fR
+.ad
+.RS 5n
+.rt  
+megabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 5n
+.rt  
+gigabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 5n
+.rt  
+terabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 5n
+.rt  
+petabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 5n
+.rt  
+exabyte
+.RE
+
+\fIlu-file\fR is the file to be used as the backing store for the logical unit.
+If the \fB-s\fR option is not specified, the size of the specified
+\fIlu-file\fR will be used as the size of the logical unit. Logical units
+registered with the STMF require space for the metadata to be stored. When a
+\fBzvol\fR is specified as the backing store device, the default will be to use
+a special property of the \fBzvol\fR to contain the metadata. For all other
+devices, the default behavior will be to use the first 64k of the device. An
+alternative approach would be to use the \fBmeta\fR property in a
+\fBcreate-lu\fR command to specify an alternate file to contain the metadata.
+It is advisable to use a file that can provide sufficient storage of the
+logical unit metadata, preferably 64k.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcreate-tg\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create a target group with the name \fIgroup-name\fR. \fIgroup-name\fR is a
+string of Unicode characters with a maximum length of 255. The group name must
+be unique within the STMF system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete-hg\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete the host group that identified by \fIgroup-name\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete-lu\fR \fIlu-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes an existing logical unit that was created using \fBstmfadm
+create-lu\fR. This effectively unloads the logical unit from the STMF
+framework. Any existing data on the logical unit remains intact.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete-tg\fR \fIgroup-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete the target group that identified by \fIgroup-name\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimport-lu\fR \fIlu-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Imports and loads a logical unit into the STMF that was previously created
+using \fBstmfadm create-lu\fR and was then deleted from the STMF using
+\fBstmfadm delete-lu\fR. On success, the logical unit is again made available
+to the STMF. \fIlu-file\fR is the filename used in the \fBstmfadm create-lu\fR
+command. If this logical unit is using a separate metadata file, the filename
+in the \fBmeta\fR property value that was used in the \fBstmfadm create-lu\fR
+command must be used here.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-hg\fR [\fB-v\fR,\fB--verbose\fR] [\fIhost-group-name\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Lists information for the host group in the system referenced by
+\fIhost-group-name\fR. If \fIhost-group-name\fR is not specified, all host
+groups in the system will be listed. If the \fB--v\fR or \fB--verbose\fR option
+is specified, all members within a host group are displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-lu\fR [\fB-v\fR,\fB--verbose\fR] [\fIlu-name\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Lists information for the logical unit in the system referenced by
+\fIlu-name\fR. If \fIlu-name\fR is not specified, all logical units in the
+system will be listed. If the \fB-v\fR or \fB--verbose\fR option is specified,
+additional information about the logical unit will be displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-target\fR [\fB-v\fR,\fB--verbose\fR] [\fItarget-name\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Lists information for the target port in the system referenced by
+\fItarget-name\fR. If target name is not specified, all target ports in the
+system will be listed. If the \fB-v\fR or \fB--verbose\fR option is specified,
+additional information about the target along with SCSI session information for
+logged-in initiators is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-tg\fR [\fB-v\fR,\fB--verbose\fR] [\fItarget-group-name\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Lists information for the target group in the system referenced by
+\fItarget-group-name\fR. If \fItarget-group-name\fR is not specified, all
+target groups in the system will be listed. If the \fB--v\fR or \fB--verbose\fR
+option is specified, all members within a target group are displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-view\fR \fB--l\fR, \fB--lu-name\fR \fIlu-name\fR
+[\fIentry-name\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Lists the view entry for the logical unit referenced by \fIlu-name\fR. If
+\fIentry-name\fR is not specified, all view entries for the specified logical
+unit will be listed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmodify-lu\fR [\fB-p\fR, \fB--lu-prop\fR
+\fIlogical-unit-property\fR=\fIval\fR \fB--s\fR, \fB--size\fR \fIsize\fR,
+\fB-f\fR, \fB--file\fR] \fIlu-name\fR|\fIlu-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modifies attributes of a logical unit created using the \fBstmfadm create-lu\fR
+command. For the \fB-p\fR option, \fIlogical-unit-property\fR can be one of the
+following properties:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalias\fR\fR
+.ad
+.sp .6
+.RS 4n
+Up to 255 characters, representing a user-defined name for the device. The
+default is the name of the backing store.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmgmt-url\fR\fR
+.ad
+.sp .6
+.RS 4n
+Up to 1024 characters representing a Management Network Address URL. More than
+one URL can be passed as a single parameter by using space-delimited URLs
+enclosed inside a single pair of quotation marks (\fB"\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwcd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write-back cache disable. Specify \fBtrue\fR or \fBfalse\fRto determine
+write-back cache disable behavior. The default is the write-back cache setting
+of the backing store device specified by the \fIlu-file\fR argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write-protect bit. Specify \fBtrue\fR or \fBfalse\fR to determine whether the
+device reports as write-protected. The default is \fBfalse\fR.
+.RE
+
+For the \fB-s\fR option, \fIsize\fR is an integer followed by one of the
+following letters, to indicate a unit of size:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBk\fR\fR
+.ad
+.RS 5n
+.rt  
+kilobyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fR\fR
+.ad
+.RS 5n
+.rt  
+megabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 5n
+.rt  
+gigabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 5n
+.rt  
+terabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 5n
+.rt  
+petabyte
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 5n
+.rt  
+exabyte
+.RE
+
+\fIlu-name\fR is the \fBguid\fR of the logical unit to be modified. If the
+\fB-f\fR option is specified, the operand is interpreted as a file name. This
+provides the ability to modify a logical unit that is not currently imported
+into the STMF.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBonline-lu\fR \fIlu-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Online a logical unit currently registered with the STMF.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBonline-target\fR \fItarget-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Online the specified target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoffline-lu\fR \fIlu-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Offline a logical unit currently registered with the STMF.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoffline-target\fR \fItarget-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Online the specified target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist-state\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the operational and configuration state of the STMF.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBremove-hg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes a host group member from a host group. \fIgroup-name\fR must be an
+existing group created using the \fBcreate-hg\fR subcommand. \fIgroup member\fR
+can be specified as \fIname_type\fR.\fIname_value\fR, where \fIname_type\fR can
+be one of the following:
+.sp
+.in +2
+.nf
+wwn
+iqn
+eui
+.fi
+.in -2
+.sp
+
+\&...and \fIname_value\fR is the value of the initiator name. As an example, to
+remove the fibre channel initiator port world-wide name \fB200000e08b909221\fR
+from the host group \fBHostA\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-hg-member -g HostA wwn.200000e08b909221\fR
+.fi
+.in -2
+.sp
+
+To remove the ISCSI initiator node member with the name
+\fBiqn.1986-03.com.sun:01.46f7e262\fR from \fBHostA\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262\fR
+.fi
+.in -2
+.sp
+
+Alternatively, members can be specified using their SCSI name string
+identifiers. To remove the two initiators above using their SCSI name string
+identifiers, the commands would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-hg-member -g HostA eui.200000e08b909221\fR
+# \fBstmfadm remove-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBremove-tg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes a target group member from a target group. \fIgroup-name\fR must be an
+existing group created using the \fBcreate-tg\fR subcommand. \fIgroup member\fR
+can be specified as \fIname_type\fR.\fIname_value\fR, where \fIname_type\fR can
+be one of the following:
+.sp
+.in +2
+.nf
+wwn
+iqn
+eui
+.fi
+.in -2
+.sp
+
+\&...and \fIname_value\fR is the value of the target name. As an example, to
+remove the fibre channel target port world-wide name \fB501000e092376af7\fR
+from the target group \fBTG0\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-tg-member -g TG0 wwn.501000e092376af7\fR
+.fi
+.in -2
+.sp
+
+To remove the ISCSI target member with the name
+\fBiqn.1986-03.com.sun:target.01.01110\fR from \fBTG0\fR, the command would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110\fR
+.fi
+.in -2
+.sp
+
+Alternatively, members can be specified using their SCSI name string
+identifiers. To remove the two targets above using their SCSI name string
+identifiers, the commands would be:
+.sp
+.in +2
+.nf
+# \fBstmfadm remove-tg-member -g TG0 eui.501000e092376af7\fR
+# \fBstmfadm remove-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBremove-view\fR \fB--l\fR, \fB--lu-name\fR \fIlu-name\fR
+\fIentry-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes one or more logical unit view entries from a logical unit.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a Host group with Two Initiator Ports
+.sp
+.LP
+The following commands use the \fBcreate-hg\fR and \fBadd-hg-member\fR
+subcommands to create a host group and add two initiator ports to that host
+group.
+
+.sp
+.in +2
+.nf
+# \fBstmfadm create-hg host-group-a\fR
+# \fBstmfadm add-hg-member -g host-group-a wwn.210105b0000d92d0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRAdding a View Entry to a Logical Unit
+.sp
+.LP
+The following command uses the \fBadd-view\fR subcommand to allow access from
+\fBhost-group-a\fR to a logical unit.
+
+.sp
+.in +2
+.nf
+# \fBstmfadm add-view -h host-group-a 6000AE40C5000000000046FC4FEA001C\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRListing a View Entry
+.sp
+.LP
+The following command uses the \fBlist-view\fR subcommand to list all view
+entries for the specified logical unit.
+
+.sp
+.in +2
+.nf
+# \fBstmfadm list-view -l 6000AE40C5000000000046FC4FEA001C\fR
+View Entry: 0 
+    			Host group      : host-group-a
+    			Target group   : All 
+    			LUN               : 0 
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsbdadm\fR(1M), \fBattributes\fR(5)

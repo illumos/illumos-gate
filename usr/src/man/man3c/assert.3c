@@ -1,0 +1,75 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH assert 3C "30 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+assert \- verify program assertion
+.SH SYNOPSIS
+.LP
+.nf
+#include <assert.h>
+
+\fBvoid\fR \fBassert\fR(\fBint\fR \fIexpression\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBassert()\fR macro inserts diagnostics into applications. When executed,
+if \fIexpression\fR is \fBFALSE\fR (zero), \fBassert()\fR prints the error
+message
+.sp
+.in +2
+.nf
+Assertion failed: \fIexpression\fR, file \fIxyz\fR, line \fInnn\fR
+.fi
+.in -2
+
+.sp
+.LP
+on the standard error output and aborts. In the error message, \fIxyz\fR is the
+name of the source file and \fInnn\fR the source line number of the
+\fBassert()\fR statement. These are respectively the values of the preprocessor
+macros \fB__FILE__\fR and \fB__LINE__\fR.
+.sp
+.LP
+Since \fBassert()\fR is implemented as a macro, the \fIexpression\fR may not
+contain any string literals.
+.sp
+.LP
+Compiling with the preprocessor option \fB\fR\fB-DNDEBUG\fR or with the
+preprocessor control statement \fB#define NDEBUG\fR ahead of the \fB#include\fR
+<\fBassert.h\fR> statement, will stop assertions from being compiled into the
+program.
+.sp
+.LP
+Messages printed from this function are in the native language specified by the
+\fBLC_MESSAGES\fR locale category. See \fBsetlocale\fR(3C).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBabort\fR(3C), \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

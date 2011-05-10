@@ -1,0 +1,123 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ident_from_dev 9F "26 Mar 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ident_from_dev, ldi_ident_from_stream, ldi_ident_from_dip,
+ldi_ident_release \- ldi cookie management
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_ident_from_dip\fR(\fBdev_info_t *\fR\fIdip\fR, \fBldi_ident_t *\fR\fIlip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldi_ident_from_dev\fR(\fBdev_t\fR \fIdev\fR, \fBldi_ident_t *\fR\fIlip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldi_ident_from_stream\fR(\fBstruct queue *\fR\fIsq\fR, \fBldi_ident_t *\fR\fIlip\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldi_ident_release\fR(\fBldi_ident_t\fR \fIli\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIli\fR\fR
+.ad
+.RS 7n
+.rt  
+ldi identifier
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlip\fR\fR
+.ad
+.RS 7n
+.rt  
+ldi identifier pointer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+pointer to device info node
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 7n
+.rt  
+device number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsq\fR\fR
+.ad
+.RS 7n
+.rt  
+pointer to a stream queue
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ident_from_dev()\fR function allocates and  returns an ldi
+identifier  that  is  associated with the device number specified by \fIdev\fR.
+The new ldi identifier is returned in the ldi identifier pointer parameter
+\fIlip\fR.
+.sp
+.LP
+The \fBldi_ident_from_dip()\fR function allocates and  returns an ldi
+identifier that is associated with the device info node pointed to by dip. The
+new ldi identifier is  returned in the ldi identifier pointer parameter
+\fIlip\fR.
+.sp
+.LP
+The \fBldi_ident_from_stream()\fR function allocates and returns an ldi
+identifier that is associated with the stream pointed to by \fIqueue\fR. The
+new ldi identifier is returned in the ldi identifier pointer parameter
+\fIlip\fR.
+.sp
+.LP
+The \fBldi_ident_release()\fR function releases an identifier that was
+allocated by one of the \fBldi_ident_from_*()\fR functions.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_ident_from_dev()\fR, \fBldi_ident_from_dip()\fR, and
+\fBldi_ident_from_stream()\fR functions return \fB0\fR upon success.
+.sp
+.LP
+All of these functions return \fBEINVAL\fR for invalid input parameters.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user or kernel context.

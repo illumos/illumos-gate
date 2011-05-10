@@ -31,7 +31,7 @@ include Makefile.master
 # it defines TARGETDIRS and ROOTDIRS.
 include Targetdirs
 
-COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd psm
+COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd psm man
 sparc_SUBDIRS= stand
 i386_SUBDIRS= grub
 
@@ -57,7 +57,7 @@ PARALLEL_HEADERS = sysheaders userheaders libheaders cmdheaders
 #
 # Directories that can be built in parallel
 #
-PARALLEL_DIRS = uts lib
+PARALLEL_DIRS = uts lib man
 
 # The check target also causes smf(5) service manifests to be validated.
 CHKMFSTSUBDIRS=	cmd

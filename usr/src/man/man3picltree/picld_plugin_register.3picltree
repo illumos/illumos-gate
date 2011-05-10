@@ -1,0 +1,114 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH picld_plugin_register 3PICLTREE "19 Sep 2001" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+picld_plugin_register \- register plug-in with the daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicltree\fR [ \fIlibrary\fR... ]
+#include <picltree.h>
+
+\fBint\fR \fBpicld_plugin_register\fR(\fBpicld_plugin_reg_t  *\fR\fIregp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpicld_plugin_register()\fR function is the function used by a plug-in
+module to register itself with the PICL daemon upon initialization. The plug-in
+provides its name and the entry points of the initialization and cleanup
+routines in the \fIregp\fR argument.
+.sp
+.in +2
+.nf
+typedef struct {
+    int   version;               /* PICLD_PLUGIN_VERSION */
+    int   critical;              /* is plug-in critical? */
+    char  *name;                 /* name of the plugin module */
+    void  (*plugin_init)(void);  /* init/reinit function */
+    void  (*plugin_fini)(void);  /* fini/cleanup function */
+} picld_plugin_reg_t;
+.fi
+.in -2
+
+.sp
+.LP
+The plug-in module also specifies whether it is a critical module for the
+proper system operation. The critical field in the registration information is
+set to \fBPICLD_PLUGIN_NON_CRITICAL\fR by plug-in modules that are not critical
+to system operation, and is set to \fBPICLD_PLUGIN_CRITICAL\fR by plug-in
+modules that are critical to the system operation. An environment control
+plug-in module is an example for a \fBPICLD_PLUGIN_CRITICAL\fR type of plug-in
+module.
+.sp
+.LP
+The PICL daemon saves the information passed during registration in \fIregp\fR
+in the order in which the plug-ins registered.
+.sp
+.LP
+Upon initialization, the PICL daemon invokes the \fBplugin_init()\fR routine of
+each of the registered plug-in modules in the order in which they registered.
+In their \fBplugin_init()\fR routines, the plug-in modules collect the platform
+configuration data and add it to the PICL tree using PICLTREE interfaces
+(3PICLTREE).
+.sp
+.LP
+On reinitialization, the PICL daemon invokes the \fBplugin_fini()\fR routines
+of the registered plug-in modules in the reverse order of registration. Then,
+the \fBplugin_init()\fR entry points are invoked again in the order in which
+the plug-ins registered.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a negative value
+is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTSUPPORTED\fR\fR
+.ad
+.RS 21n
+.rt  
+Version not supported
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 21n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpicltree\fR(3PICLTREE), \fBattributes\fR(5)

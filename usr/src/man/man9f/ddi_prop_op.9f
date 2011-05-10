@@ -1,0 +1,368 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_prop_op 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_prop_op, ddi_getprop, ddi_getlongprop, ddi_getlongprop_buf, ddi_getproplen
+\- get property information for leaf device drivers
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_prop_op\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBddi_prop_op_t\fR \fIprop_op\fR, 
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR, \fBint *\fR\fIlengthp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_getprop\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR,
+      \fBint\fR \fIdefvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_getlongprop\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR,
+      \fBcaddr_t\fR \fIvaluep\fR, \fBint *\fR\fIlengthp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_getlongprop_buf\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR,
+     \fBcaddr_t\fR \fIvaluep\fR, \fBint *\fR\fIlengthp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_getproplen\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR,
+      \fBint *\fR\fIlengthp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). The \fBddi_getlongprop()\fR,
+\fBddi_getlongprop_buf()\fR, \fBddi_getprop()\fR, and \fBddi_getproplen()\fR
+functions are obsolete. Use \fBddi_prop_lookup\fR(9F) instead of
+\fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR, and
+\fBddi_getproplen()\fR. Use \fBddi_prop_get_int\fR(9F) instead of
+\fBddi_getprop()\fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 12n
+.rt  
+Device number associated with property or \fBDDI_DEV_T_ANY\fR as the
+\fIwildcard\fR device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to a device info node.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprop_op\fR\fR
+.ad
+.RS 12n
+.rt  
+Property operator.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 12n
+.rt  
+Possible flag values are some combination of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_DONTPASS\fR\fR
+.ad
+.RS 21n
+.rt  
+do not pass request to parent device information node if property not found
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_CANSLEEP\fR\fR
+.ad
+.RS 21n
+.rt  
+the routine may sleep while allocating memory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_NOTPROM\fR\fR
+.ad
+.RS 21n
+.rt  
+do not look at PROM properties (ignored on architectures that do not support
+PROM properties)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 12n
+.rt  
+String containing the name of the property.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvaluep\fR\fR
+.ad
+.RS 12n
+.rt  
+If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_BUF\fR, this should be a pointer to the
+users buffer. If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_ALLOC,\fR this should be
+the \fIaddress\fR of a pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlengthp\fR\fR
+.ad
+.RS 12n
+.rt  
+On exit, \fI*lengthp\fR will contain the property length. If \fIprop_op\fR is
+\fBPROP_LEN_AND_VAL_BUF\fR then before calling \fBddi_prop_op()\fR,
+\fIlengthp\fR should point to an \fBint\fR that contains the length of callers
+buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdefvalue\fR\fR
+.ad
+.RS 12n
+.rt  
+The value that \fBddi_getprop()\fR returns if the property is not found.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_prop_op()\fR function gets arbitrary-size properties for leaf
+devices. The routine searches the device's property list. If it does not find
+the property at the device level, it examines the \fIflags\fR argument, and if
+\fBDDI_PROP_DONTPASS\fR is set, then \fBddi_prop_op()\fR returns
+\fBDDI_PROP_NOT_FOUND.\fR Otherwise, it passes the request to the next level of
+the device info tree. If it does find the property, but the property has been
+explicitly undefined, it returns \fBDDI_PROP_UNDEFINED.\fR Otherwise it returns
+either the property length, or both the length and value of the property to the
+caller via the \fIvaluep\fR and \fIlengthp\fR pointers, depending on the value
+of \fIprop_op\fR, as described below, and returns \fBDDI_PROP_SUCCESS.\fR If a
+property cannot be found at all, \fBDDI_PROP_NOT_FOUND\fR is returned.
+.sp
+.LP
+Usually, the \fIdev\fR argument should be set to the actual device number that
+this property applies to.  However, if the \fIdev\fR argument is
+\fBDDI_DEV_T_ANY,\fR the \fIwildcard dev\fR, then \fBddi_prop_op()\fR will
+match the request based on \fIname\fR only (regardless of the actual \fIdev\fR
+the property was created with). This property/dev match is done according to
+the property search order which is to first search software properties created
+by the driver in \fIlast-in, first-out\fR (LIFO) order, next search software
+properties created by the \fIsystem\fR in LIFO order, then search PROM
+properties if they exist in the system architecture.
+.sp
+.LP
+Property operations are specified by the \fIprop_op\fR argument. If
+\fIprop_op\fR is \fBPROP_LEN,\fR then \fBddi_prop_op()\fR just sets the callers
+length, \fI*lengthp,\fR to the property length and returns the value
+\fBDDI_PROP_SUCCESS\fR to the caller. The \fIvaluep\fR argument is not used in
+this case.  Property lengths are \fB0\fR for boolean properties,
+\fBsizeof\|(int)\fR for integer properties, and size in bytes for long
+(variable size) properties.
+.sp
+.LP
+If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_BUF,\fR then \fIvaluep\fR should be a
+pointer to a user-supplied buffer whose length should be given in
+\fI*lengthp\fR by the caller.  If the requested property exists,
+\fBddi_prop_op()\fR first sets \fI*lengthp\fR to the property length.  It then
+examines the size of the buffer supplied by the caller, and if it is large
+enough, copies the property value into that buffer, and returns
+\fBDDI_PROP_SUCCESS.\fR If the named property exists but the buffer supplied is
+too small to hold it, it returns \fBDDI_PROP_BUF_TOO_SMALL.\fR
+.sp
+.LP
+If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_ALLOC,\fR and the property is found,
+\fBddi_prop_op()\fR sets \fI*lengthp\fR to the property length. It then
+attempts to allocate a buffer to return to the caller using the
+\fBkmem_alloc\fR(9F) routine, so that memory can be later recycled using
+\fBkmem_free\fR(9F). The driver is expected to call \fBkmem_free()\fR with the
+returned address and size when it is done using the allocated buffer. If the
+allocation is successful, it sets \fI*valuep\fR to point to the allocated
+buffer, copies the property value into the buffer and returns
+\fBDDI_PROP_SUCCESS.\fR Otherwise, it returns \fBDDI_PROP_NO_MEMORY.\fR Note
+that the \fIflags\fR argument may affect the behavior of memory allocation in
+\fBddi_prop_op()\fR. In particular, if \fBDDI_PROP_CANSLEEP\fR is set, then the
+routine will wait until memory is available to copy the requested property.
+.sp
+.LP
+The \fBddi_getprop()\fR function returns boolean and integer-size properties.
+It is a convenience wrapper for \fBddi_prop_op()\fR with \fIprop_op\fR set to
+\fBPROP_LEN_AND_VAL_BUF\fR, and the buffer is provided by the wrapper. By
+convention, this function returns a \fB1\fR for boolean (zero-length)
+properties.
+.sp
+.LP
+The \fBddi_getlongprop()\fR function returns arbitrary-size properties. It is a
+convenience wrapper for \fBddi_prop_op()\fR with \fIprop_op\fR set to
+\fBPROP_LEN_AND_VAL_ALLOC,\fR so that the routine will allocate space to hold
+the buffer that will be returned to the caller via \fI*valuep\fR.
+.sp
+.LP
+The \fBddi_getlongprop_buf()\fR function returns arbitrary-size properties. It
+is a convenience wrapper for \fBddi_prop_op()\fR with \fIprop_op\fR set to
+\fBPROP_LEN_AND_VAL_BUF\fR so the user must supply a buffer.
+.sp
+.LP
+The \fBddi_getproplen()\fR function returns the length of a given property. It
+is a convenience wrapper for \fBddi_prop_op()\fR with \fIprop_op\fR set to
+\fBPROP_LEN\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_prop_op()\fR, \fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR,
+and \fBddi_getproplen()\fR functions return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_SUCCESS\fR\fR
+.ad
+.RS 26n
+.rt  
+Property found and returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_NOT_FOUND\fR\fR
+.ad
+.RS 26n
+.rt  
+Property not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_UNDEFINED\fR\fR
+.ad
+.RS 26n
+.rt  
+Property already explicitly undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_NO_MEMORY\fR\fR
+.ad
+.RS 26n
+.rt  
+Property found, but unable to allocate memory. \fIlengthp\fR points to the
+correct property length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROP_BUF_TOO_SMALL\fR\fR
+.ad
+.RS 26n
+.rt  
+Property found, but the supplied buffer is too small. \fIlengthp\fR points to
+the correct property length.
+.RE
+
+.sp
+.LP
+The \fBddi_getprop()\fR function returns:
+.sp
+.LP
+The value of the property or the value passed into the routine as
+\fIdefvalue\fR if the property is not found. By convention, the value of zero
+length properties (boolean properties) are returned as the integer value 1.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context, provided
+\fBDDI_PROP_CANSLEEP\fR is not set; if it is set, they cannot be called from
+interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.51i) |cw(2.99i) 
+lw(2.51i) |lw(2.99i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelT{
+\fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR, \fBddi_getprop()\fR, and \fBddi_getproplen()\fR functions are Obsolete
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_prop_create\fR(9F), \fBddi_prop_get_int\fR(9F),
+\fBddi_prop_lookup\fR(9F), \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

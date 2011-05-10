@@ -1,0 +1,267 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1992, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ckint 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+ckint, errint, helpint, valint \- display a prompt; verify and return an
+integer value
+.SH SYNOPSIS
+.LP
+.nf
+\fBckint\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-b\fR \fIbase\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] 
+     [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/errint\fR [\fB-W\fR \fIwidth\fR] [\fB-b\fR \fIbase\fR] [\fB-e\fR \fIerror\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/helpint\fR [\fB-W\fR \fIwidth\fR] [\fB-b\fR \fIbase\fR] [\fB-h\fR \fIhelp\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/valint\fR [\fB-b\fR \fIbase\fR] \fIinput\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBckint\fR utility prompts a user, then validates the response. It
+defines, among other things, a prompt message whose response should be an
+integer, text for help and error messages, and a default value (which will be
+returned if the user responds with a carriage return).
+.sp
+.LP
+All messages are limited in length to 70 characters and are formatted
+automatically. Any white space used in the definition (including newline) is
+stripped. The \fB-W\fR option cancels the automatic formatting. When a tilde is
+placed at the beginning or end of a message definition, the default text will
+be inserted at that point, allowing both custom text and the default text to be
+displayed.
+.sp
+.LP
+If the prompt, help or error message is not defined, the default message (as
+defined under \fBNOTES\fR) will be displayed.
+.sp
+.LP
+Three visual tool modules are linked to the \fBckint\fR command. They are
+\fBerrint\fR (which formats and displays an error message), \fBhelpint\fR
+(which formats and displays a help message), and \fBvalint\fR (which validates
+a response). These modules should be used in conjunction with FML objects. In
+this instance, the FML object defines the prompt. When \fIbase\fR is defined in
+the \fBerrint\fR and \fBhelpint\fR modules, the messages will include the
+expected base of the input.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fI base\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the base for input. Must be  \fB2\fR to  \fB36\fR, default is
+\fB10\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI default\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the default value as \fIdefault\fR. The default is not validated and so
+does not have to meet any criteria.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fI error\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the error message as \fI error\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fI help\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the help messages as \fI help\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fI pid\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
+chooses to abort.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI prompt\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the prompt message as \fIprompt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Q\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that quit will not be allowed as a valid response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI signal\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
+is to be sent signal \fI signal\fR when quit is chosen. If no signal is
+specified, \fBSIGTERM\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR\fI width\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that prompt, help and error messages will be formatted to a line
+length of \fIwidth\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput\fR\fR
+.ad
+.RS 9n
+.rt  
+Input to be verified against \fIbase\fR criterion.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+\fBEOF\fR on input, or negative width on \fB-W\fR option, or usage error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+User termination (quit).
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The default base 10 prompt for \fBckint\fR is:
+.sp
+.in +2
+.nf
+Enter an integer [?,q]:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default base 10 error message is:
+.sp
+.in +2
+.nf
+ERROR - Please enter an integer.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default base 10 help message is:
+.sp
+.in +2
+.nf
+Please enter an integer.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The messages are changed from "integer" to "base \fIbase\fR integer" if the
+base is set to a number other than 10.
+.sp
+.LP
+When the quit option is chosen (and allowed), \fBq\fR is returned along with
+the return code \fB3\fR. The \fBvalint\fR module will not produce any output.
+It returns  \fB0\fR for success and non-zero for failure.

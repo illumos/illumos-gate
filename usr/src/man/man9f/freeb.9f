@@ -1,0 +1,76 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH freeb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+freeb \- free a message block
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBvoid\fR \fBfreeb\fR(\fBmblk_t *\fR\fIbp\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message block to be deallocated. \fBmblk_t\fR is an instance of
+the \fBmsgb\fR(9S) structure.
+.RE
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfreeb()\fR function deallocates a message block. If the reference count
+of the \fBdb_ref\fR member of the \fBdatab\fR(9S) structure is greater than
+\fB1\fR, \fBfreeb()\fR decrements the count. If \fBdb_ref\fR equals \fB1\fR, it
+deallocates the message block and the corresponding data block and buffer.
+.sp
+.LP
+If the data buffer to be freed was allocated with the \fBesballoc\fR(9F), the
+buffer may be a non-STREAMS resource. In that case, the driver must be notified
+that the attached data buffer needs to be freed, and run its own freeing
+routine. To make this process independent of the driver used in the stream,
+\fBfreeb()\fR finds the \fBfree_rtn\fR(9S) structure associated with the
+buffer. The \fBfree_rtn\fR structure contains a pointer to the driver-dependent
+routine, which releases the buffer. Once this is accomplished, \fBfreeb()\fR
+releases the \fBSTREAMS\fR resources associated with the buffer.
+.SH CONTEXT
+.sp
+.LP
+The \fBfreeb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBfreeb()\fR
+.sp
+.LP
+See \fBcopyb\fR(9F) for an example of using \fBfreeb()\fR.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBallocb\fR(9F), \fBcopyb\fR(9F), \fBdupb\fR(9F), \fBesballoc\fR(9F),
+\fBfree_rtn\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

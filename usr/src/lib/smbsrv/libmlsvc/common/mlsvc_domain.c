@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -152,6 +153,30 @@ smb_locate_dc(char *domain, char *dc, smb_domainex_t *dp)
 
 	return (rc);
 }
+
+/*
+ * If domain discovery is running, wait for it to finish.
+ */
+int
+smb_ddiscover_wait(void)
+{
+	timestruc_t to;
+	int rc = 0;
+
+	(void) mutex_lock(&smb_dclocator.sdl_mtx);
+
+	if (smb_dclocator.sdl_locate) {
+		to.tv_sec = SMB_DCLOCATOR_TIMEOUT;
+		to.tv_nsec = 0;
+		rc = cond_reltimedwait(&smb_dclocator.sdl_cv,
+		    &smb_dclocator.sdl_mtx, &to);
+	}
+
+	(void) mutex_unlock(&smb_dclocator.sdl_mtx);
+
+	return (rc);
+}
+
 
 /*
  * ==========================================================

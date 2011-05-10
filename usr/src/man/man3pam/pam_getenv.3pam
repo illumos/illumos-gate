@@ -1,0 +1,63 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_getenv 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_getenv \- returns the value for a PAM environment name
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+
+\fBchar *\fR\fBpam_getenv\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_getenv()\fR function searches the \fBPAM\fR handle \fIpamh\fR for a
+value associated with \fIname\fR. If a value is present, \fBpam_getenv()\fR
+makes a copy of the value and returns a pointer to the copy back to the calling
+application. If no such entry exists, \fBpam_getenv()\fR returns  \fINULL\fR.
+It is the responsibility of the calling application to free the memory returned
+by \fBpam_getenv()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBpam_getenv()\fR returns a copy of the \fIvalue\fR associated
+with \fIname\fR in the \fBPAM\fR handle; otherwise, it returns a  \fINULL\fR
+pointer.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_getenvlist\fR(3PAM), \fBpam_putenv\fR(3PAM),
+\fBlibpam\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

@@ -1,0 +1,483 @@
+'\" te
+.\" Copyright 2009, Sun Microsystems, Inc. All Rights Reserved 
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced
+.\" with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elfsign 1 "7 Jul 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+elfsign \- sign binaries
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/elfsign\fR sign [\fB-a\fR] [\fB-v\fR] \fB-k\fR \fIprivate_key\fR \fB-c\fR \fIcertificate_file\fR
+     \fB-e\fR \fIelf_object\fR [\fB-F\fR \fIformat\fR] [file]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/elfsign\fR sign [\fB-a\fR] [\fB-v\fR] \fB-c\fR \fIcertificate_file\fR
+     \fB-e\fR \fIelf_object\fR \fB-T\fR \fItoken_label\fR [\fB-P\fR \fIpin_file\fR] [\fB-F\fR \fIformat\fR] [file]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/elfsign\fR verify [\fB-c\fR \fIcertificate_file\fR] 
+     [\fB-v\fR] \fB-e\fR \fIelf_object\fR [file]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/elfsign\fR request \fB-r\fR \fIcertificate_request_file\fR 
+     {\fB-k\fR \fIprivate_key\fR | \fB-T\fR \fItoken_label\fR}
+.fi
+
+.LP
+.nf
+\fB/usr/bin/elfsign\fR \fIlist\fR \fB-f\fR \fIfield\fR \fB-c\fR \fIcertificate_file\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/elfsign\fR \fIlist\fR \fB-f\fR \fIfield\fR \fB-e\fR \fIelf_object\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist\fR\fR
+.ad
+.RS 11n
+.rt  
+Lists on standard output information from a single certificate file or signed
+elf object. The selected field appears on a single line. If the field specified
+does not apply to the named file, the command terminates with no standard
+output. This output of this subcommand is intended for use in scripts and by
+other commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrequest\fR\fR
+.ad
+.RS 11n
+.rt  
+Generates a private key and a PKCS#10 certificate request. The PKCS#10
+certificate request for use with the Solaris Cryptographic Framework. If the
+private key is to be created in a token device, elfsign prompts for the PIN
+required to update the token device. The PKCS#10 certificate request should be
+sent to the email address \fIsolaris-crypto-req@sun.com\fR to obtain a
+Certificate.
+.sp
+Users of \fBelfsign\fR must first generate a certificate request and obtain a
+certificate before signing binaries for use with the Solaris Cryptographic
+Framework.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsign\fR\fR
+.ad
+.RS 11n
+.rt  
+Signs the elf object, using the given private key and certificate file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverify\fR\fR
+.ad
+.RS 11n
+.rt  
+Verifies an existing signed object. Uses the certificate given or searches for
+an appropriate certificate in \fB/etc/crypto/certs\fR if \fB-c\fR is not given.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generates a signed \fBELF\fR Sign Activation (\fB\&.esa\fR) file. This option
+is used when a cryptographic provider has nonretail export approval for
+unrestricted use and desires retail approval by restricting which export
+sensitive callers (for example, IPsec) can use the provider. This option
+assumes that the provider binary has previously been signed with a restricted
+certificate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIcertificate_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the path to an X.509 certificate in PEM/PKCS#7 or ASN.1 BER format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIelf_object\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the path to the object to be signed or verified.
+.sp
+The \fB-e\fR option can be specified multiple times for signing or verifying
+multiple objects.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR \fIformat\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBsign\fR subcommand, specifies the format of the signature. The valid
+format options are
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrsa_md5_sha1\fR\fR
+.ad
+.RS 16n
+.rt  
+Default format Solaris 10 and updates, The \fBrsa_md5_sha1\fR format is
+Obsolete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrsa_sha1\fR\fR
+.ad
+.RS 16n
+.rt  
+Default format for this release.
+.RE
+
+Formats other than \fBrsa_md5_sha1\fR include an informational timestamp with
+the signature indicating when the signature was applied. This timestamp is not
+cryptographically secure, nor is it used as part of verification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfield\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBlist\fR subcommand, specifies what field should appear in the
+output.
+.sp
+The valid field specifiers for a certifiicate file are:
+.sp
+.ne 2
+.mk
+.na
+\fBsubject\fR
+.ad
+.RS 11n
+.rt  
+Subject DN (Distinguished Name)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBissuer\fR
+.ad
+.RS 11n
+.rt  
+Issuer DN
+.RE
+
+The valid field specifiers for an elf object are:
+.sp
+.ne 2
+.mk
+.na
+\fBformat\fR
+.ad
+.RS 10n
+.rt  
+Format of the signature
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsigner\fR
+.ad
+.RS 10n
+.rt  
+Subject DN of the certificate used to sign the object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtime\fR
+.ad
+.RS 10n
+.rt  
+Time the signature was applied, in the locale's default format
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIprivate_key\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the location of the private key file when not using a PKCS#11 token.
+This file is an RSA Private key file in a Solaris specific format. When used
+with the \fBrequest\fR subcommand, this is the ouput file for the newly
+generated key.
+.sp
+It is an error to specify both the \fB-k\fR and \fB-T\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIpin_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the file which holds the PIN for accessing the token device. If the
+PIN is not provided in a \fIpin_file\fR, \fBelfsign\fR prompts for the PIN.
+.sp
+It is an error to specify the \fB-P\fR option without the \fB-T\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fIcertificate_request_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the path to the certificate request file, which is in PKCS#10 format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fItoken_label\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the label of the PCKS#11 token device, as provided by \fBpktool\fR,
+which holds the private key.
+.sp
+It is an error to specify both the \fB-T\fR and \fB-k\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requests more detailed information. The additional output includes the signer
+and, if the signature format contains it, the time the object was signed. This
+is not stable parseable output.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+One or more elf objects to be signed or verified. At least one elf object must
+be specified either via the -e option or after all other options.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSigning an ELF Object Using a Key/Certificate in a File
+.sp
+.in +2
+.nf
+example$ elfsign sign -k myprivatekey -c mycert -e lib/libmylib.so.1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRVerifying an \fBelf\fR Object's Signature
+.sp
+.in +2
+.nf
+example$ elfsign verify -c mycert -e lib/libmylib.so.1
+elfsign: verification of lib/libmylib.so.1 passed
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRGenerating a Certificate Request
+.sp
+.in +2
+.nf
+example$ elfsign request -k mykey -r req.pkcs10
+Enter Company Name / Stock Symbol or some other globally 
+unique identifier.
+This will be the prefix of the Certificate DN: SUNW
+
+The government of the United States of America restricts the export of
+"open cryptographic interfaces", also known as "crypto-with-a-hole".
+Due to this restriction, all providers for the Solaris cryptographic
+framework must be signed, regardless of the country of origin.
+
+The terms "retail" and "non-retail" refer to export classifications for
+products manufactured in the USA. These terms define the portion of the
+world where the product may be shipped.) Roughly speaking, "retail" is
+worldwide (minus certain excluded nations) and "non-retail" is domestic
+only (plus some highly favored nations). 
+If your provider is subject to USA export control, then you 
+must obtain an export approval (classification)
+from the government of the USA before exporting your provider.
+It is critical that you specify the obtained (or expected, when 
+used during development) classification to the following questions 
+so that your provider will be appropriately signed.
+
+Do you have retail export approval for use without restrictions 
+based on the caller (for example, IPsec)? [Yes/No] \fBNo\fR
+
+If you have non-retail export approval for unrestricted use of your
+provider by callers, are you also planning to receive retail 
+approval by restricting which export sensitive callers 
+(for example, IPsec) may use your provider? [Yes/No] \fBNo\fR
+
+[...]
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDetermining Information About an Object
+.sp
+.in +2
+.nf
+example$ elfsign list -f format -e lib/libmylib.so.1
+rsa_md5_sha1
+
+example$ elfsign list -f signer -e lib/libmylib.so.1
+CN=VENDOR, OU=Software Development, O=Vendor Inc.
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+
+.sp
+.TS
+tab();
+cw(1i) cw(3i) cw(1.5i) 
+lw(1i) lw(3i) lw(1.5i) 
+.
+VALUEMEANINGSUB-COMMAND
+\fB0\fROperation successfulsign/verify/request
+\fB1\fRInvalid arguments
+\fB2\fRFailed to verify ELF object verify
+3Unable to open ELF objectsign/verify
+4Unable to load or invalid certificatesign/verify
+5T{
+Unable to load private key, private key is invalid, or token label is invalid
+T}sign
+6Failed to add signaturesign
+7T{
+Attempt to verify unsigned object or object not an ELF file
+T}verify
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/crypto/certs\fR\fR
+.ad
+.RS 21n
+.rt  
+Directory searched for the \fBverify\fR subcommand if the \fB-c\fR flag is not
+used
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBelfsign\fR command and subcommands are Committed. While applications
+should not depend on the output format of \fBelfsign\fR, the output format of
+the \fBlist\fR subcommand is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBdate\fR(1), \fBpktool\fR(1), \fBcryptoadm\fR(1M), \fBlibpkcs11\fR(3LIB),
+\fBattributes\fR(5)

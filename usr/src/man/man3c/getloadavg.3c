@@ -1,0 +1,76 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getloadavg 3C "28 Jun 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getloadavg \- get system load averages
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/loadavg.h>
+
+\fBint\fR \fBgetloadavg\fR(\fBdouble\fR \fIloadavg\fR[\|], \fBint\fR \fInelem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetloadavg()\fR function returns the number of processes in the system
+run queue averaged over various periods of time. Up to \fInelem\fR samples are
+retrieved and assigned to successive elements of \fIloadavg\fR[\|]. The system
+imposes a maximum of 3 samples, representing averages over the last 1, 5, and
+15 minutes, respectively. The \fBLOADAVG_1MIN\fR, \fBLOADAVG_5MIN\fR, and
+\fBLOADAVG_15MIN\fR indices, defined in <\fBsys/loadavg.h\fR>, can be used to
+extract the data from the appropriate element of the \fIloadavg\fR\fB[\|]\fR
+array.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the number of samples actually retrieved is
+returned. If the load average was unobtainable, \fB\(mi1\fR is returned and
+\fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetloadavg()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The number of elements specified is less than 0.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If the caller is in a non-global zone and the pools facility is active, the
+behavior of \fBgetloadavg()\fR is equivalent to that of
+\fBpset_getloadavg\fR(3C) called with \fIpsetid\fR set to \fBPS_MYID\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBuptime\fR(1), \fBw\fR(1), \fBpooladm\fR(1M), \fBKstat\fR(3PERL),
+\fBpset_getloadavg\fR(3C), \fBstandards\fR(5)

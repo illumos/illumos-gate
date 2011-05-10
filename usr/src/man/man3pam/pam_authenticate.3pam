@@ -1,0 +1,168 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_authenticate 3PAM "27 Jan 2005" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_authenticate \- perform authentication within the PAM framework
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+\fBint\fR \fBpam_authenticate\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_authenticate()\fR function is called to authenticate the current
+user. The user is usually required to enter a password or similar
+authentication token depending upon the authentication service configured
+within the system. The user in question should have been specified by a prior
+call to \fBpam_start()\fR or \fBpam_set_item()\fR.
+.sp
+.LP
+The following flags may be set in the \fIflags\fR field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication service should not generate any messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
+.ad
+.RS 29n
+.rt  
+The authentication service should return  \fBPAM_AUTH_ERR\fR if the user has a
+null authentication token.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fBPAM_SUCCESS\fR is returned.  In addition to the
+error return values described in \fBpam\fR(3PAM), the following values may be
+returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 25n
+.rt  
+Authentication failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CRED_INSUFFICIENT\fR\fR
+.ad
+.RS 25n
+.rt  
+Cannot access authentication data due to insufficient credentials.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHINFO_UNAVAIL\fR\fR
+.ad
+.RS 25n
+.rt  
+Underlying authentication service cannot retrieve authentication information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 25n
+.rt  
+User not known to the underlying authentication module.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_MAXTRIES\fR\fR
+.ad
+.RS 25n
+.rt  
+An authentication service has maintained a retry count which has been reached.
+No further retries should be attempted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_open_session\fR(3PAM), \fBpam_set_item\fR(3PAM),
+\fBpam_setcred\fR(3PAM), \fBpam_start\fR(3PAM), \fBlibpam\fR(3LIB),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+In the case of authentication failures due to an incorrect username or
+password, it is the responsibility of the application to retry
+\fBpam_authenticate()\fR and to maintain the retry count. An authentication
+service module may implement an internal retry count and return an error
+\fBPAM_MAXTRIES\fR if the module does not want the application to retry.
+.sp
+.LP
+If the  \fBPAM\fR framework cannot load the authentication module, then it will
+return  \fBPAM_ABORT\fR. This indicates a serious failure, and  the application
+should not attempt to retry the authentication.
+.sp
+.LP
+For security reasons, the location of authentication failures is hidden from
+the user.   Thus, if several authentication services are stacked and a single
+service fails, \fBpam_authenticate()\fR requires that the user re-authenticate
+each of the services.
+.sp
+.LP
+A null authentication token in the authentication database will result in
+successful authentication unless \fBPAM_DISALLOW_NULL_AUTHTOK\fR was specified.
+In such cases, there will be no prompt to the user to enter an authentication
+token.
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own  \fBPAM\fR handle.

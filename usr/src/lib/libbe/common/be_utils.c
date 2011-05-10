@@ -24,6 +24,11 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+
+/*
  * System includes
  */
 #include <assert.h>
@@ -45,18 +50,18 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <deflt.h>
 #include <wait.h>
+#include <libdevinfo.h>
 
 #include <libbe.h>
 #include <libbe_priv.h>
 
-#define	INST_ICT "/usr/lib/python2.6/vendor-packages/osol_install/ict.py"
-
 /* Private function prototypes */
 static int update_dataset(char *, int, char *, char *, char *);
 static int _update_vfstab(char *, char *, char *, char *, be_fs_list_data_t *);
-static int be_open_menu(char *, char *, char *, FILE **, char *, boolean_t);
-static int be_create_menu(char *, char *, char *, FILE **, char *);
+static int be_open_menu(char *, char *, FILE **, char *, boolean_t);
+static int be_create_menu(char *, char *, FILE **, char *);
 static char *be_get_auto_name(char *, char *, boolean_t);
 
 /*
@@ -177,6 +182,35 @@ be_zfs_fini(void)
 }
 
 /*
+ * Function:	be_get_defaults
+ * Description:	Open defaults and gets be default paramets
+ * Parameters:
+ *		defaults - be defaults struct
+ * Returns:
+ *		None
+ * Scope:
+ *		Semi-private (library wide use only)
+ */
+void
+be_get_defaults(struct be_defaults *defaults)
+{
+	void	*defp;
+
+	defaults->be_deflt_rpool_container = B_FALSE;
+	defaults->be_deflt_bename_starts_with[0] = '\0';
+
+	if ((defp = defopen_r(BE_DEFAULTS)) != NULL) {
+		const char *res = defread_r(BE_DFLT_BENAME_STARTS, defp);
+		if (res != NULL && res[0] != NULL) {
+			(void) strlcpy(defaults->be_deflt_bename_starts_with,
+			    res, ZFS_MAXNAMELEN);
+			defaults->be_deflt_rpool_container = B_TRUE;
+		}
+		defclose_r(defp);
+	}
+}
+
+/*
  * Function:	be_make_root_ds
  * Description:	Generate string for BE's root dataset given the pool
  *		it lives in and the BE name.
@@ -194,8 +228,15 @@ void
 be_make_root_ds(const char *zpool, const char *be_name, char *be_root_ds,
     int be_root_ds_size)
 {
-	(void) snprintf(be_root_ds, be_root_ds_size, "%s/%s/%s", zpool,
-	    BE_CONTAINER_DS_NAME, be_name);
+	struct be_defaults be_defaults;
+	be_get_defaults(&be_defaults);
+
+	if (be_defaults.be_deflt_rpool_container)
+		(void) snprintf(be_root_ds, be_root_ds_size, "%s/%s", zpool,
+		    be_name);
+	else
+		(void) snprintf(be_root_ds, be_root_ds_size, "%s/%s/%s", zpool,
+		    BE_CONTAINER_DS_NAME, be_name);
 }
 
 /*
@@ -215,8 +256,14 @@ void
 be_make_container_ds(const char *zpool,  char *container_ds,
     int container_ds_size)
 {
-	(void) snprintf(container_ds, container_ds_size, "%s/%s", zpool,
-	    BE_CONTAINER_DS_NAME);
+	struct be_defaults be_defaults;
+	be_get_defaults(&be_defaults);
+
+	if (be_defaults.be_deflt_rpool_container)
+		(void) snprintf(container_ds, container_ds_size, "%s", zpool);
+	else
+		(void) snprintf(container_ds, container_ds_size, "%s/%s", zpool,
+		    BE_CONTAINER_DS_NAME);
 }
 
 /*
@@ -240,31 +287,41 @@ be_make_name_from_ds(const char *dataset, char *rc_loc)
 	char	ds[ZFS_MAXNAMELEN];
 	char	*tok = NULL;
 	char	*name = NULL;
+	struct be_defaults be_defaults;
+	int	rlen = strlen(rc_loc);
+
+	be_get_defaults(&be_defaults);
 
 	/*
 	 * First token is the location of where the root container dataset
 	 * lives; it must match rc_loc.
 	 */
-	if (strncmp(dataset, rc_loc, strlen(rc_loc)) == 0 &&
-	    dataset[strlen(rc_loc)] == '/') {
-		(void) strlcpy(ds, dataset + strlen(rc_loc) + 1, sizeof (ds));
+	if (strncmp(dataset, rc_loc, rlen) == 0 && dataset[rlen] == '/')
+		(void) strlcpy(ds, dataset + rlen + 1, sizeof (ds));
+	else
+		return (NULL);
+
+	if (be_defaults.be_deflt_rpool_container) {
+		if ((name = strdup(ds)) == NULL) {
+			be_print_err(gettext("be_make_name_from_ds: "
+			    "memory allocation failed\n"));
+			return (NULL);
+		}
 	} else {
-		return (NULL);
-	}
+		/* Second token must be BE container dataset name */
+		if ((tok = strtok(ds, "/")) == NULL ||
+		    strcmp(tok, BE_CONTAINER_DS_NAME) != 0)
+			return (NULL);
 
-	/* Second token must be BE container dataset name */
-	if ((tok = strtok(ds, "/")) == NULL ||
-	    strcmp(tok, BE_CONTAINER_DS_NAME) != 0)
-		return (NULL);
+		/* Return the remaining token if one exists */
+		if ((tok = strtok(NULL, "")) == NULL)
+			return (NULL);
 
-	/* Return the remaining token if one exists */
-	if ((tok = strtok(NULL, "")) == NULL)
-		return (NULL);
-
-	if ((name = strdup(tok)) == NULL) {
-		be_print_err(gettext("be_make_name_from_ds: "
-		    "memory allocation failed\n"));
-		return (NULL);
+		if ((name = strdup(tok)) == NULL) {
+			be_print_err(gettext("be_make_name_from_ds: "
+			    "memory allocation failed\n"));
+			return (NULL);
+		}
 	}
 
 	return (name);
@@ -389,7 +446,7 @@ be_append_menu(char *be_name, char *be_root_pool, char *boot_pool,
 	 * track of that BE's menu entry. We will then use the lines from
 	 * that entry to create the entry for the new BE.
 	 */
-	if ((ret = be_open_menu(be_root_pool, pool_mntpnt, menu_file,
+	if ((ret = be_open_menu(be_root_pool, menu_file,
 	    &menu_fp, "r", B_TRUE)) != BE_SUCCESS) {
 		goto cleanup;
 	} else if (menu_fp == NULL) {
@@ -678,7 +735,7 @@ be_remove_menu(char *be_name, char *be_root_pool, char *boot_pool)
 		(void) strlcat(menu, BE_SPARC_MENU, sizeof (menu));
 
 	/* Get handle to boot menu file */
-	if ((ret = be_open_menu(be_root_pool, pool_mntpnt, menu, &menu_fp, "r",
+	if ((ret = be_open_menu(be_root_pool, menu, &menu_fp, "r",
 	    B_TRUE)) != BE_SUCCESS) {
 		goto cleanup;
 	} else if (menu_fp == NULL) {
@@ -1118,7 +1175,7 @@ be_default_grub_bootfs(const char *be_root_pool, char **def_bootfs)
 	(void) snprintf(grub_file, MAXPATHLEN, "%s%s",
 	    pool_mntpnt, BE_GRUB_MENU);
 
-	if ((ret = be_open_menu((char *)be_root_pool, pool_mntpnt, grub_file,
+	if ((ret = be_open_menu((char *)be_root_pool, grub_file,
 	    &menu_fp, "r", B_FALSE)) != BE_SUCCESS) {
 		goto cleanup;
 	} else if (menu_fp == NULL) {
@@ -1279,7 +1336,7 @@ be_change_grub_default(char *be_name, char *be_root_pool)
 	(void) snprintf(grub_file, MAXPATHLEN, "%s%s",
 	    pool_mntpnt, BE_GRUB_MENU);
 
-	if ((ret = be_open_menu(be_root_pool, pool_mntpnt, grub_file,
+	if ((ret = be_open_menu(be_root_pool, grub_file,
 	    &grub_fp, "r+", B_TRUE)) != BE_SUCCESS) {
 		goto cleanup;
 	} else if (grub_fp == NULL) {
@@ -1517,7 +1574,7 @@ be_update_menu(char *be_orig_name, char *be_new_name, char *be_root_pool,
 	be_make_root_ds(be_root_pool, be_new_name, be_new_root_ds,
 	    sizeof (be_new_root_ds));
 
-	if ((ret = be_open_menu(be_root_pool, pool_mntpnt, menu_file,
+	if ((ret = be_open_menu(be_root_pool, menu_file,
 	    &menu_fp, "r", B_TRUE)) != BE_SUCCESS) {
 		goto cleanup;
 	} else if (menu_fp == NULL) {
@@ -1783,7 +1840,7 @@ be_has_menu_entry(char *be_dataset, char *be_root_pool, int *entry)
 		    rpool_mntpnt, BE_SPARC_MENU);
 	}
 
-	if (be_open_menu(be_root_pool, rpool_mntpnt, menu_file, &menu_fp, "r",
+	if (be_open_menu(be_root_pool, menu_file, &menu_fp, "r",
 	    B_FALSE) != 0) {
 		ret = B_FALSE;
 		goto cleanup;
@@ -2094,9 +2151,12 @@ boolean_t
 be_valid_be_name(const char *be_name)
 {
 	const char	*c = NULL;
+	struct be_defaults be_defaults;
 
 	if (be_name == NULL)
 		return (B_FALSE);
+
+	be_get_defaults(&be_defaults);
 
 	/*
 	 * A BE name must not be a multi-level dataset name.  We also check
@@ -2119,6 +2179,11 @@ be_valid_be_name(const char *be_name)
 	if (!zfs_name_valid(be_name, ZFS_TYPE_FILESYSTEM) ||
 	    strlen(be_name) > BE_NAME_MAX_LEN)
 		return (B_FALSE);
+
+	if (be_defaults.be_deflt_bename_starts_with[0] != '\0' &&
+	    strstr(be_name, be_defaults.be_deflt_bename_starts_with) == NULL) {
+		return (B_FALSE);
+	}
 
 	return (B_TRUE);
 }
@@ -2465,6 +2530,7 @@ be_zfs_find_current_be_callback(zfs_handle_t *zhp, void *data)
 				ZFS_CLOSE(zhp);
 				return (0);
 			}
+
 			if ((bt->obe_name = strdup(basename(bt->obe_root_ds)))
 			    == NULL) {
 				be_print_err(gettext(
@@ -2775,8 +2841,6 @@ be_err_to_str(int err)
 		return (gettext("Invalid path for menu.lst file"));
 	case BE_ERR_ZONE_SS_EXISTS:
 		return (gettext("Zone snapshot exists."));
-	case BE_ERR_ADD_SPLASH_ICT:
-		return (gettext("Add_spash_image ICT failed."));
 	case BE_ERR_BOOTFILE_INST:
 		return (gettext("Error installing boot files."));
 	case BE_ERR_EXTCMD:
@@ -3451,6 +3515,52 @@ be_get_auto_name(char *obe_name, char *be_container_ds, boolean_t zone_be)
 }
 
 /*
+ * Function:	be_get_console_prop
+ * Description:	Determine console device.
+ * Returns:
+ *		Success - pointer to console setting.
+ *		Failure - NULL
+ * Scope:
+ *		Private
+ */
+static char *
+be_get_console_prop(void)
+{
+	di_node_t	dn;
+	char *console = NULL;
+
+	if ((dn = di_init("/", DINFOPROP)) == DI_NODE_NIL) {
+		be_print_err(gettext("be_get_console_prop: "
+		    "di_init() failed\n"));
+		return (NULL);
+	}
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, dn,
+	    "console", &console) != -1) {
+		di_fini(dn);
+		return (console);
+	}
+
+	if (console == NULL) {
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY, dn,
+		    "output-device", &console) != -1) {
+			di_fini(dn);
+			if (strncmp(console, "screen", strlen("screen")) == 0)
+				console = BE_DEFAULT_CONSOLE;
+		}
+	}
+
+	/*
+	 * Default console to text
+	 */
+	if (console == NULL) {
+		console = BE_DEFAULT_CONSOLE;
+	}
+
+	return (console);
+}
+
+/*
  * Function:	be_create_menu
  * Description:
  *		This function is used if no menu.lst file exists. In
@@ -3458,7 +3568,6 @@ be_get_auto_name(char *obe_name, char *be_container_ds, boolean_t zone_be)
  *		lines are added to the file.
  * Parameters:
  *		pool - The name of the pool the menu.lst file is on
- *		pool_mntpt - The mountpoint for the pool we're using.
  *		menu_file - The name of the file we're creating.
  *		menu_fp - A pointer to the file pointer of the file we
  *			  created. This is also used to pass back the file
@@ -3474,17 +3583,15 @@ be_get_auto_name(char *obe_name, char *be_container_ds, boolean_t zone_be)
 static int
 be_create_menu(
 	char *pool,
-	char *pool_mntpt,
 	char *menu_file,
 	FILE **menu_fp,
 	char *mode)
 {
 	be_node_list_t	*be_nodes = NULL;
-	char add_default_cmd[BUFSIZ];
 	char *menu_path = NULL;
 	char *be_rpool = NULL;
 	char *be_name = NULL;
-
+	char *console = NULL;
 	errno = 0;
 
 	if (menu_file == NULL || menu_fp == NULL || mode == NULL)
@@ -3513,23 +3620,43 @@ be_create_menu(
 	 * Check to see if this system supports grub
 	 */
 	if (be_has_grub()) {
-		char be_run_cmd_errbuf[BUFSIZ];
 		/*
 		 * The grub menu is missing so we need to create it
 		 * and fill in the first few lines.
 		 */
-		(void) snprintf(add_default_cmd, sizeof (add_default_cmd),
-		    "%s add_splash_image_to_grub_menu %s",
-		    INST_ICT, pool_mntpt);
-		if (be_run_cmd(add_default_cmd, be_run_cmd_errbuf, BUFSIZ,
-		    NULL, 0) != BE_SUCCESS) {
-			be_print_err(gettext("be_create_menu: "
-			    "add_splash_image_to_grub_menu ICT failed.\n"));
-			be_print_err(gettext("  Command: \"%s\"\n"),
-			    add_default_cmd);
-			be_print_err(be_run_cmd_errbuf);
-			return (BE_ERR_ADD_SPLASH_ICT);
+		FILE *temp_fp = fopen(menu_file, "a+");
+		if (temp_fp == NULL) {
+			*menu_fp = NULL;
+			return (errno_to_be_err(errno));
 		}
+
+		if ((console = be_get_console_prop()) != NULL) {
+
+			/*
+			 * If console is redirected to serial line,
+			 * GRUB splash screen will not be enabled.
+			 */
+			if (strncmp(console, "text", strlen("text")) == 0 ||
+			    strncmp(console, "graphics",
+			    strlen("graphics")) == 0) {
+
+				(void) fprintf(temp_fp, "%s\n", BE_GRUB_SPLASH);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_FOREGROUND);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_BACKGROUND);
+				(void) fprintf(temp_fp, "%s\n",
+				    BE_GRUB_DEFAULT);
+			} else {
+				be_print_err(gettext("be_create_menu: "
+				    "console on serial line, "
+				    "GRUB splash image will be disabled\n"));
+			}
+		}
+
+		(void) fprintf(temp_fp,	"timeout 30\n");
+		(void) fclose(temp_fp);
+
 	} else {
 		/*
 		 * The menu file doesn't exist so we need to create a
@@ -3586,9 +3713,6 @@ be_create_menu(
  *              exist it is simply opened using the mode passed in.
  * Parameters:
  *		pool - The name of the pool the menu.lst file is on
- *		pool_mntpt - The mountpoint for the pool we're using.
- *			     The mountpoint is used since the mountpoint
- *			     name can differ from the pool name.
  *		menu_file - The name of the file we're opening.
  *		menu_fp - A pointer to the file pointer of the file we're
  *			  opening. This is also used to pass back the file
@@ -3608,7 +3732,6 @@ be_create_menu(
 static int
 be_open_menu(
 	char *pool,
-	char *pool_mntpt,
 	char *menu_file,
 	FILE **menu_fp,
 	char *mode,
@@ -3633,7 +3756,7 @@ be_open_menu(
 			if (set_print)
 				do_print = B_FALSE;
 			err = 0;
-			if ((err = be_create_menu(pool, pool_mntpt, menu_file,
+			if ((err = be_create_menu(pool, menu_file,
 			    menu_fp, mode)) == ENOENT)
 				return (BE_ERR_NO_MENU);
 			else if (err != BE_SUCCESS)

@@ -1,0 +1,130 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH untimeout 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+untimeout \- cancel previous timeout function call
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+
+
+
+\fBclock_t\fR \fBuntimeout\fR(\fBtimeout_id_t\fR \fIid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIid\fR\fR
+.ad
+.RS 6n
+.rt  
+Opaque timeout \fBID\fR from a previous \fBtimeout\fR(9F) call.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuntimeout()\fR function cancels a pending \fBtimeout\fR(9F) request.
+\fBuntimeout()\fR will not return until the pending callback is cancelled or
+has run. Because of this, locks acquired by the callback routine should not be
+held across the call to \fBuntimeout()\fR or a deadlock may result.
+.sp
+.LP
+Since no mutex should be held across the call to \fBuntimeout()\fR, there is a
+race condition between the occurrence of an expected event and the execution of
+the timeout handler. In particular, it should be noted that no problems will
+result from calling \fBuntimeout()\fR for a timeout which is either running on
+another CPU, or has already completed. Drivers should be structured with the
+understanding that the arrival of both an interrupt and a timeout for that
+interrupt can occasionally occur, in either order.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBuntimeout()\fR function returns \fB-1\fR if the \fIid\fR is not found.
+Otherwise, it returns an integer value greater than or equal to \fB0\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBuntimeout()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+In the following example, the device driver has issued an IO request and is
+waiting for the device to respond. If the device does not respond within 5
+seconds, the device driver will print out an error message to the console.
+.sp
+.in +2
+.nf
+static void
+xxtimeout_handler(void *arg)
+{
+        struct xxstate *xsp = (struct xxstate *)arg;
+        mutex_enter(&xsp->lock);
+        cv_signal(&xsp->cv);
+        xsp->flags |= TIMED_OUT;
+        mutex_exit(&xsp->lock);
+        xsp->timeout_id = 0;
+}
+static uint_t
+xxintr(caddr_t arg)
+{
+        struct xxstate *xsp = (struct xxstate *)arg;
+         .
+         .
+         .
+        mutex_enter(&xsp->lock);
+        /* Service interrupt */
+        cv_signal(&xsp->cv);
+        mutex_exit(&xsp->lock);
+        if (xsp->timeout_id != 0) {
+                (void) untimeout(xsp->timeout_id);
+                xsp->timeout_id = 0;
+        } 
+        return(DDI_INTR_CLAIMED);
+}
+static void
+xxcheckcond(struct xxstate *xsp)
+{
+         .
+         .
+         .
+        xsp->timeout_id = timeout(xxtimeout_handler,
+            xsp, (5 * drv_usectohz(1000000)));
+        mutex_enter(&xsp->lock);
+        while (/* Waiting for interrupt  or timeout*/)
+                cv_wait(&xsp->cv, &xsp->lock);
+        if (xsp->flags & TIMED_OUT)
+                cmn_err(CE_WARN, "Device not responding");
+         .
+         .
+         .
+        mutex_exit(&xsp->lock);
+         .
+         .
+         .
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopen\fR(9E), \fBcv_signal\fR(9F), \fBcv_wait_sig\fR(9F), \fBdelay\fR(9F),
+\fBtimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

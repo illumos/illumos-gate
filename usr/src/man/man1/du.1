@@ -1,0 +1,314 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH du 1 "6 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+du \- summarize disk usage
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/du\fR [\fB-dorx\fR] [\fB-a\fR | \fB-s\fR] [\fB-h\fR | \fB-k\fR | \fB-m\fR] [\fB-H\fR | \fB-L\fR] 
+     [\fIfile\fR ...]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/du\fR [\fB-dorx\fR] [\fB-a\fR | \fB-s\fR] [\fB-h\fR | \fB-k\fR | \fB-m\fR] [\fB-H\fR | \fB-L\fR] 
+     [\fIfile\fR ...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdu\fR utility writes to standard output the size of the file space
+allocated to, and the size of the file space allocated to each subdirectory of,
+the file hierarchy rooted in each of the specified files. The size of the file
+space allocated to a file of type directory is defined as the sum total of
+space allocated to all files in the file hierarchy rooted in the directory plus
+the space allocated to the directory itself. This sum will include the space
+allocated to any extended attributes encountered.
+.sp
+.LP
+Files with multiple links will be counted and written for only one entry. The
+directory entry that is selected in the report is unspecified. By default, file
+sizes are written in 512-byte units, rounded up to the next 512-byte unit.
+.SS "/usr/xpg4/bin/du"
+.sp
+.LP
+When \fBdu\fR cannot obtain file attributes or read directories (see
+\fBstat\fR(2)), it will report an error condition and the final exit status
+will be affected.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported for \fB/usr/bin/du\fR and
+\fB/usr/xpg4/bin/du\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+In addition to the default output, report the size of each file not of type
+directory in the file hierarchy rooted in the specified file. Regardless of the
+presence of the \fB-a\fR option, non-directories given as \fIfile\fR operands
+will always be listed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not cross filesystem boundaries. For example, the command, \fBdu -d /\fR
+reports usage only on the root partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+All sizes are scaled to a human readable format, for example, \fB14K\fR,
+\fB234M\fR, \fB2.7G\fR, or \fB3.0T\fR. Scaling is done by repetitively dividing
+by \fB1024\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 6n
+.rt  
+If a symbolic link to a directory is specified on the command line, process the
+symbolic link by using the directory which the symbolic link references, rather
+than the link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+Write the files sizes in units of 1024 bytes, rather than the default 512-byte
+units.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 6n
+.rt  
+Process symbolic links by using the file or directory which the symbolic link
+references, rather than the link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Write the files sizes in units of megabytes, rather than the default 512-byte
+units.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not add child directories' usage to a parent's total. Without this option,
+the usage listed for a particular directory is the space taken by the files in
+that directory, as well as the files in all directories beneath it. This option
+does nothing if \fB-s\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Generate diagnostic messages about unreadable directories and files whose
+status cannot be obtained. /usr/bin/du is silent if these conditions arise and
+\fB-r\fR is not specified. \fB/usr/xpg4/bin/du\fR acts as though \fB-r\fR is
+always specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Instead of the default output, report only the total sum for each of the
+specified files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+When evaluating file sizes, evaluate only those files that have the same device
+as the file specified by the file operand.
+.RE
+
+.sp
+.LP
+Specifying more than one of the options in the mutually exclusive pair,
+\fB-H\fR and \fB-L\fR, is not considered an error. The last option specified
+determines the output format.
+.sp
+.LP
+Specifying more than one of the options in the mutually exclusive set of
+options \fB-h\fR, \fB-k\fR, and \fB-m\fR is not considered an error.  The last
+option specified determines the output format.
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+The path name of a file whose size is to be written. If no \fIfile\fR is
+specified, the current directory is used.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+The output from \fBdu\fR consists of the amount of the space allocated to a
+file and the name of the file.
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBdu\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBdu\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fI\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/du"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStable
+.TE
+
+.SS "/usr/xpg4/bin/du"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBls\fR(1), \fBstat\fR(2), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH NOTES
+.sp
+.LP
+A file with two or more links is counted only once. If, however, there are
+links between files in different directories where the directories are on
+separate branches of the file system hierarchy, \fBdu\fR will count the excess
+files more than once.
+.sp
+.LP
+Files containing holes will result in an incorrect block count.

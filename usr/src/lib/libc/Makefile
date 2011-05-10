@@ -142,16 +142,12 @@ lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 		exit 1; \
 	fi
 
-$(MACHLIBS):	$(MACH_COMP) $(MACH)/assym.h
-
 lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
 	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
 		$(ECHO) "Error: Invalid reference to environ" ; \
 		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
 		exit 1; \
 	fi
-
-$(MACHLIBS64):	$(MACH_COMP) $(MACH64)/assym.h
 
 $(MACH)/assym.h $(MACH64)/assym.h:
 	@cd $(@D); $(MAKE) assym.h
@@ -181,7 +177,9 @@ inslib64:	$(ROOTFS_LIBS64) $(ROOTFS_LINKS64) \
 		$(ROOTFS_LINTLIB64) \
 		$(ROOTVARIANTLIBS64)
 
-install_h: $(ROOTHDRS)
+install_h: all_h $(ROOTHDRS)
+
+all_h:	$(MACH)/assym.h $(MACH64)/assym.h
 
 check:	$(CHECKHDRS)
 

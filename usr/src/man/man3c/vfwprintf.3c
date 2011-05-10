@@ -1,0 +1,91 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vfwprintf 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+vfwprintf, vswprintf, vwprintf \- wide-character formatted output of a stdarg
+argument list
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdarg.h>
+#include <stdio.h>
+#include <wchar.h>
+
+\fBint\fR \fBvfwprintf\fR(\fBFILE *restrict\fR \fIstream\fR, \fBconst wchar_t *restrict\fR \fIformat\fR,
+     \fBva_list\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvswprintf\fR(\fBwchar_t *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR,
+     \fBconst wchar_t *restrict\fR \fIformat\fR, \fBva_list\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvwprintf\fR(\fBconst wchar_t *restrict\fR \fIformat\fR, \fBva_list\fR \fIarg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvwprintf()\fR, \fBvfwprintf()\fR, and \fBvswprintf()\fR functions are
+the same as \fBwprintf()\fR, \fBfwprintf()\fR, and \fBswprintf()\fR
+respectively, except that instead of being called with a variable number of
+arguments, they are called with an argument list as defined by
+<\fBstdarg.h\fR>.
+.sp
+.LP
+These functions do not invoke the  \fBva_end()\fR macro.  However, as these
+functions do invoke the \fBva_arg()\fR macro, the value of \fIap\fR after the
+return is indeterminate.
+.SH RETURN VALUES
+.sp
+.LP
+Refer to  \fBfwprintf\fR(3C).
+.SH ERRORS
+.sp
+.LP
+Refer to  \fBfwprintf\fR(3C).
+.SH USAGE
+.sp
+.LP
+Applications using these functions should call \fBva_end(\fR\fIap\fR\fB)\fR
+afterwards to clean up.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfwprintf\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBvwprintf()\fR, \fBvfwprintf()\fR, and \fBvswprintf()\fR functions can be
+used safely in multithreaded applications, as long as \fBsetlocale\fR(3C) is
+not being called to change the locale.

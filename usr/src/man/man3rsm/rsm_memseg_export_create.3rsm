@@ -1,0 +1,309 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_memseg_export_create 3RSM "8 Apr 2003" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_memseg_export_create, rsm_memseg_export_destroy, rsm_memseg_export_rebind
+\- resource allocation and management functions for export memory segments
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_memseg_export_create\fR(
+     \fBrsmapi_controller_handle_t\fR \fIcontroller\fR,
+     \fBrsm_memseg_export_handle_t *\fR\fImemseg\fR, \fBvoid *\fR\fIvaddr\fR,
+     \fBsize_t\fR \fIlength\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_export_destroy\fR(
+     \fBrsm_memseg_export_handle_t\fR \fImemseg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_export_rebind\fR(
+     \fBrsm_memseg_export_handle_t\fR \fImemseg\fR,
+     \fBvoid *\fR\fIvaddr\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlength\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBrsm_memseg_export_create()\fR, \fBrsm_memseg_export_destroy()\fR, and
+\fBrsm_memseg_export_rebind()\fR functions provide for allocation and
+management of resources supporting export  memory segments. Exporting a memory
+segment involves the application allocating memory in its virtual address space
+through the System V shared memory interface or normal operating system memory
+allocation functions. This is followed by the calls to create the export
+segment and bind physical pages to back to allocated virtual address space.
+.sp
+.LP
+The \fBrsm_memseg_export_create()\fR creates a new memory segment. Physical
+memory pages are allocated and are associated with the segment. The segment
+lifetime is the same as the lifetime of the creating process or until a destroy
+operation is performed. The \fIcontroller\fR argument is the controller handle
+obtained from a prior call to  \fBrsm_get_controller\fR(3RSM). The export
+memory segment handle is obtained through the \fImemseg\fR argument for use in
+subsequent operations. The \fIvaddr\fR argument specifies the process virtual
+address for the segment. It must be aligned according to the controller page
+size attribute. The \fIlength\fR argument specifies the size of the segment in
+bytes and must be in multiples of the controller page size.  The \fIflags\fR
+argument is a bitmask of flags. Possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSM_ALLOW_REBIND\fR\fR
+.ad
+.RS 27n
+.rt  
+Unbind and rebind is allowed on the segment during its lifetime.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSM_CREATE_SEG_DONTWAIT\fR\fR
+.ad
+.RS 27n
+.rt  
+The RSMAPI segment create operations \fBrsm_memseg_export_create()\fR and
+\fBrsm_memseg_export_publish\fR(3RSM) should not block for resources and return
+\fBRSMERR_INSUFFICIENT_RESOURCES\fR to indicate resource shortage.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSM_LOCK_OPS\fR\fR
+.ad
+.RS 27n
+.rt  
+This segment can be used for lock operations.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_destroy()\fR function deallocates the physical memory
+pages associated with the segment and disconnects all importers of the segment.
+The \fImemseg\fR argument is the export memory segment handle obtained by a
+call to \fBrsm_memseg_export_create()\fR.
+.sp
+.LP
+The \fBrsm_memseg_export_rebind()\fR function releases the current backing
+pages associated with the segment and allocates new physical memory pages. This
+operation is transparent to the importers of the segment.  It is the
+responsibility of the application to prevent data access to the export segment
+until the rebind operation has completed. Segment data access during rebind
+does not cause a system failure but data content results are undefined. The
+\fImemseg\fR argument is the export segment handle pointer obtained from
+\fBrsm_memseg_export_create()\fR. The \fIvaddr\fR argument must be aligned with
+respect to the page size attribute of the controller. The \fIlength\fR argument
+modulo controller page size must be 0. The \fIoff\fR argument is currently
+unused.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0.  Otherwise, an error
+value is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_memseg_export_create()\fR, \fBrsm_memseg_export_destroy()\fR, and
+\fBrsm_memseg_export_rebind()\fR functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
+.ad
+.RS 24n
+.rt  
+Invalid segment handle.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_create()\fR and \fBrsm_memseg_export_rebind()\fR
+functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid controller handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_CTLR_NOT_PRESENT\fR \fR
+.ad
+.sp .6
+.RS 4n
+Controller not present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LENGTH\fR \fR
+.ad
+.sp .6
+.RS 4n
+Length zero or length exceeds controller limits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_PERM_DENIED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_NOT_CREATOR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Not creator of segment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_REBIND_NOT_ALLOWED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Rebind not allowed.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_create()\fR function can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_MEM_ALIGNMENT\fR\fR
+.ad
+.RS 28n
+.rt  
+The address is not aligned on a page boundary.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_rebind()\fR function can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INTERRUPTED\fR\fR
+.ad
+.RS 22n
+.rt  
+The operation was interrupted by a signal.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_destroy()\fR function can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_POLLFD_IN_USE\fR \fR
+.ad
+.RS 25n
+.rt  
+Poll file descriptor in use.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Exporting a memory segment involves the application allocating memory in its
+virtual address space through the System V Shared Memory interface or other
+normal operating system memory allocation methods such as \fBvalloc()\fR ( see
+\fBmalloc\fR(3C)) or \fBmmap\fR(2). Memory for a file mapped with \fBmmap()\fR
+must be mapped \fBMAP_PRIVATE\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityUnstable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_get_controller\fR(3RSM), \fBrsm_memseg_export_publish\fR(3RSM),
+\fBattributes\fR(5)

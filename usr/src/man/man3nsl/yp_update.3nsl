@@ -1,0 +1,72 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1988 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH yp_update 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+yp_update \- change NIS information
+.SH SYNOPSIS
+.LP
+.nf
+#include <rpcsvc/ypclnt.h>
+
+
+
+\fBint\fR \fByp_update\fR(\fBchar *\fR\fIdomain\fR, \fBchar *\fR\fImap\fR, \fBunsigned\fR \fIypop\fR, \fBchar *\fR\fIkey\fR,
+     \fBchar *\fR\fBint\fR \fIkeylen\fR, \fBchar *\fR\fIdata\fR, \fBint\fR \fIdatalen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fByp_update()\fR is used to make changes to the NIS database. The syntax is
+the same as that of \fByp_match()\fR except for the extra parameter \fIypop\fR
+which may take on one of four values. If it is \fBPOP_CHANGE\fR then the data
+associated with the key will be changed to the new value. If the key is not
+found in the database, then \fByp_update()\fR will return \fBYPERR_KEY\fR. If
+\fIypop\fR has the value \fBYPOP_INSERT\fR then the key-value pair will be
+inserted into the database. The error \fBYPERR_KEY\fR is returned if the key
+already exists in the database. To store an item into the database without
+concern for whether it exists already or not, pass \fIypop\fR as
+\fBYPOP_STORE\fR and no error will be returned if the key already or does not
+exist. To delete an entry, the value of \fIypop\fR should be \fBYPOP_DELETE\fR.
+.sp
+.LP
+This routine depends upon secure \fBRPC,\fR and will not work unless the
+network is running secure \fBRPC.\fR
+.SH RETURN VALUES
+.sp
+.LP
+If the value of  \fIypop\fR is  \fBPOP_CHANGE,\fR \fByp_update()\fR returns the
+error \fBYPERR_KEY\fR if the key is not found in the database.
+.sp
+.LP
+If the value of  \fIypop\fR is  \fBPOP_INSERT,\fR \fByp_update()\fR returns the
+error \fBYPERR_KEY\fR if the key already exists in the database.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsecure_rpc\fR(3NSL), \fBypclnt\fR(3NSL), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+This interface is unsafe in multithreaded applications.  Unsafe interfaces
+should be called only from the main thread.

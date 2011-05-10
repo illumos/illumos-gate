@@ -1,0 +1,146 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH apropos 1 "20 Dec 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+apropos \- locate commands by keyword lookup
+.SH SYNOPSIS
+.LP
+.nf
+\fBapropos\fR \fIkeyword\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBapropos\fR utility displays the man page name, section number, and a
+short description for each man page whose \fBNAME\fR line contains
+\fIkeyword\fR. This information is contained in the \fB/usr/share/man/windex\fR
+database created by \fBcatman\fR(1M). If \fBcatman\fR(1M) was not run, or was
+run with the \fB-n\fR option, \fBapropos\fR fails. Each word is considered
+separately and the case of letters is ignored. Words which are part of other
+words are considered; for example, when looking for `compile', \fBapropos\fR
+finds all instances of `compiler' also.
+.sp
+.LP
+\fBapropos\fR is actually just the \fB-k\fR option to the \fBman\fR(1) command.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTo find a man page whose NAME line contains a keyword
+.sp
+.LP
+Try
+
+.sp
+.in +2
+.nf
+example% \fBapropos password\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and
+
+.sp
+.in +2
+.nf
+example% \fBapropos editor\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If the line starts `\fIfilename\fR(\fIsection\fR) .\|.\|.' you can run
+
+.sp
+.in +2
+.nf
+man -s \fIsection filename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+to display the man page for \fIfilename\fR.
+
+.LP
+\fBExample 2 \fRTo find the man page for the subroutine \fBprintf()\fR
+.sp
+.LP
+Try
+
+.sp
+.in +2
+.nf
+example% \fBapropos format\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and then
+
+.sp
+.in +2
+.nf
+example% \fBman -s 3s printf\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+to get the manual page on the subroutine \fBprintf()\fR.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/man/windex\fR \fR
+.ad
+.RS 26n
+.rt  
+table of contents and keyword database
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBman\fR(1), \fBwhatis\fR(1), \fBcatman\fR(1M), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\f(CW/usr/share/man/windex: No such file or directory\fR\fR
+.ad
+.sp .6
+.RS 4n
+This database does not exist. \fBcatman\fR(1M) must be run to create it.
+.RE
+

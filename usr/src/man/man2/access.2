@@ -1,0 +1,379 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH access 2 "16 Jun 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+access, faccessat \- determine accessibility of a file
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+#include <sys/fcntl.h>
+
+\fBint\fR \fBaccess\fR(\fBconst char *\fR\fIpath\fR, \fBint\fR \fIamode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfaccessat\fR(\fBint\fR \fIfd\fR, \fBconst char *\fR\fIpath\fR, \fBint\fR \fIamode\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaccess()\fR function checks the file named by the pathname pointed to by
+the \fIpath\fR argument for accessibility according to the bit pattern
+contained in \fIamode\fR, using the real user \fBID\fR in place of the
+effective user \fBID\fR and the real group \fBID\fR in place of the effective
+group ID. This allows a setuid process to verify that the user running it would
+have had permission to access this file.
+.sp
+.LP
+The value of \fIamode\fR is either the bitwise inclusive \fBOR\fR of the access
+permissions to be checked (\fBR_OK\fR, \fBW_OK\fR, \fBX_OK\fR) or the existence
+test, \fBF_OK\fR.
+.sp
+.LP
+These constants are defined in <\fBunistd.h\fR> as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBR_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for read permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBW_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for write permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for execute or search permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Check existence of file
+.RE
+
+.sp
+.LP
+See \fBIntro\fR(2) for additional information about "File Access Permission".
+.sp
+.LP
+If any access permissions are to be checked, each will be checked individually,
+as described in \fBIntro\fR(2). If the process has appropriate privileges, an
+implementation may indicate success for \fBX_OK\fR even if none of the execute
+file permission bits are set.
+.sp
+.LP
+The \fBfaccessat()\fR function is equivalent to the \fBaccess()\fR function,
+except in the case where \fIpath\fR specifies a relative path. In this case the
+file whose accessibility is to be determined is located relative to the
+directory associated with the file descriptor \fIfd\fR instead of the current
+working directory.
+.sp
+.LP
+If \fBfaccessat()\fR is passed in the \fIfd\fR parameter the special value
+\fBAT_FDCWD\fR, defined in \fB<fcntl.h>\fR, the current working directory is
+used and the behavior is identical to a call to \fBaccess()\fR.
+.sp
+.LP
+Values for \fIflag\fR are constructed by a bitwise-inclusive OR of flags from
+the following list, defined in \fB<fcntl.h>\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAT_EACCESS\fR\fR
+.ad
+.RS 14n
+.rt  
+The checks for accessibility are performed using the effective user and group
+IDs instead of the real user and group ID as required in a call to
+\fBaccess()\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+If the requested access is permitted, \fBaccess()\fR and
+\fBfaccessat()\fRsucceed and return \fB0\fR. Otherwise, \fB\(mi1\fR is returned
+and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBaccess()\fR and \fBfaccessat()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Permission bits of the file mode do not permit the requested access, or search
+permission is denied on a component of the path prefix.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+A signal was caught during the \fBaccess()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in resolving \fIpath\fR, or loop
+exists in symbolic links encountered during resolution of the \fIpath\fR
+argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds {\fBPATH_MAX\fR}, or a pathname
+component is longer than {\fBNAME_MAX\fR} while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of \fIpath\fR does not name an existing file or \fIpath\fR is an
+empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix is not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a character or block device special file and
+the corresponding device has been retired by the fault management framework.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+Write access is requested for a file on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBfaccessat()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fIpath\fR argument does not specify an absolute path and the \fIfd\fR
+argument is neither \fBAT_FDCWD\fR nor a valid file descriptor open for reading
+or searching.
+.RE
+
+.sp
+.LP
+The \fBaccess()\fR and \fBfaccessat()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The value of the \fIamode\fR argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+Pathname resolution of a symbolic link produced an intermediate result whose
+length exceeds {\fBPATH_MAX\fR}.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETXTBSY\fR\fR
+.ad
+.RS 16n
+.rt  
+Write access is requested for a pure procedure (shared text) file that is being
+executed.
+.RE
+
+.sp
+.LP
+The \fBfaccessat()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The value of the \fIflag\fR argument is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIpath\fR argument is not an absolute path and \fIfd\fR is neither
+\fBAT_FDCWD\fR nor a file descriptor associated with a directory.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Additional values of \fIamode\fR other than the set defined in the description
+might be valid, for example, if a system has extended access controls.
+.sp
+.LP
+The purpose of the \fBfaccessat()\fR function is to enable the checking of the
+accessibility of files in directories other than the current working directory
+without exposure to race conditions. Any part of the path of a file could be
+changed in parallel to a call to \fBaccess()\fR, resulting in unspecified
+behavior. By opening a file descriptor for the target directory and using the
+\fBfaccessat()\fR function, it can be guaranteed that the file tested for
+accessibility is located relative to the desired directory.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBaccess()\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBchmod\fR(2), \fBstat\fR(2), \fBattributes\fR(5),
+\fBstandards\fR(5)

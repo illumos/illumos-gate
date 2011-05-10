@@ -1,0 +1,102 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _lwp_mutex_lock 2 "30 Jul 1992" "SunOS 5.11" "System Calls"
+.SH NAME
+_lwp_mutex_lock, _lwp_mutex_unlock, _lwp_mutex_trylock \- mutual exclusion
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/lwp.h>
+
+\fBint\fR \fB_lwp_mutex_lock\fR(\fBlwp_mutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_lwp_mutex_trylock\fR(\fBlwp_mutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_lwp_mutex_unlock\fR(\fBlwp_mutex_t *\fR\fImp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions serialize the execution of lightweight processes. They are
+useful for ensuring that only one lightweight process can execute a critical
+section of code at any one time (mutual exclusion). LWP mutexes must be
+initialized to 0 before use.
+.sp
+.LP
+The \fB_lwp_mutex_lock()\fR function locks the LWP mutex pointed to by
+\fImp\fR. If the mutex is already locked, the calling LWP blocks until the
+mutex becomes available. When \fB_lwp_mutex_lock()\fR returns, the mutex is
+locked and the calling LWP is the "owner".
+.sp
+.LP
+The \fB_lwp_mutex_trylock()\fR function attempts to lock the mutex. If the
+mutex is already locked it returns with an error. If the mutex is unlocked, it
+is locked and \fB_lwp_mutex_trylock()\fR returns.
+.sp
+.LP
+The \fB_lwp_mutex_unlock()\fR function unlocks a locked mutex. The mutex must
+be locked and the calling LWP must be the one that last locked the mutex (the
+owner). If any other LWPs are waiting for the mutex to become available, one of
+them is unblocked.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. A non-zero value indicates an
+error.
+.SH ERRORS
+.sp
+.LP
+If any of the following conditions are detected, \fB_lwp_mutex_lock()\fR,
+\fB_lwp_mutex_trylock()\fR, and \fB_lwp_mutex_unlock()\fR fail and return the
+corresponding value:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImp\fR argument points to an invalid LWP mutex.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fImp\fR argument points to an illegal address.
+.RE
+
+.sp
+.LP
+If any of the following conditions occur, \fB_lwp_mutex_trylock()\fR fails and
+returns the corresponding value:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fImp\fR argument points to a locked mutex.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fB_lwp_cond_wait\fR(2)

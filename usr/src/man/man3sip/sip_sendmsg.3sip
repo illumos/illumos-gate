@@ -1,0 +1,140 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_sendmsg 3SIP "25 Jan 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_sendmsg \- send an outbound SIP message to the SIP stack for processing
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBint\fR \fIsip_sendmsg\fR(\fBsip_conn_object_t\fR \fIobj\fR, \fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBsip_dialog_t\fR \fIdialog\fR, \fBuint32_t\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_sendmsg()\fR function is used to send an outbound \fBSIP\fR message
+\fIsip_msg\fR to the \fBSIP\fR stack on its way to the peer. The connection
+object for the \fBSIP\fR message is passed as \fIobj\fR. The caller also
+provides the dialog associated with the message, if one exists. The value of
+flags is the result of ORing the following, as required:
+.sp
+.ne 2
+.mk
+.na
+\fBSIP_SEND_STATEFUL\fR
+.ad
+.RS 22n
+.rt  
+Send the request or response statefully. This results in the stack creating and
+maintaining a transaction for this request/response. If this flag is not set
+transactions are not created for the request/response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSIP_DIALOG_ON_FORK\fR
+.ad
+.RS 22n
+.rt  
+When this flag is set, the stack may create multiple dialogs for a dialog
+completing response. This may result due to forking of the dialog creating
+request. If this flag is not set, the first response to a dialog creating
+request creates a dialog, but subsequent ones do not. It is only meaningful if
+the stack is configured to maintain dialogs.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsip_sendmsg()\fR function returns \fB0\fR on success and the appropriate
+error on failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBsip_sendmsg()\fR function can return one of the following errors on
+failure:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+If a message is being statefully sent and the \fIbranchid\fR in the \fBVIA\fR
+header does not conform to RFC 3261 or when accessing \fBCSEQ\fR header while
+creating a transaction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+If a message is being statefully sent, error getting the \fBCSEQ\fR header
+while creating a transaction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPROTO\fR\fR
+.ad
+.RS 10n
+.rt  
+If a message is being statefully sent, error getting the \fBCSEQ\fR value while
+creating a transaction.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+If the message is being statefully sent, error allocating memory for creating
+or adding a transaction or during transaction related processing.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

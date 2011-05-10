@@ -114,7 +114,6 @@ file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
-file path=opt/onbld/bin/mkclosed mode=0555
 file path=opt/onbld/bin/mkreadme_osol mode=0555
 file path=opt/onbld/bin/mktpl mode=0555
 file path=opt/onbld/bin/nightly mode=0555
@@ -270,5 +269,7 @@ link path=opt/onbld/lib/python target=python2.4
 depend fmri=library/python-2/python-extra-24 type=require
 # webrev(1) requires ps2pdf
 depend fmri=print/filter/ghostscript type=require
-# nightly uses wget
+# hgsetup(1) uses check-hostname(1) and nightly sendmail(1M)
+depend fmri=service/network/smtp/sendmail type=require
+# nightly(1) uses wget
 depend fmri=web/wget type=require

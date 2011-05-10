@@ -1,0 +1,426 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getsockopt 3XNET "21 Jan 2007" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+getsockopt \- get the socket options
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lxnet\fR [ \fIlibrary\fR... ]
+#include <sys/socket.h>
+
+\fBint\fR \fBgetsockopt\fR(\fBint\fR \fIsocket\fR, \fBint\fR \fIlevel\fR, \fBint\fR \fIoption_name\fR,
+     \fBvoid *restrict\fR \fIoption_value\fR, \fBsocklen_t *restrict\fR \fIoption_len\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetsockopt()\fR function retrieves the value for the option specified by
+the \fIoption_name\fR argument for the socket specified by the \fIsocket\fR
+argument. If the size of the option value is greater than \fIoption_len\fR, the
+value stored in the object pointed to by the \fIoption_value\fR argument will
+be silently truncated. Otherwise, the object pointed to by the \fIoption_len\fR
+argument will be modified to indicate the actual length of the value.
+.sp
+.LP
+The \fIlevel\fR argument specifies the protocol level at which the option
+resides.  To retrieve options at the socket level, specify the \fIlevel\fR
+argument as \fBSOL_SOCKET\fR. To retrieve options at other levels, supply the
+appropriate protocol number for the protocol controlling the option. For
+example, to indicate that an option will be interpreted by the \fBTCP\fR
+(Transport Control Protocol), set \fIlevel\fR to the protocol number of
+\fBTCP\fR, as defined in the <\fBnetinet/in.h\fR> header, or as determined by
+using \fBgetprotobyname\fR(3XNET) function.
+.sp
+.LP
+The socket in use might require the process to have appropriate privileges to
+use the \fBgetsockopt()\fR function.
+.sp
+.LP
+The \fIoption_name\fR argument specifies a single option to be retrieved.  It
+can be one of the following values defined in \fB<sys/socket.h>\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DEBUG\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether debugging information is being recorded. This option stores an
+\fBint\fR value. This is a boolean option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_ACCEPTCONN\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether socket listening is enabled. This option stores an \fBint\fR
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_BROADCAST\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether transmission of broadcast messages is supported, if this is
+supported by the protocol. This option stores an \fBint\fR value. This is a
+boolean option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_REUSEADDR\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether the rules used in validating addresses supplied to
+\fBbind\fR(3XNET) should allow reuse of local addresses, if this is supported
+by the protocol. This option stores an \fBint\fR value. This is a boolean
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_KEEPALIVE\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether connections are kept active with periodic transmission of
+messages, if this is supported by the protocol.
+.sp
+If the connected socket fails to respond to these messages, the connection is
+broken and threads writing to that socket are notified with a \fBSIGPIPE\fR
+signal. This option stores an \fBint\fR value.
+.sp
+This is a boolean option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_LINGER\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether the socket lingers on \fBclose\fR(2) if data is present. If
+\fBSO_LINGER\fR is set, the system blocks the process during \fBclose\fR(2)
+until it can transmit the data or until the end of the interval indicated by
+the \fBl_linger\fR member, whichever comes first. If \fBSO_LINGER\fR is not
+specified, and \fBclose\fR(2) is issued, the system handles the call in a way
+that allows the process to continue as quickly as possible. This option stores
+a \fBlinger\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_OOBINLINE\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether the socket leaves received out-of-band data (data marked
+urgent) in line. This option stores an \fBint\fR value. This is a boolean
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_SNDBUF\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports send buffer size information. This option stores an \fBint\fR value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_RCVBUF\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports receive buffer size information. This option stores an \fBint\fR value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_ERROR\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports information about error status and clears it. This option stores an
+\fBint\fR value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_TYPE\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports the socket type. This option stores an \fBint\fR value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DONTROUTE\fR\fR
+.ad
+.RS 17n
+.rt  
+Reports whether outgoing messages bypass the standard routing facilities. The
+destination must be on a directly-connected network, and messages are directed
+to the appropriate network interface according to the destination address. The
+effect, if any, of this option depends on what protocol is in use. This option
+stores an \fBint\fR value. This is a boolean option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_MAC_EXEMPT\fR\fR
+.ad
+.RS 17n
+.rt  
+Gets the mandatory access control status of the socket. A socket that has this
+option enabled can communicate with an unlabeled peer if the socket is in the
+global zone or has a label that dominates the default label of the peer.
+Otherwise, the socket must have a label that is equal to the default label of
+the unlabeled peer. \fB\fR\fBSO_MAC_EXEMPT\fR is a boolean option that is
+available only when the system is configured with Trusted Extensions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_ALLZONES\fR\fR
+.ad
+.RS 17n
+.rt  
+Bypasses zone boundaries (privileged). This option stores an \fBint\fR value.
+This is a boolean option.
+.sp
+The \fBSO_ALLZONES\fR option can be used to bypass zone boundaries between
+shared-IP zones. Normally, the system prevents a socket from being bound to an
+address that is not assigned to the current zone. It also prevents a socket
+that is bound to a wildcard address from receiving traffic for other zones.
+However, some daemons which run in the global zone might need to send and
+receive traffic using addresses that belong to other shared-IP zones. If set
+before a socket is bound, \fBSO_ALLZONES\fR causes the socket to ignore zone
+boundaries between shared-IP zones and permits the socket to be bound to any
+address assigned to the shared-IP zones. If the socket is bound to a wildcard
+address, it receives traffic intended for all shared-IP zones and behaves as if
+an equivalent socket were bound in each active shared-IP zone. Applications
+that use the \fBSO_ALLZONES\fR option to initiate connections or send datagram
+traffic should specify the source address for outbound traffic by binding to a
+specific address. There is no effect from setting this option in an
+exclusive-IP zone. Setting this option requires the \fBsys_net_config\fR
+privilege. See \fBzones\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_DOMAIN\fR\fR
+.ad
+.RS 17n
+.rt  
+get the domain used in the socket (get only)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSO_PROTOTYPE\fR\fR
+.ad
+.RS 17n
+.rt  
+for socket in domains \fBAF_INET\fR and \fBAF_INET6\fR, get the underlying
+protocol number used in the socket. For socket in domain \fBAF_ROUTE\fR, get
+the address family used in the socket.
+.RE
+
+.sp
+.LP
+For boolean options, a zero value indicates that the option is disabled and a
+non-zero value indicates that the option is enabled.
+.sp
+.LP
+Options at other protocol levels vary in format and name.
+.sp
+.LP
+The socket in use may require the process to have appropriate privileges to use
+the \fBgetsockopt()\fR function.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetsockopt()\fR returns \fB0\fR. Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetsockopt()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIsocket\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIoption_value\fR or \fIoption_len\fR parameter can not be accessed or
+written.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified option is invalid at the specified socket level.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOPROTOOPT\fR\fR
+.ad
+.RS 15n
+.rt  
+The option is not supported by the protocol.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIsocket\fR argument does not refer to a socket.
+.RE
+
+.sp
+.LP
+The \fBgetsockopt()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 11n
+.rt  
+The calling process does not have the appropriate privileges.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The socket has been shut down.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOBUFS\fR\fR
+.ad
+.RS 11n
+.rt  
+Insufficient resources are available in the system to complete the call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 11n
+.rt  
+There were insufficient STREAMS resources available for the operation to
+complete.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBbind\fR(3XNET), \fBendprotoent\fR(3XNET),
+\fBsetsockopt\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR,
+\fBstandards\fR(5)

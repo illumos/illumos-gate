@@ -1,0 +1,82 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mincore 2 "12 Aug 1990" "SunOS 5.11" "System Calls"
+.SH NAME
+mincore \- determine residency of memory pages
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+
+\fBint\fR \fBmincore\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBchar *\fR\fIvec\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmincore()\fR function determines the residency of the memory pages in
+the address space covered by mappings in the range [\fIaddr\fR, \fIaddr\fR +
+\fIlen\fR]. The status is returned as a character-per-page in the character
+array referenced by \fI*vec\fR (which the system assumes to be large enough to
+encompass all the pages in the address range). The least significant bit of
+each character is set to 1 to indicate that the referenced page is in primary
+memory, and to 0 to indicate that it is not. The settings of other bits in each
+character are undefined and may contain other information in future
+implementations.
+.sp
+.LP
+Because the status of a page can change between the time \fBmincore()\fR checks
+and returns the information, returned information might be outdated. Only
+locked pages are guaranteed to remain in memory; see \fBmlock\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmincore()\fR returns \fB0\fR.  Otherwise,
+\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmincore()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIvec\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIaddr\fR argument is not a multiple of the page size as returned by
+\fBsysconf\fR(3C), or the  \fIlen\fR argument has a value less than or equal to
+0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Addresses in the range [\fIaddr, addr + len\fR] are invalid for the address
+space of a process or specify one or more pages which are not mapped.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBmlock\fR(3C), \fBsysconf\fR(3C)

@@ -1,0 +1,132 @@
+'\" te
+.\"  Copyright (c) 2002 Sun Microsystems, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH autofs 4 "2 Aug 2005" "SunOS 5.11" "File Formats"
+.SH NAME
+autofs \- file containing parameter values for automountd daemon and automount
+command
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/default/autofs\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBautofs\fR file resides in directory \fB/etc/default\fR and supplies
+default parameters for the \fBautomountd\fR(1M) daemon and the
+\fBautomount\fR(1M) command.
+.sp
+.LP
+The \fBautofs\fR file format is \fBASCII\fR; comment lines begin with the
+crosshatch (\fB#\fR) character. Parameters consist of a keyword followed by an
+equal sign followed by the parameter value, of the form:
+.sp
+.in +2
+.nf
+\fIkeyword\fR=\fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+As shipped, the parameters in the \fBautofs\fR file are commented out. As root,
+you must uncomment a keyword-value line to make the value for that parameter
+take effect.
+.sp
+.LP
+Administrators can make changes to the startup parameters for \fBautomountd\fR
+by logging in as root and editing the \fBautofs\fR file. Changes made to
+\fBautofs\fR values on an \fBautomount\fR or \fBautomountd\fR command line
+override values in \fB/etc/default/autofs\fR. The \fB/etc/default/autofs\fR
+file is preserved across operating system upgrades.
+.sp
+.LP
+The following parameters are currently supported in the \fBautofs\fR file:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNT_TIMEOUT=\fR\fI<num>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a duration, in seconds, that a file system is to remain mounted when
+not in use. The default value is 600 (10 minutes). Equivalent to the \fB-t\fR
+option in \fBautomount\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNT_VERBOSE=\fR\fBTRUE | FALSE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Causes you to be notified of non-critical events, suchs as
+\fBautofs\fR mounts and unmounts. The default value is \fBFALSE\fR. Equivalent
+to the \fB-v\fR option in \fBautomount\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNTD_VERBOSE=\fR\fBTRUE | FALSE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Causes status messages to be logged to
+\fB/var/svc/log/system-filesystem-autofs:default.log\fR. (See \fBsmf\fR(5).)
+The default value is \fBFALSE\fR. Equivalent to the \fB-v\fR option in
+\fBautomountd\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNTD_NOBROWSE=\fR\fI<num>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Turn on or off browsing for all \fBautofs\fR mount points. The default value is
+\fBFALSE\fR. Equivalent to the \fB-n\fR option in \fBautomountd\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNTD_TRACE=\fR\fI<num>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Expands each RPC call and logs it to
+\fB/var/svc/log/system-filesystem-autofs:default.log\fR. (See \fBsmf\fR(5).)
+The default value, \fB0\fR, turns off such tracing. Starting with 1, with each
+higher value, the verbosity of trace output increases.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUTOMOUNTD_ENV\fR=\fI<name>\fR\fB=\fR\fI<value>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Environment variables. Each environment variable-value pairing must be on its
+own line. You can specify multiple such pairings. There are no environment
+variable settings supplied. For example: \fBAUTOMOUNTD_ENV=DAY=TUES\fR
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBautomount\fR(1M), \fBautomountd\fR(1M), \fBsmf\fR(5)

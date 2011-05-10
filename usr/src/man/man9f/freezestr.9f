@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH freezestr 9F "17 Oct 2000" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+freezestr, unfreezestr \- freeze, thaw the state of a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+#include <sys/ddi.h> 
+
+
+
+\fBvoid\fR \fBfreezestr\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBunfreezestr\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR \fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message queue to freeze/unfreeze.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBfreezestr()\fR freezes the state of the entire stream containing the queue
+pair \fIq\fR. A frozen stream blocks any thread attempting to enter any open,
+close, put or service routine belonging to any queue instance in the stream,
+and blocks any thread currently within the stream if it attempts to put
+messages onto or take messages off of any queue within the stream (with the
+sole exception of the caller). Threads blocked by this mechanism remain so
+until the stream is thawed by a call to \fBunfreezestr()\fR.
+.sp
+.LP
+Drivers and modules must freeze the stream before manipulating the queues
+directly (as opposed to manipulating them through programmatic interfaces such
+as \fBgetq\fR(9F), \fBputq\fR(9F), \fBputbq\fR(9F), etc.)
+.SH CONTEXT
+.sp
+.LP
+These routines may be called from any stream open, close, put or service
+routine as well as interrupt handlers, callouts and call-backs.
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The \fBfreezestr()\fR and \fBunfreezestr()\fR functions can have a serious
+impact on system performance. Their use should be very limited. In most cases,
+there is no need to use \fBfreezestr()\fR and there are usually better ways to
+accomplish what you need to do than by freezing the stream.
+.sp
+.LP
+Calling \fBfreezestr()\fR to freeze a stream that is already frozen by the
+caller will result in a single-party deadlock.
+.sp
+.LP
+The caller of \fBunfreezestr()\fR must be the thread who called
+\fBfreezestr()\fR.
+.sp
+.LP
+STREAMS utility functions such as \fBgetq\fR(9F), \fBputq\fR(9F),
+\fBputbq\fR(9F), and so forth, should not be called by the caller of
+\fBfreezestr()\fR while the stream is still frozen, as they indirectly freeze
+the stream to ensure atomicity of queue manipulation.

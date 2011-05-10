@@ -1,0 +1,230 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_update 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_update \- update an ELF descriptor
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBoff_t\fR \fBelf_update\fR(\fBElf *\fR\fIelf\fR, \fBElf_Cmd\fR \fIcmd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_update()\fR function causes the library to examine the information
+associated with an \fBELF\fR descriptor, \fIelf\fR, and to recalculate the
+structural data needed to generate the file's image.
+.sp
+.LP
+The \fIcmd\fR argument can have the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_NULL\fR\fR
+.ad
+.RS 15n
+.rt  
+This value tells \fBelf_update()\fR to recalculate various values, updating
+only the \fBELF\fR descriptor's memory structures. Any modified structures are
+flagged with the \fBELF_F_DIRTY\fR bit. A program thus can update the
+structural information and then reexamine them without changing the file
+associated with the \fBELF\fR descriptor. Because this does not change the
+file, the \fBELF\fR descriptor may allow reading, writing, or both reading and
+writing (see  \fBelf_begin\fR(3ELF)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_WRITE\fR\fR
+.ad
+.RS 15n
+.rt  
+If \fIcmd\fR has this value, \fBelf_update()\fR duplicates its \fBELF_C_NULL\fR
+actions and also writes any ``dirty'' information associated with the \fBELF\fR
+descriptor to the file. That is, when a program has used
+\fBelf_getdata\fR(3ELF) or the \fBelf_flagdata\fR(3ELF) facilities to supply
+new (or update existing) information for an \fBELF\fR descriptor, those data
+will be examined, coordinated, translated if necessary (see
+\fBelf32_xlatetof\fR(3ELF)), and written to the file. When portions of the file
+are written, any \fBELF_F_DIRTY\fR bits are reset, indicating those items no
+longer need to be written to the file (see \fBelf_flagdata\fR(3ELF)). The
+sections' data are written in the order of their section header entries, and
+the section header table is written to the end of the file. When the \fBELF\fR
+descriptor was created with \fBelf_begin()\fR, it must have allowed writing the
+file. That is, the \fBelf_begin()\fR command must have been either
+\fBELF_C_RDWR\fR or \fBELF_C_WRITE\fR.
+.RE
+
+.sp
+.LP
+If \fBelf_update()\fR succeeds, it returns the total size of the file image
+(not the memory image), in bytes. Otherwise an error occurred, and the function
+returns \fB\(mi1\fR\&.
+.sp
+.LP
+When updating the internal structures, \fBelf_update()\fR sets some members
+itself. Members listed below are the application's responsibility and retain
+the values given by the program.
+.sp
+.LP
+The following table shows ELF Header members:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.65i) lw(3.85i) 
+lw(1.65i) lw(3.85i) 
+.
+MemberNotes
+
+e_ident[EI_DATA]Library controls other \fBe_ident\fR values
+e_type
+e_machine
+e_version
+e_entry
+e_phoffOnly when \fBELF_F_LAYOUT\fR asserted
+e_shoffOnly when \fBELF_F_LAYOUT\fR asserted 
+e_flags
+e_shstrndx
+.TE
+
+.sp
+.LP
+The following table shows the Program Header members:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.65i) lw(3.85i) 
+lw(1.65i) lw(3.85i) 
+.
+MemberNotes
+
+p_typeThe application controls all
+p_offsetprogram header entries
+p_vaddr
+p_paddr
+p_filesz
+p_memsz
+p_flags
+p_align
+.TE
+
+.sp
+.LP
+The following table shows the Section Header members:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.65i) lw(3.85i) 
+lw(1.65i) lw(3.85i) 
+.
+MemberNotes
+
+sh_name
+sh_type
+sh_flags
+sh_addr
+sh_offsetOnly when \fBELF_F_LAYOUT\fR asserted
+sh_sizeOnly when \fBELF_F_LAYOUT\fR asserted
+sh_link
+sh_info
+sh_addralignOnly when \fBELF_F_LAYOUT\fR asserted
+sh_entsize
+.TE
+
+.sp
+.LP
+The following table shows the Data Descriptor members:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.65i) lw(3.85i) 
+lw(1.65i) lw(3.85i) 
+.
+MemberNotes
+
+d_buf
+d_type
+d_size
+d_offOnly when \fBELF_F_LAYOUT\fR asserted
+d_align
+d_version
+.TE
+
+.sp
+.LP
+Note that the program is responsible for two particularly important members
+(among others) in the \fBELF\fR header. The \fBe_version\fR member controls the
+version of data structures written to the file. If the version is
+\fBEV_NONE\fR, the library uses its own internal version. The
+\fBe_ident[EI_DATA]\fR entry controls the data encoding used in the file. As a
+special case, the value may be \fBELFDATANONE\fR to request the native data
+encoding for the host machine. An error occurs in this case if the native
+encoding doesn't match a file encoding known by the library.
+.sp
+.LP
+Further note that the program is responsible for the \fBsh_entsize\fR section
+header member. Although the library sets it for sections with known types, it
+cannot reliably know the correct value for all sections. Consequently, the
+library relies on the program to provide the values for unknown section types.
+If the entry size is unknown or not applicable, the value should be set to
+\fB0\fR.
+.sp
+.LP
+When deciding how to build the output file, \fBelf_update()\fR obeys the
+alignments of individual data buffers to create output sections. A section's
+most strictly aligned data buffer controls the section's alignment. The library
+also inserts padding between buffers, as necessary, to ensure the proper
+alignment of each buffer.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_fsize\fR(3ELF), \fBelf32_getehdr\fR(3ELF),
+\fBelf32_getshdr\fR(3ELF), \fBelf32_xlatetof\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_flagdata\fR(3ELF), \fBelf_getdata\fR(3ELF), \fBlibelf\fR(3LIB),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+As mentioned above, the \fBELF_C_WRITE\fR command translates data as necessary,
+before writing them to the file. This translation is \fInot\fR always
+transparent to the application program. If a program has obtained pointers to
+data associated with a file (for example, see \fBelf32_getehdr\fR(3ELF) and
+\fBelf_getdata\fR(3ELF)), the program should reestablish the pointers after
+calling \fBelf_update()\fR.

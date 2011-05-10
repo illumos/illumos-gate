@@ -1,0 +1,238 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH overlay 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+overlay, overwrite \- copy overlapped windows
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBoverlay\fR(\fBconst WINDOW *\fR\fIsrcwin\fR, \fBWINDOW *\fR\fIdstwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBoverwrite\fR(\fBconst WINDOW *\fR\fIsrcwin\fR, \fBWINDOW *\fR\fIdstwin\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrcwin\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a pointer to the source window to be copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdstwin\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a pointer to the destination window to be overlayed or overwritten.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBoverwrite()\fR and \fBoverlay()\fR functions overlay \fIsrcwin\fR on top
+of \fIdestwin\fR. The \fIsrcwin\fR and \fIdstwin\fR arguments do not have to be
+the same size; only text where the two windows overlap is copied.
+.sp
+.LP
+The \fBoverwrite()\fR function copies characters as though a sequence of
+\fBwin_wch\fR(3XCURSES) and \fBwadd_wch\fR(3XCURSES) were performed with the
+destination window's attributes and background attributes cleared.
+.sp
+.LP
+The \fBoverlay()\fR function does the same thing, except that, whenever a
+character to be copied is the background character of the source window,
+\fBoverlay()\fR does not copy the character but merely moves the destination
+cursor the width of the source background character.
+.sp
+.LP
+If any portion of the overlaying window border is not the first column of a
+multi-column character, then all the column positions will be replaced with the
+background character and rendition before the overlay is done. If the default
+background character is a multi-column character when this occurs, then these
+functions fail.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return \fBOK\fR. Otherwise, they
+return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRImplement a pop-up dialog
+.sp
+.LP
+The following example demonstrates the use of \fBoverwrite()\fR to implement a
+pop-up dialog box.
+
+.sp
+.in +2
+.nf
+#include <curses.h>
+/*
+ *   Pop-up a window on top of curscr.  If row and/or col
+ *   are -1 then that dimension will be centered within
+ *   curscr.  Return 0 for success or -1 if malloc(\|) failed.
+ *   Pass back the working window and the saved window for the
+ *   pop-up.  The saved window should not be modified.
+ */
+int
+popup(work, save, nrows, ncols, row, col)
+WINDOW **work, **save;
+int nrows, ncols, row, col;
+{
+     int mr, mc;
+     getmaxyx(curscr, mr, mc);
+     /* Windows are limited to the size of curscr. */
+     if (mr < nrows)
+          nrows = mr;
+     if (mc < ncols)
+          ncols = mc;
+     /* Center dimensions. */
+     if (row == -1)
+          row = (mr-nrows)/2;
+     if (col == -1)
+          col = (mc-ncols)/2;
+     /* The window must fit entirely in curscr. */
+     if (mr < row+nrows)
+          row = 0;
+     if (mc < col+ncols)
+          col = 0;
+     *work = newwin(nrows, ncols, row, col);
+     if (*work == NULL)
+          return (-1);
+     if ((*save = dupwin(*work)) == NULL) {
+          delwin(*work);
+          return (-1);
+     }
+     overwrite(curscr, *save);
+     return (0);
+}
+/*
+ * Restore the region covered by a pop-up window.
+ * Delete the working window and the saved window.
+ * This function is the complement to popup(\|).  Return
+ * 0 for success or -1 for an error.
+ */
+int
+popdown(work, save)
+WINDOW *work, *save;
+{
+     (void) wnoutrefresh(save);
+     (void) delwin(save);
+     (void) delwin(work);
+     return (0);
+}
+/*
+ * Compute the size of a dialog box that would fit around
+ * the string.
+ */
+void
+dialsize(str, nrows, ncols)
+char *str;
+int *nrows, *ncols;
+{
+     int rows, cols, col;
+     for (rows = 1, cols = col = 0; *str != '\e0'; ++str) {
+          if (*str == '\en') {
+               if (cols < col)
+                   cols = col;
+               col = 0;
+               ++rows;
+          } else {
+               ++col;
+          }
+      }
+      if (cols < col)
+           cols = col;
+      *nrows = rows;
+      *ncols = cols;
+}
+/*
+ * Write a string into a dialog box.
+ */
+void
+dialfill(w, s)
+WINDOW *w;
+char *s;
+{
+     int row;
+     (void) wmove(w, 1, 1);
+     for (row = 1; *s != '\e0'; ++s) {
+          (void) waddch(w, *((unsigned char*) s));
+          if (*s == '\en')
+               wmove(w, ++row, 1);
+     }
+     box(w, 0, 0);
+}
+void
+dialog(str)
+char *str;
+{
+     WINDOW *work, *save;
+     int nrows, ncols, row, col;
+     /* Figure out size of window. */
+     dialsize(str, &nrows, &ncols);
+     /* Create a centered working window with extra */
+     /* room for a border. */
+     (void) popup(&work, &save, nrows+2, ncols+2, -1, -1);
+     /* Write text into the working window. */
+     dialfill(work, str);
+     /* Pause.  Remember that wgetch(\|) will do a wrefresh(\|) */
+     /* for us. */
+     (void) wgetch(work);
+     /* Restore curscr and free windows. */
+     (void) popdown(work, save);
+     /* Redraw curscr to remove window from physical screen. */
+     (void) doupdate(\|);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcopywin\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBwadd_wch\fR(3XCURSES),
+\fBwin_wch\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

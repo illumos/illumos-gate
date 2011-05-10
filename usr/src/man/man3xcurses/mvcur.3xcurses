@@ -1,0 +1,112 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mvcur 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+mvcur \- move the cursor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBmvcur\fR(\fBint\fR \fIoldrow\fR, \fBint\fR \fIoldcol\fR, \fBint\fR \fInewrow\fR, \fBint\fR \fInewcol\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoldrow\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the row from which cursor is to be moved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoldcol\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the column from which cursor is to be moved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInewrow\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the row to which cursor is to be moved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInewcol\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the column to which cursor is to be moved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmvcur()\fR function is a low-level function used only outside of  X/Open
+Curses when the program has to deal directly with the \fBterminfo\fR database
+to handle certain terminal capabilities.  The use of appropriate X/Open Curses
+functions is recommended in all other  situations, so that X/Open Curses can
+track the cursor.
+.sp
+.LP
+The \fBmvcur()\fR function moves the cursor from the location specified by
+\fIoldrow\fR and \fIoldcol\fR to the location specified by \fInewrow\fR and
+\fInewcol\fR.  A program using this function must keep track of the current
+cursor position.
+.SH RETURN VALUES
+.sp
+.LP
+On success, the \fBmvcur()\fR function returns \fBOK\fR. Otherwise, it returns
+\fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcurses\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

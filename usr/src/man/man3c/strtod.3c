@@ -1,0 +1,407 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved. 
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strtod 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+strtod, strtof, strtold, atof \- convert string to floating-point number
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBdouble\fR \fBstrtod\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBstrtof\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBstrtold\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR);
+.fi
+
+.LP
+.nf
+\fBdouble\fR \fBatof\fR(\fBconst char *\fR\fIstr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstrtod()\fR, \fBstrtof()\fR, and \fBstrtold()\fR functions convert the
+initial portion of the string pointed to by \fInptr\fR to \fBdouble\fR,
+\fBfloat\fR, and \fBlong double\fR representation, respectively. First they
+decompose the input string into three parts:
+.RS +4
+.TP
+1.
+An initial, possibly empty, sequence of white-space characters (as specified
+by \fBisspace\fR(3C))
+.RE
+.RS +4
+.TP
+2.
+A subject sequence interpreted as a floating-point constant or representing
+infinity or NaN
+.RE
+.RS +4
+.TP
+3.
+A final string of one or more unrecognized characters, including the
+terminating null byte of the input string.
+.RE
+.sp
+.LP
+Then they attempt to convert the subject sequence to a floating-point number,
+and return the result.
+.sp
+.LP
+The expected form of the subject sequence is an optional plus or minus sign,
+then one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A non-empty sequence of digits optionally containing a radix character, then an
+optional exponent part
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A 0x or 0X, then a non-empty sequence of hexadecimal digits optionally
+containing a radix character, then an optional binary exponent part
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+One of INF or INFINITY, ignoring case
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+One of NAN or NAN(\fIn-char-sequence\fR(\fIopt\fR)), ignoring case in the NAN
+part, where:
+.sp
+.in +2
+.nf
+n-char-sequence:
+    digit
+    nondigit
+    n-char-sequence digit
+    n-char-sequence nondigit
+.fi
+.in -2
+
+.RE
+.sp
+.LP
+In default mode for \fBstrtod()\fR, only decimal, INF/INFINITY, and
+NAN/NAN(\fIn-char-sequence\fR) forms are recognized. In C99/SUSv3 mode,
+hexadecimal strings are also recognized.
+.sp
+.LP
+In default mode for \fBstrtod()\fR, the \fIn-char-sequence\fR in the
+NAN(\fIn-char-equence\fR) form can contain any character except ')' (right
+parenthesis) or '\e0' (null).  In C99/SUSv3 mode, the \fIn-char-sequence\fR can
+contain only upper and lower case letters, digits, and '_' (underscore).
+.sp
+.LP
+The \fBstrtof()\fR and \fBstrtold()\fR functions always function in
+C99/SUSv3-conformant mode.
+.sp
+.LP
+The subject sequence is defined as the longest initial subsequence of the input
+string, starting with the first non-white-space character, that is of the
+expected form. The subject sequence contains no characters if the input string
+is not of the expected form.
+.sp
+.LP
+If the subject sequence has the expected form for a floating-point number, the
+sequence of characters starting with the first digit or the decimal-point
+character (whichever occurs first) is interpreted as a floating constant of the
+C language, except that the radix character is used in place of a period, and
+that if neither an exponent part nor a radix character appears in a decimal
+floating-point number, or if a binary exponent part does not appear in a
+hexadecimal floating-point number, an exponent part of the appropriate type
+with value zero is assumed to follow the last digit in the string. If the
+subject sequence begins with a minus sign, the sequence is interpreted as
+negated. A character sequence INF or INFINITY is interpreted as an infinity. A
+character sequence NAN or NAN(\fIn-char-sequence\fR(\fIopt\fR)) is interpreted
+as a quiet NaN. A pointer to the final string is stored in the object pointed
+to by \fIendptr\fR, provided that \fIendptr\fR is not a null pointer.
+.sp
+.LP
+If the subject sequence has either the decimal or hexadecimal form, the value
+resulting from the conversion is rounded correctly according to the prevailing
+floating point rounding direction mode. The conversion also raises floating
+point inexact, underflow, or overflow exceptions as appropriate.
+.sp
+.LP
+The radix character is defined in the program's locale (category
+\fBLC_NUMERIC\fR). In the POSIX locale, or in a locale where the radix
+character is not defined, the radix character defaults to a period ('.').
+.sp
+.LP
+If the subject sequence is empty or does not have the expected form, no
+conversion is performed; the value of \fInptr\fR is stored in the object
+pointed to by \fIendptr\fR, provided that \fIendptr\fR is not a null pointer.
+.sp
+.LP
+The \fBstrtod()\fR function does not change the setting of \fBerrno\fR if
+successful.
+.sp
+.LP
+The \fBatof(\fR\fIstr\fR\fB)\fR function call is equivalent to
+\fBstrtod(\fR\fInptr\fR\fB, (char **)NULL)\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the converted value. If no
+conversion could be performed, \fB0\fR is returned.
+.sp
+.LP
+If the correct value is outside the range of representable values,
+\fB\(+-HUGE_VAL\fR, \fB\(+-HUGE_VALF\fR, or \fB\(+-HUGE_VALL\fR is returned
+(according to the sign of the value), a floating point overflow exception is
+raised, and \fBerrno\fR is set to \fBERANGE\fR.
+.sp
+.LP
+If the correct value would cause an underflow, the correctly rounded result
+(which may be normal, subnormal, or zero) is returned, a floating point
+underflow exception is raised, and \fBerrno\fR is set to \fBERANGE\fR.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The value to be returned would cause overflow or underflow
+.RE
+
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+No conversion could be performed.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Since 0 is returned on error and is also a valid return on success, an
+application wishing to check for error situations should set \fBerrno\fR to 0,
+then call \fBstrtod()\fR, \fBstrtof()\fR, or \fBstrtold()\fR, then check
+\fBerrno\fR.
+.sp
+.LP
+The changes to \fBstrtod()\fR introduced by the ISO/IEC 9899: 1999 standard can
+alter the behavior of well-formed applications complying with the ISO/IEC 9899:
+1990 standard and thus earlier versions of IEEE Std 1003.1-200x. One such
+example would be:
+.sp
+.in +2
+.nf
+int
+what_kind_of_number (char *s)
+{
+     char *endp;
+     double d;
+     long l;
+     d = strtod(s, &endp);
+     if (s != endp && *endp == `\0')
+         printf("It's a float with value %g\en", d);
+     else
+     {
+         l = strtol(s, &endp, 0);
+         if (s != endp && *endp == `\e0')
+             printf("It's an integer with value %ld\en", 1);
+         else
+             return 1;
+     }
+     return 0;
+}
+.fi
+.in -2
+
+.sp
+.LP
+If the function is called with:
+.sp
+.in +2
+.nf
+what_kind_of_number ("0x10")
+.fi
+.in -2
+
+.sp
+.LP
+an ISO/IEC 9899: 1990 standard-compliant library will result in the function
+printing:
+.sp
+.in +2
+.nf
+It's an integer with value 16
+.fi
+.in -2
+
+.sp
+.LP
+With the ISO/IEC 9899: 1999 standard, the result is:
+.sp
+.in +2
+.nf
+It's a float with value 16
+.fi
+.in -2
+
+.sp
+.LP
+The change in behavior is due to the inclusion of floating-point numbers in
+hexadecimal notation without requiring that either a decimal point or the
+binary exponent be present.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisspace\fR(3C), \fBlocaleconv\fR(3C), \fBscanf\fR(3C), \fBsetlocale\fR(3C),
+\fBstrtol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBstrtod()\fR and \fBatof()\fR functions can be used safely in
+multithreaded applications, as long as \fBsetlocale\fR(3C) is not called to
+change the locale.
+.sp
+.LP
+The DESCRIPTION and RETURN VALUES sections above are very similar to the
+wording used by the Single UNIX Specification version 2 (SUSv2) and the 1989 C
+Standard to describe the behavior of the \fBstrtod()\fR function.  Since some
+users have reported that they find the description confusing, the following
+notes might be helpful.
+.RS +4
+.TP
+1.
+The \fBstrtod()\fR function does not modify the string pointed to by
+\fIstr\fR and does not \fBmalloc()\fR space to hold the decomposed portions of
+the input string.
+.RE
+.RS +4
+.TP
+2.
+If \fIendptr\fR is not \fB(char **)NULL\fR, \fBstrtod()\fR will set the
+pointer pointed to by \fIendptr\fR to the first byte of the "final string of
+unrecognized characters".  (If all input characters were processed, the pointer
+pointed to by \fIendptr\fR will be set to point to the null character at the
+end of the input string.)
+.RE
+.RS +4
+.TP
+3.
+If \fBstrtod()\fR returns 0.0, one of the following occurred:
+.RS +4
+.TP
+a.
+The "subject sequence" was not an empty string, but evaluated to 0.0.  (In
+this case, \fBerrno\fR will be left unchanged.)
+.RE
+.RS +4
+.TP
+b.
+The "subject sequence" was an empty string . In this case, \fBerrno\fR will
+be left unchanged. (The Single UNIX Specification version 2 allows \fBerrno\fR
+to be set to \fBEINVAL\fR or to be left unchanged. The C Standard does not
+specify any specific behavior in this case.)
+.RE
+.RS +4
+.TP
+c.
+The "subject sequence" specified a numeric value whose conversion resulted
+in a floating point underflow.  In this case, an underflow exception is raised
+and \fBerrno\fR is set to \fBERANGE\fR.
+.RE
+Note that the standards do not require that implementations distinguish between
+these three cases.  An application can determine case (b) by making sure that
+there are no leading white-space characters in the string pointed to by
+\fIstr\fR and giving \fBstrtod()\fR an \fIendptr\fR that is not \fB(char
+**)NULL\fR.  If \fIendptr\fR points to the first character of \fIstr\fR when
+\fBstrtod()\fR returns, you have detected case (b).  Case (c) can be detected
+by examining the underflow flag or by looking for a non-zero digit before the
+exponent part of the "subject sequence".  Note, however, that the decimal-point
+character is locale-dependent.
+.RE
+.RS +4
+.TP
+4.
+If \fBstrtod()\fR returns \fB+HUGE_VAL\fR or \fB\(miHUGE_VAL\fR, one of the
+following occurred:
+.RS +4
+.TP
+a.
+If \fB+HUGE_VAL\fR is returned and \fBerrno\fR is set to \fBERANGE\fR, a
+floating point overflow occurred while processing a positive value, causing a
+floating point overflow exception to be raised.
+.RE
+.RS +4
+.TP
+b.
+If \fB\(miHUGE_VAL\fR is returned and \fBerrno\fR is set to \fBERANGE\fR, a
+floating point overflow occurred while processing a negative value, causing a
+floating point overflow exception to be raised.
+.RE
+.RS +4
+.TP
+c.
+If \fBstrtod()\fR does not set \fBerrno\fR to \fBERANGE\fR, the value
+specified by the "subject string" converted to \fB+HUGE_VAL\fR or
+\fB\(miHUGE_VAL\fR, respectively.
+.RE
+Note that if \fBerrno\fR is set to \fBERANGE\fR when \fBstrtod()\fR is called,
+case (c) can be distinguished from cases (a) and (b) by examining either
+\fBERANGE\fR or the overflow flag.
+.RE

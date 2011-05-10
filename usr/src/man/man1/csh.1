@@ -1,0 +1,3569 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csh 1 "27 Jul 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+csh \- shell command interpreter with a C-like syntax
+.SH SYNOPSIS
+.LP
+.nf
+\fBcsh\fR [\fB-bcefinstvVxX\fR] [\fIargument\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBcsh\fR, the C shell, is a command interpreter with a syntax reminiscent of
+the C language. It provides a number of convenient features for interactive use
+that are not available with the Bourne shell, including filename completion,
+command aliasing, history substitution, job control, and a number of built-in
+commands. As with the Bourne shell, the C shell provides variable, command and
+filename substitution.
+.SS "Initialization and Termination"
+.sp
+.LP
+When first started, the C shell normally performs commands from the
+\fB\&.cshrc\fR file in your home directory, provided that it is readable and
+you either own it or your real group \fBID\fR matches its group \fBID\fR. If
+the shell is invoked with a name that starts with `\fB\(mi\fR\&', as when
+started by \fBlogin\fR(1), the shell runs as a \fBlogin\fR shell.
+.sp
+.LP
+If the shell is a login shell, this is the sequence of invocations: First,
+commands in \fB/etc/.login\fR are executed. Next, commands from the
+\fB\&.cshrc\fR file your \fBhome\fR directory are executed. Then the shell
+executes commands from the \fB\&.login\fR file in your home directory; the same
+permission checks as those for \fB\&.cshrc\fR are applied to this file.
+Typically, the \fB\&.login\fR file contains commands to specify the terminal
+type and environment. (For an explanation of file interpreters, see \fBCommand
+Execution\fR and \fBexec\fR(2).)
+.sp
+.LP
+As a login shell terminates, it performs commands from the \fB\&.logout\fR file
+in your home directory; the same permission checks as those for \fB\&.cshrc\fR
+are applied to this file.
+.SS "Interactive Operation"
+.sp
+.LP
+After startup processing is complete, an interactive C shell begins reading
+commands from the terminal, prompting with \fBhostname\fR\fB%\fR (or
+\fBhostname\fR\fB#\fR for the privileged user). The shell then repeatedly
+performs the following actions: a line of command input is read and broken into
+\fIwords\fR. This sequence of words is placed on the history list and then
+parsed, as described under USAGE. Finally, the shell executes each command in
+the current line.
+.SS "Noninteractive Operation"
+.sp
+.LP
+When running noninteractively, the shell does not prompt for input from the
+terminal. A noninteractive C shell can execute a command supplied as an
+\fIargument\fR on its command line, or interpret commands from a file, also
+known as a script.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+.rt  
+Forced a "break" from option processing. Subsequent command line arguments are
+not interpreted as C shell options. This allows the passing of options to a
+script without confusion. The shell does not run set-user-ID or set-group-ID
+scripts unless this option is present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Executes the first \fIargument\fR, which must be present. Remaining arguments
+are placed in \fBargv\fR, the argument-list variable, and passed directly to
+\fBcsh\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 6n
+.rt  
+Exits if a command terminates abnormally or yields a nonzero exit status.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Fast start. Reads neither the \fB\&.cshrc\fR file, nor the \fB\&.login\fR file
+(if a login shell) upon startup.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Forced interactive. Prompts for command line input, even if the standard input
+does not appear to be a terminal (character-special device).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Parses (interprets), but does not execute commands. This option can be used to
+check C shell scripts for syntax errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Takes commands from the standard input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Reads and executes a single command line. A `\fB\e\fR\&' (backslash) can be
+used to escape each newline for continuation of the command line onto
+subsequent input lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Verbose. Sets the \fBverbose\fR predefined variable. Command input is echoed
+after history substitution, but before other substitutions and before
+execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 6n
+.rt  
+Sets \fBverbose\fR before reading \fB\&.cshrc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Echo. Sets the \fBecho\fR variable. Echoes commands after all substitutions and
+just before execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-X\fR\fR
+.ad
+.RS 6n
+.rt  
+Sets \fBecho\fR before reading \fB\&.cshrc\fR.
+.RE
+
+.sp
+.LP
+Except with the options \fB-c\fR, \fB-i\fR, \fB-s\fR, or \fB-t\fR, the first
+nonoption \fIargument\fR is taken to be the name of a command or script. It is
+passed as argument zero, and subsequent arguments are added to the argument
+list for that command or script.
+.SH USAGE
+.SS "Filename Completion"
+.sp
+.LP
+When enabled by setting the variable \fBfilec\fR, an interactive C shell can
+complete a partially typed filename or user name. When an unambiguous partial
+filename is followed by an \fBESC\fR character on the terminal input line, the
+shell fills in the remaining characters of a matching filename from the working
+directory.
+.sp
+.LP
+If a partial filename is followed by the \fBEOF\fR character (usually typed as
+Control-d), the shell lists all filenames that match. It then prompts once
+again, supplying the incomplete command line typed in so far.
+.sp
+.LP
+When the last (partial) word begins with a tilde (\fB~\fR), the shell attempts
+completion with a user name, rather than a file in the working directory.
+.sp
+.LP
+The terminal bell signals errors or multiple matches. This bell signal can be
+inhibited by setting the variable \fBnobeep\fR. You can exclude files with
+certain suffixes by listing those suffixes in the variable \fBfignore\fR. If,
+however, the only possible completion includes a suffix in the list, it is not
+ignored. \fBfignore\fR does not affect the listing of filenames by the
+\fBEOF\fR character.
+.SS "Lexical Structure"
+.sp
+.LP
+The shell splits input lines into words at space and tab characters, except as
+noted below. The characters \fB&\fR, \fB|\fR, \fB;\fR, \fB<\fR, \fB>\fR,
+\fB(\fR, and \fB)\fR form separate words; if paired, the pairs form single
+words. These shell metacharacters can be made part of other words, and their
+special meaning can be suppressed by preceding them with a `\fB\e\fR\&'
+(backslash). A newline preceded by a \fB\e\fR is equivalent to a space
+character.
+.sp
+.LP
+In addition, a string enclosed in matched pairs of single-quotes (\fB\&'\fR),
+double-quotes (\fB"\fR), or backquotes (\fB`\fR), forms a partial word.
+Metacharacters in such a string, including any space or tab characters, do not
+form separate words. Within pairs of backquote (\fB`\fR) or double-quote
+(\fB"\fR) characters, a newline preceded by a `\fB\e\fR\&' (backslash) gives a
+true newline character. Additional functions of each type of quote are
+described, below, under \fBVariable Substitution\fR, \fBCommand
+Substitution\fR, and \fBFilename\fR \fBSubstitution\fR.
+.sp
+.LP
+When the shell's input is not a terminal, the character \fB#\fR introduces a
+comment that continues to the end of the input line. Its special meaning is
+suppressed when preceded by a \fB\e\fR or enclosed in matching quotes.
+.SS "Command Line Parsing"
+.sp
+.LP
+A \fIsimple command\fR is composed of a sequence of words. The first word (that
+is not part of an I/O redirection) specifies the command to be executed. A
+simple command, or a set of simple commands separated by \fB|\fR or \fB|&\fR
+characters, forms a \fIpipeline\fR. With \fB|\fR, the standard output of the
+preceding command is redirected to the standard input of the command that
+follows. With \fB|\|&\fR, both the standard error and the standard output are
+redirected through the pipeline.
+.sp
+.LP
+Pipelines can be separated by semicolons (\|\fB;\fR\|), in which case they are
+executed sequentially. Pipelines that are separated by \fB&&\fR or \fB|\||\fR
+form conditional sequences in which the execution of pipelines on the right
+depends upon the success or failure, respectively, of the pipeline on the left.
+.sp
+.LP
+A pipeline or sequence can be enclosed within parentheses `()' to form a simple
+command that can be a component in a pipeline or sequence.
+.sp
+.LP
+A sequence of pipelines can be executed asynchronously or "in the background"
+by appending an `\fB&\fR\&'; rather than waiting for the sequence to finish
+before issuing a prompt, the shell displays the job number (see \fBJob
+Control\fR, below) and associated process IDs and prompts immediately.
+.SS "History Substitution"
+.sp
+.LP
+History substitution allows you to use words from previous command lines in the
+command line you are typing. This simplifies spelling corrections and the
+repetition of complicated commands or arguments. Command lines are saved in the
+history list, the size of which is controlled by the \fBhistory\fR variable.
+The most recent command is retained in any case. A history substitution begins
+with a \fB!\fR (although you can change this with the \fBhistchars\fR variable)
+and occurs anywhere on the command line; history substitutions do not nest. The
+\fB!\fR can be escaped with \fB\e\fR to suppress its special meaning.
+.sp
+.LP
+Input lines containing history substitutions are echoed on the terminal after
+being expanded, but before any other substitutions take place or the command
+gets executed.
+.SS "Event Designators"
+.sp
+.LP
+An event designator is a reference to a command line entry in the history list.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.sp .6
+.RS 4n
+Start a history substitution, except when followed by a space character, tab,
+newline, \fB=\fR or \fB(\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!!\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the previous command. By itself, this substitution repeats the
+previous command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to command line \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the current command line minus \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIstr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command starting with \fIstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!?\fR\fIstr\fR\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command containing \fIstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!?\fR\fIstr\fR\fB?\fR \fIadditional\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command containing \fIstr\fR and append
+\fIadditional\fR to that referenced command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!{\fR\fIcommand\fR\fB}\fR \fIadditional\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command beginning with \fIcommand\fR and append
+\fIadditional\fR to that referenced command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fIprevious_word\fR\fB^\fR\fIreplacement\fR\fB^\fR\fR
+.ad
+.sp .6
+.RS 4n
+Repeat the previous command line replacing the string \fIprevious_word\fR with
+the string \fIreplacement\fR. This is equivalent to the history substitution:
+.sp
+.in +2
+.nf
+!:s/\fIprevious_word\fR/\fIreplacement\fR/.
+.fi
+.in -2
+.sp
+
+To re-execute a specific previous command AND make such a substitution, say,
+re-executing command #6,
+.sp
+.in +2
+.nf
+!:6s/\fIprevious_word\fR/\fIreplacement\fR/.
+.fi
+.in -2
+.sp
+
+.RE
+
+.SS "Word Designators"
+.sp
+.LP
+A `\fB:\fR' (colon) separates the event specification from the word designator.
+It can be omitted if the word designator begins with a \fB^\fR, \fB$\fR,
+\fB*\fR, \fB\(mi\fR or \fB%\fR. If the word is to be selected from the previous
+command, the second \fB!\fR character can be omitted from the event
+specification. For instance, \fB!!:1\fR and \fB!:1\fR both refer to the first
+word of the previous command, while \fB!!$\fR and \fB!$\fR both refer to the
+last word in the previous command. Word designators include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB#\fR\fR
+.ad
+.RS 10n
+.rt  
+The entire command line typed so far.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 10n
+.rt  
+The first input word (command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIn\fR'th argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fR
+.ad
+.RS 10n
+.rt  
+The first argument, that is, \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fR
+.ad
+.RS 10n
+.rt  
+The last argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fR
+.ad
+.RS 10n
+.rt  
+The word matched by the \fB?\fR\fIs\fR search.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\(mi\fR\fIy\fR\fR
+.ad
+.RS 10n
+.rt  
+A range of words; \fB\(mi\fR\fIy\fR abbreviates \fB0\(mi\fR\fIy\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 10n
+.rt  
+All the arguments, or a null value if there is just one word in the event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB*\fR\fR
+.ad
+.RS 10n
+.rt  
+Abbreviates \fIx\fR\fB\(mi$\fR\fI\&.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\(mi\fR\fR
+.ad
+.RS 10n
+.rt  
+Like \fIx*\fR but omitting word \fB$\fR.
+.RE
+
+.SS "Modifiers"
+.sp
+.LP
+After the optional word designator, you can add one of the following modifiers,
+preceded by a \fB:\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fR\fR
+.ad
+.RS 10n
+.rt  
+Remove a trailing pathname component, leaving the head.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 10n
+.rt  
+Remove a trailing suffix of the form `\fB\&.\fR\fIxxx\fR', leaving the
+basename.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 10n
+.rt  
+Remove all but the suffix, leaving the Extension.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs/\fR\fIl\fR\fB/\fR\fIr\fR\fB/\fR\fR
+.ad
+.RS 10n
+.rt  
+Substitute \fIr\fR for \fIl\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 10n
+.rt  
+Remove all leading pathname components, leaving the tail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB&\fR\fR
+.ad
+.RS 10n
+.rt  
+Repeat the previous substitution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 10n
+.rt  
+Apply the change to the first occurrence of a match in each word, by prefixing
+the above (for example, \fBg&\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 10n
+.rt  
+Print the new command but do not execute it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.RS 10n
+.rt  
+Quote the substituted words,escaping further substitutions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 10n
+.rt  
+Like \fBq\fR, but break into words at each space character, tab or newline.
+.RE
+
+.sp
+.LP
+Unless preceded by a \fBg\fR, the modification is applied only to the first
+string that matches \fIl\fR; an error results if no string matches.
+.sp
+.LP
+The left-hand side of substitutions are not regular expressions, but character
+strings. Any character can be used as the delimiter in place of \fB/\fR. A
+backslash quotes the delimiter character. The character \fB&\fR, in the right
+hand side, is replaced by the text from the left-hand-side. The \fB&\fR can be
+quoted with a backslash. A null \fIl\fR uses the previous string either from a
+\fIl\fR or from a contextual scan string \fIs\fR from \fB!?\fR\fIs\fR. You can
+omit the rightmost delimiter if a newline immediately follows \fIr\fR; the
+rightmost \fB?\fR in a context scan can similarly be omitted.
+.sp
+.LP
+Without an event specification, a history reference refers either to the
+previous command, or to a previous history reference on the command line (if
+any).
+.SS "Quick Substitution"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fIl\fR\fB^\fR\fIr\fR\fB^\fR\fR
+.ad
+.RS 9n
+.rt  
+This is equivalent to the history substitution:
+.sp
+.in +2
+.nf
+!:s/\fIl\fR/\fIr\fR/.
+.fi
+.in -2
+.sp
+
+.RE
+
+.SS "Aliases"
+.sp
+.LP
+The C shell maintains a list of aliases that you can create, display, and
+modify using the \fBalias\fR and \fBunalias\fR commands. The shell checks the
+first word in each command to see if it matches the name of an existing alias.
+If it does, the command is reprocessed with the alias definition replacing its
+name; the history substitution mechanism is made available as though that
+command were the previous input line. This allows history substitutions,
+escaped with a backslash in the definition, to be replaced with actual command
+line arguments when the alias is used. If no history substitution is called
+for, the arguments remain unchanged.
+.sp
+.LP
+Aliases can be nested. That is, an alias definition can contain the name of
+another alias. Nested aliases are expanded before any history substitutions is
+applied. This is useful in pipelines such as
+.sp
+.in +2
+.nf
+\fBalias lm 'ls -l \e!* | more'\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+which when called, pipes the output of \fBls\fR(1) through \fBmore\fR(1).
+.sp
+.LP
+Except for the first word, the name of the alias can not appear in its
+definition, nor in any alias referred to by its definition. Such loops are
+detected, and cause an error message.
+.SS "I/O Redirection"
+.sp
+.LP
+The following metacharacters indicate that the subsequent word is the name of a
+file to which the command's standard input, standard output, or standard error
+is redirected; this word is variable, command, and filename expanded separately
+from the rest of the command.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB<\fR\fR
+.ad
+.RS 15n
+.rt  
+Redirect the standard input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB<\|<\fR\fI\|word\fR\fR
+.ad
+.RS 15n
+.rt  
+Read the standard input, up to a line that is identical with \fIword\fR, and
+place the resulting lines in a temporary file. Unless \fIword\fR is escaped or
+quoted, variable and command substitutions are performed on these lines. Then,
+the pipeline is invoked with the temporary file as its standard input.
+\fIword\fR is not subjected to variable, filename, or command substitution, and
+each line is compared to it before any substitutions are performed by the
+shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>\fR \fB>!\fR \fB>&\fR \fB>&!\fR\fR
+.ad
+.RS 15n
+.rt  
+Redirect the standard output to a file. If the file does not exist, it is
+created. If it does exist, it is overwritten; its previous contents are lost.
+.sp
+When set, the variable \fBnoclobber\fR prevents destruction of existing files.
+It also prevents redirection to terminals and \fB/dev/null\fR, unless one of
+the \fB!\fR forms is used. The \fB&\fR forms redirect both standard output and
+the standard error (diagnostic output) to the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>\|>\fR \fB>\|>&\fR \fB>\|>!\fR \fB>\|>&!\fR\fR
+.ad
+.RS 27n
+.rt  
+Append the standard output. Like \fB>\fR, but places output at the end of the
+file rather than overwriting it. If \fBnoclobber\fR is set, it is an error for
+the file not to exist, unless one of the \fB!\fR forms is used. The \fB&\fR
+forms append both the standard error and standard output to the file.
+.RE
+
+.SS "Variable Substitution"
+.sp
+.LP
+The C shell maintains a set of variables, each of which is composed of a
+\fIname\fR and a \fIvalue\fR. A variable name consists of up to 128 letters and
+digits, and starts with a letter. An underscore (\fB_\fR) is considered a
+letter). A variable's value is a space-separated list of zero or more words. If
+the shell supports a variable name upto 128 characters the variable
+\fBSUNW_VARLEN\fR is defined. If a variable name of up to 128 characters is not
+supported, then an older version of the shell is being used, and the shell
+variable name length has a maximum length of 20.
+.sp
+.LP
+To refer to a variable's value, precede its name with a `\fB$\fR'. Certain
+references (described below) can be used to select specific words from the
+value, or to display other information about the variable. Braces can be used
+to insulate the reference from other characters in an input-line word.
+.sp
+.LP
+Variable substitution takes place after the input line is analyzed, aliases are
+resolved, and I/O redirections are applied. Exceptions to this are variable
+references in I/O redirections (substituted at the time the redirection is
+made), and backquoted strings (see Command Substitution).
+.sp
+.LP
+Variable substitution can be suppressed by preceding the \fB$\fR with a
+\fB\e\fR, except within double-quotes where it always occurs. Variable
+substitution is suppressed inside of single-quotes. A \fB$\fR is escaped if
+followed by a space character, tab or newline.
+.sp
+.LP
+Variables can be created, displayed, or destroyed using the \fBset\fR and
+\fBunset\fR commands. Some variables are maintained or used by the shell. For
+instance, the \fBargv\fR variable contains an image of the shell's argument
+list. Of the variables used by the shell, a number are toggles; the shell does
+not care what their value is, only whether they are set or not.
+.sp
+.LP
+Numerical values can be operated on as numbers (as with the \fB@\fR built-in
+command). With numeric operations, an empty value is considered to be zero. The
+second and subsequent words of multiword values are ignored. For instance, when
+the \fBverbose\fR variable is set to any value (including an empty value),
+command input is echoed on the terminal.
+.sp
+.LP
+Command and filename substitution is subsequently applied to the words that
+result from the variable substitution, except when suppressed by double-quotes,
+when \fBnoglob\fR is set (suppressing filename substitution), or when the
+reference is quoted with the \fB:q\fR modifier. Within double-quotes, a
+reference is expanded to form (a portion of) a quoted string; multiword values
+are expanded to a string with embedded space characters. When the \fB:q\fR
+modifier is applied to the reference, it is expanded to a list of
+space-separated words, each of which is quoted to prevent subsequent command or
+filename substitutions.
+.sp
+.LP
+Except as noted below, it is an error to refer to a variable that is not set.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fIvar\fR\fR
+.ad
+.br
+.na
+\fB\fB${\fR\fIvar\fR\fB}\fR\fR
+.ad
+.RS 17n
+.rt  
+These are replaced by words from the value of \fIvar\fR, each separated by a
+space character. If \fIvar\fR is an environment variable, its value is returned
+(but `\fB:\fR' modifiers and the other forms given below are not available).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fIvar\fR\fB[\fR\fIindex\fR\fB]\fR\fR
+.ad
+.br
+.na
+\fB\fB${\fR\fIvar\fR\fB[\fR\fIindex\fR\fB]}\fR\fR
+.ad
+.RS 17n
+.rt  
+These select only the indicated words from the value of \fIvar\fR. Variable
+substitution is applied to \fIindex\fR\|, which can consist of (or result in) a
+either single number, two numbers separated by a `\fB\(mi\fR\&', or an
+asterisk. Words are indexed starting from 1; a `\fB*\fR' selects all words. If
+the first number of a range is omitted (as with \fB$argv[\(mi2]\fR), it
+defaults to 1. If the last number of a range is omitted (as with
+\fB$argv[1\(mi]\fR), it defaults to \fB$#\fR\fIvar\fR (the word count). It is
+not an error for a range to be empty if the second argument is omitted (or
+within range).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$#\fR\fIname\fR\fR
+.ad
+.br
+.na
+\fB\fB${#\fR\fIname\fR\fB}\fR\fR
+.ad
+.RS 17n
+.rt  
+These give the number of words in the variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$0\fR\fR
+.ad
+.RS 17n
+.rt  
+This substitutes the name of the file from which command input is being read
+except for setuid shell scripts. An error occurs if the name is not known.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fIn\fR\fR
+.ad
+.br
+.na
+\fB\fB${\fR\fIn\fR\fB}\fR\fR
+.ad
+.RS 17n
+.rt  
+Equivalent to \fB$argv[\fR\fIn\fR\fB]\fR\fI\&.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$*\fR\fR
+.ad
+.RS 17n
+.rt  
+Equivalent to \fB$argv[*]\fR.
+.RE
+
+.sp
+.LP
+The modifiers \fB:e\fR, \fB:h\fR, \fB:q\fR, \fB:r\fR, \fB:t\fR, and \fB:x\fR
+can be applied (see \fBHistory\fR \fBSubstitution\fR), as can \fB:gh\fR,
+\fB:gt\fR, and \fB:gr\fR. If \fB{\|}\fR (braces) are used, then the modifiers
+must appear within the braces. The current implementation allows only one such
+modifier per expansion.
+.sp
+.LP
+The following references can not be modified with \fB:\fR modifiers.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$?\fR\fIvar\fR\fR
+.ad
+.br
+.na
+\fB\fB${?\fR\fIvar\fR\fB}\fR\fR
+.ad
+.RS 11n
+.rt  
+Substitutes the string 1 if \fIvar\fR is set or 0 if it is not set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$?0\fR\fR
+.ad
+.RS 11n
+.rt  
+Substitutes 1 if the current input filename is known or 0 if it is not.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$$\fR\fR
+.ad
+.RS 11n
+.rt  
+Substitutes the process number of the (parent) shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$<\fR\fR
+.ad
+.RS 11n
+.rt  
+Substitutes a line from the standard input, with no further interpretation
+thereafter. It can be used to read from the keyboard in a C shell script.
+.RE
+
+.SS "Command and Filename Substitutions"
+.sp
+.LP
+Command and filename substitutions are applied selectively to the arguments of
+built-in commands. Portions of expressions that are not evaluated are not
+expanded. For non-built-in commands, filename expansion of the command name is
+done separately from that of the argument list; expansion occurs in a subshell,
+after I/O redirection is performed.
+.SS "Command Substitution"
+.sp
+.LP
+A command enclosed by backquotes (\|\fB`\fR\|.\|.\|.\|\fB`\fR\|) is performed
+by a subshell. Its standard output is broken into separate words at each space
+character, tab and newline; null words are discarded. This text replaces the
+backquoted string on the current command line. Within double-quotes, only
+newline characters force new words; space and tab characters are preserved.
+However, a final newline is ignored. It is therefore possible for a command
+substitution to yield a partial word.
+.SS "Filename Substitution"
+.sp
+.LP
+Unquoted words containing any of the characters \fB*\fR, \fB?\fR, \fB[\fR or
+\fB{\fR, or that begin with ~, are expanded (also known as \fIglobbing\fR) to
+an alphabetically sorted list of filenames, as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB*\fR
+.ad
+.RS 24n
+.rt  
+Match any (zero or more) characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB?\fR
+.ad
+.RS 24n
+.rt  
+Match any single character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR.\|.\|.\fB]\fR\fR
+.ad
+.RS 24n
+.rt  
+Match any single character in the enclosed list(s) or range(s). A list is a
+string of characters. A range is two characters separated by a dash
+(\fB\(mi\fR), and includes all the characters in between in the \fBASCII\fR
+collating sequence (see \fBascii\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB{\fIstr\fR\fB,\fR \fIstr\fR\fB,\fR .\|.\|. \fB}\fR\fR
+.ad
+.RS 24n
+.rt  
+Expand to each string (or filename-matching pattern) in the comma-separated
+list. Unlike the pattern-matching expressions above, the expansion of this
+construct is not sorted. For instance, \fB{b,a}\fR expands to `\fBb\fR'
+`\fBa\fR', (not `\fBa\fR' `\fBb\fR'). As special cases, the characters \fB{\fR
+and \fB}\fR, along with the string \fB{\|}\fR, are passed undisturbed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB~[\fIuser\fR]\fR
+.ad
+.RS 24n
+.rt  
+Your home directory, as indicated by the value of the variable \fBhome\fR, or
+that of \fIuser\fR, as indicated by the password entry for \fIuser\fR.
+.RE
+
+.sp
+.LP
+Only the patterns \fB*\fR, \fB?\fR and \fB[\fR.\|.\|.\fB]\fR imply pattern
+matching; an error results if no filename matches a pattern that contains them.
+The `\fB\&.\fR' (dot character), when it is the first character in a filename
+or pathname component, must be matched explicitly. The \fB/\fR (slash) must
+also be matched explicitly.
+.SS "Expressions and Operators"
+.sp
+.LP
+A number of C shell built-in commands accept expressions, in which the
+operators are similar to those of C and have the same precedence. These
+expressions typically appear in the \fB@\fR, \fBexit\fR, \fBif\fR, \fBset\fR
+and \fBwhile\fR commands, and are often used to regulate the flow of control
+for executing commands. Components of an expression are separated by white
+space.
+.sp
+.LP
+Null or missing values are considered \fB0\fR. The result of all expressions is
+a string, which can represent decimal numbers.
+.sp
+.LP
+The following C shell operators are grouped in order of precedence:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(\|\fR.\|.\|.\|\fB\|)\fR\fR
+.ad
+.RS 19n
+.rt  
+grouping
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB>\fB~\fR\fR
+.ad
+.RS 19n
+.rt  
+one's complement
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.RS 19n
+.rt  
+logical negation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB* / %\fR\fR
+.ad
+.RS 19n
+.rt  
+multiplication, division, remainder. These are right associative, which can
+lead to unexpected results. Combinations should be grouped explicitly with
+parentheses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+ \(mi\fR\fR
+.ad
+.RS 19n
+.rt  
+addition, subtraction (also right associative)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB<< >>\fR\fR
+.ad
+.RS 19n
+.rt  
+bitwise shift left, bitwise shift right
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB< > <= >=\fR\fR
+.ad
+.RS 19n
+.rt  
+less than, greater than, less than or equal to, greater than or equal to
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=\|= != =~ !~\fR\fR
+.ad
+.RS 19n
+.rt  
+equal to, not equal to, filename-substitution pattern match (described below),
+filename-substitution pattern mismatch
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB&\fR\fR
+.ad
+.RS 19n
+.rt  
+bitwise AND
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fR
+.ad
+.RS 19n
+.rt  
+bitwise XOR (exclusive or)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB|\fR\fR
+.ad
+.RS 19n
+.rt  
+bitwise inclusive OR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB&&\fR\fR
+.ad
+.RS 19n
+.rt  
+logical AND
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB|\|\||\fR\fR
+.ad
+.RS 19n
+.rt  
+logical OR
+.RE
+
+.sp
+.LP
+The operators: \fB==\fR, \fB!=\fR, \fB=~\fR, and \fB!~\fR compare their
+arguments as strings; other operators use numbers. The operators \fB=~\fR and
+\fB!~\fR each check whether or not a string to the left matches a filename
+substitution pattern on the right. This reduces the need for \fBswitch\fR
+statements when pattern-matching between strings is all that is required.
+.sp
+.LP
+Also available are file inquiries:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Return true, or 1 if the user has read access. Otherwise it returns false, or
+0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if the user has write access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if the user has execute permission (or search permission on a directory).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if \fIfilename\fR exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if the user owns \fIfilename\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if \fIfilename\fR is of zero length (empty).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if \fIfilename\fR is a plain file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+True if \fIfilename\fR is a directory.
+.RE
+
+.sp
+.LP
+If \fIfilename\fR does not exist or is inaccessible, then all inquiries return
+false.
+.sp
+.LP
+An inquiry as to the success of a command is also available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB{\fR \fIcommand\fR\fB}\fR\fR
+.ad
+.RS 14n
+.rt  
+If \fIcommand\fR runs successfully, the expression evaluates to true, 1.
+Otherwise, it evaluates to false, 0. \fBNote:\fR Conversely, \fIcommand\fR
+itself typically returns 0 when it runs successfully, or some other value if it
+encounters a problem. If you want to get at the status directly, use the value
+of the \fBstatus\fR variable rather than this expression.
+.RE
+
+.SS "Control Flow"
+.sp
+.LP
+The shell contains a number of commands to regulate the flow of control in
+scripts and within limits, from the terminal. These commands operate by forcing
+the shell either to reread input (to \fIloop\fR), or to skip input under
+certain conditions (to \fIbranch\fR).
+.sp
+.LP
+Each occurrence of a \fBforeach\fR, \fBswitch\fR, \fBwhile\fR,
+\fBif\fR.\|.\|.\fBthen\fR and \fBelse\fR built-in command must appear as the
+first word on its own input line.
+.sp
+.LP
+If the shell's input is not seekable and a loop is being read, that input is
+buffered. The shell performs seeks within the internal buffer to accomplish the
+rereading implied by the loop. (To the extent that this allows, backward
+\fBgoto\fR commands succeeds on nonseekable inputs.)
+.SS "Command Execution"
+.sp
+.LP
+If the command is a C shell built-in command, the shell executes it directly.
+Otherwise, the shell searches for a file by that name with execute access. If
+the command name contains a \fB/\fR, the shell takes it as a pathname, and
+searches for it. If the command name does not contain a \fB/\fR, the shell
+attempts to resolve it to a pathname, searching each directory in the
+\fBpath\fR variable for the command. To speed the search, the shell uses its
+hash table (see the \fBrehash\fR built-in command) to eliminate directories
+that have no applicable files. This hashing can be disabled with the \fB-c\fR
+or \fB-t\fR, options, or the \fBunhash\fR built-in command.
+.sp
+.LP
+As a special case, if there is no \fB/\fR in the name of the script and there
+is an alias for the word \fBshell\fR, the expansion of the \fBshell\fR alias is
+prepended (without modification) to the command line. The system attempts to
+execute the first word of this special (late-occurring) alias, which should be
+a full pathname. Remaining words of the alias's definition, along with the text
+of the input line, are treated as arguments.
+.sp
+.LP
+When a pathname is found that has proper execute permissions, the shell forks a
+new process and passes it, along with its arguments, to the kernel using the
+\fBexecve\fR(\|) system call (see \fBexec\fR(2)). The kernel then attempts to
+overlay the new process with the desired program. If the file is an executable
+binary (in \fBa.out\fR(4) format) the kernel succeeds and begins executing the
+new process. If the file is a text file and the first line begins with
+\fB#!\fR, the next word is taken to be the pathname of a shell (or command) to
+interpret that script. Subsequent words on the first line are taken as options
+for that shell. The kernel invokes (overlays) the indicated shell, using the
+name of the script as an argument.
+.sp
+.LP
+If neither of the above conditions holds, the kernel cannot overlay the file
+and the \fBexecve\fR(\|) call fails (see \fBexec\fR(2)). The C shell then
+attempts to execute the file by spawning a new shell, as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the first character of the file is a \fB#\fR, a C shell is invoked.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, a Bourne shell is invoked.
+.RE
+.SS "Signal Handling"
+.sp
+.LP
+The shell normally ignores \fBQUIT\fR signals. Background jobs are immune to
+signals generated from the keyboard, including hangups (\fBHUP\fR). Other
+signals have the values that the C shell inherited from its environment. The
+shell's handling of interrupt and terminate signals within scripts can be
+controlled by the \fBonintr\fR built-in command. Login shells catch the
+\fBTERM\fR signal. Otherwise, this signal is passed on to child processes. In
+no case are interrupts allowed when a login shell is reading the
+\fB\&.logout\fR file.
+.SS "Job Control"
+.sp
+.LP
+The shell associates a numbered \fIjob\fR with each command sequence to keep
+track of those commands that are running in the background or have been stopped
+with \fBTSTP\fR signals (typically Control-z). When a command or command
+sequence (semicolon separated list) is started in the background using the
+\fB&\fR metacharacter, the shell displays a line with the job number in
+brackets and a list of associated process numbers:
+.sp
+.in +2
+.nf
+[1] 1234
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To see the current list of jobs, use the \fBjobs\fR built-in command. The job
+most recently stopped (or put into the background if none are stopped) is
+referred to as the \fIcurrent\fR job and is indicated with a `\fB+\fR'. The
+previous job is indicated with a `\fB\(mi\fR\&'. When the current job is
+terminated or moved to the foreground, this job takes its place (becomes the
+new current job).
+.sp
+.LP
+To manipulate jobs, refer to the \fBbg\fR, \fBfg\fR, \fBkill\fR, \fBstop\fR,
+and \fB%\fR built-in commands.
+.sp
+.LP
+A reference to a job begins with a `\fB%\fR'. By itself, the percent-sign
+refers to the current job.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR \fB%+\fR \fB%%\fR\fR
+.ad
+.RS 12n
+.rt  
+The current job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\(mi\fR\fR
+.ad
+.RS 12n
+.rt  
+The previous job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fIj\fR\fR
+.ad
+.RS 12n
+.rt  
+Refer to job \fIj\fR as in: `\fBkill\fR \fB-9\fR \fB%\fR\fIj\fR'. \fIj\fR can
+be a job number, or a string that uniquely specifies the command line by which
+it was started; `\fBfg %vi\fR' might bring a stopped \fBvi\fR job to the
+foreground, for instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%?\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+Specify the job for which the command line uniquely contains \fIstring\fR.
+.RE
+
+.sp
+.LP
+A job running in the background stops when it attempts to read from the
+terminal. Background jobs can normally produce output, but this can be
+suppressed using the `\fBstty tostop\fR' command.
+.SS "Status Reporting"
+.sp
+.LP
+While running interactively, the shell tracks the status of each job and
+reports whenever the job finishes or becomes blocked. It normally displays a
+message to this effect as it issues a prompt, in order to avoid disturbing the
+appearance of your input. When set, the \fBnotify\fR variable indicates that
+the shell is to report status changes immediately. By default, the \fBnotify\fR
+command marks the current process; after starting a background job, type
+\fBnotify\fR to mark it.
+.SS "Commands"
+.sp
+.LP
+Built-in commands are executed within the C shell. If a built-in command occurs
+as any component of a pipeline except the last, it is executed in a subshell.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:\fR\fR
+.ad
+.RS 26n
+.rt  
+Null command. This command is interpreted, but performs no action.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalias\fR [ \fIname\fR [ \fIdef\fR ] ]\fR
+.ad
+.RS 26n
+.rt  
+Assign \fIdef\fR to the alias \fIname\fR. \fIdef\fR is a list of words that can
+contain escaped history-substitution metasyntax. \fIname\fR is not allowed to
+be \fBalias\fR or \fBunalias\fR. If \fIdef\fR is omitted, the current
+definition for the alias \fIname\fR is displayed. If both \fIname\fR and
+\fIdef\fR are omitted, all aliases are displayed with their definitions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbg\fR [ \fB%\fR\fIjob .\|.\|.\fR ]\fR
+.ad
+.RS 26n
+.rt  
+Run the current or specified jobs in the background.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbreak\fR\fR
+.ad
+.RS 26n
+.rt  
+Resume execution after the \fBend\fR of the nearest enclosing \fBforeach\fR or
+\fBwhile\fR loop. The remaining commands on the current line are executed. This
+allows multilevel breaks to be written as a list of \fBbreak\fR commands, all
+on one line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbreaksw\fR\fR
+.ad
+.RS 26n
+.rt  
+Break from a \fBswitch\fR, resuming after the \fBendsw\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcase\fR \fIlabel\fR\fB:\fR\fR
+.ad
+.RS 26n
+.rt  
+A label in a \fBswitch\fR statement.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcd\fR [\fIdir\fR ]\fR
+.ad
+.br
+.na
+\fB\fBchdir\fR [\fIdir\fR ]\fR
+.ad
+.RS 26n
+.rt  
+Change the shell's working directory to directory \fIdir\fR. If no argument is
+given, change to the home directory of the user. If \fIdir\fR is a relative
+pathname not found in the current directory, check for it in those directories
+listed in the \fBcdpath\fR variable. If \fIdir\fR is the name of a shell
+variable whose value starts with a \fB/\fR, change to the directory named by
+that value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcontinue\fR\fR
+.ad
+.RS 26n
+.rt  
+Continue execution of the next iteration of the nearest enclosing \fBwhile\fR
+or \fBforeach\fR loop.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdefault:\fR\fR
+.ad
+.RS 26n
+.rt  
+Labels the default case in a \fBswitch\fR statement. The default should come
+after all \fBcase\fR labels. Any remaining commands on the command line are
+first executed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdirs\fR [\fB-l\fR]\fR
+.ad
+.RS 26n
+.rt  
+Print the directory stack, most recent to the left. The first directory shown
+is the current directory. With the \fB-l\fR argument, produce an unabbreviated
+printout; use of the ~ notation is suppressed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBecho\fR [\fB-n\fR] \fIlist\fR\fR
+.ad
+.RS 26n
+.rt  
+The words in \fIlist\fR are written to the shell's standard output, separated
+by space characters. The output is terminated with a newline unless the
+\fB-n\fR option is used. \fBcsh\fR, by default, invokes its built-in
+\fBecho\fR, if \fBecho\fR is called without the full pathname of a Unix
+command, regardless of the configuration of your \fBPATH\fR (see
+\fBecho\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeval\fR \fIargument\fR\fB\|.\|.\|.\fR\fR
+.ad
+.RS 26n
+.rt  
+Reads the arguments as input to the shell and executes the resulting
+command(s). This is usually used to execute commands generated as the result of
+command or variable substitution. See \fBtset\fR(1B) for an example of how to
+use \fBeval\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexec\fR \fIcommand\fR\fR
+.ad
+.RS 26n
+.rt  
+Execute \fIcommand\fR in place of the current shell, which terminates.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexit\fR [\fB(\fR\fIexpr\fR\fB)\fR]\fR
+.ad
+.RS 26n
+.rt  
+The calling shell or shell script exits, either with the value of the status
+variable or with the value specified by the expression \fIexpr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfg\fR [\fB%\fR\fIjob\fR ]\fR
+.ad
+.RS 26n
+.rt  
+Bring the current or specified \fIjob\fR into the foreground.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBforeach\fR \fIvar\fR\fB(\fR\fIwordlist\fR\fB)\fR\fR
+.ad
+.br
+.na
+\fB\&.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBend\fR\fR
+.ad
+.RS 26n
+.rt  
+The variable \fIvar\fR is successively set to each member of \fIwordlist\fR.
+The sequence of commands between this command and the matching \fBend\fR is
+executed for each new value of \fIvar\fR. Both \fBforeach\fR and \fBend\fR must
+appear alone on separate lines.
+.sp
+The built-in command \fBcontinue\fR can be used to terminate the execution of
+the current iteration of the loop and the built-in command \fBbreak\fR can be
+used to terminate execution of the \fBforeach\fR command. When this command is
+read from the terminal, the loop is read once prompting with \fB?\fR before any
+statements in the loop are executed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglob\fR \fIwordlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform filename expansion on \fIwordlist\fR. Like \fBecho\fR, but no \fB\e\fR
+escapes are recognized. Words are delimited by \fINULL\fR characters in the
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgoto\fR\fIlabel\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified \fIlabel\fR is a filename and a command expanded to yield a
+label. The shell rewinds its input as much as possible and searches for a line
+of the form \fIlabel\fR\fB:\fR possibly preceded by space or tab characters.
+Execution continues after the indicated line. It is an error to jump to a label
+that occurs between a \fBwhile\fR or \fBfor\fR built-in command and its
+corresponding \fBend\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhashstat\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print a statistics line indicating how effective the internal hash table for
+the \fIpath\fR variable has been at locating commands (and avoiding
+\fBexec\fRs). An \fBexec\fR is attempted for each component of the \fIpath\fR
+where the hash function indicates a possible hit and in each component that
+does not begin with a `\fB/\fR'. These statistics only reflect the
+effectiveness of the \fIpath\fR variable, not the \fIcdpath\fR variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhistory\fR [\fB-hr\fR] [\fIn\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Display the history list; if \fIn\fR is given, display only the \fIn\fR most
+recent events.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Reverse the order of printout to be most recent first rather than oldest first.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Display the history list without leading numbers. This is used to produce files
+suitable for sourcing using the \fB-h\fR option to \fIsource\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif (\fR\fIexpr\fR \fB)\fR\fIcommand\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the specified expression evaluates to true, the single \fIcommand\fR with
+arguments is executed. Variable substitution on \fIcommand\fR happens early, at
+the same time it does for the rest of the \fBif\fR command. \fIcommand\fR must
+be a simple command, not a pipeline, a command list, or a parenthesized command
+list. \fBNote:\fR I/O redirection occurs even if \fIexpr\fR is false, when
+\fIcommand\fR is \fInot\fR executed (this is a bug).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif (\fR\fBexpr\fR\fB) then\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBelse if (\fR\fIexpr2\fR\fB) then\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBelse\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBendif\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fIexpr\fR is true, commands up to the first \fBelse\fR are executed.
+Otherwise, if \fIexpr2\fR is true, the commands between the \fBelse if\fR and
+the second \fBelse\fR are executed. Otherwise, commands between the \fBelse\fR
+and the \fBendif\fR are executed. Any number of \fBelse if\fR pairs are
+allowed, but only one \fBelse\fR. Only one \fBendif\fR is needed, but it is
+required. The words \fBelse\fR and \fBendif\fR must be the first nonwhite
+characters on a line. The \fBif\fR must appear alone on its input line or after
+an \fBelse\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBjobs\fR [\fB-l\fR]\fR
+.ad
+.sp .6
+.RS 4n
+List the active jobs under job control.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+List process \fBID\fRs, in addition to the normal information.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkill\fR [\fIsig\fR ] [ \fIpid\fR ] [ \fB%\fR\fB\fIjob\fR ] .\|.\|.\fR\fR
+.ad
+.br
+.na
+\fB\fBkill\fR \fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTERM\fR (terminate) signal, by default, or the signal specified, to
+the specified process ID, the \fIjob\fR indicated, or the current \fIjob\fR.
+Signals are either given by number or by name. There is no default. Typing
+\fBkill\fR does not send a signal to the current job. If the signal being sent
+is \fBTERM\fR (terminate) or \fBHUP\fR (hangup), then the job or process is
+sent a \fBCONT\fR (continue) signal as well.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+List the signal names that can be sent.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlimit\fR [\fB-h\fR] [\fIresource\fR [\fImax-use\fR ] ]\fR
+.ad
+.sp .6
+.RS 4n
+Limit the consumption by the current process or any process it spawns, each not
+to exceed \fImax-use\fR on the specified \fIresource\fR. The string
+\fBunlimited\fR requests that the current limit, if any, be removed. If
+\fImax-use\fR is omitted, print the current limit. If \fIresource\fR is
+omitted, display all limits. Run the \fBsysdef\fR(1M) command to display
+maximum limits for certain resources in your system (although it does not
+report stack size). The values reported are in hexadecimal, but can be
+translated into decimal numbers using the \fBbc\fR(1) command.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Use hard limits instead of the current limits. Hard limits impose a ceiling on
+the values of the current limits. Only the privileged user can raise the hard
+limits.
+.RE
+
+\fIresource\fR is one of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcputime\fR\fR
+.ad
+.RS 23n
+.rt  
+Maximum \fBCPU\fR seconds per process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfilesize\fR\fR
+.ad
+.RS 23n
+.rt  
+Largest single file allowed. Limited to the size of the filesystem. (See
+\fBdf\fR(1M)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdatasize\fR (heapsize)\fR
+.ad
+.RS 23n
+.rt  
+Maximum data size (including stack) for the process. This is the size of your
+virtual memory See \fBswap\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstacksize\fR\fR
+.ad
+.RS 23n
+.rt  
+Maximum stack size for the process. The default stack size is 2^64 bytes. You
+can use \fBlimit\fR(1) to change this default within a shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcoredumpsize\fR\fR
+.ad
+.RS 23n
+.rt  
+Maximum size of a core dump (file). This limited to the size of the filesystem.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdescriptors\fR\fR
+.ad
+.RS 23n
+.rt  
+Maximum number of file descriptors. Run \fBsysdef()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmemorysize\fR\fR
+.ad
+.RS 23n
+.rt  
+Maximum size of virtual memory.
+.RE
+
+\fImax-use\fR is a number, with an optional scaling factor, as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBh\fR\fR
+.ad
+.RS 9n
+.rt  
+Hours (for \fBcputime\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBk\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIn\fR kilobytes. This is the default for all but \fBcputime\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fBm\fR\fR
+.ad
+.RS 9n
+.rt  
+\fIn\fR megabytes or minutes (for \fBcputime\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImm\fR\fB:\fR\fIss\fR\fR
+.ad
+.RS 9n
+.rt  
+Minutes and seconds (for \fBcputime\fR).
+.RE
+
+Example of limit: To limit the size of a core file dump to \fB0\fR Megabytes,
+type the following:
+.sp
+.in +2
+.nf
+\fBlimit coredumpsize 0M\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogin\fR [\fIusername\fR\|| \fB-p\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Terminate a login shell and invoke \fBlogin\fR(1). The \fB\&.logout\fR file is
+not processed. If \fIusername\fR is omitted, \fBlogin\fR prompts for the name
+of a user.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Preserve the current environment (variables).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogout\fR\fR
+.ad
+.sp .6
+.RS 4n
+Terminate a login shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnice\fR [\fB+\fR\fIn\fR \||\fB-\fR\fIn\fR ] [\fIcommand\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Increment the process priority value for the shell or for \fIcommand\fR by
+\fIn\fR. The higher the priority value, the lower the priority of a process,
+and the slower it runs. When given, \fIcommand\fR is always run in a subshell,
+and the restrictions placed on commands in simple \fBif\fR commands apply. If
+\fIcommand\fR is omitted, \fBnice\fR increments the value for the current
+shell. If no increment is specified, \fBnice\fR sets the process priority value
+to 4. The range of process priority values is from \(mi20 to 20. Values of
+\fIn\fR outside this range set the value to the lower, or to the higher
+boundary, respectively.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIn\fR\fR
+.ad
+.RS 6n
+.rt  
+Increment the process priority value by \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fIn\fR\fR
+.ad
+.RS 6n
+.rt  
+Decrement by \fIn\fR. This argument can be used only by the privileged user.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnohup\fR [\fIcommand\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Run \fIcommand\fR with \fBHUP\fRs ignored. With no arguments, ignore \fBHUP\fRs
+throughout the remainder of a script. When given, \fIcommand\fR is always run
+in a subshell, and the restrictions placed on commands in simple \fBif\fR
+statements apply. All processes detached with \fB&\fR are effectively
+\fBnohup\fR'd.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnotify\fR [\fB%\fR\fIjob\fR] .\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Notify the user asynchronously when the status of the current job or specified
+jobs changes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBonintr\fR [\fB\(mi\fR| \fIlabel\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Control the action of the shell on interrupts. With no arguments, \fBonintr\fR
+restores the default action of the shell on interrupts. (The shell terminates
+shell scripts and returns to the terminal command input level). With the
+\fB\(mi\fR argument, the shell ignores all interrupts. With a \fIlabel\fR
+argument, the shell executes a \fBgoto\fR \fIlabel\fR when an interrupt is
+received or a child process terminates because it was interrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpopd\fR [\fB+\fR\fIn\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Pop the directory stack and \fBcd\fR to the new top directory. The elements of
+the directory stack are numbered from 0 starting at the top.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIn\fR\fR
+.ad
+.RS 6n
+.rt  
+Discard the \fIn\fR'th entry in the stack.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpushd\fR [\fB+\fR\fIn\fR |\fIdir\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Push a directory onto the directory stack. With no arguments, exchange the top
+two elements.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIn\fR\fR
+.ad
+.RS 7n
+.rt  
+Rotate the \fIn\fR'th entry to the top of the stack and \fBcd\fR to it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdir\fR\fR
+.ad
+.RS 7n
+.rt  
+Push the current working directory onto the stack and change to \fIdir\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrehash\fR\fR
+.ad
+.sp .6
+.RS 4n
+Recompute the internal hash table of the contents of directories listed in the
+\fIpath\fR variable to account for new commands added. Recompute the internal
+hash table of the contents of directories listed in the \fIcdpath\fR variable
+to account for new directories added.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrepeat\fR \fIcount command\fR\fR
+.ad
+.sp .6
+.RS 4n
+Repeat \fIcommand count\fR times. \fIcommand\fR is subject to the same
+restrictions as with the one-line \fBif\fR statement.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBset\fR [\fIvar\fR [\fB=\fR \fIvalue\fR ] ]\fR
+.ad
+.br
+.na
+\fB\fBset\fR \fIvar\fR\fB[\fR\fIn\fR\fB] =\fR \fIword\fR\fR
+.ad
+.sp .6
+.RS 4n
+With no arguments, \fBset\fR displays the values of all shell variables.
+Multiword values are displayed as a parenthesized list. With the \fIvar\fR
+argument alone, \fBset\fR assigns an empty (null) value to the variable
+\fIvar\fR. With arguments of the form \fIvar\fR \fB=\fR \fIvalue\fR \fBset\fR
+assigns \fIvalue\fR to \fIvar\fR, where \fIvalue\fR is one of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIword\fR\fR
+.ad
+.RS 14n
+.rt  
+A single word (or quoted string).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(\fR\fIwordlist\fR\fB)\fR\fR
+.ad
+.RS 14n
+.rt  
+A space-separated list of words enclosed in parentheses.
+.RE
+
+Values are command and filename expanded before being assigned. The form
+\fBset\fR\fIvar\fR\fB[\fR\fIn\fR\fB] =\fR \fIword\fR replaces the \fIn\fR'th
+word in a multiword value with \fIword\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsetenv\fR [\fIVAR\fR [\fIword\fR ] ]\fR
+.ad
+.sp .6
+.RS 4n
+With no arguments, \fBsetenv\fR displays all environment variables. With the
+\fIVAR\fR argument, \fBsetenv\fR sets the environment variable
+\fB\fR\fIVAR\fR\fB \fR to have an empty (null) value. (By convention,
+environment variables are normally given upper-case names.) With both \fIVAR\fR
+and \fIword\fR arguments, \fBsetenv\fR sets the environment variable \fBNAME\fR
+to the value \fIword\fR, which must be either a single word or a quoted string.
+The most commonly used environment variables, \fBUSER\fR, \fBTERM\fR, and
+\fBPATH\fR, are automatically imported to and exported from the \fBcsh\fR
+variables \fBuser\fR, \fBterm\fR, and \fBpath\fR. There is no need to use
+\fBsetenv\fR for these. In addition, the shell sets the \fBPWD\fR environment
+variable from the \fBcsh\fR variable \fBcwd\fR whenever the latter changes.
+.sp
+The environment variables \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR,
+\fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR take immediate effect
+when changed within the C shell.
+.sp
+If any of the \fBLC_*\fR variables (\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+\fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see
+\fBenviron\fR(5)) are not set in the environment, the operational behavior of
+\fBcsh\fR for each corresponding locale category is determined by the value of
+the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents are
+used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
+none of the above variables is set in the environment, the "C" (U.S. style)
+locale determines how \fBcsh\fR behaves.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 15n
+.rt  
+Determines how \fBcsh\fR handles characters. When \fBLC_CTYPE\fR is set to a
+valid value, \fBcsh\fR can display and handle text and filenames containing
+valid characters for that locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_MESSAGES\fR\fR
+.ad
+.RS 15n
+.rt  
+Determines how diagnostic and informative messages are presented. This includes
+the language and style of the messages and the correct form of affirmative and
+negative responses. In the "C" locale, the messages are presented in the
+default form found in the program itself (in most cases, U.S./English).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_NUMERIC\fR\fR
+.ad
+.RS 15n
+.rt  
+Determines the value of the radix character, decimal point, (\fB\&.\fR) in the
+"C" locale) and thousand separator, empty string (\fB""\fR) in the "C" locale).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshift\fR [\fIvariable\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+The components of \fBargv\fR, or \fIvariable\fR, if supplied, are shifted to
+the left, discarding the first component. It is an error for the variable not
+to be set or to have a null value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsource\fR [\fB-h\fR] \fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reads commands from \fIname\fR. \fBsource\fR commands can be nested, but if
+they are nested too deeply the shell can run out of file descriptors. An error
+in a sourced file at any level terminates all nested \fBsource\fR commands.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Place commands from the file \fIname\fR on the history list without executing
+them.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR \fB%\fR\fIjobid .\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stop the current or specified background job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR \fIpid .\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stop the specified process, \fIpid\fR. (see \fBps\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsuspend\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stop the shell in its tracks, much as if it had been sent a stop signal with
+\fB^Z\fR. This is most often used to stop shells started by \fBsu\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBswitch (\fR\fIstring\fR\fB)\fR\fR
+.ad
+.br
+.na
+\fB\fBcase\fR \fIlabel\fR\fB:\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBbreaksw\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBdefault:\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBbreaksw\fR\fR
+.ad
+.br
+.na
+\fB\fBendsw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Each \fIlabel\fR is successively matched, against the specified \fIstring\fR,
+which is first command and filename expanded. The file metacharacters \fB*\fR,
+\fB?\fR and \fB[\fR.\|.\|.\fB]\fR can be used in the case labels, which are
+variable expanded. If none of the labels match before a "default" label is
+found, execution begins after the default label. Each \fBcase\fR statement and
+the \fBdefault\fR statement must appear at the beginning of a line. The command
+\fBbreaksw\fR continues execution after the \fBendsw\fR. Otherwise control
+falls through subsequent \fBcase\fR and \fBdefault\fR statements as with C. If
+no label matches and there is no default, execution continues after the
+\fBendsw\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtime\fR [\fIcommand\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+With no argument, print a summary of time used by this C shell and its
+children. With an optional \fIcommand\fR, execute \fIcommand\fR and print a
+summary of the time it uses. As of this writing, the \fBtime\fR built-in
+command does NOT compute the last 6 fields of output, rendering the output to
+erroneously report the value \fB0\fR for these fields.
+.sp
+.in +2
+.nf
+example %\fBtime ls\fR \fB-R\fR 
+        9.0u 11.0s 3:32 10% 0+0k 0+0io 0pf+0w
+.fi
+.in -2
+.sp
+
+(See the \fBEnvironment Variables and Predefined Shell Variables\fR sub-section
+on the \fBtime\fR variable.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBumask\fR [\fIvalue\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Display the file creation mask. With \fIvalue\fR, set the file creation mask.
+With \fIvalue\fR given in octal, the user can turn off any bits, but cannot
+turn on bits to allow new permissions. Common values include 077, restricting
+all permissions from everyone else; 002, giving complete access to the group,
+and read (and directory search) access to others; or 022, giving read (and
+directory search) but not write permission to the group and others.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunalias\fR \fIpattern\fR\fR
+.ad
+.sp .6
+.RS 4n
+Discard aliases that match (filename substitution) \fIpattern\fR. All aliases
+are removed by `\fBunalias *\fR'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunhash\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the internal hash tables for the \fIpath\fR and \fIcdpath\fR variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunlimit\fR [\fB-h\fR] [\fIresource\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Remove a limitation on \fIresource\fR. If no \fIresource\fR is specified, then
+all resource limitations are removed. See the description of the \fBlimit\fR
+command for the list of resource names.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Remove corresponding hard limits. Only the privileged user can do this.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunset\fR \fIpattern\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove variables whose names match (filename substitution) \fIpattern\fR. All
+variables are removed by `\fBunset *\fR'; this has noticeably distasteful side
+effects.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunsetenv\fR \fIvariable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove \fIvariable\fR from the environment. As with \fBunset\fR, pattern
+matching is not performed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwait\fR\fR
+.ad
+.sp .6
+.RS 4n
+Wait for background jobs to finish (or for an interrupt) before prompting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwhile (\fR\fIexpr\fR\fB)\fR\fR
+.ad
+.br
+.na
+\fB\|\|\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBend\fR\fR
+.ad
+.sp .6
+.RS 4n
+While \fIexpr\fR is true (evaluates to nonzero), repeat commands between the
+\fBwhile\fR and the matching \fBend\fR statement. \fBbreak\fR and
+\fBcontinue\fR can be used to terminate or continue the loop prematurely. The
+\fBwhile\fR and \fBend\fR must appear alone on their input lines. If the
+shell's input is a terminal, it prompts for commands with a question-mark until
+the \fBend\fR command is entered and then performs the commands in the loop.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR [\fIjob\fR ] [\fB&\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Bring the current or indicated \fIjob\fR to the foreground. With the ampersand,
+continue running \fIjob\fR in the background.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB@\fR [\fIvar\fR \fB=\fR\fIexpr\fR]\fR
+.ad
+.br
+.na
+\fB\fB@\fR [\fIvar\fR\fB[\fR\fIn\fR\fB]\fR\fB=\fR\fIexpr\fR]\fR
+.ad
+.sp .6
+.RS 4n
+With no arguments, display the values for all shell variables. With arguments,
+set the variable \fIvar\fR, or the \fIn\fR'th word in the value of \fIvar\fR,
+to the value that \fIexpr\fR evaluates to. (If \fB[\fR\fIn\fR\fB]\fR is
+supplied, both \fIvar\fR and its \fIn\fR'th component must already exist.)
+.sp
+If the expression contains the characters \fB>\fR, \fB<\fR, \fB&\fR, or
+\fB|\fR, then at least this part of \fIexpr\fR must be placed within
+parentheses.
+.sp
+The operators \fB*=\fR, \fB+=\fR, and so forth, are available as in C. The
+space separating the name from the assignment operator is optional. Spaces are,
+however, mandatory in separating components of \fIexpr\fR that would otherwise
+be single words.
+.sp
+Special postfix operators, \fB+\|+\fR and \fB\(mi\|\(mi\fR, increment or
+decrement \fIname\fR, respectively.
+.RE
+
+.SS "Environment Variables and Predefined Shell Variables"
+.sp
+.LP
+Unlike the Bourne shell, the C shell maintains a distinction between
+environment variables, which are automatically exported to processes it
+invokes, and shell variables, which are not. Both types of variables are
+treated similarly under variable substitution. The shell sets the variables
+\fBargv\fR, \fBcwd\fR, \fBhome\fR, \fBpath\fR, \fBprompt\fR, \fBshell\fR, and
+\fBstatus\fR upon initialization. The shell copies the environment variable
+\fBUSER\fR into the shell variable \fBuser\fR, \fBTERM\fR into \fBterm\fR, and
+\fBHOME\fR into \fBhome\fR, and copies each back into the respective
+environment variable whenever the shell variables are reset. \fBPATH\fR and
+\fBpath\fR are similarly handled. You need only set \fBpath\fR once in the
+\fB\&.cshrc\fR or \fB\&.login\fR file. The environment variable \fBPWD\fR is
+set from \fBcwd\fR whenever the latter changes. The following shell variables
+have predefined meanings:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBargv\fR\fR
+.ad
+.RS 13n
+.rt  
+Argument list. Contains the list of command line arguments supplied to the
+current invocation of the shell. This variable determines the value of the
+positional parameters \fB$1\fR, \fB$2\fR, and so on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcdpath\fR\fR
+.ad
+.RS 13n
+.rt  
+Contains a list of directories to be searched by the \fBcd\fR, \fBchdir\fR, and
+\fBpopd\fR commands, if the directory argument each accepts is not a
+subdirectory of the current directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcwd\fR\fR
+.ad
+.RS 13n
+.rt  
+The full pathname of the current directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBecho\fR\fR
+.ad
+.RS 13n
+.rt  
+Echo commands (after substitutions) just before execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfignore\fR\fR
+.ad
+.RS 13n
+.rt  
+A list of filename suffixes to ignore when attempting filename completion.
+Typically the single word `\fB\&.o\fR'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfilec\fR\fR
+.ad
+.RS 13n
+.rt  
+Enable filename completion, in which case the Control-d character \fBEOT\fR and
+the \fBESC\fR character have special significance when typed in at the end of a
+terminal input line:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOT\fR\fR
+.ad
+.RS 7n
+.rt  
+Print a list of all filenames that start with the preceding string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESC\fR\fR
+.ad
+.RS 7n
+.rt  
+Replace the preceding string with the longest unambiguous extension.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhardpaths\fR\fR
+.ad
+.RS 13n
+.rt  
+If set, pathnames in the directory stack are resolved to contain no
+symbolic-link components.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhistchars\fR\fR
+.ad
+.RS 13n
+.rt  
+A two-character string. The first character replaces \fB!\fR as the
+history-substitution character. The second replaces the carat (\fB^\fR) for
+quick substitutions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhistory\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of lines saved in the history list. A very large number can use up
+all of the C shell's memory. If not set, the C shell saves only the most recent
+command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhome\fR\fR
+.ad
+.RS 13n
+.rt  
+The user's home directory. The filename expansion of ~ refers to the value of
+this variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignoreeof\fR\fR
+.ad
+.RS 13n
+.rt  
+If set, the shell ignores \fBEOF\fR from terminals. This protects against
+accidentally killing a C shell by typing a Control-d.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmail\fR\fR
+.ad
+.RS 13n
+.rt  
+A list of files where the C shell checks for mail. If the first word of the
+value is a number, it specifies a mail checking interval in seconds (default 5
+minutes).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnobeep\fR\fR
+.ad
+.RS 13n
+.rt  
+Suppress the bell during command completion when asking the C shell to extend
+an ambiguous filename.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnoclobber\fR\fR
+.ad
+.RS 13n
+.rt  
+Restrict output redirection so that existing files are not destroyed by
+accident. \fB>\fR redirections can only be made to new files. \fB>>\fR
+redirections can only be made to existing files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnoglob\fR\fR
+.ad
+.RS 13n
+.rt  
+Inhibit filename substitution. This is most useful in shell scripts once
+filenames (if any) are obtained and no further expansion is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnonomatch\fR\fR
+.ad
+.RS 13n
+.rt  
+Return the filename substitution pattern, rather than an error, if the pattern
+is not matched. Malformed patterns still result in errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnotify\fR\fR
+.ad
+.RS 13n
+.rt  
+If set, the shell notifies you immediately as jobs are completed, rather than
+waiting until just before issuing a prompt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpath\fR\fR
+.ad
+.RS 13n
+.rt  
+The list of directories in which to search for commands. \fBpath\fR is
+initialized from the environment variable \fBPATH\fR, which the C shell updates
+whenever \fBpath\fR changes. A null word ('') specifies the current directory.
+The default is typically \fB(/usr/bin .)\fR. One can override this initial
+search path upon \fBcsh\fR start-up by setting it in \fB\&.cshrc\fR or
+\fB\&.login\fR (for login shells only). If \fBpath\fR becomes unset, only full
+pathnames execute. An interactive C shell normally hashes the contents of the
+directories listed after reading \fB\&.cshrc\fR, and whenever \fBpath\fR is
+reset. If new commands are added, use the \fBrehash\fR command to update the
+table.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprompt\fR\fR
+.ad
+.RS 13n
+.rt  
+The string an interactive C shell prompts with. Noninteractive shells leave the
+\fBprompt\fR variable unset. Aliases and other commands in the \fB\&.cshrc\fR
+file that are only useful interactively, can be placed after the following
+test: `\fBif ($?prompt == 0) exit\fR', to reduce startup time for
+noninteractive shells. A \fB!\fR in the \fBprompt\fR string is replaced by the
+current event number. The default prompt is \fIhostname\fR\fB%\fR for mere
+mortals, or \fIhostname\fR\fB#\fR for the privileged user.
+.sp
+The setting of \fB$prompt\fR has three meanings:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$prompt\fR not set\fR
+.ad
+.RS 25n
+.rt  
+non-interactive shell, test \fB$?prompt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$prompt\fR set but \fB== ""\fR\fR
+.ad
+.RS 25n
+.rt  
+\fB\&.cshrc\fR called by the \fBwhich\fR(1) command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$prompt\fR set and \fB!= ""\fR\fR
+.ad
+.RS 25n
+.rt  
+normal interactive shell.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsavehist\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of lines from the history list that are saved in ~/.history when the
+user logs out. Large values for \fBsavehist\fR slow down the C shell during
+startup.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshell\fR\fR
+.ad
+.RS 13n
+.rt  
+The file in which the C shell resides. This is used in forking shells to
+interpret files that have execute bits set, but that are not executable by the
+system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR\fR
+.ad
+.RS 13n
+.rt  
+The status returned by the most recent command. If that command terminated
+abnormally, 0200 is added to the status. Built-in commands that fail return
+exit status 1; all other built-in commands set status to 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtime\fR\fR
+.ad
+.RS 13n
+.rt  
+Control automatic timing of commands. Can be supplied with one or two values.
+The first is the reporting threshold in \fBCPU\fR seconds. The second is a
+string of tags and text indicating which resources to report on. A tag is a
+percent sign (\fB%\fR) followed by a single upper-case letter (unrecognized
+tags print as text):
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%D\fR\fR
+.ad
+.RS 6n
+.rt  
+Average amount of unshared data space used in Kilobytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%E\fR\fR
+.ad
+.RS 6n
+.rt  
+Elapsed (wallclock) time for the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%F\fR\fR
+.ad
+.RS 6n
+.rt  
+Page faults.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%I\fR\fR
+.ad
+.RS 6n
+.rt  
+Number of block input operations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%K\fR\fR
+.ad
+.RS 6n
+.rt  
+Average amount of unshared stack space used in Kilobytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%M\fR\fR
+.ad
+.RS 6n
+.rt  
+Maximum real memory used during execution of the process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%O\fR\fR
+.ad
+.RS 6n
+.rt  
+Number of block output operations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%P\fR\fR
+.ad
+.RS 6n
+.rt  
+Total CPU time \(em U (user) plus S (system) \(em as a percentage of E
+(elapsed) time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%S\fR\fR
+.ad
+.RS 6n
+.rt  
+Number of seconds of CPU time consumed by the kernel on behalf of the user's
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%U\fR\fR
+.ad
+.RS 6n
+.rt  
+Number of seconds of \fBCPU\fR time devoted to the user's process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%W\fR\fR
+.ad
+.RS 6n
+.rt  
+Number of swaps.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%X\fR\fR
+.ad
+.RS 6n
+.rt  
+Average amount of shared memory used in Kilobytes.
+.RE
+
+The default summary display outputs from the \fB%U\fR, \fB%S\fR, \fB%E\fR,
+\fB%P\fR, \fB%X\fR, \fB%D\fR, \fB%I\fR, \fB%O\fR, \fB%F\fR, and \fB%W\fR tags,
+in that order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverbose\fR\fR
+.ad
+.RS 13n
+.rt  
+Display each command after history substitution takes place.
+.RE
+
+.SS "Large File Behavior"
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBcsh\fR when
+encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.cshrc\fR\fR
+.ad
+.RS 15n
+.rt  
+Read at beginning of execution by each shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.login\fR\fR
+.ad
+.RS 15n
+.rt  
+Read by login shells after \fB\&.cshrc\fR at login.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.logout\fR\fR
+.ad
+.RS 15n
+.rt  
+Read by login shells at logout.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.history\fR\fR
+.ad
+.RS 15n
+.rt  
+Saved history for use at next login.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/sh\fR\fR
+.ad
+.RS 15n
+.rt  
+The Bourne shell, for shell scripts not starting with a `\fB#\fR'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/sh*\fR\fR
+.ad
+.RS 15n
+.rt  
+Temporary file for `\fB<<\fR\&'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 15n
+.rt  
+Source of home directories for `~\fIname\fR'.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbc\fR(1), \fBecho\fR(1), \fBlimit\fR(1), \fBlogin\fR(1), \fBls\fR(1),
+\fBmore\fR(1), \fBpfcsh\fR(1), \fBpfexec\fR(1), \fBps\fR(1), \fBsh\fR(1),
+\fBshell_builtins\fR(1), \fBtset\fR(1B), \fBwhich\fR(1), \fBdf\fR(1M),
+\fBswap\fR(1M), \fBsysdef\fR(1M), \fBaccess\fR(2), \fBexec\fR(2),
+\fBfork\fR(2), \fBpipe\fR(2), \fBa.out\fR(4), \fBascii\fR(5),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBtermio\fR(7I)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBYou have stopped jobs.\fR\fR
+.ad
+.RS 26n
+.rt  
+You attempted to exit the C shell with stopped jobs under job control. An
+immediate second attempt to exit succeeds, terminating the stopped jobs.
+.RE
+
+.SH WARNINGS
+.sp
+.LP
+The use of \fBsetuid\fR shell scripts is \fIstrongly\fR discouraged.
+.SH NOTES
+.sp
+.LP
+Words can be no longer than 1024 bytes. The system limits argument lists to
+1,048,576 bytes. However, the maximum number of arguments to a command for
+which filename expansion applies is 1706. Command substitutions can expand to
+no more characters than are allowed in the argument list. To detect looping,
+the shell restricts the number of \fBalias\fR substitutions on a single line to
+20.
+.sp
+.LP
+When a command is restarted from a stop, the shell prints the directory it
+started in if this is different from the current directory; this can be
+misleading (that is, wrong) as the job might have changed directories
+internally.
+.sp
+.LP
+Shell built-in functions are not stoppable/restartable. Command sequences of
+the form \fIa\fR \fIb\fR \fIc\fR are also not handled gracefully when stopping
+is attempted. If you suspend \fIb\fR, the shell never executes \fIc\fR. This is
+especially noticeable if the expansion results from an alias. It can be avoided
+by placing the sequence in parentheses to force it into a subshell.
+.sp
+.LP
+Commands within loops, prompted for by \fB?\fR, are not placed in the
+\fIhistory\fR list.
+.sp
+.LP
+Control structures should be parsed rather than being recognized as built-in
+commands. This would allow control commands to be placed anywhere, to be
+combined with \fB|\fR, and to be used with \fB&\fR and \fB;\fR metasyntax.
+.sp
+.LP
+It should be possible to use the \fB:\fR modifiers on the output of command
+substitutions. There are two problems with \fB:\fR modifier usage on variable
+substitutions: not all of the modifiers are available, and only one modifier
+per substitution is allowed.
+.sp
+.LP
+The \fBg\fR (global) flag in history substitutions applies only to the first
+match in each word, rather than all matches in all words. The common text
+editors consistently do the latter when given the \fBg\fR flag in a
+substitution command.
+.sp
+.LP
+Quoting conventions are confusing. Overriding the escape character to force
+variable substitutions within double quotes is counterintuitive and
+inconsistent with the Bourne shell.
+.sp
+.LP
+Symbolic links can fool the shell. Setting the \fBhardpaths\fR variable
+alleviates this.
+.sp
+.LP
+It is up to the user to manually remove all duplicate pathnames accrued from
+using built-in commands as
+.sp
+.in +2
+.nf
+set path = \fIpathnames\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+setenv PATH = \fIpathnames\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+more than once. These often occur because a shell script or a \fB\&.cshrc\fR
+file does something like
+.sp
+.in +2
+.nf
+`set path=(/usr/local /usr/hosts $path)'
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+to ensure that the named directories are in the pathname list.
+.sp
+.LP
+The only way to direct the standard output and standard error separately is by
+invoking a subshell, as follows:
+.sp
+.in +2
+.nf
+\fIcommand\fR > \fIoutfile\fR ) >& \fIerrorfile\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Although robust enough for general use, adventures into the esoteric periphery
+of the C shell can reveal unexpected quirks.
+.sp
+.LP
+If you start \fBcsh\fR as a login shell and you do not have a \fB\&.login\fR in
+your home directory, then the \fBcsh\fR reads in the \fB/etc/.login\fR.
+.sp
+.LP
+When the shell executes a shell script that attempts to execute a non-existent
+command interpreter, the shell returns an erroneous diagnostic message that the
+shell script file does not exist.
+.SH BUGS
+.sp
+.LP
+As of this writing, the \fBtime\fR built-in command does \fBnot\fR compute the
+last 6 fields of output, rendering the output to erroneously report the value
+\fB0\fR for these fields:
+.sp
+.in +2
+.nf
+example %\fBtime ls -R\fR
+        9.0u 11.0s 3:32 10% 0+0k 0+0io 0pf+0w
+.fi
+.in -2
+.sp
+

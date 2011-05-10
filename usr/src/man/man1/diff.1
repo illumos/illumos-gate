@@ -1,0 +1,511 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH diff 1 "22 Sep 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+diff \- compare two files
+.SH SYNOPSIS
+.LP
+.nf
+\fBdiff\fR [\fB-bitw\fR] [\fB-c\fR | \fB-e\fR | \fB-f\fR | \fB-h\fR | \fB-n\fR | \fB-u\fR] \fIfile1\fR \fIfile2\fR
+.fi
+
+.LP
+.nf
+\fBdiff\fR [\fB-bitw\fR] [\fB-C\fR \fInumber\fR | \fB-U\fR \fInumber\fR] \fIfile1\fR \fIfile2\fR
+.fi
+
+.LP
+.nf
+\fBdiff\fR [\fB-bitw\fR] [\fB-D\fR \fIstring\fR] \fIfile1\fR \fIfile2\fR
+.fi
+
+.LP
+.nf
+\fBdiff\fR [\fB-bitw\fR] [\fB-c\fR | \fB-e\fR | \fB-f\fR | \fB-h\fR | \fB-n\fR | \fB-u\fR] [\fB-l\fR] [\fB-r\fR] [\fB-s\fR] 
+     [\fB-S\fR \fIname\fR] \fIdirectory1\fR \fIdirectory2\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdiff\fR utility will compare the contents of \fIfile1\fR and \fIfile2\fR
+and write to standard output a list of changes necessary to convert \fIfile1\fR
+into \fIfile2\fR. This list should be minimal. Except in rare circumstances,
+\fBdiff\fR finds a smallest sufficient set of file differences. No output will
+be produced if the files are identical.
+.sp
+.LP
+The normal output contains lines of these forms:
+.sp
+.in +2
+.nf
+\fIn1\fR \fBa\fR \fIn3,n4\fR
+\fIn1,n2\fR \fBd\fR \fIn3\fR
+\fIn1,n2\fR \fBc\fR \fIn3,n4\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIn1\fR and \fIn2\fR represent lines \fIfile1\fR and \fIn3\fR and
+\fIn4\fR represent lines in \fIfile2\fR These lines resemble \fBed\fR(1)
+commands to convert \fIfile1\fR to \fIfile2\fR. By exchanging \fBa\fR for
+\fBd\fR and reading backward, \fIfile2\fR can be converted to \fIfile1\fR. As
+in \fBed\fR, identical pairs, where \fIn1\fR=\fIn2\fR or \fIn3\fR=\fIn4\fR, are
+abbreviated as a single number.
+.sp
+.LP
+Following each of these lines come all the lines that are affected in the first
+file flagged by `\|\fB<\fR\|', then all the lines that are affected in the
+second file flagged by `\|\fB>\fR\|'.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fR
+.ad
+.RS 7n
+.rt  
+Ignores trailing blanks (spaces and tabs) and treats other strings of blanks as
+equivalent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fR
+.ad
+.RS 7n
+.rt  
+Ignores the case of letters. For example, `\fBA\fR' will compare equal to
+`\fBa\fR'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fR
+.ad
+.RS 7n
+.rt  
+Expands TAB characters in output lines. Normal or \fB-c\fR output adds
+character(s) to the front of each line that may adversely affect the
+indentation of the original source lines and make the output lines difficult to
+interpret. This option will preserve the original source's indentation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fR
+.ad
+.RS 7n
+.rt  
+Ignores all blanks (SPACE and TAB characters) and treats all other strings of
+blanks as equivalent. For example, `\fBif ( a =\|= b )\fR' will compare equal
+to `\fBif(a=\|=b)\fR'.
+.RE
+
+.sp
+.LP
+The following options are mutually exclusive:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fR
+.ad
+.RS 14n
+.rt  
+Produces a listing of differences with three lines of context. With this
+option, output format is modified slightly. That is, output begins with
+identification of the files involved and their creation dates, then each change
+is separated by a line with a dozen \fB*\fR's. The lines removed from
+\fIfile1\fR are marked with '\(em'. The lines added to \fIfile2\fR are
+marked '\|+\|'. Lines that are changed from one file to the other are marked in both
+files with '\|!\|'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fInumber\fR \fR
+.ad
+.RS 14n
+.rt  
+Produces a listing of differences identical to that produced by \fB-c\fR with
+\fInumber\fR lines of context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR \fIstring\fR \fR
+.ad
+.RS 14n
+.rt  
+Creates a merged version of \fIfile1\fR and \fIfile2\fR with C preprocessor
+controls included so that a compilation of the result without defining
+\fIstring\fR is equivalent to compiling \fIfile1\fR, while defining
+\fIstring\fR will yield \fIfile2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fR
+.ad
+.RS 14n
+.rt  
+Produces a script of only \fBa\fR, \fBc\fR, and \fBd\fR commands for the editor
+\fBed\fR, which will recreate \fIfile2\fR from \fIfile1\fR. In connection with
+the \fB-e\fR option, the following shell program may help maintain multiple
+versions of a file. Only an ancestral file ($1) and a chain of
+version-to-version \fBed\fR scripts ($2,$3,...) made by \fBdiff\fR need be on
+hand. A ``latest version'' appears on the standard output.
+.sp
+.in +2
+.nf
+(shift; cat $*; echo a\'1,$p') | ed \(mi $1
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fR
+.ad
+.RS 13n
+.rt  
+Produces a similar script, not useful with \fBed\fR, in the opposite order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fR
+.ad
+.RS 13n
+.rt  
+Does a fast, half-hearted job. It works only when changed stretches are short
+and well separated, but does work on files of unlimited length. Options
+\fB-c\fR, \fB-C\fR, \fB-D\fR, \fB-e\fR, \fB-f\fR, and \fB-n\fR are unavailable
+with \fB-h\fR. \fBdiff\fR does not descend into directories with this option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fR
+.ad
+.RS 13n
+.rt  
+Produces a script similar to \fB-e\fR, but in the opposite order and with a
+count of changed lines on each insert or delete command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 13n
+.rt  
+Produces a listing of differences with three lines of context. The output is
+similar to that of the \fB-c\fR option, except that the context is "unified".
+Removed and changed lines in \fIfile1\fR are marked by a '\fB-\fR' while lines
+added or changed in \fIfile2\fR are marked by a '\fB+\fR'. Both versions of
+changed lines appear in the output, while added, removed, and context lines
+appear only once. The identification of \fIfile1\fR and \fIfile2\fR is
+different, with "\fB\(mi\(mi\(mi\fR" and "\fB+++\fR" being printed where
+"\fB***\fR" and "\fB\(mi\(mi\(mi\fR" would appear with the \fB-c\fR option.
+Each change is separated by a line of the form
+.sp
+.in +2
+.nf
+\fB@@ -\fIn1\fR,\fIn2\fR +\fIn3\fR,\fIn4\fR @@\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR \fInumber\fR\fR
+.ad
+.RS 13n
+.rt  
+Produces a listing of differences identical to that produced by \fB-u\fR with
+\fInumber\fR lines of context.
+.RE
+
+.sp
+.LP
+The following options are used for comparing directories:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fR
+.ad
+.RS 12n
+.rt  
+Produces output in long format. Before the \fBdiff\fR, each text file is piped
+through \fBpr\fR(1) to paginate it. Other differences are remembered and
+summarized after all text file differences are reported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fR
+.ad
+.RS 12n
+.rt  
+Applies \fBdiff\fR recursively to common subdirectories encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 12n
+.rt  
+Reports files that are identical. These identical files would not otherwise be
+mentioned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR \fIname\fR \fR
+.ad
+.RS 12n
+.rt  
+Starts a directory \fBdiff\fR in the middle, beginning with the file
+\fIname\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile1\fR \fR
+.ad
+.br
+.na
+\fB\fIfile2\fR\fR
+.ad
+.RS 15n
+.rt  
+A path name of a file or directory to be compared. If either \fIfile1\fR or
+\fIfile2\fR is \fB\(mi\fR, the standard input will be used in its place.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdirectory1\fR \fR
+.ad
+.br
+.na
+\fB\fIdirectory2\fR\fR
+.ad
+.RS 15n
+.rt  
+A path name of a directory to be compared.
+.RE
+
+.sp
+.LP
+If only one of \fIfile1\fR and \fIfile2\fR is a directory, \fBdiff\fR will be
+applied to the non-directory file and the file contained in the directory file
+with a filename that is the same as the last component of the non-directory
+file.
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBdiff\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTypical output of the diff command
+.sp
+.LP
+In the following command, \fBdir1\fR is a directory containing a directory
+named \fBx\fR, \fBdir2\fR is a directory containing a directory named \fBx\fR,
+\fBdir1/x\fR and \fBdir2/x\fR both contain files named \fBdate.out\fR, and
+\fBdir2/x\fR contains a file named \fBy\fR:
+
+.sp
+.in +2
+.nf
+example% \fBdiff -r dir1 dir2\fR
+Common subdirectories: dir1/x and dir2/x
+
+Only in dir2/x: y
+
+diff -r dir1/x/date.out dir2/x/date.out
+
+1c1
+
+< Mon Jul  2 13:12:16 PDT 1990
+
+---
+
+> Tue Jun 19 21:41:39 PDT 1990
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBdiff\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTZ\fR \fR
+.ad
+.RS 7n
+.rt  
+Determines the locale for affecting the timezone used for calculating file
+timestamps written with the \fB-C\fR and \fB-c\fR options.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+No differences were found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 7n
+.rt  
+Differences were found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>1\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/d?????\fR \fR
+.ad
+.RS 19n
+.rt  
+temporary file used for comparison
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/diffh\fR \fR
+.ad
+.RS 19n
+.rt  
+executable file for \fB-h\fR option
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbdiff\fR(1), \fBcmp\fR(1), \fBcomm\fR(1), \fBdircmp\fR(1), \fBed\fR(1),
+\fBpr\fR(1), \fBsdiff\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Editing scripts produced under the \fB-e\fR or \fB-f\fR options are naive about
+creating lines consisting of a single period (\fB\&.\fR).
+.sp
+.LP
+Missing NEWLINE at end of file indicates that the last line of the file in
+question did not have a NEWLINE. If the lines are different, they will be
+flagged and output, although the output will seem to indicate they are the
+same.

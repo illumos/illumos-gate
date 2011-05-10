@@ -1,0 +1,238 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dmae_req 9S "18 Nov 2004" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+ddi_dmae_req \- DMA engine request structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/dma_engine.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris x86 DDI specific (Solaris x86 DDI).
+.SH DESCRIPTION
+.sp
+.LP
+A device driver uses the \fBddi_dmae_req\fR structure to describe the
+parameters for a \fBDMA\fR channel. This structure contains all the information
+necessary to set up the channel, except for the \fBDMA\fR memory address and
+transfer count. The defaults, as specified below, support most standard
+devices. Other modes might be desirable for some devices, or to increase
+performance. The \fBDMA\fR engine request structure is passed to
+\fBddi_dmae_prog\fR(9F).
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The \fBddi_dmae_req\fR structure contains several members, each of which
+controls some aspect of DMA engine operation. The structure members associated
+with supported DMA engine options are described here.
+.sp
+.in +2
+.nf
+uchar_tder_command;          /* Read / Write *
+/uchar_tder_bufprocess;      /* Standard / Chain */
+uchar_tder_path;             /* 8 / 16 / 32 */
+uchar_tder_cycles;           /* Compat / Type A / Type B / Burst */
+uchar_tder_trans;            /* Single / Demand / Block */
+ddi_dma_cookie_t*(*proc)();  /* address of nextcookie routine */
+void*procparms;              /* parameter for nextcookie call */
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBder_command\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies what \fBDMA\fR operation is to be performed. The value
+\fBDMAE_CMD_WRITE\fR signifies that data is to be transferred from memory to
+the \fBI/O \fRdevice. The value \fBDMAE_CMD_READ\fR signifies that data is to
+be transferred from the \fBI/O\fR device to memory. This field must be set by
+the driver before calling \fBddi_dmae_prog()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBder_bufprocess\fR\fR
+.ad
+.RS 18n
+.rt  
+On some bus types, a driver can set \fBder_bufprocess\fR to the value
+\fBDMAE_BUF_CHAIN\fR to specify that multiple \fBDMA\fR cookies will be given
+to the \fBDMA\fR engine for a single \fBI/O\fR transfer. This action causes a
+scatter/gather operation. In this mode of operation, the driver calls
+\fBddi_dmae_prog()\fR to give the \fBDMA\fR engine the \fBDMA\fR engine request
+structure and a pointer to the first cookie. The \fBproc\fR structure member
+must be set to the address of a driver \fBnextcookie\fR routine. This routine
+takes one argument, specified by the \fBprocparms\fR structure member, and
+returns a pointer to a structure of type \fBddi_dma_cookie_t\fR that specifies
+the next cookie for the \fBI/O \fR transfer. When the \fBDMA\fR engine is ready
+to receive an additional cookie, the bus nexus driver controlling that
+\fBDMA\fR engine calls the routine specified by the \fBproc\fR structure member
+to obtain the next cookie from the driver. The driver's \fBnextcookie\fR
+routine must then return the address of the next cookie (in static storage) to
+the bus nexus routine that called it. If there are no more segments in the
+current \fBDMA\fR window, then \fB(*proc)()\fR must return the \fBNULL\fR
+pointer.
+.sp
+A driver can specify the \fBDMAE_BUF_CHAIN\fR flag only if the particular bus
+architecture supports the use of multiple \fBDMA\fR cookies in a single
+\fBI/O\fR transfer. A bus \fBDMA\fR engine can support this feature either with
+a fixed-length scatter/gather list, or by an interrupt chaining feature. A
+driver must determine whether its parent bus nexus supports this feature by
+examining the scatter/gather list size returned in the \fBdlim_sgllen\fR member
+of the \fBDMA\fR limit structure returned by the driver's call to
+\fBddi_dmae_getlim()\fR. (See \fBddi_dma_lim_x86\fR(9S).) If the size of the
+scatter/gather list is 1, then no chaining is available. The driver must not
+specify the \fBDMAE_BUF_CHAIN\fR flag in the \fBddi_dmae_req\fR structure it
+passes to \fBddi_dmae_prog()\fR, and the driver need not provide a
+\fBnextcookie\fR routine.
+.sp
+If the size of the scatter/gather list is greater than 1, then \fBDMA\fR
+chaining is available, and the driver has two options. Under the first option,
+the driver chooses not to use the chaining feature. In this case (a) the driver
+must \fBset\fR the size of the scatter/gather list to 1 before passing it to
+the \fBDMA\fR setup routine, and (b) the driver must not set the
+\fBDMAE_BUF_CHAIN\fR flag.
+.sp
+Under the second option, the driver chooses to use the chaining feature, in
+which case, (a) it should leave the size of the scatter/gather list alone, and
+(b) it must set the \fBDMAE_BUF_CHAIN\fR flag in the \fBddi_dmae_req\fR
+structure. Before calling \fBddi_dmae_prog()\fR, the driver must \fIprefetch\fR
+cookies by repeatedly calling \fBddi_dma_nextseg\fR(9F) and
+\fBddi_dma_segtocookie\fR(9F) until either (1) the end of the DMA window is
+reached (\fBddi_dma_nextseg\fR(9F) returns \fBNULL\fR), or (2) the size of the
+scatter/gather list is reached, whichever occurs first. These cookies must be
+saved by the driver until they are requested by the nexus driver calling the
+driver's \fBnextcookie\fR routine. The driver's \fBnextcookie\fR routine must
+return the prefetched cookies in order, one cookie for each call to the
+\fBnextcookie\fR routine, until the list of prefetched cookies is exhausted.
+After the end of the list of cookies is reached, the \fBnextcookie\fR routine
+must return the \fBNULL\fR pointer.
+.sp
+The size of the scatter/gather list determines how many discontiguous segments
+of physical memory can participate in a single \fBDMA\fR transfer. \fBISA\fR
+bus \fBDMA\fR engines have no scatter/gather capability, so their
+scatter/gather list sizes are 1. Other finite scatter/gather list sizes would
+also be possible. For performance reasons, drivers should use the chaining
+capability if it is available on their parent bus.
+.sp
+As described above, a driver making use of \fBDMA\fR chaining must prefetch
+\fBDMA\fR cookies before calling \fBddi_dmae_prog()\fR. The reasons for this
+are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+First, the driver must have some way to know the total \fBI/O\fR count with
+which to program the \fBI/O\fR device. This \fBI/O\fR count must match the
+total size of all the \fBDMA\fR segments that will be chained together into one
+\fBDMA\fR operation. Depending on the size of the scatter/gather list and the
+memory position and alignment of the \fBDMA\fR object, all or just part of the
+current \fBDMA\fR window might be able to participate in a single \fBI/O\fR
+operation. The driver must compute the \fBI/O\fR count by adding up the sizes
+of the prefetched \fBDMA\fR cookies. The number of cookies whose sizes are to
+be summed is the lesser of (a) the size of the scatter/gather list, or (b) the
+number of segments remaining in the window.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Second, on some bus architectures, the driver's \fBnextcookie\fR routine can be
+called from a high-level interrupt routine. If the cookies were not prefetched,
+the \fBnextcookie\fR routine would have to call \fBddi_dma_nextseg()\fR and
+\fBddi_dma_segtocookie()\fR from a high-level interrupt routine, which is not
+recommended.
+.RE
+When breaking a \fBDMA\fR window into segments, the system arranges for the end
+of every segment whose number is an integral multiple of the scatter/gather
+list size to fall on a device-granularity boundary, as specified in the
+\fBdlim_granular\fR field in the \fBddi_dma_lim_x86\fR(9S) structure.
+.sp
+If the scatter/gather list size is 1 (either because no chaining is available
+or because the driver does not want to use the chaining feature), then the
+total \fBI/O\fR count for a single \fBDMA\fR operation is the size of \fBDMA\fR
+segment denoted by the single \fBDMA\fR cookie that is passed in the call to
+\fBddi_dmae_prog()\fR. In this case, the system arranges for each \fBDMA\fR
+segment to be a multiple of the device-granularity size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBder_path\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the \fBDMA\fR transfer size. The default of zero
+(\fBDMAE_PATH_DEF\fR) specifies \fBISA\fR compatibility mode. In that mode,
+channels 0, 1, 2, and 3 are programmed in 8-bit mode (\fBDMAE_PATH_8\fR), and
+channels 5, 6, and 7 are programmed in 16-bit, count-by-word mode
+(\fBDMAE_PATH_16\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBder_cycles\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the timing mode to be used during \fBDMA\fR data transfers. The
+default of zero (\fBDMAE_CYCLES_1\fR) specifies \fBISA\fR compatible timing.
+Drivers using this mode must also specify \fBDMAE_TRANS_SNGL\fR in the
+\fBder_trans\fR structure member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBder_trans\fR\fR
+.ad
+.RS 18n
+.rt  
+Specifies the bus transfer mode that the \fBDMA\fR engine should expect from
+the device. The default value of zero (\fBDMAE_TRANS_SNGL\fR) specifies that
+the device performs one transfer for each bus arbitration cycle. Devices that
+use \fBISA\fR compatible timing (specified by a value of zero, which is the
+default, in the \fBder_cycles\fR structure member) should use the
+\fBDMAE_TRANS_SNGL\fR mode.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architecturex86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_segtocookie\fR(9F),
+\fBddi_dmae\fR(9F), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S)

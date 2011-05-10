@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rmvb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+rmvb \- remove a message block from a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBrmvb\fR(\fBmblk_t *\fR\fImp\fR, \fBmblk_t *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Message from which a block is to be removed. \fBmblk_t\fR is an instance of the
+\fBmsgb\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Message block to be removed.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrmvb()\fR function removes a message block (\fIbp\fR) from a message
+(\fImp\fR), and returns a pointer to the altered message. The message block is
+not freed, merely removed from the message. It is the module or driver's
+responsibility to free the message block.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, a pointer to the message (minus the removed block) is returned.
+The pointer is \fBNULL\fR if \fIbp\fR was the only block of the message before
+\fBrmvb()\fR was called. If the designated message block (\fIbp\fR) does not
+exist, \fB-1\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBrmvb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+This routine removes all zero-length \fBM_DATA\fR message blocks from the given
+message. For each message block in the message, save the next message block
+(line 10). If the current message block is of type \fBM_DATA\fR and has no data
+in its buffer (line 11), then remove it from the message (line 12) and free it
+(line 13). In either case, continue with the next message block in the message
+(line 16).
+.sp
+.in +2
+.nf
+1  void
+ 2  xxclean(mp)
+ 3      mblk_t *mp;
+ 4  {
+ 5	       mblk_t *tmp;
+ 6	       mblk_t *nmp;
+ 7
+ 8	       tmp = mp;
+ 9	       while (tmp) {
+10		           nmp = tmp->b_cont;
+11		           if ((tmp->b_datap->db_type == M_DATA) &&
+		                 (tmp->b_rptr == tmp->b_wptr)) {
+12			           (void) rmvb(mp, tmp);
+13			           freeb(tmp);
+14		           }
+15		           tmp = nmp;
+16	       }
+17  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfreeb\fR(9F), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

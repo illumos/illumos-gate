@@ -1,0 +1,277 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam 3PAM "22 Feb 2005" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam \- PAM (Pluggable Authentication Module)
+.SH SYNOPSIS
+.LP
+.nf
+#include <security/pam_appl.h>
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBPAM\fR framework, \fBlibpam\fR, consists of an interface library and
+multiple authentication  service modules.  The \fBPAM\fR interface library is
+the layer implementing the  Application Programming Interface ( \fBAPI\fR ).
+The authentication service modules are a set of dynamically loadable objects
+invoked by the \fBPAM\fR \fBAPI\fR to provide a particular type of user
+authentication. \fBPAM\fR gives system administrators the flexibility of
+choosing any authentication service available on the system to perform
+authentication. This framework also allows new authentication service modules
+to be plugged in and made available without modifying the applications.
+.sp
+.LP
+Refer to  \fISolaris Security for Developers Guide\fR for information about
+providing authentication, account management, session management, and password
+management through PAM modules.
+.SS "Interface Overview"
+.sp
+.LP
+The \fBPAM\fR library interface consists of six categories of functions,  the
+names for which all start with the prefix  \fBpam_\fR.
+.sp
+.LP
+The first category contains functions for establishing and terminating an
+authentication activity, which are \fBpam_start\fR(3PAM) and
+\fBpam_end\fR(3PAM). The functions \fBpam_set_data\fR(3PAM) and
+\fBpam_get_data\fR(3PAM) maintain module specific data. The functions
+\fBpam_set_item\fR(3PAM) and \fBpam_get_item\fR(3PAM) maintain state
+information. \fBpam_strerror\fR(3PAM) is the function that returns error status
+information.
+.sp
+.LP
+The second category contains the functions that authenticate an individual user
+and set the credentials of the user, \fBpam_authenticate\fR(3PAM) and
+\fBpam_setcred\fR(3PAM).
+.sp
+.LP
+The third category of  \fBPAM\fR interfaces is account management. The function
+\fBpam_acct_mgmt\fR(3PAM) checks for password aging and access-hour
+restrictions.
+.sp
+.LP
+Category four contains the functions that perform session management after
+access to the system has been granted. See \fBpam_open_session\fR(3PAM) and
+\fBpam_close_session\fR(3PAM)
+.sp
+.LP
+The fifth category consists of the function that changes authentication tokens,
+\fBpam_chauthtok\fR(3PAM). An authentication token is the object used to verify
+the identity of the user. In UNIX, an authentication token is a user's
+password.
+.sp
+.LP
+The sixth category of functions can be used to set values for \fBPAM\fR
+environment variables. See \fBpam_putenv\fR(3PAM), \fBpam_getenv\fR(3PAM), and
+\fBpam_getenvlist\fR(3PAM).
+.sp
+.LP
+The \fBpam_*(\|)\fR interfaces are implemented through the library
+\fBlibpam\fR. For each of the categories listed above, excluding categories one
+and six, dynamically loadable shared modules exist that provides the
+appropriate  service layer functionality upon demand. The functional entry
+points in the  service layer start with the  \fBpam_sm_\fR prefix.  The only
+difference between the \fBpam_sm_*(\|)\fR interfaces and their corresponding
+\fBpam_\fR interfaces is that all the \fBpam_sm_*(\|)\fR interfaces require
+extra parameters to pass service\(mispecific options to the shared modules.
+Refer to \fBpam_sm\fR(3PAM) for an overview of the \fBPAM\fR service module
+\fBAPIs.\fR
+.SS "Stateful Interface"
+.sp
+.LP
+A sequence of calls sharing a common set of state information is referred to as
+an authentication transaction.  An authentication  transaction begins with a
+call to \fBpam_start()\fR. \fBpam_start()\fR allocates space, performs various
+initialization activities, and assigns a \fBPAM\fR authentication handle to be
+used for subsequent calls to the library.
+.sp
+.LP
+After initiating an authentication transaction, applications can invoke
+\fBpam_authenticate()\fR to authenticate a particular user, and
+\fBpam_acct_mgmt()\fR to perform system entry management. For example, the
+application may want to determine if the user's  password has expired.
+.sp
+.LP
+If the user has been successfully authenticated, the application calls
+\fBpam_setcred()\fR to set any user credentials associated with the
+authentication service. Within one authentication transaction (between
+\fBpam_start()\fR and \fBpam_end()\fR), all calls to the  \fBPAM\fR interface
+should be made with the same authentication handle returned by
+\fBpam_start()\fR. This is necessary because certain service modules may store
+module-specific data in a handle that is intended for use by other modules. For
+example, during the call to \fBpam_authenticate()\fR, service modules may store
+data in the handle that is intended for use by \fBpam_setcred()\fR.
+.sp
+.LP
+To perform session management, applications call \fBpam_open_session()\fR.
+Specifically, the system may want to store  the total time for the session. The
+function \fBpam_close_session()\fR closes the current session.
+.sp
+.LP
+When necessary, applications can call \fBpam_get_item()\fR and
+\fBpam_set_item()\fR to access and to update specific authentication
+information. Such information may include the current username.
+.sp
+.LP
+To terminate an authentication transaction, the application simply calls
+\fBpam_end()\fR, which frees previously allocated space used to store
+authentication information.
+.SS "Application\(miAuthentication Service Interactive Interface"
+.sp
+.LP
+The authentication service in \fBPAM\fR does not communicate directly with the
+user; instead it relies on the application to perform all such interactions.
+The application passes a pointer to the function, \fBconv()\fR, along with any
+associated application data pointers, through a \fIpam_conv\fR structure to the
+authentication service when it initiates an authentication transaction, via a
+call to \fBpam_start()\fR. The service will then use the function,
+\fBconv()\fR, to prompt the user for data,  output error messages, and display
+text information. Refer to \fBpam_start\fR(3PAM) for more information.
+.SS "Stacking Multiple Schemes"
+.sp
+.LP
+The \fBPAM\fR architecture enables authentication by multiple authentication
+services through \fIstacking\fR. System entry applications, such as
+\fBlogin\fR(1), stack multiple service modules to authenticate users with
+multiple authentication services. The order in which authentication service
+modules are stacked is specified in the configuration file, \fBpam.conf\fR(4).
+A system administrator determines this ordering, and also determines  whether
+the same password can be used for all authentication services.
+.SS "Administrative Interface"
+.sp
+.LP
+The authentication library, \fB/usr/lib/libpam.so.1\fR, implements the
+framework interface. Various authentication services are  implemented by their
+own loadable modules whose paths are specified through the \fBpam.conf\fR(4)
+file.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBPAM\fR functions may return one of the following generic values,  or one
+of the values defined in the specific man pages:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 19n
+.rt  
+The function returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_OPEN_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBdlopen()\fR failed when dynamically loading a service module.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SYMBOL_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Symbol not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SERVICE_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Error in service module.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+System error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Memory buffer error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CONV_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Conversation failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.RS 19n
+.rt  
+Permission denied.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlogin\fR(1), \fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
+\fBpam_open_session\fR(3PAM), \fBpam_set_item\fR(3PAM),
+\fBpam_setcred\fR(3PAM), \fBpam_sm\fR(3PAM), \fBpam_start\fR(3PAM),
+\fBpam_strerror\fR(3PAM), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam()\fR are MT-Safe only if each thread within the
+multithreaded application uses its own  \fBPAM\fR handle.

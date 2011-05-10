@@ -1,0 +1,265 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.   All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_set_item 3PAM "31 Oct 2006" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_set_item, pam_get_item \- authentication information routines for PAM
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+\fBint\fR \fBpam_set_item\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIitem_type\fR,
+     \fBconst void *\fR\fIitem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpam_get_item\fR(\fBconst pam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIitem_type\fR,
+     \fBvoid **\fR\fIitem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_get_item()\fR and \fBpam_set_item()\fR functions allow applications
+and \fBPAM\fR service modules to access and to update \fBPAM\fR information as
+needed.  The information is specified by \fIitem_type\fR, and can be one of the
+following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUSER\fR\fR
+.ad
+.RS 19n
+.rt  
+The authenticated user name.  Applications that are trusted to correctly
+identify the authenticated user should set this item to the authenticated user
+name. See NOTES and \fBpam_unix_cred\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK\fR\fR
+.ad
+.RS 19n
+.rt  
+The user authentication token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CONV\fR\fR
+.ad
+.RS 19n
+.rt  
+The  \fBpam_conv\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_OLDAUTHTOK\fR\fR
+.ad
+.RS 19n
+.rt  
+The old user authentication token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_RESOURCE\fR\fR
+.ad
+.RS 19n
+.rt  
+A semicolon-separated list of \fIkey\fR=\fIvalue\fR pairs that represent the
+set of resource controls for application by \fBpam_setcred\fR(3PAM) or
+\fBpam_open_session\fR(3PAM). See the individual service module definitions,
+such as \fBpam_unix_cred\fR(5), for interpretations of the keys and values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_RHOST\fR\fR
+.ad
+.RS 19n
+.rt  
+The remote host name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_RUSER\fR\fR
+.ad
+.RS 19n
+.rt  
+The \fBrlogin\fR/\fBrsh\fR untrusted remote user name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SERVICE\fR\fR
+.ad
+.RS 19n
+.rt  
+The service name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_TTY\fR\fR
+.ad
+.RS 19n
+.rt  
+The tty name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER\fR\fR
+.ad
+.RS 19n
+.rt  
+The user name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_PROMPT\fR\fR
+.ad
+.RS 19n
+.rt  
+The default prompt used by  \fBpam_get_user()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPAM_REPOSITORY\fR
+.ad
+.RS 19n
+.rt  
+The repository that contains the authentication token information.
+.RE
+
+.sp
+.LP
+The pam_repository structure is defined as:
+.sp
+.in +2
+.nf
+struct pam_repository {
+    char   *type;       /* Repository type, e.g., files, */ 
+                        /* nis, ldap */
+    void   *scope;      /* Optional scope information */
+    size_t  scope_len;  /* length of scope information */
+};
+.fi
+.in -2
+
+.sp
+.LP
+The \fIitem_type\fR \fBPAM_SERVICE\fR can be set only by \fBpam_start()\fR and
+is read-only to both applications and service modules.
+.sp
+.LP
+For security reasons, the \fIitem_type\fR \fBPAM_AUTHTOK\fR and
+\fBPAM_OLDAUTHTOK\fR are available only to the module providers. The
+authentication module, account module, and session management module should
+treat \fBPAM_AUTHTOK\fR as the current authentication token and ignore
+\fBPAM_OLDAUTHTOK\fR. The password management module should treat
+\fBPAM_OLDAUTHTOK\fR as the current authentication token and \fBPAM_AUTHTOK\fR
+as the new authentication token.
+.sp
+.LP
+The \fBpam_set_item()\fR function is passed the authentication handle,
+\fIpamh\fR, returned by \fBpam_start()\fR, a pointer to the object, \fIitem\fR,
+and its type, \fIitem_type\fR. If successful, \fBpam_set_item()\fR copies the
+item to an internal storage area allocated by the  authentication module and
+returns  \fBPAM_SUCCESS\fR. An item that had been previously set will be
+overwritten by the new value.
+.sp
+.LP
+The \fBpam_get_item()\fR function is passed the authentication handle,
+\fIpamh\fR, returned by \fBpam_start()\fR, an \fIitem_type\fR, and the address
+of the pointer, \fIitem\fR, which is assigned the address of the requested
+object. The object data is valid until modified by a subsequent call to
+\fBpam_set_item()\fR for the same \fIitem_type\fR, or unless it is modified by
+any of the underlying service modules. If the item has not been previously set,
+\fBpam_get_item()\fR returns a null pointer.  An \fIitem\fR retrieved by
+\fBpam_get_item()\fR should not be modified or freed.  The item will be
+released by \fBpam_end()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBpam_get_item()\fR returns  \fBPAM_SUCCESS\fR; otherwise it
+returns an error code. Refer to \fBpam\fR(3PAM) for information on error
+related return values.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.sp
+.LP
+The functions in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpam\fR(3LIB), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
+\fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
+\fBpam_get_user\fR(3PAM), \fBpam_open_session\fR(3PAM),
+\fBpam_setcred\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5),
+\fBpam_unix_cred\fR(5)
+.SH NOTES
+.sp
+.LP
+If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is set and a service module does
+not recognize the type, the service module does not process any information,
+and returns \fBPAM_IGNORE\fR. If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is
+not set, a service module performs its default action.
+.sp
+.LP
+PAM_AUSER is not intended as a replacement for PAM_USER.  It is expected to be
+used to supplement PAM_USER when there is an authenticated user from a source
+other than \fBpam_authenticate\fR(3PAM). Such sources could be \fBsshd\fR
+host-based authentication, kerberized \fBrlogin\fR, and \fBsu\fR(1M).

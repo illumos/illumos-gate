@@ -1,0 +1,98 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc., All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uio 9S "26Mar 2009" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+uio \- scatter/gather I/O request structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/uio.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH DESCRIPTION
+.sp
+.LP
+A  \fBuio\fR structure describes an \fBI/O \fRrequest that can be broken up
+into different data storage areas (scatter/gather I/O). A request is a list of
+\fBiovec\fR structures (base-length pairs) indicating where in user space or
+kernel space the \fBI/O \fRdata is to be read or written.
+.sp
+.LP
+The contents of  \fBuio\fR structures passed to the driver through the entry
+points should not be written by the driver. The  \fBuiomove\fR(9F) function
+takes care of all overhead related to maintaining the state of the \fBuio\fR
+structure.
+.sp
+.LP
+\fBuio\fR structures allocated by the driver should be initialized to zero
+before use, by \fBbzero\fR(9F), \fBkmem_zalloc\fR(9F), or an equivalent.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+iovec_t      *uio_iov;      /* pointer to start of iovec */
+                            /* list for uio struc. */
+int          uio_iovcnt;    /* number of iovecs in list */
+off_t        uio_offset;    /* 32-bit offset into file where 
+                            /* data is xferred. See NOTES. */
+offset_t     uio_loffset;   /* 64-bit offset into file where */
+                            /* data is xferred. See NOTES. */
+uio_seg_t    uio_segflg;    /* ID's type of I/O transfer: */
+                            /* UIO_SYSSPACE:  kernel <-> kernel */
+                            /* UIO_USERSPACE: kernel <-> user */
+uint16_t     uio_fmode;     /* file mode flags (not driver setable) */
+daddr_t      uio_limit;     /* 32-bit ulimit for file (max. block */
+                            /* offset). not driver setable. */
+                            /* See NOTES. */
+diskaddr_t   uio_llimit;    /* 64-bit ulimit for file (max. block */
+                            /* offset). not driver setable. */
+                            /* See NOTES */
+ssize_t      uio_resid;     /* residual count */
+.fi
+.in -2
+
+.sp
+.LP
+The  \fBuio_iov\fR member is a pointer to the beginning of the \fBiovec\fR(9S)
+list for the  \fBuio\fR. When the \fBuio\fR structure is passed to the driver
+through an entry point, the driver should not set  \fBuio_iov\fR. When the
+\fBuio\fR structure is created by the driver,  \fBuio_iov\fR should be
+initialized by the driver and not written to afterward.
+.SH SEE ALSO
+.sp
+.LP
+\fBaread\fR(9E), \fBawrite\fR(9E), \fBread\fR(9E), \fBwrite\fR(9E),
+\fBbzero\fR(9F), \fBkmem_zalloc\fR(9F), \fBuiomove\fR(9F), \fBcb_ops\fR(9S),
+\fBiovec\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Only one structure, \fBuio_offset\fR or \fBuio_loffset\fR, should be
+interpreted by the driver. Which field the driver interprets is dependent upon
+the settings in the \fBcb_ops\fR(9S) structure.
+.sp
+.LP
+Only one structure, \fBuio_limit\fR or \fBuio_llimit\fR, should be interpreted
+by the driver. Which field the driver interprets is dependent upon the settings
+in the \fBcb_ops\fR(9S) structure.
+.sp
+.LP
+When performing \fBI/O \fRon a seekable device, the driver should not modify
+either the \fBuio_offset\fR or the \fBuio_loffset\fR field of the \fBuio\fR
+structure. \fBI/O \fRto such a device is constrained by the maximum offset
+value. When performing \fBI/O \fRon a device on which the concept of position
+has no relevance, the driver may preserve the \fBuio_offset\fR or
+\fBuio_loffset\fR, perform the \fBI/O \fRoperation, then restore the
+\fBuio_offset\fR or \fBuio_loffset\fR to the field's initial value. \fBI/O
+\fRperformed to a device in this manner is not constrained.

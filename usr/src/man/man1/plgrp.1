@@ -1,0 +1,375 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH plgrp 1 "8 Sep 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+plgrp \- observe and affect home lgroup and lgroup affinities of threads
+.SH SYNOPSIS
+.LP
+.nf
+\fBplgrp\fR [\fB-F\fR] [\fB-h\fR] \fIpid\fR |\fI core\fR [/\fIlwps\fR] ...
+.fi
+
+.LP
+.nf
+\fBplgrp\fR [\fB-F\fR] \fB-a\fR \fIlgroup_list\fR \fIpid\fR[/\fIlwps\fR] ...
+.fi
+
+.LP
+.nf
+\fBplgrp\fR [\fB-F\fR] \fB-H\fR \fIlgroup_list\fR \fIpid\fR[/\fIlwps\fR] ...
+.fi
+
+.LP
+.nf
+\fBplgrp\fR [\fB-F\fR] \fB-A\fR \fIlgroup_list\fR/\fInone\fR | \fIweak\fR |\fIstrong\fR [,...] \fIpid\fR 
+     [/\fIlwps\fR] ...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBplgrp\fR displays or sets the home \fBlgroup\fR and \fBlgroup\fR affinities
+for one or more processes, threads, or LWPs.
+.sp
+.LP
+An \fBlgroup\fR represents the set of CPU and memory-like hardware devices that
+are at most some distance (latency) apart from each other. Each \fBlgroup\fR in
+the system is identified by a unique \fBlgroup\fR ID. The \fBlgroups\fR are
+organized into a hierarchy to facilitate finding the nearest resources (see
+lgrpinfo(1) for more about \fBlgroups\fR and the \fBlgroup\fR hierarchy).
+.sp
+.LP
+By default, each thread is assigned a home \fBlgroup\fR upon creation. When the
+system needs to allocate a CPU or memory resource for a thread, it searches the
+lgroup hierarchy from the thread's home \fBlgroup\fR for the nearest available
+resources to the thread's home.
+.sp
+.LP
+Typically, the home \fBlgroup\fR for a thread is the lgroup for which the
+thread has the most affinity. Initially, the system chooses a home \fBlgroup\fR
+for each thread, but leaves the thread's affinity for that \fBlgroup\fR set to
+\fBnone\fR. If a thread sets a stronger affinity for an lgroup in its processor
+set other than its home, the thread is rehomed to that lgroup as long as the
+thread is not bound to a CPU. The thread can be re-homed to the \fBlgroup\fR in
+its processor set with the next highest affinity when the affinity (if any) for
+its home \fBlgroup\fR is removed (set to \fBnone\fR).
+.sp
+.LP
+The different levels of lgroup affinities and their semantics are fully
+described in \fBlgrp_affinity_set\fR(3LGRP).
+.SH USAGE
+.SS "Specifying lgroups"
+.sp
+.LP
+\fIlgroup_list\fR is a comma separated list of one or more of the following:
+.sp
+.in +2
+.nf
+- \fIlgroup_ID\fR
+- Range of \fIlgroup_ID\fRs specified as
+ <start \fIlgroup_ID\fR>-<end \fIlgroup_ID\fR>
+- all
+- root
+- leaves
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBall\fR keyword represents all lgroup IDs in the system. The \fBroot\fR
+keyword represents the ID of the root \fBlgroup\fR. The \fBleaves\fR keyword
+represents the IDs of all \fBleaf\fR \fBlgroups\fR, that is, lgroups which do
+not have any children.
+.SS "Specifying Processes and Threads"
+.sp
+.LP
+\fBplgrp\fR takes one or more space separated processes or threads as
+arguments. Processes and threads can be specified in a manner similiar to the
+\fBproc\fR(1) tools. A process ID may be specified as an integer \fIpid\fR or
+\fB/proc/\fR\fIpid\fR. Shell expansions can be used to specify processes when
+\fB/proc/\fR\fIpid\fR is used. For example, \fB/proc/*\fR can be used to
+specify all the processes in the system. If a process ID is given alone, then
+all the threads of the process are included as arguments to \fBplgrp\fR.
+.sp
+.LP
+A thread can be explicitly specified with its process ID and thread ID given
+together as \fIpid\fR\fB/\fR\fIlwpid\fR. Multiple threads of a process can be
+selected at once by using the hyphen (\fB-\fR) and comma(\fB,\fR). For example,
+\fIpid\fR\fB/1,2,7-9\fR specifies threads 1, 2, 7, 8, and 9 of the process with
+\fIpid\fR as its process ID.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIlgroup_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display \fBlgroup\fR affinities of specified processes or threads for the
+specified \fIlgroup_list\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR \fIlgroup_list\fR\fB/\fR\fInone\fR\fB|\fR\fIweak\fR\fB|\fR\fIstrong
+\fR\fB[,...]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set affinity of specified processes or threads for the specified
+\fIlgroup_list\fR.
+.sp
+A comma separated list of \fIlgroups\fR\fB/\fR\fIaffinity\fR assignments can be
+given to set several affinities at once.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Force by grabbing the target process even if another process has control.
+Caution should be exercised when using the \fB-F\fR flag. Imposing two
+controlling processes on one victim process can lead to chaos. Safety is
+assured only when the primary controlling process (typically a debugger) has
+stopped the victim process, but isn't doing anything during the application of
+this proc tool. See \fBWARNINGS\fR for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.sp .6
+.RS 4n
+Get home \fBlgroup\fR of specified processes and/or threads. If no options are
+specified, this is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR \fIlgroup_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set home \fBlgroup\fR of specified processes and threads.
+.sp
+This sets a strong affinity for the desired lgroup to rehome the threads. If
+more than one \fBlgroup\fR is specified, \fBplgrp\fR tries to home the threads
+to the \fBlgroups\fR in a round robin fashion.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlwps\fR\fR
+.ad
+.RS 8n
+.rt  
+Specifies thread. See \fBUSAGE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 8n
+.rt  
+Specifies process ID. See \fBUSAGE\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGetting the Home \fBlgroup\fR for the Shell
+.sp
+.LP
+The following example gets the home \fBlgroup\fR for the shell:
+
+.sp
+.in +2
+.nf
+% plgrp $$
+PID/LWPID    HOME
+3401/1        1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting the Home \fBlgroup\fR of Multiple Threads to the Root
+\fBlgroup\fR
+.sp
+.LP
+The following example sets the home \fBlgroup\fR of multiple threads to the
+root \fBlgroup\fR:
+
+.sp
+.in +2
+.nf
+% plgrp -H root `pgrep firefox`
+     PID/LWPID    HOME
+     918/1        1 => 0
+     934/1        2 => 0
+     934/2        1 => 0
+     934/3        2 => 0
+     934/625      1 => 0
+     934/626      2 => 0
+     934/624      2 => 0
+     934/623      2 => 0
+     934/630      1 => 0
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRGetting Two Threads' Affinities for \fBlgroups 0-2\fR
+.sp
+.LP
+The following example gets two threads' affinities for \fBlgroups 1-2\fR:
+
+.sp
+.in +2
+.nf
+% plgrp -a 0-2 101398/1 101337/1
+PID/LWPID    HOME  AFFINITY
+101398/1        1     0-2/none
+101337/1        1     0-2/none
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSetting \fBlgroup\fR Affinities
+.sp
+.LP
+The following example sets lgroup affinities:
+
+.sp
+.in +2
+.nf
+% plgrp -A 0/weak,1/none,2/strong 101398
+PID/LWPID    HOME       AFFINITY
+101398/1        1 => 2     0,2/none => 2/strong,0/weak
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Syntax error. Nothing was changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Non-fatal error or interrupt. Something might have changed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The command syntax is Unstable. The output formats are Unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrpinfo\fR(1), \fBmadv.so.1\fR(1), \fBpmadvise\fR(1), \fBpmap\fR(1),
+\fBproc\fR(1), \fBps\fR(1), \fBprstat\fR(1M), \fBlgrp_affinity_get\fR(3LGRP),
+\fBlgrp_affinity_set\fR(3LGRP), \fBlgrp_home\fR(3LGRP), \fBliblgrp\fR(3LIB),
+\fBproc\fR(4), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+Like the \fBproc\fR(1) tools, the \fBplgrp\fR utility stops its target
+processes while inspecting them and reports the results when invoked with any
+option.
+.sp
+.LP
+There are conditions under which processes can deadlock. A process can do
+nothing while it is stopped. Stopping a heavily used process in a production
+environment (even for a short amount of time) can cause severe bottlenecks and
+even hangs of these processes, making them to be unavailable to users. Thus,
+stopping a UNIX process in a production environment should be avoided. See
+\fBproc\fR(1).
+.sp
+.LP
+A process that is stopped by this tool might be identified by issuing the
+following command:
+.sp
+.in +2
+.nf
+/usr/bin/ps -eflL
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and looking for a \fBT\fR in the first column of the output. Certain processes,
+for example, \fBsched\fR, can show the \fBT\fR status by default most of the
+time.

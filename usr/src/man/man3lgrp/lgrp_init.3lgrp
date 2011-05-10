@@ -1,0 +1,114 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_init 3LGRP "26 Jan 2005" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_init \- initialize lgroup interface
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary\fR... ] 
+#include <sys/lgrp_user.h>
+
+\fBlgrp_cookie_t\fR \fBlgrp_init\fR(\fBlgrp_view_t\fR \fIview\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_init()\fR function initializes the lgroup interface and takes a
+snapshot of the lgroup hierarchy with the given \fIview\fR.  If the given
+\fIview\fR is \fBLGRP_VIEW_CALLER\fR, the snapshot contains only the resources
+that are available to the caller (for example, with respect to processor sets).
+When the \fIview\fR is \fBLGRP_VIEW_OS\fR, the snapshot contains what is
+available to the operating system.
+.sp
+.LP
+Given the \fIview\fR, \fBlgrp_init()\fR returns a cookie representing this
+snapshot of the lgroup hierarchy. This cookie should be used with other
+routines in the lgroup interface needing the lgroup hierarchy. The
+\fBlgrp_fini\fR(3LGRP) function should be called with the cookie when it is no
+longer needed.
+.sp
+.LP
+The lgroup hiearchy represents the latency topology of the machine.  The
+hierarchy is simplified to be a tree and can be used to find the nearest
+resources.
+.sp
+.LP
+The lgroup hiearchy consists of a root lgroup, which is the maximum  bounding
+locality group of the system, contains all the CPU and memory resources of the
+machine, and may contain  other locality groups that contain CPUs and memory
+within a smaller locality. The leaf lgroups contain resources within the
+smallest latency.
+.sp
+.LP
+The resources of a given lgroup come directly from the lgroup itself or from
+leaf lgroups contained within the lgroup. Leaf lgroups directly contain their
+own resources and do not encapsulate any other lgroups.
+.sp
+.LP
+The lgroup hierarchy can be used to find the nearest resources. From a given
+lgroup, the closest resources can be found in the lgroup itself. After that,
+the next nearest resources can be found in its parent lgroup, and so on until
+the root lgroup is reached where all the resources of the machine are located.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBlgrp_init()\fR returns a cookie. Otherwise it
+returns \fBLGRP_COOKIE_NONE\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBlgrp_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The view is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There was not enough memory to allocate the snapshot of the lgroup hierarchy.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_children\fR(3LGRP), \fBlgrp_cookie_stale\fR(3LGRP),
+\fBlgrp_cpus\fR(3LGRP), \fBlgrp_fini\fR(3LGRP), \fBlgrp_mem_size\fR(3LGRP),
+\fBlgrp_nlgrps\fR(3LGRP), \fBlgrp_parents\fR(3LGRP),
+\fBlgrp_resources\fR(3LGRP), \fBlgrp_root\fR(3LGRP), \fBlgrp_view\fR(3LGRP),
+\fBliblgrp\fR(3LIB), \fBattributes\fR(5)

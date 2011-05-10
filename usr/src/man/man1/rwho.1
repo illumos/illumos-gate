@@ -1,0 +1,73 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1992, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rwho 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+rwho \- who is logged in on local machines
+.SH SYNOPSIS
+.LP
+.nf
+\fBrwho\fR [\fB-a\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrwho\fR command produces output similar to \fBwho\fR(1), but for all
+machines on your network.  If no report has been received from a machine for 5
+minutes, \fBrwho\fR assumes the machine is down, and does not report users last
+known to be logged into that machine.
+.sp
+.LP
+If a user has not typed to the system for a minute or more, \fBrwho\fR reports
+this idle time.  If a user has not typed to the system for an hour or more, the
+user is omitted from the output of \fBrwho\fR unless the \fB-a\fR flag is
+given.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Report all users whether or not they have typed to the system in the past hour.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/rwho/whod.*\fR\fR
+.ad
+.RS 26n
+.rt  
+information about other machines
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfinger\fR(1), \fBruptime\fR(1), \fBwho\fR(1), \fBin.rwhod\fR(1M),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBrwho\fR does not work through gateways.
+.sp
+.LP
+The directory \fB/var/spool/rwho\fR must exist on the host from which
+\fBrwho\fR is run.
+.sp
+.LP
+This service takes up progressively more network bandwith as the number of
+hosts on the local net increases. For large networks, the cost becomes
+prohibitive.
+.sp
+.LP
+The \fBrwho\fR service daemon, \fBin.rwhod\fR(1M), must be enabled for this
+command to return useful results.

@@ -1,0 +1,146 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tmpnam 3C "18 May 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+tmpnam, tmpnam_r, tempnam \- create a name for a temporary file
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBchar *\fR\fBtmpnam\fR(\fBchar *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtmpnam_r\fR(\fBchar *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtempnam\fR(\fBconst char *\fR\fIdir\fR, \fBconst char *\fR\fIpfx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions generate file names that can be used safely for a temporary
+file.
+.SS "\fBtmpnam()\fR"
+.sp
+.LP
+The \fBtmpnam()\fR function always generates a file name using the path prefix
+defined as \fBP_tmpdir\fR in the <\fBstdio.h\fR> header. On Solaris systems,
+the default value for \fBP_tmpdir\fR is  \fB/var/tmp\fR. If \fIs\fR is
+\fINULL\fR, \fBtmpnam()\fR leaves its result in a thread-specific data area and
+returns a pointer to that area. The next call to \fBtmpnam()\fR by the same
+thread will destroy the contents of the area. If \fIs\fR is not \fINULL\fR, it
+is assumed to be the address of an array of at least \fBL_tmpnam\fR bytes,
+where \fBL_tmpnam\fR is a constant defined through inclusion of
+<\fBstdio.h\fR>. The \fB tmpnam()\fR function places its result in that array
+and returns \fIs\fR.
+.SS "\fBtmpnam_r()\fR"
+.sp
+.LP
+The \fBtmpnam_r()\fR function has the same functionality as \fBtmpnam()\fR
+except that if \fIs\fR is a null pointer, the function returns \fINULL\fR.
+.SS "\fBtempnam()\fR"
+.sp
+.LP
+The \fBtempnam()\fR function allows the user to control the choice of a
+directory. The argument \fIdir\fR points to the name of the directory in which
+the file is to be created. If \fIdir\fR is \fINULL\fR or points to a string
+that is not a name for an appropriate directory, the path prefix defined as
+\fBP_tmpdir\fR in the <\fBstdio.h\fR> header is used. If that directory is not
+accessible, \fB/tmp\fR is used. If, however, the \fBTMPDIR\fR environment
+variable is set in the user's environment, its value is used as the
+temporary-file directory.
+.sp
+.LP
+Many applications prefer that temporary files have certain initial character
+sequences in their names. The \fIpfx\fR argument may be \fINULL\fR or point to
+a string of up to five characters to be used as the initial characters of the
+temporary-file name.
+.sp
+.LP
+Upon successful completion, \fBtempnam()\fR uses \fBmalloc\fR(3C) to allocate
+space for a string, puts the generated pathname in that space, and returns a
+pointer to it. The pointer is suitable for use in a subsequent call to
+\fBfree()\fR. If \fBtempnam()\fR cannot return the expected result for any
+reason (for example, \fBmalloc()\fR failed), or if none of the above-mentioned
+attempts to find an appropriate directory was successful, a null pointer is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtempnam()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient storage space is available.
+.RE
+
+.SH USAGE
+.sp
+.LP
+These functions generate a different file name each time they are called.
+.sp
+.LP
+Files created using these functions and either \fBfopen\fR(3C) or
+\fBcreat\fR(2) are temporary only in the sense that they reside in a directory
+intended for temporary use, and their names are unique. It is the user's
+responsibility to remove the file when its use is ended.
+.sp
+.LP
+If called more than \fBTMP_MAX\fR (defined in <\fBstdio.h\fR>) times in a
+single process, these functions start recycling previously used names.
+.sp
+.LP
+Between the time a file name is created and the file is opened, it is possible
+for some other process to create a file with the same name. This can never
+happen if that other process is using these functions or \fBmktemp\fR(3C) and
+the file names are chosen to render duplication by other means unlikely.
+.sp
+.LP
+The \fBtmpnam()\fR function is safe to use in multithreaded applications
+because it employs thread-specific data if it is passed a NULL pointer.
+However, its use is discouraged. The \fBtempnam()\fR function is safe in
+multithreaded applications and should be used instead.
+.sp
+.LP
+When compiling multithreaded applications, the  \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should be used only with multithreaded
+applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability\fBtmpnam()\fR and \fBtempnam()\fR are Standard.
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBunlink\fR(2), \fBfopen\fR(3C), \fBfree\fR(3C),
+\fBmalloc\fR(3C), \fBmktemp\fR(3C), \fBmkstemp\fR(3C), \fBtmpfile\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

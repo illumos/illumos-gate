@@ -39,12 +39,15 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=xge clone_perms="xge 0666 root sys" perms="* 0666 root sys" \
     alias=pci17d5,5731 \
     alias=pci17d5,5831 \
     alias=pci17d5,5832
 file path=kernel/drv/$(ARCH64)/xge group=sys
 $(i386_ONLY)file path=kernel/drv/xge group=sys
+file path=usr/share/man/man7d/xge.7d
 legacy pkg=SUNWxge \
     desc="Neterion Xframe (I/II) 10 Gigabit Ethernet Adapter Driver" \
     name="Xframe 10GE NIC Driver"

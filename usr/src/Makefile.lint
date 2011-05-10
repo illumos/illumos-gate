@@ -269,6 +269,7 @@ COMMON_SUBDIRS = \
 	cmd/savecore \
 	cmd/sbdadm \
 	cmd/sdpadm \
+	cmd/sed \
 	cmd/setpgrp \
 	cmd/smbios \
 	cmd/sgs \

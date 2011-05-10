@@ -1,0 +1,233 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fputwc 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fputwc, putwc, putwchar \- put wide-character code on a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h> 
+#include <wchar.h> 
+
+\fBwint_t\fR \fBfputwc\fR(\fBwchar_t\fR \fIwc\fR, \fBFILE*\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBwint_t\fR \fBputwc\fR(\fBwchar_t\fR \fIwc\fR, \fBFILE*\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+#include <wchar.h> 
+
+\fBwint_t\fR \fBputwchar\fR(\fBwchar_t\fR \fIwc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfputwc()\fR function writes the character corresponding to the
+wide-character code \fIwc\fR to the output stream pointed to by \fIstream\fR,
+at the position indicated by the associated file-position indicator for the
+stream (if defined), and advances the indicator appropriately. If the file
+cannot support positioning requests, or if the stream was opened with append
+mode, the character is appended to the output stream.  If an error occurs while
+writing the character, the shift state of the output file is left in an
+undefined state.
+.sp
+.LP
+The \fBst_ctime\fR and \fBst_mtime\fR fields of the file will be marked for
+update between the successful execution of \fBfputwc()\fR and the next
+successful completion of a call to \fBfflush\fR(3C) or \fBfclose\fR(3C) on the
+same stream or a call to \fBexit\fR(2) or \fBabort\fR(3C).
+.sp
+.LP
+The \fBputwc()\fR function is equivalent to \fBfputwc()\fR, except that it is
+implemented as a macro.
+.sp
+.LP
+The call \fBputwchar(\fR\fIwc\fR\fB)\fR is equivalent to
+\fBputwc(\fR\fIwc,\fR\fB stdout)\fR\fI\&.\fR The \fBputwchar()\fR routine is
+implemented as a macro.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBfputwc()\fR, \fBputwc()\fR, and \fBputwchar()\fR
+return \fIwc\fR. Otherwise, they return \fBWEOF\fR, the error indicator for the
+stream is set, and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBfputwc()\fR, \fBputwc()\fR, and \fBputwchar()\fR functions will fail if
+either the stream is unbuffered or data in the \fIstream\fR's buffer needs to
+be written, and:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBO_NONBLOCK\fR flag is set for the file descriptor underlying
+\fIstream\fR and the process would be delayed in the write operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The file descriptor underlying \fIstream\fR is not a valid file descriptor open
+for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was made to write to a file that exceeds the maximum file size or
+the process's file size limit; or the file is a regular file and an attempt was
+made to write at or beyond the offset maximum associated with the corresponding
+stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The write operation was terminated due to the receipt of a signal, and no data
+was transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A physical I/O error has occurred, or the process is a member of a background
+process group attempting to write to its controlling terminal, \fBTOSTOP\fR is
+set, the process is neither ignoring nor blocking \fBSIGTTOU\fR, and the
+process group of the process is orphaned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 10n
+.rt  
+There was no free space remaining on the device containing the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt is made to write to a pipe or \fBFIFO\fR that is not open for
+reading by any process. A \fBSIGPIPE\fR signal will also be sent to the calling
+thread.
+.RE
+
+.sp
+.LP
+The \fBfputwc()\fR, \fBputwc()\fR, and \fBputwchar()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient storage space is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A request was made of a non-existent device, or the request was outside the
+capabilities of the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+The wide-character code \fIwc\fR does not correspond to a valid character.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Functions exist for the \fBputwc()\fR and \fBputwchar()\fR macros. To get the
+function form, the macro name must be undefined (for example, \fB#undef
+putc\fR).
+.sp
+.LP
+When the macro form is used, \fBputwc()\fR evaluates the \fIstream\fR argument
+more than once. In particular, \fBputwc(\fR\fIwc\fR\fB, \fR\fI*f++\fR\fB)\fR
+does not work sensibly.  The \fBfputwc()\fR function should be used instead
+when evaluating the \fIstream\fR argument has side effects.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBulimit\fR(2), \fBabort\fR(3C), \fBfclose\fR(3C),
+\fBferror\fR(3C), \fBfflush\fR(3C), \fBfopen\fR(3C), \fBsetbuf\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

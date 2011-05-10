@@ -1,0 +1,216 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getipsecalgbyname 3NSL "20 Aug 2003" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+getipsecalgbyname, getipsecalgbynum, freeipsecalgent \- query algorithm mapping
+entries
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-flag \&.\|.\|.\fR  \fIfile\fR \&.\|.\|.\fB-l\fRnsl [\fB -library \&.\|.\|. \fR] 
+#include <netdb.h>
+
+
+
+\fBstruct ipsecalgent *\fR\fBgetipsecalgbyname\fR
+     (\fBconst char *\fR\fIalg_name\fR, \fBint\fR \fIprotocol_num\fR, \fBint *\fR\fIerrnop\fR
+.fi
+
+.LP
+.nf
+\fBstruct ipsecalgent *\fR\fBgetipsecalgbynum\fR(\fBint\fR \fIalg_num\fR, \fBint\fR \fIprotocol_num\fR,
+     \fBint *\fR\fIerrnop\fR
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfreeipsecalgent\fR(\fBstruct ipsecalgent *\fR\fIptr\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Use the \fBgetipsecalgbyname()\fR, \fBgetipsecalgbynum()\fR,
+\fBfreeipsecalgent()\fR functions to obtain the IPsec algorithm mappings  that
+are defined by \fBipsecalgs\fR(1M). The IPsec algorithms and associated
+protocol name spaces are defined by \fIRFC 2407\fR.
+.sp
+.LP
+\fBgetipsecalgbyname()\fR and \fBgetipsecalgbynum()\fR return a structure that
+describes the algorithm entry found. This structure is described in the
+\fBRETURN VALUES\fR section below.
+.sp
+.LP
+\fBfreeipsecalgent()\fR must be used by the caller to free the structures
+returned by \fBgetipsecalgbyname()\fR and \fBgetipsecalgbynum()\fR when they
+are no longer needed.
+.sp
+.LP
+Both \fBgetipsecalgbyname()\fR and \fBgetipsecalgbynum()\fR take as parameter
+the protocol identifier in which the algorithm is defined. See
+\fBgetipsecprotobyname\fR(3NSL) and \fBgetipsecprotobyname\fR(3NSL).
+.sp
+.LP
+The following protocol numbers are pre-defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIPSEC_PROTO_ESP\fR\fR
+.ad
+.RS 19n
+.rt  
+Defines the encryption algorithms (transforms) that can be used by IPsec to
+provide data confidentiality.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIPSEC_PROTO_AH\fR\fR
+.ad
+.RS 19n
+.rt  
+Defines the authentication algorithms (transforms) that can be used by IPsec to
+provide authentication.
+.RE
+
+.sp
+.LP
+\fBgetipsecalgbyname()\fR looks up the algorithm by its name, while
+\fBgetipsecalgbynum()\fR looks up the algorithm by its assigned number.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrnop\fR\fR
+.ad
+.RS 10n
+.rt  
+A  pointer to an integer used to return an error status value on certain error
+conditions. See \fBERRORS\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetipsecalgbyname()\fR and \fBgetipsecalgbynum()\fR functions return a
+pointer to the structure \fBipsecalgent_t\fR, defined in <\fBnetdb.h\fR>.   If
+the requested algorithm cannot be found, these functions return \fINULL\fR.
+.sp
+.LP
+The structure \fBipsecalgent_t\fR is defined as follows:
+.sp
+.in +2
+.nf
+typedef struct ipsecalgent {           
+     char **a_names;      /* algorithm names */           
+     int a_proto_num;     /* protocol number */           
+     int a_alg_num;       /* algorithm number */           
+     char *a_mech_name;   /* mechanism name */           
+     int *a_block_sizes;  /* supported block sizes */           
+     int *a_key_sizes;    /* supported key sizes */           
+     int a_key_increment; /* key size increment */     
+} ipsecalgent_t;       
+.fi
+.in -2
+
+.sp
+.LP
+If \fBa_key_increment\fR is non-zero, \fBa_key_sizes[0]\fR contains the default
+key size for the algorithm. \fBa_key_sizes[1]\fR and \fBa_key_sizes[2]\fR
+specify the smallest and biggest key sizes support by the algorithm, and
+\fBa_key_increment\fR specifies the valid key size increments in that range.
+.sp
+.LP
+If \fBa_key_increment\fR is zero, the array \fBa_key_sizes\fR  contains the set
+of key sizes, in bits, supported by the  algorithm. The last key length in the
+array is followed by an element of value \fB0\fR. The first element of this
+array is used as the default key size for the algorithm.
+.sp
+.LP
+\fBa_name\fR is an array of algorithm names, terminated by an element
+containing a \fINULL\fR pointer. \fBa_name[0]\fR is the  primary name for the
+algorithm.
+.sp
+.LP
+\fBa_proto_num\fR is the protocol identifer of this algorithm. \fBa_alg_num\fR
+is the algorithm number. \fBa_mech_name\fR contains the mechanism name
+associated with the algorithm.
+.sp
+.LP
+\fBa_block_sizes\fR is an array containing the supported block lengths or MAC
+lengths, in bytes, supported by the algorithm.  The last valid value in the
+array is followed by an element containing the value \fB0\fR.
+.SH ERRORS
+.sp
+.LP
+When the specified algorithm cannot be returned to the caller,
+\fBgetipsecalgbynam()\fR and \fBgetipsecalgbynum()\fR return a value of
+\fINULL\fR and set the integer pointed to by the \fIerrnop\fR parameter to one
+of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Not enough memory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+Specified algorithm not found
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Specified protocol number not found
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+MT LevelMT Safe
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcryptoadm\fR(1M), \fBipsecalgs\fR(1M), \fBgetipsecprotobyname\fR(3NSL),
+\fBgetipsecprotobyname\fR(3NSL), \fBattributes\fR(5)
+.sp
+.LP
+Piper, D. \fIRFC 2407, The Internet IP Security Domain of Interpretation for
+ISAKMP\fR. Network Working Group. November, 1998.

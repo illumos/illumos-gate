@@ -1,0 +1,100 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_exit 3C "2 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_exit \- terminate calling thread
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBvoid\fR \fBpthread_exit\fR(\fBvoid *\fR\fIvalue_ptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_exit()\fR function terminates the calling thread, in a similar
+way that \fBexit\fR(3C) terminates the calling process. If the thread is not
+detached, the exit status specified by  \fIvalue_ptr\fR is made  available to
+any successful join with the terminating thread. See \fBpthread_join\fR(3C).
+Any cancellation cleanup handlers that have been pushed and not yet popped are
+popped in the reverse order that they were pushed and then executed. After all
+cancellation cleanup handlers have been executed, if the thread has any
+thread-specific data, appropriate destructor functions will be called in an
+unspecified order. Thread termination does not release any application visible
+process resources, including, but not limited to, mutexes and file descriptors,
+nor does it perform any process level cleanup actions, including, but not
+limited to, calling any \fBatexit()\fR routines that might exist.
+.sp
+.LP
+An exiting thread runs with all signals blocked. All thread termination
+functions, including cancellation cleanup handlers and thread-specific data
+destructor functions, are called with all signals blocked.
+.sp
+.LP
+An implicit call to \fBpthread_exit()\fR is made when a thread other than the
+thread in which \fBmain()\fR was first invoked returns from the start routine
+that was used to create it. The function's return value serves as the thread's
+exit status.
+.sp
+.LP
+The behavior of \fBpthread_exit()\fR is undefined if called from a cancellation
+cleanup handler or destructor function that was invoked as a result of either
+an implicit or explicit call to \fBpthread_exit()\fR.
+.sp
+.LP
+After a thread has terminated, the result of access to local (auto) variables
+of the thread is undefined. Thus, references to local variables of the exiting
+thread should not be used for the \fBpthread_exit()\fR \fIvalue_ptr\fR
+parameter value.
+.sp
+.LP
+The process exits with an exit status of  \fB0\fR after the last thread has
+been terminated. The behavior is as if the implementation called \fBexit()\fR
+with a \fB0\fR argument at thread termination time.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpthread_exit()\fR function cannot return to its caller.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(3C), \fBpthread_cancel\fR(3C), \fBpthread_create\fR(3C),
+\fBpthread_join\fR(3C), \fBpthread_key_create\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

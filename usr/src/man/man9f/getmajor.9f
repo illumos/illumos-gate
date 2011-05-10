@@ -1,0 +1,83 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getmajor 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+getmajor \- get major device number
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/mkdev.h>
+#include <sys/ddi.h>
+
+
+
+\fBmajor_t\fR \fBgetmajor\fR(\fBdev_t\fR \fIdev\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 7n
+.rt  
+Device number.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetmajor()\fR function extracts the major number from a device number.
+.SH RETURN VALUES
+.sp
+.LP
+The major number.
+.SH CONTEXT
+.sp
+.LP
+The \fBgetmajor()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBgetmajor()\fR
+.sp
+.LP
+The following example shows both the \fBgetmajor()\fR and \fBgetminor\fR(9F)
+functions used in a debug \fBcmn_err\fR(9F) statement to return the major and
+minor numbers for the device supported by the driver.
+
+.sp
+.in +2
+.nf
+dev_t dev; 
+
+#ifdef DEBUG  
+cmn_err(CE_NOTE,"Driver Started.  Major# = %d, 	
+     Minor# = %d", getmajor(dev), getminor(dev)); 
+#endif
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcmn_err\fR(9F), \fBgetminor\fR(9F), \fBmakedevice\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+No validity checking is performed. If \fIdev\fR is invalid, an invalid number
+is returned.

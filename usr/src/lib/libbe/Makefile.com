@@ -22,6 +22,9 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
+ 
 
 LIBRARY= 	libbe.a
 VERS= 		.1
@@ -46,7 +49,7 @@ INCS += -I$(SRCDIR)
 
 C99MODE= 	$(C99_ENABLE)
 
-LDLIBS +=	-lzfs -linstzones -luuid -lnvpair -lc -lgen
+LDLIBS +=	-lzfs -linstzones -luuid -lnvpair -lc -lgen -ldevinfo
 CPPFLAGS +=	$(INCS)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

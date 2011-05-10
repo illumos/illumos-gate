@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -240,7 +241,7 @@ uint_t tcp_free_list_max_cnt = 0;
 /*
  * Size of acceptor hash list.  It has to be a power of 2 for hashing.
  */
-#define	TCP_ACCEPTOR_FANOUT_SIZE		256
+#define	TCP_ACCEPTOR_FANOUT_SIZE		512
 
 #ifdef	_ILP32
 #define	TCP_ACCEPTOR_HASH(accid)					\

@@ -1,0 +1,93 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strfind 3GEN "20 Jan 1999" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+strfind, strrspn, strtrns, str \- string manipulations
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBint\fR \fBstrfind\fR(\fBconst char *\fR\fIas1\fR, \fBconst char *\fR\fIas2\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBstrrspn\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fItc\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR \fBstrtrns\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fIold\fR, \fBconst char *\fR\fInew\fR,
+     \fBchar *\fR\fIresult\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstrfind()\fR function returns the offset of the first occurrence of the
+second string,  \fIas2\fR, if it is a substring of string \fIas1\fR. If the
+second string is not a substring of the first string \fBstrfind()\fR returns
+\fB\(mi1\fR\&.
+.sp
+.LP
+The \fBstrrspn()\fR function trims chartacters from a string. It searches from
+the end of \fIstring\fR for the first character that is not contained in
+\fItc\fR. If such a character is found, \fBstrrspn()\fR returns a pointer to
+the next character; otherwise, it returns a pointer to \fIstring\fR.
+.sp
+.LP
+ The \fBstrtrns()\fR function transforms  \fIstring\fR and copies it into
+\fIresult\fR. Any character  that appears in  \fIold\fR is replaced with the
+character in the same position in  \fInew\fR. The  \fInew\fR result is
+returned.
+.SH USAGE
+.sp
+.LP
+When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multithreaded
+applications.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn example of the \fBstrfind()\fR function.
+.sp
+.in +2
+.nf
+\fB/* find offset to substring "hello" within as1 */
+i = strfind(as1, "hello");
+/* trim junk from end of string */
+s2 = strrspn(s1, "*?#$%");
+*s2 = '\e0';
+/* transform lower case to upper case */
+a1[] = "abcdefghijklmnopqrstuvwxyz";
+a2[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+s2 = strtrns(s1, a1, a2, s2);\fR
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstring\fR(3C), \fBattributes\fR(5)

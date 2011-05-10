@@ -1,0 +1,196 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volrmmount 1 "28 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+volrmmount \- call rmmount to mount or unmount media
+.SH SYNOPSIS
+.LP
+.nf
+\fBvolrmmount\fR [\fB-i\fR | \fB-e\fR] [\fIname\fR | \fInickname\fR]
+.fi
+
+.LP
+.nf
+\fBvolrmmount\fR [\fB-d\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvolrmmount\fR utility calls \fBrmmount\fR(1M) to, in effect, simulate an
+insertion (\fB-i\fR) or an ejection (\fB-e\fR). Simulating an insertion often
+means that \fBrmmount\fR will mount the media. Conversely, simulating an
+ejection often means that \fBrmmount\fR will unmount the media. However, these
+actions can vary depending on the \fBrmmount\fR configuration and media type.
+.sp
+.LP
+For example, using default settings, if you insert a music CD, it might not be
+mounted. However, you can configure \fBrmmount\fR so that it calls
+\fBworkman\fR whenever a music CD is inserted.
+.sp
+.LP
+This command allows you to override volume management's usual handling of media
+(see EXAMPLES below).
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Simulates an insertion of the specified media by calling \fBrmmount\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 6n
+.rt  
+Simulates an ejection of the specified media by calling \fBrmmount\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays the name of the default device for \fBvolrmmount\fR to handle. This
+device is used if no \fIname\fR or \fInickname\fR is supplied.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 12n
+.rt  
+The name that volume management recognizes as the device's name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInickname\fR\fR
+.ad
+.RS 12n
+.rt  
+A shortened version of the device's name. Following is the list of recognized
+nicknames:
+.RE
+
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+NicknamePath
+_
+fd/dev/rdiskette
+_
+fd0/dev/rdiskette
+_
+fd1/dev/rdiskette1
+_
+diskette/dev/rdiskette
+_
+diskette0/dev/rdiskette0
+_
+diskette1/dev/rdiskette1
+_
+rdiskette/dev/rdiskette
+_
+rdiskette0/dev/rdiskette0
+_
+rdiskette1/dev/rdiskette1
+_
+floppy/dev/rdiskette
+_
+floppy0/dev/rdiskette0
+_
+floppy1/dev/rdiskette1
+_
+cdrom0/dev/rdsk/cXtYdZ/\fIlabel\fR
+_
+zip0/dev/rdsk/cXtYdZ/\fIlabel\fR
+_
+jaz0/dev/rdsk/cXtYdZ/\fIlabel\fR
+_
+rmdisk0/dev/rdsk/cXtYdZ/\fIlabel\fR
+.TE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the volrmmount command
+.sp
+.LP
+When volume management finds a floppy that contains a filesystem, it calls
+\fBrmmount\fR to mount it. If you wish to run \fBtar\fR(1) or \fBcpio\fR(1) on
+that floppy, it must first be unmounted. To unmount the floppy use:
+
+.sp
+.in +2
+.nf
+example% \fBvolrmmount \(mie floppy0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+After \fBvolrmmount\fR unmounts the floppy, if you wish to re-mount it (rather
+than ejecting it and reinserting it) use:
+
+.sp
+.in +2
+.nf
+example% \fBvolrmmount \(mii floppy0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that if you are using a named floppy, you can use its name in place of
+\fBfloppy0\fR.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/volctl\fR\fR
+.ad
+.RS 15n
+.rt  
+volume management control port
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpio\fR(1), \fBeject\fR(1), \fBtar\fR(1), \fBrmmount\fR(1M),
+\fBattributes\fR(5)

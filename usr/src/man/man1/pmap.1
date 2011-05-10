@@ -1,0 +1,1084 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pmap 1 "9 Sep 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+pmap \- display information about the address space of a process
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/pmap\fR [\fB-rslF\fR] [\fB-A\fR \fIaddress_range\fR] [\fIpid\fR | \fIcore\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pmap\fR \fB-L\fR [\fB-rslF\fR] [\fB-A\fR \fIaddress_range\fR] [\fIpid\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pmap\fR \fB-x\fR [\fB-aslF\fR] [\fB-A\fR \fIaddress_range\fR] [\fIpid\fR | \fIcore\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pmap\fR \fB-S\fR [\fB-alF\fR] [\fB-A\fR \fIaddress_range\fR] [\fIpid\fR | \fIcore\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpmap\fR utility prints information about the address space of a process.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 20n
+.rt  
+Prints anonymous and swap reservations for shared mappings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR \fIaddress_range\fR\fR
+.ad
+.RS 20n
+.rt  
+Specifies the subrange of address space to display. \fIaddress_range\fR is
+specified in one of the following forms:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstart_addr\fR\fR
+.ad
+.sp .6
+.RS 4n
+A single address limits the output to the segment (or the page if the \fB-L\fR
+option is present) containing that address. If the specified address
+corresponds to the starting address of a segment, the output always includes
+the whole segment even when the \fB-L\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstart_addr\fR\fB,\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address followed by comma without the end address limits the output to all
+segments (or pages if the \fB-L\fR option is present) starting from the one
+containing the specified address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstart_addr\fR\fB,\fR\fIend_addr\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address range specified by the start address and end addresses limits the
+output to all segments (or pages if the \fB-L\fR option is present) starting
+from the segment or page containing the start address through the segment or
+page containing the end address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB,\fR\fIend_addr\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address range started with comma without the start address limits the output
+to all segments (or pages if the \fB-L\fR option is present) starting from the
+first one present until the segment (or page if the \fB-L\fR option is present)
+containing the specified address.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 20n
+.rt  
+Force. Grabs the target process even if another process has control.
+.sp
+See \fBUSAGE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 20n
+.rt  
+Shows unresolved dynamic linker map names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 20n
+.rt  
+Prints lgroup containing physical memory that backs virtual memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 20n
+.rt  
+Prints the process's reserved addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 20n
+.rt  
+Prints \fBHAT\fR page size information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 20n
+.rt  
+Displays swap reservation information per mapping. See USAGE for more
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 20n
+.rt  
+Displays additional information per mapping. See USAGE for more information.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpmap\fR utility prints information about the address space of a process.
+.sp
+.ne 2
+.mk
+.na
+\fBProcess Mappings\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+/usr/bin/pmap [ -rslF ] [-A \fIaddress_range\fR] [ \fIpid\fR | \fIcore\fR ] ...
+.fi
+.in -2
+.sp
+
+By default, \fBpmap\fR displays all of the mappings in the virtual address
+order they are mapped into the process. The mapping size, flags, and mapped
+object name are shown.
+.sp
+The \fB-A\fR option can be used to limit the output to a specified address
+range. The specified addresses are rounded up or down to a segment boundary and
+the output includes the segments bounded by those addresses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBProcess Lgroup Mappings\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+/usr/bin/pmap -L [ -rslF ] [-A \fIaddress_range\fR] \fIpid\fR ...
+.fi
+.in -2
+.sp
+
+The \fB-L\fR option can be used to determine the lgroup containing the physical
+memory backing the specified virtual memory. When used with the \fB-A\fR
+option, the specified addresses are rounded up or down to a page boundary and
+the output is limited to the page or pages bounded by those addresses.
+.sp
+This can be used in conjunction with \fBplgrp\fR(1) to discover whether the
+home lgroup of a thread of interest is the same as where the memory is located
+and whether there should be memory locality for the thread. The
+\fBlgrpinfo\fR(1) command can also be useful with this \fBpmap\fR option. It
+displays the lgroup hierarchy, contents, and characteristics which gives more
+information about the lgroups that the memory is distributed across and their
+relationship to each other and any other lgroups of interest.
+.sp
+In addition, the thread and memory placement can be changed by using
+\fBplgrp\fR(1), \fBpmadvise\fR(1), or \fBmadv.so.1\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBProcess anon/locked mapping details\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+/usr/bin/pmap -x [ -aslF ] [-A \fIaddress_range\fR] [ \fIpid\fR | \fIcore\fR ] ...
+.fi
+.in -2
+.sp
+
+The \fB-x\fR option displays additional information per mapping. The size of
+each mapping, the amount of resident physical memory (RSS), the amount of
+anonymous memory, and the amount of memory locked is shown with this option.
+This does not include anonymous memory taken by kernel address space due to
+this process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSwap Reservations\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+/usr/bin/pmap -S [ -alF ] [-A \fIaddress_range\fR] [ \fIpid\fR | \fIcore\fR ] ...
+.fi
+.in -2
+.sp
+
+The \fB-S\fR option displays swap reservation information per mapping.
+.RE
+
+.sp
+.LP
+Caution should be exercised when using the \fB-F\fR flag. Imposing two
+controlling processes on one victim process can lead to chaos. Safety is
+assured only if the primary controlling process, typically a debugger, has
+stopped the victim process and the primary controlling process is doing nothing
+at the moment of application of the \fBproc\fR tool in question.
+.SH DISPLAY FORMATS
+.sp
+.LP
+One line of output is printed for each mapping within the process, unless the
+-\fB-s\fR or -\fB-L\fR option is specified. With \fB-s\fR option, one line is
+printed for a contiguous mapping of each hardware translation page size. With
+\fB-L\fR option one line is printed for a contiguous mapping belonging to the
+same lgroup. With both \fB-L\fR and \fB-s\fR options, one line is printed for a
+contiguous mapping of each hardware translation page size belonging to the same
+lgroup. The column headings are shown in parentheses below.
+.sp
+.ne 2
+.mk
+.na
+\fBVirtual Address (\fBAddress\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The first column of output represents the starting virtual address of each
+mapping. Virtual addresses are displayed in ascending order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBVirtual Mapping Size (\fBKbytes\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The virtual size in kilobytes of each mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBResident Physical Memory (\fBRSS\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The amount of physical memory in kilobytes that is resident for each mapping,
+including that which is shared with other address spaces.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBAnonymous Memory (\fBAnon\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The number of pages, counted by using the system page size, of anonymous memory
+associated with the specified mapping. Anonymous memory shared with other
+address spaces is not included, unless the \fB-a\fR option is specified.
+.sp
+Anonymous memory is reported for the process heap, stack, for 'copy on write'
+pages with mappings mapped with \fBMAP_PRIVATE\fR (see \fBmmap\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLocked (\fBLocked\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The number of pages locked within the mapping. Typical examples are memory
+locked with \fBmlock()\fR and System V shared memory created with
+\fBSHM_SHARE_MMU\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPermissions/Flags (\fBMode\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The virtual memory permissions are shown for each mapping. Valid permissions
+are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr:\fR\fR
+.ad
+.RS 6n
+.rt  
+The mapping can be read by the process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBw:\fR\fR
+.ad
+.RS 6n
+.rt  
+The mapping can be written by the process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx:\fR\fR
+.ad
+.RS 6n
+.rt  
+Instructions that reside within the mapping can be executed by the process.
+.RE
+
+Flags showing additional information for each mapping can be displayed:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs:\fR\fR
+.ad
+.RS 6n
+.rt  
+The mapping is shared such that changes made in the observed address space are
+committed to the mapped file, and are visible from all other processes sharing
+the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBR:\fR\fR
+.ad
+.RS 6n
+.rt  
+Swap space is not reserved for this mapping. Mappings created with
+\fBMAP_NORESERVE\fR and System V \fBISM\fR shared memory mappings do not
+reserve swap space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*:\fR\fR
+.ad
+.RS 6n
+.rt  
+The data for the mapping is not present in the core file (only applicable when
+applied to a core file). See \fBcoreadm\fR(1M) for information on configuring
+core file content.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLgroup (\fBLgrp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The lgroup containing the physical memory that backs the specified mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMapping Name (\fBMapped File\fR)\fR
+.ad
+.sp .6
+.RS 4n
+A descriptive name for each mapping. The following major types of names are
+displayed for mappings:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBA mapped file:\fR For mappings between a process and a file, the \fBpmap\fR
+command attempts to resolve the file name for each mapping. If the file name
+cannot be resolved, \fBpmap\fR displays the major and minor number of the
+device containing the file, and the file system inode number of the file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBAnonymous memory:\fR Memory not relating to any named object or file within
+the file system is reported as \fB[ anon ]\fR.
+.sp
+The \fBpmap\fR command displays common names for certain known anonymous memory
+mappings:
+.RS
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[ heap ]\fR\fR
+.ad
+.RS 22n
+.rt  
+The mapping is the process heap.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[ stack ]\fR\fR
+.ad
+.RS 22n
+.rt  
+The mapping is the main stack.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[ stack tid=\fIn\fR ]\fR\fR
+.ad
+.RS 22n
+.rt  
+The mapping is the stack for thread \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[ altstack tid=\fIn\fR ]\fR\fR
+.ad
+.RS 22n
+.rt  
+The mapping is used as the alternate signal stack for thread \fIn\fR.
+.RE
+
+.RE
+
+If the common name for the mapping is unknown, \fBpmap\fR displays \fB[ anon
+]\fR as the mapping name.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSystem V Shared Memory:\fR Mappings created using System V shared memory
+system calls are reported with the names shown below:
+.RS
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshmid=n:\fR\fR
+.ad
+.RS 17n
+.rt  
+The mapping is a System V shared memory mapping. The shared memory identifier
+that the mapping was created with is reported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBism shmid=n:\fR\fR
+.ad
+.RS 17n
+.rt  
+The mapping is an "Intimate Shared Memory" variant of System V shared memory.
+\fBISM\fR mappings are created with the \fBSHM_SHARE_MMU\fR flag set, in
+accordance with \fBshmat\fR(2) (see \fBshmop\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdism shmid=n:\fR\fR
+.ad
+.RS 17n
+.rt  
+The mapping is a pageable variant of \fBISM\fR. Pageable \fBISM\fR is created
+with the \fBSHM_PAGEABLE\fR flag set in accordance with \fBshmat\fR(2) (see
+\fBshmop\fR(2)).
+.RE
+
+.RE
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBOther:\fR Mappings of other objects, including devices such as frame
+buffers. No mapping name is shown for other mapped objects.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPage Size (\fBPgsz\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The page size in kilobytes that is used for hardware address translation for
+this mapping. See \fBmemcntl\fR(2) for further information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSwap Space (\fBSwap\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The amount of swap space in kilobytes that is reserved for this mapping. That
+is, swap space that is deducted from the total available pool of reservable
+swap space that is displayed with the command \fBswap\fR \fB-s\fR. See
+\fBswap\fR(1M).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying Process Mappings
+.sp
+.LP
+By default, \fBpmap\fR prints one line for each mapping within the address
+space of the target process. The following example displays the address space
+of a typical bourne shell:
+
+.sp
+.in +2
+.nf
+example$ pmap 102905
+102905:    sh
+00010000    192K r-x--  /usr/bin/ksh
+00040000      8K rwx--  /usr/bin/ksh
+00042000     40K rwx--    [ heap ]
+FF180000    664K r-x--  /usr/lib/libc.so.1
+FF236000     24K rwx--  /usr/lib/libc.so.1
+FF23C000      8K rwx--  /usr/lib/libc.so.1
+FF250000      8K rwx--    [ anon ]
+FF260000     16K r-x--  /usr/lib/en_US.ISO8859-1.so.2
+FF272000     16K rwx--  /usr/lib/en_US.ISO8859-1.so.2
+FF280000    560K r-x--  /usr/lib/libnsl.so.1
+FF31C000     32K rwx--  /usr/lib/libnsl.so.1
+FF324000     32K rwx--  /usr/lib/libnsl.so.1
+FF340000     16K r-x--  /usr/lib/libc_psr.so.1
+FF350000     16K r-x--  /usr/lib/libmp.so.2
+FF364000      8K rwx--  /usr/lib/libmp.so.2
+FF380000     40K r-x--  /usr/lib/libsocket.so.1
+FF39A000      8K rwx--  /usr/lib/libsocket.so.1
+FF3A0000      8K r-x--  /usr/lib/libdl.so.1
+FF3B0000      8K rwx--    [ anon ]
+FF3C0000    152K r-x--  /usr/lib/ld.so.1
+FF3F6000      8K rwx--  /usr/lib/ld.so.1
+FFBFC000     16K rw---    [ stack ]
+ total     1880K
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying Memory Allocation and Mapping Types
+.sp
+.LP
+The \fB-x\fR option can be used to provide information about the memory
+allocation and mapping types per mapping. The amount of resident, non-shared
+anonymous, and locked memory is shown for each mapping:
+
+.sp
+.in +2
+.nf
+example$ pmap -x 102908
+102908:   sh
+Address   Kbytes     RSS    Anon  Locked Mode   Mapped File
+00010000      88      88       -       - r-x--  sh
+00036000       8       8       8       - rwx--  sh
+00038000      16      16      16       - rwx--    [ heap ]
+FF260000      16      16       -       - r-x--  en_US.ISO8859-1.so.2
+FF272000      16      16       -       - rwx--  en_US.ISO8859-1.so.2
+FF280000     664     624       -       - r-x--  libc.so.1
+FF336000      32      32       8       - rwx--  libc.so.1
+FF360000      16      16       -       - r-x--  libc_psr.so.1
+FF380000      24      24       -       - r-x--  libgen.so.1
+FF396000       8       8       -       - rwx--  libgen.so.1
+FF3A0000       8       8       -       - r-x--  libdl.so.1
+FF3B0000       8       8       8       - rwx--    [ anon ]
+FF3C0000     152     152       -       - r-x--  ld.so.1
+FF3F6000       8       8       8       - rwx--  ld.so.1
+FFBFE000       8       8       8       - rw---    [ stack ]
+--------   -----   -----   -----   ------
+total Kb    1072    1032      56       -
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The amount of incremental memory used by each additional instance of a process
+can be estimated by using the resident and anonymous memory counts of each
+mapping.
+
+.sp
+.LP
+In the above example, the bourne shell has a resident memory size of
+1032Kbytes. However, a large amount of the physical memory used by the shell is
+shared with other instances of shell. Another identical instance of the shell
+shares physical memory with the other shell where possible, and allocate
+anonymous memory for any non-shared portion. In the above example, each
+additional bourne shell uses approximately 56Kbytes of additional physical
+memory.
+
+.sp
+.LP
+A more complex example shows the output format for a process containing
+different mapping types. In this example, the mappings are as follows:
+
+.sp
+.in +2
+.nf
+0001000: Executable text, mapped from 'maps' program
+
+0002000: Executable data, mapped from 'maps' program
+
+0002200: Program heap
+
+
+0300000: A mapped file, mapped MAP_SHARED
+0400000: A mapped file, mapped MAP_PRIVATE
+
+0500000: A mapped file, mapped MAP_PRIVATE | MAP_NORESERVE
+
+0600000: Anonymous memory, created by mapping /dev/zero
+
+0700000: Anonymous memory, created by mapping /dev/zero
+         with MAP_NORESERVE
+
+0800000: A DISM shared memory mapping, created with SHM_PAGEABLE
+         with 8MB locked via mlock(2)
+
+0900000: A DISM shared memory mapping, created with SHM_PAGEABLE,
+         with 4MB of its pages touched.
+
+0A00000: A DISM shared memory mapping, created with SHM_PAGEABLE,
+         with none of its pages touched.
+
+0B00000: An ISM shared memory mapping, created with SHM_SHARE_MMU
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+example$ pmap -x 15492
+15492:  ./maps
+ Address  Kbytes     RSS    Anon  Locked Mode   Mapped File
+00010000       8       8       -       - r-x--  maps
+00020000       8       8       8       - rwx--  maps
+00022000   20344   16248   16248       - rwx--    [ heap ]
+03000000    1024    1024       -       - rw-s-  dev:0,2 ino:4628487
+04000000    1024    1024     512       - rw---  dev:0,2 ino:4628487
+05000000    1024    1024     512       - rw--R  dev:0,2 ino:4628487
+06000000    1024    1024    1024       - rw---    [ anon ]
+07000000     512     512     512       - rw--R    [ anon ]
+08000000    8192    8192       -    8192 rwxs-    [ dism shmid=0x5]
+09000000    8192    4096       -       - rwxs-    [ dism shmid=0x4]
+0A000000    8192    8192       -    8192 rwxsR    [ ism shmid=0x2 ]
+0B000000    8192    8192       -    8192 rwxsR    [ ism shmid=0x3 ]
+FF280000     680     672       -       - r-x--  libc.so.1
+FF33A000      32      32      32       - rwx--  libc.so.1
+FF390000       8       8       -       - r-x--  libc_psr.so.1
+FF3A0000       8       8       -       - r-x--  libdl.so.1
+FF3B0000       8       8       8       - rwx--    [ anon ]
+FF3C0000     152     152       -       - r-x--  ld.so.1
+FF3F6000       8       8       8       - rwx--  ld.so.1
+FFBFA000      24      24      24       - rwx--    [ stack ]
+-------- ------- ------- ------- -------
+total Kb   50464   42264   18888   16384
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRDisplaying Page Size Information
+.sp
+.LP
+The \fB-s\fR option can be used to display the hardware translation page sizes
+for each portion of the address space. (See \fBmemcntl\fR(2) for futher
+information on Solaris multiple page size support).
+
+.sp
+.LP
+In the example below, we can see that the majority of the mappings are using an
+8K-Byte page size, while the heap is using a 4M-Byte page size.
+
+.sp
+.LP
+Notice that non-contiguous regions of resident pages of the same page size are
+reported as separate mappings. In the example below, the \fBlibc.so\fR library
+is reported as separate mappings, since only some of the \fBlibc.so\fR text is
+resident:
+
+.sp
+.in +2
+.nf
+example$ pmap -xs 15492
+15492:  ./maps
+ Address  Kbytes     RSS    Anon  Locked Pgsz Mode   Mapped File
+00010000       8       8       -       -   8K r-x--  maps
+00020000       8       8       8       -   8K rwx--  maps
+00022000    3960    3960    3960       -   8K rwx--    [ heap ]
+00400000    8192    8192    8192       -   4M rwx--    [ heap ]
+00C00000    4096       -       -       -    - rwx--    [ heap ]
+01000000    4096    4096    4096       -   4M rwx--    [ heap ]
+03000000    1024    1024       -       -   8K rw-s-  dev:0,2 ino:4628487
+04000000     512     512     512       -   8K rw---  dev:0,2 ino:4628487
+04080000     512     512       -       -    - rw---  dev:0,2 ino:4628487
+05000000     512     512     512       -   8K rw--R  dev:0,2 ino:4628487
+05080000     512     512       -       -    - rw--R  dev:0,2 ino:4628487
+06000000    1024    1024    1024       -   8K rw---    [ anon ]
+07000000     512     512     512       -   8K rw--R    [ anon ]
+08000000    8192    8192       -    8192    - rwxs-    [ dism shmid=0x5 ]
+09000000    4096    4096       -       -   8K rwxs-    [ dism shmid=0x4 ]
+0A000000    4096       -       -       -    - rwxs-    [ dism shmid=0x2 ]
+0B000000    8192    8192       -    8192   4M rwxsR    [ ism shmid=0x3 ]
+FF280000     136     136       -       -   8K r-x--  libc.so.1
+FF2A2000     120     120       -       -    - r-x--  libc.so.1
+FF2C0000     128     128       -       -   8K r-x--  libc.so.1
+FF2E0000     200     200       -       -    - r-x--  libc.so.1
+FF312000      48      48       -       -   8K r-x--  libc.so.1
+FF31E000      48      40       -       -    - r-x--  libc.so.1
+FF33A000      32      32      32       -   8K rwx--  libc.so.1
+FF390000       8       8       -       -   8K r-x--  libc_psr.so.1
+FF3A0000       8       8       -       -   8K r-x--  libdl.so.1
+FF3B0000       8       8       8       -   8K rwx--    [ anon ]
+FF3C0000     152     152       -       -   8K r-x--  ld.so.1
+FF3F6000       8       8       8       -   8K rwx--  ld.so.1
+FFBFA000      24      24      24       -   8K rwx--    [ stack ]
+     -------- ------- ------- ------- -------
+total Kb   50464   42264   18888   16384
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDisplaying Swap Reservations
+.sp
+.LP
+The \fB-S\fR option can be used to describe the swap reservations for a
+process. The amount of swap space reserved is displayed for each mapping within
+the process. Swap reservations are reported as zero for shared mappings, since
+they are accounted for only once system wide.
+
+.sp
+.in +2
+.nf
+example$ pmap -S 15492
+15492:  ./maps
+ Address  Kbytes    Swap Mode   Mapped File
+00010000       8       - r-x--  maps
+00020000       8       8 rwx--  maps
+00022000   20344   20344 rwx--    [ heap ]
+03000000    1024       - rw-s-  dev:0,2 ino:4628487
+04000000    1024    1024 rw---  dev:0,2 ino:4628487
+05000000    1024     512 rw--R  dev:0,2 ino:4628487
+06000000    1024    1024 rw---    [ anon ]
+07000000     512     512 rw--R    [ anon ]
+08000000    8192       - rwxs-    [ dism shmid=0x5]
+09000000    8192       - rwxs-    [ dism shmid=0x4]
+0A000000    8192       - rwxs-    [ dism shmid=0x2]
+0B000000    8192       - rwxsR    [ ism shmid=0x3]
+FF280000     680       - r-x--  libc.so.1
+FF33A000      32      32 rwx--  libc.so.1
+FF390000       8       - r-x--  libc_psr.so.1
+FF3A0000       8       - r-x--  libdl.so.1
+FF3B0000       8       8 rwx--    [ anon ]
+FF3C0000     152       - r-x--  ld.so.1
+FF3F6000       8       8 rwx--  ld.so.1
+FFBFA000      24      24 rwx--    [ stack ]
+-------- ------- -------
+total Kb   50464   23496
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The swap reservation information can be used to estimate the amount of virtual
+swap used by each additional process. Each process consumes virtual swap from a
+global virtual swap pool. Global swap reservations are reported by
+the '\fBavail\fR' field of the \fBswap\fR(1M) command.
+
+.LP
+\fBExample 5 \fRLabeling Stacks in a Multi-threaded Process
+.sp
+.in +2
+.nf
+example$ pmap 121969
+121969: ./stacks
+00010000       8K r-x--  /tmp/stacks
+00020000       8K rwx--  /tmp/stacks
+FE8FA000       8K rwx-R    [ stack tid=11 ]
+FE9FA000       8K rwx-R    [ stack tid=10 ]
+FEAFA000       8K rwx-R    [ stack tid=9 ]
+FEBFA000       8K rwx-R    [ stack tid=8 ]
+FECFA000       8K rwx-R    [ stack tid=7 ]
+FEDFA000       8K rwx-R    [ stack tid=6 ]
+FEEFA000       8K rwx-R    [ stack tid=5 ]
+FEFFA000       8K rwx-R    [ stack tid=4 ]
+FF0FA000       8K rwx-R    [ stack tid=3 ]
+FF1FA000       8K rwx-R    [ stack tid=2 ]
+FF200000      64K rw---    [ altstack tid=8 ]
+FF220000      64K rw---    [ altstack tid=4 ]
+FF240000     112K rw---    [ anon ]
+FF260000      16K rw---    [ anon ]
+FF270000      16K r-x--  /usr/platform/sun4u/lib/libc_psr.so.1
+FF280000     672K r-x--  /usr/lib/libc.so.1
+FF338000      24K rwx--  /usr/lib/libc.so.1
+FF33E000       8K rwx--  /usr/lib/libc.so.1
+FF35A000       8K rwxs-    [ anon ]
+FF360000     104K r-x--  /usr/lib/libthread.so.1
+FF38A000       8K rwx--  /usr/lib/libthread.so.1
+FF38C000       8K rwx--  /usr/lib/libthread.so.1
+FF3A0000       8K r-x--  /usr/lib/libdl.so.1
+FF3B0000       8K rwx--    [ anon ]
+FF3C0000     152K r-x--  /usr/lib/ld.so.1
+FF3F6000       8K rwx--  /usr/lib/ld.so.1
+FFBFA000      24K rwx--    [ stack ]
+ total      1400K
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRDisplaying lgroup Memory Allocation
+.sp
+.LP
+The following example displays lgroup memory allocation by mapping:
+
+.sp
+.in +2
+.nf
+example$ pmap -L `pgrep nscd`
+100095: /usr/sbin/nscd
+00010000       8K r-x--   2 /usr/sbin/nscd
+00012000      48K r-x--   1 /usr/sbin/nscd
+0002E000       8K rwx--   2 /usr/sbin/nscd
+00030000      16K rwx--   2   [ heap ]
+00034000       8K rwx--   1   [ heap ]
+         .
+         .
+         .
+FD80A000      24K rwx--   2   [ anon ]
+FD820000       8K r-x--   2 /lib/libmd5.so.1
+FD840000      16K r-x--   1 /lib/libmp.so.2
+FD860000       8K r-x--   2 /usr/lib/straddr.so.2
+FD872000       8K rwx--   1 /usr/lib/straddr.so.2
+FD97A000       8K rw--R   1   [ stack tid=24 ]
+FD990000       8K r-x--   2 /lib/nss_nis.so.1
+FD992000      16K r-x--   1 /lib/nss_nis.so.1
+FD9A6000       8K rwx--   1 /lib/nss_nis.so.1
+FD9C0000       8K rwx--   2   [ anon ]
+FD9D0000       8K r-x--   2 /lib/nss_files.so.1
+FD9D2000      16K r-x--   1 /lib/nss_files.so.1
+FD9E6000       8K rwx--   2 /lib/nss_files.so.1
+FDAFA000       8K rw--R   2   [ stack tid=23 ]
+FDBFA000       8K rw--R   1   [ stack tid=22 ]
+FDCFA000       8K rw--R   1   [ stack tid=21 ]
+FDDFA000       8K rw--R   1   [ stack tid=20 ]
+    .
+    .
+    .
+FEFFA000       8K rw--R   1   [ stack tid=2 ]
+FF000000       8K rwx--   2   [ anon ]
+FF004000      16K rwx--   1   [ anon ]
+FF00A000      16K rwx--   1   [ anon ]
+    .
+    .
+    .
+FF3EE000       8K rwx--   2 /lib/ld.so.1
+FFBFE000       8K rw---   2   [ stack ]
+ total      2968K
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error has occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/*\fR\fR
+.ad
+.RS 19n
+.rt  
+process files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/proc/lib/*\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBproc\fR tools supporting files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The command syntax is Evolving. The \fB-L\fR option and the output formats are
+Unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBldd\fR(1), \fBlgrpinfo\fR(1), \fBmadv.so.1\fR(1), \fBmdb\fR(1),
+\fBplgrp\fR(1), \fBpmadvise\fR(1), \fBproc\fR(1), \fBps\fR(1),
+\fBcoreadm\fR(1M), \fBprstat\fR(1M), \fBswap\fR(1M), \fBmmap\fR(2),
+\fBmemcntl\fR(2), \fBmeminfo\fR(2), \fBshmop\fR(2), \fBdlopen\fR(3C),
+\fBproc\fR(4), \fBattributes\fR(5)

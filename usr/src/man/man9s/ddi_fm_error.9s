@@ -1,0 +1,144 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_fm_error 9S "13 May 2007" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+ddi_fm_error \- I/O error status structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddifm.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+A \fBddi_fm_error_t\fR structure contains common data necessary for \fBI/O\fR
+error handling. A pointer to a \fBddi_fm_error_t\fR structure is passed to
+error handling callbacks where it can then be used in a call to
+\fBpci_ereport_post()\fR. The same structure is also returned to callers of
+\fBddi_fm_acc_err_get()\fR and \fBddi_fm_dma_err_get()\fR.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+int                 fme_version;
+uint64_t            fme_ena;
+int                 fme_status;
+int                 fme_flag;
+ddi_acc_handle_t    fme_acc_handle;
+ddi_dma_handle_t    fme_dma_handle;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfme_version\fR is the current version of \fBddi_fm_error_t\fR. Valid
+values for the version are: \fBDDI_FME_VER0\fR and \fBDDI_FME_VER1\fR.
+.sp
+.LP
+The \fBfme_ena\fR is the \fBFMA\fR event protocol Format 1 Error Numeric
+Association (\fBENA\fR) for this error condition.
+.sp
+.LP
+The \fBfme_flag\fR field is set to \fBDDI_FM_ERR_EXPECTED\fR if the error is
+the result of a \fBDDI_ACC_CAUTIOUS\fR protected operation. In this case,
+\fBfme_acc_handle\fR is valid and the driver should check for and report only
+errors not associated with the \fBDDI_ACC_CAUTIOUS\fR protected access
+operation. This field can also be set to \fBDDI_FM_ERR_POKE\fR or
+\fBDDI_FM_ERR_PEEK\fR if the error is the result of a \fBddi_peek\fR(9F) or
+\fBddi_poke\fR(9F) operation. The driver should handle these in a similar way
+to \fBDDI_FM_ERR_EXPECTED\fR. Otherwise, \fBddi_flag\fR is set to
+\fBDDI_FM_ERR_UNEXPECTED\fR and the driver must perform the full range of error
+handling tasks.
+.sp
+.LP
+The \fBfme_status\fR indicates current status of an error handler callback or
+resource handle:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FM_OK\fR\fR
+.ad
+.RS 19n
+.rt  
+No errors were detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FM_FATAL\fR\fR
+.ad
+.RS 19n
+.rt  
+An error which is considered fatal to the operational state of the system was
+detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FM_NONFATAL\fR\fR
+.ad
+.RS 19n
+.rt  
+An error which is not considered fatal to the operational state of the system
+was detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FM_UNKNOWN\fR\fR
+.ad
+.RS 19n
+.rt  
+An error was detected, but the driver was unable to determine the impact of the
+error on the operational state of the system.
+.RE
+
+.sp
+.LP
+The \fBfme_acc_handle\fR is the valid access handle associated with the error
+that can be returned from \fBpci_ereport_post()\fR
+.sp
+.LP
+The \fBfme_dma_handle\fR is the valid \fBDMA\fR handle associated with the
+error that can be returned from \fBpci_ereport_post()\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_fm_acc_err_get\fR(9F),
+\fBddi_fm_dma_err_get\fR(9F), \fBddi_fm_handler_register\fR(9F),
+\fBddi_peek\fR(9F), \fBddi_poke\fR(9F), \fBpci_ereport_post\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

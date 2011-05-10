@@ -1,0 +1,207 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_npic 3CPC "8 Oct 2008" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_npic, cpc_caps, cpc_cciname, cpc_cpuref, cpc_walk_events_all,
+cpc_walk_generic_events_all, cpc_walk_events_pic, cpc_walk_generic_events_pic,
+cpc_walk_attrs \- determine CPU performance counter configuration
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libcpc.h>
+
+\fBuint_t\fR \fBcpc_npic\fR(\fBcpc_t *\fR\fIcpc\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBcpc_caps\fR(\fBcpc_t *\fR\fIcpc\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpc_cciname\fR(\fBcpc_t *\fR\fIcpc\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBcpc_cpuref\fR(\fBcpc_t *\fR\fIcpc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_events_all\fR(\fBcpc_t *\fR\fIcpc\fR, \fBvoid *\fR\fIarg\fR,
+     \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, const char *\fIevent\fR));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_generic_events_all\fR(\fBcpc_t *\fR\fIcpc\fR, \fBvoid *\fR\fIarg\fR,
+     \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, \fBconst char *\fR\fIevent\fR));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_events_pic\fR(\fBcpc_t *\fR\fIcpc\fR, \fBuint_t\fR \fIpicno\fR, \fBvoid *\fR\fIarg\fR,
+     \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, uint_t \fIpicno\fR, const char *\fIevent\fR));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_generic_events_pic\fR(\fBcpc_t *\fR\fIcpc\fR, \fBuint_t\fR \fIpicno\fR, 
+     \fBvoid *\fR\fIarg\fR, \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, \fBuint_t\fR \fIpicno\fR,
+     \fBconst char *\fR\fIevent\fR));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_walk_attrs\fR(\fBcpc_t *\fR\fIcpc\fR, \fBvoid *\fR\fIarg\fR,
+     \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, \fBconst char *\fR\fIattr\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpc_cciname()\fR function returns a printable description of the
+processor performance counter interfaces, for example, the string UltraSPARC
+III+ & IV. This name should not be assumed to be the same as the name the
+manufacturer might otherwise ascribe to the processor. It simply names the
+performance counter interfaces as understood by the system, and thus names the
+set of performance counter events that can be described by that interface.
+.sp
+.LP
+The \fBcpc_cpuref()\fR function returns a string that describes a reference
+work that should be consulted to (allow a human to) understand the semantics of
+the performance counter events that are known to the system. The string
+returned might be substantially longer than 80 characters. Callers printing to
+a terminal might want to insert line breaks as appropriate.
+.sp
+.LP
+The \fBcpc_npic()\fR function returns the number of performance counters
+accessible on the processor.
+.sp
+.LP
+The \fBcpc_caps()\fR function returns a bitmap containing the bitwise
+inclusive-OR of zero or more flags that describe the capabilities of the
+processor. If \fBCPC_CAP_OVERFLOW_INTERRUPT\fR is present, the processor can
+generate an interrupt when a hardware performance counter overflows. If
+\fBCPC_CAP_OVERFLOW_PRECISE\fR is present, the processor can determine
+precisely which counter overflowed, thereby affecting the behavior of the
+overflow notification mechanism described in \fBcpc_bind_curlwp\fR(3CPC).
+.sp
+.LP
+The system maintains a list of performance counter events supported by the
+underlying processor. Some processors are able to count all events on all
+hardware counters, while other processors restrict certain events to be counted
+only on specific hardware counters. The system also maintains a list of
+processor-specific attributes that can be used for advanced configuration of
+the performance counter hardware. These functions allow applications to
+determine what events and attributes are supported by the underlying processor.
+The reference work pointed to by \fBcpc_cpuref()\fR should be consulted to
+understand the reasons for and use of the attributes.
+.sp
+.LP
+The \fBcpc_walk_events_all()\fR function calls the \fIaction\fR function on
+each element of a global \fIevent\fR list. The \fIaction\fR function is called
+with each event supported by the processor, regardless of which counter is
+capable of counting it. The \fIaction\fR function is called only once for each
+event, even if that event can be counted on more than one counter.
+.sp
+.LP
+The \fBcpc_walk_events_pic()\fR function calls the action \fIfunction\fR with
+each event supported by the counter indicated by the \fIpicno\fR argument,
+where \fIpicno\fR ranges from 0 to the value returned by \fBcpc_npic()\fR.
+.sp
+.LP
+The system maintains a list of platform independent performance counter events
+known as generic events (see \fBgeneric_events\fR(3CPC)).
+.sp
+.LP
+The \fBcpc_walk_generic_events_all()\fR function calls the action function on
+each generic event available on the processor. The action function is called
+for each generic event, regardless of which counter is capable of counting it.
+The action function is called only once for each event, even if that event can
+be counted on more than one counter.
+.sp
+.LP
+The \fBcpc_walk_generic_events_pic()\fR function calls the action function with
+each generic event supported by the counter indicated by the \fIpicno\fR
+argument, where \fIpicno\fR ranges from 0 to the value returned by
+\fBcpc_npic()\fR.
+.sp
+.LP
+The system maintains a list of attributes that can be used to enable advanced
+features of the performance counters on the underlying processor. The
+\fBcpc_walk_attrs()\fR function calls the \fIaction\fR function for each
+supported attribute name. See the reference material as returned by
+\fBcpc_cpuref\fR(3CPC) for the semantics use of attributes.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBcpc_cciname()\fR function always returns a printable description of the
+processor performance counter interfaces.
+.sp
+.LP
+The \fBcpc_cpuref()\fR function always returns a string that describes a
+reference work.
+.sp
+.LP
+The \fBcpc_npic()\fR function always returns the number of performance counters
+accessible on the processor.
+.sp
+.LP
+The \fBcpc_caps()\fR function always returns a bitmap containing the bitwise
+inclusive-OR of zero or more flags that describe the capabilities of the
+processor.
+.sp
+.LP
+If the user-defined function specified by \fIaction\fR is not called, the
+\fBcpc_walk_events_all()\fR, \fBcpc_walk_events_pic()\fR,
+\fBcpc_walk_attrs()\fR, \fBcpc_walk_generic_events_pic()\fR, and
+\fBcpc_walk_generic_events_pic()\fR functions set \fBerrno\fR to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBcpc_walk_events_all()\fR, \fBcpc_walk_events_pic()\fR,
+\fBcpc_walk_attrs()\fR, \fBcpc_walk_generic_events_pic()\fR, and
+\fBcpc_walk_generic_events_pic()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is not enough memory available.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc_bind_curlwp\fR(3CPC), \fBgeneric_events\fR(3CPC), \fBlibcpc\fR(3LIB),
+\fBattributes\fR(5)

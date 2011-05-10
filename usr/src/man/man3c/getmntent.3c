@@ -1,0 +1,189 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getmntent 3C "22 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getmntent, getmntany, getextmntent, hasmntopt, putmntent, resetmnttab \- get
+mounted device information
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+#include <sys/mnttab.h>
+
+\fBint\fR \fBgetmntent\fR(\fBFILE *\fR\fIfp\fR, \fBstruct mnttab *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetmntany\fR(\fBFILE *\fR\fIfp\fR, \fBstruct mnttab *\fR\fImp\fR, \fBstruct mnttab *\fR\fImpref\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetextmntent\fR(\fBFILE *\fR\fIfp\fR, \fBstruct extmnttab *\fR\fImp\fR, \fBint\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBhasmntopt\fR(\fBstruct mnttab *\fR\fImnt\fR, \fBchar *\fR\fIopt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBputmntent\fR(\fBFILE *\fR\fIiop\fR, \fBstruct mnttab *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBresetmnttab\fR(\fBFILE *\fR\fIfp\fR);
+.fi
+
+.SH DESCRIPTION
+.SS "\fBgetmntent()\fR and \fBgetmntany()\fR"
+.sp
+.LP
+The \fBgetmntent()\fR and \fBgetmntany()\fR functions each fill in the
+structure pointed to by \fImp\fR with the broken-out fields of a line in the
+\fBmnttab\fR file. Each line read from the file contains a \fBmnttab\fR
+structure, which is defined in the <\fBsys/mnttab.h\fR> header. The structure
+contains the following members, which correspond to the broken-out fields from
+a line in \fB/etc/mnttab\fR (see \fBmnttab\fR(4)).
+.sp
+.in +2
+.nf
+char   *mnt_special;     /* name of mounted resource */
+char   *mnt_mountp;      /* mount point */
+char   *mnt_fstype;      /* type of file system mounted */
+char   *mnt_mntopts;     /* options for this mount */
+char   *mnt_time;        /* time file system mounted */
+.fi
+.in -2
+
+.sp
+.LP
+Fields with no actual content in \fB/etc/mnttab\fR are represented in the file
+as "-". To clearly distinguish empty fields, \fBgetmntent()\fR set the
+corresponding field in \fImp\fR to \fINULL\fR.
+.sp
+.LP
+Each \fBgetmntent()\fR call causes a new line to be read from the \fBmnttab\fR
+file. Successive calls can be used to search the entire list. The
+\fBgetmntany()\fR function searches the file referenced by \fIfp\fR until a
+match is found between a line in the file and \fImpref\fR. A match occurs if
+all non-null entries in \fImpref\fR match the corresponding fields in the file.
+These functions do not open, close, or rewind the file.
+.SS "\fBgetextmntent()\fR"
+.sp
+.LP
+The \fBgetextmntent()\fR function is an extended version of the
+\fBgetmntent()\fR function that returns, in addition to the information that
+\fBgetmntent()\fR returns, the major and minor number of the mounted resource
+to which the line in \fBmnttab\fR corresponds. The \fBgetextmntent()\fR
+function also fills in the \fBextmntent\fR structure defined in the
+<\fBsys/mnttab.h\fR> header.  For \fBgetextmntent()\fR to function properly, it
+must be notified when the \fBmnttab\fR file has been reopened or rewound since
+a previous \fBgetextmntent()\fR call.  This notification is accomplished by
+calling \fBresetmnttab()\fR. Otherwise, it behaves exactly as \fBgetmntent()\fR
+described above
+.sp
+.LP
+The data pointed to by the \fBmnttab\fR structure members are stored in a
+static area and must be copied to be saved between successive calls.
+.SS "\fBhasmntopt()\fR"
+.sp
+.LP
+The \fBhasmntopt()\fR function scans the \fBmnt_mntopts\fR member of the
+\fBmnttab\fR structure \fImnt\fR for a substring that matches \fIopt\fR. It
+returns the address of the substring if a match is found; otherwise it returns
+\fB0\fR. Substrings are delimited by commas and the end of the
+\fBmnt_mntopts\fR string.
+.SS "\fBputmntent()\fR"
+.sp
+.LP
+The \fBputmntent()\fR function is obsolete and no longer has any effect.
+Entries appear in \fBmnttab\fR as a side effect of a \fBmount\fR(2) call. The
+function name is still defined for transition purposes.
+.SS "\fBresetmnttab()\fR"
+.sp
+.LP
+The \fBresetmnttab()\fR function notifies \fBgetextmntent()\fR to reload from
+the kernel the device information that corresponds to the new snapshot of the
+\fBmnttab\fR information (see \fBmnttab\fR(4)). Subsequent \fBgetextmntent()\fR
+calls then return correct \fBextmnttab\fR information. This function should be
+called whenever the \fBmnttab\fR file is either rewound or closed and reopened
+before any calls are made to \fBgetextmntent()\fR.
+.SH RETURN VALUES
+.SS "\fBgetmntent()\fR and \fBgetmntany()\fR"
+.sp
+.LP
+If the next entry is successfully read by \fBgetmntent()\fR or a match is found
+with \fBgetmntany()\fR, \fB0\fR is returned.  If an \fBEOF\fR is encountered on
+reading, these functions return \fB\(mi1\fR\&. If an error is encountered, a
+value greater than 0 is returned. The following error values are defined in
+\fB<sys/mnttab.h>\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMNT_TOOLONG\fR\fR
+.ad
+.RS 15n
+.rt  
+A line in the file exceeded the internal buffer size of \fBMNT_LINE_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMNT_TOOMANY\fR\fR
+.ad
+.RS 15n
+.rt  
+A line in the file contains too many fields.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMNT_TOOFEW\fR\fR
+.ad
+.RS 15n
+.rt  
+A line in the file contains too few fields.
+.RE
+
+.SS "\fBhasmntopt()\fR"
+.sp
+.LP
+Upon successful completion, \fBhasmntopt()\fR returns the address of the
+substring if a match is found. Otherwise, it returns \fB0\fR.
+.SS "\fBputmntent()\fR"
+.sp
+.LP
+The \fBputmntent()\fR is obsolete and always returns \fB\(mi1\fR\&.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmount\fR(2), \fBmnttab\fR(4), \fBattributes\fR(5)

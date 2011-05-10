@@ -17,8 +17,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2008, 2010, Richard Lowe
+# Copyright 2008, 2011, Richard Lowe
 #
+
 
 '''
 Workspace backup
@@ -52,6 +53,17 @@ Backup format is:
                 $CODEMGR_WS/.hg/localtags
                 $CODEMGR_WS/.hg/patches (Mq data)
 
+            clear.tar.gz (handled by CdmClearBackup)
+                <short node>/
+                    copies of each modified or added file, as it is in
+                    this head.
+
+                 ... for each outgoing head
+
+                working/
+                     copies of each modified or added file in the
+                     working copy if any.
+
          latest -> generation#
             Newest backup generation.
 
@@ -59,8 +71,11 @@ All files in a given backup generation, with the exception of
 dirstate, are optional.
 '''
 
-import os, pwd, shutil, tarfile, time, traceback
-from mercurial import changegroup, error, node, patch, util
+import grp, os, pwd, shutil, tarfile, time, traceback
+from cStringIO import StringIO
+
+from mercurial import changegroup, cmdutil, error, node, patch, util
+from onbld.Scm import Version
 
 
 class CdmNodeMissing(util.Abort):
@@ -93,6 +108,101 @@ class CdmNodeMissing(util.Abort):
                             "sufficiently up to date,\n"
                             "or is unrelated to the workspace from "
                             "which the backup was taken.\n" % (msg, n))
+
+
+class CdmTarFile(tarfile.TarFile):
+    '''Tar file access + simple comparison to the filesystem, and
+    creation addition of files from Mercurial filectx objects.'''
+
+    def __init__(self, *args, **kwargs):
+        tarfile.TarFile.__init__(self, *args, **kwargs)
+        self.errorlevel = 2
+
+    def members_match_fs(self, rootpath):
+        '''Compare the contents of the tar archive to the directory
+        specified by rootpath.  Return False if they differ.
+
+        Every file in the archive must match the equivalent file in
+        the filesystem.
+
+        The existence, modification time, and size of each file are
+        compared, content is not.'''
+
+        def _member_matches_fs(member, rootpath):
+            '''Compare a single member to its filesystem counterpart'''
+            fpath = os.path.join(rootpath, member.name)
+
+            if not os.path.exists(fpath):
+                return False
+            elif ((os.path.isfile(fpath) != member.isfile()) or
+                  (os.path.isdir(fpath) != member.isdir()) or
+                  (os.path.islink(fpath) != member.issym())):
+                return False
+
+            #
+            # The filesystem may return a modification time with a
+            # fractional component (as a float), whereas the tar format
+            # only stores it to the whole second, perform the comparison
+            # using integers (truncated, not rounded)
+            #
+            elif member.mtime != int(os.path.getmtime(fpath)):
+                return False
+            elif not member.isdir() and member.size != os.path.getsize(fpath):
+                return False
+            else:
+                return True
+
+        for elt in self:
+            if not _member_matches_fs(elt, rootpath):
+                return False
+
+        return True
+
+    def addfilectx(self, filectx, path=None):
+        '''Add a filectx object to the archive.
+
+        Use the path specified by the filectx object or, if specified,
+        the PATH argument.
+
+        The size, modification time, type and permissions of the tar
+        member are taken from the filectx object, user and group id
+        are those of the invoking user, user and group name are those
+        of the invoking user if information is available, or "unknown"
+        if it is not.
+        '''
+
+        t = tarfile.TarInfo(path or filectx.path())
+        t.size = filectx.size()
+        t.mtime = filectx.date()[0]
+        t.uid = os.getuid()
+        t.gid = os.getgid()
+
+        try:
+            t.uname = pwd.getpwuid(t.uid).pw_name
+        except KeyError:
+            t.uname = "unknown"
+
+        try:
+            t.gname = grp.getgrgid(t.gid).gr_name
+        except KeyError:
+            t.gname = "unknown"
+
+        #
+        # Mercurial versions symlinks by setting a flag and storing
+        # the destination path in place of the file content.  The
+        # actual contents (in the tar), should be empty.
+        #
+        if 'l' in filectx.flags():
+            t.type = tarfile.SYMTYPE
+            t.mode = 0777
+            t.linkname = filectx.data()
+            data = None
+        else:
+            t.type = tarfile.REGTYPE
+            t.mode = 'x' in filectx.flags() and 0755 or 0644
+            data = StringIO(filectx.data())
+
+        self.addfile(t, data)
 
 
 class CdmCommittedBackup(object):
@@ -130,50 +240,53 @@ class CdmCommittedBackup(object):
         changegroup.writebundle(cg, self.bu.backupfile('bundle'), 'HG10BZ')
 
         outnodes = self._outgoing_nodes(parent)
-        if outnodes:
-            fp = None
+        if not outnodes:
+            return
+
+        fp = None
+        try:
             try:
-                try:
-                    fp = open(self.bu.backupfile('nodes'), 'w')
-                    fp.write('%s\n' % '\n'.join(outnodes))
-                except EnvironmentError, e:
-                    raise util.Abort("couldn't store outgoing nodes: %s" % e)
-            finally:
-                if fp and not fp.closed:
-                    fp.close()
+                fp = self.bu.open('nodes', 'w')
+                fp.write('%s\n' % '\n'.join(outnodes))
+            except EnvironmentError, e:
+                raise util.Abort("couldn't store outgoing nodes: %s" % e)
+        finally:
+            if fp and not fp.closed:
+                fp.close()
 
     def restore(self):
         '''Restore committed changes from backup'''
-        bfile = self.bu.backupfile('bundle')
 
-        if os.path.exists(bfile):
-            f = None
+        if not self.bu.exists('bundle'):
+            return
+
+        bpath = self.bu.backupfile('bundle')
+        f = None
+        try:
             try:
-                try:
-                    f = open(bfile, 'r')
-                    bundle = changegroup.readbundle(f, bfile)
-                    self.ws.repo.addchangegroup(bundle, 'strip',
-                                                'bundle:%s' % bfile)
-                except EnvironmentError, e:
-                    raise util.Abort("couldn't restore committed changes: %s\n"
-                                     "   %s" % (bfile, e))
-                except error.LookupError, e:
-                    raise CdmNodeMissing("couldn't restore committed changes",
-                                                     e.name)
-            finally:
-                if f and not f.closed:
-                    f.close()
+                f = self.bu.open('bundle')
+                bundle = changegroup.readbundle(f, bpath)
+                self.ws.repo.addchangegroup(bundle, 'strip',
+                                            'bundle:%s' % bpath)
+            except EnvironmentError, e:
+                raise util.Abort("couldn't restore committed changes: %s\n"
+                                 "   %s" % (bpath, e))
+            except error.LookupError, e:
+                raise CdmNodeMissing("couldn't restore committed changes",
+                                                 e.name)
+        finally:
+            if f and not f.closed:
+                f.close()
 
     def need_backup(self):
         '''Compare backup of committed changes to workspace'''
 
-        if os.path.exists(self.bu.backupfile('nodes')):
+        if self.bu.exists('nodes'):
             f = None
             try:
                 try:
-                    f = open(self.bu.backupfile('nodes'))
-                    bnodes = set([line.rstrip('\r\n')
-                                  for line in f.readlines()])
+                    f = self.bu.open('nodes')
+                    bnodes = set(line.rstrip('\r\n') for line in f.readlines())
                     f.close()
                 except EnvironmentError, e:
                     raise util.Abort("couldn't open backup node list: %s" % e)
@@ -184,7 +297,13 @@ class CdmCommittedBackup(object):
             bnodes = set()
 
         outnodes = set(self._outgoing_nodes(self.ws.parent()))
-        if outnodes != bnodes:
+
+        #
+        # If there are outgoing nodes not in the prior backup we need
+        # to take a new backup; it's fine if there are nodes in the
+        # old backup which are no longer outgoing, however.
+        #
+        if not outnodes <= bnodes:
             return True
 
         return False
@@ -192,9 +311,8 @@ class CdmCommittedBackup(object):
     def cleanup(self):
         '''Remove backed up committed changes'''
 
-        for fname in self.files:
-            if os.path.exists(self.bu.backupfile(fname)):
-                os.unlink(self.bu.backupfile(fname))
+        for f in self.files:
+            self.bu.unlink(f)
 
 
 class CdmUncommittedBackup(object):
@@ -203,21 +321,22 @@ class CdmUncommittedBackup(object):
     def __init__(self, backup, ws):
         self.ws = ws
         self.bu = backup
+        self.wctx = self.ws.workingctx(worklist=True)
 
     def _clobbering_renames(self):
         '''Return a list of pairs of files representing renames/copies
-        that clobber already versioned files.  [(oldname newname)...]'''
+        that clobber already versioned files.  [(old-name new-name)...]
+        '''
 
         #
         # Note that this doesn't handle uncommitted merges
         # as CdmUncommittedBackup itself doesn't.
         #
-        wctx = self.ws.workingctx()
-        parent = wctx.parents()[0]
+        parent = self.wctx.parents()[0]
 
         ret = []
-        for fname in wctx.added() + wctx.modified():
-            rn = wctx.filectx(fname).renamed()
+        for fname in self.wctx.added() + self.wctx.modified():
+            rn = self.wctx.filectx(fname).renamed()
             if rn and fname in parent:
                 ret.append((rn[0], fname))
         return ret
@@ -229,35 +348,29 @@ class CdmUncommittedBackup(object):
             raise util.Abort("Unable to backup an uncommitted merge.\n"
                              "Please complete your merge and commit")
 
-        dirstate = node.hex(self.ws.workingctx().parents()[0].node())
+        dirstate = node.hex(self.wctx.parents()[0].node())
 
         fp = None
         try:
             try:
-                fp = open(self.bu.backupfile('dirstate'), 'w')
+                fp = self.bu.open('dirstate', 'w')
                 fp.write(dirstate + '\n')
+                fp.close()
             except EnvironmentError, e:
                 raise util.Abort("couldn't save working copy parent: %s" % e)
-        finally:
-            if fp and not fp.closed:
-                fp.close()
 
-        try:
             try:
-                fp = open(self.bu.backupfile('renames'), 'w')
+                fp = self.bu.open('renames', 'w')
                 for cons in self._clobbering_renames():
                     fp.write("%s %s\n" % cons)
+                fp.close()
             except EnvironmentError, e:
                 raise util.Abort("couldn't save clobbering copies: %s" % e)
-        finally:
-            if fp and not fp.closed:
-                fp.close()
 
-        try:
             try:
-                fp = open(self.bu.backupfile('diff'), 'w')
-                opts = patch.diffopts(self.ws.ui, opts={'git': True})
-                fp.write(self.ws.diff(opts=opts))
+                fp = self.bu.open('diff', 'w')
+                match = self.ws.matcher(files=self.wctx.files())
+                fp.write(self.ws.diff(opts={'git': True}, match=match))
             except EnvironmentError, e:
                 raise util.Abort("couldn't save working copy diff: %s" % e)
         finally:
@@ -269,18 +382,18 @@ class CdmUncommittedBackup(object):
         fp = None
         try:
             try:
-                fp = open(self.bu.backupfile('dirstate'))
+                fp = self.bu.open('dirstate')
                 dirstate = fp.readline().strip()
-                return dirstate
             except EnvironmentError, e:
                 raise util.Abort("couldn't read saved parent: %s" % e)
         finally:
             if fp and not fp.closed:
                 fp.close()
 
+        return dirstate
+
     def restore(self):
         '''Restore uncommitted changes'''
-        diff = self.bu.backupfile('diff')
         dirstate = self._dirstate()
 
         #
@@ -298,14 +411,14 @@ class CdmUncommittedBackup(object):
         except util.Abort, e:
             raise util.Abort("couldn't update to saved node: %s" % e)
 
-        if not os.path.exists(diff):
+        if not self.bu.exists('diff'):
             return
 
         #
         # There's a race here whereby if the patch (or part thereof)
         # is applied within the same second as the clean above (such
-        # that mtime doesn't change) and if the size of that file
-        # does not change, Hg may not see the change.
+        # that modification time doesn't change) and if the size of
+        # that file does not change, Hg may not see the change.
         #
         # We sleep a full second to avoid this, as sleeping merely
         # until the next second begins would require very close clock
@@ -315,6 +428,7 @@ class CdmUncommittedBackup(object):
 
         files = {}
         try:
+            diff = self.bu.backupfile('diff')
             try:
                 fuzz = patch.patch(diff, self.ws.ui, strip=1,
                                    cwd=self.ws.repo.root, files=files)
@@ -324,9 +438,12 @@ class CdmUncommittedBackup(object):
                 raise util.Abort("couldn't apply working copy diff: %s\n"
                                  "   %s" % (diff, e))
         finally:
-            patch.updatedir(self.ws.ui, self.ws.repo, files)
+            if Version.at_least("1.7"):
+                cmdutil.updatedir(self.ws.ui, self.ws.repo, files)
+            else:
+                patch.updatedir(self.ws.ui, self.ws.repo, files)
 
-        if not os.path.exists(self.bu.backupfile('renames')):
+        if not self.bu.exists('renames'):
             return
 
         #
@@ -335,7 +452,7 @@ class CdmUncommittedBackup(object):
         # Hg would otherwise ignore them.
         #
         try:
-            fp = open(self.bu.backupfile('renames'))
+            fp = self.bu.open('renames')
             for line in fp:
                 source, dest = line.strip().split()
                 self.ws.copy(source, dest)
@@ -347,57 +464,54 @@ class CdmUncommittedBackup(object):
 
     def need_backup(self):
         '''Compare backup of uncommitted changes to workspace'''
-        cnode = self.ws.workingctx().parents()[0].node()
+        cnode = self.wctx.parents()[0].node()
         if self._dirstate() != node.hex(cnode):
             return True
 
-        opts = patch.diffopts(self.ws.ui, opts={'git': True})
-        curdiff = self.ws.diff(opts=opts)
+        fd = None
+        match = self.ws.matcher(files=self.wctx.files())
+        curdiff = self.ws.diff(opts={'git': True}, match=match)
 
-        diff = self.bu.backupfile('diff')
-        if os.path.exists(diff):
-            try:
+        try:
+            if self.bu.exists('diff'):
                 try:
-                    fd = open(diff)
+                    fd = self.bu.open('diff')
                     backdiff = fd.read()
+                    fd.close()
                 except EnvironmentError, e:
                     raise util.Abort("couldn't open backup diff %s\n"
-                                     "   %s" % (diff, e))
-            finally:
-                if fd and not fd.closed:
-                    fd.close()
-        else:
-            backdiff = ''
+                                     "   %s" % (self.bu.backupfile('diff'), e))
+            else:
+                backdiff = ''
 
-        if backdiff != curdiff:
-            return True
+            if backdiff != curdiff:
+                return True
 
+            currrenamed = self._clobbering_renames()
+            bakrenamed = None
 
-        currrenamed = self._clobbering_renames()
-        bakrenamed = None
-
-        if os.path.exists(self.bu.backupfile('renames')):
-            try:
+            if self.bu.exists('renames'):
                 try:
-                    fd = open(self.bu.backupfile('renames'))
-                    bakrenamed = [line.strip().split(' ') for line in fd]
+                    fd = self.bu.open('renames')
+                    bakrenamed = [tuple(line.strip().split(' ')) for line in fd]
+                    fd.close()
                 except EnvironmentError, e:
                     raise util.Abort("couldn't open renames file %s: %s\n" %
                                      (self.bu.backupfile('renames'), e))
-            finally:
-                if fd and not fd.closed:
-                    fd.close()
 
             if currrenamed != bakrenamed:
                 return True
+        finally:
+            if fd and not fd.closed:
+                fd.close()
 
         return False
 
     def cleanup(self):
         '''Remove backed up uncommitted changes'''
-        for fname in ('dirstate', 'diff', 'renames'):
-            if os.path.exists(self.bu.backupfile(fname)):
-                os.unlink(self.bu.backupfile(fname))
+
+        for f in ('dirstate', 'diff', 'renames'):
+            self.bu.unlink(f)
 
 
 class CdmMetadataBackup(object):
@@ -411,48 +525,51 @@ class CdmMetadataBackup(object):
     def backup(self):
         '''Backup workspace metadata'''
 
-        tar = None
+        tarpath = self.bu.backupfile('metadata.tar.gz')
+
+        #
+        # Files is a list of tuples (name, path), where name is as in
+        # self.files, and path is the absolute path.
+        #
+        files = filter(lambda (name, path): os.path.exists(path),
+                       zip(self.files, map(self.ws.repo.join, self.files)))
+
+        if not files:
+            return
 
         try:
-            try:
-                tar = tarfile.open(self.bu.backupfile('metadata.tar.gz'),
-                                   'w:gz')
-                tar.errorlevel = 2
-            except (EnvironmentError, tarfile.TarError), e:
-                raise util.Abort("couldn't open %s for writing: %s" %
-                                 (self.bu.backupfile('metadata.tar.gz'), e))
+            tar = CdmTarFile.gzopen(tarpath, 'w')
+        except (EnvironmentError, tarfile.TarError), e:
+            raise util.Abort("couldn't open %s for writing: %s" %
+                             (tarpath, e))
 
-            try:
-                for elt in self.files:
-                    fpath = self.ws.repo.join(elt)
-                    if os.path.exists(fpath):
-                        tar.add(fpath, elt)
-            except (EnvironmentError, tarfile.TarError), e:
-                #
-                # tarfile.TarError doesn't include the tar member or file
-                # in question, so we have to do so ourselves.
-                #
-                if isinstance(e, tarfile.TarError):
-                    errstr = "%s: %s" % (elt, e)
-                else:
-                    errstr = str(e)
+        try:
+            for name, path in files:
+                try:
+                    tar.add(path, name)
+                except (EnvironmentError, tarfile.TarError), e:
+                    #
+                    # tarfile.TarError doesn't include the tar member or file
+                    # in question, so we have to do so ourselves.
+                    #
+                    if isinstance(e, tarfile.TarError):
+                        errstr = "%s: %s" % (name, e)
+                    else:
+                        errstr = str(e)
 
-                raise util.Abort("couldn't backup metadata to %s:\n"
-                                 "  %s" %
-                                 (self.bu.backupfile('metadata.tar.gz'),
-                                  errstr))
+                    raise util.Abort("couldn't backup metadata to %s:\n"
+                                     "  %s" % (tarpath, errstr))
         finally:
-            if tar and not tar.closed:
-                tar.close()
+            tar.close()
 
     def old_restore(self):
         '''Restore workspace metadata from an pre-tar backup'''
 
         for fname in self.files:
-            bfile = self.bu.backupfile(fname)
-            wfile = self.ws.repo.join(fname)
+            if self.bu.exists(fname):
+                bfile = self.bu.backupfile(fname)
+                wfile = self.ws.repo.join(fname)
 
-            if os.path.exists(bfile):
                 try:
                     shutil.copy2(bfile, wfile)
                 except EnvironmentError, e:
@@ -462,20 +579,20 @@ class CdmMetadataBackup(object):
     def tar_restore(self):
         '''Restore workspace metadata (from a tar-style backup)'''
 
-        if os.path.exists(self.bu.backupfile('metadata.tar.gz')):
-            tar = None
+        if not self.bu.exists('metadata.tar.gz'):
+            return
 
-            try:
-                try:
-                    tar = tarfile.open(self.bu.backupfile('metadata.tar.gz'))
-                    tar.errorlevel = 2
-                except (EnvironmentError, tarfile.TarError), e:
-                    raise util.Abort("couldn't open %s: %s" %
-                                 (self.bu.backupfile('metadata.tar.gz'), e))
+        tarpath = self.bu.backupfile('metadata.tar.gz')
 
+        try:
+            tar = CdmTarFile.gzopen(tarpath)
+        except (EnvironmentError, tarfile.TarError), e:
+            raise util.Abort("couldn't open %s: %s" % (tarpath, e))
+
+        try:
+            for elt in tar:
                 try:
-                    for elt in tar:
-                        tar.extract(elt, path=self.ws.repo.path)
+                    tar.extract(elt, path=self.ws.repo.path)
                 except (EnvironmentError, tarfile.TarError), e:
                     # Make sure the member name is in the exception message.
                     if isinstance(e, tarfile.TarError):
@@ -485,87 +602,182 @@ class CdmMetadataBackup(object):
 
                     raise util.Abort("couldn't restore metadata from %s:\n"
                                      "   %s" %
-                                     (self.bu.backupfile('metadata.tar.gz'),
-                                      errstr))
-            finally:
-                if tar and not tar.closed:
-                    tar.close()
+                                     (tarpath, errstr))
+        finally:
+            if tar and not tar.closed:
+                tar.close()
 
     def restore(self):
         '''Restore workspace metadata'''
 
-        if os.path.exists(self.bu.backupfile('hgrc')):
+        if self.bu.exists('hgrc'):
             self.old_restore()
         else:
             self.tar_restore()
 
+    def _walk(self):
+        '''Yield the repo-relative path to each file we operate on,
+        including each file within any affected directory'''
+
+        for elt in self.files:
+            path = self.ws.repo.join(elt)
+
+            if not os.path.exists(path):
+                continue
+
+            if os.path.isdir(path):
+                for root, dirs, files in os.walk(path, topdown=True):
+                    yield root
+
+                    for f in files:
+                        yield os.path.join(root, f)
+            else:
+                yield path
+
     def need_backup(self):
         '''Compare backed up workspace metadata to workspace'''
 
-        if os.path.exists(self.bu.backupfile('metadata.tar.gz')):
+        def strip_trailing_pathsep(pathname):
+            '''Remove a possible trailing path separator from PATHNAME'''
+            return pathname.endswith('/') and pathname[:-1] or pathname
+
+        if self.bu.exists('metadata.tar.gz'):
+            tarpath = self.bu.backupfile('metadata.tar.gz')
             try:
-                tar = tarfile.open(self.bu.backupfile('metadata.tar.gz'))
-                tar.errorlevel = 2
+                tar = CdmTarFile.gzopen(tarpath)
             except (EnvironmentError, tarfile.TarError), e:
                 raise util.Abort("couldn't open metadata tarball: %s\n"
-                                 "   %s" %
-                                 (self.bu.backupfile('metadata.tar.gz'), e))
+                                 "   %s" % (tarpath, e))
 
-            for elt in tar:
-                fpath = self.ws.repo.join(elt.name)
-                if not os.path.exists(fpath):
-                    return True     # File in tar, not workspace
+            if not tar.members_match_fs(self.ws.repo.path):
+                tar.close()
+                return True
 
-                if elt.isdir():     # Don't care about directories
-                    continue
-
-                #
-                # The filesystem can give us mtime with fractional seconds
-                # (as a float), whereas tar files only keep it to the second.
-                #
-                # Always compare to the integer (second-granularity) mtime.
-                #
-                if (elt.mtime != int(os.path.getmtime(fpath)) or
-                    elt.size != os.path.getsize(fpath)):
-                    return True
-
-            tarnames = tar.getnames()
+            tarnames = map(strip_trailing_pathsep, tar.getnames())
             tar.close()
         else:
             tarnames = []
 
-        for mfile in self.files:
-            fpath = self.ws.repo.join(mfile)
+        repopath = self.ws.repo.path
+        if not repopath.endswith('/'):
+            repopath += '/'
 
-            if os.path.isdir(fpath):
-                # Directories in tarfile always end with a '/'
-                if not mfile.endswith('/'):
-                    mfile += '/'
-
-                if mfile not in tarnames:
-                    return True
-
-                for root, dirs, files in os.walk(fpath, topdown=True):
-                    for elt in files:
-                        path = os.path.join(root, elt)
-
-                        rpath = self.ws.repo.path
-                        if not rpath.endswith('/'):
-                            rpath += '/'
-
-                        path = path.replace(rpath, '', 1)
-                        if path not in tarnames:
-                            return True # In workspace not tar
-            else:
-                if os.path.exists(fpath) and mfile not in tarnames:
-                    return True
+        for path in self._walk():
+            if path.replace(repopath, '', 1) not in tarnames:
+                return True
 
         return False
 
     def cleanup(self):
         '''Remove backed up workspace metadata'''
-        if os.path.exists(self.bu.backupfile('metadata.tar.gz')):
-            os.unlink(self.bu.backupfile('metadata.tar.gz'))
+        self.bu.unlink('metadata.tar.gz')
+
+
+class CdmClearBackup(object):
+    '''A backup (in tar format) of complete source files from every
+    workspace head.
+
+    Paths in the tarball are prefixed by the revision and node of the
+    head, or "working" for the working directory.
+
+    This is done purely for the benefit of the user, and as such takes
+    no part in restore or need_backup checking, restore always
+    succeeds, need_backup always returns False
+    '''
+
+    def __init__(self, backup, ws):
+        self.bu = backup
+        self.ws = ws
+
+    def _branch_pairs(self):
+        '''Return a list of tuples (parenttip, localtip) for each
+        outgoing head.  If the working copy contains modified files,
+        it is a head, and neither of its parents are.
+        '''
+
+        parent = self.ws.parent()
+
+        if parent:
+            outgoing = self.ws.findoutgoing(parent)
+            outnodes = set(self.ws.repo.changelog.nodesbetween(outgoing)[0])
+
+            heads = [self.ws.repo.changectx(n) for n in self.ws.repo.heads()
+                     if n in outnodes]
+        else:
+            heads = []
+            outnodes = []
+
+        wctx = self.ws.workingctx()
+        if wctx.files():        # We only care about file changes.
+            heads = filter(lambda x: x not in wctx.parents(), heads) + [wctx]
+
+        pairs = []
+        for head in heads:
+            if head.rev() is None:
+                c = head.parents()
+            else:
+                c = [head]
+
+            pairs.append((self.ws.parenttip(c, outnodes), head))
+        return pairs
+
+    def backup(self):
+        '''Save a clear copy of each source file modified between each
+        head and that head's parenttip (see WorkSpace.parenttip).
+        '''
+
+        tarpath = self.bu.backupfile('clear.tar.gz')
+        branches = self._branch_pairs()
+
+        if not branches:
+            return
+
+        try:
+            tar = CdmTarFile.gzopen(tarpath, 'w')
+        except (EnvironmentError, tarfile.TarError), e:
+            raise util.Abort("Could not open %s for writing: %s" %
+                             (tarpath, e))
+
+        try:
+            for parent, child in branches:
+                tpath = child.node() and node.short(child.node()) or "working"
+
+                for fname, change in self.ws.status(parent, child).iteritems():
+                    if change not in ('added', 'modified'):
+                        continue
+
+                    try:
+                        tar.addfilectx(child.filectx(fname),
+                                       os.path.join(tpath, fname))
+                    except ValueError, e:
+                        crev = child.rev()
+                        if crev is None:
+                            crev = "working copy"
+                        raise util.Abort("Could not backup clear file %s "
+                                         "from %s: %s\n" % (fname, crev, e))
+        finally:
+            tar.close()
+
+    def cleanup(self):
+        '''Cleanup a failed Clear backup.
+
+        Remove the clear tarball from the backup directory.
+        '''
+
+        self.bu.unlink('clear.tar.gz')
+
+    def restore(self):
+        '''Clear backups are never restored, do nothing'''
+        pass
+
+    def need_backup(self):
+        '''Clear backups are never compared, return False (no backup needed).
+
+        Should a backup actually be needed, one of the other
+        implementation classes would notice in any situation we would.
+        '''
+
+        return False
 
 
 class CdmBackup(object):
@@ -589,8 +801,8 @@ class CdmBackup(object):
         #
         self.modules = [x(self, ws) for x in [CdmCommittedBackup,
                                               CdmUncommittedBackup,
+                                              CdmClearBackup,
                                               CdmMetadataBackup]]
-
 
         if os.path.exists(os.path.join(self.backupdir, 'latest')):
             generation = os.readlink(os.path.join(self.backupdir, 'latest'))
@@ -600,8 +812,6 @@ class CdmBackup(object):
 
     def _find_backup_dir(self, name):
         '''Find the path to an appropriate backup directory based on NAME'''
-        backupdir = None
-        backupbase = None
 
         if os.path.isabs(name):
             return name
@@ -630,11 +840,7 @@ class CdmBackup(object):
 
         return backupdir
 
-    def backupfile(self, path):
-        '''return full path to backup file FILE at GEN'''
-        return os.path.join(self.backupdir, str(self.generation), path)
-
-    def update_latest(self, gen):
+    def _update_latest(self, gen):
         '''Update latest symlink to point to the current generation'''
         linkpath = os.path.join(self.backupdir, 'latest')
 
@@ -643,14 +849,36 @@ class CdmBackup(object):
 
         os.symlink(str(gen), linkpath)
 
-    def create_gen(self, gen):
+    def _create_gen(self, gen):
         '''Create a new backup generation'''
         try:
             os.makedirs(os.path.join(self.backupdir, str(gen)))
-            self.update_latest(gen)
+            self._update_latest(gen)
         except EnvironmentError, e:
             raise util.Abort("Couldn't create backup generation %s: %s" %
                              (os.path.join(self.backupdir, str(gen)), e))
+
+    def backupfile(self, path):
+        '''return full path to backup file FILE at GEN'''
+        return os.path.join(self.backupdir, str(self.generation), path)
+
+    def unlink(self, name):
+        '''Unlink the specified path from the backup directory.
+        A no-op if the path does not exist.
+        '''
+
+        fpath = self.backupfile(name)
+        if os.path.exists(fpath):
+            os.unlink(fpath)
+
+    def open(self, name, mode='r'):
+        '''Open the specified file in the backup directory'''
+        return open(self.backupfile(name), mode)
+
+    def exists(self, name):
+        '''Return boolean indicating wether a given file exists in the
+        backup directory.'''
+        return os.path.exists(self.backupfile(name))
 
     def need_backup(self):
         '''Compare backed up changes to workspace'''
@@ -659,8 +887,7 @@ class CdmBackup(object):
         # invalid (lacking the dirstate file), we need a backup regardless
         # of anything else.
         #
-        if (not self.generation or
-            not os.path.exists(self.backupfile('dirstate'))):
+        if not self.generation or not self.exists('dirstate'):
             return True
 
         for x in self.modules:
@@ -683,7 +910,7 @@ class CdmBackup(object):
                                  (self.backupdir, e))
 
         self.generation += 1
-        self.create_gen(self.generation)
+        self._create_gen(self.generation)
 
         try:
             for x in self.modules:
@@ -712,7 +939,7 @@ class CdmBackup(object):
             self.generation -= 1
 
             if self.generation != 0:
-                self.update_latest(self.generation)
+                self._update_latest(self.generation)
             else:
                 os.unlink(os.path.join(self.backupdir, 'latest'))
 
@@ -737,10 +964,10 @@ class CdmBackup(object):
                                  (os.path.join(self.backupdir, str(gen))))
             self.generation = int(gen)
 
-        if not self.generation: # This is ok, 0 is not a valid generation
+        if not self.generation: # This is OK, 0 is not a valid generation
             raise util.Abort('Backup has no generations: %s' % self.backupdir)
 
-        if not os.path.exists(self.backupfile('dirstate')):
+        if not self.exists('dirstate'):
             raise util.Abort('Backup %s/%s is incomplete (dirstate missing)' %
                              (self.backupdir, self.generation))
 

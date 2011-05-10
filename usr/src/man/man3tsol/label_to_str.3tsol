@@ -1,0 +1,256 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH label_to_str 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+label_to_str \- convert labels to human readable strings
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBint\fR \fBlabel_to_str\fR(\fBconst m_label_t *\fR\fIlabel\fR, \fBchar **\fR\fIstring\fR, 
+    \fBconst m_label_str_t\fR \fIconversion_type\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBlabel_to_str()\fR is a simple function to convert various mandatory label
+types to human readable strings.
+.sp
+.LP
+\fIlabel\fR is the mandatory label to convert. \fIstring\fR points to memory
+that is allocated by \fBlabel_to_str()\fR that contains the converted string.
+The caller is responsible for calling \fBfree\fR(3C) to free allocated memory.
+.sp
+.LP
+The calling process must have mandatory read access to the resulting human
+readable string. Or the calling process must have the \fBsys_trans_label\fR
+privilege.
+.sp
+.LP
+The \fIconversion_type\fR parameter controls the type of label conversion. Not
+all types of conversion are valid for all types of label:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_LABEL\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a human readable string based on its type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_INTERNAL\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to an internal text representation that is safe for
+storing in a public object. Internal conversions can later be parsed to their
+same value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM_COLOR\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a string that represents the color name that the
+administrator has associated with the label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRINTER_TOP_BOTTOM\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a human readable string that is appropriate for use as
+the top and bottom label of banner and trailer pages in the Defense
+Intelligence Agency (DIA) encodings printed output schema.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRINTER_LABEL\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a human readable string that is appropriate for use as
+the banner page downgrade warning in the DIA encodings printed output schema.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRINTER_CAVEATS\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a human readable string that is appropriate for use as
+the banner page caveats section in the DIA encodings printed output schema.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRINTER_CHANNELS\fR\fR
+.ad
+.RS 22n
+.rt  
+Converts \fIlabel\fR to a human readable string that is appropriate for use as
+the banner page handling channels in the DIA encodings printed output schema.
+.RE
+
+.sp
+.LP
+The \fIflags\fR parameter provides a hint to the label conversion:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEF_NAMES\fR\fR
+.ad
+.RS 15n
+.rt  
+The default names are preferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHORT_NAMES\fR\fR
+.ad
+.RS 15n
+.rt  
+Short names are preferred where defined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLONG_NAMES\fR\fR
+.ad
+.RS 15n
+.rt  
+Long names are preferred.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBlabel_to_str()\fR function returns 0.
+Otherwise, -1 is returned, \fIerrno\fR is set to indicate the error and the
+string pointer is set to \fINULL\fR.
+.SH ERRORS
+.sp
+.LP
+The \fBlabel_to_str()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+Invalid parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The system does not support label translations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+The physical limits of the system are exceeded by size bytes of memory which
+cannot be allocated.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+The \fBlabel_to_str()\fR function is Committed. The returned string is
+Not-an-Interface and is dependent on the specific \fBlabel_encodings\fR file.
+The conversion type \fBINTERNAL\fR is Uncommitted, but is always accepted as
+input to \fBstr_to_label\fR(3TSOL).
+.sp
+.LP
+Conversion types that are relative to the DIA encodings schema are Standard.
+Standard is specified in \fBlabel_encodings\fR(4).
+.SH SEE ALSO
+.sp
+.LP
+\fBfree\fR(3C), \fBlibtsol\fR(3LIB), \fBstr_to_label\fR(3TSOL),
+\fBlabel_encodings\fR(4), \fBattributes\fR(5), \fBlabels\fR(5)
+.sp
+.LP
+\fIUsing the label_to_str Function\fR in \fISolaris Trusted Extensions
+Developer\&'s Guide\fR
+.SH WARNINGS
+.sp
+.LP
+A number of these conversions rely on the DIA label encodings schema. They
+might not be valid for other label schemata.
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

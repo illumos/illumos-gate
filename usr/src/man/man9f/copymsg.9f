@@ -1,0 +1,105 @@
+'\" te
+.\"  Copyright 1989 AT&T  
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH copymsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+copymsg \- copy a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBcopymsg\fR(\fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message to be copied.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcopymsg()\fR function forms a new message by allocating new message
+blocks, and copying the contents of the message referred to by \fImp\fR (using
+the \fBcopyb\fR(9F) function). It returns a pointer to the new message.
+.SH RETURN VALUES
+.sp
+.LP
+If the copy is successful, \fBcopymsg()\fR returns a pointer to the new
+message. Otherwise, it returns a \fINULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+The \fBcopymsg()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR: Using copymsg
+.sp
+.LP
+The routine \fBlctouc()\fR converts all the lowercase \fBASCII \fRcharacters in
+the message to uppercase. If the reference count is greater than one (line 8),
+then the message is shared, and must be copied before changing the contents of
+the data buffer. If the call to the \fBcopymsg()\fR function fails (line 9),
+return \fINULL\fR (line 10), otherwise, free the original message (line 11). If
+the reference count was equal to \fB1\fR, the message can be modified. For each
+character (line 16) in each message block (line 15), if it is a lowercase
+letter, convert it to an uppercase letter (line 18). A pointer to the converted
+message is returned (line 21).
+
+.sp
+.in +2
+.nf
+ 
+ 1 mblk_t *lctouc(mp)
+ 2    mblk_t *mp;
+ 3 {
+ 4    mblk_t *cmp;
+ 5    mblk_t *tmp;
+ 6    unsigned char *cp;
+ 7
+ 8    if (mp->b_datap->db_ref > 1) {
+ 9            if ((cmp = copymsg(mp)) == NULL)
+10                     return (NULL);
+11            freemsg(mp);
+12    } else {
+13            cmp = mp;
+14    }
+15    for (tmp = cmp; tmp; tmp = tmp->b_cont) {
+16            for (cp = tmp->b_rptr; cp < tmp->b_wptr; cp++) {
+17                    if ((*cp <= 'z') && (*cp >= 'a'))
+18                             *cp -= 0x20;
+19            }
+20    }
+21    return(cmp);
+22 }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBallocb\fR(9F), \fBcopyb\fR(9F), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

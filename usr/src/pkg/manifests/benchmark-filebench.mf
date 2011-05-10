@@ -39,6 +39,7 @@ dir path=usr/benchmarks/filebench/bin/$(ARCH64)
 dir path=usr/benchmarks/filebench/config
 dir path=usr/benchmarks/filebench/scripts
 dir path=usr/benchmarks/filebench/workloads
+dir path=usr/share/man/man1
 $(i386_ONLY)file path=usr/benchmarks/filebench/bin/$(ARCH)/go_filebench \
     mode=0555
 file path=usr/benchmarks/filebench/bin/$(ARCH64)/go_filebench mode=0555
@@ -106,6 +107,7 @@ file path=usr/benchmarks/filebench/workloads/varmail.f mode=0444
 file path=usr/benchmarks/filebench/workloads/videoserver.f mode=0444
 file path=usr/benchmarks/filebench/workloads/webproxy.f mode=0444
 file path=usr/benchmarks/filebench/workloads/webserver.f mode=0444
+file path=usr/share/man/man1/filebench.1
 hardlink path=usr/benchmarks/filebench/bin/go_filebench \
     target=../../../../usr/lib/isaexec
 legacy pkg=SUNWfilebench \

@@ -1,0 +1,80 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH whocalls 1 "3 Jul 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+whocalls \- report on the calls to a specific procedure
+.SH SYNOPSIS
+.LP
+.nf
+\fBwhocalls\fR [\fB-l\fR \fIwholib\fR] [\fB-s\fR] \fIfuncname\fR \fIexecutable\fR 
+          [\fIarguments\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBwhocalls\fR is a simple example of a utility based on the
+\fILink-Auditing\fR functionality of \fBld.so.1\fR(1) that permits the tracking
+of a given function call. See the \fILinker and Libraries Guide\fR for a
+detailed description of the \fILink-Auditing\fR mechanism. The \fIexecutable\fR
+is run as normal with any associated arguments. Each time the procedure
+\fIfuncname\fR is called, both the arguments to that procedure and a stack
+trace are displayed on standard output.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIwholib\fR\fR
+.ad
+.RS 13n
+.rt  
+Specifies an alternate \fBwho.so\fR \fILink-Auditing\fR library to use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+When available, examines and uses the \fB\&.symtab\fR symbol table for local
+symbols. This is a little more expensive than using the \fB\&.dynsym\fR symbol
+table, but can produce more detailed stack trace information.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTracking Function Calls
+.sp
+.LP
+The following example tracks the calls to \fBprintf()\fR made by a simple
+\fBhelloworld\fR program:
+
+.sp
+.in +2
+.nf
+example% \fBwhocalls printf helloworld\fR
+printf(0x106e4, 0xef625310, 0xef621ba8)
+        helloworld:main+0x10
+        helloworld:_start+0x5c
+Hello World
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld.so.1\fR(1), \fBsotruss\fR(1), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

@@ -1,0 +1,823 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH share_nfs 1M "6 May 2009" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+share_nfs \- make local NFS file systems available for mounting by remote
+systems
+.SH SYNOPSIS
+.LP
+.nf
+\fBshare\fR [\fB-d\fR \fIdescription\fR] [\fB-F\fR nfs] [\fB-o\fR \fIspecific_options\fR] \fIpathname\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBshare\fR utility makes local file systems available for mounting by
+remote systems. It starts the \fBnfsd\fR(1M) and \fBmountd\fR(1M) daemons if
+they are not already running.
+.sp
+.LP
+If no argument is specified, then \fBshare\fR displays all file systems
+currently shared, including \fBNFS\fR file systems and file systems shared
+through other distributed file system packages.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdescription\fR\fR
+.ad
+.sp .6
+.RS 4n
+Provide a comment that describes the file system to be shared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-F\fR \fBnfs\fR\fR
+.ad
+.sp .6
+.RS 4n
+Share \fBNFS\fR file system type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIspecific_options\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify \fIspecific_options\fR in a comma-separated list of keywords and
+attribute-value-assertions for interpretation by the file-system-type-specific
+command. If \fIspecific_options\fR is not specified, then by default sharing is
+read-write to all clients. \fIspecific_options\fR can be any combination of the
+following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaclok\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows the \fBNFS\fR server to do access control for \fBNFS\fR Version 2
+clients (running SunOS 2.4 or earlier). When \fBaclok\fR is set on the server,
+maximal access is given to all clients. For example, with \fBaclok\fR set, if
+anyone has read permissions, then everyone does. If \fBaclok\fR is not set,
+minimal access is given to all clients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBanon=\fR\fIuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set \fIuid\fR to be the effective user \fBID\fR of unknown users. By default,
+unknown users are given the effective user \fBID\fR \fBUID_NOBODY\fR. If
+\fIuid\fR is set to \fB\(mi1\fR, access is denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcharset\fR=\fIaccess_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Where \fIcharset\fR is one of: \fBeuc-cn\fR, \fBeuc-jp\fR, \fBeuc-jpms\fR,
+\fBeuc-kr\fR, \fBeuc-tw\fR, \fBiso8859-1\fR, \fBiso8859-2\fR, \fBiso8859-5\fR,
+\fBiso8859-6\fR, \fBiso8859-7\fR, \fBiso8859-8\fR, \fBiso8859-9\fR,
+\fBiso8859-13\fR, \fBiso8859-15\fR, \fBkoi8-r\fR.
+.sp
+Clients that match the \fIaccess_list\fR for one of these properties will be
+assumed to be using that character set and file and path names will be
+converted to UTF-8 for the server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBindex=\fR\fBfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Load \fBfile\fR rather than a listing of the directory containing this file
+when the directory is referenced by an \fBNFS URL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlog=tag\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables \fBNFS\fR server logging for the specified file system. The optional
+tag determines the location of the related log files. The \fBtag\fR is defined
+in \fBetc/nfs/nfslog.conf\fR. If no \fBtag\fR is specified, the default values
+associated with the \fBglobal\fR \fBtag\fR in \fBetc/nfs/nfslog.conf\fR is
+used. Support of NFS server logging is only available for NFS Version 2 and
+Version 3 requests.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnone=\fR\fIaccess_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Access is not allowed to any client that matches the access list. The exception
+is when the access list is an asterisk (\fB*\fR), in which case \fBro\fR or
+\fBrw\fR can override \fBnone\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnosub\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prevents clients from mounting subdirectories of shared directories. For
+example, if \fB/export\fR is shared with the \fBnosub\fR option on server
+\fIfooey\fR then a \fBNFS\fR client cannot do:
+.sp
+.in +2
+.nf
+mount -F nfs fooey:/export/home/mnt
+.fi
+.in -2
+.sp
+
+NFS Version 4 does not use the \fBMOUNT\fR protocol. The \fBnosub\fR option
+only applies to NFS Version 2 and Version 3 requests.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnosuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+By default, clients are allowed to create files on the shared file system with
+the setuid or setgid mode enabled. Specifying \fBnosuid\fR causes the server
+file system to silently ignore any attempt to enable the setuid or setgid mode
+bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpublic\fR\fR
+.ad
+.sp .6
+.RS 4n
+Moves the location of the public file handle from \fBroot\fR (\fB/\fR) to the
+exported directory for Web\fBNFS\fR-enabled browsers and clients. This option
+does not enable Web\fBNFS\fR service; Web\fBNFS\fR is always on. Only one file
+system per server may use this option. Any other option, including the
+\fB-ro=list\fR and \fB-rw=list\fR options can be included with the \fBpublic\fR
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBro\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sharing is read-only to all clients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBro=\fR\fIaccess_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sharing is read-only to the clients listed in \fIaccess_list\fR; overrides the
+\fBrw\fR suboption for the clients specified. See \fIaccess_list\fR below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBroot=\fR\fIaccess_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Only root users from the hosts specified in \fIaccess_list\fR have root access.
+See \fIaccess_list\fR below. By default, no host has root access, so root users
+are mapped to an anonymous user \fBID\fR (see the \fBanon=\fR\fIuid\fR option
+described above). Netgroups can be used if the file system shared is using UNIX
+authentication ( \fBAUTH_SYS\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBroot_mapping=\fIuid\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a client that is allowed root access, map the root UID to the specified
+user id.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sharing is read-write to all clients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrw=\fR\fIaccess_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sharing is read-write to the clients listed in \fIaccess_list\fR; overrides the
+\fBro\fR suboption for the clients specified. See \fIaccess_list\fR below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsec=\fR\fImode\fR[\fB:\fR\fImode\fR].\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Sharing uses one or more of the specified security modes. The \fImode\fR in the
+\fBsec=\fR\fImode\fR option must be a node name supported on the client. If the
+\fBsec=\fR option is not specified, the default security mode used is
+\fBAUTH_SYS.\fR Multiple \fBsec=\fR options can be specified on the command
+line, although each mode can appear only once. The security modes are defined
+in \fBnfssec\fR(5).
+.sp
+Each \fBsec=\fR option specifies modes that apply to any subsequent \fBwindow=,
+rw, ro, rw=, ro=\fR and \fBroot=\fR options that are provided before another
+\fBsec=\fRoption. Each additional \fBsec=\fR resets the security mode context,
+so that more \fBwindow=,\fR \fBrw,\fR \fBro,\fR \fBrw=,\fR \fBro=\fR and
+\fBroot=\fR options can be supplied for additional modes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsec=\fR\fInone\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the option \fBsec=\fR\fInone\fR is specified when the client uses
+\fBAUTH_NONE,\fR or if the client uses a security mode that is not one that the
+file system is shared with, then the credential of each \fBNFS\fR request is
+treated as unauthenticated. See the \fBanon=\fR\fIuid\fR option for a
+description of how unauthenticated requests are handled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsecure\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option has been deprecated in favor of the \fBsec=\fR\fIdh\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwindow=\fR\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+When sharing with \fBsec=\fR\fIdh\fR, set the maximum life time (in seconds) of
+the \fBRPC\fR request's credential (in the authentication header) that the
+\fBNFS\fR server allows. If a credential arrives with a life time larger than
+what is allowed, the \fBNFS\fR server rejects the request. The default value is
+30000 seconds (8.3 hours).
+.RE
+
+.RE
+
+.SS "\fIaccess_list\fR"
+.sp
+.LP
+The \fIaccess_list\fR argument is a colon-separated list whose components may
+be any number of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBhostname\fR
+.ad
+.sp .6
+.RS 4n
+The name of a host. With a server configured for \fBDNS\fR or \fBLDAP\fR naming
+in the \fBnsswitch\fR "hosts" entry, any hostname must be represented as a
+fully qualified \fBDNS\fR or \fBLDAP\fR name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnetgroup\fR
+.ad
+.sp .6
+.RS 4n
+A netgroup contains a number of hostnames. With a server configured for
+\fBDNS\fR or \fBLDAP\fR naming in the \fBnsswitch\fR "hosts" entry, any
+hostname in a netgroup must be represented as a fully qualified \fBDNS\fR or
+\fBLDAP\fR name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdomain name suffix\fR
+.ad
+.sp .6
+.RS 4n
+To use domain membership the server must use \fBDNS\fR or \fBLDAP\fR to resolve
+hostnames to \fBIP\fR addresses; that is, the "hosts" entry in the
+\fB/etc/nsswitch.conf\fR must specify "dns" or "ldap" ahead of "nis" or
+"nisplus", since only \fBDNS\fR and \fBLDAP\fR return the full domain name of
+the host. Other name services like \fBNIS\fR or \fBNIS+\fR cannot be used to
+resolve hostnames on the server because when mapping an \fBIP\fR address to a
+hostname they do not return domain information. For example,
+.sp
+.in +2
+.nf
+NIS or NIS+   172.16.45.9 --> "myhost"
+.fi
+.in -2
+.sp
+
+and
+.sp
+.in +2
+.nf
+DNS or LDAP   172.16.45.9 --> 
+     "myhost.mydomain.mycompany.com"
+.fi
+.in -2
+.sp
+
+The domain name suffix is distinguished from hostnames and netgroups by a
+prefixed dot. For example,
+.sp
+\fBrw=.mydomain.mycompany.com\fR
+.sp
+A single dot can be used to match a hostname with no suffix. For example,
+.sp
+\fBrw=.\fR
+.sp
+matches "mydomain" but not "mydomain.mycompany.com". This feature can be used
+to match hosts resolved through \fBNIS\fR and \fBNIS+\fR rather than \fBDNS\fR
+and \fBLDAP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnetwork\fR
+.ad
+.sp .6
+.RS 4n
+The network or subnet component is preceded by an at-sign (\fB@\fR). It can be
+either a name or a dotted address. If a name, it is converted to a dotted
+address by \fBgetnetbyname\fR(3SOCKET). For example,
+.sp
+\fB=@mynet\fR
+.sp
+would be equivalent to:
+.sp
+\fB=@172.16\fR or \fB=@172.16.0.0\fR
+.sp
+The network prefix assumes an octet-aligned netmask determined from the zeroth
+octet in the low-order part of the address up to and including the high-order
+octet, if you want to specify a single IP address (see below). In the case
+where network prefixes are not byte-aligned, the syntax allows a mask length to
+be specified explicitly following a slash (\fB/\fR) delimiter. For example,
+.sp
+\fB=@theothernet/17\fR or \fB=@172.16.132/22\fR
+.sp
+\&...where the mask is the number of leftmost contiguous significant bits in
+the corresponding IP address.
+.sp
+When specifying individual IP addresses, use the same \fB@\fR notation
+described above, without a netmask specification. For example:
+.sp
+.in +2
+.nf
+=@172.16.132.14
+.fi
+.in -2
+.sp
+
+Multiple, individual IP addresses would be specified, for example, as:
+.sp
+.in +2
+.nf
+root=@172.16.132.20:@172.16.134.20
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+A prefixed minus sign (\fB\(mi\fR) denies access to that component of
+\fIaccess_list\fR. The list is searched sequentially until a match is found
+that either grants or denies access, or until the end of the list is reached.
+For example, if host "terra" is in the "engineering" netgroup, then
+.sp
+.in +2
+.nf
+rw=-terra:engineering
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+denies access to \fBterra\fR but
+.sp
+.in +2
+.nf
+rw=engineering:-terra
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+grants access to \fBterra\fR.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The pathname of the file system to be shared.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSharing A File System With Logging Enabled
+.sp
+.LP
+The following example shows the \fB/export\fR file system shared with logging
+enabled:
+
+.sp
+.in +2
+.nf
+example% \fBshare -o log /export\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default global logging parameters are used since no tag identifier is
+specified. The location of the log file, as well as the necessary logging work
+files, is specified by the global entry in \fB/etc/nfs/nfslog.conf\fR. The
+\fBnfslogd\fR(1M) daemon runs only if at least one file system entry in
+\fB/etc/dfs/dfstab\fR is shared with logging enabled upon starting or rebooting
+the system. Simply sharing a file system with logging enabled from the command
+line does not start the \fBnfslogd\fR(1M).
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/dfs/fstypes\fR\fR
+.ad
+.sp .6
+.RS 4n
+list of system types, \fBNFS\fR by default
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/dfs/sharetab\fR\fR
+.ad
+.sp .6
+.RS 4n
+system record of shared file systems
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nfs/nfslogtab\fR\fR
+.ad
+.sp .6
+.RS 4n
+system record of logged file systems
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nfs/nfslog.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+logging configuration file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmount\fR(1M), \fBmountd\fR(1M), \fBnfsd\fR(1M), \fBnfslogd\fR(1M),
+\fBshare\fR(1M), \fBunshare\fR(1M), \fBgetnetbyname\fR(3SOCKET),
+\fBnfslog.conf\fR(4), \fBnetgroup\fR(4), \fBattributes\fR(5), \fBnfssec\fR(5)
+.SH NOTES
+.sp
+.LP
+If the \fBsec=\fR option is presented at least once, all uses of the
+\fBwindow=,\fR \fBrw,\fR \fBro,\fR \fBrw=,\fR \fBro=\fR and \fBroot=\fR options
+must come \fBafter\fR the first \fBsec=\fR option. If the \fBsec=\fR option is
+not presented, then \fBsec=\fR\fIsys\fR is implied.
+.sp
+.LP
+If one or more explicit \fBsec=\fR options are presented, \fIsys\fR must appear
+in one of the options mode lists for accessing using the \fBAUTH_SYS\fR
+security mode to be allowed. For example:
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs /var\fR
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBsec=sys /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+grants read-write access to any host using \fBAUTH_SYS,\fR but
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBsec=dh /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+grants no access to clients that use \fBAUTH_SYS.\fR
+.sp
+.LP
+Unlike previous implementations of \fBshare_nfs\fR, access checking for the
+\fBwindow=, rw, ro, rw=,\fR and \fBro=\fR options is done per \fBNFS\fR
+request, instead of per mount request.
+.sp
+.LP
+Combining multiple security modes can be a security hole in situations where
+the \fBro=\fR and \fBrw=\fR options are used to control access to weaker
+security modes. In this example,
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBsec=dh,rw,sec=sys,rw=hosta /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+an intruder can forge the IP address for \fBhosta\fR (albeit on each \fBNFS\fR
+request) to side-step the stronger controls of \fBAUTH_DES.\fR Something like:
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBsec=dh,rw,sec=sys,ro /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is safer, because any client (intruder or legitimate) that avoids
+\fBAUTH_DES\fR only gets read-only access. In general, multiple security modes
+per \fBshare\fR command should only be used in situations where the clients
+using more secure modes get stronger access than clients using less secure
+modes.
+.sp
+.LP
+If \fBrw=,\fR and \fBro=\fR options are specified in the same \fBsec=\fR
+clause, and a client is in both lists, the order of the two options determines
+the access the client gets. If client \fBhosta\fR is in two netgroups -
+\fBgroup1\fR and \fBgroup2\fR - in this example, the client would get read-only
+access:
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBro=group1,rw=group2 /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example \fBhosta\fR would get read-write access:
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBrw=group2,ro=group1 /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If within a \fBsec=\fR clause, both the \fBro\fR and \fBrw=\fR options are
+specified, for compatibility, the order of the options rule is not enforced.
+All hosts would get read-only access, with the exception to those in the
+read-write list. Likewise, if the \fBro=\fR and \fBrw\fR options are specified,
+all hosts get read-write access with the exceptions of those in the read-only
+list.
+.sp
+.LP
+The \fBro=\fR and \fBrw=\fR options are guaranteed to work over \fBUDP\fR and
+\fBTCP\fR but may not work over other transport providers.
+.sp
+.LP
+The \fBroot=\fR option with \fBAUTH_SYS\fR is guaranteed to work over \fBUDP\fR
+and \fBTCP\fR but may not work over other transport providers.
+.sp
+.LP
+The \fBroot=\fR option with \fBAUTH_DES\fR is guaranteed to work over any
+transport provider.
+.sp
+.LP
+There are no interactions between the \fBroot=\fR option and the \fBrw, ro,
+rw=,\fR and \fBro=\fR options. Putting a host in the \fBroot\fR list does not
+override the semantics of the other options. The access the host gets is the
+same as when the \fBroot=\fR options is absent. For example, the following
+\fBshare\fR command denies access to \fBhostb:\fR
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBro=hosta,root=hostb /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following gives read-only permissions to \fBhostb:\fR
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBro=hostb,root=hostb /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following gives read-write permissions to \fBhostb:\fR
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBro=hosta,rw=hostb,root=hostb /var\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If the file system being shared is a symbolic link to a valid pathname, the
+canonical path (the path which the symbolic link follows) are shared. For
+example, if \fB/export/foo\fR is a symbolic link to \fB/export/bar\fR
+(\fB/export/foo -> /export/bar\fR), the following \fBshare\fR command results
+in \fB/export/bar\fR as the shared pathname (and not \fB/export/foo\fR).
+.sp
+.in +2
+.nf
+\fBexample# share\fR \fB-F\fR \fBnfs /export/foo\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An \fBNFS\fR mount of \fBserver:/export/foo\fR results in
+\fBserver:/export/bar\fR really being mounted.
+.sp
+.LP
+This line in the \fB/etc/dfs/dfstab\fR file shares the \fB/disk\fR file system
+read-only at boot time:
+.sp
+.in +2
+.nf
+\fBshare\fR \fB-F\fR \fBnfs\fR \fB-o\fR \fBro /disk\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The same command entered from the command line does not share the \fB/disk\fR
+file system unless there is at least one file system entry in the
+\fB/etc/dfs/dfstab\fR file. The \fBmountd\fR(1M) and \fBnfsd\fR(1M) daemons
+only run if there is a file system entry in \fB/etc/dfs/dfstab\fR when starting
+or rebooting the system.
+.sp
+.LP
+The \fBmountd\fR(1M) process allows the processing of a path name the contains
+a symbolic link. This allows the processing of paths that are not themselves
+explicitly shared with \fBshare_nfs\fR. For example, \fB/export/foo\fR might be
+a symbolic link that refers to \fB/export/bar\fR which has been specifically
+shared. When the client mounts \fB/export/foo\fR the \fBmountd\fR processing
+follows the symbolic link and responds with the \fB/export/bar\fR. The NFS
+Version 4 protocol does not use the \fBmountd\fR processing and the client's
+use of \fB/export/foo\fR does not work as it does with NFS Version 2 and
+Version 3 and the client receives an error when attempting to mount
+\fB/export/foo\fR.

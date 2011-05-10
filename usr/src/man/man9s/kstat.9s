@@ -1,0 +1,149 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+kstat \- kernel statistics structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+Each kernel statistic (\fBkstat\fR) exported by device drivers consists of a
+header section and a data section. The \fBkstat\fR structure is the header
+portion of the statistic.
+.sp
+.LP
+A driver receives a pointer to a \fBkstat\fR structure from a successful call
+to \fBkstat_create\fR(9F). Drivers should never allocate a \fBkstat\fR
+structure in any other manner.
+.sp
+.LP
+After allocation, the driver should perform any further initialization needed
+before calling \fBkstat_install\fR(9F) to actually export the \fBkstat\fR.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+void      *ks_data;             /* kstat type-specif. data */
+ulong_t   ks_ndata;             /* # of type-specif. data 
+                                     records */
+ulong_t   ks_data_size;         /* total size of kstat data 
+                                   section */
+int       (*ks_update)(struct kstat *, int);
+void      *ks_private;          /* arbitrary provider-private 
+                                   data */
+void      *ks_lock;             /* protects kstat's data */
+.fi
+.in -2
+
+.sp
+.LP
+The members of the \fBkstat\fR structure available to examine or set by a
+driver are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_data\fR \fR
+.ad
+.RS 17n
+.rt  
+Points to the data portion of the \fBkstat\fR. Either allocated by
+\fBkstat_create\fR(9F) for the drivers use, or by the driver if it is using
+virtual \fBkstat\fRs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_ndata\fR \fR
+.ad
+.RS 17n
+.rt  
+The number of data records in this \fBkstat\fR. Set by the \fBks_update\fR(9E)
+routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_data_size\fR \fR
+.ad
+.RS 17n
+.rt  
+The amount of data pointed to by \fBks_data\fR. Set by the \fBks_update\fR(9E)
+routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_update\fR \fR
+.ad
+.RS 17n
+.rt  
+Pointer to a routine that dynamically updates \fBkstat\fR. This is useful for
+drivers where the underlying device keeps cheap hardware statistics, but where
+extraction is expensive. Instead of constantly keeping the \fBkstat\fR data
+section up to date, the driver can supply a \fBks_update\fR(9E) function that
+updates the \fBkstat\fR data section on demand. To take advantage of this
+feature, set the \fBks_update\fR field before calling \fBkstat_install\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_private\fR \fR
+.ad
+.RS 17n
+.rt  
+Is a private field for the driver's use. Often used in \fBks_update\fR(9E).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBks_lock\fR \fR
+.ad
+.RS 17n
+.rt  
+Is a pointer to a mutex that protects this \fBkstat\fR. \fBkstat\fR data
+sections are optionally protected by the per-\fBkstat\fR \fBks_lock\fR. If
+\fBks_lock\fR is non-\fINULL\fR, \fBkstat\fR clients (such as \fB/dev/kstat\fR)
+will acquire this lock for all of their operations on that \fBkstat\fR. It is
+up to the \fBkstat\fR provider to decide whether guaranteeing consistent data
+to \fBkstat\fR clients is sufficiently important to justify the locking cost.
+Note, however, that most statistic updates already occur under one of the
+provider's mutexes. If the provider sets \fBks_lock\fR to point to that mutex,
+then \fBkstat\fR data locking is free. \fBks_lock\fR is really of type
+\fB(kmutex_t*)\fR and is declared as \fB(void*)\fR in the \fBkstat\fR header.
+That way, users do not have to be exposed to all of the kernel's lock-related
+data structures.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

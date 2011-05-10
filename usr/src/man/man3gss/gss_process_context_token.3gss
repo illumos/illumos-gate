@@ -1,0 +1,155 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_process_context_token 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_process_context_token \- pass asynchronous token to security service
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_process_context_token\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBconst gss_ctx_id_t\fR \fIcontext_handle\fR,\fBconst gss_buffer_t\fR \fItoken_buffer\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_process_context_token()\fR function provides a way to pass an
+asynchronous token to the security service. Most context-level tokens are
+emitted and processed synchronously by \fBgss_init_sec_context()\fR and
+\fBgss_accept_sec_context()\fR, and the application is informed as to whether
+further tokens are expected by the \fBGSS_C_CONTINUE_NEEDED\fR major status
+bit. Occasionally, a mechanism might need to emit a context-level token at a
+point when the peer entity is not expecting a token. For example, the
+initiator's final call to \fBgss_init_sec_context()\fR may emit a token and
+return a status of \fBGSS_S_COMPLETE\fR, but the acceptor's call to
+\fBgss_accept_sec_context()\fR might fail. The acceptor's mechanism might want
+to send a token containing an error indication to the initiator, but the
+initiator is not expecting a token at this point, believing that the context is
+fully established. \fBgss_process_context_token()\fR provides a way to pass
+such a token to the mechanism at any time.
+.sp
+.LP
+This function is provided for compatibility with the \fBGSS-API\fR version 1.
+Because \fBgss_delete_sec_context()\fR no longer returns a valid
+\fIoutput_token\fR to be sent to \fBgss_process_context_token()\fR,
+applications using a newer version of the \fBGSS-API\fR do not need to rely on
+this function.
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_process_context_token()\fR are as
+follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 18n
+.rt  
+A mechanism-specific status code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcontext_handle\fR\fR
+.ad
+.RS 18n
+.rt  
+Context handle of context on which token is to be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItoken_buffer\fR\fR
+.ad
+.RS 18n
+.rt  
+Token to process.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+\fBgss_process_context_token()\fR returns one of the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 25n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DEFECTIVE_TOKEN\fR\fR
+.ad
+.RS 25n
+.rt  
+Indicates that consistency checks performed on the token failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_NO_CONTEXT\fR\fR
+.ad
+.RS 25n
+.rt  
+The \fIcontext_handle\fR did not refer to a valid context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 25n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_accept_sec_context\fR(3GSS), \fBgss_delete_sec_context\fR(3GSS),
+\fBgss_init_sec_context\fR(3GSS), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

@@ -1,0 +1,146 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH llseek 2 "1 Apr 2005" "SunOS 5.11" "System Calls"
+.SH NAME
+llseek \- move extended read/write file pointer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <unistd.h>
+
+\fBoffset_t\fR \fBllseek\fR(\fBint\fR \fIfildes\fR, \fBoffset_t\fR \fIoffset\fR, \fBint\fR \fIwhence\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBllseek()\fR function sets the 64-bit extended file pointer associated
+with the open file descriptor specified by \fIfildes\fR as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIwhence\fR is \fBSEEK_SET\fR, the pointer is set to \fIoffset\fR bytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIwhence\fR is \fBSEEK_CUR\fR, the pointer is set to its current location
+plus \fIoffset\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIwhence\fR is \fBSEEK_END\fR, the pointer is set to the size of the file
+plus \fIoffset\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIwhence\fR is \fBSEEK_HOLE\fR, the offset of the start of the next hole
+greater than or equal to the supplied offset is returned. The definition of a
+hole immediately follows this list.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIwhence\fR is \fBSEEK_DATA\fR, the file pointer is set to the start of the
+next non-hole file region greater than or equal to the supplied offset.
+.RE
+.sp
+.LP
+A "hole" is defined as a contiguous range of bytes in a file, all having the
+value of zero, but not all zeros in a file are guaranteed to be represented as
+holes returned with \fBSEEK_HOLE\fR. Filesystems are allowed to expose ranges
+of zeros with \fBSEEK_HOLE\fR, but not required to. Applications can use
+\fBSEEK_HOLE\fR to optimise their behavior for ranges of zeros, but must not
+depend on it to find all such ranges in a file. The existence of a hole at the
+end of every data region allows for easy programming and implies that a virtual
+hole exists at the end of the file.
+.sp
+.LP
+For filesystems that do not supply information about holes, the file will be
+represented as one entire data region.
+.sp
+.LP
+Although each file has a 64-bit file pointer associated with it, some existing
+file system types (such as \fBtmpfs\fR) do not support the full range of 64-bit
+offsets.  In particular, on such file systems, non-device files remain limited
+to offsets of less than two gigabytes.  Device drivers may support offsets of
+up to 1024 gigabytes for device special files.
+.sp
+.LP
+Some devices are incapable of seeking. The value of the file pointer associated
+with such a device is undefined.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBllseek()\fR returns the resulting pointer
+location as measured in bytes from the beginning of the file. Remote file
+descriptors are the only ones that allow negative file pointers. Otherwise,
+\fB\(mi1\fR is returned, the file pointer remains unchanged, and \fBerrno\fR is
+set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBllseek()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not an open file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIwhence\fR argument is not \fBSEEK_SET\fR, \fBSEEK_CUR\fR, or
+\fBSEEK_END\fR; the \fIoffset\fR argument is not a valid offset for this file
+system type; or the \fIfildes\fR argument is not a remote file descriptor and
+the resulting file pointer would be negative.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+For \fBSEEK_DATA\fR, there are no more data regions past the supplied offset.
+For \fBSEEK_HOLE\fR, there are no more holes past the supplied offset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is associated with a pipe or FIFO.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), \fBlseek\fR(2), \fBopen\fR(2)

@@ -22,6 +22,12 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2011 cyril.galibern@opensvc.com
+ */
 
 /*
  * SCSI disk target driver.
@@ -9105,6 +9111,7 @@ static void
 sd_set_errstats(struct sd_lun *un)
 {
 	struct	sd_errstats	*stp;
+	char 			*sn;
 
 	ASSERT(un != NULL);
 	ASSERT(un->un_errstats != NULL);
@@ -9143,6 +9150,17 @@ sd_set_errstats(struct sd_lun *un)
 	if (bcmp(&SD_INQUIRY(un)->inq_pid[9], "SUN", 3) == 0) {
 		bcopy(&SD_INQUIRY(un)->inq_serial, stp->sd_serial.value.c,
 		    sizeof (SD_INQUIRY(un)->inq_serial));
+	} else {
+		/*
+		 * Set the "Serial No" kstat for non-Sun qualified drives
+		 */
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, SD_DEVINFO(un),
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    INQUIRY_SERIAL_NO, &sn) == DDI_SUCCESS) {
+			(void) strlcpy(stp->sd_serial.value.c, sn,
+			    sizeof (stp->sd_serial.value.c));
+			ddi_prop_free(sn);
+		}
 	}
 
 	if (un->un_f_blockcount_is_valid != TRUE) {
@@ -20939,7 +20957,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t  usr_cmd,
  *                      for the target.
  *		usr_cmd SCSI-3 reservation facility command (one of
  *			SD_SCSI3_REGISTER, SD_SCSI3_RESERVE, SD_SCSI3_RELEASE,
- *			SD_SCSI3_PREEMPTANDABORT)
+ *			SD_SCSI3_PREEMPTANDABORT, SD_SCSI3_CLEAR)
  *		usr_bufp - user provided pointer register, reserve descriptor or
  *			preempt and abort structure (mhioc_register_t,
  *                      mhioc_resv_desc_t, mhioc_preemptandabort_t)
@@ -21003,6 +21021,12 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(sd_ssc_t *ssc, uchar_t usr_cmd,
 		bcopy(ptr->newkey.key, prp->service_key,
 		    MHIOC_RESV_KEY_SIZE);
 		prp->aptpl = ptr->aptpl;
+		break;
+	}
+	case SD_SCSI3_CLEAR: {
+		mhioc_resv_desc_t *ptr = (mhioc_resv_desc_t *)usr_bufp;
+
+		bcopy(ptr->key.key, prp->res_key, MHIOC_RESV_KEY_SIZE);
 		break;
 	}
 	case SD_SCSI3_RESERVE:
@@ -22275,6 +22299,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case MHIOCGRP_INKEYS:
 		case MHIOCGRP_INRESV:
 		case MHIOCGRP_REGISTER:
+		case MHIOCGRP_CLEAR:
 		case MHIOCGRP_RESERVE:
 		case MHIOCGRP_PREEMPTANDABORT:
 		case MHIOCGRP_REGISTERANDIGNOREKEY:
@@ -22583,6 +22608,28 @@ skip_ready_valid:
 					err =
 					    sd_send_scsi_PERSISTENT_RESERVE_OUT(
 					    ssc, SD_SCSI3_REGISTER,
+					    (uchar_t *)&reg);
+					if (err != 0)
+						goto done_with_assess;
+				}
+			}
+		}
+		break;
+
+	case MHIOCGRP_CLEAR:
+		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_CLEAR\n");
+		if ((err = drv_priv(cred_p)) != EPERM) {
+			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
+				err = ENOTSUP;
+			} else if (arg != NULL) {
+				mhioc_register_t reg;
+				if (ddi_copyin((void *)arg, &reg,
+				    sizeof (mhioc_register_t), flag) != 0) {
+					err = EFAULT;
+				} else {
+					err =
+					    sd_send_scsi_PERSISTENT_RESERVE_OUT(
+					    ssc, SD_SCSI3_CLEAR,
 					    (uchar_t *)&reg);
 					if (err != 0)
 						goto done_with_assess;
@@ -24714,7 +24761,7 @@ sd_mhdioc_inresv(dev_t dev, caddr_t arg, int flag)
  * A direct semantic implementation of the SCSI-3 Persistent Reservation
  * facility is supported through the shared multihost disk ioctls
  * (MHIOCGRP_INKEYS, MHIOCGRP_INRESV, MHIOCGRP_REGISTER, MHIOCGRP_RESERVE,
- * MHIOCGRP_PREEMPTANDABORT)
+ * MHIOCGRP_PREEMPTANDABORT, MHIOCGRP_CLEAR)
  *
  * Reservation Reclaim:
  * --------------------
@@ -31627,6 +31674,8 @@ sd_check_solid_state(sd_ssc_t *ssc)
 			 */
 			if (inqb1[4] == 0 && inqb1[5] == 1) {
 				un->un_f_is_solid_state = TRUE;
+				/* solid state drives don't need disksort */
+				un->un_f_disksort_disabled = TRUE;
 			}
 			mutex_exit(SD_MUTEX(un));
 		} else if (rval != 0) {

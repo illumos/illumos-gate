@@ -62,6 +62,9 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=sv devlink=type=ddi_pseudo;name=sv\t\D perms="* 0666 root sys" \
     privs=sys_config privs=sys_devices
 file path=etc/init.d/sv mode=0744
@@ -77,6 +80,8 @@ $(i386_ONLY)file path=usr/kernel/drv/sv group=sys
 file path=usr/kernel/drv/sv.conf group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/sv.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/sv.so group=sys mode=0555
+file path=usr/share/man/man1m/svadm.1m
+file path=usr/share/man/man7d/sv.7d
 hardlink path=lib/svc/method/svc-sv target=../../../etc/init.d/sv
 hardlink path=usr/sbin/svadm target=../bin/svadm
 hardlink path=usr/sbin/svboot target=../bin/svboot

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * VM - Hardware Address Translation management for Spitfire MMU.
@@ -371,14 +374,6 @@ int sfmmu_max_cb_id = SFMMU_MAX_RELOC_CALLBACKS;
 static id_t sfmmu_cb_nextid = 0;
 static id_t sfmmu_tsb_cb_id;
 struct sfmmu_callback *sfmmu_cb_table;
-
-/*
- * Kernel page relocation is enabled by default for non-caged
- * kernel pages.  This has little effect unless segkmem_reloc is
- * set, since by default kernel memory comes from inside the
- * kernel cage.
- */
-int hat_kpr_enabled = 1;
 
 kmutex_t	kpr_mutex;
 kmutex_t	kpr_suspendlock;
@@ -6876,7 +6871,7 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 	int		cflags = 0;
 #endif
 
-	if (hat_kpr_enabled == 0 || !kcage_on || PP_ISNORELOC(*target)) {
+	if (!kcage_on || PP_ISNORELOC(*target)) {
 		PAGE_RELOCATE_LOG(target, replacement, EAGAIN, -1);
 		return (EAGAIN);
 	}
@@ -7922,7 +7917,7 @@ sfmmu_check_kpfn(pfn_t pfn)
 	if (hat_check_vtop == 0)
 		return;
 
-	if (hat_kpr_enabled == 0 || kvseg.s_base == NULL || panicstr)
+	if (kvseg.s_base == NULL || panicstr)
 		return;
 
 	pp = page_numtopp_nolock(pfn);
@@ -8011,57 +8006,6 @@ hat_getpfnum(struct hat *hat, caddr_t addr)
 	} else {
 		return (sfmmu_uvatopfn(addr, hat, NULL));
 	}
-}
-
-/*
- * hat_getkpfnum() is an obsolete DDI routine, and its use is discouraged.
- * Use hat_getpfnum(kas.a_hat, ...) instead.
- *
- * We'd like to return PFN_INVALID if the mappings have underlying page_t's
- * but can't right now due to the fact that some software has grown to use
- * this interface incorrectly. So for now when the interface is misused,
- * return a warning to the user that in the future it won't work in the
- * way they're abusing it, and carry on (after disabling page relocation).
- */
-pfn_t
-hat_getkpfnum(caddr_t addr)
-{
-	pfn_t pfn;
-	tte_t tte;
-	int badcaller = 0;
-	extern int segkmem_reloc;
-
-	if (segkpm && IS_KPM_ADDR(addr)) {
-		badcaller = 1;
-		pfn = sfmmu_kpm_vatopfn(addr);
-	} else {
-		while ((pfn = sfmmu_vatopfn(addr, ksfmmup, &tte))
-		    == PFN_SUSPENDED) {
-			sfmmu_vatopfn_suspended(addr, ksfmmup, &tte);
-		}
-		badcaller = pf_is_memory(pfn);
-	}
-
-	if (badcaller) {
-		/*
-		 * We can't return PFN_INVALID or the caller may panic
-		 * or corrupt the system.  The only alternative is to
-		 * disable page relocation at this point for all kernel
-		 * memory.  This will impact any callers of page_relocate()
-		 * such as FMA or DR.
-		 *
-		 * RFE: Add junk here to spit out an ereport so the sysadmin
-		 * can be advised that he should upgrade his device driver
-		 * so that this doesn't happen.
-		 */
-		hat_getkpfnum_badcall(caller());
-		if (hat_kpr_enabled && segkmem_reloc) {
-			hat_kpr_enabled = 0;
-			segkmem_reloc = 0;
-			cmn_err(CE_WARN, "Kernel Page Relocation is DISABLED");
-		}
-	}
-	return (pfn);
 }
 
 /*

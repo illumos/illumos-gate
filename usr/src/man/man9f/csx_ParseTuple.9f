@@ -1,0 +1,207 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_ParseTuple 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_ParseTuple \- generic tuple parser
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_ParseTuple\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR, \fBcisparse_t *\fR\fIcp\fR,
+     \fBcisdata_t\fR \fIcd\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItu\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
+to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBcisparse_t\fR structure that unifies all tuple parsing
+structures.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcd\fR \fR
+.ad
+.RS 7n
+.rt  
+Extended tuple data for some tuples.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is the generic tuple parser entry point.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBcisparse_t\fR are:
+.sp
+.in +2
+.nf
+  typedef union cisparse_t {
+     cistpl_config_t           cistpl_config;
+     cistpl_device_t           cistpl_device;
+     cistpl_vers_1_t           cistpl_vers_1;
+     cistpl_vers_2_t           cistpl_vers_2;
+     cistpl_jedec_t            cistpl_jedec;
+     cistpl_format_t           cistpl_format;
+     cistpl_geometry_t         cistpl_geometry;
+     cistpl_byteorder_t        cistpl_byteorder;
+     cistpl_date_t             cistpl_date;
+     cistpl_battery_t          cistpl_battery;
+     cistpl_org_t              cistpl_org;
+     cistpl_manfid_t           cistpl_manfid;
+     cistpl_funcid_t           cistpl_funcid;
+     cistpl_funce_t            cistpl_funce;
+     cistpl_cftable_entry_t    cistpl_cftable_entry;
+     cistpl_linktarget_t       cistpl_linktarget;
+     cistpl_longlink_ac_t      cistpl_longlink_ac;
+     cistpl_longlink_mfc_t     cistpl_longlink_mfc;
+     cistpl_spcl_t             cistpl_spcl;
+     cistpl_swil_t             cistpl_swil;
+     cistpl_bar_t              cistpl_bar;
+     cistpl_devicegeo_t        cistpl_devicegeo;
+     cistpl_longlink_cb_t      cistpl_longlink_cb;
+     cistpl_get_tuple_name_t   cistpl_get_tuple_name;
+  } cisparse_t;
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNKNOWN_TUPLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Parser does not know how to parse tuple.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPC\fR Card in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_CIS\fR \fR
+.ad
+.RS 28n
+.rt  
+Generic parser error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CIS\fR \fR
+.ad
+.RS 28n
+.rt  
+No Card Information Structure (\fBCIS\fR) on \fBPC\fR Card.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA\fR hardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
+\fBcsx_Parse_CISTPL_BATTERY\fR(9F), \fBcsx_Parse_CISTPL_BYTEORDER\fR(9F),
+\fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(9F), \fBcsx_Parse_CISTPL_CONFIG\fR(9F),
+\fBcsx_Parse_CISTPL_DATE\fR(9F), \fBcsx_Parse_CISTPL_DEVICE\fR(9F),
+\fBcsx_Parse_CISTPL_FUNCE\fR(9F), \fBcsx_Parse_CISTPL_FUNCID\fR(9F),
+\fBcsx_Parse_CISTPL_JEDEC_C\fR(9F), \fBcsx_Parse_CISTPL_MANFID\fR(9F),
+\fBcsx_Parse_CISTPL_SPCL\fR(9F), \fBcsx_Parse_CISTPL_VERS_1\fR(9F),
+\fBcsx_Parse_CISTPL_VERS_2\fR(9F), \fBcsx_RegisterClient\fR(9F),
+\fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

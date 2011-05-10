@@ -1,0 +1,181 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libpicl 3PICL "28 Mar 2000" "SunOS 5.11" "PICL Library Functions"
+.SH NAME
+libpicl \- PICL interface library
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR \|.\|.\|. ] \fIfile\fR \|.\|.\|. \fB-lpicl\fR [ \fIlibrary\fR \|.\|.\|. ] 
+#include <picl.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The PICL interface is the platform-independent interface for clients to access
+the platform information. The set of functions and data structures of this
+interface are defined in the <\fBpicl.h\fR> header.
+.sp
+.LP
+The information published through PICL is organized in a tree, where each node
+is an instance of a well-defined PICL class. The functions in the PICL
+interface allow the clients to access the properties of the nodes.
+.sp
+.LP
+The name of the base PICL class is \fBpicl\fR, which defines a basic set of
+properties that all nodes in the tree must possess. The following table shows
+the property set of a \fBpicl\fR class node.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.72i) |cw(2.78i) 
+lw(2.72i) |lw(2.78i) 
+.
+Property NameProperty Value
+_
+\fBname\fRThe name of the node
+_
+\fB_class\fRThe PICL class name of the node
+_
+\fB_parent\fRNode handle of the parent node
+_
+\fB_child\fRNode handle of the first child node
+_
+\fB_peer\fRNode handle of the next peer node
+.TE
+
+.sp
+.LP
+Property names with a a leading underscore ('_') are reserved for use by the
+PICL framework. The property names \fB_class\fR, \fB_parent\fR, \fB_child\fR,
+and \fB_peer\fR are reserved names of the PICL framework, and are used to refer
+to a node's parent, child, and peer nodes, respectively.  A client shall access
+a reserved property by their names only as they do not have an associated
+handle. The property \fBname\fR is not a reserved property, but a mandatory
+property for all nodes.
+.sp
+.LP
+Properties are classified into different types. Properties of type integer,
+unsigned-integer, and float have integer, unsigned integer, and floating-point
+values, respectively. A \fBtable\fR property type has the handle to a table as
+its value. A table is a matrix of properties. A \fBreference\fR property type
+has a handle to a node in the tree as its value. A \fBreference\fR property may
+be used to establish an association between any two nodes in the tree. A
+\fBtimestamp\fR property type has the value of time in seconds since Epoch. A
+\fBbytearray\fR property type has an array of bytes as its value. A
+\fBcharstring\fR property type has a nul ('\0') terminated sequence of ASCII
+characters. The size of a property specifies the size of its value in bytes. A
+\fBvoid\fR property type denotes a property that exists but has no value.
+.sp
+.LP
+The following table lists the different PICL property types enumerated in
+\fBpicl_prop_type_t\fR.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+Property TypeProperty Value
+_
+\fBPICL_PTYPE_VOID\fRNone
+_
+\fBPICL_PTYPE_INT\fRIs an integer
+_
+\fBPICL_PTYPE_UNSIGNED_INT\fRIs an unsigned integer
+_
+\fBPICL_PTYPE_FLOAT\fRIs a floating-point number
+_
+\fBPICL_PTYPE_REFERENCE\fRIs a PICL node handle
+.TE
+
+.SS "Reference Property Naming Convention"
+.sp
+.LP
+Reference properties may be used by plug-ins to publish properties in nodes of
+different classes. To make these property names unique, their names must be
+prefixed by _\fIpicl_class_name\fR_, where \fIpicl_class_name\fR is the class
+name of the node referenced by the property. Valid PICL class names are
+combinations of uppercase and lowercase letters 'a' through 'z', digits '0'
+through '9', and '-' (minus) characters.  The string that follows
+the '_\fIpicl_class_name\fR_' portion of a reference property name may be used to
+indicate a specific property in the referenced class, when applicable.
+.SS "Property Information"
+.sp
+.LP
+The information about a node's property that can be accessed by PICL clients is
+defined by the \fBpicl_propinfo_t\fR structure.
+.sp
+.in +2
+.nf
+typedef struct {
+    picl_prop_type_t  type;           /* property type */
+    unsigned int      accessmode;     /* read, write */
+    size_t            size;           /* item size or 
+                                         string size */
+    char              name[PICL_PROPNAMELEN_MAX];
+} picl_propinfo_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBtype\fR member specifies the property value type and the
+\fBaccessmode\fR specifies the allowable access to the property. The plug-in
+module that adds the property to the PICL tree also sets the access mode of
+that property. The volatile nature of a property created by the plug-in is not
+visible to the PICL clients. The \fBsize\fR member specifies the number of
+bytes occupied by the property's value. The maximum allowable size of property
+value is \fBPICL_PROPSIZE_MAX\fR, which is set to 512KB.
+.SS "Property Access Modes"
+.sp
+.LP
+The plug-in module may publish a property granting a combination of the
+following access modes to the clients:
+.sp
+.in +2
+.nf
+#define   PICL_READ   0x1   /* read permission */
+#define   PICL_WRITE  0x2   /* write permission */
+.fi
+.in -2
+
+.SS "Property Names"
+.sp
+.LP
+The maximum length of the name of any property is specified by
+\fBPICL_PROPNAMELEN_MAX\fR.
+.SS "Class Names"
+.sp
+.LP
+The maximum length of a PICL class name is specified by
+\fBPICL_CLASSNAMELEN_MAX\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpicl\fR(3LIB), \fBattributes\fR(5)

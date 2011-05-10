@@ -1,0 +1,108 @@
+'\" te
+.\" Copyright (c) David L. Mills 1992, 1993, 1994, 1995, 1996, 1997
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ntp_adjtime 2 "21 May 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+ntp_adjtime \- adjust local clock parameters
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/timex.h>
+
+\fBint\fR \fBntp_adjtime\fR(\fBstruct timex *\fR\fItptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBntp_adjtime()\fR function adjusts the parameters used to discipline the
+local clock, according to the values in the struct \fBtimex\fR pointed to by
+\fItptr\fR. Before returning, it fills in the structure with the most recent
+values kept in the kernel.
+.sp
+.LP
+The adjustment is effected in part by speeding up or slowing down the clock, as
+necessary, and in part by phase-locking onto a once-per second pulse (PPS)
+provided by a driver, if available.
+.sp
+.in +2
+.nf
+struct timex {
+    uint32_t modes;        /* clock mode bits (w) */
+    int32_t  offset;       /* time offset (us) (rw) */
+    int32_t  freq;         /* frequency offset (scaled ppm) (rw) */
+    int32_t  maxerror;     /* maximum error (us) (rw) */
+    int32_t  esterror;     /* estimated error (us) (rw) */
+    int32_t  status;       /* clock status bits (rw) */
+    int32_t  constant;     /* pll time constant (rw) */
+    int32_t  precision;    /* clock precision (us) (r) */
+    int32_t  tolerance;    /* clock frequency tolerance
+                              (scaled ppm) (r) */
+    int32_t  ppsfreq;      /* pps frequency (scaled ppm) (r) */
+    int32_t  jitter;       /* pps jitter (us) (r) */
+    int32_t  shift;        /* interval duration (s) (shift) (r) */
+    int32_t  stabil;       /* pps stability (scaled ppm) (r) */
+    int32_t  jitcnt;       /* jitter limit exceeded (r) */
+    int32_t  calcnt;       /* calibration intervals (r) */
+    int32_t  errcnt;       /* calibration errors (r) */
+    int32_t  stbcnt;       /* stability limit exceeded (r) */
+};
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBntp_adjtime()\fR returns the current clock state
+(see <\fBsys/timex.h\fR>). Otherwise, it returns \fB\(mi1\fR and sets
+\fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBntp_adjtime()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The  \fItptr\fR argument is an invalid pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBconstant\fR member of the structure pointed to by \fItptr\fR is less
+than 0 or greater than 30.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_SYS_TIME\fR} privilege is not asserted in the effective set of the
+calling process.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBntp_gettime\fR(2), \fBprivileges\fR(5)
+.sp
+.LP
+See the \fBntpd\fR man page, delivered in the \fBSUNWntpu\fR package (not a
+SunOS man page).

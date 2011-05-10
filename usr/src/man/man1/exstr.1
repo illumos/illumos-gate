@@ -1,0 +1,404 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1990, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH exstr 1 "5 Jul 1990" "SunOS 5.11" "User Commands"
+.SH NAME
+exstr \- extract strings from source files
+.SH SYNOPSIS
+.LP
+.nf
+\fBexstr\fR \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fBexstr\fR \fB-e\fR \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fBexstr\fR \fB-r\fR [\fB-d\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBexstr\fR utility is used to extract strings from C-language source files
+and replace them by calls to the message retrieval function (see
+\fBgettxt\fR(3C)). This utility will extract all character strings surrounded
+by double quotes, not just strings used as arguments to the \fBprintf\fR
+command or the \fBprintf\fR routine. In the first form, \fBexstr\fR finds all
+strings in the source files and writes them on the standard output. Each string
+is preceded by the source file name and a colon (\fB:\fR).
+.sp
+.LP
+The first step is to use \fBexstr\fR \fB-e\fR to extract a list of strings and
+save it in a file. Next, examine this list and determine which strings can be
+translated and subsequently retrieved by the message retrieval function. Then,
+modify this file by deleting lines that can't be translated and, for lines that
+can be translated, by adding the message file names and the message numbers as
+the fourth (\fImsgfile\fR) and fifth (\fImsgnum\fR) entries on a line. The
+message files named must have been created by \fBmkmsgs\fR(1) and exist in
+\fB/usr/lib/locale/\fR\fBlocale\fR\fB/\fR\fBLC_MESSAGES\fR\fB   \fR. (The
+directory \fBlocale\fR corresponds to the language in which the text strings
+are written; see \fBsetlocale\fR(3C)). The message numbers used must correspond
+to the sequence numbers of strings in the message files.
+.sp
+.LP
+Now use this modified file as input to \fBexstr\fR \fB-r\fR to produce a new
+version of the original C-language source file in which the strings have been
+replaced by calls to the message retrieval function \fBgettxt\fR(). The
+\fImsgfile\fR and \fImsgnum\fR fields are used to construct the first argument
+to \fBgettxt\fR(). The second argument to \fBgettxt\fR() is printed if the
+message retrieval fails at run-time. This argument is the null string, unless
+the \fB-d\fR option is used.
+.sp
+.LP
+This utility cannot replace strings in all instances. For example, a static
+initialized character string cannot be replaced by a function call. A second
+example is that a string could be in a form of an escape sequence which could
+not be translated. In order not to break existing code, the files created by
+invoking \fBexstr\fR \fB-e\fR must be examined and lines containing strings not
+replaceable by function calls must be deleted. In some cases the code may
+require modifications so that strings can be extracted and replaced by calls to
+the message retrieval function.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fR
+.ad
+.RS 7n
+.rt  
+Extract a list of strings from the named C-language source files, with
+positional information. This list is produced on standard output in the
+following format:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile:line:position:msgfile:msgnum:string\fR \fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR \fR
+.ad
+.sp .6
+.RS 4n
+the name of a C-language source file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIline\fR \fR
+.ad
+.sp .6
+.RS 4n
+line number in the file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIposition\fR \fR
+.ad
+.sp .6
+.RS 4n
+character position in the line
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgfile\fR \fR
+.ad
+.sp .6
+.RS 4n
+null
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgnum\fR \fR
+.ad
+.sp .6
+.RS 4n
+null
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR \fR
+.ad
+.sp .6
+.RS 4n
+the extracted text string
+.RE
+
+Normally you would redirect this output into a file. Then you would edit this
+file to add the values you want to use for \fImsgfile\fR and \fImsgnum\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgfile\fR \fR
+.ad
+.RS 12n
+.rt  
+the file that contains the text strings that will replace \fIstring\fR. A file
+with this name must be created and installed in the appropriate place by the
+\fBmkmsgs\fR(1) utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgnum\fR \fR
+.ad
+.RS 12n
+.rt  
+the sequence number of the string in \fImsgfile\fR.
+.RE
+
+The next step is to use \fBexstr\fR \fB-r\fR to replace \fIstring\fRs in
+\fBfile\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fR
+.ad
+.RS 7n
+.rt  
+Replace strings in a C-language source file with function calls to the message
+retrieval function \fBgettxt\fR().
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fR
+.ad
+.RS 7n
+.rt  
+This option is used together with the \fB-r\fR option. If the message retrieval
+fails when \fBgettxt\fR() is invoked at run-time, then the extracted string is
+printed. You would use the capability provided by \fBexstr\fR on an application
+program that needs to run in an international environment and have messages
+print in more than one language. \fBexstr\fR replaces text strings with
+function calls that point at strings in a message data base. The data base used
+depends on the run-time value of the \fBLC_MESSAGES\fR environment variable
+(see \fBenviron\fR(5)).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe following examples show uses of exstr
+.sp
+.LP
+Assume that the file \fBexample.c\fR contains two strings:
+
+.sp
+.in +2
+.nf
+main()
+
+{
+
+        printf("This is an example\en");
+
+        printf("Hello world!\en");
+
+}\fI\fR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBexstr\fR utility, invoked with the argument \fBexample.c\fR extracts
+strings from the named file and prints them on the standard output.
+
+.sp
+.in +2
+.nf
+example% \fBexstr example.c\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces the following output:
+
+.sp
+.in +2
+.nf
+example.c:This is an example\en
+example.c:Hello world!\en
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBexstr\fR utility, invoked with the \fB-e\fR option and the argument
+\fBexample.c\fR, and redirecting output to the file \fBexample.stringsout\fR
+
+.sp
+.in +2
+.nf
+example% \fBexstr -e example.c > example.stringsout\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces the following output in the file \fBexample.stringsout\fR
+
+.sp
+.in +2
+.nf
+example.c:3:8:::This is an example\en
+example.c:4:8:::Hello world!\en
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You must edit \fBexample.stringsout\fR to add the values you want to use for
+the \fImsgfile\fR and \fImsgnum\fR fields before these strings can be replaced
+by calls to the retrieval function. If \fBUX\fR is the name of the message
+file, and the numbers \fB1\fR and \fB2\fR represent the sequence number of the
+strings in the file, here is what \fBexample.stringsout\fR looks like after you
+add this information:
+
+.sp
+.in +2
+.nf
+example.c:3:8:UX:1:This is an example\en
+example.c:4:8:UX:2:Hello world!\en
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBexstr\fR utility can now be invoked with the \fB-r\fR option to replace
+the strings in the source file by calls to the message retrieval function
+\fBgettxt()\fR.
+
+.sp
+.in +2
+.nf
+example% \fBexstr -r example.c <example.stringsout >intlexample.c\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces the following output:
+
+.sp
+.in +2
+.nf
+\fBextern char *gettxt();
+
+main()
+
+{
+
+	printf(gettxt("UX:1", ""));
+
+	printf(gettxt("UX:2", ""));
+
+}\fR\fI\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example:
+
+.sp
+.in +2
+.nf
+example% \fBexstr -rd example.c <example.stringsout >intlexample.c\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+uses the extracted strings as a second argument to \fBgettxt()\fR:
+
+.sp
+.in +2
+.nf
+extern char *gettxt();
+
+main()
+
+{
+
+        printf(gettxt("UX:1", "This is an example\en"));
+
+        printf(gettxt("UX:2", "Hello world!\en"));
+
+}\fI\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES/* \fR\fR
+.ad
+.sp .6
+.RS 4n
+files created by \fBmkmsgs\fR(1)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgettxt\fR(1), \fBmkmsgs\fR(1), \fBprintf\fR(1), \fBsrchtxt\fR(1),
+\fBgettxt\fR(3C), \fBprintf\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+The error messages produced by \fBexstr\fR are intended to be self-explanatory.
+They indicate errors in the command line or format errors encountered within
+the input file.

@@ -1,0 +1,158 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH timeout 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+timeout \- execute a function after a specified length of time
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+
+
+
+\fBtimeout_id_t\fR \fBtimeout\fR(\fBvoid (\fR\fI* func\fR)(void \fI*\fR), \fBvoid\fR \fI*arg\fR, 
+     \fBclock_t\fR  \fIticks\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfunc\fR\fR
+.ad
+.RS 9n
+.rt  
+Kernel function to invoke when the time increment expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 9n
+.rt  
+Argument to the function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIticks\fR\fR
+.ad
+.RS 9n
+.rt  
+Number of clock ticks to wait before the function is called. Use
+\fBdrv_usectohz\fR(9F) to convert microseconds to clock ticks.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtimeout()\fR function schedules the specified function to be called
+after a specified time interval. The exact time interval over which the timeout
+takes effect cannot be guaranteed, but the value given is a close
+approximation.
+.sp
+.LP
+The function called by \fBtimeout()\fR must adhere to the same restrictions as
+a driver soft interrupt handler.
+.sp
+.LP
+The \fBdelay\fR(9F) function calls \fBtimeout()\fR. Because \fBtimeout()\fR is
+subject to priority inversion, drivers waiting on behalf of processes with
+real-time constraints should use \fBcv_timedwait\fR(9F) rather than
+\fBdelay()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBtimeout()\fR function returns an opaque non-zero \fBtimeout\fR
+identifier that can be passed to \fBuntimeout\fR(9F) to cancel the request.
+.SH CONTEXT
+.sp
+.LP
+The \fBtimeout()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBtimeout()\fR
+.sp
+.LP
+In the following example, the device driver has issued an IO request and is
+waiting for the device to respond. If the device does not respond within 5
+seconds, the device driver will print out an error message to the console.
+
+.sp
+.in +2
+.nf
+static void
+xxtimeout_handler(void *arg)
+{
+        struct xxstate *xsp = (struct xxstate *)arg;
+        mutex_enter(&xsp->lock);
+        cv_signal(&xsp->cv);
+        xsp->flags |= TIMED_OUT;
+        mutex_exit(&xsp->lock);
+        xsp->timeout_id = 0;
+}
+static uint_t
+xxintr(caddr_t arg)
+{
+        struct xxstate *xsp = (struct xxstate *)arg;
+         .
+         .
+         .
+        mutex_enter(&xsp->lock);
+        /* Service interrupt */
+        cv_signal(&xsp->cv);
+        mutex_exit(&xsp->lock);
+        if (xsp->timeout_id != 0) {
+                (void) untimeout(xsp->timeout_id);
+                xsp->timeout_id = 0;
+        }
+        return(DDI_INTR_CLAIMED);
+}
+static void
+xxcheckcond(struct xxstate *xsp)
+{
+         .
+         .
+         .
+        xsp->timeout_id = timeout(xxtimeout_handler,
+            xsp, (5 * drv_usectohz(1000000)));
+        mutex_enter(&xsp->lock);
+        while (/* Waiting for interrupt  or timeout*/)
+                cv_wait(&xsp->cv, &xsp->lock);
+        if (xsp->flags & TIMED_OUT)
+                cmn_err(CE_WARN, "Device not responding");
+         .
+         .
+         .
+        mutex_exit(&xsp->lock);
+         .
+         .
+         .
+}   
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbufcall\fR(9F), \fBcv_timedwait\fR(9F), \fBddi_in_panic\fR(9F),
+\fBdelay\fR(9F), \fBdrv_usectohz\fR(9F), \fBuntimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

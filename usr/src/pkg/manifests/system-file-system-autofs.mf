@@ -45,6 +45,9 @@ dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/autofs group=sys
 dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 file path=etc/auto_home original_name=SUNWatfs:etc/auto_home preserve=true
 file path=etc/auto_master original_name=SUNWatfs:etc/auto_master preserve=true
 file path=etc/default/autofs group=sys \
@@ -59,6 +62,9 @@ file path=usr/lib/fs/autofs/libshare_autofs.so.1
 file path=usr/lib/fs/autofs/mount mode=0555
 file path=usr/lib/fs/autofs/share mode=0555
 file path=usr/lib/fs/autofs/unshare mode=0555
+file path=usr/share/man/man1m/automount.1m
+file path=usr/share/man/man1m/automountd.1m
+file path=usr/share/man/man4/autofs.4
 legacy pkg=SUNWatfsr \
     desc="configuration and start-up files for the AutoFS filesystem" \
     name="AutoFS, (Root)"

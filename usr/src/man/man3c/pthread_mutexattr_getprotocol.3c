@@ -1,0 +1,213 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_mutexattr_getprotocol 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_mutexattr_getprotocol, pthread_mutexattr_setprotocol \- get or set
+protocol attribute of mutex attribute object
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h> 
+
+\fBint\fR \fBpthread_mutexattr_getprotocol\fR(
+     \fBconst pthread_mutexattr_t *restrict\fR \fIattr\fR,
+     \fBint *restrict\fR \fIprotocol\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutexattr_setprotocol\fR(\fBpthread_mutexattr_t *\fR\fIattr\fR,
+     \fBint\fR \fIprotocol\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_mutexattr_setprotocol()\fR and
+\fBpthread_mutexattr_getprotocol()\fR functions, respectively, set and get the
+protocol attribute of a mutex attribute object pointed to by \fIattr\fR, which
+was previously created by the \fBpthread_mutexattr_init()\fR function.
+.sp
+.LP
+The \fIprotocol\fR attribute defines the protocol to be followed in utilizing
+mutexes. The value of \fIprotocol\fR may be one of  \fBPTHREAD_PRIO_NONE\fR,
+\fBPTHREAD_PRIO_INHERIT\fR, or \fBPTHREAD_PRIO_PROTECT\fR, which are defined by
+the header <\fBpthread.h\fR>.
+.sp
+.LP
+When a thread owns a mutex with the  \fBPTHREAD_PRIO_NONE\fR protocol
+attribute, its priority and scheduling are not affected by its mutex ownership.
+.sp
+.LP
+When a thread is blocking higher priority threads because of owning one or more
+mutexes with the  \fBPTHREAD_PRIO_INHERIT\fR protocol attribute, it executes at
+the higher of its priority or the priority of the highest priority thread
+waiting on any of the mutexes owned by this thread and initialized with this
+protocol.
+.sp
+.LP
+When a thread owns one or more mutexes initialized with the
+\fBPTHREAD_PRIO_PROTECT\fR protocol, it executes at the higher of its priority
+or the highest of the priority ceilings of all the mutexes owned by this thread
+and initialized with this attribute, regardless of whether other threads are
+blocked on any of these mutexes.
+.sp
+.LP
+While a thread is holding a mutex that has been initialized with the
+\fBPRIO_INHERIT\fR or  \fBPRIO_PROTECT\fR protocol attributes, it will not be
+subject to being moved to the tail of the scheduling queue at its priority in
+the event that its original priority is changed, such as by a call to
+\fBsched_setparam()\fR. Likewise, when a thread unlocks a mutex that has been
+initialized with the \fBPRIO_INHERIT\fR or \fBPRIO_PROTECT\fR protocol
+attributes, it will not be subject to being moved to the tail of the scheduling
+queue at its priority in the event that its original priority is changed.
+.sp
+.LP
+If a thread simultaneously owns several mutexes initialized with different
+protocols, it will execute at the highest of the priorities that it would have
+obtained by each of these protocols.
+.sp
+.LP
+If a thread makes a call to \fBpthread_mutex_lock()\fR for a mutex that was
+initialized with the protocol attribute \fBPTHREAD_PRIO_INHERIT\fR, and if the
+calling thread becomes blocked because the mutex is owned by another thread,
+then the owner thread inherits the priority level of the  calling thread for as
+long as it continues to own the mutex. The implementation updates its execution
+priority to the maximum of its assigned priority and all its inherited
+priorities. Furthermore, if this owner thread becomes blocked on another mutex,
+the same priority inheritance effect will be propagated to the other owner
+thread, in a recursive manner.
+.sp
+.LP
+A thread that uses mutexes initialized with the \fBPTHREAD_PRIO_INHERIT\fR or
+\fBPTHREAD_PRIO_PROTECT\fR \fIprotocol\fR attribute values should have its
+scheduling policy equal to \fBSCHED_FIFO or SCHED_RR\fR (see
+\fBpthread_attr_getschedparam\fR(3C) and \fBpthread_getschedparam\fR(3C)).
+.sp
+.LP
+If a thread with scheduling policy equal to \fBSCHED_OTHER\fR uses a mutex
+initialized with the \fBPTHREAD_PRIO_INHERIT\fR or \fBPTHREAD_PRIO_PROTECT\fR
+\fIprotocol\fR attribute value, the effect on the thread's scheduling and
+priority is unspecified.
+.sp
+.LP
+The \fB_POSIX_THREAD_PRIO_INHERIT\fR and \fB_POSIX_THREAD_PRIO_PROTECT\fR
+options are designed to provide features to solve priority inversion due to
+mutexes. A priority inheritance or priority ceiling mutex is designed to
+minimize the dispatch latency of a high priority thread when a low priority
+thread is holding a mutex required by the high priority thread.  This is a
+specific need for the realtime application domain.
+.sp
+.LP
+Threads created by realtime applications need to be such that their priorities
+can influence their access to system resources (\fBCPU\fR resources, at least),
+in competition with all threads running on the system.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_mutexattr_getprotocol()\fR and
+\fBpthread_mutexattr_setprotocol()\fR functions return  \fB0\fR. Otherwise, an
+error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_mutexattr_getprotocol()\fR and
+\fBpthread_mutexattr_setprotocol()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The value specified by \fIattr\fR is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 11n
+.rt  
+Neither of the options \fB_POSIX_THREAD_PRIO_PROTECT\fR and
+\fB_POSIX_THREAD_PRIO_INHERIT\fR is defined and the system does not support the
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The value specified by \fIprotocol\fR is an unsupported value.
+.RE
+
+.sp
+.LP
+The \fBpthread_mutexattr_getprotocol()\fR and
+\fBpthread_mutexattr_setprotocol()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR or \fIprotocol\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The caller does not have the privilege to perform the operation.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_attr_getschedparam\fR(3C), \fBpthread_mutex_init\fR(3C),
+\fBpthread_mutexattr_init\fR(3C), \fBsched_setparam\fR(3C),
+\fBsched_setscheduler\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

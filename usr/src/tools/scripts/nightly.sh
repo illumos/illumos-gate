@@ -23,6 +23,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -68,6 +69,12 @@ WHICH_SCM=$(dirname $nightly_path)/which_scm
 if [[ ! -x $WHICH_SCM ]]; then
 	WHICH_SCM=which_scm
 fi
+
+function fatal_error
+{
+	print -u2 "nightly: $*"
+	exit 1
+}
 
 #
 # Function to do a DEBUG and non-DEBUG build. Needed because we might
@@ -1276,6 +1283,16 @@ fi
 # STDENV_START
 # STDENV_END
 
+# Check if we have sufficient data to continue...
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+if  [[ "${NIGHTLY_OPTIONS}" == ~(F)n ]] ; then
+	# Check if the gate data are valid if we don't do a "bringover" below
+	[[ -d "${CODEMGR_WS}" ]] || \
+		fatal_error "Error: ${CODEMGR_WS} is not a directory."
+	[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || \
+		fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+fi
+
 #
 # place ourselves in a new task, respecting BUILD_PROJECT if set.
 #
@@ -2106,7 +2123,7 @@ function child_wstype {
 	echo $scm_type
 }
 
-export SCM_TYPE=$(child_wstype)
+SCM_TYPE=$(child_wstype)
 
 #
 #	Decide whether to clobber
@@ -2492,6 +2509,11 @@ if [[ "$O_FLAG" = y && "$CLOSED_IS_PRESENT" != "yes" ]]; then
 	exit 1
 fi
 
+# Safeguards
+[[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
+[[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
+[[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
 
 # System
@@ -2650,11 +2672,7 @@ fi
 
 if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 	#
-	# Copy the open sources into their own tree, set up the closed
-	# binaries, and set up the environment.  The build looks for
-	# the closed binaries in a location that depends on whether
-	# it's a DEBUG build, so we might need to make two copies.
-	#
+	# Copy the open sources into their own tree.
 	# If copy_source fails, it will have already generated an
 	# error message and set build_ok=n, so we don't need to worry
 	# about that here.
@@ -2663,34 +2681,7 @@ if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 fi
 
 if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
-
-	echo "\n==== Generating skeleton closed binaries for" \
-	    "open-only build ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	rm -rf $CODEMGR_WS/closed.skel
-	if [ "$D_FLAG" = y ]; then
-		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		root=$ROOT
-		[ "$MULTI_PROTO" = yes ] && root=$ROOT-nd
-		mkclosed $MACH $root $CODEMGR_WS/closed.skel/root_$MACH-nd \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton non-DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-      
 	SRC=$OPEN_SRCDIR/usr/src
-	# Try not to clobber any user-provided closed binaries.
-	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
 	export CLOSED_IS_PRESENT=no
 fi
 
@@ -2714,10 +2705,6 @@ if is_source_build && [ $build_ok = y ] ; then
 
 	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
 	normal_build
-fi
-
-if [[ "$SO_FLAG" = "y" && "$build_ok" = "y" ]]; then
-	rm -rf $ON_CLOSED_BINS
 fi
 
 #

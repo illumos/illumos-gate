@@ -1,0 +1,146 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH form_fieldtype 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+form_fieldtype, new_fieldtype, free_fieldtype, set_fieldtype_arg,
+set_fieldtype_choice, link_fieldtype \- forms fieldtype routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lform\fR \fB -lcurses \fR [ \fIlibrary\fR... ]
+#include <form.h>
+
+\fBFIELDTYPE *\fR\fBnew_fieldtype\fR(\fBint (*\fR \fIfield_check\fR)(FIELD *, \fBchar *\fR),
+     \fBint (*char_check)(int, char *)\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfree_fieldtype\fR(\fBFIELDTYPE *\fR\fIfieldtype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_fieldtype_arg\fR(\fBFIELDTYPE *\fR\fIfieldtype\fR, \fBchar *(*\fR \fImak_arg\fR)(va_list *),
+     \fBchar *(*\fR \fIcopy_arg\fR)(char *), \fBvoid (*\fR \fIfree_arg\fR)(char *));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_fieldtype_choice\fR(\fBFIELDTYPE *\fR\fIfieldtype\fR, \fBint (*\fR \fInext_choice\fR)
+     (FIELD *, \fBchar *)\fR, \fBint (*\fR\fIprev_choice\fR)(FIELD *, \fBchar *)\fR);
+.fi
+
+.LP
+.nf
+\fBFIELDTYPE *\fR\fBlink_fieldtype\fR(\fBFIELDTYPE *\fR\fItype1\fR, \fBFIELDTYPE *\fR\fItype2\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBnew_fieldtype()\fR creates a new field type. The application programmer must
+write the function \fIfield_check\fR, which validates the field value, and the
+function \fIchar_check\fR, which validates each character.
+\fBfree_fieldtype()\fR frees the space allocated for the field type.
+.sp
+.LP
+By associating function pointers with a field type, \fBset_fieldtype_arg()\fR
+connects to the field type additional arguments necessary for a
+\fBset_field_type()\fR call. Function \fImak_arg\fR allocates a structure for
+the field specific parameters to \fBset_field_type()\fR and returns a pointer
+to the saved data. Function \fIcopy_arg\fR duplicates the structure created by
+\fImake_arg\fR. Function \fIfree_arg\fR frees any storage allocated by
+\fImake_arg\fR or \fIcopy_arg\fR.
+.sp
+.LP
+The \fBform_driver()\fR requests \fBREQ_NEXT_CHOICE\fR and
+\fBREQ_PREV_CHOICE\fR let the user request the next or previous value of a
+field type comprising an ordered set of values. \fBset_fieldtype_choice()\fR
+allows the application programmer to implement these requests for the given
+field type. It associates with the given field type those application-defined
+functions that return pointers to the next or previous choice for the field.
+.sp
+.LP
+\fBlink_fieldtype()\fR returns a pointer to the field type built from the two
+given types. The constituent types may be any application-defined or
+pre-defined types.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return pointers always return \fINULL\fR on error. Routines that
+return an integer return one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBE_OK\fR
+.ad
+.RS 18n
+.rt  
+The function returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_SYSTEM_ERROR\fR
+.ad
+.RS 18n
+.rt  
+System error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_BAD_ARGUMENT\fR
+.ad
+.RS 18n
+.rt  
+An argument is incorrect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_CONNECTED\fR
+.ad
+.RS 18n
+.rt  
+Type is connected to one or more fields.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBforms\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and
+\fB<curses.h>\fR\&.

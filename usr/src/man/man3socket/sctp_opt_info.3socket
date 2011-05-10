@@ -1,0 +1,387 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sctp_opt_info 3SOCKET "25 Feb 2005" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+sctp_opt_info \- examine SCTP level options for an SCTP endpoint
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR \fB -lsctp \fR [ \fIlibrary\fR... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/sctp.h>
+
+\fBint\fR \fBsctp_opt_info\fR(\fBint\fR \fIsock\fR, \fBsctp_assoc_t\fR \fIid\fR, \fBint\fR \fIopt\fR, \fBvoid *\fR\fIarg\fR,
+     \fBsocklen_t *\fR\fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsctp_opt_info()\fR returns SCTP level options associated with the SCTP
+socket \fIsock\fR. If \fIsock\fR is a one-to-many style socket, \fIid\fR refers
+to the association of interest. If \fIsock\fR is a one-to-one socket or if
+\fIsock\fR is a branched-off one-to-many style socket, \fIid\fR is ignored. The
+\fIopt\fR parameter specifies the SCTP option to get. The \fIarg\fR structure
+is an option-specific structure buffer allocated by the caller. The \fIlen\fR
+parameter is the length of the option specified.
+.sp
+.LP
+Following are the currently supported values for the \fIopt\fR parameter. When
+one of the options below specifies an association \fIid\fR, the \fIid\fR is
+relevant for only one-to-many style SCTP sockets. The associatation \fIid\fR
+can be ignored for one-to-one style or branched-off one-to-many style SCTP
+sockets.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCTP_RTOINFO\fR\fR
+.ad
+.RS 27n
+.rt  
+Returns the protocol parameters used to initialize and bind retransmission
+timeout (RTO) tunable. The following structure is used to access these
+parameters:
+.sp
+.in +2
+.nf
+struct sctp_rtoinfo {
+       sctp_assoc_t            srto_assoc_id;
+       uint32_t                srto_initial;
+       uint32_t                srto_max;
+       uint32_t                srto_min;
+};
+where:
+       srto_assoc_id           Association ID specified by the caller
+       srto_initial            Initial RTO value
+       srto_max                Maximum value for the RTO
+       srto_min                Minimum value for the RTO
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSSCTP_ASSOCINFO\fR\fR
+.ad
+.RS 27n
+.rt  
+Returns association-specific parameters. The following structure is used to
+access the parameters:
+.sp
+.in +2
+.nf
+struct sctp_assocparams {
+       sctp_assoc_t            sasoc_assoc_id;
+       uint16_t                sasoc_asocmaxrxt;
+       uint16_t                sasoc_number_peer_destinations;
+       uint32_t                sasoc_peer_rwnd;
+       uint32_t                sasoc_local_rwnd;
+       uint32_t                sasoc_cookie_life;
+};
+where:
+       srto_assoc_id           Association ID specified by the caller
+       sasoc_asocmaxrxt        Maximum retransmission count for
+                               the association
+       sasoc_number_peer_destinations
+                               Number of addresses the peer has
+       sasoc_peer_rwnd         Current value of the peer's
+                               receive window
+       sasoc_local_rwnd        Last reported receive window sent
+                               to the peer
+       sasoc_cookie_life       Association cookie lifetime used
+                               when issuing cookies
+.fi
+.in -2
+
+All parameters with time values are in milliseconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCTP_DEFAULT_SEND_PARAM\fR\fR
+.ad
+.RS 27n
+.rt  
+Returns the default set of parameters used by the \fBsendto()\fR function on
+this association. The following structure is used to access the parameters:
+.sp
+.in +2
+.nf
+struct sctp_sndrcvinfo {
+       uint16_t                sinfo_stream;
+       uint16_t                sinfo_ssn;
+       uint16_t                sinfo_flags;
+       uint32_t                sinfo_ppid;
+       uint32_t                sinfo_context;
+       uint32_t                sinfo_timetolive;
+       uint32_t                sinfo_tsn;
+       uint32_t                sinfo_cumtsn;
+       sctp_assoc_t            sinfo_assoc_id;
+};
+where:
+       sinfo_stream            Default stream for \fBsendmsg()\fR
+       sinfo_ssn               Always returned as 0
+       sinfo_flags             Default flags for \fBsendmsg()\fR
+                               that include the following:
+                               MSG_UNORDERED
+                               MSG_ADDR_OVER
+                               MSG_ABORT
+                               MSG_EOF
+                               MSG_PR_SCTP
+       sinfo_ppid              Default payload protocol identifier
+                               for \fBsendmsg()\fR
+       sinfo_context           Default context for \fBsendmsg()\fR
+       sinfo_timetolive        Time to live in milliseconds for a
+                               message on the sending side.
+                               The message expires if the sending
+                               side does not start the first
+                               transmission for the message within
+                               the specified time period. If the
+                               sending side starts the first
+                               transmission before the time period
+                               expires, the message is sent as a
+                               normal reliable message. A value of
+                               0 indicates that the message does not
+                               expire. When MSG_PR_SCTP is set in
+                               sinfo_flags, the message expires if
+                               it is not acknowledged within the
+                               time period.
+       sinfo_tsn               Always returned as 0
+       sinfo_cumtsn            Always returned as 0
+       sinfo_assoc_id          Association ID specified by the caller
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCTP_PEER_ADDR_PARAMS\fR\fR
+.ad
+.RS 27n
+.rt  
+Returns the parameters for a specified peer address of the association. The
+following structure is used to access the parameters:
+.sp
+.in +2
+.nf
+struct sctp_paddrparams {
+       sctp_assoc_t            spp_assoc_id;
+       struct sockaddr_storage spp_address;
+       uint32_t                spp_hbinterval;
+       uint16_t                spp_pathmaxrxt;
+};
+where:
+       spp_assoc_id            Association ID specified by the caller
+       spp_address             Peer's address
+       spp_hbinterval          Heartbeat interval in milliseconds
+       spp_pathmaxrxt          Maximum number of retransmissions 
+                               to an address before it is 
+                               considered unreachable
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCTP_STATUS\fR\fR
+.ad
+.RS 27n
+.rt  
+Returns the current status information about the association. The following
+structure is used to access the parameters:
+.sp
+.in +2
+.nf
+struct sctp_status {
+       sctp_assoc_t            sstat_assoc_id;
+       int32_t                 sstat_state;
+       uint32_t                sstat_rwnd;
+       uint16_t                sstat_unackdata;
+       uint16_t                sstat_penddata;
+       uint16_t                sstat_instrms;
+       uint16_t                sstat_outstrms;
+       uint16_t                sstat_fragmentation_point;
+       struct sctp_paddrinfo   sstat_primary;
+};
+where:
+
+       sstat_assoc_id          Association ID specifed by the caller
+       sstat_state             Current state of the association
+                               which might be one of the following:
+
+                               SCTP_CLOSED
+                               SCTP_BOUND
+                               SCTP_LISTEN
+                               SCTP_COOKIE_WAIT
+                               SCTP_COOKIE_ECHOED
+                               SCTP_ESTABLISHED
+                               SCTP_SHUTDOWN_PENDING
+                               SCTP_SHUTDOWN_SENT
+                               SCTP_SHUTDOWN_RECEIVED
+                               SCTP_SHUTDOWN_ACK_SENT
+       sstat_rwnd              Current receive window of the 
+                               association peer
+       sstat_unackdata         Number of unacked DATA chunks
+       sstat_penddata          Number of DATA chunks pending 
+                               receipt
+       sstat_instrms           Number of inbound streams
+       sstat_outstrms          Number of outbound streams
+       sstat_fragmentation_point
+                               Size at which SCTP fragmentation occurs
+       sstat_primary           Information about the primary
+                               peer address
+
+       sstat_primary has the following structure
+                        struct sctp_paddrinfo {
+                               sctp_assoc_t            spinfo_assoc_id;
+                               struct sockaddr_storage spinfo_address;
+                               int32_t                 spinfo_state;
+                               uint32_t                spinfo cwnd;
+                               uint32_t                spinfo_srtt;
+                               uint32_t                spinfo_rto;
+                               uint32_t                spinfo_mtu;
+                        };
+                        where:
+                        spinfo_assoc_id         Association ID
+                                                specified by
+                                                the caller
+                        spinfo_address          Primary peer
+                                                address
+                        spinfo_state            State of the peer
+                                                address:
+                                                SCTP_ACTIVE or
+                                                SCTP_INACTIVE
+                        spinfo_cwnd             Congestion window
+                                                of the peer 
+                                                address
+                        spinfo_srtt             Smoothed round-trip
+                                                time calculation of
+                                                the peer address
+                        spinfo_rto              Current retransmission 
+                                                timeout value of the
+                                                peer address in 
+                                                milliseconds
+                        spinfo_mtu              P-MTU of the address
+.fi
+.in -2
+
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBsctp_opt_info()\fR function returns \fB0\fR.
+Otherwise, the function returns \fB-1\fR and sets \fBerrno\fR to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBsctp_opt_info()\fR call fails under the following conditions.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIsock\fR argument is an invalid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIsock\fR argument is not a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The association \fIid\fR is invalid for a one-to-many style SCTP socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The input buffer length is insufficient for the option specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The peer address is invalid or does not belong to the association.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAFNOSUPPORT\fR\fR
+.ad
+.RS 16n
+.rt  
+The address family for the peer's address is other than \fBAF_INET\fR or
+\fBAF_INET6\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBin.h\fR(3HEAD), \fBlibsctp\fR(3LIB), \fBgetsockopt\fR(3SOCKET),
+\fBsetsockopt\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBinet\fR(7P),
+\fBinet6\fR(7P), \fBip\fR(7P), \fBip6\fR(7P), \fBsctp\fR(7P)

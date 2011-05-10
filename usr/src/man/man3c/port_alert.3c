@@ -1,0 +1,147 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH port_alert 3C "1 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+port_alert \- set a port in alert mode
+.SH SYNOPSIS
+.LP
+.nf
+#include <port.h>
+
+\fBint\fR \fBport_alert\fR(\fBint\fR \fIport\fR, \fBint\fR \fIflags\fR, \fBint\fR \fIevents\fR, \fBvoid *\fR\fIuser\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBport_alert()\fR function transitions a port into or out of alert mode.
+A port in alert mode immediately awakens all threads blocked in
+\fBport_get\fR(3C) or \fBport_getn\fR(3C). These threads return with an alert
+notification that consists of a single \fBport_event_t\fR structure with the
+source \fBPORT_SOURCE_ALERT\fR. Subsequent threads trying to retrieve events
+from a port that is in alert mode will return immediately with the alert
+notification.
+.sp
+.LP
+A port is transitioned into alert mode by calling the \fBport_alert()\fR
+function with a non-zero \fIevents\fR parameter.  The specified \fIevents\fR
+and \fIuser\fR parameters will be made available in the \fBportev_events\fR and
+the \fBportev_user\fR members of the alert notification, respectively. The
+\fIflags\fR argument determines the mode of operation of the alert mode:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIflags\fR is set to \fBPORT_ALERT_SET\fR, \fBport_alert()\fR sets the port
+in alert mode independent of the current state of the port.  The
+\fBportev_events\fR and \fBportev_user\fR members are set or updated
+accordingly.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIflags\fR is set to \fBPORT_ALERT_UPDATE\fR and the port is not in alert
+mode, \fBport_alert()\fR transitions the port into alert mode.  The
+\fBportev_events\fR and \fBportev_user\fR members are set accordingly.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIflags\fR is set to \fBPORT_ALERT_UPDATE\fR and the port is already in
+alert mode, \fBport_alert()\fR returns with an error value of \fBEBUSY\fR.
+.RE
+.sp
+.LP
+\fBPORT_ALERT_SET\fR and \fBPORT_ALERT_UPDATE\fR are mutually exclusive.
+.sp
+.LP
+A port is transitioned out of alert mode by calling the \fBport_alert()\fR
+function with a zero \fIevents\fR parameter.
+.sp
+.LP
+Events can be queued to a port that is in alert mode, but they will not be
+retrievable until the port is transitioned out of alert mode.
+.SH RETURN VALUES
+.sp
+.LP
+Upon succesful completion, 0 is returned. Otherwise, -1 is returned and
+\fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBport_alert()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The port identifier is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADFD\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIport\fR argument is not an event port file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+The port is already in alert mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Mutually exclusive \fIflags\fR are set.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBport_associate\fR(3C), \fBport_create\fR(3C), \fBport_get\fR(3C),
+\fBport_send\fR(3C), \fBattributes\fR(5)

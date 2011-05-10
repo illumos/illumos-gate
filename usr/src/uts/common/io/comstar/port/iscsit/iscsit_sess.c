@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -228,6 +229,8 @@ iscsit_sess_unref(void *ist_void)
 		kmem_free(iss->ss_rport_id, sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);
 		stmf_remote_port_free(iss->ss_rport);
+		if (iss->ss_rport_alias)
+			strfree(iss->ss_rport_alias);
 		stmf_free(iss);
 	}
 	mutex_exit(&ist->ist_mutex);

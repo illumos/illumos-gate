@@ -1,0 +1,527 @@
+'\" te
+.\" Copyright 1989 AT&T All Rights Reserved
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldd 1 "3 Jun 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+ldd \- list dynamic dependencies of executable files or shared objects
+.SH SYNOPSIS
+.LP
+.nf
+\fBldd\fR [\fB-d\fR | \fB-r\fR] [\fB-c\fR] [\fB-e\fR \fIenvar\fR] [\fB-f\fR] [\fB-i\fR] [\fB-L\fR] [\fB-l\fR] [\fB-p\fR] [\fB-s\fR]
+    [\fB-U\fR | \fB-u\fR] [\fB-v\fR] [\fB-w\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldd\fR utility lists the dynamic dependencies of executable files or
+shared objects. \fBldd\fR uses the runtime linker, \fBld.so.1\fR, to generate
+the diagnostics. The runtime linker takes the object being inspected and
+prepares the object as would occur in a running process. By default, \fBldd\fR
+triggers the loading of any lazy dependencies.
+.sp
+.LP
+\fBldd\fR lists the path names of all shared objects that would be loaded when
+\fIfilename\fR is loaded. \fBldd\fR expects the shared objects that are being
+inspected to have execute permission. If a shared object does not have execute
+permission, \fBldd\fR issues a warning before attempting to process the file.
+.sp
+.LP
+\fBldd\fR processes its input one file at a time. For each file, \fBldd\fR
+performs one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Lists the object dependencies if the dependencies exist.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Succeeds quietly if dependencies do not exist.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Prints an error message if processing fails.
+.RE
+.sp
+.LP
+The dynamic objects that are inspected by \fBldd\fR are not executed.
+Therefore, \fBldd\fR does not list any shared objects explicitly attached using
+\fBdlopen\fR(3C). To display all the objects in use by a process, or a core
+file, use \fBpldd\fR(1).
+.SH OPTIONS
+.sp
+.LP
+\fBldd\fR can also check the compatibility of \fIfilename\fR with the shared
+objects \fIfilename\fR uses. With the following options, \fBldd\fR prints
+warnings for any unresolved symbol references that would occur when
+\fIfilename\fR is loaded.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Check \fBimmediate\fR references.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Check both \fBimmediate\fR references and \fBlazy\fR references.
+.RE
+
+.sp
+.LP
+Only one of the options \fB-d\fR or \fB-r\fR can be specified during any single
+invocation of \fBldd\fR.
+.sp
+.LP
+\fBimmediate\fR references are typically to data items used by the executable
+or shared object code. \fBimmediate\fR references are also pointers to
+functions, and even calls to functions made from a position \fBdependent\fR
+shared object. \fBlazy\fR references are typically calls to global functions
+made from a position \fBindependent\fR shared object, or calls to external
+functions made from an executable. For more information on these types of
+reference, see When Relocations Are Performed in the \fILinker and Libraries
+Guide\fR. Object loading can also be affected by relocation processing. See
+\fBLazy Loading\fR under USAGE for more details.
+.sp
+.LP
+Some unresolved symbol references are not reported by default. These unresolved
+references can be reported with the following options. These options are only
+useful when combined with either the \fB-d\fR or the \fB-r\fR options.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Expose any unresolved symbol errors to explicit \fBparent\fR and \fBexternal\fR
+references.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 6n
+.rt  
+Expose any unresolved \fBweak\fR symbol references.
+.RE
+
+.sp
+.LP
+A shared object can make reference to symbols that should be supplied by the
+caller of the shared object. These references can be explicitly classified when
+the shared object is created, as being available from a \fBparent\fR, or simply
+as being \fBexternal\fR. See the \fB-M\fR \fBmapfile\fR option of \fBld\fR(1),
+and the \fBPARENT\fR and \fBEXTERN\fR symbol definition keywords. When
+examining a dynamic executable, a \fBparent\fR or \fBexternal\fR reference that
+can not be resolved is flagged as an error. However by default, when examining
+a shared object, a \fBparent\fR or \fBexternal\fR reference that can not be
+resolved is not flagged as an error. The \fB-p\fR option, when used with either
+the \fB-d\fR or \fB-r\fR options, causes any unresolved \fBparent\fR or
+\fBexternal\fR reference to be flagged as a relocation error.
+.sp
+.LP
+Symbols that are used by relocations may be defined as \fBweak\fR references.
+By default, if a weak symbol reference can not be resolved, the relocation is
+ignored and a zero written to the relocation offset. The \fB-w\fR option, when
+used with either the \fB-d\fR or the \fB-r\fR options, causes any unresolved
+relocation against a weak symbol reference to be flagged as a relocation error.
+.sp
+.LP
+\fBldd\fR can also check dependency use. With each of the following options,
+\fBldd\fR prints warnings for any unreferenced, or unused dependencies that are
+loaded when \fIfilename\fR is loaded. Only when a symbol reference is bound to
+a dependency, is that dependency deemed used. These options are therefore only
+useful when symbol references are being checked. If the \fB-r\fR option is not
+in effect, the \fB-d\fR option is enabled.
+.sp
+.LP
+A dependency that is defined by an object but is not bound to from that object
+is an unreferenced dependency. A dependency that is not bound to by any other
+object when \fIfilename\fR is loaded is an unused object.
+.sp
+.LP
+Dependencies can be located in default system locations, or in locations that
+must be specified by search paths. Search paths may be specified globally, such
+as the environment variable \fBLD_LIBRARY_PATH\fR. Search paths can also be
+defined in dynamic objects as runpaths. See the \fB-R\fR option to \fBld\fR(1).
+Search paths that are not used to satisfy any dependencies cause unnecessary
+file system processing.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays any unreferenced, or unused dependencies. If an unreferenced
+dependency is not bound to by other objects loaded with \fIfilename\fR, the
+dependency is also flagged as unused. Cyclic dependencies that are not bound to
+from objects outside of the cycle are also deemed unreferenced.
+.sp
+This option also displays any unused search paths.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays any unused objects.
+.RE
+
+.sp
+.LP
+Only one of the options \fB-U\fR or \fB-u\fR can be specified during any single
+invocation of \fBldd\fR, although \fB-U\fR is a superset of \fB-u\fR. Objects
+that are found to be unreferenced, or unused when using the \fB-r\fR option,
+should be removed as dependencies. These objects provide no references, but
+result in unnecessary overhead when \fIfilename\fR is loaded. When using the
+\fB-d\fR option, any objects that are found to be unreferenced, or unused are
+not immediately required when \fIfilename\fR is loaded. These objects are
+candidates for lazy loading. See \fBLazy Loading\fR under USAGE for more
+details.
+.sp
+.LP
+The removal of unused dependencies reduces runtime-linking overhead. The
+removal of unreferenced dependencies reduces runtime-linking overhead to a
+lesser degree. However, the removal of unreferenced dependencies guards against
+a dependency being unused when combined with different objects, or as the other
+object dependencies evolve.
+.sp
+.LP
+The removal of unused search paths can reduce the work required to locate
+dependencies. This can be significant when accessing files from a file server
+over a network. Note, a search path can be encoded within an object to satisfy
+the requirements of \fBdlopen\fR(3C). This search path might not be required to
+obtain the dependencies of this object, and hence will look unused to
+\fBldd\fR.
+.sp
+.LP
+The following additional options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 12n
+.rt  
+Disables any configuration file use. Configuration files can be employed to
+alter default search paths, and provide alternative object dependencies. See
+\fBcrle\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIenvar\fR\fR
+.ad
+.RS 12n
+.rt  
+Sets the environment variable \fIenvar\fR.
+.sp
+This option is useful for experimenting with environment variables that are
+recognized by the runtime linker that can adversely affect \fBldd\fR, for
+example, \fBLD_PRELOAD\fR.
+.sp
+This option is also useful for extracting additional information solely from
+the object under inspection, for example, \fBLD_DEBUG\fR. See \fBld.so.1\fR(1)
+and \fBlari\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 12n
+.rt  
+Forces \fBldd\fR to check for an executable file that is not secure. When
+\fBldd\fR is invoked by a superuser, by default \fBldd\fR does not process any
+executable that is not secure. An executable is not considered secure if the
+interpreter that the executable specifies does not reside under \fB/lib\fR,
+\fB/usr/lib\fR or \fB/etc/lib\fR. An executable is also not considered secure
+if the interpreter cannot be determined. See \fBSecurity\fR under USAGE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 12n
+.rt  
+Displays the order of execution of initialization sections. The order that is
+discovered can be affected by use of the \fB-d\fR or \fB-r\fR options. See
+\fBInitialization Order\fR under USAGE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 12n
+.rt  
+Enables lazy loading. Lazy loading is the default mode of operation when the
+object under inspection is loaded as part of a process. In this case, any lazy
+dependencies, or filters, are only loaded into the process when reference is
+made to a symbol that is defined within the lazy object. The \fB-d\fR or
+\fB-r\fR options, together with the \fB-L\fR option, can be used to inspect the
+dependencies, and their order of loading as would occur in a running process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 12n
+.rt  
+Forces the immediate processing of any filters so that all filtees, and their
+dependencies, are listed. The immediate processing of filters is now the
+default mode of operation for \fBldd\fR. However, under this default any
+auxiliary filtees that cannot be found are silently ignored. Under the \fB-l\fR
+option, missing auxiliary filtees generate an error message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 12n
+.rt  
+Displays the search path used to locate shared object dependencies.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 12n
+.rt  
+Displays all dependency relationships incurred when processing \fIfilename\fR.
+This option also displays any dependency version requirements. See
+\fBpvs\fR(1).
+.RE
+
+.SH USAGE
+.SS "Security"
+.sp
+.LP
+A superuser should use the \fB-f\fR option only if the executable to be
+examined is known to be trustworthy. The use of \fB-f\fR on an untrustworthy
+executable while superuser can compromise system security. If an executables
+trustworthyness is unknown, a superuser should temporarily become a regular
+user. Then invoke \fBldd\fR as this regular user.
+.sp
+.LP
+Untrustworthy objects can be safely examined with \fBdump\fR(1) and with
+\fBmdb\fR(1), as long as the \fB:r\fR subcommand is not used. In addition, a
+non-superuser can use either the \fB:r\fR subcommand of \fBmdb\fR, or
+\fBtruss\fR(1) to examine an untrustworthy executable without too much risk of
+compromise. To minimize risk when using \fBldd\fR, \fBadb :r\fR, or \fBtruss\fR
+on an untrustworthy executable, use the \fBUID\fR \fB"nobody"\fR.
+.SS "Lazy Loading"
+.sp
+.LP
+Lazy loading can be applied directly by specified lazy dependencies. See the
+\fB-z\fR \fBlazyload\fR option of \fBld\fR(1). Lazy loading can also be applied
+indirectly through filters. See the \fB-f\fR option and \fB-F\fR option of
+\fBld\fR(1). Objects that employ lazy loading techniques can experience
+variations in \fBldd\fR output due to the options used. If an object expresses
+all its dependencies as lazy, the default operation of \fBldd\fR lists all
+dependencies in the order in which the dependencies are recorded in that
+object:
+.sp
+.in +2
+.nf
+example% \fBldd main\fR 
+        libelf.so.1 =>   /lib/libelf.so.1
+        libnsl.so.1 =>   /lib/libnsl.so.1
+        libc.so.1 =>     /lib/libc.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The lazy loading behavior that occurs when this object is used at runtime can
+be enabled using the \fB-L\fR option. In this mode, lazy dependencies are
+loaded when reference is made to a symbol that is defined within the lazy
+object. Therefore, combining the \fB-L\fR option with use of the \fB-d\fR and
+\fB-r\fR options reveals the dependencies that are needed to satisfy the
+immediate, and lazy references respectively:
+.sp
+.in +2
+.nf
+example% \fBldd\fR \fB-L\fR \fBmain\fR 
+example% \fBldd\fR \fB-d\fR \fBmain\fR 
+        libc.so.1 =>	  /lib/libc.so.1 
+example% \fBldd\fR \fB-r\fR \fBmain\fR 
+        libc.so.1 =>	  /lib/libc.so.1
+        libelf.so.1 =>	/lib/libelf.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that in this example, the order of the dependencies that are listed is
+not the same as displayed from \fBldd\fR with no options. Even with the
+\fB-r\fR option, the lazy reference to dependencies might not occur in the same
+order as would occur in a running program.
+.sp
+.LP
+Observing lazy loading can also reveal objects that are not required to satisfy
+any references. These objects, in this example, \fBlibnsl.so.1\fR, are
+candidates for removal from the link-line used to build the object being
+inspected.
+.SS "Initialization Order"
+.sp
+.LP
+Objects that do not explicitly define their required dependencies might observe
+variations in the initialization section order displayed by \fBldd\fR due to
+the options used. For example, a simple application might reveal:
+.sp
+.in +2
+.nf
+example% \fBldd -i main\fR 
+        libA.so.1 =>	./libA.so.1
+        libc.so.1 =>	/lib/libc.so.1
+        libB.so.1 =>	./libB.so.1
+
+    init object=./libB.so.1
+    init object=./libA.so.1
+    init object=/lib/libc.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+whereas, when relocations are applied, the initialization section order is:
+.sp
+.in +2
+.nf
+example% \fBldd -ir main\fR 
+        .........
+
+    init object=/lib/libc.so.1
+    init object=./libB.so.1
+    init object=./libA.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this case, \fBlibB.so.1\fR makes reference to a function in
+\fB/usr/lib/libc.so.1\fR. However, \fBlibB.so.1\fR has no explicit dependency
+on this library. Only after a relocation is discovered is a dependency then
+established. This implicit dependency affects the initialization section order.
+.sp
+.LP
+Typically, the initialization section order established when an application is
+executed, is equivalent to \fBldd\fR with the \fB-d\fR option. The optimum
+order can be obtained if all objects fully define their dependencies. Use of
+the \fBld\fR(1) options \fB-z\|defs\fR and \fB-z\|ignore\fR when building
+dynamic objects is recommended.
+.sp
+.LP
+Cyclic dependencies can result when one or more dynamic objects reference each
+other. Cyclic dependencies should be avoided, as a unique initialization sort
+order for these dependencies can not be established.
+.sp
+.LP
+Users that prefer a more static analysis of object files can inspect
+dependencies using tools such as \fBdump\fR(1) and \fBelfdump\fR(1).
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/lddstub\fR\fR
+.ad
+.RS 23n
+.rt  
+Fake 32-bit executable loaded to check the dependencies of shared objects.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/64/lddstub\fR\fR
+.ad
+.RS 23n
+.rt  
+Fake 64-bit executable loaded to check the dependencies of shared objects.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcrle\fR(1), \fBdump\fR(1), \fBelfdump\fR(1), \fBlari\fR(1), \fBld\fR(1),
+\fBld.so.1\fR(1), \fBmdb\fR(1), \fBpldd\fR(1), \fBpvs\fR(1), \fBtruss\fR(1),
+\fBdlopen\fR(3C), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBldd\fR prints the record of shared object path names to \fBstdout\fR. The
+optional list of symbol resolution problems is printed to \fBstderr\fR. If
+\fIfilename\fR is not an executable file or a shared object, or if
+\fIfilename\fR cannot be opened for reading, a non-zero exit status is
+returned.
+.SH NOTES
+.sp
+.LP
+Use of the \fB-d\fR or \fB-r\fR option with shared objects can give misleading
+results. \fBldd\fR does a worst case analysis of the shared objects. However,
+in practice, the symbols reported as unresolved might be resolved by the
+executable file referencing the shared object. The runtime linkers preloading
+mechanism can be employed to add dependencies to the object being inspected.
+See \fBLD_PRELOAD\fR.
+.sp
+.LP
+\fBldd\fR uses the same algorithm as the runtime linker to locate shared
+objects.

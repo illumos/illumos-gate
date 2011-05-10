@@ -47,6 +47,8 @@ dir path=usr/sbin/$(ARCH64)
 dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/dict
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/pargs mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/pcred mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/pfiles mode=0555
@@ -158,6 +160,69 @@ file path=usr/sbin/projadd group=sys mode=0555
 file path=usr/sbin/projdel group=sys mode=0555
 file path=usr/sbin/projmod group=sys mode=0555
 file path=usr/share/lib/dict/words
+file path=usr/share/man/man1/asa.1
+file path=usr/share/man/man1/awk.1
+file path=usr/share/man/man1/banner.1
+file path=usr/share/man/man1/bc.1
+file path=usr/share/man/man1/bdiff.1
+file path=usr/share/man/man1/bfs.1
+file path=usr/share/man/man1/cal.1
+file path=usr/share/man/man1/calendar.1
+file path=usr/share/man/man1/col.1
+file path=usr/share/man/man1/compress.1
+file path=usr/share/man/man1/csplit.1
+file path=usr/share/man/man1/dc.1
+file path=usr/share/man/man1/diff.1
+file path=usr/share/man/man1/diff3.1
+file path=usr/share/man/man1/dircmp.1
+file path=usr/share/man/man1/dos2unix.1
+file path=usr/share/man/man1/expand.1
+file path=usr/share/man/man1/factor.1
+file path=usr/share/man/man1/hashcheck.1
+file path=usr/share/man/man1/hashmake.1
+file path=usr/share/man/man1/last.1
+file path=usr/share/man/man1/lastcomm.1
+file path=usr/share/man/man1/lgrpinfo.1
+file path=usr/share/man/man1/look.1
+file path=usr/share/man/man1/madv.so.1.1
+file path=usr/share/man/man1/mpss.so.1.1
+file path=usr/share/man/man1/nawk.1
+file path=usr/share/man/man1/newform.1
+file path=usr/share/man/man1/news.1
+file path=usr/share/man/man1/nl.1
+file path=usr/share/man/man1/pack.1
+file path=usr/share/man/man1/pargs.1
+file path=usr/share/man/man1/pcat.1
+file path=usr/share/man/man1/plgrp.1
+file path=usr/share/man/man1/pmadvise.1
+file path=usr/share/man/man1/pmap.1
+file path=usr/share/man/man1/ppgsz.1
+file path=usr/share/man/man1/ppriv.1
+file path=usr/share/man/man1/preap.1
+file path=usr/share/man/man1/ptree.1
+file path=usr/share/man/man1/sdiff.1
+file path=usr/share/man/man1/sort.1
+file path=usr/share/man/man1/spell.1
+file path=usr/share/man/man1/spellin.1
+file path=usr/share/man/man1/split.1
+file path=usr/share/man/man1/tcopy.1
+file path=usr/share/man/man1/uncompress.1
+file path=usr/share/man/man1/unexpand.1
+file path=usr/share/man/man1/units.1
+file path=usr/share/man/man1/unix2dos.1
+file path=usr/share/man/man1/unpack.1
+file path=usr/share/man/man1/yes.1
+file path=usr/share/man/man1/zcat.1
+file path=usr/share/man/man1m/adbgen.1m
+file path=usr/share/man/man1m/dmesg.1m
+file path=usr/share/man/man1m/fsck_pcfs.1m
+file path=usr/share/man/man1m/kstat.1m
+file path=usr/share/man/man1m/mkfifo.1m
+file path=usr/share/man/man1m/mkfs_pcfs.1m
+file path=usr/share/man/man1m/mount_pcfs.1m
+file path=usr/share/man/man1m/projadd.1m
+file path=usr/share/man/man1m/projdel.1m
+file path=usr/share/man/man1m/projmod.1m
 hardlink path=usr/bin/oawk target=../../usr/bin/awk
 hardlink path=usr/bin/pargs target=../../usr/lib/isaexec
 hardlink path=usr/bin/pcred target=../../usr/lib/isaexec

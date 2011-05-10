@@ -1,0 +1,1406 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pktool 1 "23 Mar 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+pktool \- manage certificates and keys
+.SH SYNOPSIS
+.LP
+.nf
+\fBpktool\fR [\fB-f\fR \fIoption_file\fR] [\fB-i\fR] \fIsubcommand\fR \fIsubcommand_options\fR ...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpktool\fR command allows users to manage the certificates and keys on
+multiple keystores including PKCS#11 tokens (that is, Cryptographic Framework),
+Netscape Security Services (NSS) tokens, and standard file based keystore for
+OpenSSL.
+.sp
+.LP
+\fBpktool\fR also provides support to list, delete and import a Certificate
+Revocation List (CRL). \fBpktool\fR does not provide support for creating CRLs,
+signing CRLs, or exporting CRLs. The CRL support for the PKCS#11 keystore is
+file-based.
+.SH OPTIONS
+.sp
+.LP
+The following command options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIoption_file\fR\fR
+.ad
+.RS 18n
+.rt  
+Allows the user to set up the options in a file instead of entering the options
+on the command line.
+.sp
+This option is provided as a convenience for users because \fBpktool\fR can
+potentially have a large list of subcommands and associated options to be
+specified on the command line.
+.sp
+The format of the \fIoption_file\fR is one option or value pair per-line.
+.sp
+An example \fIoption_file\fR might looks as follows:
+.sp
+.in +2
+.nf
+list
+keystore=nss
+dir=/export/foo
+objtype=key
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 18n
+.rt  
+Allows the user to specify the \fBsubject-DN\fR interactively for the
+\fBgencert\fR and \fBgencsr\fR subcommands. When \fB-i\fR is specified, the
+user is prompted to input some data to form a \fBsubject-DN\fR.
+.sp
+An example of using the \fB-i\fR option follows:
+.sp
+.in +2
+.nf
+Country Name (2 letter code) [US]:US
+State or Province Name (full name) [Some-State]:CA
+Locality Name (eg, city) []:Menlo Park
+Organization Name (eg, company):Sun Microsystems Inc.
+Organizational Unit Name (eg, section):OPG
+Common Name (eg, YOUR name):John Smith
+ Email Address []: john.smith@sun.com
+.fi
+.in -2
+.sp
+
+The resulting \fBsubject-DN\fR is:
+.sp
+.in +2
+.nf
+"C=US, ST=CA, L=Menlo Park, O=Sun Microsystems Inc.,\e
+   OU=OPG, emailAddress=john.smith@sun.com, \e
+   CN=John Smith"
+.fi
+.in -2
+.sp
+
+.RE
+
+.SH SUBCOMMANDS
+.sp
+.LP
+The following subcommands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBdelete\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool delete [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [objtype=private|public|both]
+              [label=\fIobject-label\fR]
+
+pktool delete keystore=pkcs11
+              objtype=cert[:public | private | both]]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [label=\fIcert-label\fR]
+              [serial=\fIhex-serial-number\fR]
+              [issuer=\fIissuer-DN\fR]
+              [subject=\fIsubject-DN\fR]
+
+pktool delete keystore=nss
+              objtype=cert
+              [subject=\fIsubject-DN\fR]
+              [issuer=\fIissuer-DN\fR]
+              [serial=\fIhex-serial-number\fR]
+              [nickname=\fIcert-nickname\fR]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+
+pktool delete keystore=nss
+              objtype=crl
+              [nickname=\fIcert-nickname\fR]
+              [subject=\fIsubject-DN\fR]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+
+pktool delete keystore=pkcs11
+              objtype=key[:public | private | both]]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [label=\fIkey-label\fR]
+
+pktool delete keystore=pkcs11
+              objtype=crl
+              infile=\fIinput-fn\fR
+
+
+pktool delete keystore=file
+              objtype=cert
+              [infile=\fIinput-fn\fR]
+              [dir=\fIdirectory-path\fR]
+              [serial=\fIhex-serial-number\fR]
+              [issuer=\fIissuer-DN\fR]
+              [subject=\fIsubject-DN\fR]
+
+pktool delete keystore=file
+              objtype=key
+              [infile=\fIinput-fn\fR]
+              [dir=\fIdirectory-path\fR]
+
+pktool delete keystore=file
+              objtype=crl
+              infile=\fIinput-fn\fR
+              
+.fi
+.in -2
+.sp
+
+Deletes a certificate, key, or certificate revocation list (CRL).
+.sp
+To delete a private certificate or key from PKCS#11 token, the user is prompted
+to authenticate to the PKCS#11 by entering the correct Personal Identification
+Number (PIN).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdownload\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBdownload\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+ pktool download url=\fIurl_str\fR 
+                 [objtype=crl|cert]
+                 [http_proxy=\fIproxy_str\fR]
+                 [outfile=\fIoutput-fn\fR]
+                 [dir=\fIdirectory-path\fR]
+.fi
+.in -2
+.sp
+
+Downloads a CRL file or a certificate file from the specified URL location.
+Once the file is successfully downloaded, checks the validity of the downloaded
+CRL or certificate file. If the CRL or the certificate is expired,
+\fBdownload\fR issues a warning.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexport\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBexport\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool export [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              outfile=\fIoutput-fn\fR
+
+pktool export keystore=pkcs11
+              outfile=\fIoutput-fn\fR
+              [objtype=cert|key]
+              [label=\fIlabel\fR]
+              [subject=\fIsubject-DN\fR]
+              [issuer=\fIissuer-DN\fR]
+              [serial=\fIhex-serial-number\fR]
+              [outformat=pem|der|pkcs12|raw]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+
+pktool export keystore=nss
+              outfile=\fIoutput-fn\fR
+              [subject=\fIsubject-DN\fR]
+              [issuer=\fIissuer-DN\fR]
+              [serial=\fIhex-serial-number\fR]
+              [nickname=\fIcert-nickname\fR]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+              [outformat=pem|der|pkcs12]
+
+pktool export keystore=file
+              certfile=\fIcert-input-fn\fR
+              keyfile=\fIkey-input-fn\fR
+              outfile=\fIoutput-pkcs12-fn\fR
+.fi
+.in -2
+.sp
+
+Saves the contents of PKCS#11 token or certificates in the NSS token or
+file-based keystore to the specified file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgencert\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBgencert\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool gencert [-i] keystore=nss
+              label=\fIcert-nickname\fR
+              subject=\fIsubject-DN\fR
+              serial=\fIhex_serial_number\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage\fR,\fIusage\fR...]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [trust=\fItrust-value\fR]
+              [lifetime=\fInumber\fR-hour|\fInumber\fR-day|\fInumber\fR-year]
+              [eku=[critical:]\fIEKU_name,...\fR]
+
+pktool gencert [-i] [ keystore=pkcs11]
+              label=\fIkey/cert-label\fR
+              subject=\fIsubject-DN\fR
+              serial=\fIhex_serial_number\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage\fR,\fIusage\fR...]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [lifetime=\fInumber\fR-hour|\fInumber\fR-day|\fInumber\fR-year]
+              [eku=[critical:]\fIEKU_name,...\fR]
+              
+pktool gencert [-i] keystore=file
+              outcert=\fIcert-fn\fR
+              outkey=\fIkey-fn\fR
+              subject=\fIsubject-DN\fR
+              serial=\fIhex_serial_number\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage\fR,\fIusage\fR...]
+              [format=der|pem]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [lifetime=\fInumber\fR-hour|\fInumber\fR-day|\fInumber\fR-year]
+              [eku=[critical:]\fIEKU_name,...\fR]
+.fi
+.in -2
+.sp
+
+Generates a self-signed certificate and installs it and its associated private
+key to the specified keystore.
+.sp
+\fBgencert\fR prompts the user to enter a PIN for token-based keystore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgencsr\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBgencsr\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool gencsr [-i] keystore=nss
+              nickname=\fIkey-nickname\fR
+              outcsr=\fIcsr-fn\fR
+              subject=\fIsubject-DN\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage\fR,\fIusage\fR...]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [format=pem|der]
+              [eku=[critical:]\fIEKU_name,...\fR]
+             
+pktool gencsr [-i] keystore=pkcs11
+              label=\fIkey-label\fR
+              outcsr=\fIcsr-fn\fR
+              subject=\fIsubject-DN\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage\fR,\fIusage\fR...]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [format=pem|der]
+              [eku=[critical:]\fIEKU_name,...\fR]
+             
+pktool gencsr [-i] keystore=file
+              outcsr=\fIcsr-fn\fR
+              outkey=\fIkey-fn\fR
+              subject=\fIsubject-DN\fR
+              [altname=[critical:]\fIsubjectAltName\fR]
+              [keyusage=[critical:]\fIusage,usage...\fR]
+              [dir=\fIdirectory-path\fR]
+              [keytype=rsa|dsa]
+              [keylen=\fIkey-size\fR]
+              [format=pem|der]
+              [eku=[critical:]\fIEKU_name,...\fR]
+.fi
+.in -2
+.sp
+
+Creates a PKCS#10 certificate signing request (CSR) file. This CSR can be sent
+to a Certifying Authority (CA) for signing. The \fBgencsr\fR subcommand prompts
+the user to enter a PIN for token-based keystore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgenkey\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBgenkey\fR subcommand is as follows:
+.sp
+\fB\fR
+.sp
+.in +2
+.nf
+pktool genkey [keystore=pkcs11]
+              label=\fIkey-label\fR
+              [keytype=aes|arcfour|des|3des|generic]
+              [keylen=\fIkey-size\fR (for aes, arcfour, or \e
+                  generic keytypes only)]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [sensitive=y|n]
+              [extractable=y|n]
+              [print=y|n]
+
+pktool genkey keystore=nss
+              label=\fIkey-label\fR
+              [keytype=aes|arcfour|des|3des|generic]
+              [keylen=\fIkey-size\fR (for aes, arcfour, or \e
+                  generic keytypes only)]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+
+pktool genkey keystore=file
+              outkey=\fIkey-fn\fR
+              [keytype=aes|arcfour|des|3des|generic]
+              [keylen=\fIkey-size\fR (for aes, arcfour, \e
+                   or generic keytypes only)]
+              [print=y|n]
+.fi
+.in -2
+.sp
+
+Generates a symmetric key in the specified keystore. The \fBgenkey\fR
+subcommand prompts the user to enter a PIN for token-based keystore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimport\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBimport\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool import [token=\fItoken\fR>[:\fImanuf\fR>[:\fIserial\fR>]]]
+              infile=\fIinput-fn\fR
+
+pktool import [keystore=pkcs11]
+              infile=\fIinput-fn\fR
+              label=\fIobject-label\fR
+              [keytype=aes|arcfour|des|3des|generic]
+              [sensitive=y|n]
+              [extractable=y|n]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [objtype=cert|key]
+
+pktool import keystore=pkcs11
+              objtype=\fIcrl\fR
+              infile=\fIinput-fn\fR
+              outcrl=\fIoutput-crl-fn\fR
+              outformat=pem|der
+
+pktool import keystore=nss
+              objtype=\fIcert\fR
+              infile=\fIinput-fn\fR
+              label=\fIcert-label\fR
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+              [trust=\fItrust-value\fR]
+
+pktool import keystore=nss
+              objtype=crl
+              infile=\fIinput-fn\fR
+              [verifycrl=y|n]
+              [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+              [dir=\fIdirectory-path\fR]
+              [prefix=\fIDBprefix\fR]
+
+pktool import keystore=file
+              infile=\fIinput-fn\fR
+              outkey=\fIoutput-key-fn\fR
+              outcert=\fIoutput-key-fn\fR
+              [outformat=pem|der]
+
+pktool import keystore=file
+              objtype=crl
+              infile=\fIinput-fn\fR
+              outcrl=\fIoutput-crl-fn\fR
+              outformat=pem|der
+.fi
+.in -2
+.sp
+
+Loads certificates, keys, or CRLs from the specified input file into the
+specified keystore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinittoken\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBinittoken\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool inittoken [ slotid=slot number ]
+                 [ currlabel=token[:manuf[:serial]]]
+                 [ newlabel=new token label ]
+.fi
+.in -2
+.sp
+
+This command initializes a PKCS#11 token using \fBC_InitToken API\fR.  The
+preferred method of locating a token is to specify its default label.
+Optionally, a new label can be assigned to the token by using the
+\fBnewlabel\fR argument.  If \fBnewlabel\fR is not present, the token label is
+not modified.  The user is prompted to enter the security officer (SO) PIN for
+this  command to proceed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBlist\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool list [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+            [objtype=private|public|both]
+            [label=\fIlabel\fR]
+
+pktool list [keystore=pkcs11]
+            [objtype=cert[:public | private | both]]
+            [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+            [label=\fIcert-label\fR]
+            [serial=\fIhex-serial-number\fR]
+            [issuer=\fIissuer-DN\fR]
+            [subject=\fIsubject-DN\fR]
+
+pktool list [keystore=pkcs11]
+            objtype=key[:public | private | both]]
+            [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+            [label=\fIkey-label\fR]
+
+pktool list keystore=pkcs11
+            objtype=crl
+            infile=\fIinput-fn\fR
+            
+pktool list keystore=nss
+            objtype=cert
+            [subject=\fIsubject-DN\fR]
+            [issuer=\fIissuer-DN\fR]
+            [serial=\fIhex-serial-number\fR]
+            [nickname=\fIcert-nickname\fR]
+            [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+            [dir=\fIdirectory-path\fR]
+            [prefix=\fIDBprefix\fR]
+
+pktool list keystore=nss
+            objtype=key
+            [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+            [dir=\fIdirectory-path\fR]
+            [prefix=\fIDBprefix\fR]
+            
+pktool list keystore=file
+            objtype=cert
+            [infile=\fIinput-fn\fR]
+            [dir=\fIdirectory-path\fR]
+            [serial=\fIhex-serial-number\fR]
+            [issuer=\fIissuer-DN\fR]
+            [subject=\fIsubject-DN\fR]
+
+pktool list keystore=file
+            objtype=\fIkey\fR
+            [infile=\fIinput-fn\fR]
+            [dir=\fIdirectory-path\fR]
+.fi
+.in -2
+.sp
+
+Lists certificates, list keys, or list certificate revocation lists (CRL). When
+displaying a private certificate or key in PKCS#11 token, the user is prompted
+to authenticate to the PKCS#11 token by entering the correct PIN.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsetpin\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBsetpin\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool setpin keystore=nss
+       [token=\fItoken\fR]
+       [dir=\fIdirectory-path\fR]
+       [prefix=\fIDBprefix\fR]
+
+pktool setpin [ keystore=pkcs11]
+       [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+       [usertype=user | so]
+.fi
+.in -2
+.sp
+
+Changes the passphrase used to authenticate a user to the PKCS#11 or NSS token.
+Passphrases can be any string of characters with lengths between 1 and 256 with
+no nulls.
+.sp
+\fBsetpin\fR prompts the user for the old passphrase, if any. If the old
+passphrase matches, \fBpktool\fR prompts for the new passphrase twice. If the
+two entries of the new passphrases match, it becomes the current passphrase for
+the token.
+.sp
+For the Sun Software PKCS#11 softtoken keystore (default), the user must use
+the \fBsetpin\fR command with the default passphrase \fBchangeme\fR as the old
+passphrase to change the passphrase of the object store.  This action is needed
+to initialize and set the passphrase to a newly created token object store.
+.sp
+If the \fBusertype=so\fR option is specified for PKCS#11 based tokens, the
+Security Officer (SO) user PIN is changed as opposed to the normal user PIN.
+By default the \fBusertype\fR is assumed to be \fBuser\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsigncsr\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBsigncsr\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+signcsr keystore=pkcs11
+        signkey=\fIlabel\fR (label of key to use for signing)
+        csr=\fICSR_filename\fR
+        serial=\fIserial_number_hex_string_for_final_certificate\fR
+        outcert=\fIfilename_for_final_certificate\fR
+        issuer=\fIissuer-DN\fR
+        [store=y|n] (store the new cert in NSS DB, default=n)
+        [outlabel=\fIcertificate label\fR]
+        [format=pem|der] (certificate output format)
+        [subject=\fIsubject-DN\fR] (override the CSR subject name)
+        [altname=\fIsubjectAltName\fR] (add subjectAltName )
+        [keyusage=[critical:]\fIusage,...\fR] (add key usage bits)
+        [eku=[critical:]\fIEKU_Name,...\fR] (add Extended Key Usage )
+        [lifetime=\fInumber-hour\fR|\fInumber-day\fR|\fInumber-year\fR]
+        [token=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]]
+signcsr keystore=\fIfile\fR
+        signkey=\fIfilename\fR
+        csr=\fICSR_filename\fR
+        serial=\fIserial_number_hex_string_for_final_certificate\fR
+        outcert=\fIfilename_for_final_certificate\fR
+        issuer=\fIissuer-DN\fR
+        [format=pem|der] (certificate output format)
+        [subject=\fIsubject-DN\fR] (override the CSR subject name)
+        [altname=\fIsubjectAltName\fR] (add a subjectAltName)
+        [keyusage=[critical:]\fIusage,...\fR] (add key usage bits)
+        [lifetime=\fInumber-hour\fR|\fInumber-day\fR|\fInumber-year\fR]
+        [eku=[critical:]\fIEKU_ Name,...\fR] (add Extended Key Usage)
+signcsr keystore=nss
+        signkey=\fIlabel\fR (label of key to use for signing)
+        csr=\fICSR_filename\fR
+        serial=\fIserial_number_hex_string_for_final_certificate\fR
+        outcert=\fIfilename_for_final_certificate\fR
+        issuer=\fIissuer-DN\fR
+        [store=y|n] (store the new cert in NSS DB, default=n)
+        [outlabel=\fIcertificate label\fR]
+        [format=pem|der] (certificate output format)
+        [subject=\fIsubject-DN\fR] (override the CSR subject name)
+        [altname=\fIsubjectAltName\fR] (add a subjectAltName)
+        [keyusage=[critical:]\fIusage,...\fR] (add key usage bits)
+        [eku=[critical:]\fIEKU_Name,...\fR] (add Extended Key Usage)
+        [lifetime=\fInumber-hour\fR|\fInumber-day\fR|\fInumber-year\fR]
+        [token=token[\fI:manuf\fR[:\fIserial\fR]]]
+        [dir=\fIdirectory-path\fR]
+        [prefix=\fIDBprefix\fR]
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtokens\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fBtokens\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool tokens
+.fi
+.in -2
+.sp
+
+The tokens subcommand lists all visible PKCS#11 tokens.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.sp .6
+.RS 4n
+The format for the \fB\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+pktool -?
+pktool --help
+.fi
+.in -2
+.sp
+
+The \fB-?\fR option displays usage and help information. \fB--help\fR is a
+synonym for \fB-?\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpktool\fR subcommands support the following options:
+.sp
+.ne 2
+.mk
+.na
+\fBaltname=[critical:]\fIsubjectAltName\fR\fR
+.ad
+.sp .6
+.RS 4n
+Subject Alternative Names the certificate. The argument that follows the -A
+option should be in the form of tag=value. Valid tags are IP, DNS, EMAIL, URI,
+DN, KRB, UPN, and RID. The SubjectAltName extension is marked as \fBcritical\fR
+if the altname string is pre-peneded with the
+.sp
+Example 1: Add an IP address to the \fIsubjectAltName\fR extension.
+\fBaltname="IP=1.2.3.4"\fR Example 2: Add an email address to the
+\fIsubjectAltName\fR extension, and mark it as being critical.
+\fBaltname="critical:EMAIL=first.last@company.com"\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcurrlabel=token label\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option is only used by the \fBinittoken\fR command.  This  is used to
+locate the default token that is being initialized.  See the \fBtoken\fR option
+for details about the format  of the token name to be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdir=\fR\fIdirectory_path\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the NSS database directory, or OpenSSL keystore directory where the
+requested object is stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeku\fR=[critical:]\fIEKU_Name\fR,[critical:]\fIEKU_Name, ...\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the extended key usage X.509v3 extension values to add to the
+certificate or certificate request.
+.sp
+Specify \fIEKU_Name\fR as one of the following:   \fBserverAuth\fR,
+\fBclientAuth\fR, \fBcodeSigning\fR, \fBemailProtection\fR,
+\fBipsecEndSystem\fR, \fBipsecTunnel\fR, \fBipsecUser\fR, \fBtimeStamping\fR,
+\fBOCSPSigning\fR, \fBKPClientAuth\fR, \fBKPKdc\fR, or \fBscLogon\fR.
+.sp
+An example is:
+.sp
+.in +2
+.nf
+eku=KPClientAuth,clientAuth
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBextractable=y | n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the resulting symmetric key in the PKCS#11 token is extractable or
+not extractable. The valid values are: \fBy\fR and \fBn\fR. The default value
+is \fBy\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBformat=pem | der | pkcs12\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBgencert\fR subcommand, this option only applies to the file based
+keystore such as OpenSSL. It is used to specify the output format of the key or
+certificate file to be created. The valid formats are: \fBpem\fR or \fBder\fR.
+The default format is \fBpem\fR.
+.sp
+For the \fBgencsr\fR subcommand, this option specifies the output encoded
+format of the CSR file. The valid formats are: \fBpem\fR or \fBder\fR. The
+default format is \fBpem\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfile=\fR\fIinput-fn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the certificate filename for \fBlist\fR and \fBdelete\fR subcommands
+when objtype=cert and keystore=file. For the \fBimport\fR subcommand, this
+option specifies the filename to be imported. Specifies the input CRL filename
+for \fBlist\fR, \fBdelete\fR and \fBimport\fR subcommands when
+\fBobjtype=crl\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBissuer=\fR\fIissuer-DN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the issuer of a certificate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeylen=\fR\fIkey-size\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the size (bits) of the private or symmetric key to generate.
+.sp
+For the \fBgencert\fR and \fBgencsr\fR subcommands, the default key length is
+1024 bits.
+.sp
+For the \fBgenkey\fR subcommand, the minimum and maximum bits of the symmetric
+key to generate using AES algorithm are \fB128\fR and \fB256\fR. Using the
+ARCFOUR algorithm, the minimum and maximum bits are \fB8\fR and \fB2048\fR. The
+minimum bits for a generic secret key is \fB8\fR and the maximum bits is
+arbitrary. The default key length for the AES, ARCFOUR or generic secret keys
+is 128. For a DES key or a 3DES key, the key length is fixed and this option is
+ignored if specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBkeystore=\fBnss | pkcs11 | file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of the underlying keystore: NSS token, PKCS#11 token, or
+file-based plugin.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeytype=rsa | dsa | aes | arcfour | des | 3des | generic\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of the private or symmetric key to generate.
+.sp
+For the \fBgencert\fR and \fBgencsr\fR subcommands, the valid private key types
+are: \fBrsa\fR, or \fBdsa\fR. The default key type is \fBrsa\fR.
+.sp
+For the \fBgenkey\fR subcommand, the valid symmetric key types are: \fBaes\fR,
+\fBarcfou\fRr, \fBdes\fR, \fB3des\fR, or \fBgeneric\fR. The default key type is
+\fBaes\fR.
+.sp
+.in +2
+.nf
+ keyusage=[critical:]usage,usage,usage,...
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+Key Usage strings:
+* digitalSignature
+* nonRepudiation
+* keyEncipherment
+* dataEncipherment
+* keyAgreement
+* keyCertSign
+* cRLSign
+* encipherOnly
+* decipherOnly
+.fi
+.in -2
+.sp
+
+Example 1: Set the KeyUsage so that the cert (or csr) can be used for signing
+and verifying data other than certificates or CRLs (digitalSignature) and also
+can be used for encrypting and decrypting data other than cryptographic keys
+(dataEncipherment). keyusage=digitalSignature,dataEncipherment
+.sp
+Example 2: The same as above (Example 1), but with the critical bit set.
+keyusage=critical:digitalSignature,dataEncipherment
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlabel=\fIkey-label\fR | \fIcert-label\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBgencert\fR subcommand, this option specifies the label of the
+private key and self-signed certificate in the PKCS#11 token.
+.sp
+For the \fBgencsr\fR subcommand, this option specifies the label of the private
+key in the PKCS#11 token.
+.sp
+For the \fBlist\fR subcommand, this option specifies the label of the X.509
+Certificate (when \fBobjtype=key\fR) or the private key (when
+\fBobjtype=cert\fR) in the PKCS#11 token to refine the list.
+.sp
+For the \fBdelete\fR subcommand, this option specifies the label of the X.509
+Certificate (when \fBobjtype=key\fR) or the private key (when
+\fBobjtype=cert\fR) to delete a designated object from the PKCS#11 token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlifetime=\fInumber\fR-hour|\fInumber\fR-day|\fInumber\fR-year\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the validity period a certificate is valid. The certificate life time
+can be specified by \fInumber\fR\fB-hour\fR, \fInumber\fR\fI-day\fR, or
+\fInumber\fR\fB-year\fR. Only one format can be specified. The default is
+\fB1-year\fR. Examples of this option might be: \fBlifetime=1-hour,
+lifetime=2-day, lifetime=3-year\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnewlabel=token label\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option is only used by the \fBinittoken\fR command.  This  is used to
+change the label assigned to the token that is  being initialized.  See the
+\fBtoken\fR option for details about the format  of the token name to be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnickname=\fR\fIcert-nickname\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBgencert\fR subcommand, this option is required to specify the
+certificate's nickname for NSS keystore.
+.sp
+For the \fBlist\fR subcommand, this option specifies the nickname of the
+certificate in the NSS token to display its content. For the \fBdelete\fR
+subcommand, to delete a CRL from the NSS token, this option is used to specify
+the nickname of the issuer's certificate. For the \fBdelete\fR subcommand, to
+delete a certificate from the NSS token, this option specifies the nickname of
+the certificate. For the \fBimport\fR subcommand, to import a specified input
+file to the NSS token, this option is required to specify the nickname of the
+resulting certificate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBobjtype=cert | key | crl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the class of the object: \fBcert,\fR \fBkey,\fR or \fBcrl\fR. For the
+\fBdownload\fR subcommand, if this option is not specified, default to
+\fBcrl\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBobjtype=public | private | both\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of object: private object, public object, or both. This
+option only applies to \fBlist\fR and \fBdelete\fR subcommands for the PKCS#11
+token when \fBobjtype=key\fR is specified. The default value is \fBpublic\fR.
+.sp
+For the \fBlist\fR subcommand, the label option can be combined with this
+option to further refine the list of keys. For the \fBdelete\fR subcommand,
+this option can used to narrow the keys to be deleted to only public, or
+private ones. Alternately, the label option can be omitted to indicate that all
+public, private, or both type of keys are to be deleted.The use of
+\fBpublic\fR, \fBprivate\fR and \fBboth\fR as choices for the \fBobjtype\fR
+parameter are only applicable with the PKCS#11 keystore in order to maintain
+compatibility with earlier versions of the \fBpktool\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutcert=\fR\fIcert-fn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output certificate filename to write to. This option is required
+for the file based plugin such as OpenSSL. Option \fBoutkey=\fR\fIkey-fn\fR is
+required with this option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutcrl=\fIoutput-crl-fn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output CRL filename to write to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutcsr=\fR\fIcsr-fn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output CSR filename to write to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutfile=\fR\fIoutput-fn\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBexport\fR subcommand, this option specifies the output filename to
+be created. For the \fBimport\fR subcommand, this option specifies the output
+filename of the certificate or CRL. It only applies to the file based plugin
+such as OpenSSL.  For the \fBdownload\fR subcommand, if this option is not
+specified, the downloaded file name is the basename of the URL string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutformat=pem | der | pkcs12\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBimport\fR subcommand, this option specifies the output format of the
+certificate or key that is extracted from a specified PKCS#12 file into the
+file based plugin, The valid values are: \fBpem\fR or \fBder\fR. The default is
+\fBpem\fR. When importing a CRL to the CRL file based keystore, this option
+specifies the output format of the CRL. The valid values are: \fBpem\fR or
+\fBder\fR. The default is \fBder\fR. For the \fBexport\fR subcommand, this
+option specifies the format of the specified output file to be created. The
+supported formats are: \fBpem\fR, \fBder\fR or \fBpkcs12\fR. The default is
+\fBpkcs12\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutkey=\fR\fIkey-fn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the output private key filename to which to write. This option is
+only required when using the \fBfiles\fR keystore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprefix=\fR\fIDBprefix\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the NSS database prefix. This option only applies to the NSS token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprint=y | n\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option is used in the \fBgenkey\fR subcommand and it applies to the PKCS11
+and File-based keystores. If \fBprint=y\fR, the \fBgenkey\fR subcommand prints
+out the key value of the generated key in a single line of hex. The default
+value is \fBn\fR.  For the PKCS11 keystore, if a symmetric key is created with
+\fBsensitive=y\fR or \fBextractable=n\fR, the key value is not displayed, even
+the \fBprint\fR option is set to \fBy\fR. The key is still created, but a
+warning like \fBcannot reveal the key value\fR is issued.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsensitive=y | n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the resulting symmetric key in the PKCS#11 token is sensitive or not
+sensitive. The valid values are: \fBy\fR and \fBn\fR. The default value is
+\fBn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBserial=\fR\fIhex-serial-number\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a unique serial number for a certificate. The serial number must be
+specified as a hex value. Example: \fB0x0102030405060708090a0b0c0d0e0f\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsubject=\fR\fIsubject-DN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a particular certificate owner for a certificate or certificate
+request. An example \fBsubject=\fR setting might be:
+.sp
+.in +2
+.nf
+subject=O=Sun Microsystems Inc., \e 
+OU=Solaris Security Technologies Group, \e
+L=Ashburn, ST=VA, C=US, CN=John Smith
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtoken=\fItoken\fR[:\fImanuf\fR[:\fIserial\fR]]\fR\fR
+.ad
+.sp .6
+.RS 4n
+When a token label contains trailing spaces, this option does not require them
+to be typed as a convenience to the user.
+.sp
+Colon separate token identification string
+\fB\fItoken\fR:\fImanuf\fR:\fIserial\fR\fR. If any of the parts have a literal
+\fB:\fR char then it needs to be escaped using a backslash (\fB\e\fR). If no
+\fB:\fR is found then the entire string (up to 32 chars) is taken as the token
+label. If only one \fB:\fR is found then the string is the token label and the
+manufacturer. When \fBkeystore=nss\fR is specified, default to NSS internal
+token if this option is not specified. When \fBkeystore=pkcs11\fR is specified,
+default to \fBpkcs11_softtoken\fR if this option is not specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtrust=\fItrust\fR-\fIvalue\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the certificate trust attributes. This is only for NSS certificates
+and that the standard NSS syntax applies.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBusertype=user | so\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of user for which the \fBsetpin\fR command   is being
+performed.  The default is for a standard user,   but \fBso\fR can be specified
+in order to set the PIN for  the security officer of the token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBurl=\fR\fIurl_string\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the URL to download a CRL or a certificate file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverifycrl=y | n\fR\fR
+.ad
+.sp .6
+.RS 4n
+When importing a CRL to NSS keystore, this option specifies whether the CRL
+verification is performed. The valid values are: \fBy\fR and \fBn\fR. The
+default value is \fBn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhttp_proxy=\fR\fIproxy_str\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the proxy server hostname and port number. The format can be either
+\fIhttp\fR\fB://\fIhostname\fR[:\fIport\fR]\fR or
+\fIhostname\fR\fB[:\fIport\fR]\fR. If this option is not specified, the
+\fBdownload\fR subcommand checks the \fBhttp_proxy\fR environment variable. The
+command line option has a higher priority than the environment variable.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGenerating a Self-Signed Certificate
+.sp
+.LP
+The following example creates the certificate and stores it in the keystore
+indicated in the command:
+
+.sp
+.in +2
+.nf
+ $ pktool gencert keystore=nss nickname=WebServerCert \e
+       subject="O=Sun Microsystems Inc., OU=Solaris Security Technologies Group, \e
+       L=Ashburn, ST=VA, C=US, CN=John Smith" dir=/etc/certs \e
+       keytype=rsa keylen=2048
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRGenerating a Certificate Signing Request
+.sp
+.LP
+The following example creates the CSR and stores it in the keystore indicated
+in the command:
+
+.sp
+.in +2
+.nf
+ $ pktool gencsr keystore=nss subject="O=Sun Microsystems Inc., \e
+       OU=Solaris Security Technologies Group, L=Ashburn, ST=VA, C=US, \e
+       CN=John Smith" keytype=rsa keylen=2048 outcsr=csr.dat
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRImporting a Certificate
+.sp
+.LP
+The following example imports a certificate object from the specified input
+file into the keystore indicated in the command:
+
+.sp
+.in +2
+.nf
+ $ pktool import keystore=nss objtype=cert infile=mycert.pem \e
+       nickname=mycert
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBpkcs11_softtoken\fR(5)
+.sp
+.LP
+RSA PKCS#11 v2.11 http://www.rsasecurity.com
+.sp
+.LP
+RSA PKCS#12 v1.0 http://www.rsasecurity.com

@@ -1,0 +1,336 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getrlimit 2 "21 Aug 2006" "SunOS 5.11" "System Calls"
+.SH NAME
+getrlimit, setrlimit \- control maximum system resource consumption
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/resource.h>
+
+\fBint\fR \fBgetrlimit\fR(\fBint\fR \fIresource\fR, \fBstruct rlimit *\fR\fIrlp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetrlimit\fR(\fBint\fR \fIresource\fR, \fBconst struct rlimit *\fR\fIrlp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Limits on the consumption of a variety of system resources by a process and
+each process it creates may be obtained with the \fBgetrlimit()\fR and set with
+\fBsetrlimit()\fR functions.
+.sp
+.LP
+Each call to either \fBgetrlimit()\fR or \fBsetrlimit()\fR identifies a
+specific resource to be operated upon as well as a resource limit. A resource
+limit is a pair of values:  one specifying the current (soft) limit, the other
+a maximum (hard) limit. Soft limits may be changed by a process to any value
+that is less than or equal to the hard limit. A process may (irreversibly)
+lower its hard limit to any value that is greater than or equal to the soft
+limit. Only a process with {\fBPRIV_SYS_RESOURCE\fR} asserted in the effective
+set can raise a hard limit. Both hard and soft limits can be changed in a
+single call to \fBsetrlimit()\fR subject to the constraints described above.
+Limits may have an "infinite" value of \fBRLIM_INFINITY\fR. The \fIrlp\fR
+argument is a pointer to \fBstruct\fR \fBrlimit\fR that includes the following
+members:
+.sp
+.in +2
+.nf
+rlim_t    rlim_cur;     /* current (soft) limit */
+rlim_t    rlim_max;     /* hard limit */
+.fi
+.in -2
+
+.sp
+.LP
+The type \fBrlim_t\fR is an arithmetic data type to which objects of type
+\fBint\fR, \fBsize_t\fR, and  \fBoff_t\fR can be cast without loss of
+information.
+.sp
+.LP
+The possible resources, their descriptions, and the actions taken when the
+current limit is exceeded are summarized as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_CORE\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum size of a core file in bytes that may be created by a process. A
+limit of  \fB0\fR will prevent the creation of a core file. The writing of a
+core file will terminate at this size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_CPU\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum amount of CPU time in seconds used by a process. This is a soft
+limit only.  The \fBSIGXCPU\fR signal is sent to the process. If the process is
+holding or ignoring \fBSIGXCPU\fR, the behavior is scheduling class defined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_DATA\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum size of a process's heap in bytes.  The \fBbrk\fR(2) function will
+fail with  \fBerrno\fR set to  \fBENOMEM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_FSIZE\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum size of a file in bytes that may be created by a process. A limit
+of  \fB0\fR will prevent the creation of a file.  The \fBSIGXFSZ\fR signal is
+sent to the process. If the process is holding or ignoring  \fBSIGXFSZ\fR,
+continued attempts to increase the size of a file beyond the limit will fail
+with  \fBerrno\fR set to  \fBEFBIG\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_NOFILE\fR\fR
+.ad
+.RS 17n
+.rt  
+One more than the maximum value that the system may assign to a newly created
+descriptor. This limit constrains the number of file descriptors that a process
+may create.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_STACK\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum size of a process's stack in bytes. The system will not
+automatically grow the stack beyond this limit.
+.sp
+Within a process, \fBsetrlimit()\fR will increase the limit on the size of your
+stack, but will not move current memory segments to allow for that growth. To
+guarantee that the process stack can grow to the limit, the limit must be
+altered prior to the execution of the process in which the new stack size is to
+be used.
+.sp
+Within a multithreaded process, \fBsetrlimit()\fR has no impact on the stack
+size limit for the calling thread if the calling thread is not the main thread.
+A call to \fBsetrlimit()\fR for \fBRLIMIT_STACK\fR impacts only the main
+thread's stack, and should be made only from the main thread, if at all.
+.sp
+The \fBSIGSEGV\fR signal is sent to the process. If the process is holding or
+ignoring  \fBSIGSEGV\fR, or is catching  \fBSIGSEGV\fR and has not made
+arrangements to use an alternate stack (see \fBsigaltstack\fR(2)), the
+disposition of  \fBSIGSEGV\fR will be set to  \fBSIG_DFL\fR before it is sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_VMEM\fR\fR
+.ad
+.RS 17n
+.rt  
+The maximum size of a process's mapped address space in bytes.  If this limit
+is exceeded, the \fBbrk\fR(2) and  \fBmmap\fR(2) functions will fail with
+\fBerrno\fR set to  \fBENOMEM\fR. In addition, the automatic stack growth will
+fail with the effects outlined above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRLIMIT_AS\fR\fR
+.ad
+.RS 17n
+.rt  
+This is the maximum size of a process's total available memory, in bytes.  If
+this limit is exceeded, the \fBbrk\fR(2), \fBmalloc\fR(3C), \fBmmap\fR(2) and
+\fBsbrk\fR(2) functions will fail with \fBerrno\fR set to \fBENOMEM\fR. In
+addition, the automatic stack growth will fail with the effects outlined above.
+.RE
+
+.sp
+.LP
+Because limit information is stored in the per-process information, the shell
+builtin \fBulimit\fR command must directly execute this system call if it is to
+affect all future processes created by the shell.
+.sp
+.LP
+The value of the current limit of the following resources affect these
+implementation defined parameters:
+.sp
+
+.sp
+.TS
+tab();
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+LimitImplementation Defined Constant
+\fBRLIMIT_FSIZE\fR\fBFCHR_MAX\fR
+\fBRLIMIT_NOFILE\fR\fBOPEN_MAX\fR
+.TE
+
+.sp
+.LP
+When using the \fBgetrlimit()\fR function, if a resource limit can be
+represented correctly in an object of type  \fBrlim_t\fR, then its
+representation is returned; otherwise, if the value of the resource limit is
+equal to that of the corresponding saved hard limit, the value returned is
+\fBRLIM_SAVED_MAX\fR; otherwise the value returned is \fBRLIM_SAVED_CUR\fR.
+.sp
+.LP
+When using the \fBsetrlimit()\fR function, if the requested new limit is
+\fBRLIM_INFINITY\fR, the new limit will be "no limit"; otherwise if the
+requested new limit is \fBRLIM_SAVED_MAX\fR, the new limit will be the
+corresponding saved hard limit; otherwise, if the requested new limit is
+\fBRLIM_SAVED_CUR\fR, the new limit will be the corresponding saved soft limit;
+otherwise, the new limit will be the requested value. In addition, if the
+corresponding saved limit can be represented correctly in an object of type
+\fBrlim_t\fR, then it will be overwritten with the new limit.
+.sp
+.LP
+The result of setting a limit to \fBRLIM_SAVED_MAX\fR or \fBRLIM_SAVED_CUR\fR
+is unspecified unless a previous call to  \fBgetrlimit()\fR returned that value
+as the soft or hard limit for the corresponding resource limit.
+.sp
+.LP
+A limit whose value is greater than \fBRLIM_INFINITY\fR is permitted.
+.sp
+.LP
+The \fBexec\fR family of functions also cause resource limits to be saved.  See
+\fBexec\fR(2).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetrlimit()\fR and \fBsetrlimit()\fR return
+\fB0\fR. Otherwise, these functions return \fB\(mi1\fR and set \fBerrno\fR to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetrlimit()\fR and \fBsetrlimit()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIrlp\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An invalid \fIresource\fR was specified; or in a \fBsetrlimit()\fR call, the
+new \fBrlim_cur\fR exceeds the new \fBrlim_max\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The limit specified to \fBsetrlimit()\fR would have raised the maximum limit
+value and {\fBPRIV_SYS_RESOURCE\fR} is not asserted in the effective set of the
+current process.
+.RE
+
+.sp
+.LP
+The \fBsetrlimit()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The limit specified cannot be lowered because current usage is already higher
+than the limit.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBgetrlimit()\fR and \fBsetrlimit()\fR functions have transitional
+interfaces for 64-bit file offsets.  See \fBlf64\fR(5).
+.sp
+.LP
+The rlimit functionality is now provided by the more general resource control
+facility described on the \fBsetrctl\fR(2) manual page. The actions associated
+with the resource limits described above are true at system boot, but an
+administrator can modify the local configuration to modify signal delivery or
+type. Application authors that utilize rlimits for the purposes of resource
+awareness should investigate the resource controls facility.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fRATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrctladm\fR(1M), \fBbrk\fR(2), \fBexec\fR(2), \fBfork\fR(2), \fBopen\fR(2),
+\fBsetrctl\fR(2), \fBsigaltstack\fR(2), \fBulimit\fR(2),
+\fBgetdtablesize\fR(3C), \fBmalloc\fR(3C), \fBsignal\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5),
+\fBprivileges\fR(5), \fBresource_controls\fR(5), \fBstandards\fR(5)

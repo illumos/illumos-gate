@@ -1,0 +1,160 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH posix_spawn_file_actions_addclose 3C "20 Feb 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+posix_spawn_file_actions_addclose, posix_spawn_file_actions_addopen \- add
+close or open action to spawn file actions object
+.SH SYNOPSIS
+.LP
+.nf
+#include <spawn.h>
+
+\fBint\fR \fBposix_spawn_file_actions_addclose\fR(
+     \fBposix_spawn_file_actions_t *\fR\fIfile_actions\fR, \fBint\fR \fIfildes\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBposix_spawn_file_actions_addopen\fR(
+     \fBposix_spawn_file_actions_t *restrict\fR \fIfile_actions\fR, \fBint\fR \fIfildes\fR,
+     \fBconst char *restrict\fR \fIpath\fR, \fBint\fR \fIoflag\fR, \fBmode_t\fR \fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions add or delete a close or open action to a spawn file actions
+object.
+.sp
+.LP
+A spawn file actions object is of type \fBposix_spawn_file_actions_t\fR
+(defined in <\fBspawn.h\fR>) and is used to specify a series of actions to be
+performed by a \fBposix_spawn\fR(3C) or \fBposix_spawn\fR(3C) operation to
+arrive at the set of open file descriptors for the child process given the set
+of open file descriptors of the parent.
+.sp
+.LP
+A spawn file actions object, when passed to \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR, specifies how the set of open file descriptors in the
+calling process is transformed into a set of potentially open file descriptors
+for the spawned process. This transformation occurs as though the specified
+sequence of actions was performed exactly once, in the context of the spawned
+process (prior to execution of the new process image), in the order in which
+the actions were added to the object.  Additionally, when the new process image
+is executed, any file descriptor (from this new set) which has its
+\fBFD_CLOEXEC\fR flag set is closed (see \fBposix_spawn\fR(3C)).
+.sp
+.LP
+The \fBposix_spawn_file_actions_addclose()\fR function adds a close action to
+the object referenced by \fIfile_actions\fR that causes the file descriptor
+fildes to be closed (as if \fBclose\fR(\fIfildes\fR) had been called) when a
+new process is spawned using this file actions object.
+.sp
+.LP
+The \fBposix_spawn_file_actions_addopen()\fR function adds an open action to
+the object referenced by \fIfile_actions\fR that causes the file named by path
+to be opened (as if \fBopen\fR(\fIpath\fR, \fIoflag\fR, \fImode\fR) had been
+called, and the returned file descriptor, if not \fIfildes\fR, had been changed
+to \fIfildes\fR) when a new process is spawned using this file actions object.
+If \fIfildes\fR was already an open file descriptor, it is closed before the
+new file is opened.
+.sp
+.LP
+The string described by \fIpath\fR is copied by the
+\fBposix_spawn_file_actions_addopen()\fR function.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error
+number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 9n
+.rt  
+The value specified by \fIfildes\fR is negative or greater than or equal to
+{\fBOPEN_MAX\fR}.
+.RE
+
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIfile_actions\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient memory exists to add to the spawn file actions object.
+.RE
+
+.sp
+.LP
+It is not considered an error for the \fIfildes\fR argument passed to these
+functions to specify a file descriptor for which the specified operation could
+not be performed at the time of the call. Any such error will be detected when
+the associated file actions object is later used during a \fBposix_spawn()\fR
+or \fBposix_spawnp()\fR operation.
+.sp
+.LP
+If a \fBclose\fR(2) operation is specified for a file descriptor that is not
+open at the time of the call to \fBposix_spawn()\fR or \fBposix_spawnp()\fR,
+the close operation will not cause the \fBposix_spawn()\fR or
+\fBposix_spawnp()\fR operation to fail.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBdup\fR(2), \fBopen\fR(2), \fBposix_spawn\fR(3C),
+\fBposix_spawn_file_actions_adddup2\fR(3C),
+\fBposix_spawn_file_actions_destroy\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

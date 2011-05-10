@@ -1,0 +1,153 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_ReleaseConfiguration 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_ReleaseConfiguration \- release PC Card and socket configuration
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_ReleaseConfiguration\fR(\fBclient_handle_t\fR \fIch\fR, \fBrelease_config_t *\fR\fIrc\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrc\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBrelease_config_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function returns a \fBPC\fR Card and socket to a simple memory only
+interface and sets the card to configuration zero by writing a \fB0\fR to the
+\fBPC\fR card's \fBCOR\fR (Configuration Option Register).
+.sp
+.LP
+Card Services may remove power from the socket if no clients have indicated
+their usage of the socket by an active \fBcsx_RequestConfiguration\fR(9F) or
+\fBcsx_RequestWindow\fR(9F).
+.sp
+.LP
+Card Services is prohibited from resetting the \fBPC\fR Card and is not
+required to cycle power through zero (\fB0\fR) volts.
+.sp
+.LP
+After calling \fBcsx_ReleaseConfiguration()\fR any resources requested via the
+request functions \fBcsx_RequestIO\fR(9F), \fBcsx_RequestIRQ\fR(9F), or
+\fBcsx_RequestWindow\fR(9F) that are no longer needed should be returned to
+Card Services via the corresponding \fBcsx_ReleaseIO\fR(9F),
+\fBcsx_ReleaseIRQ\fR(9F), or \fBcsx_ReleaseWindow\fR(9F) functions.
+\fBcsx_ReleaseConfiguration()\fR must be called to release the current card and
+socket configuration before releasing any resources requested by the driver via
+the request functions named above.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBrelease_config_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     Socket;     /* socket number */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBSocket\fR field is not used in Solaris, but for portability with other
+Card Services implementations, it should be set to the logical socket number.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid or \fBcsx_RequestConfiguration\fR(9F) not done.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SOCKET\fR \fR
+.ad
+.RS 28n
+.rt  
+Error getting or setting socket hardware parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPC\fR card in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA\fR hardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F), \fBcsx_RequestConfiguration\fR(9F),
+\fBcsx_RequestIO\fR(9F), \fBcsx_RequestIRQ\fR(9F), \fBcsx_RequestWindow\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

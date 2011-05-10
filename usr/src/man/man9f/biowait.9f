@@ -1,0 +1,82 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 1997, Sun Microsystems, Inc., All Rights Reserved 
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH biowait 9F "11 Apr 1991" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+biowait \- suspend processes pending completion of block I/O
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/buf.h>
+
+
+
+\fBint\fR \fBbiowait\fR(\fBstruct buf *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to the \fBbuf\fR structure describing the transfer.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Drivers allocating their own  \fBbuf\fR structures with  \fBgetrbuf\fR(9F) can
+use the \fBbiowait()\fR function to suspend the current thread and wait for
+completion of  the transfer.
+.sp
+.LP
+Drivers  must call \fBbiodone\fR(9F) when the transfer is complete to notify
+the thread blocked by \fBbiowait()\fR. \fBbiodone()\fR is usually called in the
+interrupt routine.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Upon success
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+Upon \fBI/O\fR failure.  \fBbiowait()\fR calls \fBgeterror\fR(9F) to retrieve
+the error number which it returns.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBbiowait()\fR can be called from user context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBbiodone\fR(9F), \fBgeterror\fR(9F), \fBgetrbuf\fR(9F), \fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

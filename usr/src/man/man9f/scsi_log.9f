@@ -1,0 +1,120 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_log 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_log \- display a SCSI-device-related message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+ #include <sys/cmn_err.h>
+
+
+
+\fBvoid\fR \fBscsi_log\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIdrv_name\fR, \fBuint_t\fR \fIlevel\fR, 
+     \fBconst char *\fR\fIfmt\fR\fB, ...\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdrv_name\fR\fR
+.ad
+.RS 12n
+.rt  
+String naming the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlevel\fR\fR
+.ad
+.RS 12n
+.rt  
+Error level.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfmt\fR\fR
+.ad
+.RS 12n
+.rt  
+Display format.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_log()\fR function is a utility function that displays a message via
+the \fBcmn_err\fR(9F) routine. The error levels that can be passed in to this
+function are \fBCE_PANIC\fR, \fBCE_WARN\fR, \fBCE_NOTE\fR, \fBCE_CONT\fR, and
+\fBSCSI_DEBUG\fR. The last level is used to assist in displaying debug messages
+to the console only. \fIdrv_name\fR is the short name by which this device is
+known; example disk driver names are \fBsd\fR and \fBcmdk\fR. If the
+\fIdev_info_t\fR pointer is \fINULL\fR, then the \fIdrv_name\fR will be used
+with no unit or long name.
+.sp
+.LP
+If the first character in \fIformat\fR is:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An exclamation mark (\fB!\fR), the message goes only to the system buffer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A caret (\fB^\fR), the message goes only to the console.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A question mark (\fB?\fR) and \fIlevel\fR is \fBCE_CONT\fR, the message is
+always sent to the system buffer, but is written to the console only when the
+system has been booted in verbose mode. See \fBkernel\fR(1M). If neither
+condition is met, the \fB?\fR character has no effect and is simply ignored.
+.RE
+.sp
+.LP
+All formatting conversions in use by \fBcmn_err()\fR also work with
+\fBscsi_log()\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_log()\fR function may be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBkernel\fR(1M), \fBsd\fR(7D), \fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -53,6 +53,9 @@ dir path=usr/platform group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib
 dir path=usr/platform/SUNW,SPARC-Enterprise/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=dm2s
 driver name=oplkmdrv
 file path=lib/svc/manifest/platform/sun4u/dscp.xml group=sys mode=0444
@@ -67,6 +70,9 @@ file path=usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options group=sys \
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln group=sys
 file path=usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp mode=0755
+file path=usr/share/man/man1m/prtdscp.1m
+file path=usr/share/man/man7d/dm2s.7d
+file path=usr/share/man/man7d/oplkmdrv.7d
 legacy pkg=SUNWdscpr.u arch=$(ARCH).sun4u \
     desc="Domain to Service Processor Communications Protocol (Root)" \
     name="Domain to Service Processor Communications Protocol (Root)"

@@ -1,0 +1,361 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_RegisterClient 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_RegisterClient \- register a client
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_RegisterClient\fR(\fBclient_handle_t *\fR\fIch\fR, \fBclient_reg_t *\fR\fIcr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBclient_handle_t\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImc\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBclient_reg_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function registers a client with Card Services and returns a unique client
+handle for the client. The client handle must be passed to
+\fBcsx_DeregisterClient\fR(9F) when the client terminates.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBclient_reg_t\fR are:
+.sp
+.in +2
+.nf
+ uint32_t                 Attributes;
+  uint32_t                 EventMask;
+  event_callback_args_t    event_callback_args;
+  uint32_t                 Version;             /* CS version to expect */
+  csfunction_t             *event_handler;
+  ddi_iblock_cookie_t      *iblk_cookie;        /* event iblk cookie */
+  ddi_idevice_cookie_t     *idev_cookie;        /* event idev cookie */
+  dev_info_t               *dip;                /* client's dip */
+  char                     driver_name[MODMAXNAMELEN];
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 23n
+.rt  
+This field is bit-mapped and defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_MEM_CLIENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Memory client device driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_MTD_CLIENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Memory Technology Driver client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_IO_CLIENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBIO\fR client device driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_CARD_SHARE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generate artificial \fBCS_EVENT_CARD_INSERTION\fR and
+\fBCS_EVENT_REGISTRATION_COMPLETE\fR events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_CARD_EXCL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generate artificial \fBCS_EVENT_CARD_INSERTION\fR and
+\fBCS_EVENT_REGISTRATION_COMPLETE\fR events.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_MEM_CLIENT\fR\fR
+.ad
+.br
+.na
+\fB\fBINFO_MTD_CLIENT\fR\fR
+.ad
+.br
+.na
+\fB\fBINFO_IO_CLIENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+These bits are mutually exclusive (that is, only one bit may be set), but one
+of the bits must be set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBINFO_CARD_SHARE\fR\fR
+.ad
+.br
+.na
+\fB\fBINFO_CARD_EXCL\fR\fR
+.ad
+.sp .6
+.RS 4n
+If either of these bits is set, the client will receive a
+\fBCS_EVENT_REGISTRATION_COMPLETE\fR event when Card Services has completed its
+internal client registration processing and after a sucessful call to
+\fBcsx_RequestSocketMask\fR(9F).
+.sp
+Also, if either of these bits is set, and if a card of the type that the client
+can control is currently inserted in the socket (and after a successful call to
+\fBcsx_RequestSocketMask\fR(9F)), the client will receive an artificial
+\fBCS_EVENT_CARD_INSERTION\fR event.
+.RE
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEvent\fR \fBMask\fR\fR
+.ad
+.RS 23n
+.rt  
+This field is bit-mapped and specifies the client's global event mask. Card
+Services performs event notification based on this field. See
+\fBcsx_event_handler\fR(9E) for valid event definitions and for additional
+information about handling events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBevent_callback_args\fR\fR
+.ad
+.RS 23n
+.rt  
+The \fBevent_callback_args_t\fR structure members are:
+.sp
+.in +2
+.nf
+    void     *client_data;
+.fi
+.in -2
+
+The \fBclient_data\fR field may be used to provide data available to the event
+handler (see \fBcsx_event_handler\fR(9E)). Typically, this is the client
+driver's soft state pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVersion\fR\fR
+.ad
+.RS 23n
+.rt  
+This field contains the specific Card Services version number that the client
+expects to use. Typically, the client will use the \fBCS_VERSION\fR macro to
+specify to Card Services which version of Card Services the client expects.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBevent_handler\fR\fR
+.ad
+.RS 23n
+.rt  
+The client event callback handler entry point is passed in the
+\fBevent_handler\fR field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBiblk_cookie\fR\fR
+.ad
+.br
+.na
+\fB\fBidev_cookie\fR\fR
+.ad
+.RS 23n
+.rt  
+These fields must be used by the client to set up mutexes that are used in the
+client's event callback handler when handling high priority events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdip\fR\fR
+.ad
+.RS 23n
+.rt  
+The client must set this field with a pointer to the client's dip.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdriver_name\fR\fR
+.ad
+.RS 23n
+.rt  
+The client must copy a driver-unique name into this member. This name must be
+identical across all instances of the driver.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ATTRIBUTE\fR\fR
+.ad
+.RS 27n
+.rt  
+No client type or more than one client type specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_OUT_OF_RESOURCE\fR\fR
+.ad
+.RS 27n
+.rt  
+Card Services is unable to register client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_VERSION\fR\fR
+.ad
+.RS 27n
+.rt  
+Card Services version is incompatible with client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client has already registered for this socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA\fR hardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_DeregisterClient\fR(9F), \fBcsx_RequestSocketMask\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

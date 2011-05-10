@@ -1,0 +1,104 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getcontext 2 "5 Feb 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+getcontext, setcontext \- get and set current user context
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBint\fR \fBgetcontext\fR(\fBucontext_t *\fR\fIucp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetcontext\fR(\fBconst ucontext_t *\fR\fIucp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetcontext()\fR function initializes the structure pointed to by
+\fIucp\fR to the current user context of the calling process.  The
+\fBucontext_t\fR type that \fIucp\fR points to defines the user context and
+includes the contents of the calling process' machine registers, the signal
+mask, and the current execution stack.
+.sp
+.LP
+The \fBsetcontext()\fR function restores the user context pointed to by
+\fIucp\fR.  A successful call to \fBsetcontext()\fR does not return; program
+execution resumes at the point specified by the \fIucp\fR argument passed to
+\fBsetcontext()\fR. The \fIucp\fR argument should be created either by a prior
+call to \fBgetcontext()\fR, or by being passed as an argument to a signal
+handler. If the \fIucp\fR argument was created with \fBgetcontext()\fR, program
+execution continues as if the corresponding call of \fBgetcontext()\fR had just
+returned.  If the \fIucp\fR argument was created with \fBmakecontext\fR(3C),
+program execution continues with the function passed to \fBmakecontext\fR(3C).
+When that function returns, the process continues as if after a call to
+\fBsetcontext()\fR with the \fIucp\fR argument that was input to
+\fBmakecontext\fR(3C). If the \fIucp\fR argument was passed to a signal
+handler, program execution continues with the program instruction following the
+instruction interrupted by the signal.  If the \fBuc_link\fR member of the
+\fBucontext_t\fR structure pointed to by the \fIucp\fR argument is equal to 0,
+then this context is the main context, and the process will exit when this
+context returns.  The effects of passing a \fIucp\fR argument obtained from any
+other source are unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, \fBsetcontext()\fR does not return and
+\fBgetcontext()\fR returns \fB0\fR. Otherwise, \fB\(mi1\fR is returned.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+When a signal handler is executed, the current user context is saved and a new
+context is created.  If the thread leaves the signal handler via
+\fBlongjmp\fR(3UCB), then it is unspecified whether the context at the time of
+the corresponding \fBsetjmp\fR(3UCB) call is restored and thus whether future
+calls to \fBgetcontext()\fR will provide an accurate representation of the
+current context, since the context restored by \fBlongjmp\fR(3UCB) may not
+contain all the information that \fBsetcontext()\fR requires.  Signal handlers
+should use \fBsiglongjmp\fR(3C) instead.
+.sp
+.LP
+Portable applications should not modify or access the \fBuc_mcontext\fR member
+of \fBucontext_t\fR.  A portable application cannot assume that context
+includes any process-wide static data, possibly including \fBerrno\fR. Users
+manipulating contexts should take care to handle these explicitly when
+required.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fRATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigaction\fR(2), \fBsigaltstack\fR(2), \fBsigprocmask\fR(2),
+\fBbsd_signal\fR(3C), \fBmakecontext\fR(3C), \fBsetjmp\fR(3UCB),
+\fBsigsetjmp\fR(3C), \fBucontext.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)

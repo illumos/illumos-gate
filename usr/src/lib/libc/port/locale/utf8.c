@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins
  * All rights reserved.
  *
@@ -110,13 +110,6 @@ _UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 		/* Incomplete multibyte sequence */
 		return ((size_t)-2);
 
-	if (us->want == 0 && ((ch = (unsigned char)*s) & ~0x7f) == 0) {
-		/* Fast path for plain ASCII characters. */
-		if (pwc != NULL)
-			*pwc = ch;
-		return (ch != '\0' ? 1 : 0);
-	}
-
 	if (us->want == 0) {
 		/*
 		 * Determine the number of octets that make up this character
@@ -132,10 +125,12 @@ _UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 		 */
 		ch = (unsigned char)*s;
 		if ((ch & 0x80) == 0) {
-			mask = 0x7f;
-			want = 1;
-			lbound = 0;
-		} else if ((ch & 0xe0) == 0xc0) {
+			/* Fast path for plain ASCII characters. */
+			if (pwc != NULL)
+				*pwc = ch;
+			return (ch != '\0' ? 1 : 0);
+		}
+		if ((ch & 0xe0) == 0xc0) {
 			mask = 0x1f;
 			want = 2;
 			lbound = 0x80;
@@ -312,12 +307,6 @@ _UTF8_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps)
 		/* Reset to initial shift state (no-op) */
 		return (1);
 
-	if ((wc & ~0x7f) == 0) {
-		/* Fast path for plain ASCII characters. */
-		*s = (char)wc;
-		return (1);
-	}
-
 	/*
 	 * Determine the number of octets needed to represent this character.
 	 * We always output the shortest sequence possible. Also specify the
@@ -325,8 +314,9 @@ _UTF8_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps)
 	 * about the sequence length.
 	 */
 	if ((wc & ~0x7f) == 0) {
-		lead = 0;
-		len = 1;
+		/* Fast path for plain ASCII characters. */
+		*s = (char)wc;
+		return (1);
 	} else if ((wc & ~0x7ff) == 0) {
 		lead = 0xc0;
 		len = 2;

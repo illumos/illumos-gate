@@ -1,0 +1,3206 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mailx 1 "19 Sep 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+mailx \- interactive message processing system
+.SH SYNOPSIS
+.LP
+.nf
+\fBmailx\fR [\fB-BdeHiInNURvV~\fR] [\fB-f\fR [\fIfile\fR | \fI+folder\fR]] [\fB-T\fR \fIfile\fR] 
+     [\fB-u\fR \fIuser\fR]
+.fi
+
+.LP
+.nf
+\fBmailx\fR [\fB-BdFintUv~\fR] [\fB-b\fR \fIbcc\fR] [\fB-c\fR \fIcc\fR] [\fB-h\fR \fInumber\fR] 
+     [\fB-r\fR \fIaddress\fR] [\fB-s\fR \fIsubject\fR] \fIrecipient\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/ucb/mail\fR ...
+.fi
+
+.LP
+.nf
+\fB/usr/ucb/Mail\fR ...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The mail utilities listed above provide a comfortable, flexible environment for
+sending and receiving mail messages electronically.
+.sp
+.LP
+When reading mail, the mail utilities provide commands to facilitate saving,
+deleting, and responding to messages. When sending mail, the mail utilities
+allow editing, reviewing and other modification of the message as it is
+entered.
+.sp
+.LP
+Incoming mail is stored in a standard file for each user, called the
+\fBmailbox\fR for that user. When the mail utilities are called to read
+messages, the \fBmailbox\fR is the default place to find them. As messages are
+read, they are marked to be moved to a secondary file for storage, unless
+specific action is taken, so that the messages need not be seen again.This
+secondary file is called the \fBmbox\fR and is normally located in the user's
+\fBHOME\fR directory (see \fBMBOX\fR in ENVIRONMENT VARIABLES for a description
+of this file). Messages can be saved in other secondary files named by the
+user. Messages remain in a secondary file until forcibly removed.
+.sp
+.LP
+The user can access a secondary file by using the \fB-f\fR option. Messages in
+the secondary file can then be read or otherwise processed using the same
+\fBCommands\fR as in the primary \fBmailbox\fR. This gives rise within these
+pages to the notion of a current \fBmailbox\fR.
+.SH OPTIONS
+.sp
+.LP
+On the command line options start with a dash (\(mi). Any other arguments are
+taken to be destinations (recipients). If no recipients are specified,
+\fBmailx\fR attempts to read messages from the \fBmailbox\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fR
+.ad
+.RS 17n
+.rt  
+Do not buffer standard input or standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIbcc\fR\fR
+.ad
+.RS 17n
+.rt  
+Set the blind carbon copy list to \fIbcc\fR. \fIbcc\fR should be enclosed in
+quotes if it contains more than one name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIcc\fR\fR
+.ad
+.RS 17n
+.rt  
+Set the carbon copy list to \fIcc\fR. \fIcc\fR should be enclosed in quotes if
+it contains more than one name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 17n
+.rt  
+Turn on debugging output. (Neither particularly interesting nor recommended.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 17n
+.rt  
+Test for the presence of mail. \fBmailx\fR prints nothing and exits with a
+successful return code if there is mail to read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 17n
+.rt  
+Record the message in a file named after the first recipient. Overrides the
+\fBrecord\fR variable, if set (see \fBInternal Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-f\fR\fB [\fR\fIfile\fR\fB]\fR\fR
+.ad
+.RS 17n
+.rt  
+Read messages from \fIfile\fR instead of \fBmailbox\fR. If no \fIfile\fR is
+specified, the \fBmbox\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-f\fR\fB [ \fR\fB+\fR\fIfolder\fR\fB]\fR\fR
+.ad
+.RS 17n
+.rt  
+Use the file \fIfolder\fR in the folder directory (same as the \fBfold\fRer
+command). The name of this directory is listed in the \fBfolder\fR variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 17n
+.rt  
+Print header summary only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fInumber\fR\fR
+.ad
+.RS 17n
+.rt  
+The number of network "hops" made so far. This is provided for network software
+to avoid infinite delivery loops. This option and its argument are passed to
+the delivery program.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR\fR
+.ad
+.RS 17n
+.rt  
+Include the newsgroup and article-id header lines when printing mail messages.
+This option requires the \fB-f\fR option to be specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 17n
+.rt  
+Ignore interrupts. See also \fBignore\fR in \fBInternal Variables\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR\fR
+.ad
+.RS 17n
+.rt  
+Do not print initial header summary.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 17n
+.rt  
+Do not initialize from the system default \fBmailx.rc\fR or \fBMail.rc\fR file.
+See USAGE.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fIaddress\fR\fR
+.ad
+.RS 17n
+.rt  
+Use \fIaddress\fR as the return address when invoking the delivery program. All
+tilde commands are disabled. This option and its argument is passed to the
+delivery program.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIsubject\fR\fR
+.ad
+.RS 17n
+.rt  
+Set the Subject header field to \fIsubject\fR. \fIsubject\fR should be enclosed
+in quotes if it contains embedded white space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fIfile\fR\fR
+.ad
+.RS 17n
+.rt  
+Message-id and article-id header lines are recorded in \fIfile\fR after the
+message is read. This option also sets the \fB-I\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 17n
+.rt  
+Scan the input for \fBTo:\fR, \fBCc:\fR, and \fBBcc:\fR fields. Any recipients
+on the command line will be ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 17n
+.rt  
+Convert \fBUUCP-style\fR addresses to internet standards.  Overrides the
+\fBconv\fR environment variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIuser\fR\fR
+.ad
+.RS 17n
+.rt  
+Read \fIuser\fR's \fBmailbox\fR. This is only effective if \fIuser\fR's
+\fBmailbox\fR is not read protected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 17n
+.rt  
+Print the \fBmailx\fR version number and exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 17n
+.rt  
+Pass the \fB-v\fR flag to \fBsendmail\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-~\fR\fR
+.ad
+.RS 17n
+.rt  
+Interpret tilde escapes in the input even if not reading from a tty.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrecipient\fR\fR
+.ad
+.RS 13n
+.rt  
+Addressee of message.
+.RE
+
+.SH USAGE
+.SS "Starting Mail"
+.sp
+.LP
+At startup time, \fBmailx\fR executes the system startup file
+\fB/etc/mail/mailx.rc\fR. If invoked as \fBmail\fR or \fBMail\fR, the system
+startup file \fB/etc/mail/Mail.rc\fR is used instead.
+.sp
+.LP
+The system startup file sets  up initial display options and alias lists and
+assigns values to some internal variables. These variables are flags and valued
+parameters which are set and cleared using the \fBse\fRt and \fBuns\fRet
+commands. See \fBInternal Variables\fR.
+.sp
+.LP
+With the following exceptions, regular commands are legal inside startup files:
+\fB!\fR, \fBC\fRopy, \fBe\fRdit, \fBfo\fRllowup, \fBF\fRollowup, \fBho\fRld,
+\fBm\fRail, \fBpre\fRserve, \fBr\fReply, \fBR\fReply, \fBsh\fRell, and
+\fBv\fRisual. An error in the startup file causes the remaining lines in the
+file to be ignored.
+.sp
+.LP
+After executing the system startup file,  the mail utilities execute the
+optional personal startup file \fB$HOME/.mailrc\fR, wherein the user can
+override the values of the internal variables as set by the system startup
+file.
+.sp
+.LP
+If the \fB-n\fR option is specified, however, the mail utilities do not execute
+the system startup file.
+.sp
+.LP
+Many system administrators include the commands
+.sp
+.in +2
+.nf
+set appenddeadletter
+unset replyall
+unset pipeignore
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+in the system startup files (to be compatible with past Solaris behavior), but
+this does not meet standards requirements for \fBmailx\fR. To get standard
+behavior for \fBmailx\fR, users should use the \fB-n\fR option or include the
+following commands in a personal startup file:
+.sp
+.in +2
+.nf
+unset appenddeadletter
+set replyall
+set pipeignore
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When reading mail, the mail utilities are in \fIcommand mode\fR. A header
+summary of the first several messages is displayed, followed by a prompt
+indicating the mail utilities can accept regular commands (see \fBCommands\fR
+below). When sending mail, the mail utilities are in \fIinput mode\fR. If no
+subject is specified on the command line, and the \fBasksub\fR variable is set,
+a prompt for the subject is printed.
+.sp
+.LP
+As the message is typed, the mail utilities read the message and store it in a
+temporary file. Commands may be entered by beginning a line with the tilde (~)
+escape character followed by a single command letter and optional arguments.
+See \fBTilde Escapes\fR for a summary of these commands.
+.SS "Reading Mail"
+.sp
+.LP
+Each message is assigned a sequential number, and there is at any time the
+notion of a current message, marked by a right angle bracket (>) in the header
+summary. Many commands take an optional list of messages (\fImessage-list\fR)
+to operate on.  In most cases, the current message is set to the
+highest-numbered message in the list after the command is finished executing.
+.sp
+.LP
+The default for \fImessage-list\fR is the current message. A \fImessage-list\fR
+is a list of message identifiers separated by spaces, which may include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 11n
+.rt  
+Message number \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&.\fR\fR
+.ad
+.RS 11n
+.rt  
+The current message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fR
+.ad
+.RS 11n
+.rt  
+The first undeleted message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fR
+.ad
+.RS 11n
+.rt  
+The last message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 11n
+.rt  
+All messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 11n
+.rt  
+The next undeleted message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 11n
+.rt  
+The previous undeleted message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fB\(mi\fR\fIm\fR\fR
+.ad
+.RS 11n
+.rt  
+An inclusive range of message numbers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser\fR\fR
+.ad
+.RS 11n
+.rt  
+All messages from \fIuser\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fI/string\fR\fR
+.ad
+.RS 11n
+.rt  
+All messages with \fIstring\fR in the Subject line (case ignored).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:\fR\fIc\fR\fR
+.ad
+.RS 11n
+.rt  
+All messages of type \fIc\fR, where \fIc\fR is one of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fR\fR
+.ad
+.RS 5n
+.rt  
+deleted messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 5n
+.rt  
+new messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 5n
+.rt  
+old messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 5n
+.rt  
+read messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR\fR
+.ad
+.RS 5n
+.rt  
+unread messages
+.RE
+
+Notice that the context of the command determines whether this type of message
+specification makes sense.
+.RE
+
+.sp
+.LP
+Other arguments are usually arbitrary strings whose usage depends on the
+command involved. Filenames, where expected, are expanded using the normal
+shell conventions (see \fBsh\fR(1)). Special characters are recognized by
+certain commands and are documented with the commands below.
+.SS "Sending Mail"
+.sp
+.LP
+Recipients listed on the command line may be of three types: login names, shell
+commands, or alias groups. Login names may be any network address, including
+mixed network addressing. If mail is found to be undeliverable, an attempt is
+made to return it to the sender's \fBmailbox\fR. If the recipient name begins
+with a pipe symbol ( | ), the rest of the name is taken to be a shell command
+to pipe the message through. This provides an automatic interface with any
+program that reads the standard input, such as \fBlp\fR(1) for recording
+outgoing mail on paper. Alias groups are set by the \fBa\fRlias command (see
+\fBCommands\fR below) or in a system startup file (for example,
+\fB$HOME/.mailrc\fR). Aliases are lists of recipients of any type.
+.SS "Forwarding Mail"
+.sp
+.LP
+To forward a specific message, include it in a message to the desired
+recipients with the \fB~f\fR or \fB~m\fR tilde escapes. See \fBTilde\fR
+\fBEscapes\fR below. To forward mail automatically, add a comma-separated list
+of addresses for additional recipients to the \fB\&.forward\fR file in your
+home directory. This is different from the format of the \fBalias\fR command,
+which takes a space-separated list instead. \fBNote:\fR Forwarding addresses
+must be valid, or the messages will "bounce." You cannot, for instance, reroute
+your mail to a new host by forwarding it to your new address if it is not yet
+listed in the \fBNIS\fR aliases domain.
+.SS "Commands"
+.sp
+.LP
+Regular commands are of the form
+.sp
+.in +2
+.nf
+[ \fIcommand\fR ] [ \fImessage-list\fR ] [ \fIarguments\fR ]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In \fIinput mode\fR, commands are recognized by the escape character,
+\fBtilde(~)\fR, and lines not treated as commands are taken as input for the
+message. If no command is specified in \fIcommand mode\fR, \fBn\fRext is
+assumed. The following is a complete list of \fBmailx\fR commands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIshell-command\fR\fR
+.ad
+.sp .6
+.RS 4n
+Escape to the shell. See \fBSHELL\fR in ENVIRONMENT VARIABLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB#\fR \fIcomment\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fINULL\fR command (comment). Useful in \fBmailrc\fR files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print the current message number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints a summary of commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fRlias \fIalias name\fR .\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBg\fRroup \fIalias name\fR .\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Declare an alias for the given names. The names are substituted when
+\fBalias\fR is used as a recipient. Useful in the \fBmailrc\fR file. With no
+arguments, the command displays the list of defined aliases.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalt\fRernates \fIname .\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Declare a list of alternate names for your login. When responding to a message,
+these names are removed from the list of recipients for the response. With no
+arguments, print the current list of alternate names. See also \fBallnet\fR in
+\fBInternal Variables\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcd\fR [\fIdirectory\fR]\fR
+.ad
+.br
+.na
+\fB\fBch\fRdir [\fIdirectory\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Change directory. If \fIdirectory\fR is not specified, \fB$HOME\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fRopy [\fIfile\fR]\fR
+.ad
+.br
+.na
+\fB\fBc\fRopy [\fImessage-list\fR] \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Copy messages to the file without marking the messages as saved. Otherwise
+equivalent to the \fBs\fRave command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBC\fRopy [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Save the specified messages in a file whose name is derived from the author of
+the message to be saved, without marking the messages as saved. Otherwise
+equivalent to the \fBS\fRave command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fRelete [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Delete messages from the \fBmailbox\fR. If \fBautoprint\fR is set, the next
+message after the last one deleted is printed (see \fBInternal Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdi\fRscard [\fIheader-field\fR.\|.\|.\|]\fR
+.ad
+.br
+.na
+\fB\fBig\fRnore [\fIheader-field\fR.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+Suppress printing of the specified header fields when displaying messages on
+the screen. Examples of header fields to ignore are \fBStatus\fR and
+\fBReceived\fR. The fields are included when the message is saved, unless the
+\fBalwaysignore\fR variable is set. The \fBMo\fRre, \fBPa\fRge, \fBP\fRrint,
+and \fBT\fRype commands override this command. If no header is specified, the
+current list of header fields being ignored is printed. See also the
+\fBundi\fRscard and \fBunig\fRnore commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdp\fR [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBdt \fR[\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Delete the specified messages from the \fBmailbox\fR and print the next message
+after the last one deleted. Roughly equivalent to a \fBd\fRelete command
+followed by a \fBp\fRrint command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBec\fRho \fIstring \fR.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Echo the given strings (like \fBecho\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fRdit [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Edit the given messages. Each message is placed in a temporary file and the
+program named by the \fBEDITOR\fR variable is invoked to edit it (see
+ENVIRONMENT VARIABLES). Default editor is \fBed\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBex\fRit\fR
+.ad
+.br
+.na
+\fB\fBx\fRit\fR
+.ad
+.sp .6
+.RS 4n
+Exit from \fBmailx\fR, without changing the \fBmailbox\fR. No messages are
+saved in the \fBmbox\fR (see also \fBq\fRuit).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfie\fRld [\fImessage-list\fR] header-file\fR
+.ad
+.sp .6
+.RS 4n
+Display the value of the header field in the specified message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfi\fRle [\fIfile\fR]\fR
+.ad
+.br
+.na
+\fB\fBfold\fRer [\fIfile\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Quit from the current file of messages and read in the specified file. Several
+special characters are recognized when used as file names:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fR
+.ad
+.RS 9n
+.rt  
+the current \fBmailbox\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fIuser\fR\fR
+.ad
+.RS 9n
+.rt  
+the \fBmailbox\fR for \fIuser\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB#\fR\fR
+.ad
+.RS 9n
+.rt  
+the previous mail file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB&\fR\fR
+.ad
+.RS 9n
+.rt  
+the current \fBmbox\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIfile\fR\fR
+.ad
+.RS 9n
+.rt  
+The named file in the \fIfolder\fR directory (listed in the \fBfolder\fR
+variable).
+.RE
+
+With no arguments, print the name of the current mail file, and the number of
+messages and characters it contains.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfolders\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print the names of the files in the directory set by the \fBfolder\fR variable
+(see \fBInternal Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFo\fRllowup [\fImessage\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Respond to a message, recording the response in a file whose name is derived
+from the author of the message. Overrides the \fBrecord\fR variable, if set. If
+the \fBreplyall\fR variable is set, the actions of \fBFo\fRllowup and
+\fBfo\fRllowup are reversed. See also the \fBf\fRollowup, \fBS\fRave, and
+\fBC\fRopy commands and \fBoutfolder\fR in \fBInternal Variables\fR, and the
+\fBStarting Mail\fR section in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf\fRollowup [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Respond to the first message in the \fImessage-list\fR, sending the message to
+the author of each message in the \fImessage-list\fR. The subject line is taken
+from the first message and the response is recorded in a file whose name is
+derived from the author of the first message. If the \fBreplyall\fR variable is
+set, the actions of \fBfo\fRllowup and \fBFo\fRllowup are reversed. See also
+the \fBFo\fRllowup, \fBS\fRave, and \fBC\fRopy commands and \fBoutfolder\fR in
+\fBInternal Variables\fR, and the \fBStarting Mail\fR section in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf\fRrom [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the header summary for the specified messages. If no messages are
+specified, print the header summary for the current message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fRroup \fIalias name \fR.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBa\fRlias \fIalias name \fR.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Declare an alias for the given names. The names are substituted when
+\fBalias\fR is used as a recipient. Useful in the \fBmailrc\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fReaders [\fImessage\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the page of headers which includes the message specified. The
+\fBscreen\fR variable sets the number of headers per page (see \fBInternal
+Variables\fR). See also the \fBz\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhel\fRp\fR
+.ad
+.sp .6
+.RS 4n
+Print a summary of commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBho\fRld [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBpre\fRserve [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Hold the specified messages in the \fBmailbox\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fRf \fBs\fR | \fBr\fR | \fBt\fR\fR
+.ad
+.br
+.na
+\fB\fImail-commands\fR\fR
+.ad
+.br
+.na
+\fB\fR
+.ad
+.br
+.na
+\fB\fBel\fRse\fR
+.ad
+.br
+.na
+\fB\fImail-commands\fR\fR
+.ad
+.br
+.na
+\fB\fR
+.ad
+.br
+.na
+\fB\fBen\fRdif\fR
+.ad
+.sp .6
+.RS 4n
+Conditional execution, where \fIs\fR executes following \fImail-commands\fR, up
+to an \fBel\fRse or \fBen\fRdif, if the program is in \fIsend\fR mode, \fIr\fR
+causes the \fImail-commands\fR to be executed only in \fIreceive\fR mode, and
+\fBt\fR causes the \fImail-commands\fR to be executed only if \fBmailx\fR is
+being run from a terminal. Useful in the \fBmailrc\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Incorporate messages that arrive while you are reading the system mailbox. The
+new messages are added to the message list in the current \fBmail\fR session.
+This command does not commit changes made during the session, and prior
+messages are not renumbered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBig\fRnore [\fIheader-field \fR.\|.\|.\|]\fR
+.ad
+.br
+.na
+\fB\fBdi\fRscard [\fIheader-field \fR.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+Suppress printing of the specified header fields when displaying messages on
+the screen. Examples of header fields to ignore are \fBStatus\fR and \fBCc\fR.
+All fields are included when the message is saved. The \fBMo\fRre, \fBPa\fRge,
+\fBP\fRrint and \fBT\fRype commands override this command. If no header is
+specified, the current list of header fields being ignored is printed. See also
+the \fBundi\fRscard and \fBunig\fRnore commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fRist\fR
+.ad
+.sp .6
+.RS 4n
+Print all commands available. No explanation is given.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlo\fRad\fR
+.ad
+.sp .6
+.RS 4n
+[\fImessage\fR] \fBfile\fR The specified message is replaced by the message in
+the named file. \fBfile\fR should contain a single mail message including mail
+headers (as saved by the \fBs\fRave command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fRail \fIrecipient \fR.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Mail a message to the specified recipients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBM\fRail \fIrecipient\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mail a message to the specified recipients, and record it in a file whose name
+is derived from the author of the message. Overrides the \fBrecord\fR variable,
+if set. See also the \fBSave\fR and \fBCopy\fR commands and \fBoutfolder\fR in
+\fBInternal Variables\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmb\fRox [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Arrange for the given messages to end up in the standard \fBmbox\fR save file
+when \fBmailx\fR terminates normally. See \fBMBOX\fR in ENVIRONMENT VARIABLES
+for a description of this file. See also the \fBex\fRit and \fBq\fRuit
+commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmo\fRre [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBpa\fRge [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages. If \fBcrt\fR is set, the messages longer than the
+number of lines specified by the \fBcrt\fR variable are paged through the
+command specified by the \fBPAGER\fR variable. The default command is
+\fBpg\fR(1) or if the \fBbsdcompat\fR variable is set, the default is
+\fBmore\fR(1). See ENVIRONMENT VARIABLES. Same as the \fBp\fRrint and
+\fBt\fRype commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMo\fRre [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBPa\fRge [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages on the screen, including all header fields.
+Overrides suppression of fields by the \fBig\fRnore command. Same as the
+\fBP\fRrint and \fBT\fRype commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBne\fRw [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBN\fRew [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBunr\fRead [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBU\fRnread\fR
+.ad
+.sp .6
+.RS 4n
+[\fImessage-list\fR] Take a message list and mark each message as \fInot\fR
+having been read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fRext [\fImessage\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Go to the next message matching \fImessage\fR. If message is not supplied, this
+command finds the next message that was not deleted or saved. A
+\fImessage-list\fR may be specified, but in this case the first valid message
+in the list is the only one used. This is useful for jumping to the next
+message from a specific user, since the name would be taken as a command in the
+absence of a real command. See the discussion of \fImessage-list\fR above for a
+description of possible message specifications.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpi\fRpe [\fImessage-list\fR] [\fIshell-command\fR]\fR
+.ad
+.br
+.na
+\fB\fB|\fR [\fImessage-list\fR] [\fIshell-command\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Pipe the message through the given \fIshell-command\fR. The message is treated
+as if it were read. If no arguments are given, the current message is piped
+through the command specified by the value of the \fBcmd\fR variable. If the
+\fBpage\fR variable is set, a form feed character is inserted after each
+message (see \fBInternal Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpre\fRserve [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBho\fRld [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Preserve the specified messages in the \fBmailbox\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fRrint [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBt\fRype [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages. If \fBcrt\fR is set, the messages longer than the
+number of lines specified by the \fBcrt\fR variable are paged through the
+command specified by the \fBPAGER\fR variable. The default command is
+\fBpg\fR(1) or if the \fBbsdcompat\fR variable is set, the default is
+\fBmore\fR(1). See ENVIRONMENT VARIABLES. Same as the \fBmo\fRre and \fBpa\fRge
+commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP\fRrint [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBT\fRype [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages on the screen, including all header fields.
+Overrides suppression of fields by the \fBig\fRnore command.  Same as the
+\fBMo\fRre and \fBPa\fRge commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpu\fRt [\fIfile\fR]\fR
+.ad
+.br
+.na
+\fB\fBpu\fRt [\fImessage-list\fR] \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the specified message in the given file. Use the same conventions as the
+\fBp\fRrint command for which header fields are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPu\fRt [\fIfile\fR]\fR
+.ad
+.br
+.na
+\fB\fBPu\fRt [\fImessage-list\fR] \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the specified message in the given file. Overrides suppression of fields
+by the \fBig\fRnore command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fRuit\fR
+.ad
+.sp .6
+.RS 4n
+Exit from \fBmailx\fR, storing messages that were read in \fBmbox\fR and unread
+messages in the \fBmailbox\fR. Messages that have been explicitly saved in a
+file are deleted unless the \fBkeepsave\fR variable is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fReply [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBr\fRespond [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBreplys\fRender [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Send a response to the author of each message in the \fImessage-list\fR. The
+subject line is taken from the first message.  If \fBrecord\fR is set to a
+file, a copy of the reply is added to that file. If the \fBreplyall\fR variable
+is set, the actions of \fBR\fReply/\fBR\fRespond and \fBr\fReply/\fBr\fRespond
+are reversed. The \fBreplys\fRender command is not affected by the
+\fBreplyall\fR variable, but sends each reply only to the sender of each
+message. See the \fBStarting Mail\fR section in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBR\fReply [\fImessage\fR]\fR
+.ad
+.br
+.na
+\fB\fBR\fRespond [\fImessage\fR]\fR
+.ad
+.br
+.na
+\fB\fBreplya\fRll [\fImessage\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Reply to the specified message, including all other recipients of that message.
+If the variable \fBrecord\fR is set to a file, a copy of the reply added to
+that file. If the \fBreplyall\fR variable is set, the actions of
+\fBR\fReply/\fBR\fRespond and \fBr\fReply/\fBr\fRespond are reversed. The
+\fBreplya\fRll command is not affected by the \fBreplyall\fR variable, but
+always sends the reply to all recipients of the message. See the \fBStarting
+Mail\fR section in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBret\fRain\fR
+.ad
+.sp .6
+.RS 4n
+Add the list of header fields named to the \fIretained list\fR. Only the header
+fields in the retain list are shown on your terminal when you print a message.
+All other header fields are suppressed.  The set of retained fields specified
+by the \fBret\fRain command overrides any list of ignored fields specified by
+the \fBig\fRnore command. The \fBT\fRype and \fBP\fRrint commands can be used
+to print a message in its entirety. If \fBret\fRain is executed with no
+arguments, it lists the current set of retained fields.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS\fRave [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Save the specified messages in a file whose name is derived from the author of
+the first message. The name of the file is taken to be the author's name with
+all network addressing stripped off. See also the \fBC\fRopy, \fBfo\fRllowup,
+and \fBF\fRollowup commands and \fBoutfolder\fR in \fBInternal Variables\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fRave [\fIfile\fR]\fR
+.ad
+.br
+.na
+\fB\fBs\fRave [\fImessage-list\fR] \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save the specified messages in the given file. The file is created if it does
+not exist. The file defaults to \fBmbox\fR. The message is deleted from the
+\fBmailbox\fR when \fBmailx\fR terminates unless \fBkeepsave\fR is set (see
+also \fBInternal Variables\fR and the \fBex\fRit and \fBq\fRuit commands).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBse\fRt\fR
+.ad
+.br
+.na
+\fB\fBse\fRt \fIvariable\fR\fR
+.ad
+.br
+.na
+\fB\fBse\fRt \fIvariable\fR\fB=\fR\fIstring\fR\fR
+.ad
+.br
+.na
+\fB\fBse\fRt \fIvariable\fR\fB=\fR\fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+Define a \fIvariable\fR. To assign a \fIvalue\fR to \fIvariable\fR, separate
+the variable name from the value by an `\fB=\fR' (there must be no space before
+or after the `\fB=\fR'). A variable may be given a null, string, or numeric
+\fIvalue\fR. To embed SPACE characters within a \fIvalue\fR, enclose it in
+quotes.
+.sp
+With no arguments, \fBse\fRt displays all defined variables and any values they
+might have. See \fBInternal Variables\fR for a description of all predefined
+\fBmail\fR variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsh\fRell\fR
+.ad
+.sp .6
+.RS 4n
+Invoke an interactive shell. See also \fBSHELL\fR in ENVIRONMENT VARIABLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsi\fRze [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the size in characters of the specified messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBso\fRurce \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Read commands from the given file and return to command mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBto\fRp [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the top few lines of the specified messages. If the \fBtoplines\fR
+variable is set, it is taken as the number of lines to print (see \fBInternal
+Variables\fR). The default is 5.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtou\fRch [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Touch the specified messages. If any message in \fImessage-list\fR is not
+specifically saved in a file, it is placed in the \fBmbox\fR, or the file
+specified in the \fBMBOX\fR environment variable, upon normal termination. See
+\fBex\fRit and \fBq\fRuit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT\fRype [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBP\fRrint [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages on the screen, including all header fields.
+Overrides suppression of fields by the \fBig\fRnore command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fRype [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBp\fRrint [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the specified messages. If \fBcrt\fR is set, the messages longer than the
+number of lines specified by the \fBcrt\fR variable are paged through the
+command specified by the \fBPAGER\fR variable. The default command is
+\fBpg\fR(1). See ENVIRONMENT VARIABLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuna\fRlias [\fBalias\fR] .\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBung\fRroup [\fBalias\fR] .\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Remove the definitions of the specified aliases.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fRndelete [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Restore the specified deleted messages. Will only restore messages deleted in
+the current mail session. If \fBautoprint\fR is set, the last message of those
+restored is printed (see \fBInternal Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBundi\fRscard [\fIheader-field\fR\|.\|.\|.]\fR
+.ad
+.br
+.na
+\fB\fBunig\fRnore [\fIheader-field\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Remove the specified header fields from the list being ignored. If no header
+fields are specified, all header fields are removed from the list being
+ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunret\fRain [\fIheader-field\fR\|.\|.\|.]\fR
+.ad
+.sp .6
+.RS 4n
+Remove the specified header fields from the list being retained. If no header
+fields are specified, all header fields are removed from the list being
+retained.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunr\fRead [\fImessage-list\fR]\fR
+.ad
+.br
+.na
+\fB\fBU\fRnread [\fImessage-list\fR] Same as the \fBne\fRw command.\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuns\fRet \fIvariable\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Erase the specified variables. If the variable was imported from the
+environment (that is, an environment variable or exported shell variable), it
+cannot be unset from within \fBmailx\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBve\fRrsion\fR
+.ad
+.sp .6
+.RS 4n
+Print the current version and release date of the \fBmailx\fR utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBv\fRisual [\fImessage-list\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Edit the given messages with a screen editor. Each messages is placed in a
+temporary file and the program named by the \fBVISUAL\fR variable is invoked to
+edit it (see ENVIRONMENT VARIABLES). Notice that the default visual editor is
+\fBvi\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBw\fRrite [\fImessage-list\fR] \fBfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write the given messages on the specified file, minus the header and trailing
+blank line. Otherwise equivalent to the \fBs\fRave command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fRit\fR
+.ad
+.br
+.na
+\fB\fBex\fRit\fR
+.ad
+.sp .6
+.RS 4n
+Exit from \fBmailx\fR, without changing the \fBmailbox\fR. No messages are
+saved in the \fBmbox\fR (see also \fBq\fRuit).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBz\fR[\fB+\fR\||\|\fB\(mi\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Scroll the header display forward or backward one screen\(mifull. The number of
+headers displayed is set by the \fBscreen\fR variable (see \fBInternal
+Variables\fR).
+.RE
+
+.SS "Tilde Escapes"
+.sp
+.LP
+The following tilde escape commands can be used when composing mail to send.
+These may be entered only from \fIinput mode\fR, by beginning a line with the
+tilde escape character (~). See \fBescape\fR in \fBInternal Variables\fR for
+changing this special character. The escape character can be entered as text by
+typing it twice.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~\|!\fR\fIshell-command\fR\fR
+.ad
+.RS 23n
+.rt  
+Escape to the shell. If present, run \fIshell-command\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~.\fR\fR
+.ad
+.RS 23n
+.rt  
+Simulate end of file (terminate message input).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~\|:\fR\fImail-command\fR\fR
+.ad
+.br
+.na
+\fB\fB~_\|\fR\fImail-command\fR\fR
+.ad
+.RS 23n
+.rt  
+Perform the command-level request. Valid only when sending a message while
+reading mail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~?\fR\fR
+.ad
+.RS 23n
+.rt  
+Print a summary of tilde escapes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~A\fR\fR
+.ad
+.RS 23n
+.rt  
+Insert the autograph string \fBSign\fR into the message (see \fBInternal
+Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~a\fR\fR
+.ad
+.RS 23n
+.rt  
+Insert the autograph string \fBsign\fR into the message (see \fBInternal
+Variables\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~b\fR\fI name \|.\|.\|.\fR\fR
+.ad
+.RS 23n
+.rt  
+Add the \fIname\fRs to the blind carbon copy (\fBBcc\fR) list. This is like the
+carbon copy (\fBCc\fR) list, except that the names in the \fBBcc\fR list are
+not shown in the header of the mail message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~c\fR\fI name \|.\|.\|.\fR\fR
+.ad
+.RS 23n
+.rt  
+Add the \fIname\fRs to the carbon copy (\fBCc\fR) list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~d\fR\fR
+.ad
+.RS 23n
+.rt  
+Read in the \fBdead-letter\fR file. See \fBDEAD\fR in ENVIRONMENT VARIABLES for
+a description of this file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~e\fR\fR
+.ad
+.RS 23n
+.rt  
+Invoke the editor on the partial message. See also \fBEDITOR\fR in ENVIRONMENT
+VARIABLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~f\fR [\fImessage-list\fR]\fR
+.ad
+.RS 23n
+.rt  
+Forward the specified message, or the current message being read. Valid only
+when sending a message while reading mail. The messages are inserted into the
+message without alteration (as opposed to the \fB~m\fR escape).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~F\fR [\fImessage-list\fR]\fR
+.ad
+.RS 23n
+.rt  
+Forward the specified message, or the current message being read, including all
+header fields. Overrides the suppression of fields by the \fBig\fRnore command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~h\fR\fR
+.ad
+.RS 23n
+.rt  
+Prompt for \fBSubject\fR line and \fBTo\fR, \fBCc\fR, and \fBBcc\fR lists. If
+the field is displayed with an initial value, it may be edited as if you had
+just typed it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~i\fR \fIvariable\fR\fR
+.ad
+.RS 23n
+.rt  
+Insert the value of the named variable into the text of the message. For
+example, \fB~A\fR is equivalent to `\fB~i Sign\fR.' Environment variables set
+and exported in the shell are also accessible by \fB~i\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~m\fR [\fImessage-list\fR]\fR
+.ad
+.RS 23n
+.rt  
+Insert the listed messages, or the current message being read into the letter.
+Valid only when sending a message while reading mail. The text of the message
+is shifted to the right, and the string contained in the \fBindentprefix\fR
+variable is inserted as the leftmost characters of each line. If
+\fBindentprefix\fR is not set, a TAB character is inserted into each line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~M\fR [\fImessage-list\fR]\fR
+.ad
+.RS 23n
+.rt  
+Insert the listed messages, or the current message being read, including the
+header fields, into the letter. Valid only when sending a message while reading
+mail. The text of the message is shifted to the right, and the string contained
+in the \fBindentprefix\fR variable is inserted as the leftmost characters of
+each line. If \fBindentprefix\fR is not set, a TAB character is inserted into
+each line. Overrides the suppression of fields by the \fBig\fRnore command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~p\fR\fR
+.ad
+.RS 23n
+.rt  
+Print the message being entered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~q\fR\fR
+.ad
+.RS 23n
+.rt  
+Quit from input mode by simulating an interrupt. If the body of the message is
+not null, the partial message is saved in \fBdead-letter\fR. See \fBDEAD\fR in
+ENVIRONMENT VARIABLES for a description of this file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~R\fR\fR
+.ad
+.RS 23n
+.rt  
+Mark message for return receipt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~r\fR \fIfile\fR\fR
+.ad
+.br
+.na
+\fB\fB~<\fR \fIfile\fR\fR
+.ad
+.br
+.na
+\fB\fB~< ! \fR\fIshell-command\fR\fR
+.ad
+.RS 23n
+.rt  
+Read in the specified file. If the argument begins with an exclamation point
+(!), the rest of the string is taken as an arbitrary shell command and is
+executed, with the standard output inserted into the message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~s\fR \fIstring \|.\|.\|.\fR\fR
+.ad
+.RS 23n
+.rt  
+Set the subject line to \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~t\fR \fIname \|.\|.\|.\fR\fR
+.ad
+.RS 23n
+.rt  
+Add the given \fIname\fRs to the To list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~v\fR\fR
+.ad
+.RS 23n
+.rt  
+Invoke a preferred screen editor on the partial message. The default visual
+editor is \fBvi\fR(1). See also \fBVISUAL\fR in ENVIRONMENT VARIABLES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~w\fR \fIfile\fR\fR
+.ad
+.RS 23n
+.rt  
+Write the message into the given file, without the header.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~x\fR\fR
+.ad
+.RS 23n
+.rt  
+Exit as with \fB~q\fR except the message is not saved in \fBdead-letter\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~|\fR \fIshell-command\fR\fR
+.ad
+.RS 23n
+.rt  
+Pipe the body of the message through the given \fIshell-command\fR. If the
+\fIshell-command\fR returns a successful exit status, the output of the command
+replaces the message.
+.RE
+
+.SS "Internal Variables"
+.sp
+.LP
+The following variables are internal variables. They may be imported from the
+execution environment or set using the \fBse\fRt command at any time. The
+\fBuns\fRet command may be used to erase variables.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBallnet\fR\fR
+.ad
+.RS 26n
+.rt  
+All network names whose last component (login name) match are treated as
+identical. This causes the \fImessage-list\fR message specifications to behave
+similarly. Disabled by default. See also the \fBalt\fRernates command and the
+\fBmetoo\fR and \fBfuzzymatch\fR variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalwaysignore\fR\fR
+.ad
+.RS 26n
+.rt  
+Ignore header fields with \fBig\fRnore everywhere, not just during \fBp\fRrint
+or \fBt\fRype. Affects the \fBs\fRave, \fBS\fRave, \fBc\fRopy, \fBC\fRopy,
+\fBto\fRp, \fBpi\fRpe, and \fBw\fRrite commands, and the \fB~m\fR and \fB~f\fR
+tilde escapes. Enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBappend\fR\fR
+.ad
+.RS 26n
+.rt  
+Upon termination, append messages to the end of the \fBmbox\fR file instead of
+prepending them. Although disabled by default, \fBappend\fR is set in the
+system startup file (which can be suppressed with the \fB-n\fR command line
+option).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBappenddeadletter\fR\fR
+.ad
+.RS 26n
+.rt  
+Append to the deadletter file rather than overwrite it. Although disabled by
+default, \fBappenddeadletter\fR is frequently set in the system startup file.
+See \fBStarting Mail\fR in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaskbcc\fR\fR
+.ad
+.RS 26n
+.rt  
+Prompt for the \fBBcc\fR list after the \fBSubject\fR is entered if it is not
+specified on the command line with the \fB-b\fR option. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaskcc\fR\fR
+.ad
+.RS 26n
+.rt  
+Prompt for the \fBCc\fR list after the \fBSubject\fR is entered if it is not
+specified on the command line with the \fB-c\fR option. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBasksub\fR\fR
+.ad
+.RS 26n
+.rt  
+Prompt for subject if it is not specified on the command line with the \fB-s\fR
+option. Enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautoinc\fR\fR
+.ad
+.RS 26n
+.rt  
+Automatically incorporate new messages into the current session as they arrive.
+This has an affect similar to issuing the \fBinc\fR command every time the
+command prompt is displayed. Disabled by default, but \fBautoinc\fR is set in
+the default system startup file for \fBmailx\fR; it is not set for
+\fB/usr/ucb/mail\fR or \fB/usr/ucb/Mail\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautoprint\fR\fR
+.ad
+.RS 26n
+.rt  
+Enable automatic printing of messages after \fBd\fRelete and \fBu\fRndelete
+commands. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbang\fR\fR
+.ad
+.RS 26n
+.rt  
+Enable the special-casing of exclamation points (!) in shell escape command
+lines as in \fBvi\fR(1). Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbsdcompat\fR\fR
+.ad
+.RS 26n
+.rt  
+Set automatically if \fBmailx\fR is invoked as \fBmail\fR or \fBMail\fR. Causes
+\fBmailx\fR to use \fB/etc/mail/Mail.rc\fR as the system startup file. Changes
+the default pager to \fBmore\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcmd=\fR\fIshell-command\fR\fR
+.ad
+.RS 26n
+.rt  
+Set the default command for the \fBpi\fRpe command.  No default value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBconv=\fR\fIconversion\fR\fR
+.ad
+.RS 26n
+.rt  
+Convert \fBuucp\fR addresses to the specified address style, which can be
+either:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinternet\fR\fR
+.ad
+.RS 12n
+.rt  
+This requires a mail delivery program conforming to the \fBRFC822\fR standard
+for electronic mail addressing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoptimize\fR\fR
+.ad
+.RS 12n
+.rt  
+Remove loops in \fBuucp\fR(1C) address paths (typically generated by the
+\fBr\fReply command).  No rerouting is performed; \fBmail\fR has no knowledge
+of \fBUUCP\fR routes or connections.
+.RE
+
+Conversion is disabled by default. See also \fBsendmail\fR(1M) and the \fB-U\fR
+command-line option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrt\fR[\fB=\fR\fInumber\fR]\fR
+.ad
+.RS 26n
+.rt  
+Pipe messages having more than \fInumber\fR lines through the command specified
+by the value of the \fBPAGER\fR variable ( \fBpg\fR(1) or \fBmore\fR(1) by
+default). If \fInumber\fR is not specified, the current window size is used.
+Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 26n
+.rt  
+Enable verbose diagnostics for debugging. Messages are not delivered. Disabled
+by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdot\fR\fR
+.ad
+.RS 26n
+.rt  
+Take a period on a line by itself, or \fBEOF\fR during input from a terminal as
+end-of-file. Disabled by default, but \fBdot\fR is set in the system startup
+file (which can be suppressed with the \fB-n\fR command line option).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfcc\fR\fR
+.ad
+.RS 26n
+.rt  
+By default, \fBmailx\fR will treat any address containing a slash ("/")
+character as a local "send to file" address. By unsetting this option, this
+behavior is disabled. Enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBflipr\fR\fR
+.ad
+.RS 26n
+.rt  
+Reverse the effect of the \fBfo\fRllowup/\fBFo\fRllowup and
+\fBr\fReply/\fBR\fReply command pairs.  If both \fBflipr\fR and \fBreplyall\fR
+are set, the effect is as if neither was set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfrom\fR\fR
+.ad
+.RS 26n
+.rt  
+Extract the author listed in the header summary from the \fBFrom:\fR header
+instead of the UNIX \fBFrom\fR line. Enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfuzzymatch\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBfrom\fR command searches for messages from the indicated sender. By
+default, the full sender address must be specified. By setting this option,
+only a sub-string of the sender address need be specified. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBescape=\fR\fIc\fR\fR
+.ad
+.RS 26n
+.rt  
+Substitute \fIc\fR for the ~ escape character. Takes effect with next message
+sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfolder=\fR\fIdirectory\fR\fR
+.ad
+.RS 26n
+.rt  
+The directory for saving standard mail files. User-specified file names
+beginning with a plus (+) are expanded by preceding the file name with this
+directory name to obtain the real file name. If \fIdirectory\fR does not start
+with a slash (/), \fB$HOME\fR is prepended to it.  There is no default for the
+\fBfolder\fR variable. See also \fBoutfolder\fR below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBheader\fR\fR
+.ad
+.RS 26n
+.rt  
+Enable printing of the header summary when entering \fBmailx\fR. Enabled by
+default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhold\fR\fR
+.ad
+.RS 26n
+.rt  
+Preserve all messages that are read in the \fBmailbox\fR instead of putting
+them in the standard \fBmbox\fR save file. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignore\fR\fR
+.ad
+.RS 26n
+.rt  
+Ignore interrupts while entering messages. Handy for noisy dial-up lines.
+Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignoreeof\fR\fR
+.ad
+.RS 26n
+.rt  
+Ignore end-of-file during message input. Input must be terminated by a period
+(.) on a line by itself or by the \fB~.\fR command. See also \fBdot\fR above.
+Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBindentprefix=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+When \fBindentprefix\fR is set, \fIstring\fR is used to mark indented lines
+from messages included with \fB~m\fR. The default is a TAB character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeep\fR\fR
+.ad
+.RS 26n
+.rt  
+When the \fBmailbox\fR is empty, truncate it to zero length instead of removing
+it. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBiprompt=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+The specified prompt string is displayed before each line on input is requested
+when sending a message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeepsave\fR\fR
+.ad
+.RS 26n
+.rt  
+Keep messages that have been saved in other files in the \fBmailbox\fR instead
+of deleting them. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmakeremote\fR\fR
+.ad
+.RS 26n
+.rt  
+When replying to all recipients of a message, if an address does not include a
+machine name, it is assumed to be relative to the sender of the message.
+Normally not needed when dealing with hosts that support RFC822.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmetoo\fR\fR
+.ad
+.RS 26n
+.rt  
+If your login appears as a recipient, do not delete it from the list. Disabled
+by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmustbang\fR\fR
+.ad
+.RS 26n
+.rt  
+Force all mail addresses to be in bang format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBonehop\fR\fR
+.ad
+.RS 26n
+.rt  
+When responding to a message that was originally sent to several recipients,
+the other recipient addresses are normally forced to be relative to the
+originating author's machine for the response. This flag disables alteration of
+the recipients' addresses, improving efficiency in a network where all machines
+can send directly to all other machines (that is, one hop away). Disabled by
+default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutfolder\fR\fR
+.ad
+.RS 26n
+.rt  
+Locate the files used to record outgoing messages in the directory specified by
+the \fBfolder\fR variable unless the path name is absolute. Disabled by
+default. See \fBfolder\fR above and the \fBS\fRave, \fBC\fRopy, \fBfo\fRllowup,
+and \fBF\fRollowup commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpage\fR\fR
+.ad
+.RS 26n
+.rt  
+Used with the \fBpi\fRpe command to insert a form feed after each message sent
+through the pipe. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpipeignore\fR\fR
+.ad
+.RS 26n
+.rt  
+Omit ignored header when outputting to the \fBpipe\fR command. Although
+disabled by default,  \fBpipeignore\fR is frequently set in the system startup
+file. See \fBStarting Mail\fR in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpostmark\fR\fR
+.ad
+.RS 26n
+.rt  
+Your "real name" to be included in the From line of messages you send.  By
+default this is derived from the comment field in your \fBpasswd\fR(4) file
+entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprompt=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+Set the \fIcommand mode\fR prompt to \fIstring\fR. Default is "\fB? \fR",
+unless the \fBbsdcompat\fR variable is set, then the default is "\fB&\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBquiet\fR\fR
+.ad
+.RS 26n
+.rt  
+Refrain from printing the opening message and version when entering
+\fBmailx\fR. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrecord=\fR\fIfile\fR\fR
+.ad
+.RS 26n
+.rt  
+Record all outgoing mail in \fIfile\fR. Disabled by default. See also
+\fBoutfolder\fR above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreplyall\fR\fR
+.ad
+.RS 26n
+.rt  
+Reverse the effect of the \fBr\fReply and \fBR\fReply and \fBfo\fRllowup and
+\fBFo\fRllowup commands. Although set by default,  \fBreplayall\fR is
+frequently unset in the system startup file. See \fBflipr\fR and \fBStarting
+Mail\fR in USAGE above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreturnaddr=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+The default sender address is that of the current user. This variable can be
+used to set the sender address to any arbitrary value. Set with caution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsave\fR\fR
+.ad
+.RS 26n
+.rt  
+Enable saving of messages in \fBdead-letter\fR on interrupt or delivery error.
+See \fBDEAD\fR for a description of this file. Enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBscreen=\fR\fInumber\fR\fR
+.ad
+.RS 26n
+.rt  
+Sets the number of lines in a screen-full of headers for the \fBh\fReaders
+command. \fInumber\fR must be a positive number.
+.sp
+The default is set according to baud rate or window size. With a baud rate less
+than \fB1200\fR, \fInumber\fR defaults to \fB5\fR, if baud rate is exactly
+\fB1200\fR, it defaults to \fB10\fR. If you are in a window, \fInumber\fR
+defaults to the default window size minus 4. Otherwise, the default is
+\fB20\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsendmail=\fR\fIshell-command\fR\fR
+.ad
+.RS 26n
+.rt  
+Alternate command for delivering messages. \fBNote:\fR In addition to the
+expected list of recipients, \fBmail\fR also passes the \fB-i\fR and \fB-m\fR,
+flags to the command. Since these flags are not appropriate to other commands,
+you may have to use a shell script that strips them from the arguments list
+before invoking the desired command. Default is \fB/usr/bin/rmail\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsendwait\fR\fR
+.ad
+.RS 26n
+.rt  
+Wait for background mailer to finish before returning. Disabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshowname\fR\fR
+.ad
+.RS 26n
+.rt  
+Causes the message header display to show the sender's real name (if known)
+rather than their mail address. Disabled by default, but \fBshowname\fR is set
+in the \fB/etc/mail/mailx.rc\fR system startup file for \fBmailx\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshowto\fR\fR
+.ad
+.RS 26n
+.rt  
+When displaying the header summary and the message is from you, print the
+recipient's name instead of the author's name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsign=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+The variable inserted into the text of a message when the \fB~a\fR (autograph)
+command is given. No default (see also \fB~i\fR in \fBTilde Escapes\fR).
+.sp
+`
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSign=\fR\fIstring\fR\fR
+.ad
+.RS 26n
+.rt  
+The variable inserted into the text of a message when the \fB~A\fR command is
+given.  No default (see also \fB~i\fR in \fBTilde Escapes\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtoplines=\fR\fInumber\fR\fR
+.ad
+.RS 26n
+.rt  
+The number of lines of header to print with the \fBto\fRp command. Default is
+\fB5\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverbose\fR\fR
+.ad
+.RS 26n
+.rt  
+Invoke \fBsendmail\fR(1M) with the \fB-v\fR flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtranslate\fR\fR
+.ad
+.RS 26n
+.rt  
+The name of a program to translate mail addresses. The program receives mail
+addresses as arguments. The program produces, on the standard output, lines
+containing the following data, in this order:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the postmark for the sender (see the postmark variable)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+translated mail addresses, one per line, corresponding to the program's
+arguments.  Each translated address will replace the corresponding address in
+the mail message being sent.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a line containing only "y" or "n".  if the line contains "y" the user will be
+asked to confirm that the message should be sent.
+.RE
+The translate program will be invoked for each mail message to be sent. If the
+program exits with a non-zero exit status, or fails to produce enough output,
+the message is not sent.
+.RE
+
+.SS "Large File Behavior"
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBmailx\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBmailx\fR: \fBHOME\fR, \fBLANG\fR,
+\fBLC_CTYPE\fR, \fBLC_TIME\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, and
+\fBTERM\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEAD\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of the file in which to save partial letters in case of untimely
+interrupt. Default is \fB$HOME/dead.letter\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDITOR\fR\fR
+.ad
+.RS 14n
+.rt  
+The command to run when the \fBe\fRdit or \fB~e\fR command is used. Default is
+\fBed\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLISTER\fR\fR
+.ad
+.RS 14n
+.rt  
+The command (and options) to use when listing the contents of the \fBfolder\fR
+directory. The default is \fBls\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAIL\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of the initial mailbox file to read (in lieu of the standard system
+mailbox). The default is \fB/var/mail/\fIusername\fR .\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAILRC\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of the startup file.  Default is \fB$HOME/.mailrc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAILX_HEAD\fR\fR
+.ad
+.RS 14n
+.rt  
+The specified string is included at the beginning of the body of each message
+that is sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAILX_TAIL\fR\fR
+.ad
+.RS 14n
+.rt  
+The specified string is included at the end of the body of each message that is
+sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMBOX\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of the file to save messages which have been read. The \fBex\fRit
+command overrides this function, as does saving the message explicitly in
+another file.  Default is \fB$HOME/mbox\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAGER\fR\fR
+.ad
+.RS 14n
+.rt  
+The command to use as a filter for paginating output. This can also be used to
+specify the options to be used.  Default is \fBpg\fR(1), or if the
+\fBbsdcompat\fR variable is set, the default is \fBmore\fR(1). See \fBInternal
+Variables\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHELL\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of a preferred command interpreter. Default is \fBsh\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVISUAL\fR\fR
+.ad
+.RS 14n
+.rt  
+The name of a preferred screen editor.  Default is \fBvi\fR(1).
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+When the \fB-e\fR option is specified, the following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Mail was found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+Mail was not found or an error occurred.
+.RE
+
+.sp
+.LP
+Otherwise, the following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion. Notice that this status implies that all messages were
+\fBsent\fR, but it gives no assurances that any of them were actually
+\fBdelivered\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.mailrc\fR\fR
+.ad
+.sp .6
+.RS 4n
+ personal startup file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/mbox\fR\fR
+.ad
+.sp .6
+.RS 4n
+secondary storage file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.Maillock\fR\fR
+.ad
+.sp .6
+.RS 4n
+lock file to prevent multiple writers of system mailbox
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/mail/mailx.rc\fR\fR
+.ad
+.sp .6
+.RS 4n
+optional system startup file for \fBmailx\fR only
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/mail/Mail.rc\fR\fR
+.ad
+.sp .6
+.RS 4n
+BSD compatibility system-wide startup file for \fB/usr/ucb/mail\fR and
+\fB/usr/ucb/Mail\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/R[emqsx]*\fR\fR
+.ad
+.sp .6
+.RS 4n
+temporary files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/mailx/mailx.help*\fR\fR
+.ad
+.sp .6
+.RS 4n
+help message files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/mail/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+post office directory
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbiff\fR(1B), \fBecho\fR(1), \fBed\fR(1), \fBex\fR(1), \fBfmt\fR(1),
+\fBlp\fR(1), \fBls\fR(1), \fBmail\fR(1), \fBmail\fR(1B), \fBmailcompat\fR(1),
+\fBmore\fR(1), \fBpg\fR(1), \fBsh\fR(1), \fBuucp\fR(1C), \fBvacation\fR(1),
+\fBvi\fR(1), \fBnewaliases\fR(1M), \fBsendmail\fR(1M), \fBaliases\fR(4),
+\fBpasswd\fR(4), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Where \fIshell-command\fR is shown as valid, arguments are not always allowed.
+Experimentation is recommended.
+.sp
+.LP
+Internal variables imported from the execution environment cannot be
+\fBuns\fRet.
+.sp
+.LP
+The full internet addressing is not fully supported by \fBmailx\fR. The new
+standards need some time to settle down.
+.sp
+.LP
+Replies do not always generate correct return addresses.  Try resending the
+errant reply with \fBonehop\fR set.
+.sp
+.LP
+\fBmailx\fR does not lock your record file. So, if you use a record file and
+send two or more messages simultaneously, lines from the messages may be
+interleaved in the record file.
+.sp
+.LP
+The format for the \fBalias\fR command is a space-separated list of recipients,
+while the format for an alias in either the \fB\&.forward\fR or
+\fB/etc/aliases\fR is a comma-separated list.
+.sp
+.LP
+To read mail on a workstation running Solaris 1.\fIx\fR when your mail server
+is running Solaris 2.\fIx\fR, first execute the \fBmailcompat\fR(1) program.

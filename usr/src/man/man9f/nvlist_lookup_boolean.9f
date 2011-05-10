@@ -1,0 +1,412 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nvlist_lookup_boolean 9F "20 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+nvlist_lookup_boolean, nvlist_lookup_boolean_value, nvlist_lookup_byte,
+nvlist_lookup_int8, nvlist_lookup_int16, nvlist_lookup_int32,
+nvlist_lookup_int64, nvlist_lookup_uint8, nvlist_lookup_uint16,
+nvlist_lookup_uint32, nvlist_lookup_uint64, nvlist_lookup_string,
+nvlist_lookup_nvlist, nvlist_lookup_boolean_array, nvlist_lookup_byte_array,
+nvlist_lookup_int8_array, nvlist_lookup_int16_array, nvlist_lookup_int32_array,
+nvlist_lookup_int64_array, nvlist_lookup_uint8_array,
+nvlist_lookup_uint16_array, nvlist_lookup_uint32_array,
+nvlist_lookup_uint64_array, nvlist_lookup_string_array,
+nvlist_lookup_nvlist_array, nvlist_lookup_pairs \- match name and type
+indicated by the interface name and retrieve data value
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/nvpair.h> 
+
+\fBint\fR \fBnvlist_lookup_boolean\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_boolean_value\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBboolean_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_byte\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuchar_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int8\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint8_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint8\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint8_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int16\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint16_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint16\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint16_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int32\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint32_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint32\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint32_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int64\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint64_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint64\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint64_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_string\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBchar **\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_nvlist\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBnvlist_t **\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_boolean_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBboolean_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_byte_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuchar_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint8_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint8_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int16_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint16_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint16_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint16_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int32_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint32_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint32_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint32_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_int64_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBint64_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_uint64_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBuint64_t **\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_string_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBchar  ***\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_nvlist_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+     \fBnvlist_t ***\fR\fIval\fR, \fBuint_t *\fR\fInelem\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnvlist_lookup_pairs\fR(\fBnvlist_t *\fR\fInvl\fR, \fBint\fR \fIflag, ...\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInvl\fR\fR
+.ad
+.RS 9n
+.rt  
+The list of name-value pairs (\fBnvlist_t\fR) to be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 9n
+.rt  
+Name of the name-value pair (\fBnvpair\fR) to search.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInelem\fR\fR
+.ad
+.RS 9n
+.rt  
+Address to store the number of elements in value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIval\fR\fR
+.ad
+.RS 9n
+.rt  
+Address to store the value or starting address of the array value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 9n
+.rt  
+Specify bit fields defining lookup behavior:
+.sp
+.ne 2
+.mk
+.na
+\fBNV_FLAG_NOENTOK\fR
+.ad
+.RS 19n
+.rt  
+The retrival function will not fail if no matching name-value pair is found.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions find the \fBnvpair\fR that matches the name and type as
+indicated by the interface name. If one is found, \fInelem\fR and \fIval\fR are
+modified to contain the number of elements in value and the starting address of
+data, respectively.
+.sp
+.LP
+These interfaces work for \fBnvlist_t\fR allocated with \fBNV_UNIQUE_NAME\fR or
+\fBNV_UNIQUE_NAME_TYPE\fR specified in \fBnvlist_alloc()\fR. See
+\fBnvlist_alloc\fR(9F). If this is not the case, the interface will return
+\fBENOTSUP\fR because the list potentially contains multiple \fBnvpair\fRs with
+the same name and type.
+.sp
+.LP
+Multiple threads can simultaneously read the same \fBnvlist_t\fR but only one
+thread should actively change a given \fBnvlist_t\fR at a time. The caller is
+responsible for the synchronization.
+.sp
+.LP
+All memory required for storing the array elements, including string values,
+are managed by the library. References to such data remain valid until
+\fBnvlist_free()\fR is called on \fInvl\fR.
+.sp
+.LP
+The \fBnvlist_lookup_pairs()\fR function retrieves a set of \fBnvpair\fRs. The
+arguments are a null-terminated list of pairs (data type
+\fBDATA_TYPE_BOOLEAN\fR), triples (non-array data types) or quads (array data
+types). As shown below, the interpretation of the arguments depends on the
+value of \fItype\fR. See \fBnvpair_type\fR(9F).
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 9n
+.rt  
+Name of the name-value pair to search.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 9n
+.rt  
+Data type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIval\fR\fR
+.ad
+.RS 9n
+.rt  
+Address to store the starting address of the value. When using data type
+\fBDATA_TYPE_BOOLEAN\fR, the \fIval\fR argument is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInelem\fR\fR
+.ad
+.RS 9n
+.rt  
+Address to store the number of elements in value. Non-array data types have
+only one argument and \fInelem\fR is ignored.
+.RE
+
+.sp
+.LP
+The argument order is \fIname\fR, \fItype\fR, [\fIval\fR], [\fInelem\fR].
+.sp
+.LP
+When using \fBNV_FLAG_NOENTOK\fR and no matching name-value pair is found, the
+memory pointed to by \fIval\fR and \fInelem\fR is not touched.
+.sp
+.LP
+These functions return \fB0\fR on success and an error value on failure.
+.SH ERRORS
+.sp
+.LP
+These functions fail under the following conditions.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 11n
+.rt  
+Success
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 11n
+.rt  
+No matching name-value pair found
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+Encode/decode method not supported
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnvlist_alloc\fR(9F), \fBnvpair_type\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

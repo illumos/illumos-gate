@@ -87,8 +87,8 @@ LDLIBS += \
 	-luutil
 
 LDLIBS_i386 +=	-lgrubmgmt
-LDLIBS +=	$(LDLIBS_$(MACH)) -L $(ROOT)/usr/lib/fm -lfmevent
-LDFLAGS +=	-R /usr/lib/fm
+LDLIBS +=	$(LDLIBS_$(MACH)) -L $(ROOT)/lib/fm -lfmevent
+LDFLAGS +=	-R /lib/fm
 
 FILEMODE = 0555
 

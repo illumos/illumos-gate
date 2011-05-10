@@ -1,0 +1,57 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceRefSockFD 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceRefSockFD \- access underlying UNIX domain socket descriptor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceRefSockFD\fR(\fBDNSServiceRef\fR *\fIsdRef\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Access the underlying UNIX\u\s-2TM\s+2\d domain socket from the initialized
+\fBDNSServiceRef\fR returned from \fBDNS\fR Service calls. Applications should
+only access the underlying UNIX domain socket to poll for results from the
+\fBmDNS\fR daemon. Applications should not directly read or write to the
+socket. When results are available, applications should call
+\fBDNSServiceProcessResult()\fR. The application is responsible for processing
+the data on the socket in a timely fashion. The daemon can terminate its
+connection with a client that does not clear its socket buffer.
+.SH RETURN VALUES
+.sp
+.LP
+The underlying UNIX domain socket descriptor of the \fBDNSServiceRef\fR or
+\fB-1\fR is returned in case of error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceBrowse\fR(3DNS_SD), \fBDNSServiceRegister\fR(3DNS_SD),
+\fBattributes\fR(5)

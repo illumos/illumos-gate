@@ -1,0 +1,261 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1992, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ckyorn 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+ckyorn, erryorn, helpyorn, valyorn \- prompts for and validates yes/no
+.SH SYNOPSIS
+.LP
+.nf
+\fBckyorn\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] [\fB-e\fR \fIerror\fR] 
+     [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/erryorn\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/helpyorn\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/valyorn\fR \fIinput\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBckyorn\fR prompts a user and validates the response. It defines, among other
+things, a prompt message for a yes or no answer, text for help and error
+messages, and a default value (which is returned if the user responds with a
+RETURN).
+.sp
+.LP
+All messages are limited in length to 70 characters and are formatted
+automatically. Any white space used in the definition (including newline) is
+stripped. The \fB-W\fR option cancels the automatic formatting. When a tilde is
+placed at the beginning or end of a message definition, the default text is
+inserted at that point, allowing both custom text and the default text to be
+displayed.
+.sp
+.LP
+If the prompt, help or error message is not defined, the default message (as
+defined under \fBNOTES\fR) is displayed.
+.sp
+.LP
+Three visual tool modules are linked to the \fBckyorn\fR command. They are
+\fBerryorn\fR (which formats and displays an error message), \fBhelpyorn\fR
+(which formats and displays a help message), and \fBvalyorn\fR (which validates
+a response). These modules should be used in conjunction with  \fBFACE\fR
+objects. In this instance, the  \fBFACE\fR object defines the prompt.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI default\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the default value as \fIdefault\fR. The default is not validated and so
+does not have to meet any criteria.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIerror\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the error message as \fIerror\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fIhelp\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the help messages as \fIhelp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fI pid\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
+chooses to abort.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI prompt\fR\fR
+.ad
+.RS 14n
+.rt  
+Defines the prompt message as \fIprompt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Q\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that quit will not be allowed as a valid response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIsignal\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
+is to be sent signal \fIsignal\fR when quit is chosen. If no signal is
+specified, \fBSIGTERM\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR\fI width\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies that prompt, help and error messages will be formatted to a line
+length of \fIwidth\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput\fR\fR
+.ad
+.RS 9n
+.rt  
+Input to be verified as \fBy\fR, \fByes\fR, or \fBn\fR, \fBno\fR (in any
+combination of upper- and lower-case letters).
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+\fBEOF\fR on input, or negative width on  \fB-W\fR option,  or usage error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Usage error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+User termination (quit).
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The default prompt for \fBckyorn\fR is:
+.sp
+.in +2
+.nf
+Yes or No [y,n,?,q]:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default error message is:
+.sp
+.in +2
+.nf
+ERROR - Please enter yes or no.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default help message is:
+.sp
+.in +2
+.nf
+To respond in the affirmative, enter y, yes, Y, or YES.
+To respond in the negative, enter n, no, N, or NO.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When the quit option is chosen (and allowed), \fBq\fR is returned along with
+the return code \fB3\fR. The \fBvalyorn\fR module will not produce any output.
+It returns  \fB0\fR for success and non-zero for failure.

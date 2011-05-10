@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree_post_event 3PICLTREE "1 Aug 2000" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+ptree_post_event \- post a PICL event
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicltree\fR [ \fIlibrary\fR... ]
+#include <picltree.h>
+
+\fBint\fR \fBptree_post_event\fR(\fBconst char *\fR\fIename\fR, \fBconst void *\fR\fIearg\fR,
+     \fBsize_t\fR \fIsize\fR, \fBvoid (*\fR\fIcompletion_handler\fR)(char *\fIename\fR,
+     \fBvoid *\fR\fIearg\fR, \fBsize_t\fR \fIsize\fR));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree_post_event()\fR function posts the specified event and its
+arguments to the PICL framework. The argument \fIename\fR specifies a pointer
+to a string containing the name of the PICL event. The arguments \fIearg\fR and
+\fIsize\fR specify a pointer to a buffer containing the event arguments and
+size of that buffer, respectively. The argument \fIcompletion_handler\fR
+specifies the completion handler to be called after the event has been
+dispatched to all handlers. A \fINULL\fR value for a completion handler
+indicates that no handler should be called. The PICL framework invokes the
+completion handler of an event with the \fIename\fR, \fIearg\fR, and \fIsize\fR
+arguments specified at the time of the posting of the event.
+.sp
+.LP
+PICL events are dispatched in the order in which they were posted. They are
+dispatched by executing the handlers registered for that event.  The handlers
+are invoked in the order in which they were registered.
+.sp
+.LP
+New events will not begin execution until all previous events have finished
+execution. Specifically, an event posted from an event handler will not begin
+execution until the current event has finished execution.
+.sp
+.LP
+The caller may not reuse or reclaim the resources associated with the event
+name and arguments until the invocation of the completion handler.  The
+completion handlers are normally used to reclaim any resources allocated for
+the posting of an event.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a non-negative
+integer is returned to indicate an error, the event is not posted, and the
+completion handler is not invoked.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDARG\fR\fR
+.ad
+.RS 19n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 19n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBptree_register_handler\fR(3PICLTREE),
+\fBptree_unregister_handler\fR(3PICLTREE), \fBattributes\fR(5)

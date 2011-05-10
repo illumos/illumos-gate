@@ -1,0 +1,334 @@
+'\" te
+.\"  Copyright 2003 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH close 9E "24 Apr 2008" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+close \- relinquish access to a device
+.SH SYNOPSIS
+.SS "Block and Character"
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBclose\fR(\fBdev_t\fR \fIdev\fR, \fBint\fR \fIflag\fR, \fBint\fR \fIotyp\fR, \fBcred_t *\fR\fIcred_p\fR);
+.fi
+
+.SS "STREAMS"
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBclose\fR(\fBqueue_t *\fR\fIq\fR, \fBint\fR \fIflag\fR, \fBcred_t *\fR\fIcred_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is \fIrequired\fR
+for block devices.
+.SH PARAMETERS
+.SS "Block and Character"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 11n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 11n
+.rt  
+File status flag, as set by the  \fBopen\fR(2) or modified by the
+\fBfcntl\fR(2) system calls. The flag is for information only\(emthe file
+should always be closed completely. Possible values are:   \fBFEXCL\fR,
+\fBFNDELAY\fR, \fBFREAD,\fR \fBFKLYR,\fR and  \fBFWRITE\fR. Refer to
+\fBopen\fR(9E) for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIotyp\fR\fR
+.ad
+.RS 11n
+.rt  
+Parameter supplied so that the driver can determine how many times a device was
+opened and for what reasons.  The flags assume the  \fBopen()\fR routine may be
+called many times, but the  \fBclose()\fR routine should only be called on the
+last  \fBclose()\fR of a device.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOTYP_BLK\fR\fR
+.ad
+.RS 12n
+.rt  
+Close was through block interface for the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOTYP_CHR\fR\fR
+.ad
+.RS 12n
+.rt  
+Close was through the raw/character interface for the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOTYP_LYR\fR\fR
+.ad
+.RS 12n
+.rt  
+Close a layered process (a higher-level driver called the \fBclose()\fR routine
+of the device).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fI*cred_p\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to the  user credential structure.
+.RE
+
+.SS "STREAMS"
+.sp
+.ne 2
+.mk
+.na
+\fB\fI*q\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to  \fBqueue\fR(9S) structure used to reference the read side of the
+driver.  (A queue is the central node of a collection of structures and
+routines pointed to by a queue.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 11n
+.rt  
+File status flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fI*cred_p\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to the  user credential structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+For STREAMS drivers, the  \fBclose()\fR routine is called by the kernel through
+the  \fBcb_ops\fR(9S) table entry for the device. (Modules use the \fBfmodsw\fR
+table.) A non-null value in the  \fBd_str\fR field of the  \fBcb_ops\fR entry
+points to a  \fBstreamtab\fR structure, which points to a \fBqinit\fR(9S)
+containing a pointer to the  \fBclose()\fR routine. Non-STREAMS  \fBclose()\fR
+routines are called directly from the  \fBcb_ops\fR table.
+.sp
+.LP
+\fBclose()\fR ends the connection between the user process and the device, and
+prepares the device (hardware and software) so that it is ready to be opened
+again.
+.sp
+.LP
+A device may be opened simultaneously by multiple processes and the
+\fBopen()\fR driver routine is called for each open. For all \fIotyp\fR values
+other than \fBOTYP_LYR\fR, the kernel calls the \fBclose()\fR routine when the
+last-reference occurs. For \fBOTYP_LYR\fR each close operation will call the
+driver.
+.sp
+.LP
+Kernel accounting for last-reference occurs at (\fIdev\fR, \fIotyp\fR)
+granularity.  Note that a device is referenced once its associated
+\fBopen\fR(9E) routine is entered, and thus \fBopen\fR(9E)'s  which have not
+yet completed will prevent \fBclose()\fR from  being called.  The driver's
+\fBclose()\fR call associated with the  last-reference going away is typically
+issued as result of a \fBclose\fR(2), \fBexit\fR(2), \fBmunmap\fR(2), or
+\fBumount\fR(2). However, a failed \fBopen\fR(9E) call can cause this
+last-reference \fBclose()\fR call to be issued as a result of an \fBopen\fR(2)
+or \fBmount\fR(2).
+.sp
+.LP
+The kernel provides \fBopen()\fR \fBclose()\fR exclusion guarantees to the
+driver at the same \fIdevp\fR, \fIotyp\fR granularity as last-reference
+accounting. The kernel delays new calls to the  \fBopen()\fR driver routine
+while the last-reference \fBclose()\fR call is executing. For example, a driver
+that blocks in \fBclose()\fR will not see new  calls to \fBopen()\fR until it
+returns from \fBclose()\fR.  This effectively delays invocation of other
+\fBcb_ops\fR(9S) driver entry points that also depend on an \fBopen\fR(9E)
+established device reference. If the driver has indicated that an \fBEINTR\fR
+return is safe via the \fBD_OPEN_RETURNS_EINTR\fR \fBcb_flag\fR, then a delayed
+\fBopen()\fR may be interrupted by a signal, resulting in an \fBEINTR\fR return
+from \fBopen()\fR prior to calling \fBopen\fR(9E).
+.sp
+.LP
+Last-reference accounting and \fBopen()\fR \fBclose()\fR exclusion typically
+simplify driver writing. In some cases, however, they might be an impediment
+for certain types of drivers. To overcome any impediment, the driver can change
+minor numbers in \fBopen\fR(9E), as described below, or implement multiple
+minor nodes for the same device. Both techniques give the driver control over
+when \fBclose()\fR calls occur and whether additional \fBopen()\fR calls will
+be delayed while \fBclose()\fR is executing.
+.sp
+.LP
+In general, a  \fBclose()\fR routine should always check the validity of the
+minor number component of the  \fIdev\fR parameter.  The routine should also
+check permissions as necessary, by using the user credential structure (if
+pertinent), and the appropriateness of the  \fIflag\fR and  \fIotyp\fR
+parameter values.
+.sp
+.LP
+\fBclose()\fR could perform any of the following general functions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+disable interrupts
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+hang up phone lines
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+rewind a tape
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+deallocate buffers from a private buffering scheme
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+unlock an unsharable device (that was locked in the  \fBopen()\fR routine)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+flush buffers
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+notify a device of the close
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+deallocate any resources allocated on open
+.RE
+.sp
+.LP
+The  \fBclose()\fR routines of STREAMS drivers and modules are called when a
+stream is dismantled or a module popped. The steps for dismantling a stream are
+performed in the following order. First, any multiplexor links present are
+unlinked and the  lower streams are closed. Next, the following steps are
+performed for each module or driver on the stream, starting at the head and
+working toward the tail:
+.RS +4
+.TP
+1.
+The write queue is given a chance to drain.
+.RE
+.RS +4
+.TP
+2.
+The  \fBclose()\fR routine is called.
+.RE
+.RS +4
+.TP
+3.
+The module or driver is removed from the stream.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+\fBclose()\fR should return \fB0\fR for success, or the appropriate error
+number. Return errors rarely occur, but if a failure is detected, the driver
+should decide whether the severity of the problem warrants either displaying a
+message on the console or, in worst cases, triggering a system panic.
+Generally, a failure in a  \fBclose()\fR routine occurs because a problem
+occurred in the associated device.
+.SH NOTES
+.sp
+.LP
+If you use \fBqwait_sig\fR(9F), \fBcv_wait_sig\fR(9F) or
+\fBcv_timedwait_sig\fR(9F), you should note that \fBclose()\fR may be called in
+contexts in which signals cannot be received. The \fBddi_can_receive_sig\fR(9F)
+function is  provided to determine when this hazard exists.
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBfcntl\fR(2), \fBopen\fR(2), \fBumount\fR(2),
+\fBdetach\fR(9E), \fBopen\fR(9E), \fBddi_can_receive_sig\fR(9F),
+\fBcb_ops\fR(9S), \fBqinit\fR(9S), \fBqueue\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

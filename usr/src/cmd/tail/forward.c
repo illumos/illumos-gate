@@ -33,9 +33,7 @@
 /*
  * Solaris porting notes:  the original FreeBSD version made use of the
  *                         BSD kqueue event notification framework; this
- *                         was changed to use the Solaris event completion
- *                         framework: port_create(), port_associate(),
- *                         and port_get().
+ *                         was changed to use usleep()
  */
 
 #include <sys/param.h>
@@ -65,12 +63,9 @@ static void set_events(file_info_t *files);
 
 /* defines for inner loop actions */
 #define	USE_SLEEP	0
-#define	USE_PORT	1
 #define	ADD_EVENTS	2
 
-int port;
 int action = USE_SLEEP;
-port_event_t ev;
 
 static const file_info_t *last;
 
@@ -271,17 +266,11 @@ set_events(file_info_t *files)
 	int i;
 	file_info_t *file;
 
-	action = USE_PORT;
 	for (i = 0, file = files; i < no_files; i++, file++) {
 		if (! file->fp)
 			continue;
 
 		(void) fstat(fileno(file->fp), &file->st);
-		/* For -f or -F will both use Solaris port interface */
-		if (fflag && (fileno(file->fp) != STDIN_FILENO)) {
-			(void) port_associate(port, PORT_SOURCE_FD,
-			    fileno(file->fp), POLLIN, (void*)file);
-		}
 	}
 }
 
@@ -295,7 +284,6 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 	int active, ev_change, i, n = -1;
 	struct stat sb2;
 	file_info_t *file;
-	struct timespec ts;
 
 	/* Position each of the files */
 
@@ -319,7 +307,6 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 		return;
 
 	last = --file;
-	port = port_create();
 	set_events(files);
 
 	for (;;) {
@@ -374,21 +361,6 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 			set_events(files);
 
 		switch (action) {
-		case USE_PORT:
-			ts.tv_sec = 1;
-			ts.tv_nsec = 0;
-			/*
-			 * In the -F case we set a timeout to ensure that
-			 * we re-stat the file at least once every second.
-			 */
-			n = port_get(port, &ev, Fflag? &ts : NULL);
-			if (n == 0) {
-				file = (file_info_t *)ev.portev_user;
-				(void) port_associate(port, PORT_SOURCE_FD,
-				    fileno(file->fp), POLLIN, (void*)file);
-			}
-			break;
-
 		case USE_SLEEP:
 			(void) usleep(250000);
 			break;

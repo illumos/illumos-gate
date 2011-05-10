@@ -61,6 +61,15 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_util.h
 usr/src/cmd/krb5/slave/kprop.c
 usr/src/cmd/krb5/slave/kprop.h
 usr/src/cmd/krb5/slave/kpropd.c
+usr/src/common/bzip2/bzlib.h
+usr/src/common/bzip2/crctable.c
+usr/src/common/bzip2/randtable.c
+usr/src/common/bzip2/blocksort.c
+usr/src/common/bzip2/compress.c
+usr/src/common/bzip2/bzlib.c
+usr/src/common/bzip2/decompress.c
+usr/src/common/bzip2/bzlib_private.h
+usr/src/common/bzip2/huffman.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
 usr/src/lib/gss_mechs/mech_krb5/crypto/aes/aes_s2k.c

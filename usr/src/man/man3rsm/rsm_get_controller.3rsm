@@ -1,0 +1,152 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_get_controller 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_get_controller, rsm_get_controller_attr, rsm_release_controller \- get or
+release a controller handle
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_get_controller\fR(\fBchar *\fR\fIname\fR,
+     \fBrsmapi_controller_handle_t *\fR\fIcontroller\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_get_controller_attr\fR(\fBrsmapi_controller_handle_t\fR \fIchdl\fR,
+     \fBrsmapi_controller_attr_t *\fR\fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_release_controller\fR(\fBrsmapi_controller_handle_t\fR \fIchdl\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The controller functions provide mechanisms for obtaining access to a
+controller, determining the characteristics of the controller, and releasing
+the controller.
+.sp
+.LP
+The  \fBrsm_get_controller()\fR function acquires a controller handle through
+the \fIcontroller\fR argument.  The \fIname\fR argument is the specific
+controller instance (for example, "sci0" or "loopback"). This controller handle
+is used for subsequent RSMAPI calls.
+.sp
+.LP
+The \fBrsm_get_controller_attr()\fR function obtains a controller's attributes
+through the \fIattr\fR argument. The \fIchdl\fR argument is the controller
+handle obtained by the   \fBrsm_get_controller()\fR call. The attribute
+structure is defined in the <\fBrsmapi\fR> header.
+.sp
+.LP
+The  \fBrsm_release_controller()\fR function releases the resources associated
+with the controller identified by the controller handle \fIchdl\fR, obtained by
+calling  \fBrsm_get_controller()\fR. Each \fBrsm_release_controller()\fR call
+must have a corresponding \fBrsm_get_controller()\fR call. It is illegal to
+access a controller or segments exported or imported using a released
+controller.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_get_controller()\fR, \fBrsm_get_controller_attr()\fR, and
+\fBrsm_release_controller()\fR functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
+.ad
+.RS 25n
+.rt  
+Invalid controller handle.
+.RE
+
+.sp
+.LP
+The \fBrsm_get_controller()\fR and  \fBrsm_get_controller_attr()\fR functions
+can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.RS 20n
+.rt  
+Bad address.
+.RE
+
+.sp
+.LP
+The  \fBrsm_get_controller()\fR function can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_CTLR_NOT_PRESENT\fR \fR
+.ad
+.sp .6
+.RS 4n
+Controller not present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_LIBRARY_VERSION\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid library version.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_memseg_export_create\fR(3RSM), \fBrsm_memseg_import_connect\fR(3RSM),
+\fBattributes\fR(5)

@@ -1,0 +1,332 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_setup 9F "22 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+devmap_setup, ddi_devmap_segmap \- set up a user mapping to device memory using
+the devmap framework
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBdevmap_setup\fR(\fBdev_t\fR \fIdev\fR, \fBoffset_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR, 
+     \fBcaddr_t *\fR\fIaddrp\fR, \fBsize_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR, 
+     \fBuint_t\fR \fIflags\fR, \fBcred_t *\fR\fIcred\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_devmap_segmap\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR, 
+     \fBcaddr_t *\fR\fIaddrp\fR, \fBoff_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR, 
+     \fBuint_t\fR \fIflags\fR, \fBcred_t *\fR\fIcred\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 12n
+.rt  
+Device whose memory is to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 12n
+.rt  
+User offset within the logical device memory at which the mapping begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIas\fR \fR
+.ad
+.RS 12n
+.rt  
+An opaque data structure that describes the address space into which the device
+memory should be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddrp\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to the starting address in the address space into which the device
+memory should be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 12n
+.rt  
+Length (in bytes) of the memory to be mapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprot\fR \fR
+.ad
+.RS 12n
+.rt  
+A bit field that specifies the protections. Some possible settings combinations
+are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_READ\fR \fR
+.ad
+.RS 15n
+.rt  
+Read access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_WRITE\fR \fR
+.ad
+.RS 15n
+.rt  
+Write access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_EXEC\fR \fR
+.ad
+.RS 15n
+.rt  
+Execute access is desired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_USER\fR \fR
+.ad
+.RS 15n
+.rt  
+User-level access is desired (the mapping is being done as a result of a
+\fBmmap\fR(2) system call).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROT_ALL\fR \fR
+.ad
+.RS 15n
+.rt  
+All access is desired.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImaxprot\fR \fR
+.ad
+.RS 12n
+.rt  
+Maximum protection flag possible for attempted mapping; the \fBPROT_WRITE\fR
+bit may be masked out if the user opened the special file read-only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR \fR
+.ad
+.RS 12n
+.rt  
+Flags indicating type of mapping. The following flags can be specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_PRIVATE\fR \fR
+.ad
+.RS 16n
+.rt  
+Changes are private.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_SHARED\fR \fR
+.ad
+.RS 16n
+.rt  
+Changes should be shared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAP_FIXED\fR \fR
+.ad
+.RS 16n
+.rt  
+The user specified an address in  \fI*addrp\fR rather than letting the system
+choose an address.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcred\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to the user credential structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdevmap_setup()\fR and \fBddi_devmap_segmap()\fR allow device drivers to use
+the devmap framework to set up user mappings to device memory.  The devmap
+framework provides several advantages over the default device mapping framework
+that is used by \fBddi_segmap\fR(9F) or \fBddi_segmap_setup\fR(9F). Device
+drivers should use the devmap framework, if the driver wants to:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+use an optimal MMU pagesize to minimize address translations,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+conserve kernel resources,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+receive callbacks to manage events on the mapping,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+export kernel memory to applications,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+set up device contexts for the user mapping if the device requires context
+switching,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+assign device access attributes to the user mapping, or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+change the maximum protection for the mapping.
+.RE
+.sp
+.LP
+\fBdevmap_setup()\fR must be called in the \fBsegmap\fR(9E) entry point to
+establish the mapping for the application. \fBddi_devmap_segmap()\fR can be
+called in, or be used as, the \fBsegmap\fR(9E) entry point. The differences
+between  \fBdevmap_setup()\fR and \fBddi_devmap_segmap()\fR are in the data
+type used for \fIoff\fR and \fIlen\fR.
+.sp
+.LP
+When setting up the mapping,  \fBdevmap_setup()\fR and
+\fBddi_devmap_segmap()\fR call the \fBdevmap\fR(9E) entry point to validate the
+range to be mapped. The \fBdevmap\fR(9E) entry point also translates the
+logical offset (as seen by the application) to the corresponding physical
+offset within the device address space. If the driver does not provide its own
+\fBdevmap\fR(9E) entry point, \fBEINVAL\fR will be returned to the
+\fBmmap\fR(2) system call.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.  The return value of \fBdevmap_setup()\fR and
+\fBddi_devmap_segmap()\fR should be used directly in the  \fBsegmap\fR(9E)
+entry point.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBdevmap_setup()\fR and \fBddi_devmap_segmap()\fR can be called from user or
+kernel context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBdevmap\fR(9E), \fBsegmap\fR(9E), \fBddi_segmap\fR(9F),
+\fBddi_segmap_setup\fR(9F), \fBcb_ops\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

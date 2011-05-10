@@ -1,0 +1,205 @@
+'\" te
+.\"  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_unload 9F "22 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+devmap_unload, devmap_load \- control validation of memory address translations
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBdevmap_load\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, 
+     \fBuint_t\fR \fItype\fR, \fBuint_t\fR \fIrw\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdevmap_unload\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdhp\fR \fR
+.ad
+.RS 8n
+.rt  
+An opaque mapping handle that the system uses to describe the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 8n
+.rt  
+User offset within the logical device memory at which the loading or unloading
+of the address translations begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 8n
+.rt  
+Length (in bytes) of the range being affected.
+.RE
+
+.SS "devmap_load() only"
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR \fR
+.ad
+.RS 9n
+.rt  
+Type of access operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 9n
+.rt  
+Direction of access.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdevmap_unload()\fR and \fBdevmap_load()\fR are used to control the
+validation of the memory mapping described by \fIdhp\fR in the specified range.
+\fBdevmap_unload()\fR invalidates the mapping translations and will generate
+calls to the \fBdevmap_access\fR(9E) entry point next time the mapping is
+accessed. The drivers use \fBdevmap_load()\fR to validate the mapping
+translations during memory access.
+.sp
+.LP
+A typical use of \fBdevmap_unload()\fR and \fBdevmap_load()\fR is in the
+driver's context management callback function, \fBdevmap_contextmgt\fR(9E). To
+manage a device context, a device driver calls \fBdevmap_unload()\fR on the
+context about to be switched out. It switches contexts, and then calls
+\fBdevmap_load()\fR on the context switched in.   \fBdevmap_unload()\fR can be
+used to unload the mappings of other processes as well as the mappings of the
+calling process, but \fBdevmap_load()\fR can only be used to load the mappings
+of the calling process. Attempting to load another process's mappings with
+\fBdevmap_load()\fR will result in a system panic.
+.sp
+.LP
+For both routines, the range to be affected is defined by the \fIoff\fR and
+\fIlen\fR arguments. Requests affect the entire page containing the \fIoff\fR
+and all pages up to and including the page containing the last byte as
+indicated by \fIoff + len\fR. The arguments \fItype\fR and \fIrw\fR are
+provided by the system to the calling function (for example,
+\fBdevmap_contextmgt\fR(9E)) and should not be modified.
+.sp
+.LP
+Supplying a value of  \fB0\fR for the \fIlen\fR argument affects all addresses
+from the \fIoff\fR to the end of the mapping.  Supplying a value of \fB0\fR for
+the \fIoff\fR argument and a value of \fB0\fR for \fIlen\fR argument affect all
+addresses in the mapping.
+.sp
+.LP
+A non-zero return value from either \fBdevmap_unload()\fR or
+\fBdevmap_load()\fR will cause the corresponding operation to fail. The failure
+may result in a \fBSIGSEGV\fR or \fBSIGBUS\fR signal being delivered to the
+process.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These routines can be called from user or kernel context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRManaging a One-Page Device Context
+.sp
+.LP
+The following shows an example of managing a device context that is one page in
+length.
+
+.sp
+.in +2
+.nf
+struct xx_context cur_ctx;
+
+static int
+xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
+   size_t len, uint_t type, uint_t rw)
+{
+    int err;
+    devmap_cookie_t cur_dhp;
+    struct xx_pvt *p;
+    struct xx_pvt *pvp = (struct xx_pvt *)pvtp;
+    /* enable access callbacks for the current mapping */
+    if (cur_ctx != NULL && cur_ctx != pvp->ctx) {
+        p = cur_ctx->pvt;
+        /*
+         * unload the region from off to the end of the mapping. 
+         */
+        cur_dhp = p->dhp;
+        if ((err = devmap_unload(cur_dhp, off, len)) != 0)
+            return (err);
+    }
+    /* Switch device context - device dependent*/
+    ...
+    /* Make handle the new current mapping */
+    cur_ctx = pvp->ctx;
+    /*
+     * Disable callbacks and complete the access for the
+     * mapping that generated this callback.
+     */
+    return (devmap_load(pvp->dhp, off, len, type, rw));
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdevmap_access\fR(9E), \fBdevmap_contextmgt\fR(9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR

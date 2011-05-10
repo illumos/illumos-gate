@@ -1486,7 +1486,7 @@ main(int argc, char **argv)
 	    ((opts.o_outpmode & (OPT_PSINFO | OPT_MSACCT))))
 		Die(gettext("-t option cannot be used with -v or -m\n"));
 
-	if ((opts.o_outpmode & OPT_SPLIT) && (opts.o_outpmode && OPT_USERS) &&
+	if ((opts.o_outpmode & OPT_SPLIT) && (opts.o_outpmode & OPT_USERS) &&
 	    !((opts.o_outpmode & (OPT_PSINFO | OPT_MSACCT))))
 		Die(gettext("-t option cannot be used with "
 		    "-a, -J, -T or -Z\n"));

@@ -1,0 +1,303 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH poll 2 "23 Aug 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+poll \- input/output multiplexing
+.SH SYNOPSIS
+.LP
+.nf
+#include <poll.h>
+
+\fBint\fR \fBpoll\fR(\fBstruct pollfd\fR \fIfds[]\fR, \fBnfds_t\fR \fInfds\fR, \fBint\fR \fItimeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpoll()\fR function provides applications with a mechanism for
+multiplexing input/output over a set of file descriptors.  For each member of
+the array pointed to by \fIfds\fR, \fBpoll()\fR examines the given file
+descriptor for the event(s) specified in \fIevents\fR. The number of
+\fBpollfd\fR structures in the \fIfds\fR array is specified by \fInfds\fR. The
+\fBpoll()\fR function identifies those file descriptors on which an application
+can read or write data, or on which certain events have occurred.
+.sp
+.LP
+The \fIfds\fR argument specifies the file descriptors to be examined and the
+events of interest for each file descriptor.  It is a pointer to an array with
+one member for each open file descriptor of interest.  The array's members are
+\fBpollfd\fR structures, which contain the following members:
+.sp
+.in +2
+.nf
+int     fd;        /* file descriptor */
+short   events;    /* requested events */
+short   revents;   /* returned events */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfd\fR member specifies an open file descriptor and the \fBevents\fR and
+\fBrevents\fR members are bitmasks constructed by a logical \fBOR\fR operation
+of any combination of the following event flags:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Data other than high priority data may be read without blocking. For streams,
+this flag is set in \fBrevents\fR even if the message is of zero length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLRDNORM\fR\fR
+.ad
+.RS 14n
+.rt  
+Normal data (priority band equals 0) may be read without blocking. For streams,
+this flag is set in \fBrevents\fR even if the message is of zero length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLRDBAND\fR\fR
+.ad
+.RS 14n
+.rt  
+Data from a non-zero priority band may be read without blocking. For streams,
+this flag is set in \fBrevents\fR even if the message is of zero length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLPRI\fR\fR
+.ad
+.RS 14n
+.rt  
+High priority data may be received without blocking. For streams, this flag is
+set in \fBrevents\fR even if the message is of zero length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLOUT\fR\fR
+.ad
+.RS 14n
+.rt  
+Normal data (priority band equals 0) may be written without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLWRNORM\fR\fR
+.ad
+.RS 14n
+.rt  
+The same as  \fBPOLLOUT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLWRBAND\fR\fR
+.ad
+.RS 14n
+.rt  
+Priority data (priority band > 0) may be written.  This event only examines
+bands that have been written to at least once.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLERR\fR\fR
+.ad
+.RS 14n
+.rt  
+An error has occurred on the device or stream.  This flag is only valid in the
+\fBrevents\fR bitmask; it is not used in the \fBevents\fR member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLHUP\fR\fR
+.ad
+.RS 14n
+.rt  
+A hangup has occurred on the stream. This event and  \fBPOLLOUT\fR are mutually
+exclusive; a stream can never be writable if a hangup has occurred. However,
+this event and  \fBPOLLIN\fR, \fBPOLLRDNORM\fR, \fBPOLLRDBAND\fR, or
+\fBPOLLPRI\fR are not mutually exclusive. This flag is only valid in the
+\fBrevents\fR bitmask; it is not used in the \fBevents\fR member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLNVAL\fR\fR
+.ad
+.RS 14n
+.rt  
+The specified \fBfd\fR value does not belong to an open file. This flag is only
+valid in the \fBrevents\fR member; it is not used in the \fBevents\fR member.
+.RE
+
+.sp
+.LP
+If the value \fBfd\fR is less than 0, \fBevents\fR is ignored and \fBrevents\fR
+is set to 0 in that entry on return from  \fBpoll()\fR.
+.sp
+.LP
+The results of the \fBpoll()\fR query are stored in the \fBrevents\fR member in
+the \fBpollfd\fR structure. Bits are set in the \fBrevents\fR bitmask to
+indicate which of the requested events are true. If none are true, none of the
+specified bits are set in \fBrevents\fR when the \fBpoll()\fR call returns. The
+event flags  \fBPOLLHUP\fR, \fBPOLLERR\fR, and  \fBPOLLNVAL\fR are always  set
+in \fBrevents\fR if the conditions they indicate are true; this occurs even
+though these flags were not present in \fBevents\fR.
+.sp
+.LP
+If none of the defined events have occurred on any selected file descriptor,
+\fBpoll()\fR waits at least \fItimeout\fR milliseconds for an event to occur on
+any of the selected file descriptors. On a computer where millisecond timing
+accuracy is not available, \fItimeout\fR is rounded up to the nearest legal
+value available on that system. If the value \fItimeout\fR is 0, \fBpoll()\fR
+returns immediately. If the value of \fItimeout\fR is  \(mi1, \fBpoll()\fR
+blocks until a requested event occurs or until the call is interrupted.  The
+\fBpoll()\fR function is not affected by the \fBO_NDELAY\fR and
+\fBO_NONBLOCK\fR flags.
+.sp
+.LP
+The \fBpoll()\fR function supports regular files, terminal and pseudo-terminal
+devices, streams-based files, FIFOs and pipes.  The behavior of \fBpoll()\fR on
+elements of \fIfds\fR that refer to other types of file is unspecified.
+.sp
+.LP
+The \fBpoll()\fR function supports sockets.
+.sp
+.LP
+A file descriptor for a socket that is listening for connections will indicate
+that it is ready for reading, once connections are available.  A file
+descriptor for a socket that is connecting asynchronously will indicate that it
+is ready for writing, once a connection has been established.
+.sp
+.LP
+Regular files always \fBpoll()\fR \fBTRUE\fR for reading and writing.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a non-negative value is returned. A positive value
+indicates the total number of file descriptors that has been selected (that is,
+file descriptors for which the \fBrevents\fR member is non-zero). A value of
+\fB0\fR indicates that the call timed out and no file descriptors have been
+selected. Upon failure, \fB\(mi1\fR is returned and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpoll()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+Allocation of internal data structures failed, but the request may be attempted
+again.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+Some argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was caught during the \fBpoll()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The argument \fInfds\fR is greater than \fB{OPEN_MAX}\fR, or one of the
+\fBfd\fR members refers to a stream or multiplexer that is linked (directly or
+indirectly) downstream from a multiplexer.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBgetmsg\fR(2), \fBgetrlimit\fR(2), \fBputmsg\fR(2),
+\fBread\fR(2), \fBwrite\fR(2), \fBselect\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5), \fBchpoll\fR(9E)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+Non-STREAMS drivers use  \fBchpoll\fR(9E) to implement  \fBpoll()\fR on these
+devices.

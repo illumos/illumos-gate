@@ -1,0 +1,370 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1995 IEEE.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_sigmask 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_sigmask \- change or examine calling thread's signal mask
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h> 
+#include <signal.h>
+
+\fBint\fR \fBpthread_sigmask\fR(\fBint\fR \fIhow\fR, \fBconst sigset_t *\fR\fIset\fR, \fBsigset_t *\fR\fIoset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_sigmask()\fR function changes or examines a calling thread's
+signal mask. Each thread has its own signal mask. A new thread inherits the
+calling thread's signal mask and priority; however, pending signals are not
+inherited. Signals pending for a new thread will be empty.
+.sp
+.LP
+If the value of the argument \fIset\fR is not \fINULL\fR, \fIset\fR points to a
+set of signals that can modify the currently blocked set. If the value of
+\fIset\fR is \fINULL\fR, the value of \fIhow\fR is insignificant and the
+thread's signal mask is unmodified; thus, \fBpthread_sigmask()\fR can be used
+to inquire about the currently blocked signals.
+.sp
+.LP
+The value of the argument \fIhow\fR specifies the method in which the set is
+changed and  takes one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIG_BLOCK\fR\fR
+.ad
+.RS 15n
+.rt  
+\fIset\fR corresponds to a set of signals to block. They are added to the
+current signal mask.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIG_UNBLOCK\fR\fR
+.ad
+.RS 15n
+.rt  
+\fIset\fR corresponds to a set of signals to unblock. These signals are deleted
+from the current signal mask.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIG_SETMASK\fR\fR
+.ad
+.RS 15n
+.rt  
+\fIset\fR corresponds to the new signal mask. The current signal mask is
+replaced by \fBset\fR.
+.RE
+
+.sp
+.LP
+If the value of \fIoset\fR is not \fINULL\fR, it points to the location where
+the previous signal mask is stored.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_sigmask()\fR function returns
+\fB0\fR. Otherwise, it returns a non-zero value.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_sigmask()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIhow\fR is not defined and \fIoset\fR is \fINULL\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreate a default thread that  can serve as a signal
+catcher/handler with its own signal mask.
+.sp
+.LP
+The following example shows how to create a default thread that  can serve as a
+signal catcher/handler with its own signal mask. \fBnew\fR will have a
+different value from the creator's signal mask.
+
+.sp
+.LP
+As POSIX threads and Solaris threads are fully compatible even within the same
+process, this example uses \fBpthread_create\fR(3C) if you execute \fBa.out
+0\fR, or \fBthr_create\fR(3C) if you execute \fBa.out 1\fR.
+
+.sp
+.LP
+In this example:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBsigemptyset\fR(3C) function initializes a null signal set, \fBnew\fR.
+The \fBsigaddset\fR(3C) function packs the signal, \fBSIGINT\fR, into that new
+set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Either \fBpthread_sigmask()\fR or \fBthr_sigsetmask()\fR is used to mask the
+signal, \fBSIGINT\fR (CTRL-C), from the calling thread, which is \fBmain()\fR.
+The signal is masked to guarantee that only the new thread will  receive this
+signal.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpthread_create()\fR or \fBthr_create()\fR creates the signal-handling
+thread.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Using \fBpthread_join\fR(3C) or \fBthr_join\fR(3C), \fBmain()\fR then waits for
+the termination of that signal-handling thread, whose \fBID\fR number is
+\fBuser_threadID\fR; \fBmain()\fR will then \fBsleep\fR(3C) for 2 seconds,
+after which the program terminates.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The signal-handling thread, \fBhandler\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Assigns the handler \fBinterrupt()\fR to handle the signal \fBSIGINT\fR, by the
+call to  \fBsigaction\fR(2).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Resets its own signal set to \fInot block\fR the signal, \fBSIGINT\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Sleeps for 8 seconds to allow time for the user to deliver the signal,
+\fBSIGINT\fR, by pressing the  \fBCTRL-C\fR.
+.RE
+.RE
+.sp
+.in +2
+.nf
+/* cc thisfile.c -lthread -lpthread */
+#define _REENTRANT    /* basic first 3-lines for threads */
+#include <pthread.h>
+#include <thread.h>
+thread_t user_threadID;
+sigset_t new;
+void *handler(\|), interrupt(\|);
+
+int
+main( int argc, char *argv[\|] )  {
+	test_argv(argv[1]);
+
+	sigemptyset(&new);
+	sigaddset(&new, SIGINT);
+	switch(*argv[1])  {
+
+		case '0':   /* POSIX */
+			pthread_sigmask(SIG_BLOCK, &new, NULL);
+			pthread_create(&user_threadID, NULL, handler,
+            argv[1]);
+			pthread_join(user_threadID, NULL);
+			break;
+
+		case '1':   /* Solaris */
+			thr_sigsetmask(SIG_BLOCK, &new, NULL);
+			thr_create(NULL, 0, handler, argv[1], 0,
+            &user_threadID);
+			thr_join(user_threadID, NULL, NULL);
+			break;
+		}  /* switch */
+
+	printf("thread handler, # %d, has exited\en",user_threadID);
+	sleep(2);
+	printf("main thread, # %d is done\en", thr_self(\|));
+ return (0)
+} /* end main */
+
+struct sigaction act;
+
+void *
+handler(char *argv1)
+{
+	act.sa_handler = interrupt;
+	sigaction(SIGINT, &act, NULL);
+	switch(*argv1)	{
+		case '0':     /* POSIX */
+			pthread_sigmask(SIG_UNBLOCK, &new, NULL);
+			break;
+		case '1':   /* Solaris */
+			thr_sigsetmask(SIG_UNBLOCK, &new, NULL);
+			break;
+	}
+	printf("\en Press CTRL-C to deliver SIGINT signal to the 
+     process\en");
+	sleep(8);  /* give user time to hit CTRL-C */
+ return (NULL)
+}
+
+void
+interrupt(int sig)
+{
+ printf("thread %d caught signal %d\en", thr_self(\|), sig);
+}
+
+void test_argv(char argv1[\|])    {
+	if(argv1 == NULL)  {
+		printf("use 0 as arg1 to use thr_create(\|);\en \e 
+		or use 1 as arg1 to use pthread_create(\|)\en");
+		exit(NULL);
+	}
+}
+.fi
+.in -2
+
+.sp
+.LP
+In the last example, the \fBhandler\fR thread served as a signal-handler while
+also taking care of activity of its own (in this case, sleeping, although it
+could have been some other activity). A thread could be completely dedicated to
+signal-handling simply by waiting for the delivery of a selected signal by
+blocking with \fBsigwait\fR(2). The two subroutines in the previous example,
+\fBhandler()\fR and \fBinterrupt()\fR, could have been replaced with the
+following routine:
+
+.sp
+.in +2
+.nf
+void *
+handler(void *unused)
+{
+    int signal;
+    printf("thread %d is waiting for you to press the CTRL-C keys\en",
+            thr_self(\|));
+    sigwait(&new, &signal);
+    printf("thread %d has received the signal %d \en", thr_self(\|),
+        signal);
+    return (NULL);
+}
+/* pthread_create(\|) and thr_create(\|) would use NULL instead
+   of argv[1] for the arg passed to handler(\|) */
+.fi
+.in -2
+
+.sp
+.LP
+In this routine, one thread is dedicated to catching and handling the  signal
+specified by the set \fBnew\fR, which allows  \fBmain()\fR and all of its other
+sub-threads, created \fIafter\fR \fBpthread_sigmask()\fR or
+\fBthr_sigsetmask()\fR masked that signal, to continue uninterrupted. Any use
+of  \fBsigwait\fR(2) should be such that all threads block the signals passed
+to \fBsigwait\fR(2) at all times. Only the thread that calls \fBsigwait()\fR
+will get the signals. The call to \fBsigwait\fR(2) takes two arguments.
+
+.sp
+.LP
+For this type of background dedicated signal-handling routine, a Solaris daemon
+thread can be used by passing the argument \fBTHR_DAEMON\fR to
+\fBthr_create\fR(3C).
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe and Async-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigaction\fR(2), \fBsigprocmask\fR(2), \fBsigwait\fR(2),
+\fBcond_wait\fR(3C), \fBpthread_cancel\fR(3C), \fBpthread_create\fR(3C),
+\fBpthread_join\fR(3C), \fBpthread_self\fR(3C), \fBsigaddset\fR(3C),
+\fBsigemptyset\fR(3C), \fBsigsetops\fR(3C), \fBsleep\fR(3C),
+\fBattributes\fR(5), \fBcancellation\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+It is not possible to block signals that cannot be caught or ignored (see
+\fBsigaction\fR(2)). It is also not possible to block or unblock
+\fBSIGCANCEL\fR, as \fBSIGCANCEL\fR is reserved for the implementation of POSIX
+thread cancellation (see \fBpthread_cancel\fR(3C) and \fBcancellation\fR(5)).
+This restriction is quietly enforced by the standard C library.
+.sp
+.LP
+Using \fBsigwait\fR(2) in a dedicated thread allows asynchronously generated
+signals to be managed synchronously; however, \fBsigwait\fR(2) should never be
+used to manage synchronously generated signals.
+.sp
+.LP
+Synchronously generated signals are exceptions that are generated by a thread
+and are directed at the thread causing the exception. Since \fBsigwait()\fR
+blocks waiting for signals, the blocking thread cannot receive a synchronously
+generated signal.
+.sp
+.LP
+The \fBsigprocmask\fR(2) function behaves the same as if
+\fBpthread_sigmask()\fR has been called. POSIX leaves the semantics of the call
+to \fBsigprocmask\fR(2) unspecified in a multi-threaded process, so programs
+that care about POSIX portability should not depend on this semantic.
+.sp
+.LP
+If a signal is delivered while a thread is waiting on a condition variable, the
+\fBcond_wait\fR(3C) function will be interrupted and the handler will be
+executed. The state of the lock protecting the condition variable is undefined
+while the thread is executing the signal handler.
+.sp
+.LP
+Although \fBpthread_sigmask()\fR is Async-Signal-Safe with respect to the
+Solaris environment, this safeness is not guaranteed to be portable to other
+POSIX domains.
+.sp
+.LP
+Signals that are generated synchronously should not be masked. If such a signal
+is blocked and delivered, the receiving process is killed.

@@ -1,0 +1,187 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH makecom 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+makecom, makecom_g0, makecom_g0_s, makecom_g1, makecom_g5 \- make a packet for
+SCSI commands
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+\fBvoid\fR \fBmakecom_g0\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+     \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmakecom_g0_s\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR,
+     \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIcnt\fR, \fBint\fR \fIfixbit\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmakecom_g1\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+     \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmakecom_g5\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+     \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+These interfaces are obsolete. \fBscsi_setup_cdb\fR(9F) should be used instead.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to an allocated \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to the target's \fBscsi_device\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 10n
+.rt  
+Flags for the \fBpkt_flags\fR member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 10n
+.rt  
+First byte of a group 0 or 1 or 5 \fBSCSI\fR \fBCDB\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointer to the location of the data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcnt\fR\fR
+.ad
+.RS 10n
+.rt  
+Data transfer length in units defined by the SCSI device type. For sequential
+devices \fIcnt\fR is the number of bytes. For block devices, \fIcnt\fR is the
+number of blocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfixbit\fR\fR
+.ad
+.RS 10n
+.rt  
+Fixed bit in sequential access device commands.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmakecom\fR functions initialize a packet with the specified command
+descriptor block, \fIdevp\fR and transport flags. The \fBpkt_address\fR,
+\fBpkt_flags\fR, and the command descriptor block pointed to by \fBpkt_cdbp\fR
+are initialized using the remaining arguments. Target drivers may use
+\fBmakecom_g0()\fR for Group 0 commands (except for sequential access devices),
+or \fBmakecom_g0_s()\fR for Group 0 commands for sequential access devices, or
+\fBmakecom_g1()\fR for Group 1 commands,  or \fBmakecom_g5()\fR for Group 5
+commands. \fIfixbit\fR is used by sequential access devices for accessing fixed
+block sizes and sets the tag portion of the \fBSCSI\fR \fBCDB\fR.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBmakecom\fR Functions
+.sp
+.in +2
+.nf
+if (blkno >= (1<<20)) {
+      makecom_g1(pkt, SD_SCSI_DEVP, pflag, SCMD_WRITE_G1,
+         (int) blkno, nblk);
+} else {
+      makecom_g0(pkt, SD_SCSI_DEVP, pflag, SCMD_WRITE,
+         (int) blkno, nblk);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBscsi_setup_cdb\fR(9F), \fBscsi_device\fR(9S),
+\fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIANSI Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The \fBmakecom_g0()\fR, \fBmakecom_g0_s()\fR, \fBmakecom_g1()\fR, and
+\fBmakecom_g5()\fR functions are obsolete and will be discontinued in a future
+release. These functions have been replaced by the \fBscsi_setup_cdb()\fR
+function. See \fBscsi_setup_cdb\fR(9F).

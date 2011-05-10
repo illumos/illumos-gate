@@ -1,0 +1,108 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_barrier_wait 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_barrier_wait \- synchronize at a barrier
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_barrier_wait\fR(\fBpthread_barrier_t *\fR\fIbarrier\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_barrier_wait()\fR function synchronizes participating threads at
+the barrier referenced by \fIbarrier\fR. The calling thread blocks until the
+required number of threads have called \fBpthread_barrier_wait()\fR specifying
+the barrier.
+.sp
+.LP
+When the required number of threads have called \fBpthread_barrier_wait()\fR
+specifying the barrier, the constant \fBPTHREAD_BARRIER_SERIAL_THREAD\fR is
+returned to one unspecified thread and 0 is returned to each of the remaining
+threads. At this point, the barrier is reset to the state it had as a result of
+the most recent \fBpthread_barrier_init\fR(3C) function that referenced it.
+.sp
+.LP
+The constant \fBPTHREAD_BARRIER_SERIAL_THREAD\fR is defined in
+<\fBpthread.h\fR> and its value is distinct from any other value returned by
+\fBpthread_barrier_wait()\fR.
+.sp
+.LP
+The results are undefined if this function is called with an uninitialized
+barrier.
+.sp
+.LP
+If a signal is delivered to a thread blocked on a barrier, upon return from the
+signal handler the thread resumes waiting at the barrier if the barrier wait
+has not completed (that is, if the required number of threads have not arrived
+at the barrier during the execution of the signal handler); otherwise, the
+thread continues as normal from the completed barrier wait. Until the thread in
+the signal handler returns from it, it is unspecified whether other threads may
+proceed past the barrier once they have all reached it.
+.sp
+.LP
+A thread that has blocked on a barrier does not prevent any unblocked thread
+that is eligible to use the same processing resources from eventually making
+forward progress in its execution.
+.sp
+.LP
+Eligibility for processing resources is determined by the scheduling policy.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_barrier_wait()\fR function returns
+\fBPTHREAD_BARRIER_SERIAL_THREAD\fR for a single (arbitrary) thread
+synchronized at the barrier and 0 for each of the other threads. Otherwise, an
+error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_barrier_wait()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIbarrier\fR does not refer to an initialized barrier
+object.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_barrier_destroy\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
