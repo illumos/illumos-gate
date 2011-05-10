@@ -702,7 +702,8 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 				err = EACCES;
 				goto done;
 			}
-			err = dls_devnet_setzid(dlh, dzp->diz_zid);
+			err = dls_devnet_setzid(dlh, dzp->diz_zid,
+			    dzp->diz_transient);
 		} else {
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			(*(zoneid_t *)kprop->pr_val) = dls_devnet_getzid(dlh);

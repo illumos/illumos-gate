@@ -205,6 +205,7 @@ typedef struct dld_ioc_rename {
 typedef struct dld_ioc_zid {
 	zoneid_t	diz_zid;
 	datalink_id_t	diz_linkid;
+	boolean_t	diz_transient;
 } dld_ioc_zid_t;
 
 /*

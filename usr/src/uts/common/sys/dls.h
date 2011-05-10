@@ -128,7 +128,7 @@ extern uint16_t		dls_devnet_vid(dls_dl_handle_t);
 extern datalink_id_t	dls_devnet_linkid(dls_dl_handle_t);
 extern int		dls_devnet_dev2linkid(dev_t, datalink_id_t *);
 extern int		dls_devnet_phydev(datalink_id_t, dev_t *);
-extern int		dls_devnet_setzid(dls_dl_handle_t, zoneid_t);
+extern int		dls_devnet_setzid(dls_dl_handle_t, zoneid_t, boolean_t);
 extern zoneid_t		dls_devnet_getzid(dls_dl_handle_t);
 extern zoneid_t		dls_devnet_getownerzid(dls_dl_handle_t);
 extern boolean_t	dls_devnet_islinkvisible(datalink_id_t, zoneid_t);

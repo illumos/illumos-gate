@@ -5191,11 +5191,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 			}
 			break;
 		case ZS_EXCLUSIVE:
-			if (unconfigure_exclusive_network_interfaces(zlogp,
-			    zoneid) != 0) {
-				zerror(zlogp, B_FALSE, "unable to unconfigure "
-				    "network interfaces in zone");
-			}
 			status = dladm_zone_halt(dld_handle, zoneid);
 			if (status != DLADM_STATUS_OK) {
 				zerror(zlogp, B_FALSE, "unable to notify "

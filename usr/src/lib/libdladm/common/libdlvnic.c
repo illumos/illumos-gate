@@ -546,13 +546,22 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 
 done:
 	if (status == DLADM_STATUS_OK && proplist != NULL) {
+    		uint32_t flg;
+
+		flg = (flags & DLADM_OPT_PERSIST) ?
+		    DLADM_OPT_PERSIST : DLADM_OPT_ACTIVE;
+
 		for (i = 0; i < proplist->al_count; i++) {
 			dladm_arg_info_t	*aip = &proplist->al_info[i];
 
+			if (strcmp(aip->ai_name, "zone") == 0 &&
+			    flags & DLADM_OPT_TRANSIENT)
+				flg |= DLADM_OPT_TRANSIENT;
+			else
+				flg &= ~DLADM_OPT_TRANSIENT;
+
 			status = dladm_set_linkprop(handle, vnic_id,
-			    aip->ai_name, aip->ai_val, aip->ai_count,
-			    ((flags & DLADM_OPT_PERSIST) ?
-			    DLADM_OPT_PERSIST : DLADM_OPT_ACTIVE));
+			    aip->ai_name, aip->ai_val, aip->ai_count, flg);
 			if (status != DLADM_STATUS_OK)
 				break;
 		}
