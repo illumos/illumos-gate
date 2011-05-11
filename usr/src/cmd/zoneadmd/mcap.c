@@ -103,6 +103,10 @@
 #include <sys/resource.h>
 #include <sys/debug.h>
 #include <synch.h>
+#include <wait.h>
+#include <libcontract.h>
+#include <libcontract_priv.h>
+#include <sys/contract/process.h>
 #include "zoneadmd.h"
 
 					/* round up to next y = 2^n */
@@ -121,6 +125,8 @@ static int	shutting_down = 0;
 static thread_t mcap_tid;
 static FILE	*debug_log_fp = NULL;
 static uint64_t	sum_pageout = 0;	/* total bytes paged out in a pass */
+static uint64_t zone_rss_cap;		/* RSS cap(KB) */
+static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 
 /*
  * Structure to hold current state about a process address space that we're
@@ -201,6 +207,60 @@ proc_issystem(pid_t pid)
 		return (strcmp(pc_clname, "SYS") == 0);
 
 	return (B_TRUE);
+}
+
+/*
+ * Fork a child that enters the zone and runs the "phys-mcap-cmd" command.
+ */
+static void
+run_over_cmd()
+{
+	int		ctfd;
+	int		err;
+	pid_t		childpid;
+	siginfo_t	info;
+	ctid_t		ct;
+
+	/*
+	 * Before we enter the zone, we need to create a new process contract
+	 * for the child, as required by zone_enter().
+	 */
+	if ((ctfd = open64("/system/contract/process/template", O_RDWR)) == -1)
+		return;
+	if (ct_tmpl_set_critical(ctfd, 0) != 0 ||
+	    ct_tmpl_set_informative(ctfd, 0) != 0 ||
+	    ct_pr_tmpl_set_fatal(ctfd, CT_PR_EV_HWERR) != 0 ||
+	    ct_pr_tmpl_set_param(ctfd, CT_PR_PGRPONLY) != 0 ||
+	    ct_tmpl_activate(ctfd) != 0) {
+		(void) close(ctfd);
+		return;
+	}
+
+	childpid = fork();
+	switch (childpid) {
+	case -1:
+		(void) ct_tmpl_clear(ctfd);
+		(void) close(ctfd);
+		break;
+	case 0:	/* Child */
+		(void) ct_tmpl_clear(ctfd);
+		(void) close(ctfd);
+		if (zone_enter(zid) == -1)
+			_exit(errno);
+		err = system(over_cmd);
+		_exit(err);
+		break;
+	default:	/* Parent */
+		if (contract_latest(&ct) == -1)
+			ct = -1;
+		(void) ct_tmpl_clear(ctfd);
+		(void) close(ctfd);
+		err = waitid(P_PID, childpid, &info, WEXITED);
+		(void) contract_abandon_id(ct);
+		if (err == -1 || info.si_status != 0)
+			debug("over_cmd failed");
+		break;
+	}
 }
 
 static struct ps_prochandle *
@@ -642,7 +702,6 @@ static int64_t
 check_suspend(int age)
 {
 	static hrtime_t last_cap_read = 0;
-	static uint64_t zone_rss_cap;	/* RSS cap(KB) */
 	static uint64_t addon;
 	static uint64_t lo_thresh;	/* Thresholds for how long to  sleep */
 	static uint64_t hi_thresh;	/* when under the cap (80% & 90%). */
@@ -817,6 +876,20 @@ mcap_zone()
 		 */
 		age = 1;
 
+		if (over_cmd[0] != '\0') {
+			uint64_t zone_rss;	/* total RSS(KB) */
+
+			debug("run phys_mcap_cmd: %s\n", over_cmd);
+			run_over_cmd();
+
+			zone_rss = get_mem_info(0);
+			excess = zone_rss - zone_rss_cap;
+			debug("rss %lluKB, cap %lluKB, excess %lldKB\n",
+			    zone_rss, zone_rss_cap, excess);
+			if (excess <= 0)
+				continue;
+		}
+
 		while (!shutting_down && (dirent = readdir(pdir)) != NULL) {
 			pid_t pid;
 
@@ -846,6 +919,34 @@ mcap_zone()
 	debug("thread shutdown\n");
 }
 
+static void
+get_over_cmd()
+{
+	zone_dochandle_t handle;
+	struct zone_attrtab attr;
+
+	over_cmd[0] = '\0';
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return;
+
+	if (zonecfg_get_handle(zonename, handle) != Z_OK)
+		goto done;
+
+	if (zonecfg_setattrent(handle) != Z_OK)
+		goto done;
+	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
+		if (strcmp("phys-mcap-cmd", attr.zone_attr_name) != 0)
+			continue;	/* no match */
+		(void) strlcpy(over_cmd, attr.zone_attr_value,
+		    sizeof (over_cmd));
+		break;
+	}
+	(void) zonecfg_endattrent(handle);
+
+done:
+	zonecfg_fini_handle(handle);
+}
+
 void
 create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 {
@@ -860,6 +961,7 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 	(void) snprintf(zoneproc, sizeof (zoneproc), "%s/root/proc", zonepath);
 	(void) snprintf(debug_log, sizeof (debug_log), "%s/mcap_debug.log",
 	    zonepath);
+	get_over_cmd();
 
 	res = thr_create(NULL, NULL, (void *(*)(void *))mcap_zone, NULL, NULL,
 	    &mcap_tid);
