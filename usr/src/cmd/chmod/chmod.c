@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T			*/
@@ -450,7 +451,7 @@ errmsg(int severity, int code, char *format, ...)
 	va_start(ap, format);
 
 	/*
-	 * Always print error message if this is a fatal error (code == 0);
+	 * Always print error message if this is a fatal error (code != 0);
 	 * otherwise, print message if fflag == 0 (no -f option specified)
 	 */
 	if (!fflag || (code != 0)) {
@@ -729,14 +730,14 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 	error = acl_get(file, 0, &aclp);
 
 	if (error != 0) {
-		errmsg(1, 1, "%s\n", acl_strerror(error));
+		errmsg(1, 0, "%s\n", acl_strerror(error));
 		return (1);
 	}
 	switch (acl_args->acl_action) {
 	case ACL_ADD:
 		if ((error = acl_addentries(aclp,
 		    acl_args->acl_aclp, acl_args->acl_slot)) != 0) {
-			errmsg(1, 1, "%s\n", acl_strerror(error));
+			errmsg(1, 0, "%s\n", acl_strerror(error));
 			acl_free(aclp);
 			return (1);
 		}
@@ -744,14 +745,14 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 		break;
 	case ACL_SLOT_DELETE:
 		if (acl_args->acl_slot + 1 > aclp->acl_cnt) {
-			errmsg(1, 1,
+			errmsg(1, 0,
 			    gettext("Invalid slot specified for removal\n"));
 			acl_free(aclp);
 			return (1);
 		}
 
 		if (acl_args->acl_slot == 0 && aclp->acl_cnt == 1) {
-			errmsg(1, 1,
+			errmsg(1, 0,
 			    gettext("Can't remove all ACL "
 			    "entries from a file\n"));
 			acl_free(aclp);
@@ -781,13 +782,13 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 	case ACL_DELETE:
 		if ((error = acl_removeentries(aclp, acl_args->acl_aclp,
 		    acl_args->acl_slot, ACL_REMOVE_ALL)) != 0) {
-			errmsg(1, 1, "%s\n", acl_strerror(error));
+			errmsg(1, 0, "%s\n", acl_strerror(error));
 			acl_free(aclp);
 			return (1);
 		}
 
 		if (aclp->acl_cnt == 0) {
-			errmsg(1, 1,
+			errmsg(1, 0,
 			    gettext("Can't remove all ACL "
 			    "entries from a file\n"));
 			acl_free(aclp);
@@ -801,7 +802,7 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 			error = acl_modifyentries(aclp, acl_args->acl_aclp,
 			    acl_args->acl_slot);
 			if (error) {
-				errmsg(1, 1, "%s\n", acl_strerror(error));
+				errmsg(1, 0, "%s\n", acl_strerror(error));
 				acl_free(aclp);
 				return (1);
 			}
@@ -813,24 +814,23 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 	case ACL_STRIP:
 		error = acl_strip(file, st->st_uid, st->st_gid, st->st_mode);
 		if (error) {
-			errmsg(1, 1, "%s\n", acl_strerror(error));
+			errmsg(1, 0, "%s\n", acl_strerror(error));
+			acl_free(aclp);
 			return (1);
 		}
 		acl_free(aclp);
 		return (0);
 		/*NOTREACHED*/
 	default:
-		errmsg(1, 0, gettext("Unknown ACL action requested\n"));
-		return (1);
-		break;
+		errmsg(1, 2, gettext("Unknown ACL action requested\n"));
+		/*NOTREACHED*/
 	}
 	error = acl_check(set_aclp, isdir);
 
 	if (error) {
-		errmsg(1, 0, "%s\n%s", acl_strerror(error),
+		errmsg(1, 2, "%s\n%s", acl_strerror(error),
 		    gettext("See chmod(1) for more information on "
 		    "valid ACL syntax\n"));
-		return (1);
 	}
 	if ((error = acl_set(file, set_aclp)) != 0) {
 			errmsg(1, 0, gettext("Failed to set ACL: %s\n"),
