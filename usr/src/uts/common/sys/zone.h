@@ -422,6 +422,7 @@ typedef struct {
 	kstat_named_t	zm_swap_cap;
 	kstat_named_t	zm_nover;
 	kstat_named_t	zm_pagedout;
+	kstat_named_t	zm_pgpgin;
 } zone_mcap_kstat_t;
 
 typedef struct zone {
@@ -624,6 +625,7 @@ typedef struct zone {
 	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
 	kstat_t		*zone_mcap_ksp;
 	zone_mcap_kstat_t *zone_mcap_stats;
+	uint64_t	zone_pgpgin;		/* pages paged in */
 } zone_t;
 
 /*

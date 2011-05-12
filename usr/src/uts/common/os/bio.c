@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1320,6 +1321,9 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 		cpup = CPU;	/* get pointer AFTER preemption is disabled */
 		CPU_STATS_ADDQ(cpup, vm, pgin, 1);
 		CPU_STATS_ADDQ(cpup, vm, pgpgin, btopr(len));
+
+		atomic_add_64(&curzone->zone_pgpgin, btopr(len));
+
 		if ((flags & B_ASYNC) == 0) {
 			klwp_t *lwp = ttolwp(curthread);
 			if (lwp != NULL)
